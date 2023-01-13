@@ -128,7 +128,7 @@ type UnparsedPlatformAllocation struct {
 	ValidatorDuration uint64 `json:"validatorDuration,omitempty"`
 	DepositDuration   uint64 `json:"depositDuration,omitempty"`
 	TimestampOffset   uint64 `json:"timestampOffset,omitempty"`
-	DepositOfferID    string `json:"depositOfferID"`
+	DepositOfferID    string `json:"depositOfferID,omitempty"`
 	Memo              string `json:"memo,omitempty"`
 }
 

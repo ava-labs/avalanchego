@@ -114,17 +114,23 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qd92krjvxgkxnuku4mwj2gevzpslzcayeuv0d9",
-        "xAmount": 10000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
         },
-        "platformAllocations": []
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 1209600,
+            "memo": "1+"
+          }
+        ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v7kdfuh0u2sg26cu7nf6drptz7lzayfm7vqrnk",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -138,13 +144,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "2"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "2+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ce27vm0mwdkf03ct6vh8gtldur0rm4rdv0uazk",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -158,13 +169,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "3"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "3+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kuaaqcggcl8ke6dhm8zmuhl2xc544q8v8khm5v",
-        "xAmount": 100000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -176,18 +192,29 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "4"
+          },
+          {
+            "amount": 100000000000000,
+            "timestampOffset": 1209600,
+            "memo": "4+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vscyf7czawylztn6ghhg0z27swwewxgzzxkyke",
-        "xAmount": 779955800000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
         },
-        "platformAllocations": []
+        "platformAllocations": [
+          {
+            "amount": 779955800000000000,
+            "timestampOffset": 1209600,
+            "memo": "5+"
+          }
+        ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
@@ -209,7 +236,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1jguqx4hzpyd9l60ketlnhs3x5p7564rd4rqvd9",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -221,13 +248,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "7"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "7+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1xsydxj3lr093hy6cpwuxqq5s9htlsmag0cwvgf",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -239,13 +271,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "8"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "8+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zt8xtay9acsvedths3cur6aj6q4jcdrnhxd679",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -257,13 +294,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "9"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "9+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lanx4jtlah0nxcm9grc9d7lnpfw9lhwp68p4w4",
-        "xAmount": 100000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -275,13 +317,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "10"
+          },
+          {
+            "amount": 100000000000000,
+            "timestampOffset": 1209600,
+            "memo": "10+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vxmf8899y6x7dsam0xnr0hp6syzwz33383z3s7",
-        "xAmount": 100000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -293,13 +340,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "11"
+          },
+          {
+            "amount": 100000000000000,
+            "timestampOffset": 1209600,
+            "memo": "11+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19rezarpltcxy399xtqsxlrhpyp0usx25mscakq",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -311,18 +363,29 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "12"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "12+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zawetvfggky6yvx5wdcn0tjsalw9ql9dz537x7",
-        "xAmount": 10000000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
         },
-        "platformAllocations": []
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "timestampOffset": 1209600,
+            "memo": "13+"
+          }
+        ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
@@ -345,7 +408,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rf43hs576l0jj72haq0h4yq06lmv2pk844uygs",
-        "xAmount": 100000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -357,13 +420,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "15"
+          },
+          {
+            "amount": 100000000000000,
+            "timestampOffset": 1209600,
+            "memo": "15+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v7kdfuh0u2sg26cu7nf6drptz7lzayfm7vqrnk",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -375,13 +443,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "16"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "16+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kle7nccwsdqcu44zmgphn49mrwseju8azev6ws",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -393,13 +466,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "17"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "17+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18kuuh3zhckna8u3xxqqjeh4e45930xuf8d4emd",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -411,13 +489,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "18"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "18+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1pnr2a58pkmlkznxfqxaqn4xs3cjflcljt9uuua",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -429,13 +512,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "19"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "19+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ftrh6sly2fh4k8rz4wwp60jj4dfdtg2xxkj3e0",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -447,6 +535,11 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "20"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "20+"
           }
         ]
       },
@@ -471,7 +564,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1a9nvy2lw42n6u8u23gqz945wmw9ma90twzdke0",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -483,13 +576,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "22"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "22+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zurrkypnersx9v5fdnlk6m8xz46ackgw0a42ee",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -501,13 +599,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "23"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "23+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yurtgh9tdjfjlkdxhr7w8f4035g4eqazqkgra0",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -519,13 +622,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "24"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "24+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1uuudvyuqef9wacp8shquts36tj0z2hsk84yxhz",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -537,13 +645,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "25"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "25+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lff8ns8ra2drccej8s6gx5sqadjupj9c7txpks",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -555,6 +668,11 @@
             "timestampOffset": 1209600,
             "depositOfferID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
             "memo": "26"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "26+"
           }
         ]
       },
@@ -578,7 +696,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fzf5w8fffkxhgcafu30kd2led3qxpejqtahsxl",
-        "xAmount": 100000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -590,13 +708,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "28"
+          },
+          {
+            "amount": 100000000000000,
+            "timestampOffset": 1209600,
+            "memo": "28+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kn7rn8huslse9lku6n2jp3tydpnepfe3tv56z4",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -608,13 +731,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "29"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "29+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v7w05yes4zk3vcrygjqkhr4j5v99pj2zz4lnus",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -626,13 +754,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "30"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "30+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t4mgmrh4psygy5ty060uryse0t7pa292xlun3s",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -644,13 +777,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "31"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "31+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus10lpkh3lwskn6m0kzwp2q3adak3vp724ew25ta4",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -662,13 +800,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "32"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "32+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus17xcgajyrrm2udr6v234rut9af29tpwpnsra7er",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -680,13 +823,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "33"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "33+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12p6fceecmrmfr4n608yde3u55dc9jtm5dl37zs",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -698,13 +846,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "34"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "34+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dfmxynlz2dv50k57wwarqhe5nau7dx57ppxgt3",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -716,13 +869,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "35"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "35+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1g2gtwzpqjmf32q7s0wyvyseukceuztjhcf3wqu",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -734,13 +892,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "36"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "36+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19fpg5r87ur86u64vugacducwmulf3m7esxygmz",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -752,13 +915,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "37"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "37+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1m74wq7lh30gv5qy3jczlg742hreryny05djc2k",
-        "xAmount": 400000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -770,13 +938,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "38"
+          },
+          {
+            "amount": 400000000000,
+            "timestampOffset": 1209600,
+            "memo": "38+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vw4l6l9uvvang4xyrlewam07x66p06ned5yzrg",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -788,13 +961,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "39"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "39+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16zfwqtqrp9rah023gfh205f3j292cwl2j2kn9c",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -806,13 +984,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "40"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "40+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1gtvh3ayanw76frhhluj7jtp9mwk3nk6mt7n3uu",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -824,13 +1007,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "41"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "41+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13hc2cmy48yzuu84nfxhg04x63v9g9ry89r8a7y",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -842,13 +1030,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "42"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "42+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vq2w2xemvxznka75429dfzxesq05wm7znyudlf",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -860,13 +1053,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "43"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "43+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rnjszgltcd004tlxjuvg463g7v48tf5ln0hsxm",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -878,13 +1076,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "44"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "44+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19vugf30dc9dwz2p8k45fefz92wsf086gt7xasy",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -896,13 +1099,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "45"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "45+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16weeyg74n7dpkzhrhgrdgul7zzhsq5kwwqulrn",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -914,13 +1122,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "46"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "46+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1svc43t9yvwkfzvnwlrgppd3vjsy5t7wv73auel",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -932,13 +1145,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "47"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "47+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lkw22g4u03m22fch36ac0z5gzr0kmqlmuazmse",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -950,13 +1168,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "48"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "48+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1j9hrlqshwea2n9e3c936zlvejk97pyvtg0p078",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -968,13 +1191,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "49"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "49+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1k9d6k4keaje95mwfw6qtz5whkhar3spekmmtvv",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -988,13 +1216,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "50"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "50+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dejsdmyraan5cx0lurjh7cs5hkkkrjukeat6j7",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1006,13 +1239,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "51"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "51+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1tx32w7tukcvvw7f0ucuneuhl9g40xcp6h7fema",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1024,13 +1262,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "52"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "52+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1p0qlsu09y9qnxe4szzjhj8g693m8fwr04rjr6x",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1042,13 +1285,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "53"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "53+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus124n89hkqa7nacrw28j4q6wn856faf564z4pc74",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1060,13 +1308,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "54"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "54+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus14jsqtvkx2u4andtrddaaj06ay8qg5d3hxg43jp",
-        "xAmount": 6000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1078,13 +1331,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "55"
+          },
+          {
+            "amount": 6000000000000,
+            "timestampOffset": 1209600,
+            "memo": "55+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus104g2cskldran63tmwdg4598e5qhzy4aqnt2n7c",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1096,13 +1354,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "56"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "56+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus14xm35uq00s9pgtluhnaw4an6uax9675q0n95gz",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1114,13 +1377,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "57"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "57+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18n0pzqv8w97977yr6t37j3ygh56j2d8swu0r9l",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1132,13 +1400,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "58"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "58+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vcqtprwzv0njkaly0kd4823cqsf2kxgwum25an",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1150,13 +1423,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "59"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "59+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12aghnv0jhwsd5yd436l6czeexzyqsv8cqsr867",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1168,13 +1446,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "60"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "60+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lwfr2907ruy6wayyxm8w324c9sqj6kagkhxdgc",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1186,13 +1469,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "61"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "61+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t8h492s3qnrm6xrrg29xr9f39ggnna0eaw8yvt",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1204,13 +1492,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "62"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "62+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1q47qs230y69zlkv7zmawtml5ehdvaf8ets3p2k",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1222,13 +1515,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "63"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "63+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c3hh59qrrkjgv4ymgdkmhxlypwkdkk902hlej2",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1240,13 +1538,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "64"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "64+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13cfgts975eya0nkdwwl4dx3gttv3kffdxdm552",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1258,13 +1561,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "65"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "65+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1z3r42nuh0jtl6rsnt4gj43j0dtflj4pkjlghj7",
-        "xAmount": 600000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1276,13 +1584,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "66"
+          },
+          {
+            "amount": 600000000000,
+            "timestampOffset": 1209600,
+            "memo": "66+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18ahxzmj3280c5evh3mjjk3g5kqp7ewtk7d87ua",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1294,13 +1607,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "67"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "67+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12sewqfh7q3y0ze0t3yp7l5nq5tjmwytm7wun4e",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1312,13 +1630,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "68"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "68+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t9tfrxekua9u3etlxvt7pw8cgd9p748lxqr3pe",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1330,13 +1653,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "69"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "69+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1344av3drwd03pmnk99jlgsv3gz0xsuyvtp5mpv",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1348,13 +1676,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "70"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "70+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13wcyfd6act50j2vpfp9cnzwzq6cgy8aze6jpr8",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1366,13 +1699,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "71"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "71+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18r8zjp9ggt97xya7phvvh7x87k82kz6y734a6a",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1384,13 +1722,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "72"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "72+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1aqnxp2slnsh98pxc5ru2gndjarpn0v2x9r27ee",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1402,13 +1745,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "73"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "73+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16kkecr7xhhry9dzhcjr3merda0994nxkefhxgd",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1420,13 +1768,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "74"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "74+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1g6lezrps3g9v83fyrd675hde53ramrk6p55unh",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1438,13 +1791,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "75"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "75+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vz0qks08wfeu95jt4gr89svpsschxpl44x7vu7",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1456,13 +1814,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "76"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "76+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1p7ud3q07rz72yp3kmtphxetqcgrsx5vqptulxp",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1474,13 +1837,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "77"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "77+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kasunnxyupgzrlynfe3ljj6kw7jg8tshhdt74p",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1492,13 +1860,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "78"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "78+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1asn9xfcq3lz3kfvy0k2a7cxe0n6lx0hmvehpwf",
-        "xAmount": 250000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1510,13 +1883,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "79"
+          },
+          {
+            "amount": 250000000000,
+            "timestampOffset": 1209600,
+            "memo": "79+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus17h4xy6ft6eezfecql5v0cm5s0fpqn73jaml402",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1528,13 +1906,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "80"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "80+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1l828527ytgs0wlk9ncvw7zgp4jtadzc25xl2tz",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1546,13 +1929,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "81"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "81+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v0cdjxydfgjd0v7vakphnwsxrxauwurmmddq9e",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -1564,13 +1952,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "82"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "82+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1jffy966mrq89xgv6k7lle0hdv97ymzfmug9dnn",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1582,13 +1975,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "83"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "83+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1838dmm2ec6pj8hhvkv077srpenspgydejadv8w",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1600,13 +1998,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "84"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "84+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1plhzrxlua2w8dhmw85d8nr907sq3328ln9k98e",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1618,13 +2021,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "85"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "85+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus147xtkfw9cpfkyuajzyqh2wzgrmhgf7596tgteh",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -1636,13 +2044,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "86"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "86+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13sj2s45m5twuxt3ddsct57q87apjm43ymr90mc",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1654,13 +2067,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "87"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "87+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1neujngjxfe0fjrejvx9r0cq252074a3gkkdxfp",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -1672,13 +2090,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "88"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "88+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1npxkkgtaq8p00uwc8nwrfm25rzf2pdyf2ywpe9",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -1690,13 +2113,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "89"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "89+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1gs4dlsv4d7j053vy7fs44p63kmmwjrzvv38ffk",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1708,13 +2136,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "90"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "90+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zd8q570y8q8z42huyxmejnnhmmw75uys7afzrv",
-        "xAmount": 10000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1726,13 +2159,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "91"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 1209600,
+            "memo": "91+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13cvll3vsm02quegweeupnan5kvkqtkzpj0r5xe",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1744,13 +2182,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "92"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "92+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kqd0hqxvrjkc0ez30lfst860w2uu6562knn9tx",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1762,13 +2205,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "93"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "93+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1780,13 +2228,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "94"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "94+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ujp0vh9az0gaeuqd44vmmx9f7ztmyhmt9hj9vt",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1798,13 +2251,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "95"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "95+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fnpdrhkmtz6pfngm73k2nfgfwsgdhhdp0zqfnh",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1816,13 +2274,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "96"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "96+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1udj7xy6g2ppr9d4m55e9v2r98lk8ntcl3f98m2",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -1834,13 +2297,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "97"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "97+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1m22a6qy7vtgxg73pt6uzew5zfjq0fn8ndqgsca",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1852,13 +2320,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "98"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "98+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus15zt49dmwzq3qdfqkwx3rrkzcl42yezf0aqhw9w",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1870,13 +2343,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "99"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "99+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1jj003n7f454ku29y5l3a05p6quzu0khz3axu3q",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1888,13 +2366,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "100"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "100+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1mvceaqtg5jefpwdhkqxj75ll79t95k4yjgncrp",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1906,13 +2389,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "101"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "101+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19q3cq6pz468vpx7g337laevc2vjkt9482uugwx",
-        "xAmount": 250000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1924,13 +2412,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "102"
+          },
+          {
+            "amount": 250000000000,
+            "timestampOffset": 1209600,
+            "memo": "102+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vzcaj0e3n76fng2xc0lug2sl26re2sav4e0aj5",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1942,13 +2435,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "103"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "103+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus127fy88q8lfue2teuflgg8yzwdanj096rvk8ewx",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1960,13 +2458,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "104"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "104+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19x22enr8t00kr8yuc76atdf8yfwsmkjvxftqtj",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1978,13 +2481,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "105"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "105+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vgphq2z2u4rgv6jux8yez4uwygx6qgqvehe4uz",
-        "xAmount": 10000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -1996,13 +2504,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "106"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 1209600,
+            "memo": "106+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12wa0pwzygj0e60lpjkle9nkejwne6ue6h40v57",
-        "xAmount": 300000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2014,13 +2527,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "107"
+          },
+          {
+            "amount": 300000000000,
+            "timestampOffset": 1209600,
+            "memo": "107+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1r265cwy7rgpclut52qrzsl56tt3ywn8tf7v4cc",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2032,13 +2550,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "108"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "108+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dw50nruyyhdqfsjnvpw8kt4eyjr5mw8qcad4wm",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2050,13 +2573,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "109"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "109+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1m0wxqxk304jeqqdzk6elgh4zrx5uvgl2vgamev",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2068,13 +2596,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "110"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "110+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus105e0gjwzsvvffa9l60j5h8f4tcxss9dm8rktdt",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -2086,13 +2619,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "111"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "111+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1pe75rm3mkxs6q99d0wxh9mzrwtv5jzvz3udtwh",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -2104,13 +2642,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "112"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "112+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1jn7h9l0phzh9lvj0744tvc6ta20vxsxffdpzkm",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2122,13 +2665,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "113"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "113+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19drcmmm4smw3hd4a6k4fyzapaznf9t05uzlu5p",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2140,13 +2688,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "114"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "114+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus17jk0qh8727rk9sfd5fdtn3mg83zva23hx592f6",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2158,13 +2711,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "115"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "115+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dce8ay267x3rdk5lumnn273r0dalm60cx3hzy3",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2176,13 +2734,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "116"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "116+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ah4qrkkprd7z062vaewvdvxhxes4n0curnm4jk",
-        "xAmount": 4000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2194,13 +2757,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "117"
+          },
+          {
+            "amount": 4000000000000,
+            "timestampOffset": 1209600,
+            "memo": "117+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1m7vkm5q9jr0papjc3meux346chqq2wuf3vqvmd",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2212,13 +2780,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "118"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "118+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1epg2a7nk4c7yqh48286n3r8hnc5lhtddjt7t2v",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2230,13 +2803,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "119"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "119+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus126lt3yr99frvdeajduw2q7m9dgqnkrkfp03ppx",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2248,13 +2826,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "120"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "120+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18nleueq7dvfr782dlq3cpz9402y0944cpkkf9p",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2266,13 +2849,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "121"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "121+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13jm659wgtlyhynufv2jmmjsux5hgq7sjdukzne",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2284,13 +2872,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "122"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "122+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1tvpqc5dpeduzwsuez597xf7h9qtlalxn3m77rn",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -2302,13 +2895,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "123"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "123+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1krytgmsvgezzn6vj8zx2jhy3hjmed7cxyhvh6f",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2320,13 +2918,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "124"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "124+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qnatsmlx0xandjnjyc5c7fzksjjfzl6amxxgsd",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2338,13 +2941,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "125"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "125+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cqmedqupdjezjt4yw2rhpyh33u3hh2m64e5gpt",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2356,6 +2964,11 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "126"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "126+"
           }
         ]
       },
@@ -2379,7 +2992,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wd6lw2ssu4edpl9c5gymsk5e7clxw03hsuzceg",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2391,13 +3004,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "128"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "128+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lgjlklvqgj9rn0zjfh06zgzfa45cfcj6lhuzah",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2409,13 +3027,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "129"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "129+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rwaj6n2hp8gvxr0dqn5mgesccgek6f85hzj38q",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2427,13 +3050,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "130"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "130+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t9wruy74ma9k7nswq2vvmw05yqzfdaenglfxue",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2445,13 +3073,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "131"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "131+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13enppcukm9jxvs4jms25er7u5jntpnm8vrdzek",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2463,13 +3096,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "132"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "132+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t0shdplvgkq9kg508v4mquj6xgdzuyq8m3vpyw",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2481,13 +3119,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "133"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "133+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kyrnfq2gwgx2eqkrwej4cumkjydqlj600qlczz",
-        "xAmount": 300000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2499,13 +3142,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "134"
+          },
+          {
+            "amount": 300000000000,
+            "timestampOffset": 1209600,
+            "memo": "134+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1u6q5jgrawt0m6g4kcwewut7zfzfu7dddz9vv9g",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2517,13 +3165,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "135"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "135+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus14c7mns35dfpyvpqc3wllkhusmjp7kgts3slyz4",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2535,13 +3188,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "136"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "136+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus14w8skztykj8p3kqjy4xr3mdx7nf3w00q39htgn",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -2553,13 +3211,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "137"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "137+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t7ptfcxfxgv7xal499pm0m2r8rf8kaukkwy3uy",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2571,13 +3234,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "138"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "138+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c3zwa9ezxa77wd8qkvtyk6akfkr7usn82z6qlg",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2589,13 +3257,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "139"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "139+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qtvt2rmn34ufdxvm2nwsm6ksadqvs6qvc635w7",
-        "xAmount": 2500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2607,13 +3280,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "140"
+          },
+          {
+            "amount": 2500000000000,
+            "timestampOffset": 1209600,
+            "memo": "140+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1h9xtus3a0a6fqfngqfsganha436tm320u933km",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2625,13 +3303,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "141"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "141+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus187l7hzn5rldne5lcq0un2ushzhtqekvltz4jnx",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2643,13 +3326,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "142"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "142+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qg4c3qpvq08gsu90sw9x84fcw86tdgcx6vapgh",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2661,13 +3349,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "143"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "143+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18nmn4htudf268aknz7k2ee92zrhau5tc68cman",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -2679,13 +3372,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "144"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "144+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v3c33ujhgkzr369024w4f6x7ssaxf0y6dkgqy0",
-        "xAmount": 30000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2697,13 +3395,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "145"
+          },
+          {
+            "amount": 30000000000000,
+            "timestampOffset": 1209600,
+            "memo": "145+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1lf3rmuueyqhdjkqphwkky4e5wcaevflguhu6hc",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2715,13 +3418,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "146"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "146+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19se7jz52czhxsvdgz87aedywcdgxycf2699csh",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2733,13 +3441,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "147"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "147+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus165tgygtc8h73pkvakdvl5nuzgtqzvwgr7fjpku",
-        "xAmount": 300000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2751,13 +3464,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "148"
+          },
+          {
+            "amount": 300000000000,
+            "timestampOffset": 1209600,
+            "memo": "148+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qcgtkfcda46lnluehc6r98xjgcxmxy82f9sn0l",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2769,13 +3487,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "149"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "149+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus182v0jkv9esteufgpu6d29dqr0n6dzrpestrfh7",
-        "xAmount": 250000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2787,13 +3510,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "150"
+          },
+          {
+            "amount": 250000000000,
+            "timestampOffset": 1209600,
+            "memo": "150+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1syef5x68ra2k9edldegm9wvqhg567ygwhqtaug",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2805,13 +3533,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "151"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "151+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wmqq9v670z4hrr3x65xhfhttlk9lqu8myp4uyk",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2823,13 +3556,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "152"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "152+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1puxw75l9njng4gr8f27ajl7qpl45ndyzgkrn2l",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2841,13 +3579,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "153"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "153+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus15cwtyp6670eeeypkpsvamnzy4m7jpxehazy9y0",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2859,13 +3602,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "154"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "154+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1quvvdczjdlt0vcd2v6y7eem6g0khj60y9wc88x",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2877,13 +3625,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "155"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "155+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1sfgnnad8g2f9lnw6c8eqe52nyhz4cd8drys5nr",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2895,13 +3648,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "156"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "156+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1d8wfvesnck4ptcfp70tajhu54zrgftwzmxsmgq",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2913,13 +3671,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "157"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "157+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wqmv02nm4cu0alxyegxcc4mp4732q6ac9k9jjp",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2931,13 +3694,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "158"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "158+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cvng85rpwwumxd90uwjr3ky64876h2egs5x3w2",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2949,13 +3717,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "159"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "159+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12x34xyn47cx3cqprf7pqz6cpzv60ynelpqsg74",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2967,13 +3740,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "160"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "160+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fx8rm8dww6uzstdk65du5d73x0nzntg9cqexm4",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -2985,13 +3763,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "161"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "161+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12362l5ftcuva4q6p5jcyf7h6gjgy2qtmsqwuys",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3003,13 +3786,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "162"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "162+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ldwjgkwgd7hhyutdfdskr5nmw87k77t6z75n49",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3021,13 +3809,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "163"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "163+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yc54996lkxajkys2zpaquju8hn3pwr58za4u5m",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3039,13 +3832,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "164"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "164+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus109x70su7sqqn9t2s4danjjueu5mc9jhyawxnly",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -3057,13 +3855,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "165"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "165+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16tdrzql3nyxd0npqhw9f5d6zxkpvq208y42s0l",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3075,13 +3878,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "166"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "166+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3093,13 +3901,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "167"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "167+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dew8n748nygu6mfflq4f22rs25uu2dss2hfud2",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3111,13 +3924,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "168"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "168+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13e2yxg2gkpkxmtedkqpnynvup30k3t2sh6g7tp",
-        "xAmount": 4000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3129,13 +3947,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "169"
+          },
+          {
+            "amount": 4000000000000,
+            "timestampOffset": 1209600,
+            "memo": "169+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1mjenvt5su69dh0zyshvqyv3kcw4ul805geezw8",
-        "xAmount": 2500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3147,13 +3970,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "170"
+          },
+          {
+            "amount": 2500000000000,
+            "timestampOffset": 1209600,
+            "memo": "170+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1sgyj0xkjt5erpammkfcftg8aqv2fp8e65mu0pr",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3165,13 +3993,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "171"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "171+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fvppvzuf6vnduwvcgvn9per95dryn4ww2lggy5",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3183,13 +4016,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "172"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "172+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rjtkck732eu288f7gc98u4ckc5zwr5xw63atxy",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3201,13 +4039,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "173"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "173+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zqp6d8zjd63gyq42px7gsf2ac6h9kwym6ksjs8",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3219,13 +4062,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "174"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "174+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cvrvujyg3sd92tek7y02vgs6zlz35rh29djmqn",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -3237,13 +4085,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "175"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "175+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19a3qnpagws33cmcpfptfc4evekvructnd7rm3f",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -3255,13 +4108,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "176"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "176+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ztxgksna3mhnwpvc4slze3q59x9grsf6gtelrv",
-        "xAmount": 750000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3273,13 +4131,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "177"
+          },
+          {
+            "amount": 750000000000,
+            "timestampOffset": 1209600,
+            "memo": "177+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18d6x3whh25l8m4x53g0kygv4ppewmkq59wsz9k",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3291,13 +4154,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "178"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "178+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1r5fr6qz5s2qjd0lqkrju8trrkg4v86mre0jqrp",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3309,13 +4177,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "179"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "179+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c65a257ndfgtayq5m3n3z9xhcpkhevszgxlxa3",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3327,13 +4200,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "180"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "180+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13pk0dtypwfnssdx880hvr9ezjzlvkp5lcr3ltw",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3345,13 +4223,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "181"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "181+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qwck6hzr4l02g8rnc3nmw76exxz5fej9mj9rjy",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3363,13 +4246,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "182"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "182+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ujqfjw0ntt0eclgezscry4rfqtka5affxggsgw",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -3381,13 +4269,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "183"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "183+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1xysg8r87kzrm8vwx04gzzvttx902ttmppauqrq",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3399,13 +4292,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "184"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "184+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fpxdj92sma76eh6pc4myeumnr2v3a8tes8k88d",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -3417,13 +4315,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "185"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "185+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1djvdu0lagmtrpq35fnug649fmv3ry6z5lu5n4t",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3435,13 +4338,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "186"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "186+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1r8ackvr368s76ec6zlkxvjmxw4njn6fklhft37",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3453,13 +4361,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "187"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "187+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1jmw9k6v3pfk2wr5yj80svy9ulf8qr0yg2gcqsw",
-        "xAmount": 250000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3471,13 +4384,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "188"
+          },
+          {
+            "amount": 250000000000,
+            "timestampOffset": 1209600,
+            "memo": "188+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cpawfw2u3cxzan8n7uqs5hcy2hk847m8sdpuca",
-        "xAmount": 1200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": false
@@ -3489,13 +4407,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "189"
+          },
+          {
+            "amount": 1200000000000,
+            "timestampOffset": 1209600,
+            "memo": "189+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ah2ss87zx8tg4e3l62c9a03gj4c4rml9heykvz",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3507,13 +4430,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "190"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "190+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1pxweaqwecr4gsh9kr3ed8ljegsxgh2ezucf3za",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3525,13 +4453,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "191"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "191+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rnfwllg4wjtygafheat8da4lv4wqa7yyf8qata",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3543,13 +4476,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "192"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "192+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zj4gs3ldxz6sm5d6zjdv36p0ag8rjey6q5pt2t",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3561,13 +4499,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "193"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "193+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1nl0pgg4fry3rwxcvw7h0n2ypt65ns0587dqu6g",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3579,13 +4522,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "194"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "194+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kgfs032y5fxnvyp0nyhzgt78dzmk2y39r8zrac",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3597,13 +4545,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "195"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "195+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12wz3mm7qgz0elxf3htwg8sgvnzevr7026k6ryw",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3615,13 +4568,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "196"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "196+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3633,13 +4591,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "197"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "197+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1j300cnhffvpuezmnh4hm54cfu6g4fgjw55vt9u",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3651,13 +4614,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "198"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "198+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cfqr4ch84z728k2kzqwy82llsmzpa4frg0g8lp",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3669,13 +4637,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "199"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "199+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zpmmsy75djpguyp7m55vp4x37k4hesx595thn5",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3687,13 +4660,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "200"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "200+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dp7cltp0j3aaj6efku3ewd29mwe8el44jvztps",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3705,13 +4683,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "201"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "201+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus10q3dc78tw70m89s8lgl9fgwe9tfu4a0sry5xgd",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3723,13 +4706,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "202"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "202+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dt2gmpynvaah9juxwpyw2l83lm78c2c9rvnsyw",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3741,13 +4729,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "203"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "203+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1344av3drwd03pmnk99jlgsv3gz0xsuyvtp5mpv",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3759,13 +4752,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "204"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "204+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
-        "xAmount": 500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3777,13 +4775,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "205"
+          },
+          {
+            "amount": 500000000000,
+            "timestampOffset": 1209600,
+            "memo": "205+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kjj39faew5lvkfrslp70fuvdk4vvzktngjwhr8",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3795,13 +4798,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "206"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "206+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yk2ydhcav6sq4gm4tw9necmtmgnx3q2ngwx6n9",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3813,13 +4821,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "207"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "207+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18dw78q4lkdks05zk939mc4rygs6w5uetwz8gfa",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3831,13 +4844,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "208"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "208+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ruhwpty2jnyz2stv007y56w6llc9w58n3as7wf",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3849,13 +4867,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "209"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "209+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vuq4da8j4t8vf4nn7gq0kg0a2lgczf8epa0g6f",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3867,13 +4890,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "210"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "210+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13tg6t2ed9yrle44s9z8g3mag4cfw68gk0tly0x",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3885,13 +4913,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "211"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "211+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18fphrmnm8zl5y8m2z39ydpmhl4pvtslj8kwpxe",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3903,13 +4936,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "212"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "212+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1uhdv7ytdu9w7mza2etzajrcqvl2j85s93d328a",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3921,13 +4959,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "213"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "213+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wjz4ssewut2cv4kk9y5ladfr3g97ng9s55xrea",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3939,13 +4982,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "214"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "214+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus145pm20lmj3w6ts4u29826m59mca23muwju8qzd",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3957,13 +5005,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "215"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "215+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus104wz2lt44kw2u8r775hfdujk6rrpgmjdhl7q6h",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3975,13 +5028,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "216"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "216+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus105ysvey52quqydtuwcw9qgx3c3y0eqk04qtcdx",
-        "xAmount": 700000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -3993,13 +5051,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "217"
+          },
+          {
+            "amount": 700000000000,
+            "timestampOffset": 1209600,
+            "memo": "217+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yqqenlx3n6lc7jas4m0jh9cghct3me68depja2",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4011,13 +5074,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "218"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "218+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1q37excjx65fzk2kgjqesqjmp0de0nvkh4kvghy",
-        "xAmount": 200000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4029,13 +5097,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "219"
+          },
+          {
+            "amount": 200000000000,
+            "timestampOffset": 1209600,
+            "memo": "219+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19n3y06nrquf9n7y22x3gr35gsms94a4zwjupxh",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4047,13 +5120,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "220"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "220+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1l828527ytgs0wlk9ncvw7zgp4jtadzc25xl2tz",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4065,13 +5143,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "221"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "221+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dxqcc8s3mfgj6thsfmkh5z23gt0fyngjgy5jfe",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4083,13 +5166,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "222"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "222+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1w82vcsrucl4lrys8dtnk5t2yshpnuq234u53x9",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4101,13 +5189,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "223"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "223+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus10hdjkp8qynahtewufy6ek3pv0r35j7ufqaze4x",
-        "xAmount": 150000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
           "kycVerified": true
@@ -4119,6 +5212,11 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "224"
+          },
+          {
+            "amount": 150000000000,
+            "timestampOffset": 1209600,
+            "memo": "224+"
           }
         ]
       },
@@ -4142,7 +5240,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zq3vqpsxpfakseymatqmm7krm64uhm80q8ey4p",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4154,13 +5252,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "226"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "226+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1npxkkgtaq8p00uwc8nwrfm25rzf2pdyf2ywpe9",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4172,13 +5275,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "227"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "227+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16sw3qmf2m4p6enwfzs9qfhjm538dzpf2ess6dg",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4190,13 +5298,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "228"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "228+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19rzuswq4ek9u0y47dzefcgvjuxlktwm2a4x827",
-        "xAmount": 20000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4210,13 +5323,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "229"
+          },
+          {
+            "amount": 20000000000000,
+            "timestampOffset": 1209600,
+            "memo": "229+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c6zz8pqjvyd40rq4mre4azaalur7rsdn69hh6u",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4228,13 +5346,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "230"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "230+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1xl6ezwlmpxhytmhlvrl85lvnheunjuu5un5qa9",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4246,13 +5369,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "231"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "231+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dd39r6a83pd5llzag9r4c9mqdgd38jzlnsd2t2",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4264,13 +5392,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "232"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "232+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1pkfar9ajf34egm9my20tnytmvn98d6d9xdahvr",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4282,13 +5415,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "233"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "233+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ph50fuuzxmmkmpskmvkrdzudtdze4zfj33p4ef",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4300,13 +5438,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "234"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "234+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1rrdl8mgqhs7af9ktx4uw9puyanfc93223yn8kd",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4318,13 +5461,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "235"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "235+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus17zjxkrmglzcmuwafag4uknacew39ev2ls9tga3",
-        "xAmount": 1500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4336,13 +5484,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "236"
+          },
+          {
+            "amount": 1500000000000,
+            "timestampOffset": 1209600,
+            "memo": "236+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yd8u5d2jq4x9nntadxq6zuz0g8k2x5twgme9d8",
-        "xAmount": 20000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4356,13 +5509,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "237"
+          },
+          {
+            "amount": 20000000000000,
+            "timestampOffset": 1209600,
+            "memo": "237+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ymnp6l60g0ykhr9k484qcdfjjfmdskx4hz5gzk",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4374,13 +5532,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "238"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "238+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1xvl6dfj5w9f35duqg97g79pnmffya96p464xc4",
-        "xAmount": 3000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4392,13 +5555,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "239"
+          },
+          {
+            "amount": 3000000000000,
+            "timestampOffset": 1209600,
+            "memo": "239+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1yumnux0gjuxv2p074gcwqw5hv4cjhpc3gehteh",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4410,13 +5578,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "240"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "240+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1f5rt0mgznxknyj34vft99s9prfvdhem439ud02",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4428,13 +5601,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "241"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "241+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1kjxmutel336ev5kzfvsal7e4ytvmu7z6t2dwg2",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4446,13 +5624,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "242"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "242+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16wdrtdycwgvf8q6ct425q2wh8dldj0kzhfuje4",
-        "xAmount": 4000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4464,13 +5647,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "243"
+          },
+          {
+            "amount": 4000000000000,
+            "timestampOffset": 1209600,
+            "memo": "243+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1hjh9dspr4wh3kedkpu7mkym9v66x7vqtsntke5",
-        "xAmount": 100000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4482,13 +5670,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "244"
+          },
+          {
+            "amount": 100000000000,
+            "timestampOffset": 1209600,
+            "memo": "244+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1l84g47rj8r9p8zsznvnz2nce65k3wjxgeyrwzv",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4500,13 +5693,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "245"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "245+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1akmdd3p8e3c2vu2cp9cz40ssyt79tzcragnfl8",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4518,13 +5716,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "246"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "246+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wpxls6rvgx6gpkm57zhjqy9g7wwq00kgxyugtq",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4536,13 +5739,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "247"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "247+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus17p73e7x3qamqh4r0m9dx7ktzd0dck5jrtdyxy4",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4554,13 +5762,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "248"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "248+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c3dhlnasnjcgfv4tvqzqk47l5upvka4rmfgqqs",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4574,13 +5787,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "249"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "249+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1v9dvjffg95tlxp7u3ehufgmm4xpuunzssaz527",
-        "xAmount": 2000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4592,13 +5810,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "250"
+          },
+          {
+            "amount": 2000000000000,
+            "timestampOffset": 1209600,
+            "memo": "250+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1wpxa43ech79mxs5ta9kgrg3jx03rrjc3sv6qmv",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4610,13 +5833,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "251"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "251+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1dgky8sv7ps46hrd29uhltjzjfuaavpgpxxnv80",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4628,13 +5856,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "252"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "252+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1p7tlgcxyx8clqq3yvf4pr9gjng22ns9k42lcs0",
-        "xAmount": 3000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4646,13 +5879,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "253"
+          },
+          {
+            "amount": 3000000000000,
+            "timestampOffset": 1209600,
+            "memo": "253+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qkecpdfst3hjl4sdktn25dvrq4x4gt8ljqsnqp",
-        "xAmount": 2500000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4664,13 +5902,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
             "memo": "254"
+          },
+          {
+            "amount": 2500000000000,
+            "timestampOffset": 1209600,
+            "memo": "254+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16wdrtdycwgvf8q6ct425q2wh8dldj0kzhfuje4",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4682,13 +5925,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "255"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "255+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zg907zmsrkk7j37l0gfh7k20yw7s5na2qurp2w",
-        "xAmount": 1000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4700,13 +5948,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "256"
+          },
+          {
+            "amount": 1000000000000,
+            "timestampOffset": 1209600,
+            "memo": "256+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
-        "xAmount": 10000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4718,13 +5971,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "257"
+          },
+          {
+            "amount": 10000000000000,
+            "timestampOffset": 1209600,
+            "memo": "257+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
-        "xAmount": 5000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4736,13 +5994,18 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "258"
+          },
+          {
+            "amount": 5000000000000,
+            "timestampOffset": 1209600,
+            "memo": "258+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1x7mff9z99azsd2djf4j0yp43ne0gxuvsggpnms",
-        "xAmount": 15000000000000,
+        "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -4754,6 +6017,11 @@
             "timestampOffset": 1209600,
             "depositOfferID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
             "memo": "259"
+          },
+          {
+            "amount": 15000000000000,
+            "timestampOffset": 1209600,
+            "memo": "259+"
           }
         ]
       },
