@@ -34,7 +34,7 @@ pub fn run(opts: &Options) -> Result<()> {
     let x = match db.new_writebatch().kv_remove(opts.key.clone(), &mut account) {
         Ok(wb) => {
             wb.commit();
-            log::info!("{}", opts.key);
+            println!("{}", opts.key);
 
             Ok(())
         }

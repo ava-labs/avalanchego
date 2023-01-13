@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
+use std::str;
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -32,7 +33,11 @@ pub fn run(opts: &Options) -> Result<()> {
 
     match db.kv_get(opts.key.as_bytes()) {
         Ok(val) => {
-            log::info!("{:#?}", val);
+            let s = match str::from_utf8(&val) {
+                Ok(v) => v,
+                Err(e) => return Err(anyhow!("Invalid UTF-8 sequence: {}", e)),
+            };
+            println!("{:#?}", s);
             if val.is_empty() {
                 return Err(anyhow!("no value found for key"))
             }

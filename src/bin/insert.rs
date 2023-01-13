@@ -40,7 +40,7 @@ pub fn run(opts: &Options) -> Result<()> {
     {
         Ok(insertion) => {
             insertion.commit();
-            log::info!("{}", opts.key);
+            println!("{}", opts.key);
 
             Ok(())
         }

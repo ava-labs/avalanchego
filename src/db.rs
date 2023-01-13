@@ -29,6 +29,7 @@ pub enum DBError {
     Blob(crate::account::BlobError),
     System(nix::Error),
     KeyNotFound,
+    CreateError,
 }
 
 /// DBParams contains the constants that are fixed upon the creation of the DB, this ensures the
@@ -252,7 +253,7 @@ impl DBRev {
         let obj_ref = self.merkle.get(key, self.header.kv_root);
         match obj_ref {
             Err(_) => None,
-            Ok(obj) => Some(obj.unwrap().to_vec()),
+            Ok(obj) => obj.map(|o| o.to_vec()),
         }
     }
 

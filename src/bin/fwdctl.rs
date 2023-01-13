@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::process;
 
 pub mod create;
 pub mod delete;
@@ -45,9 +46,33 @@ fn main() -> Result<()> {
     );
 
     match &cli.command {
-        Commands::Create(opts) => create::run(opts),
-        Commands::Insert(opts) => insert::run(opts),
-        Commands::Get(opts) => get::run(opts),
-        Commands::Delete(opts) => delete::run(opts),
+        Commands::Create(opts) => match create::run(opts) {
+            Err(e) => {
+                eprintln!("{e}");
+                process::exit(1)
+            }
+            Ok(_) => Ok(()),
+        },
+        Commands::Insert(opts) => match insert::run(opts) {
+            Err(e) => {
+                eprintln!("{e}");
+                process::exit(1)
+            }
+            Ok(_) => Ok(()),
+        },
+        Commands::Get(opts) => match get::run(opts) {
+            Err(e) => {
+                eprintln!("{e}");
+                process::exit(1)
+            }
+            Ok(_) => Ok(()),
+        },
+        Commands::Delete(opts) => match delete::run(opts) {
+            Err(e) => {
+                eprintln!("{e}");
+                process::exit(1)
+            }
+            Ok(_) => Ok(()),
+        },
     }
 }
