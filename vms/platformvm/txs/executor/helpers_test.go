@@ -84,7 +84,7 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
@@ -113,8 +113,8 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newEnvironment(postBanff bool) *environment {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	config := defaultConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -123,7 +123,7 @@ func newEnvironment(postBanff bool) *environment {
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(&config, ctx, baseDB, rewards)
@@ -426,7 +426,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.GetValue() {
+	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errMissingPrimaryValidators

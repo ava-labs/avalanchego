@@ -382,7 +382,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.RunningStateSync(false)
+		t.Ctx.StateSyncing.Set(false)
 		return nil
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
@@ -446,7 +446,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.SetState(snow.NormalOp)
+	t.Ctx.State.Set(snow.NormalOp)
 	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
@@ -487,7 +487,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
-	if t.Ctx.IsRunningStateSync() {
+	if t.Ctx.StateSyncing.Get() {
 		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
 	} else {
 		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})

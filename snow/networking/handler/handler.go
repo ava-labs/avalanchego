@@ -158,7 +158,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) IsValidator(nodeID ids.NodeID) bool {
-	return !h.ctx.IsValidatorOnly() ||
+	return !h.ctx.ValidatorOnly.Get() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
 }
@@ -448,7 +448,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.GetState() == snow.NormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.State.Get() == snow.NormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
@@ -835,7 +835,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 }
 
 func (h *handler) getEngine() (common.Engine, error) {
-	state := h.ctx.GetState()
+	state := h.ctx.State.Get()
 	switch state {
 	case snow.StateSyncing:
 		return h.stateSyncer, nil

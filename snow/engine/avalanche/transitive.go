@@ -376,7 +376,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.SetState(snow.NormalOp)
+	t.Ctx.State.Set(snow.NormalOp)
 	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus has started: %w",
 			err)

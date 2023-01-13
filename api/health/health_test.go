@@ -192,9 +192,9 @@ func TestPassingChecks(t *testing.T) {
 func TestPassingThenFailingChecks(t *testing.T) {
 	require := require.New(t)
 
-	var shouldCheckErr utils.AtomicBool
+	var shouldCheckErr utils.Atomic[bool]
 	check := CheckerFunc(func(context.Context) (interface{}, error) {
-		if shouldCheckErr.GetValue() {
+		if shouldCheckErr.Get() {
 			return errUnhealthy.Error(), errUnhealthy
 		}
 		return "", nil
@@ -228,7 +228,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		require.True(liveness)
 	}
 
-	shouldCheckErr.SetValue(true)
+	shouldCheckErr.Set(true)
 
 	awaitHealthy(h, false)
 	awaitLiveness(h, false)

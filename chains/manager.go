@@ -454,14 +454,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
 		Registerer:        consensusMetrics,
 	}
-	// We set the state to Initializing here because failing to set the state
-	// before it's first access would cause a panic.
-	ctx.SetState(snow.Initializing)
 
 	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		if subnetConfig.ValidatorOnly {
-			ctx.SetValidatorOnly()
-		}
+		ctx.ValidatorOnly.Set(subnetConfig.ValidatorOnly)
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -1095,7 +1090,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().GetState() == snow.NormalOp
+	return chain.Context().State.Get() == snow.NormalOp
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
