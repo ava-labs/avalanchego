@@ -322,7 +322,7 @@ func (*bootstrapper) Notify(context.Context, common.Message) error {
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
-	b.Ctx.SetState(snow.Bootstrapping)
+	b.Ctx.State.Set(snow.Bootstrapping)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)

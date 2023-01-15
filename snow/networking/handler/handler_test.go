@@ -80,7 +80,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.State.Set(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
@@ -172,7 +172,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
-	ctx.SetState(snow.Bootstrapping)
+	ctx.State.Set(snow.Bootstrapping)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -240,7 +240,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.State.Set(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -311,7 +311,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 	handler.SetConsensus(engine)
-	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+	ctx.State.Set(snow.NormalOp) // assumed bootstrapping is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -376,7 +376,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		return ctx
 	}
 	handler.SetConsensus(engine)
-	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+	ctx.State.Set(snow.NormalOp) // assumed bootstrapping is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil

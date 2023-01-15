@@ -93,7 +93,7 @@ type environment struct {
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
@@ -110,11 +110,11 @@ type environment struct {
 
 func newEnvironment(t *testing.T) *environment {
 	res := &environment{
-		isBootstrapped: &utils.AtomicBool{},
+		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
-	res.isBootstrapped.SetValue(true)
+	res.isBootstrapped.Set(true)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
@@ -123,7 +123,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
 
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
@@ -436,7 +436,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.GetValue() {
+	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errMissingPrimaryValidators

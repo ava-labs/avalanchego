@@ -1650,7 +1650,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
-	consensusCtx.SetState(snow.Initializing)
+	consensusCtx.State.Set(snow.Initializing)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)

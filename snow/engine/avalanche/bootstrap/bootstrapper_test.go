@@ -146,7 +146,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -193,7 +193,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetState() != snow.NormalOp:
+	case config.Ctx.State.Get() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -249,7 +249,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -343,7 +343,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	switch {
 	case *requestID != oldReqID:
 		t.Fatal("should not have issued new request")
-	case config.Ctx.GetState() != snow.NormalOp:
+	case config.Ctx.State.Get() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -427,7 +427,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -498,7 +498,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetState() != snow.NormalOp {
+	if config.Ctx.State.Get() != snow.NormalOp {
 		t.Fatalf("Should have finished bootstrapping")
 	}
 	if tx0.Status() != choices.Accepted {
@@ -571,7 +571,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -631,7 +631,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetState() != snow.NormalOp {
+	if config.Ctx.State.Get() != snow.NormalOp {
 		t.Fatalf("Bootstrapping should have finished")
 	}
 	if tx0.Status() != choices.Unknown { // never saw this tx
@@ -692,7 +692,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -760,7 +760,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.Context().GetState() == snow.NormalOp:
+	case bs.Context().State.Get() == snow.NormalOp:
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
 		t.Fatal("should hae requested vtx0")
@@ -770,7 +770,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case bs.Context().GetState() != snow.NormalOp:
+	case bs.Context().State.Get() != snow.NormalOp:
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
@@ -812,7 +812,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -891,7 +891,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case config.Ctx.GetState() != snow.NormalOp:
+	case config.Ctx.State.Get() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -943,7 +943,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -1024,7 +1024,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetState() != snow.NormalOp:
+	case config.Ctx.State.Get() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1110,7 +1110,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetState(snow.NormalOp)
+			config.Ctx.State.Set(snow.NormalOp)
 			return nil
 		},
 	)
@@ -1272,7 +1272,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetState() != snow.NormalOp:
+	case config.Ctx.State.Get() != snow.NormalOp:
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")

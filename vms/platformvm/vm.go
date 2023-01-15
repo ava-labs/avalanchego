@@ -93,7 +93,7 @@ type VM struct {
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
-	bootstrapped utils.AtomicBool
+	bootstrapped utils.Atomic[bool]
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -275,16 +275,16 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // onBootstrapStarted marks this VM as bootstrapping
 func (vm *VM) onBootstrapStarted() error {
-	vm.bootstrapped.SetValue(false)
+	vm.bootstrapped.Set(false)
 	return vm.fx.Bootstrapping()
 }
 
 // onNormalOperationsStarted marks this VM as bootstrapped
 func (vm *VM) onNormalOperationsStarted() error {
-	if vm.bootstrapped.GetValue() {
+	if vm.bootstrapped.Get() {
 		return nil
 	}
-	vm.bootstrapped.SetValue(true)
+	vm.bootstrapped.Set(true)
 
 	if err := vm.fx.Bootstrapped(); err != nil {
 		return err
@@ -336,7 +336,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 	vm.Builder.Shutdown()
 
-	if vm.bootstrapped.GetValue() {
+	if vm.bootstrapped.Get() {
 		primaryVdrIDs, exists := vm.getValidatorIDs(constants.PrimaryNetworkID)
 		if !exists {
 			return errMissingValidatorSet

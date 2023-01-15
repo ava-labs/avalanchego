@@ -322,13 +322,13 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	case block.StateSyncStatic:
 		// Summary was accepted and VM is state syncing.
 		// Engine will wait for notification of state sync done.
-		ss.Ctx.RunningStateSync(true)
+		ss.Ctx.StateSyncing.Set(true)
 		return nil
 	case block.StateSyncDynamic:
 		// Summary was accepted and VM is state syncing.
 		// Engine will continue into bootstrapping and the VM will sync in the
 		// background.
-		ss.Ctx.RunningStateSync(true)
+		ss.Ctx.StateSyncing.Set(true)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	default:
 		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",
@@ -384,7 +384,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
-	ss.Ctx.SetState(snow.StateSyncing)
+	ss.Ctx.State.Set(snow.StateSyncing)
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}
@@ -542,7 +542,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		return nil
 	}
 
-	ss.Ctx.RunningStateSync(false)
+	ss.Ctx.StateSyncing.Set(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 

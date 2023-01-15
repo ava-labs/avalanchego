@@ -118,7 +118,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
-					Bootstrapped: &utils.AtomicBool{},
+					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
@@ -135,8 +135,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "start time too early",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -158,8 +158,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "weight too low",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -184,8 +184,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "weight too high",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -210,8 +210,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "insufficient delegation fee",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -237,8 +237,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "duration too short",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -267,8 +267,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "duration too long",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -297,8 +297,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "wrong assetID",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -329,8 +329,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "duplicate validator",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -355,8 +355,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "validator not subset of primary network validator",
 			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 				return &Backend{
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -387,8 +387,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "flow check fails",
 			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 
 				flowChecker := utxo.NewMockVerifier(ctrl)
 				flowChecker.EXPECT().VerifySpend(
@@ -433,8 +433,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "starts too far in the future",
 			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 
 				flowChecker := utxo.NewMockVerifier(ctrl)
 				flowChecker.EXPECT().VerifySpend(
@@ -483,8 +483,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		{
 			name: "success",
 			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.AtomicBool{}
-				bootstrapped.SetValue(true)
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
 
 				flowChecker := utxo.NewMockVerifier(ctrl)
 				flowChecker.EXPECT().VerifySpend(
