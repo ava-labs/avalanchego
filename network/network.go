@@ -15,6 +15,8 @@ import (
 
 	gomath "math"
 
+	"github.com/pires/go-proxyproto"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
@@ -56,6 +58,8 @@ var (
 	errNotValidator             = errors.New("node is not a validator")
 	errNotTracked               = errors.New("subnet is not tracked")
 	errSubnetNotExist           = errors.New("subnet does not exist")
+	errExpectedProxy            = errors.New("expected proxy")
+	errExpectedTCPProtocol      = errors.New("expected TCP protocol")
 )
 
 // Network defines the functionality of the networking library.
@@ -187,6 +191,28 @@ func NewNetwork(
 	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return nil, errMissingPrimaryValidators
+	}
+
+	if config.ProxyEnabled {
+		// Wrap the listener to process the proxy header.
+		listener = &proxyproto.Listener{
+			Listener: listener,
+			Policy: func(net.Addr) (proxyproto.Policy, error) {
+				// Do not perform any fuzzy matching, the header must be
+				// provided.
+				return proxyproto.REQUIRE, nil
+			},
+			ValidateHeader: func(h *proxyproto.Header) error {
+				if !h.Command.IsProxy() {
+					return errExpectedProxy
+				}
+				if h.TransportProtocol != proxyproto.TCPv4 && h.TransportProtocol != proxyproto.TCPv6 {
+					return errExpectedTCPProtocol
+				}
+				return nil
+			},
+			ReadHeaderTimeout: config.ProxyReadHeaderTimeout,
+		}
 	}
 
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
@@ -730,9 +756,15 @@ func (n *network) Dispatch() error {
 		}
 		n.metrics.inboundConnAllowed.Inc()
 
+		n.peerConfig.Log.Verbo("starting to upgrade connection",
+			zap.String("direction", "inbound"),
+			zap.Stringer("peerIP", ip),
+		)
+
 		go func() {
 			if err := n.upgrade(conn, n.serverUpgrader); err != nil {
-				n.peerConfig.Log.Verbo("failed to upgrade inbound connection",
+				n.peerConfig.Log.Verbo("failed to upgrade connection",
+					zap.String("direction", "inbound"),
 					zap.Error(err),
 				)
 			}
@@ -1066,6 +1098,11 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				)
 				continue
 			}
+
+			n.peerConfig.Log.Verbo("starting to upgrade connection",
+				zap.String("direction", "outbound"),
+				zap.Stringer("peerIP", ip.ip.IP),
+			)
 
 			err = n.upgrade(conn, n.clientUpgrader)
 			if err != nil {
