@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -324,7 +324,7 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 				return nil, ids.Empty, errEmptyAllocation
 			}
 
-			allocationMessage, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+			allocationMessage, err := formatting.Encode(defaultEncoding, []byte(platformAllocation.Memo))
 			if err != nil {
 				return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 			}

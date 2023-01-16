@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -370,15 +370,15 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.CaminoID,
-			expectedID: "9z7NSs8bnNuhv5AwEf2exY35SsYaJL7gW9Z5oT14hZmnkaiUM",
+			expectedID: "2WTr7jgbMWB4os5swbFNLeoeKCKWie3YkTSPxoYDXmbkR1UG3J",
 		},
 		{
 			networkID:  constants.ColumbusID,
-			expectedID: "MjW9HTxaXD9f6P1Ndt7PiK9e3bu23DG4EfqBDXKwd3LY3HsAT",
+			expectedID: "wCrXyXo2nMPprNt2hWP11P68ixZqVnkSP6Q4YUvSSTPT1LvFg",
 		},
 		{
 			networkID:  constants.KopernikusID,
-			expectedID: "2BKZXGV9hJqf4jU9CrKMaXEdNxLBHAqRGmEgTWb7L6GmC9dqR8",
+			expectedID: "QoL5hk4px3Lr8sY7CqiYGoBjmzgjiBSdXA9PnrwuyATDdoNxL",
 		},
 		{
 			networkID:  constants.LocalID,

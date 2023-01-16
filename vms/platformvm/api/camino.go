@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -117,7 +117,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 
 			utxo, depositTx, err := makeUTXOAndDeposit(
 				offers,
-				&vdr.Staked[i],
+				uint64(vdr.Staked[i].Amount),
 				bondTxID,
 				args.Camino.ValidatorDeposits[validatorIndex][i],
 				uint32(i),
@@ -146,8 +146,9 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 	}
 
+	unlockedUTXOIndices := map[uint64][]int{}
+
 	for i, apiUTXO := range args.UTXOs {
-		apiUTXO := apiUTXO
 		if apiUTXO.Amount == 0 {
 			return errUTXOHasNoValue
 		}
@@ -162,12 +163,19 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
 
+		blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
+		genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp)
+		outputIndex := uint32(0)
+		if len(genesisBlock.UnlockedUTXOsTxs) != 0 {
+			outputIndex = uint32(len(genesisBlock.UnlockedUTXOsTxs[0].Unsigned.Outputs()))
+		}
+
 		utxo, depositTx, err := makeUTXOAndDeposit(
 			offers,
-			&apiUTXO,
+			uint64(apiUTXO.Amount),
 			ids.Empty,
 			args.Camino.UTXODeposits[i],
-			uint32(i),
+			outputIndex,
 			addrID,
 			args.AvaxAssetID,
 			networkID,
@@ -175,9 +183,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		if err != nil {
 			return err
 		}
-
-		blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
-		genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp)
 
 		if depositTx != nil {
 			genesisBlock.Deposits = append(genesisBlock.Deposits, depositTx)
@@ -200,6 +205,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 					},
 				},
 			})
+			unlockedUTXOIndices[blockTimestamp] = append(unlockedUTXOIndices[blockTimestamp], len(utxos))
 		}
 
 		utxos = append(utxos, &genesis.UTXO{
@@ -237,9 +243,16 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	camino := args.Camino.ParseToGenesis()
 	camino.Blocks = make([]*genesis.Block, 0, len(genesisBlocks))
 	for _, genesisBlock := range genesisBlocks {
-		for _, tx := range genesisBlock.UnlockedUTXOsTxs {
+		if len(genesisBlock.UnlockedUTXOsTxs) != 0 {
+			tx := genesisBlock.UnlockedUTXOsTxs[0]
 			if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 				return err
+			}
+
+			if utxoIndices, ok := unlockedUTXOIndices[genesisBlock.Timestamp]; ok {
+				for _, i := range utxoIndices {
+					utxos[i].TxID = tx.ID()
+				}
 			}
 		}
 
@@ -345,7 +358,7 @@ func makeValidator(
 
 func makeUTXOAndDeposit(
 	offers map[ids.ID]genesis.DepositOffer,
-	apiUTXO *UTXO,
+	amount uint64,
 	bondTxID ids.ID,
 	deposit UTXODeposit,
 	outputIndex uint32,
@@ -364,7 +377,7 @@ func makeUTXOAndDeposit(
 	}
 
 	innerOut := &secp256k1fx.TransferOutput{
-		Amt:          uint64(apiUTXO.Amount),
+		Amt:          amount,
 		OutputOwners: owner,
 	}
 
@@ -391,7 +404,7 @@ func makeUTXOAndDeposit(
 						DepositTxID: ids.Empty,
 					},
 					TransferableIn: &secp256k1fx.TransferInput{
-						Amt:   uint64(apiUTXO.Amount),
+						Amt:   amount,
 						Input: secp256k1fx.Input{},
 					},
 				},

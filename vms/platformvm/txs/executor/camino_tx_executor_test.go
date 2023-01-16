@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	"github.com/stretchr/testify/require"
@@ -1304,6 +1305,15 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	utxosBeforeReward, err := avax.GetAllUTXOs(env.state, stakeOwnersAddresses)
 	require.NoError(t, err)
 
+	unlockedUTXOTxID := ids.Empty
+	for _, utxo := range utxosBeforeReward {
+		if _, ok := utxo.Out.(*locked.Out); !ok {
+			unlockedUTXOTxID = utxo.TxID
+			break
+		}
+	}
+	require.NotEqual(t, ids.Empty, unlockedUTXOTxID)
+
 	type test struct {
 		ins                      []*avax.TransferableInput
 		outs                     []*avax.TransferableOutput
@@ -1502,7 +1512,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
 			return []*avax.UTXO{
 				generateTestUTXO(txID, env.ctx.AVAXAssetID, defaultCaminoValidatorWeight, stakeOwners, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.Empty, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(unlockedUTXOTxID, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty),
 			}
 		},
 		expectedErr: nil,
@@ -1550,6 +1560,24 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 		err := shutdownCaminoEnvironment(env)
 		require.NoError(t, err)
 	}()
+
+	utxos, err := avax.GetAllUTXOs(env.state, set.Set[ids.ShortID]{
+		caminoPreFundedKeys[0].Address(): struct{}{},
+	})
+	require.NoError(t, err)
+
+	var unlockedUTXO *avax.UTXO
+	for _, utxo := range utxos {
+		if _, ok := utxo.Out.(*locked.Out); !ok {
+			unlockedUTXO = utxo
+			break
+		}
+	}
+	require.NotNil(t, unlockedUTXO)
+
+	out, ok := utxos[0].Out.(avax.TransferableOut)
+	require.True(t, ok)
+	unlockedUTXOAmount := out.Amount()
 
 	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
 
@@ -1714,19 +1742,21 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 		},
 	}
 
+	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    env.ctx.NetworkID,
+		BlockchainID: env.ctx.ChainID,
+		Ins: []*avax.TransferableInput{
+			generateTestInFromUTXO(unlockedUTXO, sigIndices),
+		},
+		Outs: []*avax.TransferableOutput{
+			generateTestOut(avaxAssetID, unlockedUTXOAmount-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+		},
+	}}
+
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			addressStateTx := &txs.AddressStateTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins: []*avax.TransferableInput{
-						generateTestIn(avaxAssetID, defaultCaminoBalance, ids.Empty, ids.Empty, sigIndices),
-					},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-					},
-				}},
+				BaseTx:  baseTx,
 				Address: tt.stateAddress,
 				State:   tt.state,
 				Remove:  tt.remove,

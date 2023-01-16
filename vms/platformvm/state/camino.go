@@ -51,6 +51,7 @@ var (
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
+	errNotUniqueTx      = errors.New("not unique genesis tx")
 )
 
 type CaminoApply interface {
@@ -229,6 +230,8 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		s.SetCurrentSupply(constants.PrimaryNetworkID, g.InitialSupply)
 	}
 
+	txIDs := set.Set[ids.ID]{}
+
 	// adding address states
 
 	for _, addrState := range g.Camino.AddressStates {
@@ -242,12 +245,17 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	cs.SetAddressStates(g.Camino.InitialAdmin,
 		initalAdminAddressState|txs.AddressStateRoleAdminBit)
 
-	tx := &txs.AddressStateTx{
+	addrStateTx, err := txs.NewSigned(&txs.AddressStateTx{
 		Address: g.Camino.InitialAdmin,
 		State:   txs.AddressStateRoleAdmin,
 		Remove:  false,
+	}, txs.Codec, nil)
+	if err != nil {
+		return err
 	}
-	s.AddTx(&txs.Tx{Unsigned: tx}, status.Committed)
+
+	s.AddTx(addrStateTx, status.Committed)
+	txIDs.Add(addrStateTx.ID())
 
 	// adding consortium member nodes
 
@@ -289,11 +297,21 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	for blockIndex, block := range g.Camino.Blocks {
 		// add unlocked utxos txs
 		for _, tx := range block.UnlockedUTXOsTxs {
+			if txIDs.Contains(tx.ID()) {
+				return errNotUniqueTx
+			}
+			txIDs.Add(tx.ID())
+
 			s.AddTx(tx, status.Committed)
 		}
 
 		// add validators
 		for _, tx := range block.Validators {
+			if txIDs.Contains(tx.ID()) {
+				return errNotUniqueTx
+			}
+			txIDs.Add(tx.ID())
+
 			validatorTx, ok := tx.Unsigned.(txs.ValidatorTx)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", tx.Unsigned)
@@ -310,6 +328,11 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 		// add deposits
 		for _, tx := range block.Deposits {
+			if txIDs.Contains(tx.ID()) {
+				return errNotUniqueTx
+			}
+			txIDs.Add(tx.ID())
+
 			depositTx, ok := tx.Unsigned.(*txs.DepositTx)
 			if !ok {
 				return errWrongTxType
