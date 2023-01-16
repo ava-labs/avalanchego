@@ -152,6 +152,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(NetworkPeerReadBufferSizeKey, 8*units.KiB, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, 8*units.KiB, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
 
+	fs.Bool(NetworkTCPProxyEnabledKey, false, "Require all P2P connections to be initiated with a TCP proxy header")
+	// The PROXY protocol specification recommends setting this value to be at
+	// least 3 seconds to cover a TCP retransmit.
+	// Ref: https://www.haproxy.org/download/2.3/doc/proxy-protocol.txt
+	// Specifying a timeout of 0 will actually result in a timeout of 200ms, but
+	// a timeout of 0 should generally not be provided.
+	fs.Duration(NetworkTCPProxyReadTimeoutKey, 3*time.Second, "Maximum duration to wait for a TCP proxy header")
+
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
