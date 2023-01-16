@@ -10,9 +10,7 @@ package fx
 import (
 	reflect "reflect"
 
-	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
-	set "github.com/ava-labs/avalanchego/utils/set"
 	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	secp256k1fx "github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	gomock "github.com/golang/mock/gomock"
@@ -98,6 +96,49 @@ func (mr *MockFxMockRecorder) Initialize(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockFx)(nil).Initialize), arg0)
 }
 
+// RecoverAddresses mocks base method.
+func (m *MockFx) RecoverAddresses(arg0 secp256k1fx.UnsignedTx, arg1 []verify.Verifiable) (secp256k1fx.RecoverMap, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecoverAddresses", arg0, arg1)
+	ret0, _ := ret[0].(secp256k1fx.RecoverMap)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RecoverAddresses indicates an expected call of RecoverAddresses.
+func (mr *MockFxMockRecorder) RecoverAddresses(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverAddresses", reflect.TypeOf((*MockFx)(nil).RecoverAddresses), arg0, arg1)
+}
+
+// VerifyMultisigOwner mocks base method.
+func (m *MockFx) VerifyMultisigOwner(arg0, arg1 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyMultisigOwner", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyMultisigOwner indicates an expected call of VerifyMultisigOwner.
+func (mr *MockFxMockRecorder) VerifyMultisigOwner(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigOwner", reflect.TypeOf((*MockFx)(nil).VerifyMultisigOwner), arg0, arg1)
+}
+
+// VerifyMultisigTransfer mocks base method.
+func (m *MockFx) VerifyMultisigTransfer(arg0, arg1, arg2, arg3, arg4 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyMultisigTransfer", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyMultisigTransfer indicates an expected call of VerifyMultisigTransfer.
+func (mr *MockFxMockRecorder) VerifyMultisigTransfer(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigTransfer", reflect.TypeOf((*MockFx)(nil).VerifyMultisigTransfer), arg0, arg1, arg2, arg3, arg4)
+}
+
 // VerifyPermission mocks base method.
 func (m *MockFx) VerifyPermission(arg0, arg1, arg2, arg3 interface{}) error {
 	m.ctrl.T.Helper()
@@ -124,21 +165,6 @@ func (m *MockFx) VerifyTransfer(arg0, arg1, arg2, arg3 interface{}) error {
 func (mr *MockFxMockRecorder) VerifyTransfer(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTransfer", reflect.TypeOf((*MockFx)(nil).VerifyTransfer), arg0, arg1, arg2, arg3)
-}
-
-// RecoverAddresses mocks base method.
-func (m *MockFx) RecoverAddresses(arg0 secp256k1fx.UnsignedTx, arg1 []verify.Verifiable) (set.Set[ids.ShortID], error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecoverAddresses", arg0, arg1)
-	ret0, _ := ret[0].(set.Set[ids.ShortID])
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RecoverAddresses indicates an expected call of RecoverAddresses.
-func (mr *MockFxMockRecorder) RecoverAddresses(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverAddresses", reflect.TypeOf((*MockFx)(nil).RecoverAddresses), arg0, arg1)
 }
 
 // MockOwner is a mock of Owner interface.

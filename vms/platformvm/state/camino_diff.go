@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -159,11 +160,11 @@ func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return parentState.GetDeposit(depositTxID)
 }
 
-func (d *diff) SetMultisigOwner(owner *MultisigOwner) {
-	d.caminoDiff.modifiedMultisigOwners[owner.Alias] = owner
+func (d *diff) SetMultisigAlias(owner *multisig.Alias) {
+	d.caminoDiff.modifiedMultisigOwners[owner.ID] = owner
 }
 
-func (d *diff) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
+func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
 	if msigOwner, ok := d.caminoDiff.modifiedMultisigOwners[alias]; ok {
 		return msigOwner, nil
 	}
@@ -173,7 +174,7 @@ func (d *diff) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.GetMultisigOwner(alias)
+	return parentState.GetMultisigAlias(alias)
 }
 
 func (d *diff) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
@@ -211,7 +212,7 @@ func (d *diff) ApplyCaminoState(baseState State) {
 	}
 
 	for _, v := range d.caminoDiff.modifiedMultisigOwners {
-		baseState.SetMultisigOwner(v)
+		baseState.SetMultisigAlias(v)
 	}
 
 	for nodeID, addr := range d.caminoDiff.modifiedConsortiumMemberNodes {

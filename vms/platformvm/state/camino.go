@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -76,8 +77,8 @@ type CaminoDiff interface {
 
 	// Multisig Owners
 
-	GetMultisigOwner(ids.ShortID) (*MultisigOwner, error)
-	SetMultisigOwner(*MultisigOwner)
+	GetMultisigAlias(ids.ShortID) (*multisig.Alias, error)
+	SetMultisigAlias(*multisig.Alias)
 
 	// Consortium member nodes
 
@@ -113,7 +114,7 @@ type caminoDiff struct {
 	modifiedAddressStates         map[ids.ShortID]uint64
 	modifiedDepositOffers         map[ids.ID]*deposit.Offer
 	modifiedDeposits              map[ids.ID]*deposit.Deposit
-	modifiedMultisigOwners        map[ids.ShortID]*MultisigOwner
+	modifiedMultisigOwners        map[ids.ShortID]*multisig.Alias
 	modifiedConsortiumMemberNodes map[ids.NodeID]*ids.ShortID
 }
 
@@ -151,7 +152,7 @@ func newCaminoDiff() *caminoDiff {
 		modifiedAddressStates:         make(map[ids.ShortID]uint64),
 		modifiedDepositOffers:         make(map[ids.ID]*deposit.Offer),
 		modifiedDeposits:              make(map[ids.ID]*deposit.Deposit),
-		modifiedMultisigOwners:        make(map[ids.ShortID]*MultisigOwner),
+		modifiedMultisigOwners:        make(map[ids.ShortID]*multisig.Alias),
 		modifiedConsortiumMemberNodes: make(map[ids.NodeID]*ids.ShortID),
 	}
 }
@@ -280,7 +281,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 	for _, gma := range g.Camino.InitialMultisigAddresses {
 		owner := FromGenesisMultisigAlias(gma)
-		cs.SetMultisigOwner(owner)
+		cs.SetMultisigAlias(owner)
 	}
 
 	// adding blocks (validators and deposits)

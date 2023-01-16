@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -242,9 +243,9 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetNodeConsortiumMember(nodeID, &msigAlias)
-				env.state.SetMultisigOwner(&state.MultisigOwner{
-					Alias: msigAlias,
-					Owners: secp256k1fx.OutputOwners{
+				env.state.SetMultisigAlias(&multisig.Alias{
+					ID: msigAlias,
+					Owners: &secp256k1fx.OutputOwners{
 						Threshold: 2,
 						Addrs: []ids.ShortID{
 							caminoPreFundedKeys[0].Address(),

@@ -11,6 +11,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	multisig "github.com/ava-labs/avalanchego/vms/components/multisig"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -112,7 +113,8 @@ func (m *MockChain) AddTx(arg0 *txs.Tx, arg1 status.Status) {
 // AddTx indicates an expected call of AddTx.
 func (mr *MockChainMockRecorder) AddTx(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTx", reflect.TypeOf((*MockChain)(nil).AddTx), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTx", reflect.TypeOf((*MockChain)(nil).AddTx),
+		arg0, arg1)
 }
 
 // AddUTXO mocks base method.
@@ -232,48 +234,6 @@ func (mr *MockChainMockRecorder) GetAllDepositOffers() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllDepositOffers", reflect.TypeOf((*MockChain)(nil).GetAllDepositOffers))
 }
 
-// GetMultisigOwner mocks base method.
-func (m *MockChain) GetMultisigOwner(arg0 ids.ShortID) (*MultisigOwner, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMultisigOwner", arg0)
-	ret0, _ := ret[0].(*MultisigOwner)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetMultisigOwner indicates an expected call of GetMultisigOwner.
-func (mr *MockChainMockRecorder) GetMultisigOwner(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultisigOwner", reflect.TypeOf((*MockChain)(nil).GetMultisigOwner), arg0)
-}
-
-// SetNodeConsortiumMember mocks base method.
-func (m *MockChain) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 *ids.ShortID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetNodeConsortiumMember", arg0)
-}
-
-// SetNodeConsortiumMember indicates an expected call of SetNodeConsortiumMember.
-func (mr *MockChainMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockChain)(nil).SetNodeConsortiumMember), arg0, arg1)
-}
-
-// GetNodeConsortiumMember mocks base method.
-func (m *MockChain) GetNodeConsortiumMember(arg0 ids.NodeID) (ids.ShortID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNodeConsortiumMember", arg0)
-	ret0, _ := ret[0].(ids.ShortID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetNodeConsortiumMember indicates an expected call of GetNodeConsortiumMember.
-func (mr *MockChainMockRecorder) GetNodeConsortiumMember(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConsortiumMember", reflect.TypeOf((*MockChain)(nil).GetNodeConsortiumMember), arg0)
-}
-
 // GetChains mocks base method.
 func (m *MockChain) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -377,6 +337,36 @@ func (m *MockChain) GetDepositOffer(arg0 ids.ID) (*deposit.Offer, error) {
 func (mr *MockChainMockRecorder) GetDepositOffer(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDepositOffer", reflect.TypeOf((*MockChain)(nil).GetDepositOffer), arg0)
+}
+
+// GetMultisigAlias mocks base method.
+func (m *MockChain) GetMultisigAlias(arg0 ids.ShortID) (*multisig.Alias, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMultisigAlias", arg0)
+	ret0, _ := ret[0].(*multisig.Alias)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMultisigAlias indicates an expected call of GetMultisigAlias.
+func (mr *MockChainMockRecorder) GetMultisigAlias(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultisigAlias", reflect.TypeOf((*MockChain)(nil).GetMultisigAlias), arg0)
+}
+
+// GetNodeConsortiumMember mocks base method.
+func (m *MockChain) GetNodeConsortiumMember(arg0 ids.NodeID) (ids.ShortID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeConsortiumMember", arg0)
+	ret0, _ := ret[0].(ids.ShortID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeConsortiumMember indicates an expected call of GetNodeConsortiumMember.
+func (mr *MockChainMockRecorder) GetNodeConsortiumMember(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConsortiumMember", reflect.TypeOf((*MockChain)(nil).GetNodeConsortiumMember), arg0)
 }
 
 // GetPendingDelegatorIterator mocks base method.
@@ -496,7 +486,8 @@ func (m *MockChain) GetTx(arg0 ids.ID) (*txs.Tx, status.Status, error) {
 // GetTx indicates an expected call of GetTx.
 func (mr *MockChainMockRecorder) GetTx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockChain)(nil).GetTx), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockChain)(nil).GetTx),
+		arg0)
 }
 
 // GetUTXO mocks base method.
@@ -601,16 +592,28 @@ func (mr *MockChainMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockChain)(nil).SetCurrentSupply), arg0, arg1)
 }
 
-// SetMultisigOwner mocks base method.
-func (m *MockChain) SetMultisigOwner(arg0 *MultisigOwner) {
+// SetMultisigAlias mocks base method.
+func (m *MockChain) SetMultisigAlias(arg0 *multisig.Alias) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetMultisigOwner", arg0)
+	m.ctrl.Call(m, "SetMultisigAlias", arg0)
 }
 
-// SetMultisigOwner indicates an expected call of SetMultisigOwner.
-func (mr *MockChainMockRecorder) SetMultisigOwner(arg0 interface{}) *gomock.Call {
+// SetMultisigAlias indicates an expected call of SetMultisigAlias.
+func (mr *MockChainMockRecorder) SetMultisigAlias(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMultisigOwner", reflect.TypeOf((*MockChain)(nil).SetMultisigOwner), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMultisigAlias", reflect.TypeOf((*MockChain)(nil).SetMultisigAlias), arg0)
+}
+
+// SetNodeConsortiumMember mocks base method.
+func (m *MockChain) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 *ids.ShortID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetNodeConsortiumMember", arg0, arg1)
+}
+
+// SetNodeConsortiumMember indicates an expected call of SetNodeConsortiumMember.
+func (mr *MockChainMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockChain)(nil).SetNodeConsortiumMember), arg0, arg1)
 }
 
 // SetTimestamp mocks base method.

@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -566,11 +566,6 @@ func (h *handler) VerifySpendUTXOs(
 			in = inner.TransferableIn
 		}
 
-		// Get output signed by real owners (would stay the same if its not msig)
-		out, err := h.getMultisigTransferOutput(out)
-		if err != nil {
-			return err
-		}
 		// Verify that this tx's credentials allow [in] to be spent
 		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)

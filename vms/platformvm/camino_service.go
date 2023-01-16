@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"go.uber.org/zap"
 
 	utilsjson "github.com/ava-labs/avalanchego/utils/json"
@@ -33,11 +34,18 @@ var (
 	errCreateTransferables    = errors.New("couldn't create transferables")
 	errSerializeTransferables = errors.New("couldn't serialize transferables")
 	errEncodeTransferables    = errors.New("couldn't encode transferables as string")
+	errWrongOwnerType         = errors.New("wrong owner type")
 )
 
 // CaminoService defines the API calls that can be made to the platform chain
 type CaminoService struct {
 	Service
+}
+
+// APIOwner is a representation of an owner used in API calls
+type APIOwner struct {
+	Addresses []string         `json:"addresses"`
+	Threshold utilsjson.Uint32 `json:"threshold"`
 }
 
 type GetBalanceResponseV2 struct {
@@ -266,12 +274,8 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 	return nil
 }
 
-type GetAddressStateArgs struct {
-	Address string `json:"address"`
-}
-
 // GetAdressStates retrieves the state applied to an address (see setAddressState)
-func (s *CaminoService) GetAddressStates(_ *http.Request, args *GetAddressStateArgs, response *utilsjson.Uint64) error {
+func (s *CaminoService) GetAddressStates(_ *http.Request, args *api.JSONAddress, response *utilsjson.Uint64) error {
 	addr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
 		return err
@@ -283,6 +287,42 @@ func (s *CaminoService) GetAddressStates(_ *http.Request, args *GetAddressStateA
 	}
 
 	*response = utilsjson.Uint64(state)
+
+	return nil
+}
+
+type GetMultisigAliasReply struct {
+	Memo types.JSONByteSlice `json:"memo"`
+	APIOwner
+}
+
+// GetMultisigAlias retrieves the owners and threshold for a given multisig alias
+func (s *CaminoService) GetMultisigAlias(_ *http.Request, args *api.JSONAddress, response *GetMultisigAliasReply) error {
+	addr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
+	if err != nil {
+		return err
+	}
+
+	alias, err := s.vm.state.GetMultisigAlias(addr)
+	if err != nil {
+		return err
+	}
+	owners, ok := alias.Owners.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return errWrongOwnerType
+	}
+
+	response.Memo = alias.Memo
+	response.Threshold = utilsjson.Uint32(owners.Threshold)
+	response.Addresses = make([]string, len(owners.Addrs))
+
+	for index, addr := range owners.Addrs {
+		addrString, err := s.addrManager.FormatLocalAddress(addr)
+		if err != nil {
+			return err
+		}
+		response.Addresses[index] = addrString
+	}
 
 	return nil
 }

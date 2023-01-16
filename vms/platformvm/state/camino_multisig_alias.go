@@ -1,45 +1,44 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-type MultisigOwner struct {
-	Alias  ids.ShortID
-	Memo   types.JSONByteSlice      `serialize:"true" json:"memo"`
-	Owners secp256k1fx.OutputOwners `serialize:"true" json:"owners"`
-}
+var errWrongOwnerType = errors.New("wrong owner type")
 
-func FromGenesisMultisigAlias(msig genesis.MultisigAlias) *MultisigOwner {
+func FromGenesisMultisigAlias(msig genesis.MultisigAlias) *multisig.Alias {
 	// Important! OutputOwners expects sorted list of addresses
 	owners := msig.Addresses
 	utils.Sort(owners)
 
-	return &MultisigOwner{
-		Alias: msig.Alias,
-		Memo:  types.JSONByteSlice(msig.Memo),
-		Owners: secp256k1fx.OutputOwners{
+	return &multisig.Alias{
+		ID:   msig.Alias,
+		Memo: types.JSONByteSlice(msig.Memo),
+		Owners: &secp256k1fx.OutputOwners{
 			Threshold: msig.Threshold,
 			Addrs:     owners,
 		},
 	}
 }
 
-func (cs *caminoState) SetMultisigOwner(ma *MultisigOwner) {
-	cs.modifiedMultisigOwners[ma.Alias] = ma
+func (cs *caminoState) SetMultisigAlias(ma *multisig.Alias) {
+	cs.modifiedMultisigOwners[ma.ID] = ma
 }
 
-func (cs *caminoState) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
+func (cs *caminoState) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
 	if owner, exist := cs.modifiedMultisigOwners[alias]; exist {
 		return owner, nil
 	}
@@ -49,15 +48,15 @@ func (cs *caminoState) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, erro
 		return nil, err
 	}
 
-	multisigOwner := &MultisigOwner{}
-	_, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigOwner)
+	multisigAlias := &multisig.Alias{}
+	_, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigAlias)
 	if err != nil {
 		return nil, err
 	}
 
-	multisigOwner.Alias = alias
+	multisigAlias.ID = alias
 
-	return multisigOwner, nil
+	return multisigAlias, nil
 }
 
 func (cs *caminoState) writeMultisigOwners() error {
@@ -78,4 +77,24 @@ func (cs *caminoState) writeMultisigOwners() error {
 		}
 	}
 	return nil
+}
+
+func GetOwner(state Chain, addr ids.ShortID) (*secp256k1fx.OutputOwners, error) {
+	msigOwner, err := state.GetMultisigAlias(addr)
+	if err != nil && err != database.ErrNotFound {
+		return nil, err
+	}
+
+	if msigOwner != nil {
+		owners, ok := msigOwner.Owners.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return nil, errWrongOwnerType
+		}
+		return owners, nil
+	}
+
+	return &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}, nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -13,11 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/msig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -46,6 +44,7 @@ var (
 	errConsortiumMemberHasNode    = errors.New("consortium member already has registered node")
 	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
 	errNotNodeOwner               = errors.New("node is registered for another consortium member address")
+	errWrongOwnerType             = errors.New("wrong owner type")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -127,7 +126,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	consortiumMemberOwner, err := msig.GetOwner(e.State, consortiumMemberAddress)
+	consortiumMemberOwner, err := state.GetOwner(e.State, consortiumMemberAddress)
 	if err != nil {
 		return err
 	}
@@ -176,6 +175,19 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 				tx.Validator.NodeID,
 				err,
 			)
+		}
+
+		rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return errWrongOwnerType
+		}
+
+		if err := e.Fx.VerifyMultisigOwner(
+			&secp256k1fx.TransferOutput{
+				OutputOwners: *rewardOwner,
+			}, e.State,
+		); err != nil {
+			return err
 		}
 
 		// Verify the flowcheck
@@ -501,6 +513,19 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errDepositToSmall
 	}
 
+	rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return errWrongOwnerType
+	}
+
+	if err := e.Fx.VerifyMultisigOwner(
+		&secp256k1fx.TransferOutput{
+			OutputOwners: *rewardOwner,
+		}, e.State,
+	); err != nil {
+		return err
+	}
+
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
@@ -640,7 +665,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	// verify consortium member cred
 
-	consortiumMemberOwner, err := msig.GetOwner(e.State, tx.ConsortiumMemberAddress)
+	consortiumMemberOwner, err := state.GetOwner(e.State, tx.ConsortiumMemberAddress)
 	if err != nil {
 		return err
 	}
@@ -756,7 +781,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		return fmt.Errorf("%w: %s", errRecoverAdresses, err)
 	}
 
-	if addresses.Len() == 0 {
+	if len(addresses) == 0 {
 		return errWrongNumberOfCredentials
 	}
 
@@ -834,10 +859,10 @@ func verifyAccess(roles, statesBit uint64) error {
 	return nil
 }
 
-func verifyAddrsOwner(addrs set.Set[ids.ShortID], owner *secp256k1fx.OutputOwners) error {
+func verifyAddrsOwner(addrs secp256k1fx.RecoverMap, owner *secp256k1fx.OutputOwners) error {
 	matchingSigsCount := uint32(0)
 	for _, addr := range owner.Addrs {
-		if addrs.Contains(addr) {
+		if _, exists := addrs[addr]; exists {
 			matchingSigsCount++
 			if matchingSigsCount == owner.Threshold {
 				return nil

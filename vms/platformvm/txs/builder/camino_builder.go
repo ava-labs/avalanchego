@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/msig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -369,7 +368,7 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	}
 	signers = append(signers, nodeSigners)
 
-	consortiumMemberOwner, err := msig.GetOwner(b.state, consortiumMemberAddress)
+	consortiumMemberOwner, err := state.GetOwner(b.state, consortiumMemberAddress)
 	if err != nil {
 		return nil, err
 	}

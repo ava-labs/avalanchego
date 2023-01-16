@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package crypto
@@ -85,4 +85,9 @@ func FakePrivateKey(addr ids.ShortID) *PrivateKeySECP256K1R {
 			addr: addr,
 		},
 	}
+}
+
+// IsFakeKey returns true if sk's key is zero
+func (k *PrivateKeySECP256K1R) IsZero() bool {
+	return k.sk.Key.IsZero()
 }

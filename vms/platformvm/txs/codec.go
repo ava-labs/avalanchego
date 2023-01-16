@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -114,6 +114,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&UnlockDepositTx{}),
 		targetCodec.RegisterCustomType(&RegisterNodeTx{}),
 		targetCodec.RegisterCustomType(&BaseTx{}),
+		targetCodec.RegisterCustomType(&MultisigAliasTx{}),
 	)
 	return errs.Err
 }

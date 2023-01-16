@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utxo
@@ -452,6 +452,7 @@ func TestLock(t *testing.T) {
 				internalState.EXPECT().GetUTXO(utxo.InputID()).Return(testState.GetUTXO(utxo.InputID()))
 			}
 			internalState.EXPECT().UTXOIDs(address.Bytes(), ids.Empty, math.MaxInt).Return(utxoIDs, nil)
+			internalState.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
 
 			testHandler := defaultCaminoHandler(t, internalState)
 
@@ -484,7 +485,10 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	err = fx.Bootstrapped()
 	require.NoError(t, err)
 
-	testHandler := defaultCaminoHandler(t, nil)
+	ctrl := gomock.NewController(t)
+	internalState := state.NewMockState(ctrl)
+	internalState.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+	testHandler := defaultCaminoHandler(t, internalState)
 
 	assetID := testHandler.ctx.AVAXAssetID
 
@@ -976,9 +980,7 @@ func TestUnlockDeposit(t *testing.T) {
 }
 
 func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
-	testHandler := defaultCaminoHandler(t, nil)
-	ctx := testHandler.ctx
-
+	assetID := snow.DefaultContextTest().AVAXAssetID
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.Initialize([]byte{0})
 	var nilCreds *secp256k1fx.Credential
@@ -1012,9 +1014,10 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 		assetID      ids.ID
 	}
 	tests := map[string]struct {
-		args args
-		want map[ids.ID]uint64
-		err  error
+		handlerState func(ctrl *gomock.Controller) state.State
+		args         args
+		want         map[ids.ID]uint64
+		err          error
 	}{
 		"Inputs Credentials Mismatch": {
 			args: args{
@@ -1058,10 +1061,10 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(depositID, ctx.AVAXAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+					generateTestUTXO(depositID, assetID, 1, outputOwners, ids.Empty, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, depositID, ids.Empty, sigIndices),
 				},
 				creds: []verify.Verifiable{cred1},
 			},
@@ -1075,15 +1078,15 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, 1, outputOwners, ids.Empty, depositID),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, depositID),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
 				},
 				creds:   []verify.Verifiable{cred1},
 				assetID: depositID,
 			},
-			err: fmt.Errorf("utxo %d has asset ID %s but expect %s: %w", 0, ctx.AVAXAssetID, depositID, errAssetIDMismatch),
+			err: fmt.Errorf("utxo %d has asset ID %s but expect %s: %w", 0, assetID, depositID, errAssetIDMismatch),
 		},
 		"Input AssetID mismatch": {
 			args: args{
@@ -1096,7 +1099,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					generateTestUTXO(ids.ID{9, 9}, depositID, 1, outputOwners, ids.Empty, depositID),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
 				},
 				creds:   []verify.Verifiable{cred1},
 				assetID: depositID,
@@ -1111,13 +1114,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, 1, outputOwners, ids.Empty, depositID),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, depositID),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
 				},
 				creds:   []verify.Verifiable{cred1},
-				assetID: ctx.AVAXAssetID,
+				assetID: assetID,
 			},
 			err: errUnlockingUnlockedUTXO,
 		},
@@ -1129,13 +1132,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
 				},
 				creds:   []verify.Verifiable{cred1},
-				assetID: ctx.AVAXAssetID,
+				assetID: assetID,
 			},
 			err: errLockedFundsNotMarkedAsLocked,
 		},
@@ -1148,14 +1151,14 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1+1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1+1, depositID, ids.Empty, sigIndices),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: fmt.Errorf("failed to verify transfer: utxo inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Am"),
 		},
@@ -1170,14 +1173,14 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, depositID, ids.Empty, sigIndices),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 1 + 1,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: errNotBurnedEnough,
 		},
@@ -1192,17 +1195,17 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, unlockableAmount+1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount+1, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, unlockableAmount+1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount+1, depositID, ids.Empty, sigIndices),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(ctx.AVAXAssetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(assetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: fmt.Errorf("unlockedDepositAmount %d > %d unlockableAmount: %w", unlockableAmount+1, unlockableAmount, errUnlockedMoreThanAvailable),
 		},
@@ -1215,17 +1218,17 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(ctx.AVAXAssetID, deposit1.Amount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(assetID, deposit1.Amount+1, outputOwners, ids.Empty, ids.Empty),
 				},
 				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: errWrongProducedAmount,
 		},
@@ -1238,17 +1241,17 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(ctx.AVAXAssetID, unlockableAmount, outputOwners, ids.Empty, otherID),
+					generateTestOut(assetID, unlockableAmount, outputOwners, ids.Empty, otherID),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: errWrongProducedAmount,
 		},
@@ -1263,17 +1266,17 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, deposit1.Amount/2, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount/2, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, deposit1.Amount/2, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount/2, depositID, ids.Empty, sigIndices),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(ctx.AVAXAssetID, deposit1.Amount/2, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(assetID, deposit1.Amount/2, outputOwners, ids.Empty, ids.Empty),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			err: errNotConsumedDeposit,
 		},
@@ -1288,14 +1291,14 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
 				},
 				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
 			},
 			want: map[ids.ID]uint64{depositID: deposit1.Amount},
 		},
@@ -1310,30 +1313,70 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
 				},
 				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
 				burnedAmount: 0,
-				assetID:      ctx.AVAXAssetID,
+				assetID:      assetID,
+			},
+			want: map[ids.ID]uint64{depositID: unlockableAmount},
+		},
+		"Success (not expired deposit), burn fee": {
+			handlerState: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().GetMultisigAlias(outputOwners.Addrs[0]).Return(nil, database.ErrNotFound)
+				return s
+			},
+			args: args{
+				chainState: func(ctrl *gomock.Controller) state.Chain {
+					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
+					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					return s
+				},
+				tx: tx,
+				utxos: []*avax.UTXO{
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, ids.Empty),
+					generateTestUTXO(ids.ID{9, 11}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+				},
+				ins: []*avax.TransferableInput{
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+				},
+				creds:        []verify.Verifiable{cred1, cred1},
+				burnedAmount: 1,
+				assetID:      assetID,
 			},
 			want: map[ids.ID]uint64{depositID: unlockableAmount},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			var handlerState state.State
+			if tt.handlerState != nil {
+				handlerState = tt.handlerState(ctrl)
+			} else {
+				handlerState = state.NewMockState(ctrl)
+			}
+			testHandler := defaultCaminoHandler(t, handlerState)
+
 			got, err := testHandler.VerifyUnlockDepositedUTXOs(tt.args.chainState(ctrl), tt.args.tx, tt.args.utxos, tt.args.ins, tt.args.outs, tt.args.creds, tt.args.burnedAmount, tt.args.assetID)
 
 			if tt.err != nil {
-				require.ErrorContains(t, err, tt.err.Error())
+				require.ErrorContains(err, tt.err.Error())
 				return
 			}
 
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.NoError(err)
+			require.Equal(tt.want, got)
 		})
 	}
 }

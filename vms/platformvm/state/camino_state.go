@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -69,12 +70,12 @@ func (s *state) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return s.caminoState.GetDeposit(depositTxID)
 }
 
-func (s *state) SetMultisigOwner(owner *MultisigOwner) {
-	s.caminoState.SetMultisigOwner(owner)
+func (s *state) SetMultisigAlias(owner *multisig.Alias) {
+	s.caminoState.SetMultisigAlias(owner)
 }
 
-func (s *state) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
-	return s.caminoState.GetMultisigOwner(alias)
+func (s *state) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
+	return s.caminoState.GetMultisigAlias(alias)
 }
 
 func (s *state) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {

@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utxo
@@ -11,7 +11,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -324,7 +323,7 @@ func (h *handler) Lock(
 			continue
 		}
 
-		inIntf, inSigners, err := kc.Spend(innerOut, now)
+		inIntf, inSigners, err := kc.SpendMultiSig(innerOut, now, h.utxosReader)
 		if err != nil {
 			// We couldn't spend the output, so move on to the next one
 			continue
@@ -355,7 +354,7 @@ func (h *handler) Lock(
 			if toOwnerID != nil {
 				lockedOwnerID = OwnerID{to, toOwnerID}
 			}
-			if changeOwnerID != nil {
+			if changeOwnerID != nil && !h.isMultisigTransferOutput(innerOut) {
 				remainingOwnerID = OwnerID{change, changeOwnerID}
 			}
 		}
@@ -676,7 +675,7 @@ func (h *handler) UnlockDeposit(
 			continue
 		}
 
-		inIntf, inSigners, err := kc.Spend(innerOut, currentTimestamp)
+		inIntf, inSigners, err := kc.SpendMultiSig(innerOut, currentTimestamp, h.utxosReader)
 		if err != nil {
 			// We couldn't spend the output, so move on to the next one
 			continue
@@ -876,13 +875,7 @@ func (h *handler) VerifyLockUTXOs(
 			return errLockedFundsNotMarkedAsLocked
 		}
 
-		// Get output signed by real owners (would stay the same if its not msig)
-		out, err := h.getMultisigTransferOutput(out)
-		if err != nil {
-			return err
-		}
-		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyMultisigTransfer(tx, in, creds[index], out, h.utxosReader); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -924,6 +917,11 @@ func (h *handler) VerifyLockUTXOs(
 		if lockedOut, ok := out.(*locked.Out); ok {
 			lockIDs = &lockedOut.IDs
 			out = lockedOut.TransferableOut
+		} else {
+			// unlocked tokens can be transferred and must be checked
+			if err := h.fx.VerifyMultisigOwner(out, h.utxosReader); err != nil {
+				return err
+			}
 		}
 
 		otherLockTxID := &lockIDs.DepositTxID
@@ -1142,12 +1140,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			}
 			depUnlock.consumed = newAmount
 		} else {
-			// Get output signed by real owners (would stay the same if its not msig)
-			out, err := h.getMultisigTransferOutput(out)
-			if err != nil {
-				return nil, err
-			}
-			if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+			if err := h.fx.VerifyMultisigTransfer(tx, in, creds[index], out, h.utxosReader); err != nil {
 				return nil, fmt.Errorf("failed to verify transfer: %w", err)
 			}
 
@@ -1170,6 +1163,11 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 		if isLocked {
 			lockIDs = &lockedOut.IDs
 			out = lockedOut.TransferableOut
+		} else {
+			// unlocked tokens can be transferred and must be checked
+			if err := h.fx.VerifyMultisigOwner(out, h.utxosReader); err != nil {
+				return nil, err
+			}
 		}
 
 		producedAmount := out.Amount()
@@ -1302,16 +1300,11 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	return unlockedAmount, nil
 }
 
-func (h *handler) getMultisigTransferOutput(out verify.State) (verify.State, error) {
+func (h *handler) isMultisigTransferOutput(out verify.State) bool {
 	secpOut, ok := out.(*secp256k1fx.TransferOutput)
 	if !ok {
 		// Conversion should succeed, otherwise it will be handled by the caller
-		return secpOut, nil
-	}
-
-	if len(secpOut.Addrs) != 1 {
-		// There always should be just one, otherwise it is not a multisig
-		return secpOut, nil
+		return false
 	}
 
 	// ! because currently there is no support for adding new msig aliases after genesis,
@@ -1319,22 +1312,15 @@ func (h *handler) getMultisigTransferOutput(out verify.State) (verify.State, err
 	// ! that must be changed later
 	state, ok := h.utxosReader.(state.State)
 	if !ok {
-		return secpOut, nil
+		return false
 	}
 
-	owner, err := state.GetMultisigOwner(secpOut.Addrs[0])
-	if err != nil {
-		if err == database.ErrNotFound {
-			return secpOut, nil
+	for _, addr := range secpOut.Addrs {
+		if _, err := state.GetMultisigAlias(addr); err == nil {
+			return true
 		}
-
-		return secpOut, err
 	}
-
-	return &secp256k1fx.TransferOutput{
-		Amt:          secpOut.Amount(),
-		OutputOwners: owner.Owners,
-	}, nil
+	return false
 }
 
 type innerSortUTXOs struct {
