@@ -688,7 +688,6 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 	)
@@ -966,7 +965,6 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		m.ResourceTracker,
 		subnetConnector,
 	)
@@ -1093,7 +1091,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get() == snow.NormalOp
+	return chain.Context().State.Get().State == snow.NormalOp
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {

@@ -76,7 +76,7 @@ type ConsensusContext struct {
 	ConsensusAcceptor Acceptor
 
 	// State indicates the current state of this consensus instance.
-	State utils.Atomic[State]
+	State utils.Atomic[EngineState]
 
 	// True iff this chain is executing transactions as part of bootstrapping.
 	Executing utils.Atomic[bool]
