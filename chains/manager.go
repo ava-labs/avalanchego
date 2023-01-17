@@ -139,7 +139,8 @@ type ChainParameters struct {
 
 type chain struct {
 	Name    string
-	Engine  common.Engine
+	Context *snow.ConsensusContext
+	VM      common.VM
 	Handler handler.Handler
 	Beacons validators.Set
 }
@@ -373,7 +374,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	}
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Engine)
+	m.notifyRegistrants(chain.Name, chain.Context, chain.VM)
 
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
@@ -784,7 +785,8 @@ func (m *manager) createAvalancheChain(
 
 	return &chain{
 		Name:    chainAlias,
-		Engine:  engine,
+		Context: ctx,
+		VM:      vm,
 		Handler: handler,
 	}, nil
 }
@@ -1077,7 +1079,8 @@ func (m *manager) createSnowmanChain(
 
 	return &chain{
 		Name:    chainAlias,
-		Engine:  engine,
+		Context: ctx,
+		VM:      vm,
 		Handler: handler,
 	}, nil
 }
@@ -1183,9 +1186,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) {
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, vm common.VM) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(name, engine)
+		registrant.RegisterChain(name, ctx, vm)
 	}
 }
 
