@@ -78,7 +78,7 @@ type State interface {
 	//
 	// Invariant: After the chain is linearized, this function is expected to be
 	// called during startup.
-	InitializeChainState(genesisID ids.ID, genesisTimestamp time.Time) error
+	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
 	// TODO: deprecate statuses. We should only persist accepted state
 	// Status returns a status from storage.
@@ -344,10 +344,10 @@ func (s *state) AddBlock(block blocks.Block) {
 	s.addedBlocks[blkID] = block
 }
 
-func (s *state) InitializeChainState(genesisID ids.ID, genesisTimestamp time.Time) error {
+func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err == database.ErrNotFound {
-		return s.initializeChainState(genesisID, genesisTimestamp)
+		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
 		return err
 	}
@@ -358,9 +358,9 @@ func (s *state) InitializeChainState(genesisID ids.ID, genesisTimestamp time.Tim
 	return err
 }
 
-func (s *state) initializeChainState(genesisID ids.ID, genesisTimestamp time.Time) error {
+func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
 	genesis, err := blocks.NewStandardBlock(
-		genesisID,
+		stopVertexID,
 		0,
 		genesisTimestamp,
 		nil,
@@ -370,8 +370,8 @@ func (s *state) initializeChainState(genesisID ids.ID, genesisTimestamp time.Tim
 		return err
 	}
 
-	s.SetLastAccepted(genesisID)
-	s.SetTimestamp(genesisTimestamp)
+	s.SetLastAccepted(genesis.ID())
+	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
 	return s.Commit()
 }
