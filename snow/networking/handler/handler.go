@@ -489,7 +489,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
 				zap.Uint32("requestID", msg.RequestId),
 				zap.String("field", "Heights"),
-				zap.Error(err),
 			)
 			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
