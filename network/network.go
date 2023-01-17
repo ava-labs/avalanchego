@@ -1135,9 +1135,9 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
-
 	if n.closing {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1148,6 +1148,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	if _, connecting := n.connectingPeers.GetByID(nodeID); connecting {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1158,6 +1160,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1194,6 +1198,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		),
 	)
 	n.connectingPeers.Add(peer)
+	n.peersLock.Unlock()
 	return nil
 }
 
