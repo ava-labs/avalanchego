@@ -10,6 +10,7 @@ uid = str(uuid.uuid4())
 file = '.github/workflows/amichange.json'
 packerfile = ".github/packer/ubuntu-focal-x86_64-public-ami.json"
 
+update_marketplace = True
 product_id = os.getenv('PRODUCT_ID')
 role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
@@ -19,7 +20,7 @@ variables = [product_id,role_arn,tag]
 for var in variables:
   if var is None:
     print("A Variable is not set correctly or this is not the right repo.  Only validating packer.")
-    update_marketpalce = False
+    update_marketplace = False
 
 if 'rc' in tag:
   print("This is a release candidate.  Nothing to do.")
