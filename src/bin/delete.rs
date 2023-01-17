@@ -11,12 +11,13 @@ pub struct Options {
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.
     #[arg(
+        long,
         required = false,
         value_name = "DB_NAME",
         default_value_t = String::from("firewood"),
         help = "Name of the database"
     )]
-    pub db_path: String,
+    pub db: String,
 }
 
 pub fn run(opts: &Options) -> Result<()> {
@@ -25,7 +26,7 @@ pub fn run(opts: &Options) -> Result<()> {
         .truncate(false)
         .wal(WALConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db_path.as_str(), &cfg.build()) {
+    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
         Ok(db) => db,
         Err(_) => return Err(anyhow!("error opening database")),
     };
