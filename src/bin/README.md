@@ -26,14 +26,26 @@ $ ./target/release/fwdctl -h
 ## Examples
 * fwdctl create
 ```
-# Check available options when creating a database, including the defaults
+# Check available options when creating a database, including the defaults.
 $ fwdctl create -h
-# Create a new, blank instance of firewood with a custom name
-$ fwdctl create --name=my-db
-# Look inside, there are several folders representing different components of firewood, including the WAL
-$ ls my-db
+# Create a new, blank instance of firewood using the default name "firewood".
+$ fwdctl create
+# Look inside, there are several folders representing different components of firewood, including the WAL.
+$ ls firewood
 ```
 * fwdctl get <KEY>
+```
+Get the value associated with a key in the database, if it exists.
+fwdctl get --key <KEY>
+```
 * fwdctl insert --key <KEY> --value <VALUE>
+```
+Insert a key/value pair into the database.
+fwdctl insert --key <KEY> --value <VALUE>
+```
 * fwdctl delete <KEY>
+```
+Delete a key from the database, along with the associated value.
+fwdctl delete --key <KEY>
+```
 
