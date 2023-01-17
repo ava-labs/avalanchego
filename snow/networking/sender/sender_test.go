@@ -118,7 +118,6 @@ func TestTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Hour,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -141,7 +140,10 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx2.State.Set(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping, // assumed bootstrap is ongoing
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -377,7 +379,6 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		nil,
 		1,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -410,7 +411,10 @@ func TestReliableMessages(t *testing.T) {
 	}
 	bootstrapper.CantGossip = false
 	handler.SetBootstrapper(bootstrapper)
-	ctx2.State.Set(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping, // assumed bootstrap is ongoing
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -503,7 +507,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -535,7 +538,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx2.State.Set(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping, // assumed bootstrap is ongoing
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 

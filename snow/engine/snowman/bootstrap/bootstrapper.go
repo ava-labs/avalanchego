@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -121,7 +122,10 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
-	b.Ctx.State.Set(snow.Bootstrapping)
+	b.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping,
+	})
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)

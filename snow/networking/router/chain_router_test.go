@@ -89,7 +89,6 @@ func TestShutdown(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -133,7 +132,10 @@ func TestShutdown(t *testing.T) {
 	}
 	engine.HaltF = func(context.Context) {}
 	handler.SetConsensus(engine)
-	ctx.State.Set(snow.NormalOp) // assumed bootstrap is done
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp, // assumed bootstrapping is done
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -212,7 +214,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -255,7 +256,10 @@ func TestShutdownTimesOut(t *testing.T) {
 		return nil
 	}
 	handler.SetConsensus(engine)
-	ctx.State.Set(snow.NormalOp) // assumed bootstrapping is done
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp, // assumed bootstrapping is done
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -353,7 +357,6 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -423,7 +426,10 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.State.Set(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -670,7 +676,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -696,7 +701,10 @@ func TestRouterClearTimeouts(t *testing.T) {
 		return ctx
 	}
 	handler.SetConsensus(engine)
-	ctx.State.Set(snow.NormalOp) // assumed bootstrapping is done
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp, // assumed bootstrapping is done
+	})
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -944,7 +952,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -968,7 +975,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.State.Set(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
+	})
 
 	engine := &common.EngineTest{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
@@ -1105,7 +1115,6 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -1123,15 +1132,20 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
-		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 
 	// assumed bootstrapping is done
-	responder.State.Set(snow.NormalOp)
-	requester.State.Set(snow.NormalOp)
+	responder.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp,
+	})
+	requester.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp,
+	})
 
 	// router tracks two chains - one will send a message to the other
 	chainRouter.AddChain(context.Background(), requesterHandler)
@@ -1231,7 +1245,10 @@ func TestConnectedSubnet(t *testing.T) {
 	platform.Registerer = prometheus.NewRegistry()
 	platform.Metrics = metrics.NewOptionalGatherer()
 	platform.Executing.Set(false)
-	platform.State.Set(snow.NormalOp)
+	platform.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.NormalOp,
+	})
 
 	myConnectedMsg := message.InternalConnected(myNodeID, version.CurrentApp)
 	mySubnetConnectedMsg0 := message.InternalConnectedSubnet(myNodeID, subnetID0)

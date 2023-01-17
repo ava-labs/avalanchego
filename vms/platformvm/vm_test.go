@@ -1650,7 +1650,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
-	consensusCtx.State.Set(snow.Initializing)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -1838,7 +1837,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		cpuTracker,
 		vm,
 	)

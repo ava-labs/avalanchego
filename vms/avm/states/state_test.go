@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -268,4 +269,46 @@ func ChainBlockTest(t *testing.T, c Chain) {
 	fetchedBlk, err = c.GetBlock(blkID)
 	require.NoError(err)
 	require.Equal(blk, fetchedBlk)
+}
+
+func TestInitializeChainState(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	vdb := versiondb.New(db)
+	s, err := New(vdb, parser, prometheus.NewRegistry())
+	require.NoError(err)
+
+	stopVertexID := ids.GenerateTestID()
+	genesisTimestamp := version.XChainMigrationDefaultTime
+	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
+	require.NoError(err)
+
+	lastAcceptedID := s.GetLastAccepted()
+	genesis, err := s.GetBlock(lastAcceptedID)
+	require.NoError(err)
+	require.Equal(stopVertexID, genesis.Parent())
+	require.Equal(genesisTimestamp.UnixNano(), genesis.Timestamp().UnixNano())
+
+	childBlock, err := blocks.NewStandardBlock(
+		genesis.ID(),
+		genesis.Height()+1,
+		genesisTimestamp,
+		nil,
+		parser.Codec(),
+	)
+	require.NoError(err)
+
+	s.AddBlock(childBlock)
+	s.SetLastAccepted(childBlock.ID())
+	err = s.Commit()
+	require.NoError(err)
+
+	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
+	require.NoError(err)
+
+	lastAcceptedID = s.GetLastAccepted()
+	lastAccepted, err := s.GetBlock(lastAcceptedID)
+	require.NoError(err)
+	require.Equal(genesis.ID(), lastAccepted.Parent())
 }

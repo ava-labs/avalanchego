@@ -138,7 +138,8 @@ type ChainParameters struct {
 
 type chain struct {
 	Name    string
-	Engine  common.Engine
+	Context *snow.ConsensusContext
+	VM      common.VM
 	Handler handler.Handler
 	Beacons validators.Set
 }
@@ -373,7 +374,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	}
 
 	// Notify those that registered to be notified when a new chain is created
-	m.notifyRegistrants(chain.Name, chain.Engine)
+	m.notifyRegistrants(chain.Name, chain.Context, chain.VM)
 
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
@@ -687,7 +688,6 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 	)
@@ -784,7 +784,8 @@ func (m *manager) createAvalancheChain(
 
 	return &chain{
 		Name:    chainAlias,
-		Engine:  engine,
+		Context: ctx,
+		VM:      vm,
 		Handler: handler,
 	}, nil
 }
@@ -969,7 +970,6 @@ func (m *manager) createSnowmanChain(
 		msgChan,
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		m.ResourceTracker,
 		subnetConnector,
 	)
@@ -1082,7 +1082,8 @@ func (m *manager) createSnowmanChain(
 
 	return &chain{
 		Name:    chainAlias,
-		Engine:  engine,
+		Context: ctx,
+		VM:      vm,
 		Handler: handler,
 	}, nil
 }
@@ -1095,7 +1096,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get() == snow.NormalOp
+	return chain.Context().State.Get().State == snow.NormalOp
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
@@ -1188,9 +1189,9 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) {
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
-func (m *manager) notifyRegistrants(name string, engine common.Engine) {
+func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, vm common.VM) {
 	for _, registrant := range m.registrants {
-		registrant.RegisterChain(name, engine)
+		registrant.RegisterChain(name, ctx, vm)
 	}
 }
 
