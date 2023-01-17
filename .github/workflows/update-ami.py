@@ -18,14 +18,12 @@ variables = [product_id,role_arn,tag]
 
 for var in variables:
   if var is None:
-    print("A Variable is not set correctly or this is not the right repo.  Exiting.")
-    exit(0)
+    print("A Variable is not set correctly or this is not the right repo.  Only validating packer.")
+    update_marketpalce = False
 
 if 'rc' in tag:
   print("This is a release candidate.  Nothing to do.")
   exit(0)
-  
-client = boto3.client('marketplace-catalog',region_name='us-east-1')
 
 def packer_build(packerfile):
   p = packer.Packer(packerfile)
@@ -44,24 +42,28 @@ def parse_amichange(object):
 
 amiid=packer_build(packerfile)
 
-try:
-  response = client.start_change_set(
-    Catalog='AWSMarketplace',
-    ChangeSet=[
-      {
-        'ChangeType': 'AddDeliveryOptions',
-        'Entity': {
-          'Type': 'AmiProduct@1.0',
-          'Identifier': product_id
-        },
-          'Details': parse_amichange(file),
-          'ChangeName': 'Update'
-        },
-      ],
-      ChangeSetName='AvalancheGo Update ' + tag,
-      ClientRequestToken=uid
-  )
-  print(response)
-except client.exceptions.ResourceInUseException:
-  print("The product is currently blocked by Amazon.  Please check the product site for more details")
+if update_marketplace:
+
+  client = boto3.client('marketplace-catalog',region_name='us-east-1')
+
+  try:
+    response = client.start_change_set(
+      Catalog='AWSMarketplace',
+      ChangeSet=[
+        {
+          'ChangeType': 'AddDeliveryOptions',
+          'Entity': {
+            'Type': 'AmiProduct@1.0',
+            'Identifier': product_id
+          },
+            'Details': parse_amichange(file),
+            'ChangeName': 'Update'
+          },
+        ],
+        ChangeSetName='AvalancheGo Update ' + tag,
+        ClientRequestToken=uid
+    )
+    print(response)
+  except client.exceptions.ResourceInUseException:
+    print("The product is currently blocked by Amazon.  Please check the product site for more details")
 
