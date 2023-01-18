@@ -2,8 +2,10 @@ name: build-public-ami
 
 on:
   push:
-    tags:
-      - "*"
+#    tags:
+#      - "*"
+    branches:
+      - packer_validate
   workflow_dispatch:
     inputs:
       tag:
@@ -52,6 +54,7 @@ jobs:
 
       - name: Create AMI and upload to marketplace
         run: |
+          /usr/local/bin/packer build .github/packer/ubuntu-focal-x86_64-public-ami.json
           ./.github/workflows/update-ami.py
         env:
           TAG: ${{ env.VERSION }}
