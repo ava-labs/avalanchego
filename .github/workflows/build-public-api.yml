@@ -2,10 +2,8 @@ name: build-public-ami
 
 on:
   push:
-#    tags:
-#      - "*"
-    branches:
-      - packer_validate
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       tag:
