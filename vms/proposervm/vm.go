@@ -75,6 +75,7 @@ type VM struct {
 	state.State
 	hIndexer indexer.HeightIndexer
 
+	proposer.Retriever
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
@@ -169,6 +170,11 @@ func (vm *VM) Initialize(
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
+
+	proposerRetriever := proposer.NewRetriever(vm.ctx.ValidatorState, vm.ctx.SubnetID, vm.ctx.ChainID)
+	vm.Retriever = proposerRetriever
+	vm.ctx.ProposerRetriever = proposerRetriever
+
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
