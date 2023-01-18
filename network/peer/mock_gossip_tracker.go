@@ -38,18 +38,18 @@ func (m *MockGossipTracker) EXPECT() *MockGossipTrackerMockRecorder {
 }
 
 // AddKnown mocks base method.
-func (m *MockGossipTracker) AddKnown(arg0 ids.NodeID, arg1 []ids.ID) ([]ids.ID, bool) {
+func (m *MockGossipTracker) AddKnown(arg0 ids.NodeID, arg1, arg2 []ids.ID) ([]ids.ID, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddKnown", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddKnown", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]ids.ID)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // AddKnown indicates an expected call of AddKnown.
-func (mr *MockGossipTrackerMockRecorder) AddKnown(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockGossipTrackerMockRecorder) AddKnown(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddKnown", reflect.TypeOf((*MockGossipTracker)(nil).AddKnown), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddKnown", reflect.TypeOf((*MockGossipTracker)(nil).AddKnown), arg0, arg1, arg2)
 }
 
 // AddValidator mocks base method.
@@ -64,6 +64,21 @@ func (m *MockGossipTracker) AddValidator(arg0 ValidatorID) bool {
 func (mr *MockGossipTrackerMockRecorder) AddValidator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddValidator", reflect.TypeOf((*MockGossipTracker)(nil).AddValidator), arg0)
+}
+
+// GetNodeID mocks base method.
+func (m *MockGossipTracker) GetNodeID(arg0 ids.ID) (ids.NodeID, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeID", arg0)
+	ret0, _ := ret[0].(ids.NodeID)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetNodeID indicates an expected call of GetNodeID.
+func (mr *MockGossipTrackerMockRecorder) GetNodeID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeID", reflect.TypeOf((*MockGossipTracker)(nil).GetNodeID), arg0)
 }
 
 // GetUnknown mocks base method.
@@ -93,6 +108,20 @@ func (m *MockGossipTracker) RemoveValidator(arg0 ids.NodeID) bool {
 func (mr *MockGossipTrackerMockRecorder) RemoveValidator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveValidator", reflect.TypeOf((*MockGossipTracker)(nil).RemoveValidator), arg0)
+}
+
+// ResetValidator mocks base method.
+func (m *MockGossipTracker) ResetValidator(arg0 ids.NodeID) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetValidator", arg0)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ResetValidator indicates an expected call of ResetValidator.
+func (mr *MockGossipTrackerMockRecorder) ResetValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetValidator", reflect.TypeOf((*MockGossipTracker)(nil).ResetValidator), arg0)
 }
 
 // StartTrackingPeer mocks base method.

@@ -17,7 +17,7 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
-# Build avalanchego and plugins
+# Build avalanchego
 RUN ./scripts/build.sh
 
 # ============= Cleanup Stage ================

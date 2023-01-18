@@ -88,6 +88,11 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 	return nil
 }
 
+func (*linearCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.IntLen
+}
+
 func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

@@ -6,13 +6,10 @@ package config
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
-
-	"github.com/kardianos/osext"
 
 	"github.com/spf13/viper"
 
@@ -49,35 +46,13 @@ var (
 	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
 	defaultChainAliasFilePath   = filepath.Join(defaultChainConfigDir, "aliases.json")
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
+	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
-
-	// Places to look for the build directory
-	defaultBuildDirs = []string{}
 )
-
-func init() {
-	folderPath, err := osext.ExecutableFolder()
-	if err == nil {
-		defaultBuildDirs = append(defaultBuildDirs, folderPath)
-		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defaultBuildDirs = append(defaultBuildDirs,
-		wd,
-		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		defaultUnexpandedDataDir,
-	)
-}
 
 func addProcessFlags(fs *flag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
-
-	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
 	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
@@ -88,6 +63,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max")
+
+	// Plugin directory
+	fs.String(PluginDirKey, defaultPluginDir, "Path to the plugin directory")
 
 	// Config File
 	fs.String(ConfigFileKey, "", fmt.Sprintf("Specifies a config file. Ignored if %s is specified", ConfigContentKey))
@@ -174,6 +152,14 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(NetworkPeerReadBufferSizeKey, 8*units.KiB, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, 8*units.KiB, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
 
+	fs.Bool(NetworkTCPProxyEnabledKey, false, "Require all P2P connections to be initiated with a TCP proxy header")
+	// The PROXY protocol specification recommends setting this value to be at
+	// least 3 seconds to cover a TCP retransmit.
+	// Ref: https://www.haproxy.org/download/2.3/doc/proxy-protocol.txt
+	// Specifying a timeout of 0 will actually result in a timeout of 200ms, but
+	// a timeout of 0 should generally not be provided.
+	fs.Duration(NetworkTCPProxyReadTimeoutKey, 3*time.Second, "Maximum duration to wait for a TCP proxy header")
+
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
@@ -229,7 +215,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
-	fs.Bool(KeystoreAPIEnabledKey, true, "If true, this node exposes the Keystore API")
+	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
@@ -280,7 +266,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.RewardConfig.MintingPeriod, "Consumption period of the staking function")
 	fs.Uint64(StakeSupplyCapKey, genesis.LocalParams.RewardConfig.SupplyCap, "Supply cap of the staking function")
 	// Subnets
-	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate")
+	fs.String(WhitelistedSubnetsKey, "", fmt.Sprintf("[DEPRECATED] Use --%s", TrackSubnetsKey))
+	fs.String(TrackSubnetsKey, "", "List of subnets for the node to track. A node tracking a subnet will track the uptimes of the subnet validators and attempt to sync all the chains in the subnet. Before validating a subnet, a node should be tracking the subnet to avoid impacting their subnet validation uptime")
 
 	// State syncing
 	fs.String(StateSyncIPsKey, "", "Comma separated list of state sync peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")

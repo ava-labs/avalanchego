@@ -15,8 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -24,31 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func stopHeightReindexing(t *testing.T, coreVM *fullVM, dbMan manager.Manager) {
-	rawDB := dbMan.Current().Database
-	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	db := versiondb.New(prefixDB)
-	vmState := state.New(db)
-
-	if err := vmState.SetIndexHasReset(); err != nil {
-		t.Fatal("could not preload key to vm state")
-	}
-	if err := vmState.Commit(); err != nil {
-		t.Fatal("could not commit preloaded key")
-	}
-	if err := db.Commit(); err != nil {
-		t.Fatal("could not commit preloaded key")
-	}
-
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
-}
+var errUnknownSummary = errors.New("unknown summary")
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM := &fullVM{
@@ -65,10 +43,10 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		},
 	}
 
-	// Preload DB with key showing height index has been purged of rejected blocks
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-	stopHeightReindexing(t, innerVM, dbManager)
+	// signal height index is complete
+	innerVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	// load innerVM expectations
 	innerGenesisBlk := &snowman.TestBlock{
@@ -95,12 +73,20 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	}
 
 	// createVM
-	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
+	dbManager = dbManager.NewPrefixDBManager([]byte{})
+
+	vm := New(
+		innerVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 
 	err := vm.Initialize(
 		context.Background(),
@@ -204,10 +190,10 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -286,10 +272,10 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -371,10 +357,10 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -441,10 +427,10 @@ func TestParseStateSummary(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -501,10 +487,10 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -521,20 +507,20 @@ func TestStateSummaryAccept(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept accepted
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return true, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
 	}
-	accepted, err := summary.Accept(context.Background())
+	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.True(accepted)
+	require.Equal(block.StateSyncStatic, status)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return false, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncSkipped, nil
 	}
-	accepted, err = summary.Accept(context.Background())
+	status, err = summary.Accept(context.Background())
 	require.NoError(err)
-	require.False(accepted)
+	require.Equal(block.StateSyncSkipped, status)
 }
 
 func TestStateSummaryAcceptOlderBlock(t *testing.T) {
@@ -575,10 +561,10 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.ctx.StakingCertLeaf,
+		vm.stakingCertLeaf,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.ctx.StakingLeafSigner,
+		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -595,12 +581,12 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return true, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
 	}
-	accepted, err := summary.Accept(context.Background())
+	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.False(accepted)
+	require.Equal(block.StateSyncSkipped, status)
 }
 
 func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
@@ -623,7 +609,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	}
 	coreVM.GetStateSummaryF = func(_ context.Context, height uint64) (block.StateSummary, error) {
 		if height != summaryHeight {
-			return nil, errors.New("requested unexpected summary")
+			return nil, errUnknownSummary
 		}
 		return coreStateSummary, nil
 	}

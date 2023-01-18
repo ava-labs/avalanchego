@@ -163,10 +163,10 @@ type Node struct {
 	shutdownOnce sync.Once
 
 	// True if node is shutting down or is done shutting down
-	shuttingDown utils.AtomicBool
+	shuttingDown utils.Atomic[bool]
 
 	// Sets the exit code
-	shuttingDownExitCode utils.AtomicInterface
+	shuttingDownExitCode utils.Atomic[int]
 
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
@@ -285,7 +285,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		// shutdown.
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
-			if !n.shuttingDown.GetValue() {
+			if !n.shuttingDown.Get() {
 				n.Log.Warn("failed to connect to bootstrap nodes",
 					zap.Stringer("beacons", n.beacons),
 					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
@@ -325,7 +325,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.Beacons = n.beacons
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
-	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
+	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
 	n.Config.NetworkConfig.ResourceTracker = n.resourceTracker
@@ -362,7 +362,7 @@ func (n *Node) Dispatch() error {
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
-		if !n.shuttingDown.GetValue() {
+		if !n.shuttingDown.Get() {
 			n.Log.Fatal("API server dispatch failed",
 				zap.Error(err),
 			)
@@ -554,12 +554,18 @@ func (n *Node) initChains(genesisBytes []byte) {
 	n.chainManager.StartChainCreator(platformChain)
 }
 
+func (n *Node) initMetrics() {
+	n.MetricsRegisterer = prometheus.NewRegistry()
+	n.MetricsGatherer = metrics.NewMultiGatherer()
+}
+
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
 	if !n.Config.APIRequireAuthToken {
-		n.APIServer = server.New(
+		var err error
+		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
 			n.Config.HTTPHost,
@@ -569,8 +575,10 @@ func (n *Node) initAPIServer() error {
 			n.ID,
 			n.Config.TraceConfig.Enabled,
 			n.tracer,
+			"api",
+			n.MetricsRegisterer,
 		)
-		return nil
+		return err
 	}
 
 	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
@@ -578,7 +586,7 @@ func (n *Node) initAPIServer() error {
 		return err
 	}
 
-	n.APIServer = server.New(
+	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
@@ -588,8 +596,13 @@ func (n *Node) initAPIServer() error {
 		n.ID,
 		n.Config.TraceConfig.Enabled,
 		n.tracer,
+		"api",
+		n.MetricsRegisterer,
 		a,
 	)
+	if err != nil {
+		return err
+	}
 
 	// only create auth service if token authorization is required
 	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
@@ -662,7 +675,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		n.Config.WhitelistedSubnets,
+		n.Config.EnableStaking,
+		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
 		"requests",
@@ -754,7 +768,7 @@ func (n *Node) initVMs() error {
 				Validators:                      vdrs,
 				UptimeLockedCalculator:          n.uptimeCalculator,
 				StakingEnabled:                  n.Config.EnableStaking,
-				WhitelistedSubnets:              n.Config.WhitelistedSubnets,
+				TrackedSubnets:                  n.Config.TrackedSubnets,
 				TxFee:                           n.Config.TxFee,
 				CreateAssetTxFee:                n.Config.CreateAssetTxFee,
 				CreateSubnetTxFee:               n.Config.CreateSubnetTxFee,
@@ -846,9 +860,6 @@ func (n *Node) initKeystoreAPI() error {
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
 func (n *Node) initMetricsAPI() error {
-	n.MetricsRegisterer = prometheus.NewRegistry()
-	n.MetricsGatherer = metrics.NewMultiGatherer()
-
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
@@ -1232,6 +1243,8 @@ func (n *Node) Initialize(
 		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
 	}
 
+	n.initMetrics()
+
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
@@ -1325,10 +1338,10 @@ func (n *Node) Initialize(
 // Shutdown this node
 // May be called multiple times
 func (n *Node) Shutdown(exitCode int) {
-	if !n.shuttingDown.GetValue() { // only set the exit code once
-		n.shuttingDownExitCode.SetValue(exitCode)
+	if !n.shuttingDown.Get() { // only set the exit code once
+		n.shuttingDownExitCode.Set(exitCode)
 	}
-	n.shuttingDown.SetValue(true)
+	n.shuttingDown.Set(true)
 	n.shutdownOnce.Do(n.shutdown)
 }
 
@@ -1412,8 +1425,5 @@ func (n *Node) shutdown() {
 }
 
 func (n *Node) ExitCode() int {
-	if exitCode, ok := n.shuttingDownExitCode.GetValue().(int); ok {
-		return exitCode
-	}
-	return 0
+	return n.shuttingDownExitCode.Get()
 }

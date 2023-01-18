@@ -21,7 +21,6 @@ import (
 )
 
 func TestDiffMissingState(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -31,7 +30,7 @@ func TestDiffMissingState(t *testing.T) {
 	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
 
 	_, err := NewDiff(parentID, versions)
-	require.ErrorIs(err, ErrMissingParentState)
+	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
 func TestDiffCreation(t *testing.T) {
@@ -318,8 +317,8 @@ func TestDiffChain(t *testing.T) {
 	gotChains, err := d.GetChains(subnetID)
 	require.NoError(err)
 	require.Len(gotChains, 2)
-	require.Equal(gotChains[0], parentStateCreateChainTx)
-	require.Equal(gotChains[1], createChainTx)
+	require.Equal(parentStateCreateChainTx, gotChains[0])
+	require.Equal(createChainTx, gotChains[1])
 }
 
 func TestDiffTx(t *testing.T) {
@@ -345,7 +344,7 @@ func TestDiffTx(t *testing.T) {
 			SubnetID: subnetID,
 		},
 	}
-	tx.Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
+	tx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
 	d.AddTx(tx, status.Committed)
 
 	{
@@ -364,7 +363,7 @@ func TestDiffTx(t *testing.T) {
 				SubnetID: subnetID,
 			},
 		}
-		parentTx.Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
+		parentTx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
 		state.EXPECT().GetTx(parentTx.ID()).Return(parentTx, status.Committed, nil).Times(1)
 		gotParentTx, gotStatus, err := d.GetTx(parentTx.ID())
 		require.NoError(err)

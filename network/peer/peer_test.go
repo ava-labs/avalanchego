@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -90,9 +91,6 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	require.NoError(err)
 
-	gossipTracker, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
-	require.NoError(err)
-
 	sharedConfig := Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
@@ -106,7 +104,6 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
-		GossipTracker:        gossipTracker,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig
@@ -260,7 +257,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := makeReadyTestPeers(t)
 	mc := newMessageCreator(t)
 
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
 	sent := peer0.Send(context.Background(), outboundGetMsg)

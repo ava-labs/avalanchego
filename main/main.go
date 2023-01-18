@@ -28,18 +28,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	runnerConfig, err := config.GetRunnerConfig(v)
-	if err != nil {
-		fmt.Printf("couldn't load process config: %s\n", err)
-		os.Exit(1)
-	}
-
+	runnerConfig := config.GetRunnerConfig(v)
 	if runnerConfig.DisplayVersionAndExit {
 		fmt.Print(version.String)
 		os.Exit(0)
 	}
 
-	nodeConfig, err := config.GetNodeConfig(v, runnerConfig.BuildDir)
+	nodeConfig, err := config.GetNodeConfig(v)
 	if err != nil {
 		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)

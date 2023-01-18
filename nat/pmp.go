@@ -14,11 +14,19 @@ import (
 	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
-var (
-	errInvalidLifetime = errors.New("invalid mapping duration range")
+const (
+	// pmpProtocol is intentionally lowercase and should not be confused with
+	// upnpProtocol.
+	// See:
+	// - https://github.com/jackpal/go-nat-pmp/blob/v1.0.2/natpmp.go#L82
+	pmpProtocol      = "tcp"
+	pmpClientTimeout = 500 * time.Millisecond
+)
 
-	pmpClientTimeout        = 500 * time.Millisecond
-	_                Router = (*pmpRouter)(nil)
+var (
+	_ Router = (*pmpRouter)(nil)
+
+	errInvalidLifetime = errors.New("invalid mapping duration range")
 )
 
 // pmpRouter adapts the NAT-PMP protocol implementation so it conforms to the
@@ -32,13 +40,11 @@ func (*pmpRouter) SupportsNAT() bool {
 }
 
 func (r *pmpRouter) MapPort(
-	networkProtocol string,
 	newInternalPort uint16,
 	newExternalPort uint16,
 	_ string,
 	mappingDuration time.Duration,
 ) error {
-	protocol := networkProtocol
 	internalPort := int(newInternalPort)
 	externalPort := int(newExternalPort)
 
@@ -49,19 +55,14 @@ func (r *pmpRouter) MapPort(
 		return errInvalidLifetime
 	}
 
-	_, err := r.client.AddPortMapping(protocol, internalPort, externalPort, int(lifetime))
+	_, err := r.client.AddPortMapping(pmpProtocol, internalPort, externalPort, int(lifetime))
 	return err
 }
 
-func (r *pmpRouter) UnmapPort(
-	networkProtocol string,
-	internalPort uint16,
-	_ uint16,
-) error {
-	protocol := networkProtocol
+func (r *pmpRouter) UnmapPort(internalPort uint16, _ uint16) error {
 	internalPortInt := int(internalPort)
 
-	_, err := r.client.AddPortMapping(protocol, internalPortInt, 0, 0)
+	_, err := r.client.AddPortMapping(pmpProtocol, internalPortInt, 0, 0)
 	return err
 }
 
@@ -79,7 +80,9 @@ func getPMPRouter() *pmpRouter {
 		return nil
 	}
 
-	pmp := &pmpRouter{natpmp.NewClientWithTimeout(gatewayIP, pmpClientTimeout)}
+	pmp := &pmpRouter{
+		client: natpmp.NewClientWithTimeout(gatewayIP, pmpClientTimeout),
+	}
 	if _, err := pmp.ExternalIP(); err != nil {
 		return nil
 	}

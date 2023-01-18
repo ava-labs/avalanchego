@@ -15,9 +15,7 @@ import (
 var (
 	errWrongPublicKeySize  = errors.New("wrong public key size")
 	errWrongPrivateKeySize = errors.New("wrong private key size")
-)
 
-var (
 	_ Factory    = (*FactoryED25519)(nil)
 	_ PublicKey  = (*PublicKeyED25519)(nil)
 	_ PrivateKey = (*PrivateKeyED25519)(nil)

@@ -39,9 +39,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// add a tx to it
@@ -52,22 +50,22 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		return nil
 	}
 	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err, "couldn't add tx to mempool")
+	require.NoError(err)
 
 	has := env.mempool.Has(txID)
-	require.True(has, "valid tx not recorded into mempool")
+	require.True(has)
 
 	// show that build block include that tx and removes it from mempool
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
-	require.NoError(err, "couldn't build block out of mempool")
+	require.NoError(err)
 
 	blk, ok := blkIntf.(*blockexecutor.Block)
-	require.True(ok, "expected standard block")
-	require.Len(blk.Txs(), 1, "standard block should include a single transaction")
-	require.Equal(txID, blk.Txs()[0].ID(), "standard block does not include expected transaction")
+	require.True(ok)
+	require.Len(blk.Txs(), 1)
+	require.Equal(txID, blk.Txs()[0].ID())
 
 	has = env.mempool.Has(txID)
-	require.False(has, "tx included in block is still recorded into mempool")
+	require.False(has)
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
@@ -76,9 +74,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// create candidate tx
@@ -110,12 +106,10 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	env.isBootstrapped.SetValue(false)
+	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, shutdownEnvironment(env))
 	}()
 
 	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic
@@ -495,7 +489,7 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(*require.Assertions) blocks.Block {
 				return nil
 			},
 			expectedErr: errNoPendingBlocks,

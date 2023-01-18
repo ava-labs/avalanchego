@@ -177,15 +177,16 @@ func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.No
 	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("numVotes", len(votes)),
+		attribute.Int("numAccepted", len(accepted)),
 	))
 	defer span.End()
 
-	s.sender.SendChits(ctx, nodeID, requestID, votes)
+	s.sender.SendChits(ctx, nodeID, requestID, votes, accepted)
 }
 
 func (s *tracedSender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {

@@ -117,8 +117,8 @@ func (j *Jobs) ExecuteAll(
 	restarted bool,
 	acceptors ...snow.Acceptor,
 ) (int, error) {
-	chainCtx.Executing(true)
-	defer chainCtx.Executing(false)
+	chainCtx.Executing.Set(true)
+	defer chainCtx.Executing.Set(false)
 
 	numExecuted := 0
 	numToExecute := j.state.numJobs

@@ -92,9 +92,9 @@ type VM struct {
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
-	bootstrapped utils.AtomicBool
+	bootstrapped utils.Atomic[bool]
 
-	// Maps caches for each subnet that is currently whitelisted.
+	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
 	validatorSetCaches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
@@ -129,7 +129,7 @@ func (vm *VM) Initialize(
 
 	// Initialize metrics as soon as possible
 	var err error
-	vm.metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
+	vm.metrics, err = metrics.New("", registerer, vm.TrackedSubnets)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
@@ -237,7 +237,7 @@ func (vm *VM) initBlockchains() error {
 	}
 
 	if vm.StakingEnabled {
-		for subnetID := range vm.WhitelistedSubnets {
+		for subnetID := range vm.TrackedSubnets {
 			if err := vm.createSubnet(subnetID); err != nil {
 				return err
 			}
@@ -274,16 +274,16 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // onBootstrapStarted marks this VM as bootstrapping
 func (vm *VM) onBootstrapStarted() error {
-	vm.bootstrapped.SetValue(false)
+	vm.bootstrapped.Set(false)
 	return vm.fx.Bootstrapping()
 }
 
 // onNormalOperationsStarted marks this VM as bootstrapped
 func (vm *VM) onNormalOperationsStarted() error {
-	if vm.bootstrapped.GetValue() {
+	if vm.bootstrapped.Get() {
 		return nil
 	}
-	vm.bootstrapped.SetValue(true)
+	vm.bootstrapped.Set(true)
 
 	if err := vm.fx.Bootstrapped(); err != nil {
 		return err
@@ -297,7 +297,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	for subnetID := range vm.WhitelistedSubnets {
+	for subnetID := range vm.TrackedSubnets {
 		vdrIDs, exists := vm.getValidatorIDs(subnetID)
 		if !exists {
 			return errMissingValidatorSet
@@ -335,7 +335,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 	vm.Builder.Shutdown()
 
-	if vm.bootstrapped.GetValue() {
+	if vm.bootstrapped.Get() {
 		primaryVdrIDs, exists := vm.getValidatorIDs(constants.PrimaryNetworkID)
 		if !exists {
 			return errMissingValidatorSet
@@ -344,7 +344,7 @@ func (vm *VM) Shutdown(context.Context) error {
 			return err
 		}
 
-		for subnetID := range vm.WhitelistedSubnets {
+		for subnetID := range vm.TrackedSubnets {
 			vdrIDs, exists := vm.getValidatorIDs(subnetID)
 			if !exists {
 				return errMissingValidatorSet
@@ -477,8 +477,8 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
-		// Only cache whitelisted subnets
-		if subnetID == constants.PrimaryNetworkID || vm.WhitelistedSubnets.Contains(subnetID) {
+		// Only cache tracked subnets
+		if subnetID == constants.PrimaryNetworkID || vm.TrackedSubnets.Contains(subnetID) {
 			vm.validatorSetCaches[subnetID] = validatorSetsCache
 		}
 	}
@@ -501,7 +501,10 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 
 	currentSubnetValidators, ok := vm.Validators.Get(subnetID)
 	if !ok {
-		return nil, errMissingValidatorSet
+		currentSubnetValidators = validators.NewSet()
+		if err := vm.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
+			return nil, err
+		}
 	}
 	currentPrimaryNetworkValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
@@ -571,18 +574,14 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 		}
 
 		for nodeID, pk := range pkDiffs {
-			vdr, ok := vdrSet[nodeID]
-			if !ok {
-				// If this were to happen - that would mean that this validator
-				// had a public key removed when they were not a validator.
-				// Because there is a minimum stake duration, this is
-				// impossible.
-				return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
+			// pkDiffs includes all primary network key diffs, if we are
+			// fetching a subnet's validator set, we should ignore non-subnet
+			// validators.
+			if vdr, ok := vdrSet[nodeID]; ok {
+				// The validator's public key was removed at this block, so it
+				// was in the validator set before.
+				vdr.PublicKey = pk
 			}
-
-			// The validator's public key was removed at this block, so it
-			// was in the validator set before.
-			vdr.PublicKey = pk
 		}
 	}
 
@@ -594,6 +593,27 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	vm.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
 	vm.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
+}
+
+// GetCurrentHeight returns the height of the last accepted block
+func (vm *VM) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
+	if chainID == constants.PlatformChainID {
+		return constants.PrimaryNetworkID, nil
+	}
+
+	chainTx, _, err := vm.state.GetTx(chainID)
+	if err != nil {
+		return ids.Empty, fmt.Errorf(
+			"problem retrieving blockchain %q: %w",
+			chainID,
+			err,
+		)
+	}
+	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+	if !ok {
+		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
+	}
+	return chain.SubnetID, nil
 }
 
 // GetMinimumHeight returns the height of the most recent block beyond the

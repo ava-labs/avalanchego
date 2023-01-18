@@ -42,6 +42,12 @@ type Manager interface {
 	// by this codec manager
 	SetMaxSize(int)
 
+	// Size returns the size, in bytes, of [value] when it's marshaled
+	// using the codec with the given version.
+	// RegisterCodec must have been called with that version.
+	// If [value] is nil, returns [errMarshalNil]
+	Size(version uint16, value interface{}) (int, error)
+
 	// Marshal the given value using the codec with the given version.
 	// RegisterCodec must have been called with that version.
 	Marshal(version uint16, source interface{}) (destination []byte, err error)
@@ -89,6 +95,25 @@ func (m *manager) SetMaxSize(size int) {
 	m.lock.Lock()
 	m.maxSize = size
 	m.lock.Unlock()
+}
+
+func (m *manager) Size(version uint16, value interface{}) (int, error) {
+	if value == nil {
+		return 0, errMarshalNil // can't marshal nil
+	}
+
+	m.lock.RLock()
+	c, exists := m.codecs[version]
+	m.lock.RUnlock()
+
+	if !exists {
+		return 0, errUnknownVersion
+	}
+
+	res, err := c.Size(value)
+
+	// Add [wrappers.ShortLen] for the codec version
+	return wrappers.ShortLen + res, err
 }
 
 // To marshal an interface, [value] must be a pointer to the interface.

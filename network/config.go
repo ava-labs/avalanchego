@@ -21,6 +21,9 @@ import (
 
 // HealthConfig describes parameters for network layer health checks.
 type HealthConfig struct {
+	// Marks if the health check should be enabled
+	Enabled bool `json:"-"`
+
 	// MinConnectedPeers is the minimum number of peers that the network should
 	// be connected to to be considered healthy.
 	MinConnectedPeers uint `json:"minConnectedPeers"`
@@ -106,6 +109,9 @@ type Config struct {
 	DelayConfig          `json:"delayConfig"`
 	ThrottlerConfig      ThrottlerConfig `json:"throttlerConfig"`
 
+	ProxyEnabled           bool          `json:"proxyEnabled"`
+	ProxyReadHeaderTimeout time.Duration `json:"proxyReadHeaderTimeout"`
+
 	DialerConfig dialer.Config `json:"dialerConfig"`
 	TLSConfig    *tls.Config   `json:"-"`
 
@@ -126,9 +132,9 @@ type Config struct {
 	// TLSKey is this node's TLS key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
 
-	// WhitelistedSubnets of the node.
-	WhitelistedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons            validators.Set  `json:"-"`
+	// TrackedSubnets of the node.
+	TrackedSubnets set.Set[ids.ID] `json:"-"`
+	Beacons        validators.Set  `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`

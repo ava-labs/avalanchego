@@ -21,7 +21,7 @@ func TestSubnetValidatorVerifySubnetID(t *testing.T) {
 			Subnet: constants.PrimaryNetworkID,
 		}
 
-		require.Equal(errBadSubnetID, vdr.Verify())
+		require.ErrorIs(vdr.Verify(), errBadSubnetID)
 	}
 
 	// Happy path
@@ -33,6 +33,6 @@ func TestSubnetValidatorVerifySubnetID(t *testing.T) {
 			},
 		}
 
-		require.Equal(nil, vdr.Verify())
+		require.NoError(vdr.Verify())
 	}
 }

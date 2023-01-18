@@ -45,7 +45,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	serverCloser := grpcutils.ServerCloser{}
 
 	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		pb.RegisterValidatorStateServer(server, NewServer(state.server))
 		serverCloser.Add(server)
 		return server
@@ -118,6 +118,30 @@ func TestGetCurrentHeight(t *testing.T) {
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetCurrentHeight(context.Background())
+	require.Error(err)
+}
+
+func TestGetSubnetID(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := setupState(t, ctrl)
+	defer state.closeFn()
+
+	// Happy path
+	chainID := ids.GenerateTestID()
+	expectedSubnetID := ids.GenerateTestID()
+	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, nil)
+
+	subnetID, err := state.client.GetSubnetID(context.Background(), chainID)
+	require.NoError(err)
+	require.Equal(expectedSubnetID, subnetID)
+
+	// Error path
+	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
+
+	_, err = state.client.GetSubnetID(context.Background(), chainID)
 	require.Error(err)
 }
 

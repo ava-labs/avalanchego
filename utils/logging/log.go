@@ -106,6 +106,12 @@ func (l *log) Verbo(msg string, fields ...zap.Field) {
 	l.log(Verbo, msg, fields...)
 }
 
+func (l *log) SetLevel(level Level) {
+	for _, core := range l.wrappedCores {
+		core.AtomicLevel.SetLevel(zapcore.Level(level))
+	}
+}
+
 func (l *log) StopOnPanic() {
 	if r := recover(); r != nil {
 		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))

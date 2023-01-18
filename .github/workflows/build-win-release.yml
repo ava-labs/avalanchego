@@ -37,15 +37,14 @@ jobs:
           aws --version
 
       # Runs a single command using the runners shell
-      - name: Build the avalanchego binaries
+      - name: Build the avalanchego binary
         run: ./scripts/build.sh
         shell: bash
 
       - name: Create zip
         run: |
           mv .\build\avalanchego .\build\avalanchego.exe
-          mv .\build\plugins\evm .\build\plugins\evm.exe
-          Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ env.VERSION }}-experimental.zip
+          Compress-Archive -Path .\build\avalanchego.exe -DestinationPath .\build\avalanchego-win-${{ env.VERSION }}-experimental.zip
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1

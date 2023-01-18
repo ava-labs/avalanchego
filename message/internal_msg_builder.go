@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -17,36 +18,51 @@ var (
 	timeout       = &Timeout{}
 	gossipRequest = &GossipRequest{}
 
-	_ chainIDGetter       = (*GetStateSummaryFrontierFailed)(nil)
-	_ requestIDGetter     = (*GetStateSummaryFrontierFailed)(nil)
-	_ chainIDGetter       = (*GetAcceptedStateSummaryFailed)(nil)
-	_ requestIDGetter     = (*GetAcceptedStateSummaryFailed)(nil)
-	_ chainIDGetter       = (*GetAcceptedFrontierFailed)(nil)
-	_ requestIDGetter     = (*GetAcceptedFrontierFailed)(nil)
-	_ chainIDGetter       = (*GetAcceptedFailed)(nil)
-	_ requestIDGetter     = (*GetAcceptedFailed)(nil)
-	_ chainIDGetter       = (*GetAncestorsFailed)(nil)
-	_ requestIDGetter     = (*GetAncestorsFailed)(nil)
-	_ chainIDGetter       = (*GetFailed)(nil)
-	_ requestIDGetter     = (*GetFailed)(nil)
-	_ chainIDGetter       = (*QueryFailed)(nil)
-	_ requestIDGetter     = (*QueryFailed)(nil)
-	_ chainIDGetter       = (*AppRequestFailed)(nil)
-	_ requestIDGetter     = (*AppRequestFailed)(nil)
+	_ chainIDGetter   = (*GetStateSummaryFrontierFailed)(nil)
+	_ requestIDGetter = (*GetStateSummaryFrontierFailed)(nil)
+
+	_ chainIDGetter   = (*GetAcceptedStateSummaryFailed)(nil)
+	_ requestIDGetter = (*GetAcceptedStateSummaryFailed)(nil)
+
+	_ chainIDGetter    = (*GetAcceptedFrontierFailed)(nil)
+	_ requestIDGetter  = (*GetAcceptedFrontierFailed)(nil)
+	_ engineTypeGetter = (*GetAcceptedFrontierFailed)(nil)
+
+	_ chainIDGetter    = (*GetAcceptedFailed)(nil)
+	_ requestIDGetter  = (*GetAcceptedFailed)(nil)
+	_ engineTypeGetter = (*GetAcceptedFailed)(nil)
+
+	_ chainIDGetter    = (*GetAncestorsFailed)(nil)
+	_ requestIDGetter  = (*GetAncestorsFailed)(nil)
+	_ engineTypeGetter = (*GetAncestorsFailed)(nil)
+
+	_ chainIDGetter    = (*GetFailed)(nil)
+	_ requestIDGetter  = (*GetFailed)(nil)
+	_ engineTypeGetter = (*GetFailed)(nil)
+
+	_ chainIDGetter    = (*QueryFailed)(nil)
+	_ requestIDGetter  = (*QueryFailed)(nil)
+	_ engineTypeGetter = (*QueryFailed)(nil)
+
+	_ chainIDGetter   = (*AppRequestFailed)(nil)
+	_ requestIDGetter = (*AppRequestFailed)(nil)
+
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequest)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequest)(nil)
+
 	_ sourceChainIDGetter = (*CrossChainAppRequestFailed)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequestFailed)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequestFailed)(nil)
+
 	_ sourceChainIDGetter = (*CrossChainAppResponse)(nil)
 	_ chainIDGetter       = (*CrossChainAppResponse)(nil)
 	_ requestIDGetter     = (*CrossChainAppResponse)(nil)
 )
 
 type GetStateSummaryFrontierFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *GetStateSummaryFrontierFailed) GetChainId() []byte {
@@ -74,8 +90,8 @@ func InternalGetStateSummaryFrontierFailed(
 }
 
 type GetAcceptedStateSummaryFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte {
@@ -103,8 +119,9 @@ func InternalGetAcceptedStateSummaryFailed(
 }
 
 type GetAcceptedFrontierFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID    ids.ID         `json:"chain_id,omitempty"`
+	RequestID  uint32         `json:"request_id,omitempty"`
+	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
 func (m *GetAcceptedFrontierFailed) GetChainId() []byte {
@@ -115,25 +132,32 @@ func (m *GetAcceptedFrontierFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
+func (m *GetAcceptedFrontierFailed) GetEngineType() p2p.EngineType {
+	return m.EngineType
+}
+
 func InternalGetAcceptedFrontierFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFrontierFailedOp,
 		message: &GetAcceptedFrontierFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
+			ChainID:    chainID,
+			RequestID:  requestID,
+			EngineType: engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type GetAcceptedFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID    ids.ID         `json:"chain_id,omitempty"`
+	RequestID  uint32         `json:"request_id,omitempty"`
+	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
 func (m *GetAcceptedFailed) GetChainId() []byte {
@@ -144,25 +168,32 @@ func (m *GetAcceptedFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
+func (m *GetAcceptedFailed) GetEngineType() p2p.EngineType {
+	return m.EngineType
+}
+
 func InternalGetAcceptedFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFailedOp,
 		message: &GetAcceptedFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
+			ChainID:    chainID,
+			RequestID:  requestID,
+			EngineType: engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type GetAncestorsFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID    ids.ID         `json:"chain_id,omitempty"`
+	RequestID  uint32         `json:"request_id,omitempty"`
+	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
 func (m *GetAncestorsFailed) GetChainId() []byte {
@@ -173,25 +204,32 @@ func (m *GetAncestorsFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
+func (m *GetAncestorsFailed) GetEngineType() p2p.EngineType {
+	return m.EngineType
+}
+
 func InternalGetAncestorsFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAncestorsFailedOp,
 		message: &GetAncestorsFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
+			ChainID:    chainID,
+			RequestID:  requestID,
+			EngineType: engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type GetFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID    ids.ID         `json:"chain_id,omitempty"`
+	RequestID  uint32         `json:"request_id,omitempty"`
+	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
 func (m *GetFailed) GetChainId() []byte {
@@ -202,25 +240,32 @@ func (m *GetFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
+func (m *GetFailed) GetEngineType() p2p.EngineType {
+	return m.EngineType
+}
+
 func InternalGetFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetFailedOp,
 		message: &GetFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
+			ChainID:    chainID,
+			RequestID:  requestID,
+			EngineType: engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type QueryFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID    ids.ID         `json:"chain_id,omitempty"`
+	RequestID  uint32         `json:"request_id,omitempty"`
+	EngineType p2p.EngineType `json:"engine_type,omitempty"`
 }
 
 func (m *QueryFailed) GetChainId() []byte {
@@ -231,25 +276,31 @@ func (m *QueryFailed) GetRequestId() uint32 {
 	return m.RequestID
 }
 
+func (m *QueryFailed) GetEngineType() p2p.EngineType {
+	return m.EngineType
+}
+
 func InternalQueryFailed(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     QueryFailedOp,
 		message: &QueryFailed{
-			ChainID:   chainID,
-			RequestID: requestID,
+			ChainID:    chainID,
+			RequestID:  requestID,
+			EngineType: engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
 }
 
 type AppRequestFailed struct {
-	ChainID   ids.ID
-	RequestID uint32
+	ChainID   ids.ID `json:"chain_id,omitempty"`
+	RequestID uint32 `json:"request_id,omitempty"`
 }
 
 func (m *AppRequestFailed) GetChainId() []byte {
@@ -277,10 +328,10 @@ func InternalAppRequestFailed(
 }
 
 type CrossChainAppRequest struct {
-	SourceChainID      ids.ID
-	DestinationChainID ids.ID
-	RequestID          uint32
-	Message            []byte
+	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
+	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
+	RequestID          uint32 `json:"request_id,omitempty"`
+	Message            []byte `json:"message,omitempty"`
 }
 
 func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
@@ -317,9 +368,9 @@ func InternalCrossChainAppRequest(
 }
 
 type CrossChainAppRequestFailed struct {
-	SourceChainID      ids.ID
-	DestinationChainID ids.ID
-	RequestID          uint32
+	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
+	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
+	RequestID          uint32 `json:"request_id,omitempty"`
 }
 
 func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
@@ -353,10 +404,10 @@ func InternalCrossChainAppRequestFailed(
 }
 
 type CrossChainAppResponse struct {
-	SourceChainID      ids.ID
-	DestinationChainID ids.ID
-	RequestID          uint32
-	Message            []byte
+	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
+	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
+	RequestID          uint32 `json:"request_id,omitempty"`
+	Message            []byte `json:"message,omitempty"`
 }
 
 func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
@@ -392,7 +443,7 @@ func InternalCrossChainAppResponse(
 }
 
 type Connected struct {
-	NodeVersion *version.Application
+	NodeVersion *version.Application `json:"node_version,omitempty"`
 }
 
 func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
@@ -409,7 +460,7 @@ func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) Inbo
 // ConnectedSubnet contains the subnet ID of the subnet that the node is
 // connected to.
 type ConnectedSubnet struct {
-	SubnetID ids.ID
+	SubnetID ids.ID `json:"subnet_id,omitempty"`
 }
 
 // InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
@@ -437,7 +488,7 @@ func InternalDisconnected(nodeID ids.NodeID) InboundMessage {
 }
 
 type VMMessage struct {
-	Notification uint32
+	Notification uint32 `json:"notification,omitempty"`
 }
 
 func InternalVMMessage(

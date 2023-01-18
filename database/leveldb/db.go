@@ -77,7 +77,7 @@ type Database struct {
 	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
 	// in the config
 	metrics   metrics
-	closed    utils.AtomicBool
+	closed    utils.Atomic[bool]
 	closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
@@ -351,7 +351,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 }
 
 func (db *Database) Close() error {
-	db.closed.SetValue(true)
+	db.closed.Set(true)
 	db.closeOnce.Do(func() {
 		close(db.closeCh)
 	})
@@ -360,7 +360,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) HealthCheck(context.Context) (interface{}, error) {
-	if db.closed.GetValue() {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 	return nil, nil
@@ -447,7 +447,7 @@ type iter struct {
 
 func (it *iter) Next() bool {
 	// Short-circuit and set an error if the underlying database has been closed.
-	if it.db.closed.GetValue() {
+	if it.db.closed.Get() {
 		it.key = nil
 		it.val = nil
 		it.err = database.ErrClosed

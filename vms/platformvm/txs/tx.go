@@ -44,27 +44,45 @@ func NewSigned(
 	return res, res.Sign(c, signers)
 }
 
+func (tx *Tx) Initialize(c codec.Manager) error {
+	signedBytes, err := c.Marshal(Version, tx)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
+	}
+
+	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	if err != nil {
+		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
+	}
+
+	unsignedBytes := signedBytes[:unsignedBytesLen]
+	tx.SetBytes(unsignedBytes, signedBytes)
+	return nil
+}
+
+func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
+	tx.Unsigned.SetBytes(unsignedBytes)
+	tx.bytes = signedBytes
+	tx.id = hashing.ComputeHash256Array(signedBytes)
+}
+
 // Parse signed tx starting from its byte representation.
 // Note: We explicitly pass the codec in Parse since we may need to parse
-//       P-Chain genesis txs whose length exceed the max length of txs.Codec.
+// P-Chain genesis txs whose length exceed the max length of txs.Codec.
 func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	tx := &Tx{}
 	if _, err := c.Unmarshal(signedBytes, tx); err != nil {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
+
+	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
+		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	tx.Initialize(unsignedBytes, signedBytes)
+
+	unsignedBytes := signedBytes[:unsignedBytesLen]
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return tx, nil
-}
-
-func (tx *Tx) Initialize(unsignedBytes, signedBytes []byte) {
-	tx.Unsigned.Initialize(unsignedBytes)
-
-	tx.bytes = signedBytes
-	tx.id = hashing.ComputeHash256Array(signedBytes)
 }
 
 func (tx *Tx) Bytes() []byte {
@@ -105,7 +123,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 
 // Sign this transaction with the provided signers
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
-//       genesis txs whose length exceed the max length of txs.Codec.
+// genesis txs whose length exceed the max length of txs.Codec.
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
 	if err != nil {
@@ -132,6 +150,6 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
-	tx.Initialize(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }

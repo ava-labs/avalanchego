@@ -6,37 +6,39 @@ package wrappers
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const (
-	ByteSentinal  = 0
-	ShortSentinal = 0
-	IntSentinal   = 0
-	LongSentinal  = 0
-	BoolSentinal  = false
+	ByteSentinel  = 0
+	ShortSentinel = 0
+	IntSentinel   = 0
+	LongSentinel  = 0
+	BoolSentinel  = false
 )
 
 func TestPackerCheckSpace(t *testing.T) {
 	p := Packer{Offset: -1}
-	p.CheckSpace(1)
+	p.checkSpace(1)
 	if !p.Errored() {
 		t.Fatal("Expected errNegativeOffset")
 	}
 
 	p = Packer{}
-	p.CheckSpace(-1)
+	p.checkSpace(-1)
 	if !p.Errored() {
 		t.Fatal("Expected errInvalidInput")
 	}
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 1}
-	p.CheckSpace(1)
+	p.checkSpace(1)
 	if !p.Errored() {
 		t.Fatal("Expected errBadLength")
 	}
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 2}
-	p.CheckSpace(0)
+	p.checkSpace(0)
 	if !p.Errored() {
 		t.Fatal("Expected errBadLength, due to out of bounds offset")
 	}
@@ -44,13 +46,13 @@ func TestPackerCheckSpace(t *testing.T) {
 
 func TestPackerExpand(t *testing.T) {
 	p := Packer{Bytes: []byte{0x01}, Offset: 2}
-	p.Expand(1)
+	p.expand(1)
 	if !p.Errored() {
 		t.Fatal("packer.Expand didn't notice packer had out of bounds offset")
 	}
 
 	p = Packer{Bytes: []byte{0x01, 0x02, 0x03}, Offset: 0}
-	p.Expand(1)
+	p.expand(1)
 	if p.Errored() {
 		t.Fatalf("packer.Expand unexpectedly had error %s", p.Err)
 	} else if len(p.Bytes) != 3 {
@@ -101,8 +103,8 @@ func TestPackerUnpackByte(t *testing.T) {
 	actual = p.UnpackByte()
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackByte should have set error, due to attempted out of bounds read")
-	} else if actual != ByteSentinal {
-		t.Fatalf("Packer.UnpackByte returned %d, expected sentinal value %d", actual, ByteSentinal)
+	} else if actual != ByteSentinel {
+		t.Fatalf("Packer.UnpackByte returned %d, expected sentinel value %d", actual, ByteSentinel)
 	}
 }
 
@@ -145,8 +147,8 @@ func TestPackerUnpackShort(t *testing.T) {
 	actual = p.UnpackShort()
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackShort should have set error, due to attempted out of bounds read")
-	} else if actual != ShortSentinal {
-		t.Fatalf("Packer.UnpackShort returned %d, expected sentinal value %d", actual, ShortSentinal)
+	} else if actual != ShortSentinel {
+		t.Fatalf("Packer.UnpackShort returned %d, expected sentinel value %d", actual, ShortSentinel)
 	}
 }
 
@@ -194,8 +196,8 @@ func TestPackerUnpackInt(t *testing.T) {
 	actual = p.UnpackInt()
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackInt should have set error, due to attempted out of bounds read")
-	} else if actual != IntSentinal {
-		t.Fatalf("Packer.UnpackInt returned %d, expected sentinal value %d", actual, IntSentinal)
+	} else if actual != IntSentinel {
+		t.Fatalf("Packer.UnpackInt returned %d, expected sentinel value %d", actual, IntSentinel)
 	}
 }
 
@@ -244,8 +246,8 @@ func TestPackerUnpackLong(t *testing.T) {
 	actual = p.UnpackLong()
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackLong should have set error, due to attempted out of bounds read")
-	} else if actual != LongSentinal {
-		t.Fatalf("Packer.UnpackLong returned %d, expected sentinal value %d", actual, LongSentinal)
+	} else if actual != LongSentinel {
+		t.Fatalf("Packer.UnpackLong returned %d, expected sentinel value %d", actual, LongSentinel)
 	}
 }
 
@@ -294,7 +296,7 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackFixedBytes should have set error, due to attempted out of bounds read")
 	} else if actual != nil {
-		t.Fatalf("Packer.UnpackFixedBytes returned %v, expected sentinal value %v", actual, nil)
+		t.Fatalf("Packer.UnpackFixedBytes returned %v, expected sentinel value %v", actual, nil)
 	}
 }
 
@@ -334,7 +336,7 @@ func TestPackerUnpackBytes(t *testing.T) {
 	case p.Errored():
 		t.Fatalf("Packer.UnpackBytes unexpectedly raised %s", p.Err)
 	case !bytes.Equal(actual, expected):
-		t.Fatalf("Packer.UnpackBytes returned %d, but expected %d", actual, expected)
+		t.Fatalf("Packer.UnpackBytes returned %x, but expected %x", actual, expected)
 	case p.Offset != expectedLen:
 		t.Fatalf("Packer.UnpackBytes left Offset %d, expected %d", p.Offset, expectedLen)
 	}
@@ -343,8 +345,32 @@ func TestPackerUnpackBytes(t *testing.T) {
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackBytes should have set error, due to attempted out of bounds read")
 	} else if actual != nil {
-		t.Fatalf("Packer.UnpackBytes returned %v, expected sentinal value %v", actual, nil)
+		t.Fatalf("Packer.UnpackBytes returned %v, expected sentinel value %v", actual, nil)
 	}
+}
+
+func TestPackerUnpackLimitedBytes(t *testing.T) {
+	var (
+		p           = Packer{Bytes: []byte("\x00\x00\x00\x04Avax")}
+		actual      = p.UnpackLimitedBytes(10)
+		expected    = []byte("Avax")
+		expectedLen = 8
+		require     = require.New(t)
+	)
+	require.NoError(p.Err)
+	require.False(p.Errored())
+	require.Equal(expected, actual)
+	require.Equal(expectedLen, p.Offset)
+
+	actual = p.UnpackLimitedBytes(10)
+	require.ErrorIs(p.Err, errBadLength)
+	require.Nil(actual)
+
+	// Reset and don't allow enough bytes
+	p = Packer{Bytes: p.Bytes}
+	actual = p.UnpackLimitedBytes(2)
+	require.ErrorIs(p.Err, errOversized)
+	require.Nil(actual)
 }
 
 func TestPackerString(t *testing.T) {
@@ -364,6 +390,48 @@ func TestPackerString(t *testing.T) {
 	if !bytes.Equal(p.Bytes, expected) {
 		t.Fatalf("Packer.PackStr wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
 	}
+}
+
+func TestPackerUnpackString(t *testing.T) {
+	var (
+		p           = Packer{Bytes: []byte("\x00\x04Avax")}
+		actual      = p.UnpackStr()
+		expected    = "Avax"
+		expectedLen = 6
+		require     = require.New(t)
+	)
+	require.NoError(p.Err)
+	require.False(p.Errored())
+	require.Equal(expected, actual)
+	require.Equal(expectedLen, p.Offset)
+
+	actual = p.UnpackStr()
+	require.ErrorIs(p.Err, errBadLength)
+	require.Equal("", actual)
+}
+
+func TestPackerUnpackLimitedString(t *testing.T) {
+	var (
+		p           = Packer{Bytes: []byte("\x00\x04Avax")}
+		actual      = p.UnpackLimitedStr(10)
+		expected    = "Avax"
+		expectedLen = 6
+		require     = require.New(t)
+	)
+	require.NoError(p.Err)
+	require.False(p.Errored())
+	require.Equal(expected, actual)
+	require.Equal(expectedLen, p.Offset)
+
+	actual = p.UnpackLimitedStr(10)
+	require.ErrorIs(p.Err, errBadLength)
+	require.Equal("", actual)
+
+	// Reset and don't allow enough bytes
+	p = Packer{Bytes: p.Bytes}
+	actual = p.UnpackLimitedStr(2)
+	require.ErrorIs(p.Err, errOversized)
+	require.Equal("", actual)
 }
 
 func TestPacker(t *testing.T) {
@@ -459,8 +527,8 @@ func TestPackerUnpackBool(t *testing.T) {
 	actual = p.UnpackBool()
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackBool should have set error, due to attempted out of bounds read")
-	} else if actual != BoolSentinal {
-		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
+	} else if actual != BoolSentinel {
+		t.Fatalf("Packer.UnpackBool returned %t, expected sentinel value %t", actual, BoolSentinel)
 	}
 
 	p = Packer{Bytes: []byte{0x42}, Offset: 0}
@@ -469,6 +537,6 @@ func TestPackerUnpackBool(t *testing.T) {
 	if !p.Errored() {
 		t.Fatalf("Packer.UnpackBool id not raise error for invalid boolean value %v", p.Bytes)
 	} else if actual != expected {
-		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
+		t.Fatalf("Packer.UnpackBool returned %t, expected sentinel value %t", actual, BoolSentinel)
 	}
 }

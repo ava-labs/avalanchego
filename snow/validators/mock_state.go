@@ -68,6 +68,21 @@ func (mr *MockStateMockRecorder) GetMinimumHeight(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight), arg0)
 }
 
+// GetSubnetID mocks base method.
+func (m *MockState) GetSubnetID(arg0 context.Context, arg1 ids.ID) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetID", arg0, arg1)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetID indicates an expected call of GetSubnetID.
+func (mr *MockStateMockRecorder) GetSubnetID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetID", reflect.TypeOf((*MockState)(nil).GetSubnetID), arg0, arg1)
+}
+
 // GetValidatorSet mocks base method.
 func (m *MockState) GetValidatorSet(arg0 context.Context, arg1 uint64, arg2 ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
 	m.ctrl.T.Helper()

@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
+var errInvalidSubnetAuth = errors.New("invalid subnet auth")
+
 func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name      string
@@ -29,9 +31,8 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	var (
-		networkID            = uint32(1337)
-		chainID              = ids.GenerateTestID()
-		errInvalidSubnetAuth = errors.New("invalid subnet auth")
+		networkID = uint32(1337)
+		chainID   = ids.GenerateTestID()
 	)
 
 	ctx := &snow.Context{

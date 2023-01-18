@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var errTest = errors.New("non-nil error")
+
 func TestInitialStateVerifySerialization(t *testing.T) {
 	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
@@ -144,7 +146,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 	is := InitialState{
 		FxIndex: 0,
-		Outs:    []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
+		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
 	}
 	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have erred due to an invalid output")

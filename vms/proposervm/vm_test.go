@@ -57,6 +57,7 @@ var (
 	errUnknownBlock      = errors.New("unknown block")
 	errUnverifiedBlock   = errors.New("unverified block")
 	errMarshallingFailed = errors.New("marshalling failed")
+	errTooHigh           = errors.New("too high")
 )
 
 func init() {
@@ -129,7 +130,14 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		proBlkStartTime,
+		minPChainHeight,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -163,15 +171,15 @@ func initTestProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 
-	// pre-insert resetOccurred key to make VM not spinning height reindexing
-	stopHeightReindexing(t, coreVM, dummyDBManager)
+	// signal height index is complete
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	err := proVM.Initialize(
 		context.Background(),
@@ -528,10 +536,10 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -573,10 +581,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -594,10 +602,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -923,7 +931,14 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -945,8 +960,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1260,8 +1273,6 @@ func TestInnerVMRollback(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1280,7 +1291,14 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	err := proVM.Initialize(
 		context.Background(),
@@ -1382,7 +1400,14 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	err = proVM.Initialize(
 		context.Background(),
@@ -1903,7 +1928,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			},
 			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errors.New("too high")
+					return ids.ID{}, errTooHigh
 				}
 				return coreHeights[height], nil
 			},
@@ -1936,7 +1961,14 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1970,8 +2002,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2113,7 +2143,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			},
 			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errors.New("too high")
+					return ids.ID{}, errTooHigh
 				}
 				return coreHeights[height], nil
 			},
@@ -2146,7 +2176,14 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -2180,8 +2217,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2312,6 +2347,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2332,8 +2369,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 
 	err := vm.Initialize(
 		context.Background(),
@@ -2353,13 +2388,13 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	blkNearTip, err := statelessblock.Build(
-		ids.GenerateTestID(),     // parent
-		time.Time{},              // timestamp
-		1,                        // pChainHeight,
-		vm.ctx.StakingCertLeaf,   // cert
-		blkNearTipInnerBytes,     // inner blk bytes
-		vm.ctx.ChainID,           // chain ID
-		vm.ctx.StakingLeafSigner, // key
+		ids.GenerateTestID(), // parent
+		time.Time{},          // timestamp
+		1,                    // pChainHeight,
+		vm.stakingCertLeaf,   // cert
+		blkNearTipInnerBytes, // inner blk bytes
+		vm.ctx.ChainID,       // chain ID
+		vm.stakingLeafSigner, // key
 	)
 	require.NoError(err)
 
@@ -2495,6 +2530,8 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2515,8 +2552,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	snowCtx.StakingCertLeaf = pTestCert.Leaf
-	snowCtx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 
 	err := vm.Initialize(
 		context.Background(),

@@ -24,7 +24,7 @@ type TestStateSummary struct {
 
 	T          *testing.T
 	CantAccept bool
-	AcceptF    func(context.Context) (bool, error)
+	AcceptF    func(context.Context) (StateSyncMode, error)
 }
 
 func (s *TestStateSummary) ID() ids.ID {
@@ -39,12 +39,12 @@ func (s *TestStateSummary) Bytes() []byte {
 	return s.BytesV
 }
 
-func (s *TestStateSummary) Accept(ctx context.Context) (bool, error) {
+func (s *TestStateSummary) Accept(ctx context.Context) (StateSyncMode, error) {
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx)
 	}
 	if s.CantAccept && s.T != nil {
 		s.T.Fatal(errAccept)
 	}
-	return false, errAccept
+	return StateSyncSkipped, errAccept
 }

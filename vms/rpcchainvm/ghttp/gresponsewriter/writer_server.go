@@ -103,10 +103,7 @@ func (s *Server) Hijack(context.Context, *emptypb.Empty) (*responsewriterpb.Hija
 
 	closer := grpcutils.ServerCloser{}
 	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		if len(opts) == 0 {
-			opts = append(opts, grpcutils.DefaultServerOptions...)
-		}
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		closer.Add(server)
 		connpb.RegisterConnServer(server, gconn.NewServer(conn, &closer))
 		readerpb.RegisterReaderServer(server, greader.NewServer(readWriter))

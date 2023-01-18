@@ -47,8 +47,8 @@ func (c *Client) Read(p []byte) (int, error) {
 
 	copy(p, resp.Read)
 
-	if resp.Errored {
-		err = errors.New(resp.Error)
+	if resp.Error != nil {
+		err = errors.New(*resp.Error)
 	}
 	return len(resp.Read), err
 }
@@ -61,8 +61,8 @@ func (c *Client) Write(b []byte) (int, error) {
 		return 0, err
 	}
 
-	if resp.Errored {
-		err = errors.New(resp.Error)
+	if resp.Error != nil {
+		err = errors.New(*resp.Error)
 	}
 	return int(resp.Length), err
 }

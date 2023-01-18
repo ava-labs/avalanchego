@@ -366,10 +366,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
@@ -799,10 +799,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

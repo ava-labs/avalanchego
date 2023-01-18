@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"errors"
+	"crypto"
 	"testing"
 	"time"
 
@@ -274,8 +274,8 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	}
 
 	// set error on coreBlock.Verify and recall Verify()
-	coreOpt0.VerifyV = errors.New("core block verify should only be called once")
-	coreOpt1.VerifyV = errors.New("core block verify should only be called once")
+	coreOpt0.VerifyV = errDuplicateVerify
+	coreOpt1.VerifyV = errDuplicateVerify
 
 	// ... and verify them again. They verify without call to innerBlk
 	if err := opts[0].Verify(context.Background()); err != nil {
@@ -741,7 +741,14 @@ func TestOptionTimestampValidity(t *testing.T) {
 	// Restart the node.
 
 	ctx := proVM.ctx
-	proVM = New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	coreVM.InitializeF = func(
 		context.Context,

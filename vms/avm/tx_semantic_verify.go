@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -49,7 +51,7 @@ func (t *txSemanticVerify) ImportTx(tx *txs.ImportTx) error {
 		return nil
 	}
 
-	if err := verify.SameSubnet(t.vm.ctx, tx.SourceChain); err != nil {
+	if err := verify.SameSubnet(context.TODO(), t.vm.ctx, tx.SourceChain); err != nil {
 		return err
 	}
 
@@ -84,7 +86,7 @@ func (t *txSemanticVerify) ImportTx(tx *txs.ImportTx) error {
 
 func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 	if t.vm.bootstrapped {
-		if err := verify.SameSubnet(t.vm.ctx, tx.DestinationChain); err != nil {
+		if err := verify.SameSubnet(context.TODO(), t.vm.ctx, tx.DestinationChain); err != nil {
 			return err
 		}
 	}

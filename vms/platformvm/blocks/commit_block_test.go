@@ -26,7 +26,7 @@ func TestNewBanffCommitBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block is initialized
-	require.NotNil(blk.Bytes())
+	require.NotEmpty(blk.Bytes())
 
 	require.Equal(timestamp, blk.Timestamp())
 	require.Equal(parentID, blk.Parent())
@@ -45,7 +45,7 @@ func TestNewApricotCommitBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block is initialized
-	require.NotNil(blk.Bytes())
+	require.NotEmpty(blk.Bytes())
 
 	require.Equal(parentID, blk.Parent())
 	require.Equal(height, blk.Height())

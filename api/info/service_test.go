@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var errOops = errors.New("oops")
+var errTest = errors.New("non-nil error")
 
 type getVMsTest struct {
 	info          *Info
@@ -79,12 +79,12 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errOops)
+	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	require.Equal(t, errOops, err)
+	require.Equal(t, errTest, err)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
@@ -100,10 +100,10 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
+	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	require.Equal(t, err, errOops)
+	require.Equal(t, err, errTest)
 }

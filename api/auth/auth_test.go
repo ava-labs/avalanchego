@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 
 	"github.com/stretchr/testify/require"
 
@@ -26,6 +26,7 @@ var (
 	testPassword              = "password!@#$%$#@!"
 	hashedPassword            = password.Hash{}
 	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}"
+	errTest                   = errors.New("non-nil error")
 )
 
 func init() {
@@ -70,7 +71,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 	require.True(t, ok, "expected auth token's claims to be type endpointClaims but is different type")
 	require.ElementsMatch(t, endpoints, claims.Endpoints, "token has wrong endpoint claims")
 
-	shouldExpireAt := now.Add(defaultTokenLifespan).Unix()
+	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
 	require.Equal(t, shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")
 }
 
@@ -151,8 +152,8 @@ func TestWrapHandlerHappyPath(t *testing.T) {
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusOK, rr.Code)
@@ -173,8 +174,8 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -196,8 +197,8 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -233,8 +234,8 @@ func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range unauthorizedEndpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -253,7 +254,7 @@ func TestWrapHandlerAuthEndpoint(t *testing.T) {
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650/ext/auth", strings.NewReader(""))
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+	req.Header.Add("Authorization", "Bearer "+tokenStr)
 	rr := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusOK, rr.Code)
@@ -269,8 +270,8 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusOK, rr.Code)
@@ -279,9 +280,9 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 func TestWriteUnauthorizedResponse(t *testing.T) {
 	rr := httptest.NewRecorder()
-	writeUnauthorizedResponse(rr, errors.New("example err"))
+	writeUnauthorizedResponse(rr, errTest)
 	require.Equal(t, http.StatusUnauthorized, rr.Code)
-	require.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}\n", rr.Body.String())
+	require.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"non-nil error\"},\"id\":1}\n", rr.Body.String())
 }
 
 func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
@@ -298,13 +299,11 @@ func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr+"="))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s=", tokenStr)) // The appended = at the end looks like padding
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusUnauthorized, rr.Code)
-		require.Contains(t, rr.Body.String(), errTokenRevoked.Error())
-		require.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
@@ -317,12 +316,12 @@ func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
 	if _, err := rand.Read(idBytes[:]); err != nil {
 		t.Fatal(err)
 	}
-	id := base64.URLEncoding.EncodeToString(idBytes[:])
+	id := base64.RawURLEncoding.EncodeToString(idBytes[:])
 
 	claims := endpointClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: auth.clock.Time().Add(defaultTokenLifespan).Unix(),
-			Id:        id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(auth.clock.Time().Add(defaultTokenLifespan)),
+			ID:        id,
 		},
 		Endpoints: endpoints,
 	}
@@ -335,8 +334,8 @@ func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr+"="))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
 		require.Equal(t, http.StatusUnauthorized, rr.Code)

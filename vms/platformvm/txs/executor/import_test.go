@@ -23,9 +23,7 @@ import (
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, shutdownEnvironment(env))
 	}()
 
 	type test struct {
@@ -40,9 +38,8 @@ func TestNewImportTx(t *testing.T) {
 
 	factory := crypto.FactorySECP256K1R{}
 	sourceKeyIntf, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	sourceKey := sourceKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	cnt := new(byte)
@@ -74,19 +71,24 @@ func TestNewImportTx(t *testing.T) {
 				},
 			}
 			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
 			inputID := utxo.InputID()
-			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-				Key:   inputID[:],
-				Value: utxoBytes,
-				Traits: [][]byte{
-					sourceKey.PublicKey().Address().Bytes(),
+			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+				env.ctx.ChainID: {
+					PutRequests: []*atomic.Element{
+						{
+							Key:   inputID[:],
+							Value: utxoBytes,
+							Traits: [][]byte{
+								sourceKey.PublicKey().Address().Bytes(),
+							},
+						},
+					},
 				},
-			}}}}); err != nil {
-				t.Fatal(err)
-			}
+			},
+			)
+			require.NoError(t, err)
 		}
 
 		return sm
@@ -185,7 +187,7 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			require.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
+			require.Equal(env.config.TxFee, totalIn-totalOut)
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

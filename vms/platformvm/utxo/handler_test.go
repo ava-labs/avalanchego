@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,12 +35,8 @@ func (*dummyUnsignedTx) Visit(txs.Visitor) error {
 func TestVerifySpendUTXOs(t *testing.T) {
 	fx := &secp256k1fx.Fx{}
 
-	if err := fx.InitializeVM(&secp256k1fx.TestVM{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.Bootstrapped(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
+	require.NoError(t, fx.Bootstrapped())
 
 	h := &handler{
 		ctx: snow.DefaultContextTest(),
@@ -56,7 +54,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	unsignedTx := dummyUnsignedTx{
 		BaseTx: txs.BaseTx{},
 	}
-	unsignedTx.Initialize([]byte{0})
+	unsignedTx.SetBytes([]byte{0})
 
 	customAssetID := ids.GenerateTestID()
 
@@ -1094,6 +1092,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 		h.clk.Set(now)
 
 		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
 			err := h.VerifySpendUTXOs(
 				&unsignedTx,
 				test.utxos,
@@ -1103,10 +1102,10 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				test.producedAmounts,
 			)
 
-			if err == nil && test.shouldErr {
-				t.Fatalf("expected error but got none")
-			} else if err != nil && !test.shouldErr {
-				t.Fatalf("unexpected error: %s", err)
+			if test.shouldErr {
+				require.Error(err)
+			} else {
+				require.NoError(err)
 			}
 		})
 	}

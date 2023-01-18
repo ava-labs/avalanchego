@@ -386,7 +386,13 @@ type ChitsHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a PullQuery or a PushQuery message.
 	// However, the validatorID is assumed to be authenticated.
-	Chits(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
+	Chits(
+		ctx context.Context,
+		validatorID ids.NodeID,
+		requestID uint32,
+		preferredContainerIDs []ids.ID,
+		acceptedContainerIDs []ids.ID,
+	) error
 
 	// Notify this engine that a query it issued has failed.
 	//

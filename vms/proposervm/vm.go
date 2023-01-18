@@ -5,6 +5,8 @@ package proposervm
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -65,10 +67,13 @@ type VM struct {
 	activationTime      time.Time
 	minimumPChainHeight uint64
 	minBlkDelay         time.Duration
+	// block signer
+	stakingLeafSigner crypto.Signer
+	// block certificate
+	stakingCertLeaf *x509.Certificate
 
 	state.State
-	hIndexer                indexer.HeightIndexer
-	resetHeightIndexOngoing utils.AtomicBool
+	hIndexer indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -109,6 +114,8 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
+	stakingLeafSigner crypto.Signer,
+	stakingCertLeaf *x509.Certificate,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
@@ -124,6 +131,8 @@ func New(
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 		minBlkDelay:         minBlkDelay,
+		stakingLeafSigner:   stakingLeafSigner,
+		stakingCertLeaf:     stakingCertLeaf,
 	}
 }
 
@@ -206,7 +215,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(detachedCtx, indexerState); err != nil {
+	if err := vm.repair(detachedCtx); err != nil {
 		return err
 	}
 
@@ -327,75 +336,39 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
-func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
-	// check and possibly rebuild height index
+// repair makes sure that vm and innerVM chains are in sync.
+// Moreover it fixes vm's height index if defined.
+func (vm *VM) repair(ctx context.Context) error {
 	if vm.hVM == nil {
+		// height index not defined. Just sync vms and innerVM chains.
 		return vm.repairAcceptedChainByIteration(ctx)
 	}
 
-	indexIsEmpty, err := vm.State.IsIndexEmpty()
-	if err != nil {
-		return err
-	}
-	if indexIsEmpty {
-		if err := vm.State.SetIndexHasReset(); err != nil {
-			return err
-		}
-		if err := vm.State.Commit(); err != nil {
-			return err
-		}
-	} else {
-		indexWasReset, err := vm.State.HasIndexReset()
+	switch vm.hVM.VerifyHeightIndex(ctx) {
+	case nil:
+		// InnerVM height index is complete. We can immediately verify
+		// and repair this VM height index.
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
 		if err != nil {
-			return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
-		}
-
-		if !indexWasReset {
-			vm.resetHeightIndexOngoing.SetValue(true)
-		}
-	}
-
-	if !vm.resetHeightIndexOngoing.GetValue() {
-		// We are not going to wipe the height index
-		switch vm.hVM.VerifyHeightIndex(ctx) {
-		case nil:
-			// We are not going to wait for the height index to be repaired.
-			shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
-			if err != nil {
-				return err
-			}
-			if !shouldRepair {
-				vm.ctx.Log.Info("block height index was successfully verified")
-				vm.hIndexer.MarkRepaired(true)
-				return vm.repairAcceptedChainByHeight(ctx)
-			}
-		case block.ErrIndexIncomplete:
-		default:
 			return err
 		}
+		if !shouldRepair {
+			vm.ctx.Log.Info("block height index was successfully verified")
+			vm.hIndexer.MarkRepaired(true)
+			return vm.repairAcceptedChainByHeight(ctx)
+		}
+	case block.ErrIndexIncomplete:
+	default:
+		return nil
 	}
 
+	// innerVM height index is incomplete. Sync vm and innerVM chains first.
 	if err := vm.repairAcceptedChainByIteration(ctx); err != nil {
 		return err
 	}
 
 	// asynchronously rebuild height index, if needed
 	go func() {
-		// If index reset has been requested, carry it out first
-		if vm.resetHeightIndexOngoing.GetValue() {
-			vm.ctx.Log.Info("block height indexing reset started")
-
-			if err := indexerState.ResetHeightIndex(vm.ctx.Log, vm); err != nil {
-				vm.ctx.Log.Error("block height indexing reset failed",
-					zap.Error(err),
-				)
-				return
-			}
-
-			vm.ctx.Log.Info("block height indexing reset finished")
-			vm.resetHeightIndexOngoing.SetValue(false)
-		}
-
 		// Poll until the underlying chain's index is complete or shutdown is
 		// called.
 		ticker := time.NewTicker(checkIndexedFrequency)
@@ -407,7 +380,7 @@ func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
-				// innerVM indexing complete. Let re-index this machine
+				// innerVM indexing complete. Let's re-index this VM
 				break
 			}
 			if err != block.ErrIndexIncomplete {
@@ -549,7 +522,6 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
 	if err != nil {
 		return err
@@ -573,7 +545,6 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
-
 		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return err
 		}

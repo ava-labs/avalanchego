@@ -98,11 +98,10 @@ func (p *process) Start() error {
 	// Open staking port we want for NAT traversal to have the external port
 	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	if p.config.IPPort.IPPort().Port != 0 {
+	if port := p.config.IPPort.IPPort().Port; port != 0 {
 		mapper.Map(
-			"TCP",
-			p.config.IPPort.IPPort().Port,
-			p.config.IPPort.IPPort().Port,
+			port,
+			port,
 			stakingPortName,
 			p.config.IPPort,
 			p.config.IPResolutionFreq,
@@ -114,7 +113,6 @@ func (p *process) Start() error {
 		// For NAT traversal we want to route from the external port
 		// (config.ExternalHTTPPort) to our internal port (config.HTTPPort)
 		mapper.Map(
-			"TCP",
 			p.config.HTTPPort,
 			p.config.HTTPPort,
 			httpPortName,

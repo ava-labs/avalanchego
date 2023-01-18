@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -35,7 +36,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -62,6 +65,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
+	errUnimplemented             = errors.New("unimplemented")
 
 	_ vertex.DAGVM = (*VM)(nil)
 )
@@ -79,7 +83,7 @@ type VM struct {
 	// Used to check local time
 	clock mockable.Clock
 
-	parser txs.Parser
+	parser blocks.Parser
 
 	pubsub *pubsub.Server
 
@@ -93,7 +97,7 @@ type VM struct {
 	feeAssetID ids.ID
 
 	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *cache.LRU[ids.ID, ids.BitSet64]
+	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -124,7 +128,7 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
 
 /*
  ******************************************************************************
- ******************************** Avalanche API *******************************
+ ********************************* Common VM **********************************
  ******************************************************************************
  */
 
@@ -171,7 +175,7 @@ func (vm *VM) Initialize(
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &cache.LRU[ids.ID, ids.BitSet64]{Size: assetToFxCacheSize}
+	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.Log)
 
@@ -193,7 +197,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.parser, err = txs.NewCustomParser(
+	vm.parser, err = blocks.NewCustomParser(
 		vm.typeToFxIndex,
 		&vm.clock,
 		ctx.Log,
@@ -246,7 +250,7 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
-	return vm.db.Commit()
+	return vm.state.Commit()
 }
 
 // onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
@@ -291,7 +295,12 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.timer.Stop()
 	vm.ctx.Lock.Lock()
 
-	return vm.baseDB.Close()
+	errs := wrappers.Errs{}
+	errs.Add(
+		vm.state.Close(),
+		vm.baseDB.Close(),
+	)
+	return errs.Err
 }
 
 func (*VM) Version(context.Context) (string, error) {
@@ -337,6 +346,43 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}, newServer.RegisterService(staticService, "avm")
+}
+
+/*
+ ******************************************************************************
+ ********************************** Chain VM **********************************
+ ******************************************************************************
+ */
+
+func (*VM) GetBlock(context.Context, ids.ID) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) ParseBlock(context.Context, []byte) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) BuildBlock(context.Context) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) SetPreference(context.Context, ids.ID) error {
+	return errUnimplemented
+}
+
+func (*VM) LastAccepted(context.Context) (ids.ID, error) {
+	return ids.Empty, errUnimplemented
+}
+
+/*
+ ******************************************************************************
+ *********************************** DAG VM ***********************************
+ ******************************************************************************
+ */
+
+func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID) error {
+	time := version.GetXChainMigrationTime(vm.ctx.NetworkID)
+	return vm.state.InitializeChainState(stopVertexID, time)
 }
 
 func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {
@@ -440,10 +486,10 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			return errGenesisAssetMustHaveState
 		}
 
-		tx := txs.Tx{
+		tx := &txs.Tx{
 			Unsigned: &genesisTx.CreateAssetTx,
 		}
-		if err := vm.parser.InitializeGenesisTx(&tx); err != nil {
+		if err := vm.parser.InitializeGenesisTx(tx); err != nil {
 			return err
 		}
 
@@ -453,9 +499,7 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		}
 
 		if !stateInitialized {
-			if err := vm.initState(tx); err != nil {
-				return err
-			}
+			vm.initState(tx)
 		}
 		if index == 0 {
 			vm.ctx.Log.Info("fee asset is established",
@@ -473,27 +517,20 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 	return nil
 }
 
-func (vm *VM) initState(tx txs.Tx) error {
+func (vm *VM) initState(tx *txs.Tx) {
 	txID := tx.ID()
 	vm.ctx.Log.Info("initializing genesis asset",
 		zap.Stringer("txID", txID),
 	)
-	if err := vm.state.PutTx(txID, &tx); err != nil {
-		return err
-	}
-	if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
-		return err
-	}
+	vm.state.AddTx(tx)
+	vm.state.AddStatus(txID, choices.Accepted)
 	for _, utxo := range tx.UTXOs() {
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			return err
-		}
+		vm.state.AddUTXO(utxo)
 	}
-	return nil
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
-	rawTx, err := vm.parser.Parse(bytes)
+	rawTx, err := vm.parser.ParseTx(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -510,13 +547,9 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	}
 
 	if tx.Status() == choices.Unknown {
-		if err := vm.state.PutTx(tx.ID(), tx.Tx); err != nil {
-			return nil, err
-		}
-		if err := tx.setStatus(choices.Processing); err != nil {
-			return nil, err
-		}
-		return tx, vm.db.Commit()
+		vm.state.AddTx(tx.Tx)
+		tx.setStatus(choices.Processing)
+		return tx, vm.state.Commit()
 	}
 
 	return tx, nil
@@ -586,7 +619,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		// This transaction was not an asset creation tx
 		return false
 	}
-	fxIDs := ids.BitSet64(0)
+	fxIDs := set.Bits64(0)
 	for _, state := range createAssetTx.States {
 		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx

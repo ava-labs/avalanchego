@@ -407,7 +407,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			errMessage: "invalid character",
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
 			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
@@ -508,7 +508,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.K)
 			},
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				require.Empty(given)
@@ -614,17 +614,8 @@ func setupViperFlags() *viper.Viper {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := setupViperFlags()
-	// need to set it since in tests executable dir is somewhere /var/tmp/ (or wherever is designated by go)
-	// thus it searches buildDir in /var/tmp/
-	// but actual buildDir resides under project_root/build
-	currentPath, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	v.Set(BuildDirKey, filepath.Join(currentPath, "..", "build"))
 	v.SetConfigFile(configFilePath)
-	err = v.ReadInConfig()
-	if err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		log.Fatal(err)
 	}
 	return v

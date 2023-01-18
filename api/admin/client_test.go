@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
+var errTest = errors.New("non-nil error")
+
 // SuccessResponseTest defines the expected result of an API call that returns SuccessResponse
 type SuccessResponseTest struct {
 	Err error
@@ -28,7 +30,7 @@ func GetSuccessResponseTests() []SuccessResponseTest {
 			Err: nil,
 		},
 		{
-			Err: errors.New("Non-nil error"),
+			Err: errTest,
 		},
 	}
 }
@@ -182,11 +184,11 @@ func TestGetChainAliases(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
+		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errTest)}
 
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
 
-		require.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -228,11 +230,11 @@ func TestReloadInstalledVMs(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errors.New("some error"))}
+		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errTest)}
 
 		_, _, err := mockClient.LoadVMs(context.Background())
 
-		require.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -279,7 +281,7 @@ func TestSetLoggerLevel(t *testing.T) {
 			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, err)}
 			err = mockClient.SetLoggerLevel(
@@ -328,7 +330,7 @@ func TestGetLoggerLevel(t *testing.T) {
 			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(&GetLoggerLevelReply{LoggerLevels: tt.serviceResponse}, err)}
 			res, err := mockClient.GetLoggerLevel(
@@ -372,7 +374,7 @@ func TestGetConfig(t *testing.T) {
 			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
 			res, err := mockClient.GetConfig(context.Background())

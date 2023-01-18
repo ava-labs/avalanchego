@@ -42,6 +42,10 @@ type TypeCodec interface {
 	// When deserializing the bytes, the prefix specifies which concrete type
 	// to deserialize into.
 	PackPrefix(*wrappers.Packer, reflect.Type) error
+
+	// PrefixSize returns prefix length for the given type into the given
+	// packer.
+	PrefixSize(reflect.Type) int
 }
 
 // genericCodec handles marshaling and unmarshaling of structs with a generic
@@ -73,6 +77,136 @@ func New(typer TypeCodec, tagNames []string, maxSliceLen uint32) codec.Codec {
 	}
 }
 
+func (c *genericCodec) Size(value interface{}) (int, error) {
+	if value == nil {
+		return 0, errMarshalNil // can't marshal nil
+	}
+
+	size, _, err := c.size(reflect.ValueOf(value))
+	return size, err
+}
+
+// size returns the size of the value along with whether the value is constant sized.
+func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
+	switch valueKind := value.Kind(); valueKind {
+	case reflect.Uint8:
+		return wrappers.ByteLen, true, nil
+	case reflect.Int8:
+		return wrappers.ByteLen, true, nil
+	case reflect.Uint16:
+		return wrappers.ShortLen, true, nil
+	case reflect.Int16:
+		return wrappers.ShortLen, true, nil
+	case reflect.Uint32:
+		return wrappers.IntLen, true, nil
+	case reflect.Int32:
+		return wrappers.IntLen, true, nil
+	case reflect.Uint64:
+		return wrappers.LongLen, true, nil
+	case reflect.Int64:
+		return wrappers.LongLen, true, nil
+	case reflect.Bool:
+		return wrappers.BoolLen, true, nil
+	case reflect.String:
+		return wrappers.StringLen(value.String()), false, nil
+	case reflect.Ptr:
+		if value.IsNil() {
+			// Can't marshal nil pointers (but nil slices are fine)
+			return 0, false, errMarshalNil
+		}
+		return c.size(value.Elem())
+
+	case reflect.Interface:
+		if value.IsNil() {
+			// Can't marshal nil interfaces (but nil slices are fine)
+			return 0, false, errMarshalNil
+		}
+		underlyingValue := value.Interface()
+		underlyingType := reflect.TypeOf(underlyingValue)
+		prefixSize := c.typer.PrefixSize(underlyingType)
+		valueSize, _, err := c.size(value.Elem())
+		if err != nil {
+			return 0, false, err
+		}
+		return prefixSize + valueSize, false, nil
+
+	case reflect.Slice:
+		numElts := value.Len()
+		if numElts == 0 {
+			return wrappers.IntLen, false, nil
+		}
+
+		size, constSize, err := c.size(value.Index(0))
+		if err != nil {
+			return 0, false, err
+		}
+
+		// For fixed-size types we manually calculate lengths rather than
+		// processing each element separately to improve performance.
+		if constSize {
+			return wrappers.IntLen + numElts*size, false, nil
+		}
+
+		for i := 1; i < numElts; i++ {
+			innerSize, _, err := c.size(value.Index(i))
+			if err != nil {
+				return 0, false, err
+			}
+			size += innerSize
+		}
+		return wrappers.IntLen + size, false, nil
+
+	case reflect.Array:
+		numElts := value.Len()
+		if numElts == 0 {
+			return 0, true, nil
+		}
+
+		size, constSize, err := c.size(value.Index(0))
+		if err != nil {
+			return 0, false, err
+		}
+
+		// For fixed-size types we manually calculate lengths rather than
+		// processing each element separately to improve performance.
+		if constSize {
+			return numElts * size, true, nil
+		}
+
+		for i := 1; i < numElts; i++ {
+			innerSize, _, err := c.size(value.Index(i))
+			if err != nil {
+				return 0, false, err
+			}
+			size += innerSize
+		}
+		return size, false, nil
+
+	case reflect.Struct:
+		serializedFields, err := c.fielder.GetSerializedFields(value.Type())
+		if err != nil {
+			return 0, false, err
+		}
+
+		var (
+			size      int
+			constSize = true
+		)
+		for _, fieldDesc := range serializedFields {
+			innerSize, innerConstSize, err := c.size(value.Field(fieldDesc.Index))
+			if err != nil {
+				return 0, false, err
+			}
+			size += innerSize
+			constSize = constSize && innerConstSize
+		}
+		return size, constSize, nil
+
+	default:
+		return 0, false, fmt.Errorf("can't evaluate marshal length of unknown kind %s", valueKind)
+	}
+}
+
 // To marshal an interface, [value] must be a pointer to the interface
 func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error {
 	if value == nil {
@@ -86,15 +220,7 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 // [value]'s underlying value must not be a nil pointer or interface
 // c.lock should be held for the duration of this function
 func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32) error {
-	valueKind := value.Kind()
-	switch valueKind {
-	case reflect.Interface, reflect.Ptr, reflect.Invalid:
-		if value.IsNil() { // Can't marshal nil (except nil slices)
-			return errMarshalNil
-		}
-	}
-
-	switch valueKind {
+	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
 		p.PackByte(uint8(value.Uint()))
 		return p.Err
@@ -125,9 +251,15 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 	case reflect.Bool:
 		p.PackBool(value.Bool())
 		return p.Err
-	case reflect.Uintptr, reflect.Ptr:
+	case reflect.Ptr:
+		if value.IsNil() { // Can't marshal nil (except nil slices)
+			return errMarshalNil
+		}
 		return c.marshal(value.Elem(), p, c.maxSliceLen)
 	case reflect.Interface:
+		if value.IsNil() { // Can't marshal nil (except nil slices)
+			return errMarshalNil
+		}
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
 		if err := c.typer.PackPrefix(p, underlyingType); err != nil {
@@ -369,8 +501,6 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		// Assign to the top-level struct's member
 		value.Set(v)
 		return nil
-	case reflect.Invalid:
-		return errUnmarshalNil
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}

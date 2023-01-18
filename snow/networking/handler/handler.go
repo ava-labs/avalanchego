@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -26,8 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 const (
@@ -156,7 +155,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) IsValidator(nodeID ids.NodeID) bool {
-	return !h.ctx.IsValidatorOnly() ||
+	return !h.ctx.ValidatorOnly.Get() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
 }
@@ -418,12 +417,17 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding sync message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
@@ -441,38 +445,39 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.GetState() == snow.NormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.State.Get().State == snow.NormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", msg),
+				zap.Any("message", body),
 			)
 		}
 	}()
 
+	// TODO: Use message.GetEngineType to differentiate messages intended for
+	// the avalanche engine or the snowman engine.
 	engine, err := h.getEngine()
 	if err != nil {
 		return err
 	}
 
-	// Invariant: msg.Get(message.RequestID) must never error. The [ChainRouter]
-	//            should have already successfully called this function.
 	// Invariant: Response messages can never be dropped here. This is because
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
 	//            response fails.
-	switch msg := msg.Message().(type) {
-	case *p2ppb.GetStateSummaryFrontier:
+	switch msg := body.(type) {
+	// State messages should always be sent to the snowman engine
+	case *p2p.GetStateSummaryFrontier:
 		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
 
-	case *p2ppb.StateSummaryFrontier:
+	case *p2p.StateSummaryFrontier:
 		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
 
 	case *message.GetStateSummaryFrontierFailed:
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.GetAcceptedStateSummary:
+	case *p2p.GetAcceptedStateSummary:
 		// TODO: Enforce that the numbers are sorted to make this verification
 		//       more efficient.
 		if !utils.IsUnique(msg.Heights) {
@@ -481,7 +486,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
 				zap.Uint32("requestID", msg.RequestId),
 				zap.String("field", "Heights"),
-				zap.Error(err),
 			)
 			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
@@ -493,7 +497,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 			msg.Heights,
 		)
 
-	case *p2ppb.AcceptedStateSummary:
+	case *p2p.AcceptedStateSummary:
 		summaryIDs, err := getIDs(msg.SummaryIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -511,10 +515,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	case *message.GetAcceptedStateSummaryFailed:
 		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.GetAcceptedFrontier:
+	// Bootstrapping messages may be forwarded to either avalanche or snowman
+	// engines, depending on the EngineType field
+	case *p2p.GetAcceptedFrontier:
 		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
-	case *p2ppb.AcceptedFrontier:
+	case *p2p.AcceptedFrontier:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -532,7 +538,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	case *message.GetAcceptedFrontierFailed:
 		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.GetAccepted:
+	case *p2p.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -547,7 +553,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 
 		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
 
-	case *p2ppb.Accepted:
+	case *p2p.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -565,7 +571,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	case *message.GetAcceptedFailed:
 		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.GetAncestors:
+	case *p2p.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -583,10 +589,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	case *message.GetAncestorsFailed:
 		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.Ancestors:
+	case *p2p.Ancestors:
 		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
 
-	case *p2ppb.Get:
+	case *p2p.Get:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -604,13 +610,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	case *message.GetFailed:
 		return engine.GetFailed(ctx, nodeID, msg.RequestID)
 
-	case *p2ppb.Put:
+	case *p2p.Put:
 		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
-	case *p2ppb.PushQuery:
+	case *p2p.PushQuery:
 		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
 
-	case *p2ppb.PullQuery:
+	case *p2p.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
@@ -625,24 +631,37 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
 
-	case *p2ppb.Chits:
-		votes, err := getIDs(msg.ContainerIds)
+	case *p2p.Chits:
+		votes, err := getIDs(msg.PreferredContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "ContainerIDs"),
+				zap.String("field", "PreferredContainerIDs"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, votes)
+		accepted, err := getIDs(msg.AcceptedContainerIds)
+		if err != nil {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.ChitsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "AcceptedContainerIDs"),
+				zap.Error(err),
+			)
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+		}
+
+		return engine.Chits(ctx, nodeID, msg.RequestId, votes, accepted)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
+	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
@@ -677,12 +696,17 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding async message to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding async message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
@@ -703,8 +727,8 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 		return err
 	}
 
-	switch m := msg.Message().(type) {
-	case *p2ppb.AppRequest:
+	switch m := body.(type) {
+	case *p2p.AppRequest:
 		return engine.AppRequest(
 			ctx,
 			nodeID,
@@ -713,13 +737,13 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 			m.AppBytes,
 		)
 
-	case *p2ppb.AppResponse:
+	case *p2p.AppResponse:
 		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
 	case *message.AppRequestFailed:
 		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
 
-	case *p2ppb.AppGossip:
+	case *p2p.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
 
 	case *message.CrossChainAppRequest:
@@ -758,11 +782,15 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	var (
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding chan message to consensus",
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.ctx.Lock.Lock()
 	defer func() {
@@ -784,7 +812,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return err
 	}
 
-	switch msg := msg.Message().(type) {
+	switch msg := body.(type) {
 	case *message.VMMessage:
 		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
@@ -803,7 +831,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 }
 
 func (h *handler) getEngine() (common.Engine, error) {
-	state := h.ctx.GetState()
+	state := h.ctx.State.Get().State
 	switch state {
 	case snow.StateSyncing:
 		return h.stateSyncer, nil

@@ -6,27 +6,29 @@ package rpcchainvm
 import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
-	errCodeToError = map[uint32]error{
-		1: database.ErrClosed,
-		2: database.ErrNotFound,
-		3: block.ErrHeightIndexedVMNotImplemented,
-		4: block.ErrIndexIncomplete,
-		5: block.ErrStateSyncableVMNotImplemented,
+	errEnumToError = map[vmpb.Error]error{
+		vmpb.Error_ERROR_CLOSED:                       database.ErrClosed,
+		vmpb.Error_ERROR_NOT_FOUND:                    database.ErrNotFound,
+		vmpb.Error_ERROR_HEIGHT_INDEX_NOT_IMPLEMENTED: block.ErrHeightIndexedVMNotImplemented,
+		vmpb.Error_ERROR_HEIGHT_INDEX_INCOMPLETE:      block.ErrIndexIncomplete,
+		vmpb.Error_ERROR_STATE_SYNC_NOT_IMPLEMENTED:   block.ErrStateSyncableVMNotImplemented,
 	}
-	errorToErrCode = map[error]uint32{
-		database.ErrClosed:                     1,
-		database.ErrNotFound:                   2,
-		block.ErrHeightIndexedVMNotImplemented: 3,
-		block.ErrIndexIncomplete:               4,
-		block.ErrStateSyncableVMNotImplemented: 5,
+	errorToErrEnum = map[error]vmpb.Error{
+		database.ErrClosed:                     vmpb.Error_ERROR_CLOSED,
+		database.ErrNotFound:                   vmpb.Error_ERROR_NOT_FOUND,
+		block.ErrHeightIndexedVMNotImplemented: vmpb.Error_ERROR_HEIGHT_INDEX_NOT_IMPLEMENTED,
+		block.ErrIndexIncomplete:               vmpb.Error_ERROR_HEIGHT_INDEX_INCOMPLETE,
+		block.ErrStateSyncableVMNotImplemented: vmpb.Error_ERROR_STATE_SYNC_NOT_IMPLEMENTED,
 	}
 )
 
 func errorToRPCError(err error) error {
-	if _, ok := errorToErrCode[err]; ok {
+	if _, ok := errorToErrEnum[err]; ok {
 		return nil
 	}
 	return err

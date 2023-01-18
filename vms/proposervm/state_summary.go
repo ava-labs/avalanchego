@@ -38,24 +38,24 @@ func (s *stateSummary) Height() uint64 {
 	return s.innerSummary.Height()
 }
 
-func (s *stateSummary) Accept(ctx context.Context) (bool, error) {
+func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
 	// If we have already synced up to or past this state summary, we do not
 	// want to sync to it.
 	if s.vm.lastAcceptedHeight >= s.Height() {
-		return false, nil
+		return block.StateSyncSkipped, nil
 	}
 
 	// set fork height first, before accepting proposerVM full block
 	// which updates height index (among other indices)
 	if err := s.vm.State.SetForkHeight(s.StateSummary.ForkHeight()); err != nil {
-		return false, err
+		return block.StateSyncSkipped, err
 	}
 
 	// We store the full proposerVM block associated with the summary
 	// and update height index with it, so that state sync could resume
 	// after a shutdown.
 	if err := s.block.acceptOuterBlk(); err != nil {
-		return false, err
+		return block.StateSyncSkipped, err
 	}
 
 	// innerSummary.Accept may fail with the proposerVM block and index already

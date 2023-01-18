@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"math"
 	"testing"
 
@@ -61,8 +60,6 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-
-	errCustom := errors.New("custom error")
 
 	tests := []test{
 		{
@@ -418,18 +415,16 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 
 	t.Run("invalid BaseTx", func(t *testing.T) {
-		require := require.New(t)
 		tx := &AddPermissionlessValidatorTx{
 			BaseTx: invalidBaseTx,
 			Validator: validator.Validator{
@@ -448,11 +443,10 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			DelegationShares: reward.PercentDenominator,
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 
 	t.Run("stake overflow", func(t *testing.T) {
-		require := require.New(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -490,7 +484,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			DelegationShares:      reward.PercentDenominator,
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 }
 

@@ -9,20 +9,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	errPending = errors.New("unexpectedly called Pending")
+	errPending   = errors.New("unexpectedly called Pending")
+	errLinearize = errors.New("unexpectedly called Linearize")
 
 	_ DAGVM = (*TestVM)(nil)
 )
 
 type TestVM struct {
-	common.TestVM
+	block.TestVM
 
-	CantPendingTxs, CantParse, CantGet bool
+	CantLinearize, CantPendingTxs, CantParse, CantGet bool
 
+	LinearizeF  func(context.Context, ids.ID) error
 	PendingTxsF func(context.Context) []snowstorm.Tx
 	ParseTxF    func(context.Context, []byte) (snowstorm.Tx, error)
 	GetTxF      func(context.Context, ids.ID) (snowstorm.Tx, error)
@@ -34,6 +36,16 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantPendingTxs = cant
 	vm.CantParse = cant
 	vm.CantGet = cant
+}
+
+func (vm *TestVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
+	if vm.LinearizeF != nil {
+		return vm.LinearizeF(ctx, stopVertexID)
+	}
+	if vm.CantLinearize && vm.T != nil {
+		vm.T.Fatal(errLinearize)
+	}
+	return errLinearize
 }
 
 func (vm *TestVM) PendingTxs(ctx context.Context) []snowstorm.Tx {

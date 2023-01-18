@@ -81,27 +81,20 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -110,13 +103,12 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	if err == nil {
-		t.Fatal("should've failed verification because proposed timestamp same as current timestamp")
-	}
+	require.Error(err, "should've failed verification because proposed timestamp same as current timestamp")
 }
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 
@@ -126,23 +118,17 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	{
 		tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime.Add(1 * time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -151,22 +137,17 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
-		}
+		require.Error(err, "should've failed verification because proposed timestamp is after pending validator start time")
 	}
 
-	if err := shutdownEnvironment(env); err != nil {
-		t.Fatal(err)
-	}
+	err = shutdownEnvironment(env)
+	require.NoError(err)
 
 	// Case: Timestamp is after next validator end time
 	env = newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// fast forward clock to 10 seconds before genesis validators stop validating
@@ -175,19 +156,13 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	{
 		// Proposes advancing timestamp to 1 second after genesis validators stop validating
 		tx, err := env.txBuilder.NewAdvanceTimeTx(defaultValidateEndTime.Add(1 * time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -196,9 +171,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should've failed verification because proposed timestamp is after pending validator start time")
-		}
+		require.Error(err, "should've failed verification because proposed timestamp is after pending validator start time")
 	}
 }
 
@@ -371,8 +344,8 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.description, func(ts *testing.T) {
-			require := require.New(ts)
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
 			env := newEnvironment( /*postBanff*/ false)
 			env.ctx.Lock.Lock()
 			defer func() {
@@ -382,7 +355,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
-			env.config.WhitelistedSubnets.Add(subnetID)
+			env.config.TrackedSubnets.Add(subnetID)
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
@@ -482,7 +455,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}()
 
 	subnetID := testSubnet1.ID()
-	env.config.WhitelistedSubnets.Add(subnetID)
+	env.config.TrackedSubnets.Add(subnetID)
 	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	dummyHeight := uint64(1)
@@ -572,21 +545,20 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 }
 
-func TestWhitelistedSubnet(t *testing.T) {
-	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
+func TestTrackedSubnet(t *testing.T) {
+	for _, tracked := range []bool{true, false} {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
+			require := require.New(t)
 			env := newEnvironment( /*postBanff*/ false)
 			env.ctx.Lock.Lock()
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
-			if whitelist {
-				env.config.WhitelistedSubnets.Add(subnetID)
+			if tracked {
+				env.config.TrackedSubnets.Add(subnetID)
 				env.config.Validators.Add(subnetID, validators.NewSet())
 			}
 
@@ -604,41 +576,30 @@ func TestWhitelistedSubnet(t *testing.T) {
 				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			staker, err := state.NewPendingStaker(
 				tx.ID(),
 				tx.Unsigned.(*txs.AddSubnetValidatorTx),
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
 			env.state.SetHeight(dummyHeight)
-			if err := env.state.Commit(); err != nil {
-				t.Fatal(err)
-			}
+			err = env.state.Commit()
+			require.NoError(err)
 
 			// Advance time to the staker's start time.
 			env.clk.Set(subnetVdr1StartTime)
 			tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1StartTime)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			onCommitState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			onAbortState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
@@ -647,25 +608,22 @@ func TestWhitelistedSubnet(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			executor.OnCommitState.Apply(env.state)
 			env.state.SetHeight(dummyHeight)
-			require.NoError(t, env.state.Commit())
-			require.Equal(t, whitelist, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
+			require.NoError(env.state.Commit())
+			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
 		})
 	}
 }
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -681,20 +639,16 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		nodeID,
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -703,17 +657,17 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	executor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(t, ok)
+	require.True(ok)
 	vdrWeight := primarySet.GetWeight(nodeID)
-	require.Equal(t, env.config.MinValidatorStake, vdrWeight)
+	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
@@ -732,32 +686,28 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		},
 		ids.ShortEmpty,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	staker, err := state.NewPendingStaker(
 		addDelegatorTx.ID(),
 		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -766,24 +716,23 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	executor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Test validator weight after delegation
 	vdrWeight = primarySet.GetWeight(nodeID)
-	require.Equal(t, env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
+	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -793,20 +742,16 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	_, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -815,17 +760,17 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	executor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Test validator weight before delegation
 	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(t, ok)
+	require.True(ok)
 	vdrWeight := primarySet.GetWeight(nodeID)
-	require.Equal(t, env.config.MinValidatorStake, vdrWeight)
+	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
@@ -839,28 +784,28 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
 		ids.ShortEmpty,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	staker, err := state.NewPendingStaker(
 		addDelegatorTx.ID(),
 		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Advance Time
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	executor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -869,43 +814,36 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	executor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	require.NoError(t, env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// Test validator weight after delegation
 	vdrWeight = primarySet.GetWeight(nodeID)
-	require.Equal(t, env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
+	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 
 	// Proposed advancing timestamp to 1 second after sync bound
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -914,39 +852,30 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	if !executor.PrefersCommit {
-		t.Fatal("should prefer to commit this tx because its proposed timestamp it's within sync bound")
-	}
+	require.True(executor.PrefersCommit, "should prefer to commit this tx because its proposed timestamp it's within sync bound")
 }
 
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 	env.config.BanffTime = defaultGenesisTime.Add(SyncBound)
 
 	// Proposed advancing timestamp to the banff timestamp
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	executor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -955,35 +884,32 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(t, err, errAdvanceTimeTxIssuedAfterBanff)
+	require.ErrorIs(err, errAdvanceTimeTxIssuedAfterBanff)
 }
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	bytes, err := txs.Codec.Marshal(txs.Version, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	var unmarshaledTx txs.Tx
-	if _, err := txs.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
-		t.Fatal(err)
-	} else if tx.Unsigned.(*txs.AdvanceTimeTx).Time != unmarshaledTx.Unsigned.(*txs.AdvanceTimeTx).Time {
-		t.Fatal("should have same timestamp")
-	}
+	_, err = txs.Codec.Unmarshal(bytes, &unmarshaledTx)
+	require.NoError(err)
+
+	require.Equal(
+		tx.Unsigned.(*txs.AdvanceTimeTx).Time,
+		unmarshaledTx.Unsigned.(*txs.AdvanceTimeTx).Time,
+	)
 }
 
 func addPendingValidator(

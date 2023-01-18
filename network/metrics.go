@@ -4,6 +4,9 @@
 package network
 
 import (
+	"sync"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,10 +29,16 @@ type metrics struct {
 	acceptFailed                    prometheus.Counter
 	inboundConnRateLimited          prometheus.Counter
 	inboundConnAllowed              prometheus.Counter
+	numUselessPeerListBytes         prometheus.Counter
 	nodeUptimeWeightedAverage       prometheus.Gauge
 	nodeUptimeRewardingStake        prometheus.Gauge
 	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec
 	nodeSubnetUptimeRewardingStake  *prometheus.GaugeVec
+	peerConnectedLifetimeAverage    prometheus.Gauge
+
+	lock                       sync.RWMutex
+	peerConnectedStartTimes    map[ids.NodeID]float64
+	peerConnectedStartTimesSum float64
 }
 
 func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs set.Set[ids.ID]) (*metrics, error) {
@@ -92,6 +101,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "inbound_conn_throttler_allowed",
 			Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 		}),
+		numUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "num_useless_peerlist_bytes",
+			Help:      "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in PeerList messages",
+		}),
 		inboundConnRateLimited: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "inbound_conn_throttler_rate_limited",
@@ -123,6 +137,14 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			},
 			[]string{"subnetID"},
 		),
+		peerConnectedLifetimeAverage: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "peer_connected_duration_average",
+				Help:      "The average duration of all peer connections in nanoseconds",
+			},
+		),
+		peerConnectedStartTimes: make(map[ids.NodeID]float64),
 	}
 
 	errs := wrappers.Errs{}
@@ -138,14 +160,16 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.disconnected),
 		registerer.Register(m.acceptFailed),
 		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.numUselessPeerListBytes),
 		registerer.Register(m.inboundConnRateLimited),
 		registerer.Register(m.nodeUptimeWeightedAverage),
 		registerer.Register(m.nodeUptimeRewardingStake),
 		registerer.Register(m.nodeSubnetUptimeWeightedAverage),
 		registerer.Register(m.nodeSubnetUptimeRewardingStake),
+		registerer.Register(m.peerConnectedLifetimeAverage),
 	)
 
-	// init subnet tracker metrics with whitelisted subnets
+	// init subnet tracker metrics with tracked subnets
 	for subnetID := range initialSubnetIDs {
 		// no need to track primary network ID
 		if subnetID == constants.PrimaryNetworkID {
@@ -169,6 +193,13 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	for subnetID := range trackedSubnets {
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	now := float64(time.Now().UnixNano())
+	m.peerConnectedStartTimes[peer.ID()] = now
+	m.peerConnectedStartTimesSum += now
 }
 
 func (m *metrics) markDisconnected(peer peer.Peer) {
@@ -179,4 +210,26 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 	for subnetID := range trackedSubnets {
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	peerID := peer.ID()
+	start := m.peerConnectedStartTimes[peerID]
+	m.peerConnectedStartTimesSum -= start
+
+	delete(m.peerConnectedStartTimes, peerID)
+}
+
+func (m *metrics) updatePeerConnectionLifetimeMetrics() {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	avg := float64(0)
+	if n := len(m.peerConnectedStartTimes); n > 0 {
+		avgStartTime := m.peerConnectedStartTimesSum / float64(n)
+		avg = float64(time.Now().UnixNano()) - avgStartTime
+	}
+
+	m.peerConnectedLifetimeAverage.Set(avg)
 }

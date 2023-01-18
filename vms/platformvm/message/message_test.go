@@ -34,9 +34,7 @@ func TestTx(t *testing.T) {
 }
 
 func TestParseGibberish(t *testing.T) {
-	require := require.New(t)
-
 	randomBytes := utils.RandomBytes(256 * units.KiB)
 	_, err := Parse(randomBytes)
-	require.Error(err)
+	require.Error(t, err)
 }

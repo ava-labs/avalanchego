@@ -31,8 +31,8 @@ func (c *Client) Read(p []byte) (int, error) {
 
 	copy(p, resp.Read)
 
-	if resp.Errored {
-		err = errors.New(resp.Error)
+	if resp.Error != nil {
+		err = errors.New(*resp.Error)
 	}
 	return len(resp.Read), err
 }

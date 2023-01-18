@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
+var errDuplicateVerify = errors.New("duplicate verify")
+
 // ProposerBlock Option interface tests section
 func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
@@ -62,10 +64,10 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -151,10 +153,10 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -266,10 +268,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -299,10 +301,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		beforeWinStart,
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -320,10 +322,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		atWindowStart,
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -341,10 +343,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		afterWindowStart,
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -377,10 +379,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		prntProBlk.ID(),
 		afterSubWinEnd,
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -463,10 +465,10 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -671,10 +673,10 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -809,7 +811,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	}
 
 	// set error on coreBlock.Verify and recall Verify()
-	coreBlk.VerifyV = errors.New("core block verify should only be called once")
+	coreBlk.VerifyV = errDuplicateVerify
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -1087,10 +1089,10 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("failed to build new child block")

@@ -14,28 +14,28 @@ type Service struct {
 	health Reporter
 }
 
-// APIHealthReply is the response for Health
-type APIHealthReply struct {
+// APIReply is the response for Readiness, Health, and Liveness.
+type APIReply struct {
 	Checks  map[string]Result `json:"checks"`
 	Healthy bool              `json:"healthy"`
 }
 
 // Readiness returns if the node has finished initialization
-func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIReply) error {
 	s.log.Debug("Health.readiness called")
 	reply.Checks, reply.Healthy = s.health.Readiness()
 	return nil
 }
 
 // Health returns a summation of the health of the node
-func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIReply) error {
 	s.log.Debug("Health.health called")
 	reply.Checks, reply.Healthy = s.health.Health()
 	return nil
 }
 
 // Liveness returns if the node is in need of a restart
-func (s *Service) Liveness(_ *http.Request, _ *struct{}, reply *APIHealthReply) error {
+func (s *Service) Liveness(_ *http.Request, _ *struct{}, reply *APIReply) error {
 	s.log.Debug("Health.liveness called")
 	reply.Checks, reply.Healthy = s.health.Liveness()
 	return nil

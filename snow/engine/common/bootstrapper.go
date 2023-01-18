@@ -218,14 +218,18 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		}
 	}
 
-	// if we don't have enough weight for the bootstrap to be accepted then retry or fail the bootstrap
+	// if we don't have enough weight for the bootstrap to be accepted then
+	// retry or fail the bootstrap
 	size := len(accepted)
 	if size == 0 && b.Beacons.Len() > 0 {
-		// retry the bootstrap if the weight is not enough to bootstrap
+		// if we had too many timeouts when asking for validator votes, we
+		// should restart bootstrap hoping for the network problems to go away;
+		// otherwise, we received enough (>= b.Alpha) responses, but no frontier
+		// was supported by a majority of validators (i.e. votes are split
+		// between minorities supporting different frontiers).
 		failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAccepted)
-
-		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
-		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
+		votingStakes := b.Beacons.Weight() - failedBeaconWeight
+		if b.Config.RetryBootstrap && votingStakes < b.Alpha {
 			b.Ctx.Log.Debug("restarting bootstrap",
 				zap.String("reason", "not enough votes received"),
 				zap.Int("numBeacons", b.Beacons.Len()),

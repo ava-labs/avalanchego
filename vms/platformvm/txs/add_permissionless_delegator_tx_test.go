@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var errCustom = errors.New("custom error")
+
 func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name   string
@@ -53,8 +55,6 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-
-	errCustom := errors.New("custom error")
 
 	tests := []test{
 		{
@@ -314,18 +314,16 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 
 	t.Run("invalid BaseTx", func(t *testing.T) {
-		require := require.New(t)
 		tx := &AddPermissionlessDelegatorTx{
 			BaseTx: invalidBaseTx,
 			Validator: validator.Validator{
@@ -343,11 +341,10 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			},
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 
 	t.Run("stake overflow", func(t *testing.T) {
-		require := require.New(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -382,7 +379,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			DelegationRewardsOwner: rewardsOwner,
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 }
 

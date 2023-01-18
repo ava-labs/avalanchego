@@ -46,9 +46,8 @@ func TestTreeIterator(t *testing.T) {
 }
 
 func TestTreeIteratorNil(t *testing.T) {
-	require := require.New(t)
 	it := NewTreeIterator(nil)
-	require.False(it.Next())
+	require.False(t, it.Next())
 	it.Release()
 }
 

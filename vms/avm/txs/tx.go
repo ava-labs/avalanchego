@@ -25,7 +25,7 @@ var errNilTx = errors.New("nil tx is not valid")
 type UnsignedTx interface {
 	snow.ContextInitializable
 
-	Initialize(unsignedBytes []byte)
+	SetBytes(unsignedBytes []byte)
 	Bytes() []byte
 
 	ConsumedAssetIDs() set.Set[ids.ID]
@@ -59,10 +59,26 @@ type Tx struct {
 	bytes []byte
 }
 
-func (t *Tx) Initialize(unsignedBytes, signedBytes []byte) {
+func (t *Tx) Initialize(c codec.Manager) error {
+	signedBytes, err := c.Marshal(CodecVersion, t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	unsignedBytesLen, err := c.Size(CodecVersion, &t.Unsigned)
+	if err != nil {
+		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
+	}
+
+	unsignedBytes := signedBytes[:unsignedBytesLen]
+	t.SetBytes(unsignedBytes, signedBytes)
+	return nil
+}
+
+func (t *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 	t.id = hashing.ComputeHash256Array(signedBytes)
 	t.bytes = signedBytes
-	t.Unsigned.Initialize(unsignedBytes)
+	t.Unsigned.SetBytes(unsignedBytes)
 }
 
 // ID returns the unique ID of this tx
@@ -141,7 +157,7 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
-	t.Initialize(unsignedBytes, signedBytes)
+	t.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }
 
@@ -170,7 +186,7 @@ func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP2
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
-	t.Initialize(unsignedBytes, signedBytes)
+	t.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }
 
@@ -199,6 +215,6 @@ func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R
 	if err != nil {
 		return fmt.Errorf("problem creating transaction: %w", err)
 	}
-	t.Initialize(unsignedBytes, signedBytes)
+	t.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }

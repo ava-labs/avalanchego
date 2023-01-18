@@ -23,7 +23,7 @@ var (
 	pluginDir = "plugin getter"
 
 	// errors
-	errOops = errors.New("oops")
+	errTest = errors.New("non-nil error")
 
 	// vm names
 	registeredVMName   = "mgj786NP7uDwBCcq6YwThhaN8FLyybkCa4zBWTQbNgmK6k9A6"
@@ -66,10 +66,10 @@ func TestGet_ReadDirFails(t *testing.T) {
 	defer resources.ctrl.Finish()
 
 	// disk read fails
-	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(nil, errOops)
+	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(nil, errTest)
 
 	_, _, err := resources.getter.Get()
-	require.ErrorIs(t, err, errOops)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Get should fail if we see an invalid VM id
@@ -79,7 +79,7 @@ func TestGet_InvalidVMName(t *testing.T) {
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(invalidVMs, nil)
 	// didn't find an alias, so we'll try using this invalid vm name
-	resources.mockManager.EXPECT().Lookup("invalid-vm").Times(1).Return(ids.Empty, errOops)
+	resources.mockManager.EXPECT().Lookup("invalid-vm").Times(1).Return(ids.Empty, errTest)
 
 	_, _, err := resources.getter.Get()
 	require.ErrorIs(t, err, errInvalidVMID)
@@ -95,10 +95,10 @@ func TestGet_GetFactoryFails(t *testing.T) {
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(oneValidVM, nil)
 	resources.mockManager.EXPECT().Lookup(registeredVMName).Times(1).Return(vm, nil)
 	// Getting the factory fails
-	resources.mockManager.EXPECT().GetFactory(vm).Times(1).Return(nil, errOops)
+	resources.mockManager.EXPECT().GetFactory(vm).Times(1).Return(nil, errTest)
 
 	_, _, err := resources.getter.Get()
-	require.ErrorIs(t, err, errOops)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Get should return the correct registered and unregistered VMs.

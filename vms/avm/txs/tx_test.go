@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -30,26 +29,13 @@ var (
 )
 
 func setupCodec() codec.Manager {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(CodecVersion, c),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
+	parser, err := NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	if err != nil {
+		panic(err)
 	}
-	return m
+	return parser.Codec()
 }
 
 func NewContext(tb testing.TB) *snow.Context {
@@ -125,9 +111,9 @@ func TestTxInvalidCredential(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{Err: errors.New("")}}},
+		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{Err: errTest}}},
 	}
-	tx.Initialize(nil, nil)
+	tx.SetBytes(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
@@ -180,7 +166,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 			{Verifiable: &avax.TestVerifiable{}},
 		},
 	}
-	tx.Initialize(nil, nil)
+	tx.SetBytes(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
@@ -224,7 +210,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 		}},
 		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{}}},
 	}
-	tx.Initialize(nil, nil)
+	tx.SetBytes(nil, nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid number of credentials")

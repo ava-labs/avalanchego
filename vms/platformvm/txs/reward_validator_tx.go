@@ -32,7 +32,7 @@ type RewardValidatorTx struct {
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (tx *RewardValidatorTx) Initialize(unsignedBytes []byte) {
+func (tx *RewardValidatorTx) SetBytes(unsignedBytes []byte) {
 	tx.unsignedBytes = unsignedBytes
 }
 

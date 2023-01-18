@@ -110,22 +110,20 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
-type LastAccepteder interface {
-	GetLastAccepted() ids.ID
-	SetLastAccepted(blkID ids.ID)
-}
-
-type BlockState interface {
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
-	AddStatelessBlock(block blocks.Block, status choices.Status)
-}
-
 type State interface {
-	LastAccepteder
 	Chain
-	BlockState
 	uptime.State
 	avax.UTXOReader
+
+	GetLastAccepted() ids.ID
+	SetLastAccepted(blkID ids.ID)
+
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	AddStatelessBlock(block blocks.Block, status choices.Status)
+
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
@@ -141,8 +139,8 @@ type State interface {
 	// Commit changes to the base database.
 	Commit() error
 
-	// Returns a batch of unwritten changes that, when written, will be commit
-	// all pending changes to the base database.
+	// Returns a batch of unwritten changes that, when written, will commit all
+	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
 	Close() error
@@ -912,6 +910,26 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
+func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+	for nodeID, validator := range s.currentStakers.validators[subnetID] {
+		staker := validator.validator
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+			return err
+		}
+
+		delegatorIterator := NewTreeIterator(validator.delegators)
+		for delegatorIterator.Next() {
+			staker := delegatorIterator.Value()
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+				delegatorIterator.Release()
+				return err
+			}
+		}
+		delegatorIterator.Release()
+	}
+	return nil
+}
+
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
 		Height:   height,
@@ -1337,7 +1355,7 @@ func (s *state) initValidatorSets() error {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := s.validatorSet(constants.PrimaryNetworkID, primaryValidators)
+	err := s.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
 	if err != nil {
 		return err
 	}
@@ -1345,9 +1363,9 @@ func (s *state) initValidatorSets() error {
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
-	for subnetID := range s.cfg.WhitelistedSubnets {
+	for subnetID := range s.cfg.TrackedSubnets {
 		subnetValidators := validators.NewSet()
-		err := s.validatorSet(subnetID, subnetValidators)
+		err := s.ValidatorSet(subnetID, subnetValidators)
 		if err != nil {
 			return err
 		}
@@ -1355,26 +1373,6 @@ func (s *state) initValidatorSets() error {
 		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
-	}
-	return nil
-}
-
-func (s *state) validatorSet(subnetID ids.ID, vdrs validators.Set) error {
-	for nodeID, validator := range s.currentStakers.validators[subnetID] {
-		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
-			return err
-		}
-
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
-				return err
-			}
-		}
-		delegatorIterator.Release()
 	}
 	return nil
 }
@@ -1687,8 +1685,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				continue
 			}
 
-			// We only track the current validator set of whitelisted subnets.
-			if subnetID != constants.PrimaryNetworkID && !s.cfg.WhitelistedSubnets.Contains(subnetID) {
+			// We only track the current validator set of tracked subnets.
+			if subnetID != constants.PrimaryNetworkID && !s.cfg.TrackedSubnets.Contains(subnetID) {
 				continue
 			}
 

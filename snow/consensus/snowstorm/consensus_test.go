@@ -57,6 +57,8 @@ var (
 	}
 
 	Red, Green, Blue, Alpha *TestTx
+
+	errTest = errors.New("non-nil error")
 )
 
 //  R - G - B - A
@@ -1475,7 +1477,7 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 
@@ -1504,7 +1506,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
@@ -1548,7 +1550,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
 	pink.InputIDsV = append(pink.InputIDsV, x)
@@ -1594,7 +1596,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
 	pink.InputIDsV = append(pink.InputIDsV, x)

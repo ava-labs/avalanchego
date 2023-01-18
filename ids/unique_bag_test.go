@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestUniqueBag(t *testing.T) {
@@ -32,7 +34,7 @@ func TestUniqueBag(t *testing.T) {
 		t.Fatalf("Set missing element")
 	}
 
-	var bs1 BitSet64
+	var bs1 set.Bits64
 	bs1.Add(2)
 	bs1.Add(4)
 
@@ -94,7 +96,7 @@ func TestUniqueBag(t *testing.T) {
 	ub6.Add(2, id1)
 	ub6.Add(7, id1)
 
-	diffBitSet := BitSet64(0)
+	diffBitSet := set.Bits64(0)
 	diffBitSet.Add(1)
 	diffBitSet.Add(7)
 

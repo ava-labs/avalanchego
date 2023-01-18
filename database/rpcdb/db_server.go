@@ -12,9 +12,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
+
+const iterationBatchSize = 128 * units.KiB
 
 var errUnknownIterator = errors.New("unknown iterator")
 
@@ -23,13 +26,6 @@ type DatabaseServer struct {
 	rpcdbpb.UnsafeDatabaseServer
 
 	db database.Database
-
-	// batchLock protects [batches] from concurrent modifications. Note that
-	// [batchLock] does not protect the actual Batch. Batches are documented as
-	// not being safe for concurrent use. Therefore, it is up to the client to
-	// respect this invariant.
-	batchLock sync.Mutex
-	batches   map[int64]database.Batch
 
 	// iteratorLock protects [nextIteratorID] and [iterators] from concurrent
 	// modifications. Similarly to [batchLock], [iteratorLock] does not protect
@@ -45,7 +41,6 @@ type DatabaseServer struct {
 func NewServer(db database.Database) *DatabaseServer {
 	return &DatabaseServer{
 		db:        db,
-		batches:   make(map[int64]database.Batch),
 		iterators: make(map[uint64]database.Iterator),
 	}
 }
@@ -55,7 +50,7 @@ func (db *DatabaseServer) Has(_ context.Context, req *rpcdbpb.HasRequest) (*rpcd
 	has, err := db.db.Has(req.Key)
 	return &rpcdbpb.HasResponse{
 		Has: has,
-		Err: errorToErrCode[err],
+		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -64,34 +59,34 @@ func (db *DatabaseServer) Get(_ context.Context, req *rpcdbpb.GetRequest) (*rpcd
 	value, err := db.db.Get(req.Key)
 	return &rpcdbpb.GetResponse{
 		Value: value,
-		Err:   errorToErrCode[err],
+		Err:   errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
 // Put delegates the Put call to the managed database and returns the result
 func (db *DatabaseServer) Put(_ context.Context, req *rpcdbpb.PutRequest) (*rpcdbpb.PutResponse, error) {
 	err := db.db.Put(req.Key, req.Value)
-	return &rpcdbpb.PutResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.PutResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Delete delegates the Delete call to the managed database and returns the
 // result
 func (db *DatabaseServer) Delete(_ context.Context, req *rpcdbpb.DeleteRequest) (*rpcdbpb.DeleteResponse, error) {
 	err := db.db.Delete(req.Key)
-	return &rpcdbpb.DeleteResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.DeleteResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Compact delegates the Compact call to the managed database and returns the
 // result
 func (db *DatabaseServer) Compact(_ context.Context, req *rpcdbpb.CompactRequest) (*rpcdbpb.CompactResponse, error) {
 	err := db.db.Compact(req.Start, req.Limit)
-	return &rpcdbpb.CompactResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.CompactResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Close delegates the Close call to the managed database and returns the result
 func (db *DatabaseServer) Close(context.Context, *rpcdbpb.CloseRequest) (*rpcdbpb.CloseResponse, error) {
 	err := db.db.Close()
-	return &rpcdbpb.CloseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.CloseResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // HealthCheck performs a heath check against the underlying database.
@@ -110,42 +105,26 @@ func (db *DatabaseServer) HealthCheck(ctx context.Context, _ *emptypb.Empty) (*r
 // WriteBatch takes in a set of key-value pairs and atomically writes them to
 // the internal database
 func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbpb.WriteBatchRequest) (*rpcdbpb.WriteBatchResponse, error) {
-	db.batchLock.Lock()
-	batch, exists := db.batches[req.Id]
-	if !exists {
-		batch = db.db.NewBatch()
-		db.batches[req.Id] = batch
-	}
-	db.batchLock.Unlock()
-
+	batch := db.db.NewBatch()
 	for _, put := range req.Puts {
 		if err := batch.Put(put.Key, put.Value); err != nil {
-			// Because we are reporting an error, we free the allocated batch.
-			delete(db.batches, req.Id)
-
-			return &rpcdbpb.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+			return &rpcdbpb.WriteBatchResponse{
+				Err: errorToErrEnum[err],
+			}, errorToRPCError(err)
 		}
 	}
-
 	for _, del := range req.Deletes {
 		if err := batch.Delete(del.Key); err != nil {
-			// Because we are reporting an error, we free the allocated batch.
-			delete(db.batches, req.Id)
-
-			return &rpcdbpb.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+			return &rpcdbpb.WriteBatchResponse{
+				Err: errorToErrEnum[err],
+			}, errorToRPCError(err)
 		}
 	}
 
-	if req.Continues {
-		return &rpcdbpb.WriteBatchResponse{}, nil
-	}
-
-	db.batchLock.Lock()
-	delete(db.batches, req.Id)
-	db.batchLock.Unlock()
-
 	err := batch.Write()
-	return &rpcdbpb.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.WriteBatchResponse{
+		Err: errorToErrEnum[err],
+	}, errorToRPCError(err)
 }
 
 // NewIteratorWithStartAndPrefix allocates an iterator and returns the iterator
@@ -171,9 +150,11 @@ func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbpb.IteratorN
 		return nil, errUnknownIterator
 	}
 
-	size := 0
-	data := []*rpcdbpb.PutRequest(nil)
-	for size < maxBatchSize && it.Next() {
+	var (
+		size int
+		data []*rpcdbpb.PutRequest
+	)
+	for size < iterationBatchSize && it.Next() {
 		key := it.Key()
 		value := it.Value()
 		size += len(key) + len(value)
@@ -196,7 +177,7 @@ func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbpb.Iterator
 		return nil, errUnknownIterator
 	}
 	err := it.Error()
-	return &rpcdbpb.IteratorErrorResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.IteratorErrorResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // IteratorRelease attempts to release the resources allocated to an iterator
@@ -205,12 +186,12 @@ func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbpb.Iterat
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		db.iteratorLock.Unlock()
-		return &rpcdbpb.IteratorReleaseResponse{Err: 0}, nil
+		return &rpcdbpb.IteratorReleaseResponse{}, nil
 	}
 	delete(db.iterators, req.Id)
 	db.iteratorLock.Unlock()
 
 	err := it.Error()
 	it.Release()
-	return &rpcdbpb.IteratorReleaseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.IteratorReleaseResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }

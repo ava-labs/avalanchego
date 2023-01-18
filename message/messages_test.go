@@ -16,9 +16,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 func TestMessage(t *testing.T) {
@@ -51,7 +50,7 @@ func TestMessage(t *testing.T) {
 	tests := []struct {
 		desc             string
 		op               Op
-		msg              *p2ppb.Message
+		msg              *p2p.Message
 		gzipCompress     bool
 		bypassThrottling bool
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
@@ -59,9 +58,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "ping message with no compression",
 			op:   PingOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ping{
-					Ping: &p2ppb.Ping{},
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ping{
+					Ping: &p2p.Ping{},
 				},
 			},
 			gzipCompress:     false,
@@ -71,9 +70,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "pong message with no compression no subnet uptimes",
 			op:   PongOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Pong{
-					Pong: &p2ppb.Pong{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Pong{
+					Pong: &p2p.Pong{
 						Uptime: 100,
 					},
 				},
@@ -85,11 +84,11 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "pong message with no compression and subnet uptimes",
 			op:   PongOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Pong{
-					Pong: &p2ppb.Pong{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Pong{
+					Pong: &p2p.Pong{
 						Uptime: 100,
-						SubnetUptimes: []*p2ppb.SubnetUptime{
+						SubnetUptimes: []*p2p.SubnetUptime{
 							{
 								SubnetId: testID[:],
 								Uptime:   100,
@@ -105,9 +104,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "version message with no compression",
 			op:   VersionOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Version{
-					Version: &p2ppb.Version{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Version{
+					Version: &p2p.Version{
 						NetworkId:      uint32(1337),
 						MyTime:         uint64(nowUnix),
 						IpAddr:         []byte(net.IPv6zero),
@@ -126,10 +125,10 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "peer_list message with no compression",
 			op:   PeerListOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
+			msg: &p2p.Message{
+				Message: &p2p.Message_PeerList{
+					PeerList: &p2p.PeerList{
+						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],
 								IpAddr:          []byte(net.IPv4zero),
@@ -148,10 +147,10 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "peer_list message with compression",
 			op:   PeerListOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
+			msg: &p2p.Message{
+				Message: &p2p.Message_PeerList{
+					PeerList: &p2p.PeerList{
+						ClaimedIpPorts: []*p2p.ClaimedIpPort{
 							{
 								X509Certificate: testTLSCert.Certificate[0],
 								IpAddr:          []byte(net.IPv6zero),
@@ -170,11 +169,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "peer_list_ack message with no compression",
 			op:   PeerListAckOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerListAck{
-					PeerListAck: &p2ppb.PeerListAck{
-						TxIds: [][]byte{
-							testID[:],
+			msg: &p2p.Message{
+				Message: &p2p.Message_PeerListAck{
+					PeerListAck: &p2p.PeerListAck{
+						PeerAcks: []*p2p.PeerAck{
+							{
+								TxId:      testID[:],
+								Timestamp: 1,
+							},
 						},
 					},
 				},
@@ -186,9 +188,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_state_summary_frontier message with no compression",
 			op:   GetStateSummaryFrontierOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetStateSummaryFrontier{
-					GetStateSummaryFrontier: &p2ppb.GetStateSummaryFrontier{
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetStateSummaryFrontier{
+					GetStateSummaryFrontier: &p2p.GetStateSummaryFrontier{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
@@ -202,9 +204,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "state_summary_frontier message with no compression",
 			op:   StateSummaryFrontierOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_StateSummaryFrontier_{
-					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
+			msg: &p2p.Message{
+				Message: &p2p.Message_StateSummaryFrontier_{
+					StateSummaryFrontier_: &p2p.StateSummaryFrontier{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Summary:   []byte{0},
@@ -218,9 +220,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "state_summary_frontier message with compression",
 			op:   StateSummaryFrontierOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_StateSummaryFrontier_{
-					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
+			msg: &p2p.Message{
+				Message: &p2p.Message_StateSummaryFrontier_{
+					StateSummaryFrontier_: &p2p.StateSummaryFrontier{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Summary:   compressibleContainers[0],
@@ -234,9 +236,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_accepted_state_summary message with no compression",
 			op:   GetAcceptedStateSummaryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedStateSummary{
-					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAcceptedStateSummary{
+					GetAcceptedStateSummary: &p2p.GetAcceptedStateSummary{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
@@ -251,9 +253,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_accepted_state_summary message with compression",
 			op:   GetAcceptedStateSummaryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedStateSummary{
-					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAcceptedStateSummary{
+					GetAcceptedStateSummary: &p2p.GetAcceptedStateSummary{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
@@ -268,9 +270,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "accepted_state_summary message with no compression",
 			op:   AcceptedStateSummaryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AcceptedStateSummary_{
+					AcceptedStateSummary_: &p2p.AcceptedStateSummary{
 						ChainId:    testID[:],
 						RequestId:  1,
 						SummaryIds: [][]byte{testID[:], testID[:]},
@@ -284,9 +286,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "accepted_state_summary message with compression",
 			op:   AcceptedStateSummaryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AcceptedStateSummary_{
+					AcceptedStateSummary_: &p2p.AcceptedStateSummary{
 						ChainId:    testID[:],
 						RequestId:  1,
 						SummaryIds: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
@@ -300,12 +302,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_accepted_frontier message with no compression",
 			op:   GetAcceptedFrontierOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedFrontier{
-					GetAcceptedFrontier: &p2ppb.GetAcceptedFrontier{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAcceptedFrontier{
+					GetAcceptedFrontier: &p2p.GetAcceptedFrontier{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Deadline:   1,
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -316,12 +319,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "accepted_frontier message with no compression",
 			op:   AcceptedFrontierOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedFrontier_{
-					AcceptedFrontier_: &p2ppb.AcceptedFrontier{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AcceptedFrontier_{
+					AcceptedFrontier_: &p2p.AcceptedFrontier{
 						ChainId:      testID[:],
 						RequestId:    1,
 						ContainerIds: [][]byte{testID[:], testID[:]},
+						EngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -332,13 +336,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_accepted message with no compression",
 			op:   GetAcceptedOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAccepted{
-					GetAccepted: &p2ppb.GetAccepted{
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAccepted{
+					GetAccepted: &p2p.GetAccepted{
 						ChainId:      testID[:],
 						RequestId:    1,
 						Deadline:     1,
 						ContainerIds: [][]byte{testID[:], testID[:]},
+						EngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -349,12 +354,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "accepted message with no compression",
 			op:   AcceptedOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Accepted_{
-					Accepted_: &p2ppb.Accepted{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Accepted_{
+					Accepted_: &p2p.Accepted{
 						ChainId:      testID[:],
 						RequestId:    1,
 						ContainerIds: [][]byte{testID[:], testID[:]},
+						EngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -365,13 +371,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get_ancestors message with no compression",
 			op:   GetAncestorsOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAncestors{
-					GetAncestors: &p2ppb.GetAncestors{
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAncestors{
+					GetAncestors: &p2p.GetAncestors{
 						ChainId:     testID[:],
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
+						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -382,12 +389,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "ancestors message with no compression",
 			op:   AncestorsOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ancestors_{
+					Ancestors_: &p2p.Ancestors{
 						ChainId:    testID[:],
 						RequestId:  12345,
 						Containers: compressibleContainers,
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -398,12 +406,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "ancestors message with compression",
 			op:   AncestorsOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ancestors_{
+					Ancestors_: &p2p.Ancestors{
 						ChainId:    testID[:],
 						RequestId:  12345,
 						Containers: compressibleContainers,
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -414,13 +423,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "get message with no compression",
 			op:   GetOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Get{
-					Get: &p2ppb.Get{
+			msg: &p2p.Message{
+				Message: &p2p.Message_Get{
+					Get: &p2p.Get{
 						ChainId:     testID[:],
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
+						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -431,12 +441,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "put message with no compression",
 			op:   PutOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Container: []byte{0},
+			msg: &p2p.Message{
+				Message: &p2p.Message_Put{
+					Put: &p2p.Put{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Container:  []byte{0},
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -447,12 +458,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "put message with compression",
 			op:   PutOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Container: compressibleContainers[0],
+			msg: &p2p.Message{
+				Message: &p2p.Message_Put{
+					Put: &p2p.Put{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Container:  compressibleContainers[0],
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -463,13 +475,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "push_query message with no compression",
 			op:   PushQueryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: []byte{0},
+			msg: &p2p.Message{
+				Message: &p2p.Message_PushQuery{
+					PushQuery: &p2p.PushQuery{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Deadline:   1,
+						Container:  []byte{0},
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -480,13 +493,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "push_query message with compression",
 			op:   PushQueryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: compressibleContainers[0],
+			msg: &p2p.Message{
+				Message: &p2p.Message_PushQuery{
+					PushQuery: &p2p.PushQuery{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Deadline:   1,
+						Container:  compressibleContainers[0],
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -497,13 +511,14 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "pull_query message with no compression",
 			op:   PullQueryOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PullQuery{
-					PullQuery: &p2ppb.PullQuery{
+			msg: &p2p.Message{
+				Message: &p2p.Message_PullQuery{
+					PullQuery: &p2p.PullQuery{
 						ChainId:     testID[:],
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
+						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -514,12 +529,13 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "chits message with no compression",
 			op:   ChitsOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Chits{
-					Chits: &p2ppb.Chits{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
+			msg: &p2p.Message{
+				Message: &p2p.Message_Chits{
+					Chits: &p2p.Chits{
+						ChainId:               testID[:],
+						RequestId:             1,
+						PreferredContainerIds: [][]byte{testID[:], testID[:]},
+						EngineType:            p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
@@ -530,9 +546,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_request message with no compression",
 			op:   AppRequestOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppRequest{
+					AppRequest: &p2p.AppRequest{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
@@ -547,9 +563,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_request message with compression",
 			op:   AppRequestOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppRequest{
+					AppRequest: &p2p.AppRequest{
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
@@ -564,9 +580,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_response message with no compression",
 			op:   AppResponseOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppResponse{
+					AppResponse: &p2p.AppResponse{
 						ChainId:   testID[:],
 						RequestId: 1,
 						AppBytes:  compressibleContainers[0],
@@ -580,9 +596,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_response message with compression",
 			op:   AppResponseOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppResponse{
+					AppResponse: &p2p.AppResponse{
 						ChainId:   testID[:],
 						RequestId: 1,
 						AppBytes:  compressibleContainers[0],
@@ -596,9 +612,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_gossip message with no compression",
 			op:   AppGossipOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppGossip{
+					AppGossip: &p2p.AppGossip{
 						ChainId:  testID[:],
 						AppBytes: compressibleContainers[0],
 					},
@@ -611,9 +627,9 @@ func TestMessage(t *testing.T) {
 		{
 			desc: "app_gossip message with compression",
 			op:   AppGossipOp,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppGossip{
+					AppGossip: &p2p.AppGossip{
 						ChainId:  testID[:],
 						AppBytes: compressibleContainers[0],
 					},
@@ -655,7 +671,7 @@ func TestEmptyInboundMessage(t *testing.T) {
 	)
 	require.NoError(err)
 
-	msg := &p2ppb.Message{}
+	msg := &p2p.Message{}
 	msgBytes, err := proto.Marshal(msg)
 	require.NoError(err)
 
@@ -675,8 +691,8 @@ func TestNilInboundMessage(t *testing.T) {
 	)
 	require.NoError(err)
 
-	msg := &p2ppb.Message{
-		Message: &p2ppb.Message_Ping{
+	msg := &p2p.Message{
+		Message: &p2p.Message_Ping{
 			Ping: nil,
 		},
 	}
@@ -686,7 +702,7 @@ func TestNilInboundMessage(t *testing.T) {
 	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	pingMsg, ok := parsedMsg.message.(*p2ppb.Ping)
+	pingMsg, ok := parsedMsg.message.(*p2p.Ping)
 	require.True(ok)
 	require.NotNil(pingMsg)
 }

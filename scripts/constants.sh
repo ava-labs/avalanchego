@@ -2,20 +2,18 @@
 #
 # Use lower_case variables in the scripts and UPPER_CASE variables for override
 # Use the constants.sh for env overrides
-# Use the versions.sh to specify versions
-#
 
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 
+# Where AvalancheGo binary goes
+avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
+plugin_dir=${PLUGIN_DIR:-$HOME/.avalanchego/plugins}
+evm_path=${EVM_PATH:-$plugin_dir/evm}
+coreth_version=${CORETH_VERSION:-'v0.11.6-rc.0'}
+
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
-coreth_path="$GOPATH/pkg/mod/github.com/ava-labs/coreth@$coreth_version"
-
-# Where AvalancheGo binary goes
-build_dir="$AVALANCHE_PATH/build"
-avalanchego_path="$build_dir/avalanchego"
-plugin_dir="$build_dir/plugins"
-evm_path="$plugin_dir/evm"
+coreth_path=${CORETH_PATH:-"$GOPATH/pkg/mod/github.com/ava-labs/coreth@$coreth_version"}
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes

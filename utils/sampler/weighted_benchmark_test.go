@@ -12,6 +12,8 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var errOverflow = errors.New("overflow error")
+
 // BenchmarkAllWeightedSampling
 func BenchmarkAllWeightedSampling(b *testing.B) {
 	pows := []float64{
@@ -96,7 +98,7 @@ func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 		totalWeight = newWeight
 	}
 	if totalWeight > math.MaxInt64 {
-		return 0, nil, errors.New("overflow error")
+		return 0, nil, errOverflow
 	}
 	return totalWeight, weights, nil
 }

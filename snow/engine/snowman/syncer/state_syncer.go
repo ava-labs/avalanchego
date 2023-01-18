@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -304,23 +305,38 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	preferredStateSummary := ss.selectSyncableStateSummary()
-	ss.Ctx.Log.Info("selected summary start state sync",
-		zap.Stringer("summaryID", preferredStateSummary.ID()),
-		zap.Int("numTotalSummaries", size),
-	)
-
-	startedSyncing, err := preferredStateSummary.Accept(ctx)
+	syncMode, err := preferredStateSummary.Accept(ctx)
 	if err != nil {
 		return err
 	}
-	if startedSyncing {
-		// summary was accepted and VM is state syncing.
-		// Engine will wait for notification of state sync done.
-		return nil
-	}
 
-	// VM did not accept the summary, move on to bootstrapping.
-	return ss.onDoneStateSyncing(ctx, ss.requestID)
+	ss.Ctx.Log.Info("accepted state summary",
+		zap.Stringer("summaryID", preferredStateSummary.ID()),
+		zap.Stringer("syncMode", syncMode),
+		zap.Int("numTotalSummaries", size),
+	)
+
+	switch syncMode {
+	case block.StateSyncSkipped:
+		// VM did not accept the summary, move on to bootstrapping.
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	case block.StateSyncStatic:
+		// Summary was accepted and VM is state syncing.
+		// Engine will wait for notification of state sync done.
+		ss.Ctx.StateSyncing.Set(true)
+		return nil
+	case block.StateSyncDynamic:
+		// Summary was accepted and VM is state syncing.
+		// Engine will continue into bootstrapping and the VM will sync in the
+		// background.
+		ss.Ctx.StateSyncing.Set(true)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	default:
+		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",
+			zap.Stringer("syncMode", syncMode),
+		)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	}
 }
 
 // selectSyncableStateSummary chooses a state summary from all
@@ -369,7 +385,10 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
-	ss.Ctx.SetState(snow.StateSyncing)
+	ss.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.StateSyncing,
+	})
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}
@@ -526,6 +545,8 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		)
 		return nil
 	}
+
+	ss.Ctx.StateSyncing.Set(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 

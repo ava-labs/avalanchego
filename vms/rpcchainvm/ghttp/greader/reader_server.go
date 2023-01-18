@@ -30,8 +30,8 @@ func (s *Server) Read(_ context.Context, req *readerpb.ReadRequest) (*readerpb.R
 		Read: buf[:n],
 	}
 	if err != nil {
-		resp.Errored = true
-		resp.Error = err.Error()
+		errStr := err.Error()
+		resp.Error = &errStr
 	}
 	return resp, nil
 }

@@ -40,7 +40,7 @@ func setupDB(t testing.TB) *testDatabase {
 	serverCloser := grpcutils.ServerCloser{}
 
 	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		rpcdbpb.RegisterDatabaseServer(server, NewServer(db.server))
 		serverCloser.Add(server)
 		return server
@@ -143,7 +143,7 @@ func TestHealthCheck(t *testing.T) {
 				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
 				return
 			}
-			require.Nil(err)
+			require.NoError(err)
 
 			// check rpc HealthCheck
 			_, err = baseDB.client.HealthCheck(context.Background())
@@ -155,7 +155,7 @@ func TestHealthCheck(t *testing.T) {
 				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
 				return
 			}
-			require.Nil(err)
+			require.NoError(err)
 		})
 	}
 }

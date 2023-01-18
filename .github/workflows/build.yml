@@ -25,7 +25,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser
-          version: latest
+          version: v1.13.1
           # TODO: automate github release page announce and artifact uploads
           # https://goreleaser.com/cmd/goreleaser_release/
           args: release --rm-dist --skip-announce --skip-publish

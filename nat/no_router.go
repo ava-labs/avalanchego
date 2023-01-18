@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	errNoRouterCantMapPorts        = errors.New("can't map ports without a known router")
-	errFetchingIP                  = errors.New("getting outbound IP failed")
-	_                       Router = (*noRouter)(nil)
+	_ Router = (*noRouter)(nil)
+
+	errNoRouterCantMapPorts = errors.New("can't map ports without a known router")
+	errFetchingIP           = errors.New("getting outbound IP failed")
 )
 
 const googleDNSServer = "8.8.8.8:80"
@@ -26,11 +27,11 @@ func (noRouter) SupportsNAT() bool {
 	return false
 }
 
-func (noRouter) MapPort(string, uint16, uint16, string, time.Duration) error {
+func (noRouter) MapPort(uint16, uint16, string, time.Duration) error {
 	return errNoRouterCantMapPorts
 }
 
-func (noRouter) UnmapPort(string, uint16, uint16) error {
+func (noRouter) UnmapPort(uint16, uint16) error {
 	return nil
 }
 

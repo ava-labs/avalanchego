@@ -103,6 +103,11 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 	return nil
 }
 
+func (*hierarchyCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.ShortLen + wrappers.ShortLen
+}
+
 func (c *hierarchyCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

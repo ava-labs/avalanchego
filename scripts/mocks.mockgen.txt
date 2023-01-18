@@ -5,11 +5,9 @@ github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
 github.com/ava-labs/avalanchego/message=OutboundMsgBuilder=message/mock_outbound_message_builder.go
 github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
-github.com/ava-labs/avalanchego/snow/engine/avalanche=Engine=snow/engine/avalanche/mock_engine.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=DAGVM=snow/engine/avalanche/vertex/mock_vm.go
-github.com/ava-labs/avalanchego/snow/engine/snowman=Engine=snow/engine/snowman/mock_engine.go
-github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=BuildBlockWithContextChainVM=snow/engine/snowman/block/mocks/build_block_with_context_vm.go
+github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/mocks/state_syncable_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=WithVerifyContext=snow/engine/snowman/block/mocks/with_verify_context.go
 github.com/ava-labs/avalanchego/snow/networking/handler=Handler=snow/networking/handler/mock_handler.go
@@ -20,12 +18,13 @@ github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculat
 github.com/ava-labs/avalanchego/snow/validators=Manager=snow/validators/mock_manager.go
 github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/mock_state.go
 github.com/ava-labs/avalanchego/snow/validators=SubnetConnector=snow/validators/mock_subnet_connector.go
+github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keychain/mock_ledger.go
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/mock_user.go
-github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
+github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor=Manager=vms/platformvm/blocks/executor/mock_manager.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks=Block=vms/platformvm/blocks/mock_block.go

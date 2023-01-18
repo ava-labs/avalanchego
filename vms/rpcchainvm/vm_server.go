@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -35,9 +36,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter/gteleporter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
@@ -47,13 +48,15 @@ import (
 	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	teleporterpb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
 	_ vmpb.VMServer = (*VMServer)(nil)
+
+	originalStderr = os.Stderr
 
 	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
 )
@@ -186,9 +189,9 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	keystoreClient := gkeystore.NewClient(keystorepb.NewKeystoreClient(clientConn))
 	sharedMemoryClient := gsharedmemory.NewClient(sharedmemorypb.NewSharedMemoryClient(clientConn))
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
-	snLookupClient := gsubnetlookup.NewClient(subnetlookuppb.NewSubnetLookupClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
+	teleporterSignerClient := gteleporter.NewClient(teleporterpb.NewSignerClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
@@ -217,12 +220,22 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		CChainID:    cChainID,
 		AVAXAssetID: avaxAssetID,
 
-		Log:          logging.NoLog{},
+		// TODO: Allow the logger to be configured by the client
+		Log: logging.NewLogger(
+			fmt.Sprintf("<%s Chain>", chainID),
+			logging.NewWrappedCore(
+				logging.Info,
+				originalStderr,
+				logging.Colors.ConsoleEncoder(),
+			),
+		),
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
-		SNLookup:     snLookupClient,
 		Metrics:      metrics.NewOptionalGatherer(),
+
+		// Signs teleporter messages
+		TeleporterSigner: teleporterSignerClient,
 
 		ValidatorState: validatorStateClient,
 		// TODO: support remaining snowman++ fields
@@ -319,10 +332,7 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 
 		// Start the gRPC server which serves the HTTP service
 		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			if len(opts) == 0 {
-				opts = append(opts, grpcutils.DefaultServerOptions...)
-			}
-			server := grpc.NewServer(opts...)
+			server := grpcutils.NewDefaultServer(opts)
 			vm.serverCloser.Add(server)
 			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
@@ -354,10 +364,7 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 
 		// Start the gRPC server which serves the HTTP service
 		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			if len(opts) == 0 {
-				opts = append(opts, grpcutils.DefaultServerOptions...)
-			}
-			server := grpc.NewServer(opts...)
+			server := grpcutils.NewDefaultServer(opts)
 			vm.serverCloser.Add(server)
 			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
@@ -455,7 +462,7 @@ func (vm *VMServer) ParseBlock(ctx context.Context, req *vmpb.ParseBlockRequest)
 	return &vmpb.ParseBlockResponse{
 		Id:                blkID[:],
 		ParentId:          parentID[:],
-		Status:            uint32(blk.Status()),
+		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
 		VerifyWithContext: verifyWithCtx,
@@ -470,7 +477,7 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 	blk, err := vm.vm.GetBlock(ctx, id)
 	if err != nil {
 		return &vmpb.GetBlockResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -486,7 +493,7 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 	return &vmpb.GetBlockResponse{
 		ParentId:          parentID[:],
 		Bytes:             blk.Bytes(),
-		Status:            uint32(blk.Status()),
+		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
 		VerifyWithContext: verifyWithCtx,
@@ -677,7 +684,7 @@ func (vm *VMServer) VerifyHeightIndex(ctx context.Context, _ *emptypb.Empty) (*v
 	}
 
 	return &vmpb.VerifyHeightIndexResponse{
-		Err: errorToErrCode[err],
+		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -697,7 +704,7 @@ func (vm *VMServer) GetBlockIDAtHeight(
 
 	return &vmpb.GetBlockIDAtHeightResponse{
 		BlkId: blkID[:],
-		Err:   errorToErrCode[err],
+		Err:   errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -712,7 +719,7 @@ func (vm *VMServer) StateSyncEnabled(ctx context.Context, _ *emptypb.Empty) (*vm
 
 	return &vmpb.StateSyncEnabledResponse{
 		Enabled: enabled,
-		Err:     errorToErrCode[err],
+		Err:     errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -732,7 +739,7 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 
 	if err != nil {
 		return &vmpb.GetOngoingSyncStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -757,7 +764,7 @@ func (vm *VMServer) GetLastStateSummary(ctx context.Context, _ *emptypb.Empty) (
 
 	if err != nil {
 		return &vmpb.GetLastStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -785,7 +792,7 @@ func (vm *VMServer) ParseStateSummary(
 
 	if err != nil {
 		return &vmpb.ParseStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -812,7 +819,7 @@ func (vm *VMServer) GetStateSummary(
 
 	if err != nil {
 		return &vmpb.GetStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -885,21 +892,21 @@ func (vm *VMServer) StateSummaryAccept(
 	req *vmpb.StateSummaryAcceptRequest,
 ) (*vmpb.StateSummaryAcceptResponse, error) {
 	var (
-		accepted bool
-		err      error
+		mode = block.StateSyncSkipped
+		err  error
 	)
 	if vm.ssVM != nil {
 		var summary block.StateSummary
 		summary, err = vm.ssVM.ParseStateSummary(ctx, req.Bytes)
 		if err == nil {
-			accepted, err = summary.Accept(ctx)
+			mode, err = summary.Accept(ctx)
 		}
 	} else {
 		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	return &vmpb.StateSummaryAcceptResponse{
-		Accepted: accepted,
-		Err:      errorToErrCode[err],
+		Mode: vmpb.StateSummaryAcceptResponse_Mode(mode),
+		Err:  errorToErrEnum[err],
 	}, errorToRPCError(err)
 }

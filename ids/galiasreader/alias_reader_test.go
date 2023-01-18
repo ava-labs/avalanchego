@@ -32,7 +32,7 @@ func TestInterface(t *testing.T) {
 		w := ids.NewAliaser()
 
 		serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-			server := grpc.NewServer(opts...)
+			server := grpcutils.NewDefaultServer(opts)
 			aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
 			serverCloser.Add(server)
 			return server

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Consensus = (*tracedConsensus)(nil)
@@ -38,7 +39,7 @@ func (c *tracedConsensus) Add(ctx context.Context, vtx Vertex) error {
 }
 
 func (c *tracedConsensus) RecordPoll(ctx context.Context, votes ids.UniqueBag) error {
-	var allVotes ids.BitSet64
+	var allVotes set.Bits64
 	for _, vote := range votes {
 		allVotes.Union(vote)
 	}
