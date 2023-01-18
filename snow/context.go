@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
@@ -52,6 +53,8 @@ type Context struct {
 	ValidatorState validators.State // interface for P-Chain validators
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string
+
+	ProposerRetriever proposer.Retriever // enables retrieval of current proposers
 }
 
 // Expose gatherer interface for unit testing.
