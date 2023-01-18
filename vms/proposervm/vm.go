@@ -300,6 +300,8 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	// reset scheduler
+	vm.Retriever.SetChainHeight(blk.Height() + 1)
+	vm.Retriever.SetPChainHeight(pChainHeight)
 	minDelay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
