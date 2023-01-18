@@ -46,6 +46,7 @@ rand = "0.8.5"
 triehash = "0.8.4"
 assert_cmd = "2.0.7"
 predicates = "2.1.1"
+serial_test = "1.0.0"
 
 [profile.release]
 debug = true

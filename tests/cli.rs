@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use assert_cmd::Command;
 use predicates::prelude::*;
+use serial_test::serial;
 use std::fs::remove_dir_all;
 
 const PRG: &str = "fwdctl";
@@ -9,6 +10,7 @@ const FIREWOOD: &str = "firewood";
 const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
 
 #[test]
+#[serial]
 fn fwdctl_prints_version() -> Result<()> {
     let expected_version_output: String = format!("{FIREWOOD} {VERSION}\n");
 
@@ -23,6 +25,7 @@ fn fwdctl_prints_version() -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn fwdctl_creates_database() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
@@ -39,6 +42,7 @@ fn fwdctl_creates_database() -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn fwdctl_insert_successful() -> Result<()> {
     // Create db
     Command::cargo_bin(PRG)?
@@ -66,6 +70,7 @@ fn fwdctl_insert_successful() -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn fwdctl_get_successful() -> Result<()> {
     // Create db and insert data
     Command::cargo_bin(PRG)?
@@ -100,6 +105,7 @@ fn fwdctl_get_successful() -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn fwdctl_delete_successful() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
@@ -135,11 +141,10 @@ fn fwdctl_delete_successful() -> Result<()> {
 
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
-    match remove_dir_all(FIREWOOD_TEST_DB_NAME) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("failed to delete testing dir: {e}");
-        }
+    if let Err(e) = remove_dir_all(FIREWOOD_TEST_DB_NAME) {
+        eprintln!("failed to delete testing dir: {e}");
+        return Err(anyhow!(e))
     }
+
     Ok(())
 }
