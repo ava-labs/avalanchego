@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.11.6](https://github.com/ava-labs/coreth/releases/tag/v0.11.6)
+
+- Bump AvalancheGo to v1.9.6
+
 ## [v0.11.5](https://github.com/ava-labs/coreth/releases/tag/v0.11.5)
 
 - Add support for eth_call over VM2VM messaging
