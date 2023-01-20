@@ -2355,7 +2355,9 @@ func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 	if err != nil {
 		return nil, err
 	}
-	uptime := json.Float32(rawUptime)
+	// Transform this to a percentage (0-100) to make it consistent
+	// with observedUptime in info.peers API
+	uptime := json.Float32(rawUptime * 100)
 	return &uptime, nil
 }
 
