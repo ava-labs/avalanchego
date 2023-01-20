@@ -135,7 +135,7 @@ func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) 
 	return vdrs.RemoveWeight(nodeID, weight)
 }
 
-// AddWeight is a helper that fetches the validator set of [subnetID] from [m]
+// Contains is a helper that fetches the validator set of [subnetID] from [m]
 // and returns if the validator set contains [nodeID]. If [m] does not contain a
 // validator set for [subnetID], false is returned.
 func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
