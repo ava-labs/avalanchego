@@ -1310,7 +1310,7 @@ func (h *handler) isMultisigTransferOutput(out verify.State) bool {
 	// ! because currently there is no support for adding new msig aliases after genesis,
 	// ! we assume that state diffs won't contain any changes to msig aliases state
 	// ! that must be changed later
-	state, ok := h.utxosReader.(state.State)
+	state, ok := h.utxosReader.(state.CaminoDiff)
 	if !ok {
 		return false
 	}

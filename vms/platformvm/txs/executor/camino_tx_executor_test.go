@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/golang/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -38,7 +39,7 @@ func TestCaminoEnv(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ false, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ false, true, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	defer func() {
 		err := shutdownCaminoEnvironment(env)
@@ -52,7 +53,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -296,7 +297,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -578,7 +579,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -858,7 +859,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run("ExportTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -908,7 +909,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("ImportTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -936,7 +937,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("AddressStateTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -963,7 +964,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("CreateChainTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -989,7 +990,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("CreateSubnetTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1014,7 +1015,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("TransformSubnetTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1041,7 +1042,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("AddSubnetValidatorTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1075,7 +1076,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("RemoveSubnetValidatorTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1211,7 +1212,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env := newCaminoEnvironment( /*postBanff*/ true, true, tt.caminoConfig, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {
@@ -1281,7 +1282,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		LockModeBondDeposit: true,
 	}
 
-	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	env.config.BanffTime = env.state.GetTimestamp()
 
@@ -1323,6 +1324,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	}
 
 	tests := map[string]test{
+		// TODO@ ok case!
 		"Reward before end time": {
 			ins:        ins,
 			outs:       outs,
@@ -1353,7 +1355,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
 				return utxosBeforeReward
 			},
-			expectedErr: errWrongNumberOfCredentials,
+			expectedErr: errWrongCredentialsNumber,
 		},
 		"Invalid inputs (one excess)": {
 			ins:        append(ins, &avax.TransferableInput{In: &secp256k1fx.TransferInput{}}),
@@ -1529,7 +1531,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	})
 
 	// We need to start again the environment because the staker is already removed from the previous test
-	env = newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env = newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	env.config.BanffTime = env.state.GetTimestamp()
 
@@ -1554,7 +1556,7 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 		LockModeBondDeposit: true,
 	}
 
-	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 	env.ctx.Lock.Lock()
 	defer func() {
 		err := shutdownCaminoEnvironment(env)
@@ -2448,7 +2450,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoGenesisConf)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoGenesisConf, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {
@@ -3053,7 +3055,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err = shutdownCaminoEnvironment(env); err != nil {
@@ -3100,6 +3102,208 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 
 			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorClaimRewardTx(t *testing.T) {
+	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
+	rewardOwnerKey, _, rewardOwner := generateKeyAndOwner(t)
+	sigIndices := []uint32{0}
+	feeSigners := []*crypto.PrivateKeySECP256K1R{feeOwnerKey}
+	feeUTXO := generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
+	feeInput := generateTestInFromUTXO(feeUTXO, sigIndices)
+	depositTxID := ids.GenerateTestID()
+	timestamp := time.Now()
+
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+
+	baseState := func(c *gomock.Controller) *state.MockState {
+		s := state.NewMockState(c)
+		// shutdown
+		s.EXPECT().SetHeight(uint64(math.MaxUint64))
+		s.EXPECT().Commit()
+		s.EXPECT().Close()
+		return s
+	}
+
+	tests := map[string]struct {
+		state        func(*gomock.Controller, ids.ID) *state.MockDiff
+		baseState    func(*gomock.Controller, *state.MockState) *state.MockState
+		ins          []*avax.TransferableInput
+		signers      [][]*crypto.PrivateKeySECP256K1R
+		outs         []*avax.TransferableOutput
+		depositTxIDs []ids.ID
+		expectedErr  error
+	}{
+		"Stakeable ins": {
+			state: func(c *gomock.Controller, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
+			},
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(avaxAssetID, 1, uint64(defaultMinStakingDuration), sigIndices),
+			},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Stakeable outs": {
+			state: func(c *gomock.Controller, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
+			},
+			ins: []*avax.TransferableInput{feeInput},
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(avaxAssetID, 1, uint64(defaultMinStakingDuration), feeOwner),
+			},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"Deposit not found": {
+			baseState: func(c *gomock.Controller, s *state.MockState) *state.MockState {
+				// utxo handler, used in fx VerifyMultisigTransfer method,
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				s.EXPECT().GetTimestamp().Return(timestamp)
+				s.EXPECT().GetTx(depositTxID).Return(nil, status.Unknown, database.ErrNotFound)
+				return s
+			},
+			ins:          []*avax.TransferableInput{feeInput},
+			signers:      [][]*crypto.PrivateKeySECP256K1R{feeSigners, {}},
+			depositTxIDs: []ids.ID{depositTxID},
+			expectedErr:  errDepositNotFound,
+		},
+		"Bad deposit credential": {
+			baseState: func(c *gomock.Controller, s *state.MockState) *state.MockState {
+				// utxo handler, used in fx VerifyMultisigTransfer method,
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				s.EXPECT().GetTimestamp().Return(timestamp)
+				s.EXPECT().GetTx(depositTxID).Return(
+					&txs.Tx{Unsigned: &txs.DepositTx{
+						RewardsOwner: &rewardOwner,
+					}},
+					status.Committed,
+					nil,
+				)
+				return s
+			},
+			ins:          []*avax.TransferableInput{feeInput},
+			signers:      [][]*crypto.PrivateKeySECP256K1R{feeSigners, {}},
+			depositTxIDs: []ids.ID{depositTxID},
+			expectedErr:  errDepositCredentialMissmatch,
+		},
+		"OK": {
+			baseState: func(c *gomock.Controller, s *state.MockState) *state.MockState {
+				// utxo handler, used in fx VerifyMultisigTransfer method,
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				s.EXPECT().GetTimestamp().Return(timestamp)
+				s.EXPECT().GetTx(depositTxID).Return(
+					&txs.Tx{Unsigned: &txs.DepositTx{
+						RewardsOwner: &rewardOwner,
+					}},
+					status.Committed,
+					nil,
+				)
+
+				depositOfferID := ids.GenerateTestID()
+
+				s.EXPECT().GetDeposit(depositTxID).Return(&deposits.Deposit{
+					DepositOfferID:      depositOfferID,
+					Start:               uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
+					Duration:            365 * 24 * 60 * 60,                        // 1 year
+					Amount:              10,
+					ClaimedRewardAmount: 0, // TODO@ add for complexity ?
+				}, nil)
+				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposits.Offer{
+					NoRewardsPeriodDuration: 0,         // TODO@ add for complexity ?
+					InterestRateNominator:   1_000_000, // 100%
+				}, nil)
+
+				rewardUTXO := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: 0,
+					},
+					Asset: avax.Asset{ID: avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          5, // expected claimable reward amount
+						OutputOwners: rewardOwner,
+					},
+				}
+
+				s.EXPECT().AddUTXO(rewardUTXO)
+				s.EXPECT().AddRewardUTXO(depositTxID, rewardUTXO)
+				s.EXPECT().DeleteUTXO(feeUTXO.InputID())
+				return s
+			},
+			ins:          []*avax.TransferableInput{feeInput},
+			signers:      [][]*crypto.PrivateKeySECP256K1R{feeSigners, {rewardOwnerKey}},
+			depositTxIDs: []ids.ID{depositTxID},
+			expectedErr:  nil,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			state := baseState(ctrl)
+			if tt.baseState != nil {
+				state = tt.baseState(ctrl, state)
+			}
+			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, state)
+			defer require.NoError(shutdownCaminoEnvironment(env))
+			env.ctx.Lock.Lock()
+
+			// generating tx
+
+			avax.SortTransferableInputsWithSigners(tt.ins, tt.signers)
+			avax.SortTransferableOutputs(tt.outs, txs.Codec)
+
+			utx := &txs.ClaimRewardTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.backend.Ctx.NetworkID,
+					BlockchainID: env.backend.Ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				DepositTxs:   tt.depositTxIDs,
+				RewardsOwner: &secp256k1fx.OutputOwners{},
+			}
+
+			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
+			require.NoError(err)
+
+			// testing
+
+			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   tt.state(ctrl, tx.ID()),
+					Tx:      tx,
+				},
+			})
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

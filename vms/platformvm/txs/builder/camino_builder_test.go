@@ -4,17 +4,24 @@
 package builder
 
 import (
+	"math"
 	"testing"
 	"time"
 
+	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -261,6 +268,309 @@ func TestUnlockDepositTx(t *testing.T) {
 			for _, in := range ins {
 				require.False(t, consumedUTXOIDs[in.InputID()])
 				consumedUTXOIDs[in.InputID()] = true
+			}
+		})
+	}
+}
+
+func TestNewClaimRewardTx(t *testing.T) {
+	depositTxID1 := ids.GenerateTestID()
+	depositTxID2 := ids.GenerateTestID()
+
+	feeKey, feeAddr, feeUTXOOwner := generateKeyAndOwner()
+	rewardOwner1Key, rewardOwner1Addr, rewardOwner1 := generateKeyAndOwner()
+	rewardOwner2Key, rewardOwner2Addr, rewardOwner2 := generateKeyAndOwner()
+
+	feeUTXO := generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, feeUTXOOwner, ids.Empty, ids.Empty)
+
+	type args struct {
+		depositTxIDs  []ids.ID
+		rewardAddress ids.ShortID
+		keys          []*crypto.PrivateKeySECP256K1R
+		change        *secp256k1fx.OutputOwners
+	}
+
+	tests := map[string]struct {
+		state           func(*gomock.Controller) state.State
+		args            args
+		expectedSigsLen int
+		expectedErr     error
+	}{
+		"OK, single deposit tx": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				depositTx := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx, status.Committed, nil)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys: []*crypto.PrivateKeySECP256K1R{
+					feeKey,
+					rewardOwner1Key,
+				},
+			},
+			expectedSigsLen: 1,
+			expectedErr:     nil,
+		},
+		"OK, two deposit tx": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
+				s.EXPECT().UTXOIDs(rewardOwner2Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
+				depositTx2 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner2}}
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1, depositTxID2},
+				rewardAddress: rewardOwner1Addr,
+				keys: []*crypto.PrivateKeySECP256K1R{
+					feeKey,
+					rewardOwner1Key,
+					rewardOwner2Key,
+				},
+			},
+			expectedSigsLen: 2,
+			expectedErr:     nil,
+		},
+		"OK, two deposit tx, owner keys intersect": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
+				s.EXPECT().UTXOIDs(rewardOwner2Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 2,
+						Addrs: []ids.ShortID{
+							rewardOwner1Key.Address(),
+							rewardOwner2Key.Address(),
+						},
+					},
+				}}
+				depositTx2 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1, depositTxID2},
+				rewardAddress: rewardOwner1Addr,
+				keys: []*crypto.PrivateKeySECP256K1R{
+					feeKey,
+					rewardOwner1Key,
+					rewardOwner2Key,
+				},
+			},
+			expectedSigsLen: 2,
+			expectedErr:     nil,
+		},
+		"Fail, deposit errored": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, database.ErrNotFound)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys:          []*crypto.PrivateKeySECP256K1R{feeKey},
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		"Fail, deposit not committed": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, nil)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys:          []*crypto.PrivateKeySECP256K1R{feeKey},
+			},
+			expectedErr: errTxIsNotCommitted,
+		},
+		"Fail, deposit isn't deposit": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				s.EXPECT().GetTx(depositTxID1).Return(
+					&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{}},
+					status.Committed,
+					nil,
+				)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys:          []*crypto.PrivateKeySECP256K1R{feeKey},
+			},
+			expectedErr: errWrongTxType,
+		},
+		"Fail, deposit rewards owner isn't secp type (shouldn't happen)": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				s.EXPECT().GetTx(depositTxID1).Return(
+					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &avax.TransferableOutput{}}},
+					status.Committed,
+					nil,
+				)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys:          []*crypto.PrivateKeySECP256K1R{feeKey},
+			},
+			expectedErr: errNotSECPOwner,
+		},
+		"Fail, missing deposit signer": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				// utxo fetching for utxo handler Lock(..)
+				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
+				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
+				// fee utxo
+				s.EXPECT().GetMultisigAlias(feeAddr).Return(nil, database.ErrNotFound)
+				// deposits
+				s.EXPECT().GetTx(depositTxID1).Return(
+					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}},
+					status.Committed,
+					nil,
+				)
+				return s
+			},
+			args: args{
+				depositTxIDs:  []ids.ID{depositTxID1},
+				rewardAddress: rewardOwner1Addr,
+				keys:          []*crypto.PrivateKeySECP256K1R{feeKey},
+			},
+			expectedErr: errKeyMissing,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			b, db := newCaminoBuilder(true, tt.state(ctrl))
+			defer func() {
+				require.NoError(db.Close())
+				ctrl.Finish()
+			}()
+
+			// testing
+
+			tx, err := b.NewClaimRewardTx(
+				tt.args.depositTxIDs,
+				tt.args.rewardAddress,
+				tt.args.keys,
+				tt.args.change,
+			)
+			require.ErrorIs(err, tt.expectedErr)
+
+			if tt.expectedErr != nil {
+				return
+			}
+
+			// checking tx
+
+			utx, ok := tx.Unsigned.(*txs.ClaimRewardTx)
+			require.True(ok)
+			require.Len(tx.Creds, 2)
+			require.Equal(tt.args.depositTxIDs, utx.DepositTxs)
+			require.Equal(&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{tt.args.rewardAddress},
+			}, utx.RewardsOwner)
+
+			txHash := hashing.ComputeHash256(tx.Unsigned.Bytes())
+
+			// checking input creds
+
+			require.Len(utx.Ins, 1)
+			feeInput, ok := utx.Ins[0].In.(*secp256k1fx.TransferInput)
+			require.True(ok)
+			err = b.fx.VerifyTransfer(utx, feeInput, tx.Creds[0], feeUTXO.Out)
+			require.NoError(err)
+
+			// checking deposit cred
+
+			depositCred, ok := tx.Creds[1].(*secp256k1fx.Credential)
+			require.True(ok)
+			require.Len(depositCred.Sigs, tt.expectedSigsLen)
+
+			signedAddresses := set.Set[ids.ShortID]{}
+
+			// gather addresses and check that they are unique
+			for i := range depositCred.Sigs {
+				pk, err := testKeyfactory.RecoverHashPublicKey(txHash, depositCred.Sigs[i][:])
+				require.NoError(err)
+				addr := pk.Address()
+				require.False(signedAddresses.Contains(addr))
+				signedAddresses.Add(addr)
+			}
+
+			for _, depositTxID := range tt.args.depositTxIDs {
+				depositRewardsOwner, err := getDepositRewardsOwner(b.state, depositTxID)
+				require.NoError(err)
+				err = b.fx.VerifyPermissionUnordered(
+					tx.Unsigned,
+					tx.Creds[1],
+					depositRewardsOwner,
+				)
+				require.NoError(err)
 			}
 		})
 	}

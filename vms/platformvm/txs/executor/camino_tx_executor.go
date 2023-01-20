@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -44,6 +46,10 @@ var (
 	errConsortiumMemberHasNode    = errors.New("consortium member already has registered node")
 	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
 	errNotNodeOwner               = errors.New("node is registered for another consortium member address")
+	errDepositCredentialMissmatch = errors.New("deposit credential isn't matching")
+	errDepositNotFound            = errors.New("deposit tx not found")
+	errNotSECPOwner               = errors.New("owner is not *secp256k1fx.OutputOwners")
+	errWrongCredentialsNumber     = errors.New("unexpected number of credentials")
 	errWrongOwnerType             = errors.New("wrong owner type")
 )
 
@@ -384,7 +390,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	case tx.TxID == ids.Empty:
 		return errInvalidID
 	case len(e.Tx.Creds) != 0:
-		return errWrongNumberOfCredentials
+		return errWrongCredentialsNumber
 	}
 
 	ins, outs, err := e.FlowChecker.Unlock(e.OnCommitState, []ids.ID{tx.TxID}, locked.StateBonded)
@@ -631,6 +637,118 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		}
 
 		e.State.UpdateDeposit(depositTxID, updatedDeposit)
+	}
+
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
+	caminoConfig, err := e.State.CaminoConfig()
+	if err != nil {
+		return err
+	}
+
+	if !caminoConfig.LockModeBondDeposit {
+		return errWrongLockMode
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := e.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds[:len(e.Tx.Creds)-1],
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+		locked.StateDeposited,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
+	claimRewardTxID := e.Tx.ID()
+
+	for _, depositTxID := range tx.DepositTxs {
+		// getting deposit tx
+
+		signedDepositTx, txStatus, err := e.State.GetTx(depositTxID)
+		if err != nil {
+			return fmt.Errorf("%w: %s", errDepositNotFound, err)
+		}
+		if txStatus != status.Committed {
+			return fmt.Errorf("%w: %s", errDepositNotFound, "tx is not committed")
+		}
+		depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
+		if !ok {
+			return fmt.Errorf("%w: %s", errDepositNotFound, errWrongTxType)
+		}
+
+		// checking deposit signatures
+
+		depositRewardsOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return errNotSECPOwner
+		}
+
+		if err := e.Fx.VerifyPermissionUnordered(tx, e.Tx.Creds[len(e.Tx.Creds)-1], depositRewardsOwner); err != nil {
+			return fmt.Errorf("%w: %s", errDepositCredentialMissmatch, err)
+		}
+
+		// creating reward output, if there is any
+
+		deposit, err := e.State.GetDeposit(depositTxID)
+		if err != nil {
+			return err
+		}
+
+		depositOffer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+
+		claimableReward := deposit.ClaimableReward(depositOffer, currentTimestamp)
+		if claimableReward > 0 {
+			rewardsOwner := tx.RewardsOwner
+			secpOwners, ok := rewardsOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return errNotSECPOwner
+			}
+			if len(secpOwners.Addrs) == 0 {
+				rewardsOwner = depositTx.RewardsOwner
+			}
+
+			outIntf, err := e.Fx.CreateOutput(claimableReward, rewardsOwner)
+			if err != nil {
+				return fmt.Errorf("failed to create output: %w", err)
+			}
+			out, ok := outIntf.(verify.State)
+			if !ok {
+				return errInvalidState
+			}
+
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        claimRewardTxID,
+					OutputIndex: uint32(len(tx.Outs)),
+				},
+				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
+				Out:   out,
+			}
+
+			e.State.AddUTXO(utxo)
+			e.State.AddRewardUTXO(depositTxID, utxo)
+		}
 	}
 
 	utxo.Consume(e.State, tx.Ins)

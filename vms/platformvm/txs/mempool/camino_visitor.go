@@ -24,6 +24,11 @@ func (i *issuer) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	return nil
 }
 
+func (i *issuer) ClaimRewardTx(*txs.ClaimRewardTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 func (i *issuer) RegisterNodeTx(*txs.RegisterNodeTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
@@ -42,6 +47,11 @@ func (r *remover) DepositTx(*txs.DepositTx) error {
 }
 
 func (r *remover) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) ClaimRewardTx(*txs.ClaimRewardTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }

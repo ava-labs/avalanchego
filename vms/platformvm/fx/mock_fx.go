@@ -167,6 +167,20 @@ func (mr *MockFxMockRecorder) VerifyTransfer(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyTransfer", reflect.TypeOf((*MockFx)(nil).VerifyTransfer), arg0, arg1, arg2, arg3)
 }
 
+// VerifyPermissionUnordered mocks base method.
+func (m *MockFx) VerifyPermissionUnordered(arg0 secp256k1fx.UnsignedTx, arg1 verify.Verifiable, arg2 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyPermissionUnordered", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyPermissionUnordered indicates an expected call of VerifyPermissionUnordered.
+func (mr *MockFxMockRecorder) VerifyPermissionUnordered(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPermissionUnordered", reflect.TypeOf((*MockFx)(nil).VerifyPermissionUnordered), arg0, arg1, arg2)
+}
+
 // MockOwner is a mock of Owner interface.
 type MockOwner struct {
 	ctrl     *gomock.Controller

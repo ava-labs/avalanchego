@@ -140,3 +140,51 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 
 	return nil
 }
+
+func (fx *Fx) VerifyPermissionUnordered(
+	utx UnsignedTx,
+	credIntf verify.Verifiable,
+	ownerIntf interface{},
+) error {
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return errWrongCredentialType
+	}
+	owner, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return errWrongOwnerType
+	}
+
+	numSigs := len(cred.Sigs)
+	switch {
+	case owner.Locktime > fx.VM.Clock().Unix():
+		return errTimelocked
+	case owner.Threshold > uint32(numSigs):
+		return errTooFewSigners
+	case !fx.bootstrapped: // disable signature verification during bootstrapping
+		return nil
+	}
+
+	ownerAddrs := owner.AddressesSet()
+	txHash := hashing.ComputeHash256(utx.Bytes())
+
+	for _, sig := range cred.Sigs {
+		pk, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:])
+		if err != nil {
+			return err
+		}
+		addr := pk.Address()
+		if ownerAddrs.Contains(addr) {
+			ownerAddrs.Remove(addr)
+			if ownerAddrs.Len() == 0 {
+				break
+			}
+		}
+	}
+
+	if ownerAddrs.Len() > 0 {
+		return errTooFewSigners
+	}
+
+	return nil
+}

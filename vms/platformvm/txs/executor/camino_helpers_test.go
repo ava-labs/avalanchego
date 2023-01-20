@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -88,7 +90,7 @@ func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoEnvironment {
+func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camino, mockState state.State) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -102,7 +104,11 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoE
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
+
+	baseState := mockState
+	if mockState == nil {
+		baseState = defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
+	}
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -146,7 +152,9 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoE
 		backend:        backend,
 	}
 
-	addCaminoSubnet(env, txBuilder)
+	if addSubnet {
+		addCaminoSubnet(env, txBuilder)
+	}
 
 	return env
 }
@@ -456,6 +464,21 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 		UTXOID: utxo.UTXOID,
 		Asset:  utxo.Asset,
 		In:     in,
+	}
+}
+
+func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+	key, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(t, ok)
+	addr := secpKey.Address()
+
+	return secpKey, addr, secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
 	}
 }
 

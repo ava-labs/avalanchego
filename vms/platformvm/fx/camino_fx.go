@@ -18,4 +18,12 @@ type CaminoFx interface {
 	// can't spend the output based on the input and credential, a non-nil error
 	// should be returned. Multisig aliases supported.
 	VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigIntf interface{}) error
+
+	// VerifyPermission returns nil if credential [credIntf] proves that [controlGroup] assents to transaction [utx].
+	// [credIntf] signatures order doesn't matter, it could also contain unrelated signatures to [controlGroup].
+	VerifyPermissionUnordered(
+		utx secp256k1fx.UnsignedTx,
+		credIntf verify.Verifiable,
+		controlGroup interface{},
+	) error
 }

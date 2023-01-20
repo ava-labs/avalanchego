@@ -184,6 +184,40 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoE
 	return env
 }
 
+func newCaminoBuilder(postBanff bool, state state.State) (*caminoBuilder, *versiondb.Database) {
+	var isBootstrapped utils.AtomicBool
+	isBootstrapped.SetValue(true)
+
+	config := defaultCaminoConfig(postBanff)
+	clk := defaultClock(postBanff)
+
+	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	ctx, _ := defaultCtx(baseDB)
+
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+
+	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
+
+	txBuilder := NewCamino(
+		ctx,
+		&config,
+		&clk,
+		fx,
+		state,
+		atomicUTXOs,
+		utxoHandler,
+	)
+
+	caminoBuilder, ok := txBuilder.(*caminoBuilder)
+	if !ok {
+		panic("not camino builder")
+	}
+
+	return caminoBuilder, baseDB
+}
+
 func addCaminoSubnet(
 	env *caminoEnvironment,
 	txBuilder Builder,
@@ -490,4 +524,23 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 	}
 	testUTXO.InputID()
 	return testUTXO
+}
+
+func generateKeyAndOwner() (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+	key, err := testKeyfactory.NewPrivateKey()
+	if err != nil {
+		panic(err)
+	}
+
+	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	if !ok {
+		panic("key isn't secp key")
+	}
+	addr := secpKey.Address()
+
+	return secpKey, addr, secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}
 }
