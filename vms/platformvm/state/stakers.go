@@ -128,8 +128,7 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validator.validator = staker
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorModified = true
-	validatorDiff.validatorDeleted = false
+	validatorDiff.validatorAdded = true
 	validatorDiff.validator = staker
 
 	v.stakers.ReplaceOrInsert(staker)
@@ -141,7 +140,6 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorModified = true
 	validatorDiff.validatorDeleted = true
 	validatorDiff.validator = staker
 
@@ -249,8 +247,9 @@ type diffStakers struct {
 }
 
 type diffValidator struct {
-	validatorModified bool
-	// [validatorDeleted] implies [validatorModified]
+	// Invariant: [validatorAdded] and [validatorDeleted] will not be set at the
+	// same time.
+	validatorAdded   bool
 	validatorDeleted bool
 	validator        *Staker
 
@@ -266,6 +265,8 @@ type diffValidator struct {
 //  2. If the validator was removed in this diff, [nil, true] will be returned.
 //  3. If the validator was not modified by this diff, [nil, false] will be
 //     returned.
+//
+// Invariant: Assumes that the validator will never be removed and then added.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
@@ -277,20 +278,19 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, false
 	}
 
-	if !validatorDiff.validatorModified {
+	switch {
+	case validatorDiff.validatorAdded:
+		return validatorDiff.validator, true
+	case validatorDiff.validatorDeleted:
+		return nil, true
+	default:
 		return nil, false
 	}
-
-	if validatorDiff.validatorDeleted {
-		return nil, true
-	}
-	return validatorDiff.validator, true
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorModified = true
-	validatorDiff.validatorDeleted = false
+	validatorDiff.validatorAdded = true
 	validatorDiff.validator = staker
 
 	if s.addedStakers == nil {
@@ -301,14 +301,18 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorModified = true
-	validatorDiff.validatorDeleted = true
-	validatorDiff.validator = staker
-
-	if s.deletedStakers == nil {
-		s.deletedStakers = make(map[ids.ID]*Staker)
+	if validatorDiff.validatorAdded {
+		validatorDiff.validatorAdded = false
+		s.addedStakers.Delete(validatorDiff.validator)
+		validatorDiff.validator = nil
+	} else {
+		validatorDiff.validatorDeleted = true
+		validatorDiff.validator = staker
+		if s.deletedStakers == nil {
+			s.deletedStakers = make(map[ids.ID]*Staker)
+		}
+		s.deletedStakers[staker.TxID] = staker
 	}
-	s.deletedStakers[staker.TxID] = staker
 }
 
 func (s *diffStakers) GetDelegatorIterator(

@@ -439,12 +439,11 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorModified {
-				if validatorDiff.validatorDeleted {
-					baseState.DeleteCurrentValidator(validatorDiff.validator)
-				} else {
-					baseState.PutCurrentValidator(validatorDiff.validator)
-				}
+			if validatorDiff.validatorAdded {
+				baseState.PutCurrentValidator(validatorDiff.validator)
+			}
+			if validatorDiff.validatorDeleted {
+				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
@@ -460,12 +459,11 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorModified {
-				if validatorDiff.validatorDeleted {
-					baseState.DeletePendingValidator(validatorDiff.validator)
-				} else {
-					baseState.PutPendingValidator(validatorDiff.validator)
-				}
+			if validatorDiff.validatorAdded {
+				baseState.PutPendingValidator(validatorDiff.validator)
+			}
+			if validatorDiff.validatorDeleted {
+				baseState.DeletePendingValidator(validatorDiff.validator)
 			}
 
 			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)

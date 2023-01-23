@@ -1592,58 +1592,55 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
 			nodeID := nodeID
 
-			var (
-				weightDiff     = &ValidatorWeightDiff{}
-				isNewValidator bool
-			)
-			if validatorDiff.validatorModified {
-				// This validator is being added or removed.
+			weightDiff := &ValidatorWeightDiff{
+				Decrease: validatorDiff.validatorDeleted,
+			}
+			switch {
+			case validatorDiff.validatorAdded:
 				staker := validatorDiff.validator
-
-				weightDiff.Decrease = validatorDiff.validatorDeleted
 				weightDiff.Amount = staker.Weight
 
-				if validatorDiff.validatorDeleted {
-					// Invariant: Only the Primary Network contains non-nil
-					//            public keys.
-					if staker.PublicKey != nil {
-						// Record the public key of the validator being removed.
-						pkDiffs[nodeID] = staker.PublicKey
+				// The validator is being added.
+				vdr := &uptimeAndReward{
+					txID:        staker.TxID,
+					lastUpdated: staker.StartTime,
 
-						pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
-						if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
-							return err
-						}
-					}
-
-					if err := validatorDB.Delete(staker.TxID[:]); err != nil {
-						return fmt.Errorf("failed to delete current staker: %w", err)
-					}
-
-					s.validatorUptimes.DeleteUptime(nodeID, subnetID)
-				} else {
-					// The validator is being added.
-					vdr := &uptimeAndReward{
-						txID:        staker.TxID,
-						lastUpdated: staker.StartTime,
-
-						UpDuration:      0,
-						LastUpdated:     uint64(staker.StartTime.Unix()),
-						PotentialReward: staker.PotentialReward,
-					}
-
-					vdrBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, vdr)
-					if err != nil {
-						return fmt.Errorf("failed to serialize current validator: %w", err)
-					}
-
-					if err = validatorDB.Put(staker.TxID[:], vdrBytes); err != nil {
-						return fmt.Errorf("failed to write current validator to list: %w", err)
-					}
-
-					s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
-					isNewValidator = true
+					UpDuration:      0,
+					LastUpdated:     uint64(staker.StartTime.Unix()),
+					PotentialReward: staker.PotentialReward,
 				}
+
+				vdrBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, vdr)
+				if err != nil {
+					return fmt.Errorf("failed to serialize current validator: %w", err)
+				}
+
+				if err = validatorDB.Put(staker.TxID[:], vdrBytes); err != nil {
+					return fmt.Errorf("failed to write current validator to list: %w", err)
+				}
+
+				s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
+			case validatorDiff.validatorDeleted:
+				staker := validatorDiff.validator
+				weightDiff.Amount = staker.Weight
+
+				// Invariant: Only the Primary Network contains non-nil
+				//            public keys.
+				if staker.PublicKey != nil {
+					// Record the public key of the validator being removed.
+					pkDiffs[nodeID] = staker.PublicKey
+
+					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
+					if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
+						return err
+					}
+				}
+
+				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
+					return fmt.Errorf("failed to delete current staker: %w", err)
+				}
+
+				s.validatorUptimes.DeleteUptime(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -1683,7 +1680,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if weightDiff.Decrease {
 				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
-				if isNewValidator {
+				if validatorDiff.validatorAdded {
 					staker := validatorDiff.validator
 					err = validators.Add(
 						s.cfg.Validators,
@@ -1781,17 +1778,16 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	if validatorDiff.validatorModified {
-		staker := validatorDiff.validator
-
-		var err error
-		if validatorDiff.validatorDeleted {
-			err = pendingValidatorList.Delete(staker.TxID[:])
-		} else {
-			err = pendingValidatorList.Put(staker.TxID[:], nil)
-		}
+	if validatorDiff.validatorAdded {
+		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
 		if err != nil {
-			return fmt.Errorf("failed to update pending validator: %w", err)
+			return fmt.Errorf("failed to add pending validator: %w", err)
+		}
+	}
+	if validatorDiff.validatorDeleted {
+		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+		if err != nil {
+			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
 	}
 
