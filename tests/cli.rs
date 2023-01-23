@@ -9,6 +9,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const FIREWOOD: &str = "firewood";
 const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
 
+// Removes the firewood database on disk
+fn fwdctl_delete_db() -> Result<()> {
+    if let Err(e) = remove_dir_all(FIREWOOD_TEST_DB_NAME) {
+        eprintln!("failed to delete testing dir: {e}");
+        return Err(anyhow!(e))
+    }
+
+    Ok(())
+}
+
 #[test]
 #[serial]
 fn fwdctl_prints_version() -> Result<()> {
@@ -139,17 +149,8 @@ fn fwdctl_delete_successful() -> Result<()> {
     Ok(())
 }
 
-// Removes the firewood database on disk
-fn fwdctl_delete_db() -> Result<()> {
-    if let Err(e) = remove_dir_all(FIREWOOD_TEST_DB_NAME) {
-        eprintln!("failed to delete testing dir: {e}");
-        return Err(anyhow!(e))
-    }
-
-    Ok(())
-}
-
 #[test]
+#[serial]
 fn fwdctl_root_hash() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
@@ -183,6 +184,7 @@ fn fwdctl_root_hash() -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn fwdctl_dump() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
