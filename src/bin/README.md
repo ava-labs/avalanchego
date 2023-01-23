@@ -22,6 +22,7 @@ $ ./target/release/fwdctl -h
 * `fwdctl get`: Get the code associated with a key in the database.
 * `fwdctl insert`: Insert a key/value pair into the generic key/value store.
 * `fwdctl delete`: Delete a key/value pair from the database. 
+* `fwdctl root`: Get the root hash of the key/value trie
 
 ## Examples
 * fwdctl create
