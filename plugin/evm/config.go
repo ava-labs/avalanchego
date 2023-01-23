@@ -15,37 +15,38 @@ import (
 )
 
 const (
-	defaultAcceptorQueueLimit                     = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
-	defaultPruningEnabled                         = true
-	defaultCommitInterval                         = 4096
-	defaultTrieCleanCache                         = 512
-	defaultTrieDirtyCache                         = 256
-	defaultTrieDirtyCommitTarget                  = 20
-	defaultSnapshotCache                          = 256
-	defaultSyncableCommitInterval                 = defaultCommitInterval * 4
-	defaultSnapshotAsync                          = true
-	defaultRpcGasCap                              = 50_000_000 // Default to 50M Gas Limit
-	defaultRpcTxFeeCap                            = 100        // 100 AVAX
-	defaultMetricsExpensiveEnabled                = true
-	defaultApiMaxDuration                         = 0 // Default to no maximum API call duration
-	defaultWsCpuRefillRate                        = 0 // Default to no maximum WS CPU usage
-	defaultWsCpuMaxStored                         = 0 // Default to no maximum WS CPU usage
-	defaultMaxBlocksPerRequest                    = 0 // Default to no maximum on the number of blocks per getLogs request
-	defaultContinuousProfilerFrequency            = 15 * time.Minute
-	defaultContinuousProfilerMaxFiles             = 5
-	defaultRegossipFrequency                      = 1 * time.Minute
-	defaultRegossipMaxTxs                         = 16
-	defaultRegossipTxsPerAddress                  = 1
-	defaultPriorityRegossipFrequency              = 1 * time.Second
-	defaultPriorityRegossipMaxTxs                 = 32
-	defaultPriorityRegossipTxsPerAddress          = 16
-	defaultOfflinePruningBloomFilterSize   uint64 = 512 // Default size (MB) for the offline pruner to use
-	defaultLogLevel                               = "info"
-	defaultLogJSONFormat                          = false
-	defaultMaxOutboundActiveRequests              = 16
-	defaultPopulateMissingTriesParallelism        = 1024
-	defaultStateSyncServerTrieCache               = 64 // MB
-	defaultAcceptedCacheSize                      = 32 // blocks
+	defaultAcceptorQueueLimit                         = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
+	defaultPruningEnabled                             = true
+	defaultCommitInterval                             = 4096
+	defaultTrieCleanCache                             = 512
+	defaultTrieDirtyCache                             = 256
+	defaultTrieDirtyCommitTarget                      = 20
+	defaultSnapshotCache                              = 256
+	defaultSyncableCommitInterval                     = defaultCommitInterval * 4
+	defaultSnapshotAsync                              = true
+	defaultRpcGasCap                                  = 50_000_000 // Default to 50M Gas Limit
+	defaultRpcTxFeeCap                                = 100        // 100 AVAX
+	defaultMetricsExpensiveEnabled                    = true
+	defaultApiMaxDuration                             = 0 // Default to no maximum API call duration
+	defaultWsCpuRefillRate                            = 0 // Default to no maximum WS CPU usage
+	defaultWsCpuMaxStored                             = 0 // Default to no maximum WS CPU usage
+	defaultMaxBlocksPerRequest                        = 0 // Default to no maximum on the number of blocks per getLogs request
+	defaultContinuousProfilerFrequency                = 15 * time.Minute
+	defaultContinuousProfilerMaxFiles                 = 5
+	defaultRegossipFrequency                          = 1 * time.Minute
+	defaultRegossipMaxTxs                             = 16
+	defaultRegossipTxsPerAddress                      = 1
+	defaultPriorityRegossipFrequency                  = 1 * time.Second
+	defaultPriorityRegossipMaxTxs                     = 32
+	defaultPriorityRegossipTxsPerAddress              = 16
+	defaultOfflinePruningBloomFilterSize       uint64 = 512 // Default size (MB) for the offline pruner to use
+	defaultLogLevel                                   = "info"
+	defaultLogJSONFormat                              = false
+	defaultMaxOutboundActiveRequests                  = 16
+	defaultMaxOutboundActiveCrossChainRequests        = 64
+	defaultPopulateMissingTriesParallelism            = 1024
+	defaultStateSyncServerTrieCache                   = 64 // MB
+	defaultAcceptedCacheSize                          = 32 // blocks
 
 	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
 	// should be ahead of local last accepted to perform state sync.
@@ -171,7 +172,11 @@ type Config struct {
 	OfflinePruningDataDirectory   string `json:"offline-pruning-data-directory"`
 
 	// VM2VM network
-	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
+	MaxOutboundActiveRequests           int64 `json:"max-outbound-active-requests"`
+	MaxOutboundActiveCrossChainRequests int64 `json:"max-outbound-active-cross-chain-requests"`
+
+	// Database Settings
+	InspectDatabase bool `json:"inspect-database"` // Inspects the database on startup if enabled.
 
 	// Sync settings
 	StateSyncEnabled         bool   `json:"state-sync-enabled"`
@@ -196,6 +201,12 @@ type Config struct {
 	// This is particularly useful for improving the performance of eth_getLogs
 	// on RPC nodes.
 	AcceptedCacheSize int `json:"accepted-cache-size"`
+
+	// TxLookupLimit is the maximum number of blocks from head whose tx indices
+	// are reserved:
+	//  * 0:   means no limit
+	//  * N:   means N block limit [HEAD-N+1, HEAD] and delete extra indexes
+	TxLookupLimit uint64 `json:"tx-lookup-limit"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -246,6 +257,7 @@ func (c *Config) SetDefaults() {
 	c.LogLevel = defaultLogLevel
 	c.LogJSONFormat = defaultLogJSONFormat
 	c.MaxOutboundActiveRequests = defaultMaxOutboundActiveRequests
+	c.MaxOutboundActiveCrossChainRequests = defaultMaxOutboundActiveCrossChainRequests
 	c.PopulateMissingTriesParallelism = defaultPopulateMissingTriesParallelism
 	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval

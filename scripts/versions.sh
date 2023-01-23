@@ -8,4 +8,4 @@ network_runner_version=${NETWORK_RUNNER_VERSION:-'v1.3.5'}
 ginkgo_version=${GINKGO_VERSION:-'v2.2.0'}
 
 # This won't be used, but it's here to make code syncs easier
-latest_coreth_version=0.11.3
+latest_coreth_version=0.11.6

@@ -276,6 +276,16 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
+
+	if vm.config.InspectDatabase {
+		start := time.Now()
+		log.Info("Starting database inspection")
+		if err := rawdb.InspectDatabase(vm.chaindb, nil, nil); err != nil {
+			return err
+		}
+		log.Info("Completed database inspection", "elapsed", time.Since(start))
+	}
+
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err
@@ -348,6 +358,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.CommitInterval = vm.config.CommitInterval
 	vm.ethConfig.SkipUpgradeCheck = vm.config.SkipUpgradeCheck
 	vm.ethConfig.AcceptedCacheSize = vm.config.AcceptedCacheSize
+	vm.ethConfig.TxLookupLimit = vm.config.TxLookupLimit
 
 	// Create directory for offline pruning
 	if len(vm.ethConfig.OfflinePruningDataDirectory) != 0 {
@@ -403,7 +414,7 @@ func (vm *VM) Initialize(
 
 	// initialize peer network
 	vm.networkCodec = message.Codec
-	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests)
+	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, message.CrossChainCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests, vm.config.MaxOutboundActiveCrossChainRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
 
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
@@ -524,6 +535,7 @@ func (vm *VM) initializeStateSyncServer() {
 	})
 
 	vm.setAppRequestHandlers()
+	vm.setCrossChainAppRequestHandler()
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
@@ -602,6 +614,13 @@ func (vm *VM) setAppRequestHandlers() {
 		handlerstats.NewHandlerStats(metrics.Enabled),
 	)
 	vm.Network.SetRequestHandler(syncRequestHandler)
+}
+
+// setCrossChainAppRequestHandler sets the request handlers for the VM to serve cross chain
+// requests.
+func (vm *VM) setCrossChainAppRequestHandler() {
+	crossChainRequestHandler := message.NewCrossChainHandler(vm.eth.APIBackend, message.CrossChainCodec)
+	vm.Network.SetCrossChainRequestHandler(crossChainRequestHandler)
 }
 
 // Shutdown implements the snowman.ChainVM interface

@@ -73,6 +73,34 @@ func TestUnmarshalConfig(t *testing.T) {
 			false,
 		},
 		{
+			"empty tx lookup limit",
+			[]byte(`{}`),
+			Config{TxLookupLimit: 0},
+			false,
+		},
+		{
+			"zero tx lookup limit",
+			[]byte(`{"tx-lookup-limit": 0}`),
+			func() Config {
+				return Config{TxLookupLimit: 0}
+			}(),
+			false,
+		},
+		{
+			"1 tx lookup limit",
+			[]byte(`{"tx-lookup-limit": 1}`),
+			func() Config {
+				return Config{TxLookupLimit: 1}
+			}(),
+			false,
+		},
+		{
+			"-1 tx lookup limit",
+			[]byte(`{"tx-lookup-limit": -1}`),
+			Config{},
+			true,
+		},
+		{
 			"allow unprotected tx hashes",
 			[]byte(`{"allow-unprotected-tx-hashes": ["0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c"]}`),
 			Config{AllowUnprotectedTxHashes: []common.Hash{common.HexToHash("0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c")}},

@@ -215,6 +215,7 @@ func New(
 			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
 			AcceptedCacheSize:               config.AcceptedCacheSize,
+			TxLookupLimit:                   config.TxLookupLimit,
 		}
 	)
 
