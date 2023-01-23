@@ -1,8 +1,9 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
 
 type CaminoConfig struct {
-	DaoProposalBondAmount uint64
+	DaoProposalBondAmount  uint64
+	ValidatorsRewardPeriod uint64
 }

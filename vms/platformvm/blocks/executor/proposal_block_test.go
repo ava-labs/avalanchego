@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -203,6 +203,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			}
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)

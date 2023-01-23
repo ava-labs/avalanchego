@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -495,4 +495,86 @@ func noInputs(_ []*avax.UTXO) []*avax.TransferableInput {
 
 func noOffers(_ caminoEnvironment) ids.ID {
 	return ids.Empty
+}
+
+func newMockableCaminoEnvironment(
+	postBanff bool,
+	addSubnet bool,
+	caminoVMConfig config.CaminoConfig,
+	caminoGenesisConf api.Camino,
+	mockState state.State,
+	mockAtomicUTXOs avax.AtomicUTXOManager,
+) *caminoEnvironment {
+	var isBootstrapped utils.AtomicBool
+	isBootstrapped.SetValue(true)
+
+	config := defaultCaminoConfig(postBanff)
+	config.CaminoConfig = caminoVMConfig
+
+	clk := defaultClock(postBanff)
+
+	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	ctx, msm := defaultCtx(baseDB)
+
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+
+	rewards := reward.NewCalculator(config.RewardConfig)
+
+	baseState := mockState
+	if mockState == nil {
+		baseState = defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
+	}
+
+	if mockAtomicUTXOs == nil {
+		mockAtomicUTXOs = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	}
+
+	uptimes := uptime.NewManager(baseState)
+	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, baseState, fx, true)
+
+	txBuilder := builder.NewCamino(
+		ctx,
+		&config,
+		&clk,
+		fx,
+		baseState,
+		mockAtomicUTXOs,
+		utxoHandler,
+	)
+
+	backend := Backend{
+		Config:            &config,
+		Ctx:               ctx,
+		Clk:               &clk,
+		Bootstrapped:      &isBootstrapped,
+		Fx:                fx,
+		FlowChecker:       utxoHandler,
+		Uptimes:           uptimes,
+		Rewards:           rewards,
+		AtomicUTXOManager: mockAtomicUTXOs,
+	}
+
+	env := &caminoEnvironment{
+		isBootstrapped: &isBootstrapped,
+		config:         &config,
+		clk:            &clk,
+		baseDB:         baseDB,
+		ctx:            ctx,
+		msm:            msm,
+		fx:             fx,
+		state:          baseState,
+		states:         make(map[ids.ID]state.Chain),
+		atomicUTXOs:    mockAtomicUTXOs,
+		uptimes:        uptimes,
+		utxosHandler:   utxoHandler,
+		txBuilder:      txBuilder,
+		backend:        backend,
+	}
+
+	if addSubnet {
+		addCaminoSubnet(env, txBuilder)
+	}
+
+	return env
 }

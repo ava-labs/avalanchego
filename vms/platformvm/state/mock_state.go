@@ -16,6 +16,7 @@ import (
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	multisig "github.com/ava-labs/avalanchego/vms/components/multisig"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -155,6 +156,21 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// Config mocks base method.
+func (m *MockState) Config() (*config.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Config")
+	ret0, _ := ret[0].(*config.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Config indicates an expected call of Config.
+func (mr *MockStateMockRecorder) Config() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockState)(nil).Config))
 }
 
 // CaminoConfig mocks base method.
@@ -800,6 +816,18 @@ func (m *MockState) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 *ids.ShortID) 
 func (mr *MockStateMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockState)(nil).SetNodeConsortiumMember), arg0, arg1)
+}
+
+// SetLastRewardImportTimestamp mocks base method.
+func (m *MockState) SetLastRewardImportTimestamp(arg0 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastRewardImportTimestamp", arg0)
+}
+
+// SetLastRewardImportTimestamp indicates an expected call of SetLastRewardImportTimestamp.
+func (mr *MockStateMockRecorder) SetLastRewardImportTimestamp(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastRewardImportTimestamp", reflect.TypeOf((*MockState)(nil).SetLastRewardImportTimestamp), arg0)
 }
 
 // SetTimestamp mocks base method.

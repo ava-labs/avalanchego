@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -71,6 +72,14 @@ func (d *diff) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID]
 	}
 
 	return retUtxos, nil
+}
+
+func (d *diff) Config() (*config.Config, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.Config()
 }
 
 func (d *diff) CaminoConfig() (*CaminoConfig, error) {
@@ -197,8 +206,16 @@ func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 	return parentState.GetNodeConsortiumMember(nodeID)
 }
 
+func (d *diff) SetLastRewardImportTimestamp(timestamp uint64) {
+	d.caminoDiff.newRewardImportTimestamp = &timestamp
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
+	if d.caminoDiff.newRewardImportTimestamp != nil {
+		baseState.SetLastRewardImportTimestamp(*d.caminoDiff.newRewardImportTimestamp)
+	}
+
 	for k, v := range d.caminoDiff.modifiedAddressStates {
 		baseState.SetAddressStates(k, v)
 	}

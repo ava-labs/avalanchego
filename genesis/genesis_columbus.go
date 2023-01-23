@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -40,7 +40,8 @@ var (
 				SupplyCap:          1000 * units.MegaAvax,
 			},
 			CaminoConfig: config.CaminoConfig{
-				DaoProposalBondAmount: 100 * units.Avax,
+				DaoProposalBondAmount:  100 * units.Avax,
+				ValidatorsRewardPeriod: 60 * 60, // seconds
 			},
 		},
 	}

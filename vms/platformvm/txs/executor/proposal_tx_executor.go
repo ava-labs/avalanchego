@@ -1,3 +1,13 @@
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -592,13 +602,13 @@ func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
 		nextCurrentTime := currentStakerIterator.Value().NextTime
 		nextPendingTime := pendingStakerIterator.Value().NextTime
 		if nextCurrentTime.Before(nextPendingTime) {
-			return nextCurrentTime, nil
+			return GetNextChainEventTime(state, nextCurrentTime)
 		}
-		return nextPendingTime, nil
+		return GetNextChainEventTime(state, nextPendingTime)
 	case hasCurrentStaker:
-		return currentStakerIterator.Value().NextTime, nil
+		return GetNextChainEventTime(state, currentStakerIterator.Value().NextTime)
 	case hasPendingStaker:
-		return pendingStakerIterator.Value().NextTime, nil
+		return GetNextChainEventTime(state, pendingStakerIterator.Value().NextTime)
 	default:
 		return time.Time{}, database.ErrNotFound
 	}

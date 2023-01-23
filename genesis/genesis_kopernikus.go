@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3
@@ -46,7 +46,8 @@ var (
 				SupplyCap:          1000 * units.MegaAvax,
 			},
 			CaminoConfig: config.CaminoConfig{
-				DaoProposalBondAmount: 100 * units.Avax,
+				DaoProposalBondAmount:  100 * units.Avax,
+				ValidatorsRewardPeriod: 60, // seconds
 			},
 		},
 	}

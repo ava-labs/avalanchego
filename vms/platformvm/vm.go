@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -202,14 +202,15 @@ func (vm *VM) Initialize(
 	)
 
 	vm.txExecutorBackend = &txexecutor.Backend{
-		Config:       &vm.Config,
-		Ctx:          vm.ctx,
-		Clk:          &vm.clock,
-		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
-		Bootstrapped: &vm.bootstrapped,
+		Config:            &vm.Config,
+		Ctx:               vm.ctx,
+		Clk:               &vm.clock,
+		Fx:                vm.fx,
+		FlowChecker:       utxoHandler,
+		AtomicUTXOManager: vm.atomicUtxosManager,
+		Uptimes:           vm.uptimeManager,
+		Rewards:           rewards,
+		Bootstrapped:      &vm.bootstrapped,
 	}
 
 	// Note: There is a circular dependency between the mempool and block

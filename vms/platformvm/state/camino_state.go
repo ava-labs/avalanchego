@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -36,6 +37,10 @@ func (s *state) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID
 		}
 	}
 	return retUtxos, nil
+}
+
+func (s *state) Config() (*config.Config, error) {
+	return s.cfg, nil
 }
 
 func (s *state) CaminoConfig() (*CaminoConfig, error) {
@@ -84,4 +89,8 @@ func (s *state) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
 
 func (s *state) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 	return s.caminoState.GetNodeConsortiumMember(nodeID)
+}
+
+func (s *state) SetLastRewardImportTimestamp(timestamp uint64) {
+	s.caminoState.SetLastRewardImportTimestamp(timestamp)
 }

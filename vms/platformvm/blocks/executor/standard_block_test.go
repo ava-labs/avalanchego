@@ -1,3 +1,13 @@
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -126,6 +136,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).lastAccepted = parentID
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 
 	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
 

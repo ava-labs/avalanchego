@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -48,6 +49,8 @@ var (
 
 	nodeSignatureKey   = []byte("nodeSignature")
 	depositBondModeKey = []byte("depositBondMode")
+
+	lastRewardImportTimestampKey = []byte("lastRewardImportTimestamp")
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
@@ -85,6 +88,9 @@ type CaminoDiff interface {
 
 	SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID)
 	GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error)
+
+	// Validator rewards
+	SetLastRewardImportTimestamp(timestamp uint64)
 }
 
 // For state and diff
@@ -93,6 +99,7 @@ type Camino interface {
 
 	LockedUTXOs(set.Set[ids.ID], set.Set[ids.ShortID], locked.State) ([]*avax.UTXO, error)
 	CaminoConfig() (*CaminoConfig, error)
+	Config() (*config.Config, error)
 }
 
 // For state only
@@ -117,6 +124,7 @@ type caminoDiff struct {
 	modifiedDeposits              map[ids.ID]*deposit.Deposit
 	modifiedMultisigOwners        map[ids.ShortID]*multisig.Alias
 	modifiedConsortiumMemberNodes map[ids.NodeID]*ids.ShortID
+	newRewardImportTimestamp      *uint64
 }
 
 type caminoState struct {
@@ -437,6 +445,9 @@ func (cs *caminoState) Write() error {
 		return err
 	}
 	if err := cs.writeNodeConsortiumMembers(); err != nil {
+		return err
+	}
+	if err := cs.writeValidatorRewards(); err != nil {
 		return err
 	}
 
