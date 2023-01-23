@@ -181,3 +181,36 @@ fn fwdctl_root_hash() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn fwdctl_dump() -> Result<()> {
+    Command::cargo_bin(PRG)?
+        .arg("create")
+        .arg("--name")
+        .arg(FIREWOOD_TEST_DB_NAME)
+        .assert()
+        .success();
+
+    Command::cargo_bin(PRG)?
+        .arg("insert")
+        .args(["--key", "year"])
+        .args(["--value", "2023"])
+        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("year"));
+
+    // Get root
+    Command::cargo_bin(PRG)?
+        .arg("dump")
+        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not());
+
+    if let Err(e) = fwdctl_delete_db() {
+        return Err(anyhow!(e))
+    }
+
+    Ok(())
+}
