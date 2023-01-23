@@ -21,7 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-var errNonExistingOffer = errors.New("non existing deposit offer")
+var (
+	errNonExistingOffer             = errors.New("non existing deposit offer")
+	errWrongUTXONumber              = errors.New("not matching amount of utxo deposits and utxos")
+	errWrongValidatorNumber         = errors.New("not matching amount of validator deposits and validators")
+	errWrongDepositsAndStakedNumber = errors.New("not matching amount of deposit definitions ad validator staked outs")
+	errWrongLockMode                = errors.New("wrong lock mode")
+)
 
 type UTXODeposit struct {
 	OfferID         ids.ID `json:"offerID"`
@@ -55,15 +61,18 @@ func (c Camino) ParseToGenesis() genesis.Camino {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+	if !args.Camino.LockModeBondDeposit {
+		return errWrongLockMode
+	}
 	if len(args.Camino.UTXODeposits) != len(args.UTXOs) {
-		return errors.New("len(args.Camino.UTXODeposits) != len(args.UTXOs)")
+		return errWrongUTXONumber
 	}
 	if len(args.Camino.ValidatorDeposits) != len(args.Validators) {
-		return errors.New("len(args.Camino.ValidatorDeposits) != len(args.Validators)")
+		return errWrongValidatorNumber
 	}
 	for i := range args.Validators {
 		if len(args.Camino.ValidatorDeposits[i]) != len(args.Validators[i].Staked) {
-			return fmt.Errorf("len(args.Camino.ValidatorDeposits[%d]) != len(args.Validators[%d].Staked)", i, i)
+			return errWrongDepositsAndStakedNumber
 		}
 	}
 
@@ -385,7 +394,7 @@ func makeUTXOAndDeposit(
 	txID := bondTxID
 	depositTxID := ids.Empty
 	if deposit.OfferID != ids.Empty {
-		offer, ok := offers[deposit.OfferID]
+		_, ok := offers[deposit.OfferID]
 		if !ok {
 			return nil, nil, errNonExistingOffer
 		}
@@ -429,7 +438,7 @@ func makeUTXOAndDeposit(
 				}},
 			}},
 			DepositOfferID:  deposit.OfferID,
-			DepositDuration: offer.MinDuration,
+			DepositDuration: uint32(deposit.Duration),
 			RewardsOwner:    &owner,
 		}}
 		if err := depositTx.Sign(txs.GenesisCodec, nil); err != nil {
