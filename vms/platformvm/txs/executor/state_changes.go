@@ -119,6 +119,16 @@ func AdvanceTimeTo(
 
 	// Add to the staker set any pending stakers whose start time is at or
 	// before the new timestamp
+
+	// Note: we process pending stakers ready to be promoted to current ones and
+	// then we process current stakers to be demoted out of stakers set. It is
+	// guaranteed that no promoted stakers would be demoted immediately. A
+	// failure of this invariant would cause a staker to be added to
+	// StateChanges and be persisted among current stakers even if it already
+	// expired. The following invariants ensure this does not happens:
+	// Invariant: minimum stake duration is > 0, so staker.StartTime != staker.EndTime.
+	// Invariant: [newChainTime] does not skip stakers set change times.
+
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -130,12 +140,6 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			// Invariant: [txTimestamp] <= [nextStakerChangeTime].
-			// Invariant: minimum stake duration is > 0.
-			//
-			// Both of the above invariants ensure the staker we are adding here
-			// should never be attempted to be removed in the following loop.
-
 			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
 			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
 			continue

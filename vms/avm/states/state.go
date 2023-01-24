@@ -125,19 +125,19 @@ type state struct {
 	utxoState     avax.UTXOState
 
 	addedStatuses map[ids.ID]choices.Status
-	statusCache   cache.Cacher // cache of id -> choices.Status if the entry is nil, it is not in the database
+	statusCache   cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB      database.Database
 
-	addedTxs map[ids.ID]*txs.Tx // map of txID -> *txs.Tx
-	txCache  cache.Cacher       // cache of txID -> *txs.Tx if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
+	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
 	txDB     database.Database
 
-	addedBlockIDs map[uint64]ids.ID // map of height -> blockID
-	blockIDCache  cache.Cacher      // cache of height -> blockID, if the entry is nil, it is not in the database
+	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]blocks.Block // map of blockID -> Block
-	blockCache  cache.Cacher            // cache of blockID -> Block, if the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	// [lastAccepted] is the most recently accepted block.
@@ -158,37 +158,37 @@ func New(
 	blockDB := prefixdb.New(blockPrefix, db)
 	singletonDB := prefixdb.New(singletonPrefix, db)
 
-	statusCache, err := metercacher.New(
+	statusCache, err := metercacher.New[ids.ID, *choices.Status](
 		"status_cache",
 		metrics,
-		&cache.LRU{Size: statusCacheSize},
+		&cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	txCache, err := metercacher.New(
+	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
-		&cache.LRU{Size: txCacheSize},
+		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	blockIDCache, err := metercacher.New(
+	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metrics,
-		&cache.LRU{Size: blockIDCacheSize},
+		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New(
+	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metrics,
-		&cache.LRU{Size: blockCacheSize},
+		&cache.LRU[ids.ID, blocks.Block]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -249,11 +249,11 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
-	if txIntf, found := s.txCache.Get(txID); found {
-		if txIntf == nil {
+	if tx, exists := s.txCache.Get(txID); exists {
+		if tx == nil {
 			return nil, database.ErrNotFound
 		}
-		return txIntf.(*txs.Tx), nil
+		return tx, nil
 	}
 
 	txBytes, err := s.txDB.Get(txID[:])
@@ -283,12 +283,11 @@ func (s *state) GetBlockID(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
-	if blkIDIntf, cached := s.blockIDCache.Get(height); cached {
-		if blkIDIntf == nil {
+	if blkID, cached := s.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
 			return ids.Empty, database.ErrNotFound
 		}
 
-		blkID := blkIDIntf.(ids.ID)
 		return blkID, nil
 	}
 
@@ -296,7 +295,7 @@ func (s *state) GetBlockID(height uint64) (ids.ID, error) {
 
 	blkID, err := database.GetID(s.blockIDDB, heightKey)
 	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, nil)
+		s.blockIDCache.Put(height, ids.Empty)
 		return ids.Empty, database.ErrNotFound
 	}
 	if err != nil {
@@ -311,12 +310,11 @@ func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
 	if blk, exists := s.addedBlocks[blkID]; exists {
 		return blk, nil
 	}
-	if blkIntf, cached := s.blockCache.Get(blkID); cached {
-		if blkIntf == nil {
+	if blk, cached := s.blockCache.Get(blkID); cached {
+		if blk == nil {
 			return nil, database.ErrNotFound
 		}
 
-		blk := blkIntf.(blocks.Block)
 		return blk, nil
 	}
 
@@ -405,11 +403,11 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 	if status, exists := s.addedStatuses[id]; exists {
 		return status, nil
 	}
-	if statusIntf, found := s.statusCache.Get(id); found {
-		if statusIntf == nil {
+	if status, found := s.statusCache.Get(id); found {
+		if status == nil {
 			return choices.Unknown, database.ErrNotFound
 		}
-		return statusIntf.(choices.Status), nil
+		return *status, nil
 	}
 
 	val, err := database.GetUInt32(s.statusDB, id[:])
@@ -426,7 +424,7 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 		return choices.Unknown, err
 	}
 
-	s.statusCache.Put(id, status)
+	s.statusCache.Put(id, &status)
 	return status, nil
 }
 
@@ -559,9 +557,10 @@ func (s *state) writeMetadata() error {
 func (s *state) writeStatuses() error {
 	for id, status := range s.addedStatuses {
 		id := id
+		status := status
 
 		delete(s.addedStatuses, id)
-		s.statusCache.Put(id, status)
+		s.statusCache.Put(id, &status)
 		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
 			return fmt.Errorf("failed to add status: %w", err)
 		}

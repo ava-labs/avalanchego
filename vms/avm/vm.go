@@ -97,7 +97,7 @@ type VM struct {
 	feeAssetID ids.ID
 
 	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *cache.LRU
+	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -115,7 +115,7 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	uniqueTxs cache.Deduplicator
+	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
 }
 
 func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
@@ -175,7 +175,7 @@ func (vm *VM) Initialize(
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
+	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.Log)
 
@@ -229,7 +229,7 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 	vm.batchTimeout = batchTimeout
 
-	vm.uniqueTxs = &cache.EvictableLRU{
+	vm.uniqueTxs = &cache.EvictableLRU[ids.ID, *UniqueTx]{
 		Size: txDeduplicatorSize,
 	}
 	vm.walletService.vm = vm
@@ -602,9 +602,8 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
-	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
-	if assetInCache {
-		return fxIDsIntf.(set.Bits64).Contains(uint(fxID))
+	if fxIDs, ok := vm.assetToFxCache.Get(assetID); ok {
+		return fxIDs.Contains(uint(fxID))
 	}
 	// Caches doesn't say whether this asset support this fx.
 	// Get the tx that created the asset and check.
@@ -1116,5 +1115,5 @@ func (*VM) AppGossip(context.Context, ids.NodeID, []byte) error {
 
 // UniqueTx de-duplicates the transaction.
 func (vm *VM) DeduplicateTx(tx *UniqueTx) *UniqueTx {
-	return vm.uniqueTxs.Deduplicate(tx).(*UniqueTx)
+	return vm.uniqueTxs.Deduplicate(tx)
 }

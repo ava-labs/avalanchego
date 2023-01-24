@@ -27,8 +27,8 @@ var (
 )
 
 var (
-	_ snowstorm.Tx    = (*UniqueTx)(nil)
-	_ cache.Evictable = (*UniqueTx)(nil)
+	_ snowstorm.Tx            = (*UniqueTx)(nil)
+	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -117,7 +117,7 @@ func (tx *UniqueTx) ID() ids.ID {
 	return tx.txID
 }
 
-func (tx *UniqueTx) Key() interface{} {
+func (tx *UniqueTx) Key() ids.ID {
 	return tx.txID
 }
 

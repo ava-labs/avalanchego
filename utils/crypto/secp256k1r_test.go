@@ -12,6 +12,7 @@ import (
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -38,7 +39,7 @@ func TestRecover(t *testing.T) {
 func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := FactorySECP256K1R{Cache: cache.LRU{Size: 1}}
+	f := FactorySECP256K1R{Cache: cache.LRU[ids.ID, *PublicKeySECP256K1R]{Size: 1}}
 	key, err := f.NewPrivateKey()
 	require.NoError(err)
 

@@ -43,17 +43,14 @@ type State struct {
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
 	// decidedBlocks is an LRU cache of decided blocks.
-	// Every value in [decidedBlocks] is a (*BlockWrapper)
-	decidedBlocks cache.Cacher
+	decidedBlocks cache.Cacher[ids.ID, *BlockWrapper]
 	// unverifiedBlocks is an LRU cache of blocks with status processing
 	// that have not yet passed verification.
-	// Every value in [unverifiedBlocks] is a (*BlockWrapper)
-	unverifiedBlocks cache.Cacher
+	unverifiedBlocks cache.Cacher[ids.ID, *BlockWrapper]
 	// missingBlocks is an LRU cache of missing blocks
-	// Every value in [missingBlocks] is an empty struct.
-	missingBlocks cache.Cacher
+	missingBlocks cache.Cacher[ids.ID, struct{}]
 	// string([byte repr. of block]) --> the block's ID
-	bytesToIDCache    cache.Cacher
+	bytesToIDCache    cache.Cacher[string, ids.ID]
 	lastAcceptedBlock *BlockWrapper
 }
 
@@ -141,10 +138,10 @@ func (s *State) initialize(config *Config) {
 func NewState(config *Config) *State {
 	c := &State{
 		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
-		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
-		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
-		bytesToIDCache:   &cache.LRU{Size: config.BytesToIDCacheSize},
+		decidedBlocks:    &cache.LRU[ids.ID, *BlockWrapper]{Size: config.DecidedCacheSize},
+		missingBlocks:    &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
+		unverifiedBlocks: &cache.LRU[ids.ID, *BlockWrapper]{Size: config.UnverifiedCacheSize},
+		bytesToIDCache:   &cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
 	}
 	c.initialize(config)
 	return c
@@ -154,34 +151,34 @@ func NewMeteredState(
 	registerer prometheus.Registerer,
 	config *Config,
 ) (*State, error) {
-	decidedCache, err := metercacher.New(
+	decidedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"decided_cache",
 		registerer,
-		&cache.LRU{Size: config.DecidedCacheSize},
+		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.DecidedCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
-	missingCache, err := metercacher.New(
+	missingCache, err := metercacher.New[ids.ID, struct{}](
 		"missing_cache",
 		registerer,
-		&cache.LRU{Size: config.MissingCacheSize},
+		&cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
-	unverifiedCache, err := metercacher.New(
+	unverifiedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"unverified_cache",
 		registerer,
-		&cache.LRU{Size: config.UnverifiedCacheSize},
+		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.UnverifiedCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
-	bytesToIDCache, err := metercacher.New(
+	bytesToIDCache, err := metercacher.New[string, ids.ID](
 		"bytes_to_id_cache",
 		registerer,
-		&cache.LRU{Size: config.BytesToIDCacheSize},
+		&cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -265,11 +262,11 @@ func (s *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 	}
 
 	if blk, ok := s.decidedBlocks.Get(blkID); ok {
-		return blk.(snowman.Block), true
+		return blk, true
 	}
 
 	if blk, ok := s.unverifiedBlocks.Get(blkID); ok {
-		return blk.(snowman.Block), true
+		return blk, true
 	}
 
 	return nil, false
@@ -289,11 +286,10 @@ func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Blo
 // appropriate caching layer if successful.
 func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	// See if we've cached this block's ID by its byte repr.
-	blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(b))
+	cachedBlkID, blkIDCached := s.bytesToIDCache.Get(string(b))
 	if blkIDCached {
-		blkID := blkIDIntf.(ids.ID)
 		// See if we have this block cached
-		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+		if cachedBlk, ok := s.getCachedBlock(cachedBlkID); ok {
 			return cachedBlk, nil
 		}
 	}
@@ -334,14 +330,13 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 	unparsedBlksBytes := make([][]byte, 0, len(blksBytes))
 	for i, blkBytes := range blksBytes {
 		// See if we've cached this block's ID by its byte repr.
-		blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(blkBytes))
+		blkID, blkIDCached := s.bytesToIDCache.Get(string(blkBytes))
 		idWasCached[i] = blkIDCached
 		if !blkIDCached {
 			unparsedBlksBytes = append(unparsedBlksBytes, blkBytes)
 			continue
 		}
 
-		blkID := blkIDIntf.(ids.ID)
 		// See if we have this block cached
 		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
 			blks[i] = cachedBlk

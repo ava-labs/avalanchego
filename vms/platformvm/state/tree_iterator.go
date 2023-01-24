@@ -23,7 +23,7 @@ type treeIterator struct {
 
 // NewTreeIterator returns a new iterator of the stakers in [tree] in ascending
 // order. Note that it isn't safe to modify [tree] while iterating over it.
-func NewTreeIterator(tree *btree.BTree) StakerIterator {
+func NewTreeIterator(tree *btree.BTreeG[*Staker]) StakerIterator {
 	if tree == nil {
 		return EmptyIterator
 	}
@@ -34,9 +34,9 @@ func NewTreeIterator(tree *btree.BTree) StakerIterator {
 	it.wg.Add(1)
 	go func() {
 		defer it.wg.Done()
-		tree.Ascend(func(i btree.Item) bool {
+		tree.Ascend(func(i *Staker) bool {
 			select {
-			case it.next <- i.(*Staker):
+			case it.next <- i:
 				return true
 			case <-it.release:
 				return false

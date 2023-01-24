@@ -3,37 +3,34 @@
 
 package cache
 
-// Cacher acts as a best effort key value store. Keys must be comparable, as
-// defined by https://golang.org/ref/spec#Comparison_operators.
-type Cacher interface {
-	// Put inserts an element into the cache. If spaced is required, elements will
+// Cacher acts as a best effort key value store.
+type Cacher[K comparable, V any] interface {
+	// Put inserts an element into the cache. If space is required, elements will
 	// be evicted.
-	Put(key, value interface{})
+	Put(key K, value V)
 
 	// Get returns the entry in the cache with the key specified, if no value
 	// exists, false is returned.
-	Get(key interface{}) (interface{}, bool)
+	Get(key K) (V, bool)
 
 	// Evict removes the specified entry from the cache
-	Evict(key interface{})
+	Evict(key K)
 
 	// Flush removes all entries from the cache
 	Flush()
 }
 
 // Evictable allows the object to be notified when it is evicted
-type Evictable interface {
-	// Key must return a comparable value as defined by
-	// https://golang.org/ref/spec#Comparison_operators.
-	Key() interface{}
+type Evictable[K comparable] interface {
+	Key() K
 	Evict()
 }
 
 // Deduplicator acts as a best effort deduplication service
-type Deduplicator interface {
+type Deduplicator[K comparable, V Evictable[K]] interface {
 	// Deduplicate returns either the provided value, or a previously provided
 	// value with the same ID that hasn't yet been evicted
-	Deduplicate(Evictable) Evictable
+	Deduplicate(V) V
 
 	// Flush removes all entries from the cache
 	Flush()
