@@ -1228,7 +1228,7 @@ func (s *state) loadCurrentValidators() error {
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
-				validator.delegators = btree.New(defaultTreeDegree)
+				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
 			validator.delegators.ReplaceOrInsert(staker)
 
@@ -1314,7 +1314,7 @@ func (s *state) loadPendingValidators() error {
 
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
-				validator.delegators = btree.New(defaultTreeDegree)
+				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
 			validator.delegators.ReplaceOrInsert(staker)
 
