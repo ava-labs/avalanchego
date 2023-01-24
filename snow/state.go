@@ -3,7 +3,11 @@
 
 package snow
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+)
 
 const (
 	Initializing = iota
@@ -29,4 +33,9 @@ func (st State) String() string {
 	default:
 		return "Unknown state"
 	}
+}
+
+type EngineState struct {
+	Type  p2p.EngineType
+	State State
 }

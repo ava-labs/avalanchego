@@ -71,14 +71,10 @@ type Server interface {
 	Dispatch() error
 	// DispatchTLS starts the API server with the provided TLS certificate
 	DispatchTLS(certBytes, keyBytes []byte) error
-	// RegisterChain registers the API endpoints associated with this chain. That is,
-	// add <route, handler> pairs to server so that API calls can be made to the VM.
-	// This method runs in a goroutine to avoid a deadlock in the event that the caller
-	// holds the engine's context lock. Namely, this could happen when the P-Chain is
-	// creating a new chain and holds the P-Chain's lock when this function is held,
-	// and at the same time the server's lock is held due to an API call and is trying
-	// to grab the P-Chain's lock.
-	RegisterChain(chainName string, engine common.Engine)
+	// RegisterChain registers the API endpoints associated with this chain.
+	// That is, add <route, handler> pairs to server so that API calls can be
+	// made to the VM.
+	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
 	// Shutdown this server
 	Shutdown() error
 }
@@ -217,19 +213,14 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 	return s.srv.Serve(listener)
 }
 
-func (s *server) RegisterChain(chainName string, engine common.Engine) {
-	go s.registerChain(chainName, engine)
-}
-
-func (s *server) registerChain(chainName string, engine common.Engine) {
+func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
 	var (
 		handlers map[string]*common.HTTPHandler
 		err      error
 	)
 
-	ctx := engine.Context()
 	ctx.Lock.Lock()
-	handlers, err = engine.GetVM().CreateHandlers(context.TODO())
+	handlers, err = vm.CreateHandlers(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create handlers",
@@ -377,7 +368,7 @@ func lockMiddleware(
 // not done state-syncing/bootstrapping, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
-		if ctx.GetState() != snow.NormalOp {
+		if ctx.State.Get().State != snow.NormalOp {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
 			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))

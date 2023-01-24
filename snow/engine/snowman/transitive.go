@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -65,7 +66,7 @@ type Transitive struct {
 	// A block is put into this cache if it was not able to be issued. A block
 	// fails to be issued if verification on the block or one of its ancestors
 	// occurs.
-	nonVerifiedCache cache.Cacher
+	nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
 
 	// acceptedFrontiers of the other validators of this chain
 	acceptedFrontiers tracker.Accepted
@@ -85,10 +86,10 @@ type Transitive struct {
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
-	nonVerifiedCache, err := metercacher.New(
+	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		&cache.LRU{Size: nonVerifiedCacheSize},
+		&cache.LRU[ids.ID, snowman.Block]{Size: nonVerifiedCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -382,7 +383,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.RunningStateSync(false)
+		t.Ctx.StateSyncing.Set(false)
 		return nil
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
@@ -446,7 +447,10 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.SetState(snow.NormalOp)
+	t.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.NormalOp,
+	})
 	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
@@ -479,7 +483,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 		return blk, nil
 	}
 	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
-		return blk.(snowman.Block), nil
+		return blk, nil
 	}
 
 	return t.VM.GetBlock(ctx, blkID)
@@ -487,7 +491,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
-	if t.Ctx.IsRunningStateSync() {
+	if t.Ctx.StateSyncing.Get() {
 		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
 	} else {
 		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})

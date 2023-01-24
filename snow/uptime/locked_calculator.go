@@ -21,12 +21,12 @@ var (
 type LockedCalculator interface {
 	Calculator
 
-	SetCalculator(isBootstrapped *utils.AtomicBool, lock sync.Locker, newC Calculator)
+	SetCalculator(isBootstrapped *utils.Atomic[bool], lock sync.Locker, newC Calculator)
 }
 
 type lockedCalculator struct {
 	lock           sync.RWMutex
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	calculatorLock sync.Locker
 	c              Calculator
 }
@@ -39,7 +39,7 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
 		return 0, time.Time{}, errNotReady
 	}
 
@@ -53,7 +53,7 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID, subnetID id
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
 		return 0, errNotReady
 	}
 
@@ -67,7 +67,7 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetI
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.GetValue() {
+	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
 		return 0, errNotReady
 	}
 
@@ -77,7 +77,7 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetI
 	return c.c.CalculateUptimePercentFrom(nodeID, subnetID, startTime)
 }
 
-func (c *lockedCalculator) SetCalculator(isBootstrapped *utils.AtomicBool, lock sync.Locker, newC Calculator) {
+func (c *lockedCalculator) SetCalculator(isBootstrapped *utils.Atomic[bool], lock sync.Locker, newC Calculator) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

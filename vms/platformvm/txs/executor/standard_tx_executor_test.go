@@ -1103,7 +1103,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1111,7 +1111,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr: false,
@@ -1128,7 +1128,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1136,7 +1136,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr: true,
@@ -1153,7 +1153,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1161,7 +1161,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1182,7 +1182,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1190,7 +1190,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1209,7 +1209,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1217,7 +1217,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1235,7 +1235,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1243,7 +1243,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1268,7 +1268,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1276,7 +1276,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1304,7 +1304,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1312,7 +1312,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1468,7 +1468,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1476,7 +1476,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: txs.ErrNilTx,
@@ -1492,7 +1492,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1500,7 +1500,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errMaxStakeDurationTooLarge,
@@ -1518,7 +1518,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1526,7 +1526,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errWrongNumberOfCredentials,
@@ -1554,7 +1554,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1562,7 +1562,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errFlowCheckFailed,
@@ -1595,7 +1595,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.AtomicBool{},
+						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
@@ -1603,7 +1603,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.SetValue(true)
+				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: nil,

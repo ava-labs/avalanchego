@@ -15,6 +15,7 @@ import (
 	manager "github.com/ava-labs/avalanchego/database/manager"
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
+	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	snowstorm "github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	version "github.com/ava-labs/avalanchego/version"
@@ -98,6 +99,21 @@ func (m *MockDAGVM) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint
 func (mr *MockDAGVMMockRecorder) AppResponse(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*MockDAGVM)(nil).AppResponse), arg0, arg1, arg2, arg3)
+}
+
+// BuildBlock mocks base method.
+func (m *MockDAGVM) BuildBlock(arg0 context.Context) (snowman.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildBlock", arg0)
+	ret0, _ := ret[0].(snowman.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildBlock indicates an expected call of BuildBlock.
+func (mr *MockDAGVMMockRecorder) BuildBlock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildBlock", reflect.TypeOf((*MockDAGVM)(nil).BuildBlock), arg0)
 }
 
 // Connected mocks base method.
@@ -200,6 +216,21 @@ func (mr *MockDAGVMMockRecorder) Disconnected(arg0, arg1 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockDAGVM)(nil).Disconnected), arg0, arg1)
 }
 
+// GetBlock mocks base method.
+func (m *MockDAGVM) GetBlock(arg0 context.Context, arg1 ids.ID) (snowman.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
+	ret0, _ := ret[0].(snowman.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlock indicates an expected call of GetBlock.
+func (mr *MockDAGVMMockRecorder) GetBlock(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockDAGVM)(nil).GetBlock), arg0, arg1)
+}
+
 // GetTx mocks base method.
 func (m *MockDAGVM) GetTx(arg0 context.Context, arg1 ids.ID) (snowstorm.Tx, error) {
 	m.ctrl.T.Helper()
@@ -244,6 +275,50 @@ func (mr *MockDAGVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockDAGVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 }
 
+// LastAccepted mocks base method.
+func (m *MockDAGVM) LastAccepted(arg0 context.Context) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastAccepted", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastAccepted indicates an expected call of LastAccepted.
+func (mr *MockDAGVMMockRecorder) LastAccepted(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAccepted", reflect.TypeOf((*MockDAGVM)(nil).LastAccepted), arg0)
+}
+
+// Linearize mocks base method.
+func (m *MockDAGVM) Linearize(arg0 context.Context, arg1 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Linearize", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Linearize indicates an expected call of Linearize.
+func (mr *MockDAGVMMockRecorder) Linearize(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Linearize", reflect.TypeOf((*MockDAGVM)(nil).Linearize), arg0, arg1)
+}
+
+// ParseBlock mocks base method.
+func (m *MockDAGVM) ParseBlock(arg0 context.Context, arg1 []byte) (snowman.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ParseBlock", arg0, arg1)
+	ret0, _ := ret[0].(snowman.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ParseBlock indicates an expected call of ParseBlock.
+func (mr *MockDAGVMMockRecorder) ParseBlock(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*MockDAGVM)(nil).ParseBlock), arg0, arg1)
+}
+
 // ParseTx mocks base method.
 func (m *MockDAGVM) ParseTx(arg0 context.Context, arg1 []byte) (snowstorm.Tx, error) {
 	m.ctrl.T.Helper()
@@ -271,6 +346,20 @@ func (m *MockDAGVM) PendingTxs(arg0 context.Context) []snowstorm.Tx {
 func (mr *MockDAGVMMockRecorder) PendingTxs(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTxs", reflect.TypeOf((*MockDAGVM)(nil).PendingTxs), arg0)
+}
+
+// SetPreference mocks base method.
+func (m *MockDAGVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPreference", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPreference indicates an expected call of SetPreference.
+func (mr *MockDAGVMMockRecorder) SetPreference(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockDAGVM)(nil).SetPreference), arg0, arg1)
 }
 
 // SetState mocks base method.

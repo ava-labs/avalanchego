@@ -76,9 +76,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			t.Fatal("Error saving utxo", err)
-		}
+		vm.state.AddUTXO(utxo)
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
@@ -168,9 +166,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			t.Fatal("Error saving utxo", err)
-		}
+		vm.state.AddUTXO(utxo)
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
@@ -264,9 +260,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 	// save utxo to state
-	if err := vm.state.PutUTXO(utxo); err != nil {
-		t.Fatal("Error saving utxo", err)
-	}
+	vm.state.AddUTXO(utxo)
 
 	var inputUTXOs []*avax.UTXO //nolint:prealloc
 	for _, utxoID := range tx.Unsigned.InputUTXOs() {
@@ -325,9 +319,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			t.Fatal("Error saving utxo", err)
-		}
+		vm.state.AddUTXO(utxo)
 
 		// issue transaction
 		if _, err := vm.IssueTx(tx.Bytes()); err != nil {

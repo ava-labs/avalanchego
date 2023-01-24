@@ -15,6 +15,8 @@ import (
 
 	gomath "math"
 
+	"github.com/pires/go-proxyproto"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
@@ -56,6 +58,8 @@ var (
 	errNotValidator             = errors.New("node is not a validator")
 	errNotTracked               = errors.New("subnet is not tracked")
 	errSubnetNotExist           = errors.New("subnet does not exist")
+	errExpectedProxy            = errors.New("expected proxy")
+	errExpectedTCPProtocol      = errors.New("expected TCP protocol")
 )
 
 // Network defines the functionality of the networking library.
@@ -187,6 +191,28 @@ func NewNetwork(
 	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return nil, errMissingPrimaryValidators
+	}
+
+	if config.ProxyEnabled {
+		// Wrap the listener to process the proxy header.
+		listener = &proxyproto.Listener{
+			Listener: listener,
+			Policy: func(net.Addr) (proxyproto.Policy, error) {
+				// Do not perform any fuzzy matching, the header must be
+				// provided.
+				return proxyproto.REQUIRE, nil
+			},
+			ValidateHeader: func(h *proxyproto.Header) error {
+				if !h.Command.IsProxy() {
+					return errExpectedProxy
+				}
+				if h.TransportProtocol != proxyproto.TCPv4 && h.TransportProtocol != proxyproto.TCPv6 {
+					return errExpectedTCPProtocol
+				}
+				return nil
+			},
+			ReadHeaderTimeout: config.ProxyReadHeaderTimeout,
+		}
 	}
 
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
@@ -705,34 +731,50 @@ func (n *network) Dispatch() error {
 			continue
 		}
 
-		// We pessimistically drop an incoming connection if the remote
-		// address is found in connectedIPs, myIPs, or peerAliasIPs.
-		// This protects our node from spending CPU cycles on TLS
-		// handshakes to upgrade connections from existing peers.
-		// Specifically, this can occur when one of our existing
-		// peers attempts to connect to one our IP aliases (that they
-		// aren't yet aware is an alias).
-		remoteAddr := conn.RemoteAddr().String()
-		ip, err := ips.ToIPPort(remoteAddr)
-		if err != nil {
-			errs.Add(fmt.Errorf("unable to convert remote address %s to IP: %w", remoteAddr, err))
-			break
-		}
+		// Note: listener.Accept is rate limited outside of this package, so a
+		// peer can not just arbitrarily spin up goroutines here.
+		go func() {
+			// We pessimistically drop an incoming connection if the remote
+			// address is found in connectedIPs, myIPs, or peerAliasIPs. This
+			// protects our node from spending CPU cycles on TLS handshakes to
+			// upgrade connections from existing peers. Specifically, this can
+			// occur when one of our existing peers attempts to connect to one
+			// our IP aliases (that they aren't yet aware is an alias).
+			//
+			// Note: Calling [RemoteAddr] with the Proxy protocol enabled may
+			// block for up to ProxyReadHeaderTimeout. Therefore, we ensure to
+			// call this function inside the go-routine, rather than the main
+			// accept loop.
+			remoteAddr := conn.RemoteAddr().String()
+			ip, err := ips.ToIPPort(remoteAddr)
+			if err != nil {
+				n.peerConfig.Log.Error("failed to parse remote address",
+					zap.String("peerIP", remoteAddr),
+					zap.Error(err),
+				)
+				_ = conn.Close()
+				return
+			}
 
-		if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ip) {
-			n.peerConfig.Log.Debug("failed to upgrade connection",
-				zap.String("reason", "rate-limiting"),
+			if !n.inboundConnUpgradeThrottler.ShouldUpgrade(ip) {
+				n.peerConfig.Log.Debug("failed to upgrade connection",
+					zap.String("reason", "rate-limiting"),
+					zap.Stringer("peerIP", ip),
+				)
+				n.metrics.inboundConnRateLimited.Inc()
+				_ = conn.Close()
+				return
+			}
+			n.metrics.inboundConnAllowed.Inc()
+
+			n.peerConfig.Log.Verbo("starting to upgrade connection",
+				zap.String("direction", "inbound"),
 				zap.Stringer("peerIP", ip),
 			)
-			n.metrics.inboundConnRateLimited.Inc()
-			_ = conn.Close()
-			continue
-		}
-		n.metrics.inboundConnAllowed.Inc()
 
-		go func() {
 			if err := n.upgrade(conn, n.serverUpgrader); err != nil {
-				n.peerConfig.Log.Verbo("failed to upgrade inbound connection",
+				n.peerConfig.Log.Verbo("failed to upgrade connection",
+					zap.String("direction", "inbound"),
 					zap.Error(err),
 				)
 			}
@@ -1067,6 +1109,11 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				continue
 			}
 
+			n.peerConfig.Log.Verbo("starting to upgrade connection",
+				zap.String("direction", "outbound"),
+				zap.Stringer("peerIP", ip.ip.IP),
+			)
+
 			err = n.upgrade(conn, n.clientUpgrader)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
@@ -1135,9 +1182,9 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
-
 	if n.closing {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1148,6 +1195,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	if _, connecting := n.connectingPeers.GetByID(nodeID); connecting {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1158,6 +1207,8 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	}
 
 	if _, connected := n.connectedPeers.GetByID(nodeID); connected {
+		n.peersLock.Unlock()
+
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping connection",
@@ -1194,6 +1245,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 		),
 	)
 	n.connectingPeers.Add(peer)
+	n.peersLock.Unlock()
 	return nil
 }
 

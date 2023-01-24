@@ -259,7 +259,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	//       before the overflow may not be handled properly.
 	if notRequested := message.UnrequestedOps.Contains(op); notRequested ||
 		(op == message.PutOp && requestID == constants.GossipMsgRequestID) {
-		if chainCtx.IsExecuting() {
+		if chainCtx.Executing.Get() {
 			cr.log.Debug("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),
 				zap.Stringer("messageOp", op),
@@ -290,7 +290,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	if chainCtx.IsExecuting() {
+	if chainCtx.Executing.Get() {
 		cr.log.Debug("dropping message and skipping queue",
 			zap.String("reason", "the chain is currently executing"),
 			zap.Stringer("messageOp", op),

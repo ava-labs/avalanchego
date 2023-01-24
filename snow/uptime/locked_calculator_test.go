@@ -36,7 +36,7 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
 	require.ErrorIs(err, errNotReady)
 
-	var isBootstrapped utils.AtomicBool
+	var isBootstrapped utils.Atomic[bool]
 	mockCalc := NewMockCalculator(ctrl)
 
 	// Should still error because ctx is not bootstrapped
@@ -50,7 +50,7 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
 	require.EqualValues(errNotReady, err)
 
-	isBootstrapped.SetValue(true)
+	isBootstrapped.Set(true)
 
 	// Should return the value from the mocked inner calculator
 	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)

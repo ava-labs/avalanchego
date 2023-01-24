@@ -78,10 +78,9 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	defaultEngine p2p.EngineType
-	stateSyncer   common.StateSyncer
-	bootstrapper  common.BootstrapableEngine
-	engine        common.Engine
+	stateSyncer  common.StateSyncer
+	bootstrapper common.BootstrapableEngine
+	engine       common.Engine
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
 	onStopped func()
@@ -116,7 +115,6 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
-	defaultEngine p2p.EngineType,
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 ) (Handler, error) {
@@ -126,7 +124,6 @@ func New(
 		msgFromVMChan:    msgFromVMChan,
 		preemptTimeouts:  preemptTimeouts,
 		gossipFrequency:  gossipFrequency,
-		defaultEngine:    defaultEngine,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
 		timeouts:         make(chan struct{}, 1),
 		closingChan:      make(chan struct{}),
@@ -158,7 +155,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) IsValidator(nodeID ids.NodeID) bool {
-	return !h.ctx.IsValidatorOnly() ||
+	return !h.ctx.ValidatorOnly.Get() ||
 		nodeID == h.ctx.NodeID ||
 		h.validators.Contains(nodeID)
 }
@@ -448,7 +445,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.GetState() == snow.NormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.State.Get().State == snow.NormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
@@ -489,7 +486,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
 				zap.Uint32("requestID", msg.RequestId),
 				zap.String("field", "Heights"),
-				zap.Error(err),
 			)
 			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
@@ -835,7 +831,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 }
 
 func (h *handler) getEngine() (common.Engine, error) {
-	state := h.ctx.GetState()
+	state := h.ctx.State.Get().State
 	switch state {
 	case snow.StateSyncing:
 		return h.stateSyncer, nil

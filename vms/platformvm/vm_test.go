@@ -1650,7 +1650,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
-	consensusCtx.SetState(snow.Initializing)
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
@@ -1838,7 +1837,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
-		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		cpuTracker,
 		vm,
 	)
@@ -2827,4 +2825,107 @@ func copySubnetValidator(vdr *validators.Validator) *validators.Validator {
 	newVdr := *vdr
 	newVdr.PublicKey = nil
 	return &newVdr
+}
+
+func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
+	require := require.New(t)
+
+	validatorStartTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+
+	vm, _, _ := defaultVM()
+
+	vm.ctx.Lock.Lock()
+	defer func() {
+		err := vm.Shutdown(context.Background())
+		require.NoError(err)
+
+		vm.ctx.Lock.Unlock()
+	}()
+
+	keyIntf, err := testKeyFactory.NewPrivateKey()
+	require.NoError(err)
+	key := keyIntf.(*crypto.PrivateKeySECP256K1R)
+
+	id := key.PublicKey().Address()
+
+	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		defaultMaxValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.NodeID(id),
+		id,
+		reward.PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].Address(),
+	)
+	require.NoError(err)
+
+	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
+	require.NoError(err)
+
+	// trigger block creation for the validator tx
+	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(addValidatorBlock.Verify(context.Background()))
+	require.NoError(addValidatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		1,
+		[]ids.ShortID{id},
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		keys[0].Address(),
+	)
+	require.NoError(err)
+
+	err = vm.Builder.AddUnverifiedTx(createSubnetTx)
+	require.NoError(err)
+
+	// trigger block creation for the subnet tx
+	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(createSubnetBlock.Verify(context.Background()))
+	require.NoError(createSubnetBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		defaultMaxValidatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.NodeID(id),
+		createSubnetTx.ID(),
+		[]*crypto.PrivateKeySECP256K1R{key, keys[1]},
+		keys[1].Address(),
+	)
+	require.NoError(err)
+
+	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
+		ids.NodeID(id),
+		createSubnetTx.ID(),
+		[]*crypto.PrivateKeySECP256K1R{key, keys[2]},
+		keys[2].Address(),
+	)
+	require.NoError(err)
+
+	statelessBlock, err := blocks.NewBanffStandardBlock(
+		vm.state.GetTimestamp(),
+		createSubnetBlock.ID(),
+		createSubnetBlock.Height()+1,
+		[]*txs.Tx{
+			addSubnetValidatorTx,
+			removeSubnetValidatorTx,
+		},
+	)
+	require.NoError(err)
+
+	blockBytes := statelessBlock.Bytes()
+	block, err := vm.ParseBlock(context.Background(), blockBytes)
+	require.NoError(err)
+	require.NoError(block.Verify(context.Background()))
+	require.NoError(block.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), ids.NodeID(id))
+	require.ErrorIs(err, database.ErrNotFound)
 }

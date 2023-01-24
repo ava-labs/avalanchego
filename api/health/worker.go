@@ -60,16 +60,16 @@ func (w *worker) RegisterCheck(name string, checker Checker) error {
 }
 
 func (w *worker) RegisterMonotonicCheck(name string, checker Checker) error {
-	var result utils.AtomicInterface
-	return w.RegisterCheck(name, CheckerFunc(func(ctx context.Context) (interface{}, error) {
-		details := result.GetValue()
+	var result utils.Atomic[any]
+	return w.RegisterCheck(name, CheckerFunc(func(ctx context.Context) (any, error) {
+		details := result.Get()
 		if details != nil {
 			return details, nil
 		}
 
 		details, err := checker.HealthCheck(ctx)
 		if err == nil {
-			result.SetValue(details)
+			result.Set(details)
 		}
 		return details, err
 	}))
