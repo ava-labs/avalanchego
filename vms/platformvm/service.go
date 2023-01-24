@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -51,6 +53,10 @@ const (
 	// Minimum amount of delay to allow a transaction to be issued through the
 	// API
 	minAddStakerDelay = 2 * executor.SyncBound
+
+	// Note: Staker attributes cache should be large enough so that no evictions
+	// happen when the API loops through all stakers.
+	stakerAttributesCacheSize = 100_000
 )
 
 var (
@@ -74,8 +80,18 @@ var (
 
 // Service defines the API calls that can be made to the platform chain
 type Service struct {
-	vm          *VM
-	addrManager avax.AddressManager
+	vm                    *VM
+	addrManager           avax.AddressManager
+	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
+}
+
+// All attributes are optional and may not be filled for each stakerTx.
+type stakerAttributes struct {
+	shares                 uint32
+	rewardsOwner           fx.Owner
+	validationRewardsOwner fx.Owner
+	delegationRewardsOwner fx.Owner
+	proofOfPossession      *signer.ProofOfPossession
 }
 
 type GetHeightResponse struct {
@@ -673,6 +689,48 @@ type GetCurrentValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 }
 
+func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
+	// Lookup tx from the cache first.
+	attr, found := s.stakerAttributesCache.Get(txID)
+	if found {
+		return attr, nil
+	}
+
+	// Tx not available in cache; pull it from disk and populate the cache.
+	tx, _, err := s.vm.state.GetTx(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	switch stakerTx := tx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		var pop *signer.ProofOfPossession
+		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
+			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
+				pop = s
+			}
+		}
+
+		attr = &stakerAttributes{
+			shares:                 stakerTx.Shares(),
+			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
+			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
+			proofOfPossession:      pop,
+		}
+
+	case txs.DelegatorTx:
+		attr = &stakerAttributes{
+			rewardsOwner: stakerTx.RewardsOwner(),
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected staker tx type %T", tx.Unsigned)
+	}
+
+	s.stakerAttributesCache.Put(txID, attr)
+	return attr, nil
+}
+
 // GetCurrentValidators returns current validators and delegators
 func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
@@ -727,11 +785,6 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	}
 
 	for _, currentStaker := range targetStakers {
-		tx, _, err := s.vm.state.GetTx(currentStaker.TxID)
-		if err != nil {
-			return err
-		}
-
 		nodeID := currentStaker.NodeID
 		weight := json.Uint64(currentStaker.Weight)
 		apiStaker := platformapi.Staker{
@@ -743,9 +796,14 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 		potentialReward := json.Uint64(currentStaker.PotentialReward)
 
-		switch stakerTx := tx.Unsigned.(type) {
-		case txs.ValidatorTx:
-			shares := stakerTx.Shares()
+		switch currentStaker.Priority {
+		case txs.PrimaryNetworkValidatorCurrentPriority, txs.SubnetPermissionlessValidatorCurrentPriority:
+			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
+			if err != nil {
+				return err
+			}
+
+			shares := attr.shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			uptime, err := s.getAPIUptime(currentStaker)
@@ -758,14 +816,14 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
 			)
-			validationOwner, ok := stakerTx.ValidationRewardsOwner().(*secp256k1fx.OutputOwners)
+			validationOwner, ok := attr.validationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				validationRewardOwner, err = s.getAPIOwner(validationOwner)
 				if err != nil {
 					return err
 				}
 			}
-			delegationOwner, ok := stakerTx.DelegationRewardsOwner().(*secp256k1fx.OutputOwners)
+			delegationOwner, ok := attr.delegationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				delegationRewardOwner, err = s.getAPIOwner(delegationOwner)
 				if err != nil {
@@ -782,19 +840,18 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				ValidationRewardOwner: validationRewardOwner,
 				DelegationRewardOwner: delegationRewardOwner,
 				DelegationFee:         delegationFee,
+				Signer:                attr.proofOfPossession,
 			}
-
-			if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-				if signer, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-					vdr.Signer = signer
-				}
-			}
-
 			reply.Validators = append(reply.Validators, vdr)
 
-		case txs.DelegatorTx:
+		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:
+			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
+			if err != nil {
+				return err
+			}
+
 			var rewardOwner *platformapi.Owner
-			owner, ok := stakerTx.RewardsOwner().(*secp256k1fx.OutputOwners)
+			owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				rewardOwner, err = s.getAPIOwner(owner)
 				if err != nil {
@@ -808,7 +865,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				PotentialReward: &potentialReward,
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-		case *txs.AddSubnetValidatorTx:
+
+		case txs.SubnetPermissionedValidatorCurrentPriority:
 			uptime, err := s.getAPIUptime(currentStaker)
 			if err != nil {
 				return err
@@ -819,8 +877,9 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 				Connected: connected,
 				Uptime:    uptime,
 			})
+
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+			return fmt.Errorf("unexpected staker priority %d", currentStaker.Priority)
 		}
 	}
 
@@ -907,11 +966,6 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 	}
 
 	for _, pendingStaker := range targetStakers {
-		tx, _, err := s.vm.state.GetTx(pendingStaker.TxID)
-		if err != nil {
-			return err
-		}
-
 		nodeID := pendingStaker.NodeID
 		weight := json.Uint64(pendingStaker.Weight)
 		apiStaker := platformapi.Staker{
@@ -922,9 +976,14 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			StakeAmount: &weight,
 		}
 
-		switch stakerTx := tx.Unsigned.(type) {
-		case txs.ValidatorTx:
-			shares := stakerTx.Shares()
+		switch pendingStaker.Priority {
+		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
+			attr, err := s.loadStakerTxAttributes(pendingStaker.TxID)
+			if err != nil {
+				return err
+			}
+
+			shares := attr.shares
 			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
@@ -932,27 +991,22 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 				Staker:        apiStaker,
 				DelegationFee: delegationFee,
 				Connected:     connected,
+				Signer:        attr.proofOfPossession,
 			}
-
-			if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-				if signer, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-					vdr.Signer = signer
-				}
-			}
-
 			reply.Validators = append(reply.Validators, vdr)
 
-		case txs.DelegatorTx:
+		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
 			reply.Delegators = append(reply.Delegators, apiStaker)
 
-		case *txs.AddSubnetValidatorTx:
+		case txs.SubnetPermissionedValidatorPendingPriority:
 			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker:    apiStaker,
 				Connected: connected,
 			})
+
 		default:
-			return fmt.Errorf("expected validator but got %T", tx.Unsigned)
+			return fmt.Errorf("unexpected staker priority %d", pendingStaker.Priority)
 		}
 	}
 	return nil

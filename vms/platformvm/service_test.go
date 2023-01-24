@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -77,6 +78,9 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
+			Size: stakerAttributesCacheSize,
+		},
 	}, mutableSharedMemory
 }
 

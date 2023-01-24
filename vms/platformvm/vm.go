@@ -424,6 +424,9 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 		&Service{
 			vm:          vm,
 			addrManager: avax.NewAddressManager(vm.ctx),
+			stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
+				Size: stakerAttributesCacheSize,
+			},
 		},
 		"platform",
 	); err != nil {

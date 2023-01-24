@@ -33,6 +33,7 @@ type StakerIterator interface {
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
+// Invariant: Staker's size is bounded to prevent OOM DoS attacks.
 type Staker struct {
 	TxID            ids.ID
 	NodeID          ids.NodeID
