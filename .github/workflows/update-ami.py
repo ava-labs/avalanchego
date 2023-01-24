@@ -22,10 +22,6 @@ for var in variables:
     print("A Variable is not set correctly or this is not the right repo.  Only validating packer.")
     update_marketplace = False
 
-if 'rc' in tag:
-  print("This is a release candidate.  Nothing to do.")
-  exit(0)
-
 def packer_build(packerfile):
   p = packer.Packer(packerfile)
   output = p.build(parallel=False, debug=False, force=False)
