@@ -372,6 +372,7 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			tt := tt
 			t.Parallel()
 			tt.testFunc(t, create)
 		})
