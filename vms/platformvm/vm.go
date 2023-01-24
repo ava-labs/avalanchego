@@ -66,7 +66,6 @@ var (
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
 
-	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")
 	errMissingValidator    = errors.New("missing validator")
 )
@@ -98,7 +97,7 @@ type VM struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	validatorSetCaches map[ids.ID]cache.Cacher
+	validatorSetCaches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -144,7 +143,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
+	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput])
 	vm.recentlyAccepted = window.New[ids.ID](
 		window.Config{
 			Clock:   &vm.clock,
@@ -477,18 +476,14 @@ func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
-		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
+		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
 		// Only cache tracked subnets
 		if subnetID == constants.PrimaryNetworkID || vm.TrackedSubnets.Contains(subnetID) {
 			vm.validatorSetCaches[subnetID] = validatorSetsCache
 		}
 	}
 
-	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
-		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]*validators.GetValidatorOutput)
-		if !ok {
-			return nil, errWrongCacheType
-		}
+	if validatorSet, ok := validatorSetsCache.Get(height); ok {
 		vm.metrics.IncValidatorSetsCached()
 		return validatorSet, nil
 	}

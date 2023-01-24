@@ -37,7 +37,7 @@ type state struct {
 	parser         Parser
 	runnableJobIDs linkeddb.LinkedDB
 	cachingEnabled bool
-	jobsCache      cache.Cacher
+	jobsCache      cache.Cacher[ids.ID, Job]
 	jobsDB         database.Database
 	// Should be prefixed with the jobID that we are attempting to find the
 	// dependencies of. This prefixdb.Database should then be wrapped in a
@@ -45,7 +45,7 @@ type state struct {
 	dependenciesDB database.Database
 	// This is a cache that tracks LinkedDB iterators that have recently been
 	// made.
-	dependentsCache cache.Cacher
+	dependentsCache cache.Cacher[ids.ID, linkeddb.LinkedDB]
 	missingJobIDs   linkeddb.LinkedDB
 	// This tracks the summary values of this state. Currently, this only
 	// contains the last known checkpoint of how many jobs are currently in the
@@ -62,7 +62,13 @@ func newState(
 	metricsRegisterer prometheus.Registerer,
 ) (*state, error) {
 	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
-	jobsCache, err := metercacher.New(jobsCacheMetricsNamespace, metricsRegisterer, &cache.LRU{Size: jobsCacheSize})
+	jobsCache, err := metercacher.New[ids.ID, Job](
+		jobsCacheMetricsNamespace,
+		metricsRegisterer,
+		&cache.LRU[ids.ID, Job]{
+			Size: jobsCacheSize,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
 	}
@@ -79,7 +85,7 @@ func newState(
 		jobsCache:       jobsCache,
 		jobsDB:          jobs,
 		dependenciesDB:  prefixdb.New(dependenciesPrefix, db),
-		dependentsCache: &cache.LRU{Size: dependentsCacheSize},
+		dependentsCache: &cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: dependentsCacheSize},
 		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsPrefix, db)),
 		metadataDB:      metadataDB,
 		numJobs:         numJobs,
@@ -228,7 +234,7 @@ func (s *state) HasJob(id ids.ID) (bool, error) {
 func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 	if s.cachingEnabled {
 		if job, exists := s.jobsCache.Get(id); exists {
-			return job.(Job), nil
+			return job, nil
 		}
 	}
 	jobBytes, err := s.jobsDB.Get(id[:])
@@ -313,8 +319,8 @@ func (s *state) MissingJobIDs() ([]ids.ID, error) {
 
 func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {
 	if s.cachingEnabled {
-		if dependentsDBIntf, ok := s.dependentsCache.Get(dependency); ok {
-			return dependentsDBIntf.(linkeddb.LinkedDB)
+		if dependentsDB, ok := s.dependentsCache.Get(dependency); ok {
+			return dependentsDB
 		}
 	}
 	dependencyDB := prefixdb.New(dependency[:], s.dependenciesDB)

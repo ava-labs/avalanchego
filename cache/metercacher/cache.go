@@ -10,32 +10,32 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ cache.Cacher = (*Cache)(nil)
+var _ cache.Cacher[struct{}, struct{}] = (*Cache[struct{}, struct{}])(nil)
 
-type Cache struct {
+type Cache[K comparable, V any] struct {
 	metrics
-	cache.Cacher
+	cache.Cacher[K, V]
 
 	clock mockable.Clock
 }
 
-func New(
+func New[K comparable, V any](
 	namespace string,
 	registerer prometheus.Registerer,
-	cache cache.Cacher,
-) (cache.Cacher, error) {
-	meterCache := &Cache{Cacher: cache}
+	cache cache.Cacher[K, V],
+) (cache.Cacher[K, V], error) {
+	meterCache := &Cache[K, V]{Cacher: cache}
 	return meterCache, meterCache.metrics.Initialize(namespace, registerer)
 }
 
-func (c *Cache) Put(key, value interface{}) {
+func (c *Cache[K, V]) Put(key K, value V) {
 	start := c.clock.Time()
 	c.Cacher.Put(key, value)
 	end := c.clock.Time()
 	c.put.Observe(float64(end.Sub(start)))
 }
 
-func (c *Cache) Get(key interface{}) (interface{}, bool) {
+func (c *Cache[K, V]) Get(key K) (V, bool) {
 	start := c.clock.Time()
 	value, has := c.Cacher.Get(key)
 	end := c.clock.Time()

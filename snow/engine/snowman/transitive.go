@@ -66,7 +66,7 @@ type Transitive struct {
 	// A block is put into this cache if it was not able to be issued. A block
 	// fails to be issued if verification on the block or one of its ancestors
 	// occurs.
-	nonVerifiedCache cache.Cacher
+	nonVerifiedCache cache.Cacher[ids.ID, snowman.Block]
 
 	// acceptedFrontiers of the other validators of this chain
 	acceptedFrontiers tracker.Accepted
@@ -86,10 +86,10 @@ type Transitive struct {
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
-	nonVerifiedCache, err := metercacher.New(
+	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		&cache.LRU{Size: nonVerifiedCacheSize},
+		&cache.LRU[ids.ID, snowman.Block]{Size: nonVerifiedCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -483,7 +483,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 		return blk, nil
 	}
 	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
-		return blk.(snowman.Block), nil
+		return blk, nil
 	}
 
 	return t.VM.GetBlock(ctx, blkID)

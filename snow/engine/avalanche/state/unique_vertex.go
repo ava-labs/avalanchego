@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	_ cache.Evictable  = (*uniqueVertex)(nil)
-	_ avalanche.Vertex = (*uniqueVertex)(nil)
+	_ cache.Evictable[ids.ID] = (*uniqueVertex)(nil)
+	_ avalanche.Vertex        = (*uniqueVertex)(nil)
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -171,7 +171,7 @@ func (vtx *uniqueVertex) ID() ids.ID {
 	return vtx.id
 }
 
-func (vtx *uniqueVertex) Key() interface{} {
+func (vtx *uniqueVertex) Key() ids.ID {
 	return vtx.id
 }
 
