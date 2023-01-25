@@ -437,6 +437,7 @@ func (c *client) AddValidator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -469,6 +470,7 @@ func (c *client) AddDelegator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -500,6 +502,7 @@ func (c *client) AddSubnetValidator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
