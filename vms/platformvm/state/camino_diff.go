@@ -207,13 +207,51 @@ func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 }
 
 func (d *diff) SetLastRewardImportTimestamp(timestamp uint64) {
-	d.caminoDiff.newRewardImportTimestamp = &timestamp
+	d.caminoDiff.modifiedRewardImportTimestamp = &timestamp
+}
+
+func (d *diff) SetClaimable(ownerID ids.ID, claimable *Claimable) {
+	d.caminoDiff.modifiedClaimables[ownerID] = claimable
+}
+
+func (d *diff) GetClaimable(ownerID ids.ID) (*Claimable, error) {
+	if claimable, ok := d.caminoDiff.modifiedClaimables[ownerID]; ok {
+		return claimable, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetClaimable(ownerID)
+}
+
+func (d *diff) SetNotDistributedValidatorReward(reward uint64) {
+	d.caminoDiff.modifiedNotDistributedValidatorReward = &reward
+}
+
+func (d *diff) GetNotDistributedValidatorReward() (uint64, error) {
+	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
+		return *d.caminoDiff.modifiedNotDistributedValidatorReward, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetNotDistributedValidatorReward()
 }
 
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
-	if d.caminoDiff.newRewardImportTimestamp != nil {
-		baseState.SetLastRewardImportTimestamp(*d.caminoDiff.newRewardImportTimestamp)
+	if d.caminoDiff.modifiedRewardImportTimestamp != nil {
+		baseState.SetLastRewardImportTimestamp(*d.caminoDiff.modifiedRewardImportTimestamp)
+	}
+
+	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
+		baseState.SetNotDistributedValidatorReward(*d.caminoDiff.modifiedNotDistributedValidatorReward)
 	}
 
 	for k, v := range d.caminoDiff.modifiedAddressStates {
@@ -234,5 +272,9 @@ func (d *diff) ApplyCaminoState(baseState State) {
 
 	for nodeID, addr := range d.caminoDiff.modifiedConsortiumMemberNodes {
 		baseState.SetNodeConsortiumMember(nodeID, addr)
+	}
+
+	for ownerID, claimable := range d.caminoDiff.modifiedClaimables {
+		baseState.SetClaimable(ownerID, claimable)
 	}
 }

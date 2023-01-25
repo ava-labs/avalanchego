@@ -576,6 +576,36 @@ func (mr *MockStateMockRecorder) GetSubnetTransformation(arg0 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetTransformation", reflect.TypeOf((*MockState)(nil).GetSubnetTransformation), arg0)
 }
 
+// GetClaimable mocks base method.
+func (m *MockState) GetClaimable(arg0 ids.ID) (*Claimable, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClaimable", arg0)
+	ret0, _ := ret[0].(*Claimable)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetClaimable indicates an expected call of GetClaimable.
+func (mr *MockStateMockRecorder) GetClaimable(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClaimable", reflect.TypeOf((*MockState)(nil).GetClaimable), arg0)
+}
+
+// GetNotDistributedValidatorReward mocks base method.
+func (m *MockState) GetNotDistributedValidatorReward() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotDistributedValidatorReward")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotDistributedValidatorReward indicates an expected call of GetNotDistributedValidatorReward.
+func (mr *MockStateMockRecorder) GetNotDistributedValidatorReward() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotDistributedValidatorReward", reflect.TypeOf((*MockState)(nil).GetNotDistributedValidatorReward))
+}
+
 // GetSubnets mocks base method.
 func (m *MockState) GetSubnets() ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -828,6 +858,30 @@ func (m *MockState) SetLastRewardImportTimestamp(arg0 uint64) {
 func (mr *MockStateMockRecorder) SetLastRewardImportTimestamp(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastRewardImportTimestamp", reflect.TypeOf((*MockState)(nil).SetLastRewardImportTimestamp), arg0)
+}
+
+// SetClaimable mocks base method.
+func (m *MockState) SetClaimable(arg0 ids.ID, arg1 *Claimable) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetClaimable", arg0, arg1)
+}
+
+// SetClaimable indicates an expected call of SetClaimable.
+func (mr *MockStateMockRecorder) SetClaimable(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetClaimable", reflect.TypeOf((*MockState)(nil).SetClaimable), arg0, arg1)
+}
+
+// SetNotDistributedValidatorReward mocks base method.
+func (m *MockState) SetNotDistributedValidatorReward(arg0 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetNotDistributedValidatorReward", arg0)
+}
+
+// SetNotDistributedValidatorReward indicates an expected call of SetNotDistributedValidatorReward.
+func (mr *MockStateMockRecorder) SetNotDistributedValidatorReward(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotDistributedValidatorReward", reflect.TypeOf((*MockState)(nil).SetNotDistributedValidatorReward), arg0)
 }
 
 // SetTimestamp mocks base method.

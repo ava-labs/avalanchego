@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -35,20 +36,27 @@ var (
 	errWrongOutType = errors.New("wrong output type")
 )
 
-// TODO@ may be its better to wrap stateChanges with caminoStateChanges
 type caminoStateChanges struct {
-	AtomicInputs              set.Set[ids.ID]
-	AtomicRequests            map[ids.ID]*atomic.Requests
-	AddedUTXOs                []*avax.UTXO
-	LastRewardImportTimestamp *uint64
+	AtomicInputs                  set.Set[ids.ID]
+	AtomicRequests                map[ids.ID]*atomic.Requests
+	AddedUTXOs                    []*avax.UTXO
+	Claimables                    map[ids.ID]*state.Claimable
+	LastRewardImportTimestamp     *uint64
+	NotDistributedValidatorReward *uint64
 }
 
 func (cs *caminoStateChanges) Apply(stateDiff state.Diff) {
 	for _, utxo := range cs.AddedUTXOs {
 		stateDiff.AddUTXO(utxo)
 	}
+	for ownerID, claimable := range cs.Claimables {
+		stateDiff.SetClaimable(ownerID, claimable)
+	}
 	if cs.LastRewardImportTimestamp != nil {
 		stateDiff.SetLastRewardImportTimestamp(*cs.LastRewardImportTimestamp)
+	}
+	if cs.NotDistributedValidatorReward != nil {
+		stateDiff.SetNotDistributedValidatorReward(*cs.NotDistributedValidatorReward)
 	}
 }
 
@@ -62,7 +70,10 @@ func (cs *caminoStateChanges) AtomicChanges() (
 func (cs *caminoStateChanges) Len() int {
 	base := 0
 	if cs.LastRewardImportTimestamp != nil {
-		base = 1
+		base++
+	}
+	if cs.NotDistributedValidatorReward != nil {
+		base++
 	}
 	return base + cs.AtomicInputs.Len() + len(cs.AtomicRequests) + len(cs.AddedUTXOs)
 }
@@ -83,6 +94,8 @@ func caminoAdvanceTimeTo(
 	)
 
 	if !nextValidatorsRewardTime.After(newChainTime) {
+		// Getting imported reward utxos
+
 		atomicUTXOs, _, _, err := backend.AtomicUTXOManager.GetAtomicUTXOs(
 			backend.Ctx.CChainID,
 			feeRewardAddrTraits,
@@ -98,6 +111,8 @@ func caminoAdvanceTimeTo(
 		if len(atomicUTXOs) == 0 {
 			return nil
 		}
+
+		// Calculating imported amount, getting utxoids
 
 		changes.AtomicInputs = set.NewSet[ids.ID](len(atomicUTXOs))
 		utxoIDs := make([][]byte, len(atomicUTXOs))
@@ -125,6 +140,80 @@ func caminoAdvanceTimeTo(
 			return fmt.Errorf("failed to generate id out of atomic UTXOs ids: %w", err)
 		}
 
+		// Calculating and setting validators rewards
+
+		currentStakerIterator, err := parentState.GetCurrentStakerIterator()
+		if err != nil {
+			return err
+		}
+		defer currentStakerIterator.Release()
+
+		validators := set.Set[ids.ShortID]{}
+		for currentStakerIterator.Next() {
+			staker := currentStakerIterator.Value()
+			if staker.SubnetID != constants.PrimaryNetworkID {
+				continue
+			}
+
+			validatorAddr, err := parentState.GetNodeConsortiumMember(staker.NodeID)
+			if err != nil {
+				return err
+			}
+			validators.Add(validatorAddr)
+		}
+
+		notDistributedAmount, err := parentState.GetNotDistributedValidatorReward()
+		if err != nil {
+			return err
+		}
+
+		amountToDistribute, err := math.Add64(importedAmount, notDistributedAmount)
+		if err != nil {
+			return err
+		}
+
+		addedReward := amountToDistribute / uint64(validators.Len())
+		newNotDistributedAmount := amountToDistribute - addedReward*uint64(validators.Len())
+
+		if newNotDistributedAmount != notDistributedAmount {
+			changes.NotDistributedValidatorReward = &newNotDistributedAmount
+		}
+
+		if addedReward != 0 {
+			changes.Claimables = make(map[ids.ID]*state.Claimable, validators.Len())
+			for validatorAddr := range validators {
+				owner := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{validatorAddr},
+				}
+
+				ownerID, err := GetOwnerID(owner)
+				if err != nil {
+					return err
+				}
+
+				claimable, err := parentState.GetClaimable(ownerID)
+				if err != nil {
+					return err
+				}
+
+				if claimable == nil {
+					claimable = &state.Claimable{
+						Owner: owner,
+					}
+				}
+
+				newValidatorReward, err := math.Add64(claimable.ValidatorReward, addedReward)
+				if err != nil {
+					return err
+				}
+				claimable.ValidatorReward = newValidatorReward
+				changes.Claimables[ownerID] = claimable
+			}
+		}
+
+		// Producing reward utxo
+
 		changes.AddedUTXOs = append(changes.AddedUTXOs, &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
@@ -148,4 +237,12 @@ func caminoAdvanceTimeTo(
 	}
 
 	return nil
+}
+
+func GetOwnerID(owner *secp256k1fx.OutputOwners) (ids.ID, error) {
+	ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
+	if err != nil {
+		return ids.Empty, fmt.Errorf("couldn't marshal owner: %w", err)
+	}
+	return hashing.ComputeHash256Array(ownerBytes), nil
 }

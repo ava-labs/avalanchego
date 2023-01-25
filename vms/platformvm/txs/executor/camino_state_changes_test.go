@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -31,6 +32,20 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 		ValidatorsRewardPeriod: 10,
 	}
 
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+	nodeID3 := ids.GenerateTestNodeID()
+	nodeID4 := ids.GenerateTestNodeID()
+	_, validatorAddr1, validatorOwner1 := generateKeyAndOwner(t)
+	_, validatorAddr2, validatorOwner2 := generateKeyAndOwner(t)
+	_, validatorAddr4, validatorOwner4 := generateKeyAndOwner(t)
+	validatorOwnerID1, err := GetOwnerID(&validatorOwner1)
+	require.NoError(t, err)
+	validatorOwnerID2, err := GetOwnerID(&validatorOwner2)
+	require.NoError(t, err)
+	validatorOwnerID4, err := GetOwnerID(&validatorOwner4)
+	require.NoError(t, err)
+
 	baseState := func(c *gomock.Controller) *state.MockState {
 		s := state.NewMockState(c)
 		// shutdown
@@ -41,7 +56,7 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		state              func(*state.MockState) *state.MockState
+		state              func(*gomock.Controller, *state.MockState) *state.MockState
 		atomicUTXOsManager func(*gomock.Controller, []*avax.UTXO) *avax.MockAtomicUTXOManager
 		importedUTXOs      []*avax.UTXO
 		newChainTime       time.Time
@@ -49,9 +64,49 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 		expectedErr        error
 	}{
 		"OK": {
-			state: func(state *state.MockState) *state.MockState {
-				state.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-				return state
+			state: func(c *gomock.Controller, baseState *state.MockState) *state.MockState {
+				currentStakerIterator := state.NewMockStakerIterator(c)
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID1,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID2,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID3,
+					SubnetID: ids.GenerateTestID(),
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID4,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(false)
+				currentStakerIterator.EXPECT().Release()
+
+				baseState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				baseState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
+				baseState.EXPECT().GetNodeConsortiumMember(nodeID1).Return(validatorAddr1, nil)
+				baseState.EXPECT().GetNodeConsortiumMember(nodeID2).Return(validatorAddr2, nil)
+				baseState.EXPECT().GetNodeConsortiumMember(nodeID4).Return(validatorAddr4, nil)
+				baseState.EXPECT().GetNotDistributedValidatorReward().Return(uint64(1), nil)
+				baseState.EXPECT().GetClaimable(validatorOwnerID1).Return(&state.Claimable{
+					Owner:           &validatorOwner1,
+					ValidatorReward: 10,
+					DepositReward:   100,
+				}, nil)
+				baseState.EXPECT().GetClaimable(validatorOwnerID2).Return(&state.Claimable{
+					Owner:           &validatorOwner2,
+					ValidatorReward: 20,
+					DepositReward:   200,
+				}, nil)
+				baseState.EXPECT().GetClaimable(validatorOwnerID4).Return(nil, nil)
+				return baseState
 			},
 			atomicUTXOsManager: func(c *gomock.Controller, importedUTXOs []*avax.UTXO) *avax.MockAtomicUTXOManager {
 				atomicUTXOsManager := avax.NewMockAtomicUTXOManager(c)
@@ -65,7 +120,7 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
 					Asset:  avax.Asset{ID: avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: 100,
+						Amt: 3,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{feeRewardAddr},
@@ -76,7 +131,7 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 1},
 					Asset:  avax.Asset{ID: avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: 110,
+						Amt: 1,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{feeRewardAddr},
@@ -103,6 +158,7 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 				}
 
 				newChainTimestamp := uint64(newChainTime.Unix())
+				notDistributedValidatorReward := uint64(2)
 
 				return &stateChanges{
 					caminoStateChanges: caminoStateChanges{
@@ -117,7 +173,24 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 								},
 							},
 						}},
-						LastRewardImportTimestamp: &newChainTimestamp,
+						Claimables: map[ids.ID]*state.Claimable{
+							validatorOwnerID1: {
+								Owner:           &validatorOwner1,
+								ValidatorReward: 11,
+								DepositReward:   100,
+							},
+							validatorOwnerID2: {
+								Owner:           &validatorOwner2,
+								ValidatorReward: 21,
+								DepositReward:   200,
+							},
+							validatorOwnerID4: {
+								Owner:           &validatorOwner4,
+								ValidatorReward: 1,
+							},
+						},
+						NotDistributedValidatorReward: &notDistributedValidatorReward,
+						LastRewardImportTimestamp:     &newChainTimestamp,
 						AtomicRequests: map[ids.ID]*atomic.Requests{
 							cChainID: {RemoveRequests: utxoIDs},
 						},
@@ -139,7 +212,7 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 				false,
 				caminoVMConfig,
 				caminoGenesisConf,
-				tt.state(baseState(ctrl)),
+				tt.state(ctrl, baseState(ctrl)),
 				tt.atomicUTXOsManager(ctrl, tt.importedUTXOs),
 			)
 			defer require.NoError(shutdownCaminoEnvironment(env))

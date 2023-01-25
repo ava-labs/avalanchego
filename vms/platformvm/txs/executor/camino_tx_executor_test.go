@@ -1324,7 +1324,6 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	}
 
 	tests := map[string]test{
-		// TODO@ ok case!
 		"Reward before end time": {
 			ins:        ins,
 			outs:       outs,
@@ -3232,10 +3231,10 @@ func TestCaminoStandardTxExecutorClaimRewardTx(t *testing.T) {
 					Start:               uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:            365 * 24 * 60 * 60,                        // 1 year
 					Amount:              10,
-					ClaimedRewardAmount: 0, // TODO@ add for complexity ?
+					ClaimedRewardAmount: 0, // TODO @evlekht make it non-zero for more complex test
 				}, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposits.Offer{
-					NoRewardsPeriodDuration: 0,         // TODO@ add for complexity ?
+					NoRewardsPeriodDuration: 0,         // TODO @evlekht make it non-zero for more complex test
 					InterestRateNominator:   1_000_000, // 100%
 				}, nil)
 

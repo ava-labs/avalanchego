@@ -94,3 +94,19 @@ func (s *state) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) 
 func (s *state) SetLastRewardImportTimestamp(timestamp uint64) {
 	s.caminoState.SetLastRewardImportTimestamp(timestamp)
 }
+
+func (s *state) SetClaimable(ownerID ids.ID, claimable *Claimable) {
+	s.caminoState.SetClaimable(ownerID, claimable)
+}
+
+func (s *state) GetClaimable(ownerID ids.ID) (*Claimable, error) {
+	return s.caminoState.GetClaimable(ownerID)
+}
+
+func (s *state) SetNotDistributedValidatorReward(reward uint64) {
+	s.caminoState.SetNotDistributedValidatorReward(reward)
+}
+
+func (s *state) GetNotDistributedValidatorReward() (uint64, error) {
+	return s.caminoState.GetNotDistributedValidatorReward()
+}

@@ -45,12 +45,13 @@ var (
 	depositOffersPrefix         = []byte("depositOffers")
 	depositsPrefix              = []byte("deposits")
 	multisigOwnersPrefix        = []byte("multisigOwners")
-	ConsortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
+	consortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
+	claimablesPrefix            = []byte("claimables")
 
-	nodeSignatureKey   = []byte("nodeSignature")
-	depositBondModeKey = []byte("depositBondMode")
-
-	lastRewardImportTimestampKey = []byte("lastRewardImportTimestamp")
+	nodeSignatureKey                 = []byte("nodeSignature")
+	depositBondModeKey               = []byte("depositBondMode")
+	notDistributedValidatorRewardKey = []byte("notDistributedValidatorReward")
+	lastRewardImportTimestampKey     = []byte("lastRewardImportTimestamp")
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
@@ -89,8 +90,13 @@ type CaminoDiff interface {
 	SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID)
 	GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error)
 
-	// Validator rewards
+	// Claimable & rewards
+
 	SetLastRewardImportTimestamp(timestamp uint64)
+	SetClaimable(ownerID ids.ID, claimable *Claimable)
+	GetClaimable(ownerID ids.ID) (*Claimable, error)
+	SetNotDistributedValidatorReward(reward uint64)
+	GetNotDistributedValidatorReward() (uint64, error)
 }
 
 // For state and diff
@@ -119,12 +125,14 @@ type CaminoConfig struct {
 }
 
 type caminoDiff struct {
-	modifiedAddressStates         map[ids.ShortID]uint64
-	modifiedDepositOffers         map[ids.ID]*deposit.Offer
-	modifiedDeposits              map[ids.ID]*deposit.Deposit
-	modifiedMultisigOwners        map[ids.ShortID]*multisig.Alias
-	modifiedConsortiumMemberNodes map[ids.NodeID]*ids.ShortID
-	newRewardImportTimestamp      *uint64
+	modifiedAddressStates                 map[ids.ShortID]uint64
+	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
+	modifiedDeposits                      map[ids.ID]*deposit.Deposit
+	modifiedMultisigOwners                map[ids.ShortID]*multisig.Alias
+	modifiedConsortiumMemberNodes         map[ids.NodeID]*ids.ShortID
+	modifiedClaimables                    map[ids.ID]*Claimable
+	modifiedRewardImportTimestamp         *uint64
+	modifiedNotDistributedValidatorReward *uint64
 }
 
 type caminoState struct {
@@ -154,6 +162,9 @@ type caminoState struct {
 	// Consortium member nodes
 	consortiumMemberNodesCache cache.Cacher
 	consortiumMemberNodesDB    database.Database
+
+	//  Claimable & rewards
+	claimableDB database.Database
 }
 
 func newCaminoDiff() *caminoDiff {
@@ -163,6 +174,7 @@ func newCaminoDiff() *caminoDiff {
 		modifiedDeposits:              make(map[ids.ID]*deposit.Deposit),
 		modifiedMultisigOwners:        make(map[ids.ShortID]*multisig.Alias),
 		modifiedConsortiumMemberNodes: make(map[ids.NodeID]*ids.ShortID),
+		modifiedClaimables:            make(map[ids.ID]*Claimable),
 	}
 }
 
@@ -197,23 +209,30 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
 
 	return &caminoState{
+		// Address State
 		addressStateDB:    prefixdb.New(addressStatePrefix, baseDB),
 		addressStateCache: addressStateCache,
 
+		// Deposit offers
 		depositOffers:     make(map[ids.ID]*deposit.Offer),
 		depositOffersDB:   depositOffersDB,
 		depositOffersList: linkeddb.NewDefault(depositOffersDB),
 
+		// Deposits
 		depositsCache: depositsCache,
 		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
 
+		// Multisig Owners
 		multisigOwnersDB: prefixdb.New(multisigOwnersPrefix, baseDB),
 
+		// Consortium member nodes
 		consortiumMemberNodesCache: consortiumMemberNodesCache,
-		consortiumMemberNodesDB:    prefixdb.New(ConsortiumMemberNodesPrefix, baseDB),
+		consortiumMemberNodesDB:    prefixdb.New(consortiumMemberNodesPrefix, baseDB),
 
-		caminoDB: prefixdb.New(caminoPrefix, baseDB),
+		//  Claimable & rewards
+		claimableDB: prefixdb.New(claimablesPrefix, baseDB),
 
+		caminoDB:   prefixdb.New(caminoPrefix, baseDB),
 		caminoDiff: newCaminoDiff(),
 	}, nil
 }
@@ -447,7 +466,7 @@ func (cs *caminoState) Write() error {
 	if err := cs.writeNodeConsortiumMembers(); err != nil {
 		return err
 	}
-	if err := cs.writeValidatorRewards(); err != nil {
+	if err := cs.writeClaimableAndValidatorRewards(); err != nil {
 		return err
 	}
 
@@ -463,6 +482,7 @@ func (cs *caminoState) Close() error {
 		cs.depositsDB.Close(),
 		cs.multisigOwnersDB.Close(),
 		cs.consortiumMemberNodesDB.Close(),
+		cs.claimableDB.Close(),
 	)
 	return errs.Err
 }

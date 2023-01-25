@@ -35,6 +35,5 @@ func GetNextChainEventTime(state state.Chain, stakerChangeTime time.Time) (time.
 }
 
 func getNextValidatorsRewardTime(chainTime uint64, validatorsRewardPeriod uint64) time.Time {
-	period := chainTime / validatorsRewardPeriod
-	return time.Unix(int64(period*validatorsRewardPeriod+validatorsRewardPeriod), 0)
+	return time.Unix(int64(chainTime-chainTime%validatorsRewardPeriod+validatorsRewardPeriod), 0)
 }
