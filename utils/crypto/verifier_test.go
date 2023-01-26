@@ -20,13 +20,13 @@ func TestTLSVerifier(t *testing.T) {
 		message, signature []byte
 	}
 
-	ipBytes := []byte{1, 2, 3, 4, 5}
+	msg := []byte{1, 2, 3, 4, 5}
 
 	cert, err := staking.NewTLSCert()
 	require.NoError(t, err)
 
 	signer := cert.PrivateKey.(crypto.Signer)
-	sig, err := signer.Sign(rand.Reader, hashing.ComputeHash256(ipBytes),
+	sig, err := signer.Sign(rand.Reader, hashing.ComputeHash256(msg),
 		crypto.SHA256)
 	require.NoError(t, err)
 
@@ -66,7 +66,7 @@ func TestTLSVerifier(t *testing.T) {
 		{
 			name: "fail - invalid signature",
 			args: args{
-				message:   ipBytes,
+				message:   msg,
 				signature: []byte("garbage"),
 			},
 			expectedErr: true,
@@ -74,7 +74,7 @@ func TestTLSVerifier(t *testing.T) {
 		{
 			name: "success - valid signature",
 			args: args{
-				message:   ipBytes,
+				message:   msg,
 				signature: sig,
 			},
 			expectedErr: false,
@@ -103,17 +103,18 @@ func TestBLSVerifier(t *testing.T) {
 		message, signature []byte
 	}
 
-	ipBytes := []byte{1, 2, 3, 4, 5}
+	msg := []byte{1, 2, 3, 4, 5}
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	pk := bls.PublicFromSecretKey(sk)
 
-	sig := bls.SignatureToBytes(bls.Sign(sk, ipBytes))
+	sig := bls.SignatureToBytes(bls.Sign(sk, msg))
 
 	tests := []struct {
 		name        string
 		args        args
+		expectedOk  bool
 		expectedErr bool
 	}{
 		{
@@ -121,6 +122,7 @@ func TestBLSVerifier(t *testing.T) {
 			args: args{
 				message: nil,
 			},
+			expectedOk:  false,
 			expectedErr: true,
 		},
 		{
@@ -128,6 +130,7 @@ func TestBLSVerifier(t *testing.T) {
 			args: args{
 				message: []byte{},
 			},
+			expectedOk:  false,
 			expectedErr: true,
 		},
 		{
@@ -135,6 +138,7 @@ func TestBLSVerifier(t *testing.T) {
 			args: args{
 				signature: nil,
 			},
+			expectedOk:  false,
 			expectedErr: true,
 		},
 		{
@@ -142,22 +146,25 @@ func TestBLSVerifier(t *testing.T) {
 			args: args{
 				signature: []byte{},
 			},
+			expectedOk:  false,
 			expectedErr: true,
 		},
 		{
 			name: "fail - invalid signature",
 			args: args{
-				message:   ipBytes,
+				message:   msg,
 				signature: []byte("garbage"),
 			},
+			expectedOk:  false,
 			expectedErr: true,
 		},
 		{
 			name: "success - valid msg",
 			args: args{
-				message:   ipBytes,
+				message:   msg,
 				signature: sig,
 			},
+			expectedOk:  true,
 			expectedErr: false,
 		},
 	}
@@ -170,7 +177,8 @@ func TestBLSVerifier(t *testing.T) {
 				PublicKey: pk,
 			}
 
-			err := verifier.Verify(test.args.message, test.args.signature)
+			ok, err := verifier.Verify(test.args.message, test.args.signature)
+			r.Equal(ok, test.expectedOk)
 			if test.expectedErr {
 				r.Error(err)
 			} else {

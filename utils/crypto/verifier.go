@@ -16,10 +16,11 @@ var errFailedBLSVerification = errors.New("failed bls verification")
 type MultiVerifier interface {
 	// VerifyTLS [sig] against [msg] using a tls key.
 	// Returns an error if verification fails.
-	VerifyTLS(ipBytes []byte, sig []byte) error
+	VerifyTLS(msg, sig []byte) error
 	// VerifyBLS [sig] against [msg] using a bls key.
+	// Returns if [sig] is valid for [msg]
 	// Returns an error if verification fails.
-	VerifyBLS(ipBytes []byte, sig []byte) error
+	VerifyBLS(msg, sig []byte) (bool, error)
 }
 
 // BLSVerifier verifies a signature of an ip against a BLS key
@@ -27,17 +28,17 @@ type BLSVerifier struct {
 	PublicKey *bls.PublicKey
 }
 
-func (b BLSVerifier) Verify(msg, sig []byte) error {
+func (b BLSVerifier) Verify(msg, sig []byte) (bool, error) {
 	blsSig, err := bls.SignatureFromBytes(sig)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if !bls.Verify(b.PublicKey, blsSig, msg) {
-		return errFailedBLSVerification
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }
 
 // TLSVerifier verifies a signature of an ip against  a TLS cert.
@@ -45,6 +46,6 @@ type TLSVerifier struct {
 	Cert *x509.Certificate
 }
 
-func (t TLSVerifier) Verify(msg []byte, sig []byte) error {
+func (t TLSVerifier) Verify(msg, sig []byte) error {
 	return t.Cert.CheckSignature(t.Cert.SignatureAlgorithm, msg, sig)
 }

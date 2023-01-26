@@ -80,7 +80,9 @@ func TestPreBanffSigner_BLS(t *testing.T) {
 			sig := signer.SignBLS(test.msg)
 			verifier := NewPreBanffVerifier(cert.Leaf)
 
-			r.NoError(verifier.VerifyBLS(test.msg, sig))
+			ok, err := verifier.VerifyBLS(test.msg, sig)
+			r.True(ok)
+			r.NoError(err)
 		})
 	}
 }

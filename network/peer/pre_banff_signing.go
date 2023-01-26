@@ -52,8 +52,8 @@ func NewPreBanffVerifier(cert *x509.Certificate) *PreBanffVerifier {
 	}
 }
 
-func (PreBanffVerifier) VerifyBLS(_, _ []byte) error {
-	return nil
+func (PreBanffVerifier) VerifyBLS(_, _ []byte) (bool, error) {
+	return true, nil
 }
 
 func (b PreBanffVerifier) VerifyTLS(msg, sig []byte) error {

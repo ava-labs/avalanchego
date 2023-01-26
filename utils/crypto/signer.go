@@ -18,10 +18,10 @@ var errInvalidTLSKey = errors.New("invalid TLS key")
 // MultiSigner supports the signing of multiple signature types
 type MultiSigner interface {
 	// SignBLS signs the byte representation of the unsigned ip with a bls key.
-	SignBLS(ipBytes []byte) []byte
+	SignBLS(msg []byte) []byte
 	// SignTLS signs the byte representation of the unsigned ip with a tls key.
 	// Returns an error if signing failed.
-	SignTLS(ipBytes []byte) ([]byte, error)
+	SignTLS(msg []byte) ([]byte, error)
 }
 
 // TLSSigner is signs ips with a TLS key.
