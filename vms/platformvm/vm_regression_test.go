@@ -359,7 +359,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,

@@ -320,7 +320,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			StakingEnabled:         true,
 			Validators:             vdrs,
@@ -425,7 +425,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			TxFee:                  defaultTxFee,
@@ -1478,7 +1478,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             firstVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
@@ -1569,7 +1569,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             secondVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
@@ -1627,7 +1627,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
@@ -1938,7 +1938,7 @@ func TestUnverifiedParent(t *testing.T) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
@@ -2103,7 +2103,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			UptimePercentage:       .2,
 			RewardConfig:           defaultRewardConfig,
 			Validators:             firstVdrs,
@@ -2148,7 +2148,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			UptimePercentage:       .21,
 			Validators:             secondVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -2286,7 +2286,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			UptimePercentage:       .2,
 			RewardConfig:           defaultRewardConfig,
 			Validators:             vdrs,
@@ -2402,7 +2402,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			Chains:                 chains.MockManager{},
+			Chains:                 chains.TestManager,
 			UptimePercentage:       .2,
 			RewardConfig:           defaultRewardConfig,
 			Validators:             vdrManager,

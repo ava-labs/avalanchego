@@ -336,7 +336,7 @@ func defaultConfig() *config.Config {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
