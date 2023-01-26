@@ -791,6 +791,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			TxID:        currentStaker.TxID,
 			StartTime:   json.Uint64(currentStaker.StartTime.Unix()),
 			EndTime:     json.Uint64(currentStaker.EndTime.Unix()),
+			Weight:      weight,
 			StakeAmount: &weight,
 			NodeID:      nodeID,
 		}
@@ -973,6 +974,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			NodeID:      nodeID,
 			StartTime:   json.Uint64(pendingStaker.StartTime.Unix()),
 			EndTime:     json.Uint64(pendingStaker.EndTime.Unix()),
+			Weight:      weight,
 			StakeAmount: &weight,
 		}
 
@@ -1160,9 +1162,14 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		}
 	}
 
+	// TODO: Remove after StakeAmount is removed from [args].
+	if args.StakeAmount != nil {
+		args.Weight = *args.StakeAmount
+	}
+
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddValidatorTx(
-		args.GetWeight(),                     // Stake amount
+		uint64(args.Weight),                  // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
@@ -1264,7 +1271,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddDelegatorTx(
-		args.GetWeight(),       // Stake amount
+		uint64(args.Weight),    // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
@@ -1361,7 +1368,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddSubnetValidatorTx(
-		args.GetWeight(),       // Stake amount
+		uint64(args.Weight),    // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
 		args.NodeID,            // Node ID

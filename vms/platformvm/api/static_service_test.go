@@ -33,7 +33,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	validator := PermissionlessValidator{
 		Staker: Staker{
 			EndTime: 15,
-			Weight:  &weight,
+			Weight:  weight,
 			NodeID:  nodeID,
 		},
 		RewardOwner: &Owner{
