@@ -9,13 +9,11 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/precompile"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -38,8 +36,9 @@ func NewEvmClient(ep string, baseFee uint64, priorityFee uint64) (*EvmClient, er
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
 	chainID, err := ethCli.ChainID(ctx)
-	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +112,7 @@ func (ec *EvmClient) ConfirmTx(ctx context.Context, txHash common.Hash) (*big.In
 			time.Sleep(time.Second)
 			continue
 		}
+		// XXX: this uses gas instead of gas used, so it may be incorrect if the transaction does more than a simple transfer
 		return result.Cost(), nil
 	}
 	return nil, ctx.Err()
@@ -128,18 +128,14 @@ func (ec *EvmClient) TransferTx(
 	for ctx.Err() == nil {
 		senderBal, err := ec.FetchBalance(ctx, sender)
 		if err != nil {
-			log.Printf("could not get balance: %s", err.Error())
-			time.Sleep(time.Second)
-			continue
+			return nil, fmt.Errorf("failed to fetch balance: %w", err)
 		}
 
 		if senderBal.Cmp(transferAmount) < 0 {
 			return nil, fmt.Errorf("not enough balance %s to transfer %s", senderBal, transferAmount)
 		}
 
-		cctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		nonce, err := ec.FetchNonce(cctx, sender)
-		cancel()
+		nonce, err := ec.FetchNonce(ctx, sender)
 		if err != nil {
 			return nil, err
 		}
@@ -153,34 +149,23 @@ func (ec *EvmClient) TransferTx(
 				GasFeeCap: ec.feeCap,
 				GasTipCap: ec.priorityFee,
 				Value:     transferAmount,
-				Data:      []byte{},
 			}),
 			ec.signer,
 			senderPriv,
 		)
 		if err != nil {
-			log.Printf("failed to sign transaction: %v (key address %s)", err, sender)
-			time.Sleep(time.Second)
-			continue
+			return nil, fmt.Errorf("failed to sign transaction: %w", err)
 		}
 
 		if err := ec.ethClient.SendTransaction(ctx, signedTx); err != nil {
 			log.Printf("failed to send transaction: %v (key address %s)", err, sender)
-
-			if strings.Contains(err.Error(), precompile.ErrSenderAddressNotAllowListed.Error()) {
-				return nil, err
-			}
-
-			time.Sleep(time.Second)
-			continue
+			return nil, err
 		}
 
 		txHash := signedTx.Hash()
 		cost, err := ec.ConfirmTx(ctx, txHash)
 		if err != nil {
-			log.Printf("failed to confirm %s: %v", txHash.Hex(), err)
-			time.Sleep(time.Second)
-			continue
+			return nil, err
 		}
 
 		senderBal = new(big.Int).Sub(senderBal, cost)

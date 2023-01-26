@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/subnet-evm/cmd/simulator/worker"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/yaml"
 )
 
 func init() {
@@ -31,15 +30,24 @@ func main() {
 }
 
 var (
-	timeout time.Duration
-	keysDir string
+	version     = "v0.0.1"
+	versionFlag bool
+	timeout     time.Duration
+	keysDir     string
 
-	clusterInfoYamlPath string
-	rpcEndpoints        []string
+	rpcEndpoints []string
 
 	concurrency int
 	baseFee     uint64
 	priorityFee uint64
+
+	defaultLocalNetworkCChainEndpoints = []string{
+		"http://127.0.0.1:9650/ext/bc/C/rpc",
+		"http://127.0.0.1:9652/ext/bc/C/rpc",
+		"http://127.0.0.1:9654/ext/bc/C/rpc",
+		"http://127.0.0.1:9656/ext/bc/C/rpc",
+		"http://127.0.0.1:9658/ext/bc/C/rpc",
+	}
 )
 
 func newCommand() *cobra.Command {
@@ -50,55 +58,31 @@ func newCommand() *cobra.Command {
 		Run:        runFunc,
 	}
 
+	cmd.PersistentFlags().BoolVarP(&versionFlag, "version", "v", false, "Print the version of the simulator and exit.")
 	cmd.PersistentFlags().DurationVarP(&timeout, "timeout", "t", time.Minute, "Duration to run simulator")
-	cmd.PersistentFlags().StringVarP(&keysDir, "keys", "k", ".simulator/keys", "Directory for key files")
-	cmd.PersistentFlags().StringVarP(&clusterInfoYamlPath, "cluster-info-yaml", "o", "", "If non-empty, it loads the endpoints from the YAML and overwrites --config")
-	cmd.PersistentFlags().StringSliceVarP(&rpcEndpoints, "endpoints", "e", nil, "If non-empty, it loads the endpoints from the YAML and overwrites --config")
-	cmd.PersistentFlags().IntVarP(&concurrency, "concurrency", "c", 10, "Concurrency")
-	cmd.PersistentFlags().Uint64VarP(&baseFee, "base-fee", "f", 25, "Base fee")
-	cmd.PersistentFlags().Uint64VarP(&priorityFee, "priority-fee", "p", 1, "Base fee")
+	cmd.PersistentFlags().StringVarP(&keysDir, "keys", "k", ".simulator/keys", "Directory to find key files")
+	cmd.PersistentFlags().StringSliceVarP(&rpcEndpoints, "rpc-endpoints", "e", defaultLocalNetworkCChainEndpoints, `Specifies a comma separated list of RPC Endpoints to use for the load test. Ex. "http://127.0.0.1:9650/ext/bc/C/rpc,http://127.0.0.1:9652/ext/bc/C/rpc". Defaults to the default RPC Endpoints for the C-Chain on a 5 Node local network.`)
+	cmd.PersistentFlags().IntVarP(&concurrency, "concurrency", "c", 10, "Number of concurrent workers to use during the load test")
+	cmd.PersistentFlags().Uint64VarP(&baseFee, "base-fee", "f", 25, "Base fee to use for each transaction issued into the load test")
+	cmd.PersistentFlags().Uint64VarP(&priorityFee, "priority-fee", "p", 1, "Priority fee to use for each transaction issued into the load test")
 
 	return cmd
 }
 
 func runFunc(cmd *cobra.Command, args []string) {
-	log.Printf("launching simulator with rpc endpoints %q or cluster info yaml %q, timeout %v, concurrentcy %d, base fee %d, priority fee %d",
-		rpcEndpoints, clusterInfoYamlPath, timeout, concurrency, baseFee, priorityFee)
+	if versionFlag {
+		fmt.Printf("%s\n", version)
+		return
+	}
+	// TODO: use geth logger
+	log.Printf("launching simulator with rpc endpoints %q timeout %v, concurrency %d, base fee %d, priority fee %d",
+		rpcEndpoints, timeout, concurrency, baseFee, priorityFee)
 
 	cfg := &worker.Config{
 		Endpoints:   rpcEndpoints,
 		Concurrency: concurrency,
 		BaseFee:     baseFee,
 		PriorityFee: priorityFee,
-	}
-
-	if clusterInfoYamlPath != "" {
-		log.Printf("loading cluster info yaml %q", clusterInfoYamlPath)
-		b, err := os.ReadFile(clusterInfoYamlPath)
-		if err != nil {
-			log.Fatalf("failed to read cluster info yaml %v", err)
-		}
-		var ci networkRunnerClusterInfo
-		if err = yaml.Unmarshal(b, &ci); err != nil {
-			log.Fatalf("failed to parse cluster info yaml %v", err)
-		}
-
-		eps := make([]string, len(ci.URIs))
-		for i := range eps {
-			/*
-			   e.g.,
-
-			   uris:
-			   - http://127.0.0.1:32945
-			   - http://127.0.0.1:38948
-			   - http://127.0.0.1:47203
-			   - http://127.0.0.1:54708
-			   - http://127.0.0.1:64435
-			   endpoint: /ext/bc/oFzgVk4nzHApgcBAPXa7JLX5mhqAJnxQkiYD915tZ6LMPcPRu
-			*/
-			eps[i] = ci.URIs[i] + ci.Endpoint + "/rpc"
-		}
-		cfg.Endpoints = eps
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -119,9 +103,4 @@ func runFunc(cmd *cobra.Command, args []string) {
 			log.Fatalf("worker.Run returned an error %v", err)
 		}
 	}
-}
-
-type networkRunnerClusterInfo struct {
-	URIs     []string `json:"uris"`
-	Endpoint string   `json:"endpoint"`
 }

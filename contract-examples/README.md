@@ -54,13 +54,52 @@ For more information about precompiles see [subnet-evm precompiles](https://gith
 
 Hardhat uses `hardhat.config.js` as the configuration file. You can define tasks, networks, compilers and more in that file. For more information see [here](https://hardhat.org/config/).
 
-In our repository we use a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts). This file configures necessary network information to provide smooth interaction with Avalanche. There are two networks in the hardhat config: `e2e` and `local`. `e2e` network is used for e2e tests and should not be changed. `local` network is used by tasks and for local deployments. There are also some pre-defined private keys for these networks. Each chain in subnets has their own RPC URL. Subnet EVM's RPC URL is in form of: `"http://{ip}:{port}/ext/bc/{chainID}/rpc`. When you create your own subnet and Subnet EVM chain `{chainID}` will be different. You can change `local` network RPC url with the `local_rpc.json`. There is an example file named with `local_rpc_example.json`. You can copy & rename this file to customize the url:
+In Subnet-EVM, we provide a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts).
+
+The HardHat config file includes a single network configuration: `local`. `local` defaults to using the following values for the RPC URL and the Chain ID:
 
 ```
-cp local_rpc.example.json local_rpc.json
+var local_rpc_uri = process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/C/rpc"
+var local_chain_id = process.env.CHAIN_ID || 99999
 ```
 
-Do not forget to set correct URL in the `local_rpc.json` file.
+You can use this network configuration by providing the environment variables and specifying the `--network` flag, as Subnet-EVM does in its testing suite:
+
+```bash
+RPC_URI=http://127.0.0.1:9650/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc CHAIN_ID=77777 npx hardhat test --network local
+```
+
+Alternatively, you can copy and paste the `local` network configuration to create a new network configuration for your own local testing. For example, you can copy and paste the `local` network configuration to create your own network and fill in the required details:
+
+```json
+{
+  networks: {
+    mynetwork: {
+      url: "http://127.0.0.1:9650/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc",
+      chainId: 33333,
+      accounts: [
+        "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",
+        "0x7b4198529994b0dc604278c99d153cfd069d594753d471171a1d102a10438e07",
+        "0x15614556be13730e9e8d6eacc1603143e7b96987429df8726384c2ec4502ef6e",
+        "0x31b571bf6894a248831ff937bb49f7754509fe93bbd2517c9c73c4144c0e97dc",
+        "0x6934bef917e01692b789da754a0eae31a8536eb465e7bff752ea291dad88c675",
+        "0xe700bdbdbc279b808b1ec45f8c2370e4616d3a02c336e68d85d4668e08f53cff",
+        "0xbbc2865b76ba28016bc2255c7504d000e046ae01934b04c694592a6276988630",
+        "0xcdbfd34f687ced8c6968854f8a99ae47712c4f4183b78dcc4a903d1bfe8cbf60",
+        "0x86f78c5416151fe3546dece84fda4b4b1e36089f2dbc48496faf3a950f16157c",
+        "0x750839e9dbbd2a0910efe40f50b2f3b2f2f59f5580bb4b83bd8c1201cf9a010a"
+      ],
+      pollingInterval: "1s"
+    },
+  }
+}
+```
+
+By creating your own network configuration in the HardHat config, you can run HardHat commands directly on your subnet:
+
+```bash
+npx hardhat accounts --network mynetwork
+```
 
 ## Hardhat Tasks
 
@@ -68,7 +107,11 @@ You can define custom hardhat tasks in [tasks.ts](https://github.com/ava-labs/av
 
 ## Tests
 
-Tests are written for a local network which runs a Subnet-EVM chain. E.g `npx hardhat test --network local`. Subnet-EVM must activate required precompiles with following genesis:
+Tests are written for a local network which runs a Subnet-EVM Blockchain.
+
+E.g `RPC_URI=http://127.0.0.1:9650/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc CHAIN_ID=77777 npx hardhat test --network local`.
+
+Subnet-EVM must activate any precompiles used in the test in the genesis:
 
 ```json
 {

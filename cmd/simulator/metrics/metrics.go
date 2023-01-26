@@ -10,9 +10,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 
 // Monitor periodically prints metrics related to transaction activity on
 // a given network.
-func Monitor(ctx context.Context, client ethclient.Client) error {
+func Monitor(ctx context.Context, client *ethclient.Client) error {
 	lastBlockNumber, err := client.BlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get block number: %w", err)
@@ -58,7 +58,7 @@ func Monitor(ctx context.Context, client ethclient.Client) error {
 				gas := block.GasUsed()
 				t := block.Time()
 
-				log.Printf("[block created] t: %v index: %d base fee: %d block gas cost: %d block txs: %d gas used: %d\n", time.Unix(int64(t), 0), i, block.BaseFee().Div(block.BaseFee(), big.NewInt(params.GWei)), block.BlockGasCost(), txs, gas)
+				log.Printf("[block created] t: %v index: %d base fee: %d block txs: %d gas used: %d\n", time.Unix(int64(t), 0), i, block.BaseFee().Div(block.BaseFee(), big.NewInt(params.GWei)), txs, gas)
 
 				// Update Tx Count
 				timeTxs[t] += txs

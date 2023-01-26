@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-# Set up the versions to be used
-subnet_evm_version=${SUBNET_EVM_VERSION:-'v0.4.9'}
+# Set up the versions to be used - populate ENV variables only if they are not already populated
+SUBNET_EVM_VERSION=${SUBNET_EVM_VERSION:-'v0.4.9'}
 # Don't export them as they're used in the context of other calls
-avalanche_version=${AVALANCHE_VERSION:-'v1.9.7'}
-network_runner_version=${NETWORK_RUNNER_VERSION:-'v1.3.5'}
-ginkgo_version=${GINKGO_VERSION:-'v2.2.0'}
+AVALANCHEGO_VERSION=${AVALANCHE_VERSION:-'v1.9.7'}
+GINKGO_VERSION=${GINKGO_VERSION:-'v2.2.0'}
 
 # This won't be used, but it's here to make code syncs easier
-latest_coreth_version=0.11.6
+LATEST_CORETH_VERSION=0.11.6

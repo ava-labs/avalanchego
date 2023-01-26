@@ -63,29 +63,15 @@ jobs:
       - name: Yarn install
         run: yarn
         working-directory: ./contract-examples
-      - name: Run e2e tests
+      - name: Install AvalancheGo Release
         shell: bash
-        run: SKIP_NETWORK_RUNNER_START=true SKIP_NETWORK_RUNNER_SHUTDOWN=true ENABLE_SOLIDITY_TESTS=true scripts/run.sh
-
-  simulator_test:
-    name: Load testing with simulator
-    runs-on: ubuntu-latest
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-      - name: Install dependencies with go module
+        run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
+      - name: Build Subnet-EVM Plugin Binary
         shell: bash
-        run: go mod download
-      - name: Run simulator tests
+        run: ./scripts/build.sh /tmp/e2e-test/avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+      - name: Run E2E Tests
         shell: bash
-        # skip shutdown so external simulator binary can run against the existing cluster
-        run: SKIP_NETWORK_RUNNER_SHUTDOWN=true RUN_SIMULATOR=true scripts/run.sh
+        run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo.sh
 
   release:
     # needs: [lint_test, unit_test, e2e_test, simulator_test]

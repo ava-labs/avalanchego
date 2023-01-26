@@ -4,19 +4,22 @@
 package utils
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-cmd/cmd"
 )
 
-func RunCommand(ctx context.Context, bin string, args ...string) (cmd.Status, error) {
-	Outf("{{green}}running '%s %s'{{/}}\n", bin, strings.Join(args, " "))
+// RunCommand starts the command [bin] with the given [args] and returns the command to the caller
+// TODO cmd package mentions we can do this more efficiently with cmd.NewCmdOptions rather than looping
+// and calling Status().
+func RunCommand(bin string, args ...string) (*cmd.Cmd, error) {
+	log.Info("Executing", "cmd", fmt.Sprintf("%s %s", bin, strings.Join(args, " ")))
 
 	curCmd := cmd.NewCmd(bin, args...)
-	statusChan := curCmd.Start()
+	_ = curCmd.Start()
 
 	// to stream outputs
 	ticker := time.NewTicker(10 * time.Millisecond)
@@ -38,11 +41,5 @@ func RunCommand(ctx context.Context, bin string, args ...string) (cmd.Status, er
 		}
 	}()
 
-	select {
-	case s := <-statusChan:
-		return s, nil
-	case <-ctx.Done():
-		curCmd.Stop()
-		return cmd.Status{}, ctx.Err()
-	}
+	return curCmd, nil
 }

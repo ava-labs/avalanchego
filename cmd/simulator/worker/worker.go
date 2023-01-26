@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,10 +14,10 @@ import (
 
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
-	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -104,7 +105,7 @@ func createWorkers(ctx context.Context, keysDir string, endpoints []string, desi
 }
 
 type worker struct {
-	c ethclient.Client
+	c *ethclient.Client
 	k *key.Key
 
 	balance *big.Int
@@ -112,6 +113,7 @@ type worker struct {
 }
 
 func newWorker(k *key.Key, endpoint string, keysDir string) (*worker, error) {
+	log.Printf("Creating worker endpoint %s, keysDir %s", endpoint, keysDir)
 	client, err := ethclient.Dial(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ethclient: %w", err)
@@ -276,6 +278,9 @@ func (w *worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.I
 // Run attempts to apply load to a network specified in .simulator/config.yml
 // and periodically prints metrics about the traffic it generates.
 func Run(ctx context.Context, cfg *Config, keysDir string) error {
+	if len(cfg.Endpoints) == 0 {
+		return errors.New("cannot start worker with no endpoints")
+	}
 	rclient, err := ethclient.Dial(cfg.Endpoints[0])
 	if err != nil {
 		return err

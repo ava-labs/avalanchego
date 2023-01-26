@@ -4,37 +4,37 @@
 GOPATH="$(go env GOPATH)"
 
 # Avalabs docker hub
-dockerhub_repo="avaplatform/avalanchego"
+DOCKERHUB_REPO="avaplatform/avalanchego"
 
 # if this isn't a git repository (say building from a release), don't set our git constants.
 if [ ! -d .git ]
 then
-    current_branch=""
-    subnet_evm_commit=""
-    subnet_evm_commit_id=""
+    CURRENT_BRANCH=""
+    SUBNET_EVM_COMMIT=""
+    SUBNET_EVM_COMMIT_ID=""
 else
     # Current branch
-    current_branch=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2> /dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD || :)}
+    CURRENT_BRANCH=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2> /dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD || :)}
 
     # Image build id
     #
     # Use an abbreviated version of the full commit to tag the image.
     # WARNING: this will use the most recent commit even if there are un-committed changes present
-    subnet_evm_commit="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD || :)"
-    subnet_evm_commit_id="${subnet_evm_commit::8}"
+    SUBNET_EVM_COMMIT="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD || :)"
+    SUBNET_EVM_COMMIT_ID="${SUBNET_EVM_COMMIT::8}"
 fi
 
-echo "Using branch: ${current_branch}"
+echo "Using branch: ${CURRENT_BRANCH}"
 
-build_image_id=${BUILD_IMAGE_ID:-"$avalanche_version-$subnet_evm_commit_id"}
+BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"$AVALANCHEGO_VERSION-$SUBNET_EVM_COMMIT_ID"}
 
 # Static compilation
-static_ld_flags=''
+STATIC_LD_FLAGS=''
 if [ "${STATIC_COMPILATION:-}" = 1 ]
 then
     export CC=musl-gcc
     command -v $CC || ( echo $CC must be available for static compilation && exit 1 )
-    static_ld_flags=' -extldflags "-static" -linkmode external '
+    STATIC_LD_FLAGS=' -extldflags "-static" -linkmode external '
 fi
 
 # Set the CGO flags to use the portable version of BLST
