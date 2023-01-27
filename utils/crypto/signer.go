@@ -13,7 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var errInvalidTLSKey = errors.New("invalid TLS key")
+var (
+	errInvalidTLSKey = errors.New("invalid TLS key")
+
+	_ BLSSigner = (*blsSigner)(nil)
+	_ BLSSigner = (*noOpBlsSigner)(nil)
+)
 
 // MultiSigner supports the signing of multiple signature types
 type MultiSigner interface {
@@ -51,24 +56,33 @@ func (t TLSSigner) Sign(bytes []byte) ([]byte, error) {
 	return tlsSig, err
 }
 
-// BLSSigner signs ips with a BLS key.
-type BLSSigner struct {
+type BLSSigner interface {
+	// Sign returns the signed representation of [msg].
+	Sign(msg []byte) []byte
+}
+
+// blsSigner signs ips with a BLS key.
+type blsSigner struct {
 	secretKey *bls.SecretKey
 }
 
-// NewBLSSigner returns a new instance of BLSSigner.
+// NewBLSSigner returns a BLSSigner
 func NewBLSSigner(secretKey *bls.SecretKey) BLSSigner {
-	return BLSSigner{
+	if secretKey == nil {
+		return &noOpBlsSigner{}
+	}
+	return &blsSigner{
 		secretKey: secretKey,
 	}
 }
 
-func (b BLSSigner) Sign(msg []byte) []byte {
+func (b blsSigner) Sign(msg []byte) []byte {
 	return bls.SignatureToBytes(bls.Sign(b.secretKey, msg))
 }
 
-type NoOpBLSSigner struct{}
+// NoOPBLSSigner is a signer that always returns an empty signature.
+type noOpBlsSigner struct{}
 
-func (NoOpBLSSigner) Sign([]byte) []byte {
+func (noOpBlsSigner) Sign([]byte) []byte {
 	return nil
 }

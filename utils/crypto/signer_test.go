@@ -113,3 +113,13 @@ func TestBLSSigner(t *testing.T) {
 		})
 	}
 }
+
+func TestBLSSigner_MissingKey(t *testing.T) {
+	r := require.New(t)
+
+	signer := NewBLSSigner(nil)
+	msg := []byte("message")
+	sig := signer.Sign(msg)
+
+	r.Nil(sig)
+}
