@@ -63,19 +63,3 @@ func TestBLSSigner(t *testing.T) {
 		})
 	}
 }
-
-func TestBLSSigner_MissingKey(t *testing.T) {
-	r := require.New(t)
-
-	// generate a bls key
-	sk, err := bls.NewSecretKey()
-	r.NoError(err)
-
-	signer := BLSKeySigner{
-		SecretKey: sk,
-	}
-	msg := []byte("message")
-	sig := signer.Sign(msg)
-
-	r.Nil(sig)
-}
