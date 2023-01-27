@@ -5,9 +5,14 @@ package crypto
 
 import "github.com/ava-labs/avalanchego/utils/crypto/bls"
 
+var (
+	_ BLSVerifier = (*BLSKeyVerifier)(nil)
+	_ BLSVerifier = (*NoKeyVerifier)(nil)
+)
+
 // BLSVerifier verifies BLS signatures for a message
 type BLSVerifier interface {
-	Verify(msg, sig []byte) error
+	Verify(msg, sig []byte) (bool, error)
 }
 
 // BLSVerifier verifies a signature of an ip against a BLS key
@@ -28,8 +33,7 @@ func (b BLSKeyVerifier) Verify(msg, sig []byte) (bool, error) {
 	return true, nil
 }
 
-type NoKeyVerifier struct {
-}
+type NoKeyVerifier struct{}
 
 func (NoKeyVerifier) Verify(_, sig []byte) (bool, error) {
 	// If there isn't a key associated, only an empty signature is considered
