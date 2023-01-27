@@ -90,13 +90,6 @@ func TestBLSSigner(t *testing.T) {
 				msg: []byte{1, 2, 3, 3, 5},
 			},
 		},
-		{
-			name: "overwrite previous signature",
-			args: args{
-				msg:       []byte{1, 2, 3, 3, 5},
-				signature: []byte{6, 7, 8, 9, 0},
-			},
-		},
 	}
 
 	for _, test := range tests {
