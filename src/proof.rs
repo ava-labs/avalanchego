@@ -29,6 +29,16 @@ pub enum ProofError {
     EmptyRange,
 }
 
+impl From<DataStoreError> for ProofError {
+    fn from(d: DataStoreError) -> ProofError {
+        match d {
+            DataStoreError::InsertionError => ProofError::NodesInsertionError,
+            DataStoreError::RootHashError => ProofError::InvalidNode,
+            _ => ProofError::InvalidProof,
+        }
+    }
+}
+
 const EXT_NODE_SIZE: usize = 2;
 const BRANCH_NODE_SIZE: usize = 17;
 
@@ -172,9 +182,9 @@ impl Proof {
             // Use in-memory merkle
             let mut merkle = new_merkle(0x10000, 0x10000);
             for (index, k) in keys.iter().enumerate() {
-                merkle.insert(k, vals[index].as_ref().to_vec())
+                merkle.insert(k, vals[index].as_ref().to_vec())?;
             }
-            let merkle_root = &*merkle.root_hash();
+            let merkle_root = &*merkle.root_hash()?;
             if merkle_root != &root_hash {
                 return Err(ProofError::InvalidProof)
             }
@@ -214,11 +224,11 @@ impl Proof {
         }
 
         for (i, _) in keys.iter().enumerate() {
-            merkle_setup.insert(keys[i].as_ref(), vals[i].as_ref().to_vec())
+            merkle_setup.insert(keys[i].as_ref(), vals[i].as_ref().to_vec())?;
         }
 
         // Calculate the hash
-        let merkle_root = &*merkle_setup.root_hash();
+        let merkle_root = &*merkle_setup.root_hash()?;
         if merkle_root != &root_hash {
             return Err(ProofError::InvalidProof)
         }

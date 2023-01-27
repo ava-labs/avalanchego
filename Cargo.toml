@@ -34,6 +34,7 @@ clap = { version = "4.0.29", features = ["cargo", "derive"] }
 anyhow = "1.0.66"
 env_logger = "0.10.0"
 log = "0.4.17"
+thiserror = "1.0.38"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
