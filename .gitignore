@@ -5,3 +5,6 @@ shale/Cargo.lock
 
 # test database
 test_firewood
+
+# vscode
+.vscode
