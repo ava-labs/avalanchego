@@ -7,7 +7,7 @@ import "github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 var (
 	_ BLSVerifier = (*BLSKeyVerifier)(nil)
-	_ BLSVerifier = (*NoKeyVerifier)(nil)
+	_ BLSVerifier = (*NoBLSKeyVerifier)(nil)
 )
 
 // BLSVerifier verifies BLS signatures for a message
@@ -33,9 +33,9 @@ func (b BLSKeyVerifier) Verify(msg, sig []byte) (bool, error) {
 	return true, nil
 }
 
-type NoKeyVerifier struct{}
+type NoBLSKeyVerifier struct{}
 
-func (NoKeyVerifier) Verify(_, sig []byte) (bool, error) {
+func (NoBLSKeyVerifier) Verify(_, sig []byte) (bool, error) {
 	// If there isn't a key associated, only an empty signature is considered
 	// valid.
 	if len(sig) == 0 {
