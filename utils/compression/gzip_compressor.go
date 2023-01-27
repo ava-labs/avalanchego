@@ -12,7 +12,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -52,7 +52,7 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	}
 
 	compressed := g.writeBuffer.Bytes()
-	compressedCopy := utils.CopyBytes(compressed)
+	compressedCopy := slices.Clone(compressed)
 	return compressedCopy, nil
 }
 

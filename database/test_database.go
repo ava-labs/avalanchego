@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"golang.org/x/exp/slices"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -1210,7 +1212,7 @@ func TestModifyValueAfterPut(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
 	err := db.Put(key, value)
 	require.NoError(err)
@@ -1228,7 +1230,7 @@ func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
 	batch := db.NewBatch()
 	err := batch.Put(key, value)
@@ -1252,7 +1254,7 @@ func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
 	batch := db.NewBatch()
 	err := batch.Put(key, value)

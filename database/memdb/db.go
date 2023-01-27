@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -84,7 +83,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 	if entry, ok := db.db[string(key)]; ok {
-		return utils.CopyBytes(entry), nil
+		return slices.Clone(entry), nil
 	}
 	return nil, database.ErrNotFound
 }
@@ -96,7 +95,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	if db.db == nil {
 		return database.ErrClosed
 	}
-	db.db[string(key)] = utils.CopyBytes(value)
+	db.db[string(key)] = slices.Clone(value)
 	return nil
 }
 
@@ -185,13 +184,13 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
+	b.writes = append(b.writes, keyValue{slices.Clone(key), slices.Clone(value), false})
 	b.size += len(key) + len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{slices.Clone(key), nil, true})
 	b.size += len(key)
 	return nil
 }
