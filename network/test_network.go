@@ -4,7 +4,6 @@
 package network
 
 import (
-	"crypto"
 	"errors"
 	"math"
 	"net"
@@ -181,7 +180,11 @@ func NewTestNetwork(
 	}
 	tlsConfig := peer.TLSConfig(*tlsCert, nil)
 	networkConfig.TLSConfig = tlsConfig
-	networkConfig.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
+	signer, err := peer.NewPreBanffSigner(tlsCert)
+	if err != nil {
+		return nil, err
+	}
+	networkConfig.IPSigner = signer
 
 	validatorManager := validators.NewManager()
 	beacons := validators.NewSet()
