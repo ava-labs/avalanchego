@@ -66,3 +66,9 @@ func NewBLSSigner(secretKey *bls.SecretKey) BLSSigner {
 func (b BLSSigner) Sign(msg []byte) []byte {
 	return bls.SignatureToBytes(bls.Sign(b.secretKey, msg))
 }
+
+type NoOpBLSSigner struct{}
+
+func (NoOpBLSSigner) Sign([]byte) []byte {
+	return nil
+}
