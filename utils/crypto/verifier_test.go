@@ -173,7 +173,7 @@ func TestBLSVerifier(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
 
-			verifier := BLSVerifier{
+			verifier := BLSKeyVerifier{
 				PublicKey: pk,
 			}
 
