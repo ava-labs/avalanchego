@@ -5,12 +5,9 @@ package crypto
 
 import (
 	"crypto/x509"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
-
-var errFailedBLSVerification = errors.New("failed bls verification")
 
 // MultiVerifier supports the verification of multiple signature types
 type MultiVerifier interface {
