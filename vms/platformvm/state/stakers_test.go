@@ -166,12 +166,28 @@ func TestDiffStakersValidator(t *testing.T) {
 
 	v.DeleteValidator(staker)
 
-	returnedStaker, ok = v.GetValidator(staker.SubnetID, staker.NodeID)
-	require.True(ok)
-	require.Nil(returnedStaker)
+	_, ok = v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.False(ok)
 
 	stakerIterator = v.GetStakerIterator(EmptyIterator)
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
+}
+
+func TestDiffStakersDeleteValidator(t *testing.T) {
+	require := require.New(t)
+	staker := newTestStaker()
+	delegator := newTestStaker()
+
+	v := diffStakers{}
+
+	_, ok := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
+	require.False(ok)
+
+	v.DeleteValidator(staker)
+
+	returnedStaker, ok := v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.True(ok)
+	require.Nil(returnedStaker)
 }
 
 func TestDiffStakersDelegator(t *testing.T) {

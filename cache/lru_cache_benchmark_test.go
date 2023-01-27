@@ -12,7 +12,7 @@ import (
 
 func BenchmarkLRUCachePutSmall(b *testing.B) {
 	smallLen := 5
-	cache := &LRU{Size: smallLen}
+	cache := &LRU[ids.ID, int]{Size: smallLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < smallLen; i++ {
 			var id ids.ID
@@ -29,7 +29,7 @@ func BenchmarkLRUCachePutSmall(b *testing.B) {
 
 func BenchmarkLRUCachePutMedium(b *testing.B) {
 	mediumLen := 250
-	cache := &LRU{Size: mediumLen}
+	cache := &LRU[ids.ID, int]{Size: mediumLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < mediumLen; i++ {
 			var id ids.ID
@@ -46,7 +46,7 @@ func BenchmarkLRUCachePutMedium(b *testing.B) {
 
 func BenchmarkLRUCachePutLarge(b *testing.B) {
 	largeLen := 10000
-	cache := &LRU{Size: largeLen}
+	cache := &LRU[ids.ID, int]{Size: largeLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < largeLen; i++ {
 			var id ids.ID

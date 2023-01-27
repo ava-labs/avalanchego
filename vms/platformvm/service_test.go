@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -77,6 +78,9 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
+			Size: stakerAttributesCacheSize,
+		},
 	}, mutableSharedMemory
 }
 
@@ -96,7 +100,7 @@ func defaultAddress(t *testing.T, service *Service) {
 }
 
 func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
+	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
 	require.NoError(t, err)
@@ -611,8 +615,6 @@ func TestGetCurrentValidators(t *testing.T) {
 
 			require.Equal(vdr.EndTime, gotVdr.EndTime)
 			require.Equal(vdr.StartTime, gotVdr.StartTime)
-			require.Equal(vdr.Weight, gotVdr.Weight)
-
 			found = true
 		}
 		require.True(found, "expected validators to contain %s but didn't", vdr.NodeID)
@@ -667,7 +669,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(delegator.NodeID, vdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
 		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
-		require.Equal(delegator.GetWeight(), stakeAmount)
+		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
 }

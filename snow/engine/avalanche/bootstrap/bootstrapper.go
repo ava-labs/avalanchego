@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -52,7 +53,7 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
 
-		processedCache:           &cache.LRU{Size: cacheSize},
+		processedCache:           &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
 		executedStateTransitions: math.MaxInt32,
 	}
@@ -106,7 +107,7 @@ type bootstrapper struct {
 	needToFetch set.Set[ids.ID]
 
 	// Contains IDs of vertices that have recently been processed
-	processedCache *cache.LRU
+	processedCache *cache.LRU[ids.ID, struct{}]
 	// number of state transitions executed
 	executedStateTransitions int
 
@@ -322,7 +323,10 @@ func (*bootstrapper) Notify(context.Context, common.Message) error {
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
-	b.Ctx.SetState(snow.Bootstrapping)
+	b.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		State: snow.Bootstrapping,
+	})
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
@@ -488,7 +492,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 				return err
 			}
 			if height%stripeDistance < stripeWidth { // See comment for stripeDistance
-				b.processedCache.Put(vtxID, nil)
+				b.processedCache.Put(vtxID, struct{}{})
 			}
 			if height == prevHeight {
 				vtxHeightSet.Add(vtxID)

@@ -106,7 +106,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
-	env.isBootstrapped.SetValue(false)
+	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))

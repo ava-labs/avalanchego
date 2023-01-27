@@ -92,7 +92,7 @@ type VM struct {
 	// Only contains post-fork blocks near the tip so that the cache doesn't get
 	// filled with random blocks every time this node parses blocks while
 	// processing a GetAncestors message from a bootstrapping node.
-	innerBlkCache  cache.Cacher
+	innerBlkCache  cache.Cacher[ids.ID, snowman.Block]
 	preferred      ids.ID
 	consensusState snow.State
 	context        context.Context
@@ -171,10 +171,10 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
-	innerBlkCache, err := metercacher.New(
+	innerBlkCache, err := metercacher.New[ids.ID, snowman.Block](
 		"inner_block_cache",
 		registerer,
-		&cache.LRU{Size: innerBlkCacheSize},
+		&cache.LRU[ids.ID, snowman.Block]{Size: innerBlkCacheSize},
 	)
 	if err != nil {
 		return err
@@ -789,8 +789,8 @@ func (vm *VM) optimalPChainHeight(ctx context.Context, minPChainHeight uint64) (
 // the inner block happens to be cached, then the inner block will not be
 // parsed.
 func (vm *VM) parseInnerBlock(ctx context.Context, outerBlkID ids.ID, innerBlkBytes []byte) (snowman.Block, error) {
-	if innerBlkIntf, ok := vm.innerBlkCache.Get(outerBlkID); ok {
-		return innerBlkIntf.(snowman.Block), nil
+	if innerBlk, ok := vm.innerBlkCache.Get(outerBlkID); ok {
+		return innerBlk, nil
 	}
 
 	innerBlk, err := vm.ChainVM.ParseBlock(ctx, innerBlkBytes)

@@ -20,7 +20,7 @@ type state struct {
 	serializer *Serializer
 	log        logging.Logger
 
-	dbCache cache.Cacher
+	dbCache cache.Cacher[ids.ID, any]
 	db      database.Database
 }
 

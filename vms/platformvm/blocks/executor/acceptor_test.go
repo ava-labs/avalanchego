@@ -284,7 +284,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
-		bootstrapped: &utils.AtomicBool{},
+		bootstrapped: &utils.Atomic[bool]{},
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
@@ -374,7 +374,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
-		bootstrapped: &utils.AtomicBool{},
+		bootstrapped: &utils.Atomic[bool]{},
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)

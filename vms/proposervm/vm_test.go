@@ -2502,9 +2502,8 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 		bBlock.(*postForkBlock).innerBlk.Status(),
 	)
 
-	xBlockIntf, ok := proVM.innerBlkCache.Get(bBlock.ID())
+	cachedXBlock, ok := proVM.innerBlkCache.Get(bBlock.ID())
 	require.True(ok)
-	cachedXBlock := xBlockIntf.(snowman.Block)
 	require.Equal(
 		choices.Accepted,
 		cachedXBlock.Status(),

@@ -4,17 +4,12 @@
 package network
 
 import (
-	"errors"
 	"net"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-var (
-	errClosed = errors.New("closed")
-
-	_ net.Listener = (*testListener)(nil)
-)
+var _ net.Listener = (*testListener)(nil)
 
 type testListener struct {
 	ip      ips.IPPort

@@ -9,7 +9,7 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
 plugin_dir=${PLUGIN_DIR:-$HOME/.avalanchego/plugins}
 evm_path=${EVM_PATH:-$plugin_dir/evm}
-coreth_version=${CORETH_VERSION:-'v0.11.6-0.20221228194216-966a5923da9b'}
+coreth_version=${CORETH_VERSION:-'v0.11.6-rc.0'}
 
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
