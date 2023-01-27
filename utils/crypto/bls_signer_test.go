@@ -13,8 +13,7 @@ import (
 
 func TestBLSSigner(t *testing.T) {
 	type args struct {
-		msg       []byte
-		signature []byte
+		msg []byte
 	}
 
 	tests := []struct {
