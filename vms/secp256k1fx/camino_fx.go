@@ -6,6 +6,7 @@ package secp256k1fx
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -128,7 +129,8 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 		}
 		if sig, exists := resolved[addr]; exists &&
 			sig == cred.Sigs[verified] &&
-			in.SigIndices[verified] == visited {
+			(in.SigIndices[verified] == math.MaxUint32 ||
+				in.SigIndices[verified] == visited) {
 			return true, nil
 		}
 		return false, nil
