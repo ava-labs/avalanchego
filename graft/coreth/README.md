@@ -15,6 +15,13 @@ cd $GOPATH/src/github.com/ava-labs/avalanchego
 go mod edit -replace github.com/ava-labs/coreth=../coreth
 ```
 
+Now that AvalancheGo depends on the local version of Coreth, we can build with the normal build script:
+
+```bash
+./scripts/build.sh
+./build/avalanchego
+```
+
 Note: the C-Chain originally ran in a separate process from the main AvalancheGo process and communicated with it over a local gRPC connection. When this was the case, AvalancheGo's build script would download Coreth, compile it, and place the binary into the `avalanchego/build/plugins` directory.
 
 ## API
