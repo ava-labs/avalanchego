@@ -9,19 +9,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm"
 )
 
 func main() {
-	version, err := PrintVersion()
+	printVersion, err := PrintVersion()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)
 	}
-	if version {
-		fmt.Println(evm.Version)
+	if printVersion {
+		fmt.Printf("Subnet-EVM/%s [AvalancheGo=%s, rpcchainvm=%d]\n", evm.Version, version.Current, version.RPCChainVMProtocol)
 		os.Exit(0)
 	}
 	if err := ulimit.Set(ulimit.DefaultFDLimit, logging.NoLog{}); err != nil {
