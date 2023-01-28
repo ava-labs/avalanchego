@@ -59,6 +59,26 @@ func TestVerifyWithChainConfig(t *testing.T) {
 	assert.ErrorContains(t, err, "disable should be [true]")
 }
 
+func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
+	admins := []common.Address{{1}}
+	baseConfig := *SubnetEVMDefaultChainConfig
+	config := &baseConfig
+	config.PrecompileUpgrade = PrecompileUpgrade{
+		// this does NOT enable the precompile, so it should be upgradeable.
+		TxAllowListConfig: precompile.NewTxAllowListConfig(nil, nil, nil),
+	}
+	require.False(t, config.IsTxAllowList(common.Big0)) // check the precompile is not enabled.
+	config.PrecompileUpgrades = []PrecompileUpgrade{
+		{
+			// enable TxAllowList at timestamp 5
+			TxAllowListConfig: precompile.NewTxAllowListConfig(big.NewInt(5), admins, nil),
+		},
+	}
+
+	// check this config is valid
+	require.NoError(t, config.Verify())
+}
+
 func TestVerifyPrecompileUpgrades(t *testing.T) {
 	admins := []common.Address{{1}}
 	tests := []struct {

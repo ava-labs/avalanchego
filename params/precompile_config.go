@@ -129,7 +129,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 			disabled     bool
 		)
 		// check the genesis chain config for any enabled upgrade
-		if config, ok := c.PrecompileUpgrade.getByKey(key); ok {
+		if config, ok := c.PrecompileUpgrade.getByKey(key); ok && config.Timestamp() != nil {
 			if err := config.Verify(); err != nil {
 				return err
 			}
