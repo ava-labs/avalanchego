@@ -291,9 +291,7 @@ func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeRespons
 }
 
 type GetTxFeeResponse struct {
-	TxFee json.Uint64 `json:"txFee"`
-	// TODO: remove [CreationTxFee] after enough time for dependencies to update
-	CreationTxFee                 json.Uint64 `json:"creationTxFee"`
+	TxFee                         json.Uint64 `json:"txFee"`
 	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
 	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
 	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
@@ -307,7 +305,6 @@ type GetTxFeeResponse struct {
 // GetTxFee returns the transaction fee in nAVAX.
 func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
 	reply.TxFee = json.Uint64(i.TxFee)
-	reply.CreationTxFee = json.Uint64(i.CreateAssetTxFee)
 	reply.CreateAssetTxFee = json.Uint64(i.CreateAssetTxFee)
 	reply.CreateSubnetTxFee = json.Uint64(i.CreateSubnetTxFee)
 	reply.TransformSubnetTxFee = json.Uint64(i.TransformSubnetTxFee)

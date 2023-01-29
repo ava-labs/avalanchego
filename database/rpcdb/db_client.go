@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"golang.org/x/exp/slices"
+
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -157,13 +159,13 @@ type batch struct {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
+	b.writes = append(b.writes, keyValue{slices.Clone(key), slices.Clone(value), false})
 	b.size += len(key) + len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
+	b.writes = append(b.writes, keyValue{slices.Clone(key), nil, true})
 	b.size += len(key)
 	return nil
 }

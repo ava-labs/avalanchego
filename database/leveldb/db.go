@@ -23,6 +23,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -456,8 +458,8 @@ func (it *iter) Next() bool {
 
 	hasNext := it.Iterator.Next()
 	if hasNext {
-		it.key = utils.CopyBytes(it.Iterator.Key())
-		it.val = utils.CopyBytes(it.Iterator.Value())
+		it.key = slices.Clone(it.Iterator.Key())
+		it.val = slices.Clone(it.Iterator.Value())
 	} else {
 		it.key = nil
 		it.val = nil

@@ -190,8 +190,6 @@ func (s *Service) ImportKey(_ *http.Request, args *ImportKeyArgs, reply *api.JSO
  */
 
 type GetBalanceRequest struct {
-	// TODO: remove Address
-	Address   *string  `json:"address,omitempty"`
 	Addresses []string `json:"addresses"`
 }
 
@@ -212,10 +210,6 @@ type GetBalanceResponse struct {
 
 // GetBalance gets the balance of an address
 func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponse) error {
-	if args.Address != nil {
-		args.Addresses = append(args.Addresses, *args.Address)
-	}
-
 	s.vm.ctx.Log.Debug("Platform: GetBalance called",
 		logging.UserStrings("addresses", args.Addresses),
 	)
