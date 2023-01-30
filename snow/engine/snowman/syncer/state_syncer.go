@@ -6,7 +6,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	stdmath "math"
 
@@ -102,7 +101,7 @@ func New(
 		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
 		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
 		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
-		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.Log),
+		AppHandler:              cfg.VM,
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}
@@ -524,18 +523,6 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 			zap.Int("numPending", ss.targetVoters.Len()),
 		)
 	}
-}
-
-func (ss *stateSyncer) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	return ss.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
-}
-
-func (ss *stateSyncer) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	return ss.VM.AppResponse(ctx, nodeID, requestID, response)
-}
-
-func (ss *stateSyncer) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	return ss.VM.AppRequestFailed(ctx, nodeID, requestID)
 }
 
 func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {

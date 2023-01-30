@@ -6,7 +6,6 @@ package snowman
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -21,9 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 const nonVerifiedCacheSize = 128
@@ -46,6 +45,8 @@ type Transitive struct {
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
+	common.AppHandler
+	validators.Connector
 
 	RequestID uint32
 
@@ -106,6 +107,8 @@ func newTransitive(config Config) (*Transitive, error) {
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		AppHandler:                  config.VM,
+		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                NewAncestorTree(),
 		nonVerifiedCache:            nonVerifiedCache,
@@ -301,46 +304,6 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 	)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks(ctx)
-}
-
-func (t *Transitive) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return t.VM.CrossChainAppRequest(ctx, chainID, requestID, deadline, request)
-}
-
-func (t *Transitive) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
-	return t.VM.CrossChainAppRequestFailed(ctx, chainID, requestID)
-}
-
-func (t *Transitive) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	return t.VM.CrossChainAppResponse(ctx, chainID, requestID, response)
-}
-
-func (t *Transitive) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	// Notify the VM of this request
-	return t.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
-}
-
-func (t *Transitive) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(ctx, nodeID, requestID)
-}
-
-func (t *Transitive) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	// Notify the VM of a response to its request
-	return t.VM.AppResponse(ctx, nodeID, requestID, response)
-}
-
-func (t *Transitive) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
-	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(ctx, nodeID, msg)
-}
-
-func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
-	return t.VM.Connected(ctx, nodeID, nodeVersion)
-}
-
-func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	return t.VM.Disconnected(ctx, nodeID)
 }
 
 func (*Transitive) Timeout(context.Context) error {
