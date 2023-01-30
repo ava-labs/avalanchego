@@ -1263,6 +1263,11 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		}
 	}
 
+	// TODO: Remove after StakeAmount is removed from [args].
+	if args.StakeAmount != nil {
+		args.Weight = *args.StakeAmount
+	}
+
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddDelegatorTx(
 		uint64(args.Weight),    // Stake amount
@@ -1358,6 +1363,11 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
+	}
+
+	// TODO: Remove after StakeAmount is removed from [args].
+	if args.StakeAmount != nil {
+		args.Weight = *args.StakeAmount
 	}
 
 	// Create the transaction
