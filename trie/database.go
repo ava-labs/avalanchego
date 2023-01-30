@@ -702,6 +702,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	nodes, storage := len(db.dirties), db.dirtiesSize
 	toFlush, err := db.commit(node, make([]*flushItem, 0, 128), callback)
 	if err != nil {
+		db.lock.RUnlock()
 		log.Error("Failed to commit trie from trie database", "err", err)
 		return err
 	}
