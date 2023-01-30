@@ -129,7 +129,7 @@ type Config struct {
 	// true.
 	CompressionEnabled bool `json:"compressionEnabled"`
 
-	// IPSigner this node's key which is used to sign IPs.
+	// IPSigner is the signer that is used to sign IPs.
 	IPSigner crypto.MultiSigner `json:"-"`
 
 	// TrackedSubnets of the node.
