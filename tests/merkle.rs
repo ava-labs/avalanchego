@@ -2,30 +2,31 @@ use firewood::{merkle_util::*, proof::Proof};
 
 fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
     items: Vec<(K, V)>, meta_size: u64, compact_size: u64,
-) -> MerkleSetup {
+) -> Result<MerkleSetup, DataStoreError> {
     let mut merkle = new_merkle(meta_size, compact_size);
     for (k, v) in items.iter() {
-        merkle.insert(k, v.as_ref().to_vec())
+        merkle.insert(k, v.as_ref().to_vec())?;
     }
-    let merkle_root = &*merkle.root_hash();
+    let merkle_root = merkle.root_hash().unwrap();
     let items_copy = items.clone();
     let reference_root = triehash::trie_root::<keccak_hasher::KeccakHasher, _, _, _>(items);
     println!(
         "ours: {}, correct: {}",
-        hex::encode(merkle_root),
+        hex::encode(merkle_root.0),
         hex::encode(reference_root)
     );
-    if merkle_root != &reference_root {
+    if merkle_root.0 != reference_root {
         for (k, v) in items_copy {
             println!("{} => {}", hex::encode(k), hex::encode(v));
         }
-        println!("{}", merkle.dump());
+        println!("{:?}", merkle.dump()?);
         panic!();
     }
-    merkle
+    Ok(merkle)
 }
 
 #[test]
+#[allow(unused_must_use)]
 fn test_root_hash_simple_insertions() {
     let items = vec![
         ("do", "verb"),
@@ -35,11 +36,12 @@ fn test_root_hash_simple_insertions() {
         ("horse", "stallion"),
         ("ddd", "ok"),
     ];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000).unwrap();
     merkle.dump();
 }
 
 #[test]
+#[allow(unused_must_use)]
 fn test_root_hash_fuzz_insertions() {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
@@ -67,7 +69,7 @@ fn test_root_hash_fuzz_insertions() {
 }
 
 #[test]
-fn test_root_hash_reversed_deletions() {
+fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
     let max_len0 = 8;
@@ -96,36 +98,37 @@ fn test_root_hash_reversed_deletions() {
         let mut dumps = Vec::new();
         for (k, v) in items.iter() {
             dumps.push(merkle.dump());
-            merkle.insert(k, v.to_vec());
+            merkle.insert(k, v.to_vec())?;
             hashes.push(merkle.root_hash());
         }
         hashes.pop();
         println!("----");
-        let mut prev_dump = merkle.dump();
+        let mut prev_dump = merkle.dump()?;
         for (((k, _), h), d) in items.iter().rev().zip(hashes.iter().rev()).zip(dumps.iter().rev()) {
-            merkle.remove(k);
-            let h0 = merkle.root_hash();
-            if *h != h0 {
+            merkle.remove(k)?;
+            let h0 = merkle.root_hash()?.0;
+            if h.as_ref().unwrap().0 != h0 {
                 for (k, _) in items.iter() {
                     println!("{}", hex::encode(k));
                 }
-                println!("{} != {}", hex::encode(**h), hex::encode(*h0));
+                println!("{} != {}", hex::encode(**h.as_ref().unwrap()), hex::encode(h0));
                 println!("== before {} ===", hex::encode(k));
                 print!("{prev_dump}");
                 println!("== after {} ===", hex::encode(k));
-                print!("{}", merkle.dump());
+                print!("{}", merkle.dump()?);
                 println!("== should be ===");
-                print!("{d}");
+                print!("{:?}", d);
                 panic!();
             }
-            prev_dump = merkle.dump();
+            prev_dump = merkle.dump()?;
         }
         println!("i = {i}");
     }
+    Ok(())
 }
 
 #[test]
-fn test_root_hash_random_deletions() {
+fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
     use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
     let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
     let max_len0 = 8;
@@ -152,45 +155,48 @@ fn test_root_hash_random_deletions() {
         items_ordered.shuffle(&mut *rng.borrow_mut());
         let mut merkle = new_merkle(0x100000, 0x100000);
         for (k, v) in items.iter() {
-            merkle.insert(k, v.to_vec());
+            merkle.insert(k, v.to_vec())?;
         }
         for (k, _) in items_ordered.into_iter() {
-            assert!(merkle.get(&k).is_some());
-            assert!(merkle.get_mut(&k).is_some());
-            merkle.remove(&k);
-            assert!(merkle.get(&k).is_none());
-            assert!(merkle.get_mut(&k).is_none());
+            assert!(merkle.get(&k)?.is_some());
+            assert!(merkle.get_mut(&k)?.is_some());
+            merkle.remove(&k)?;
+            assert!(merkle.get(&k)?.is_none());
+            assert!(merkle.get_mut(&k)?.is_none());
             items.remove(&k);
             for (k, v) in items.iter() {
-                assert_eq!(&*merkle.get(k).unwrap(), &v[..]);
-                assert_eq!(&*merkle.get_mut(k).unwrap().get(), &v[..]);
+                assert_eq!(&*merkle.get(k)?.unwrap(), &v[..]);
+                assert_eq!(&*merkle.get_mut(k)?.unwrap().get(), &v[..]);
             }
             let h = triehash::trie_root::<keccak_hasher::KeccakHasher, Vec<_>, _, _>(items.iter().collect());
-            let h0 = merkle.root_hash();
+            let h0 = merkle.root_hash()?;
             if h[..] != *h0 {
                 println!("{} != {}", hex::encode(h), hex::encode(*h0));
             }
         }
         println!("i = {i}");
     }
+    Ok(())
 }
 
 #[test]
-fn test_one_element_proof() {
+fn test_one_element_proof() -> Result<(), DataStoreError> {
     let items = vec![("k", "v")];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "k";
 
-    let proof = merkle.prove(key);
+    let proof = merkle.prove(key)?;
     assert!(!proof.0.is_empty());
 
-    let verify_proof = merkle.verify_proof(key, &proof);
+    let verify_proof = merkle.verify_proof(key, &proof)?;
     assert!(verify_proof.is_some());
+
+    Ok(())
 }
 
 #[test]
 /// Verify the proofs that end with leaf node with the given key.
-fn test_proof_end_with_leaf() {
+fn test_proof_end_with_leaf() -> Result<(), DataStoreError> {
     let items = vec![
         ("do", "verb"),
         ("doe", "reindeer"),
@@ -199,32 +205,36 @@ fn test_proof_end_with_leaf() {
         ("horse", "stallion"),
         ("ddd", "ok"),
     ];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "doe";
 
-    let proof = merkle.prove(key);
+    let proof = merkle.prove(key)?;
     assert!(!proof.0.is_empty());
 
-    let verify_proof = merkle.verify_proof(key, &proof);
+    let verify_proof = merkle.verify_proof(key, &proof)?;
     assert!(verify_proof.is_some());
+
+    Ok(())
 }
 
 #[test]
 /// Verify the proofs that end with branch node with the given key.
-fn test_proof_end_with_branch() {
+fn test_proof_end_with_branch() -> Result<(), DataStoreError> {
     let items = vec![("d", "verb"), ("do", "verb"), ("doe", "reindeer"), ("e", "coin")];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "d";
 
-    let proof = merkle.prove(key);
+    let proof = merkle.prove(key)?;
     assert!(!proof.0.is_empty());
 
-    let verify_proof = merkle.verify_proof(key, &proof);
+    let verify_proof = merkle.verify_proof(key, &proof)?;
     assert!(verify_proof.is_some());
+
+    Ok(())
 }
 
 #[test]
-#[should_panic]
+#[allow(unused_must_use)]
 fn test_bad_proof() {
     let items = vec![
         ("do", "verb"),
@@ -237,48 +247,52 @@ fn test_bad_proof() {
     let merkle = merkle_build_test(items, 0x10000, 0x10000);
     let key = "ddd";
 
-    let mut proof = merkle.prove(key);
-    assert!(!proof.0.is_empty());
+    let proof = merkle.as_ref().unwrap().prove(key);
+    assert!(!proof.as_ref().unwrap().0.is_empty());
 
     // Delete an entry from the generated proofs.
-    let new_proof = Proof(proof.0.drain().take(1).collect());
-    merkle.verify_proof(key, &new_proof);
+    let new_proof = Proof(proof.unwrap().0.drain().take(1).collect());
+    merkle.unwrap().verify_proof(key, &new_proof).is_err();
 }
 
 #[test]
-fn test_missing_key_proof() {
+fn test_missing_key_proof() -> Result<(), DataStoreError> {
     let items = vec![("k", "v")];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "x";
 
-    let proof = merkle.prove(key);
+    let proof = merkle.prove(key)?;
     assert!(!proof.0.is_empty());
 
-    let verify_proof = merkle.verify_proof(key, &proof);
+    let verify_proof = merkle.verify_proof(key, &proof)?;
     assert!(verify_proof.is_none());
+
+    Ok(())
 }
 
 #[test]
-fn test_empty_tree_proof() {
+fn test_empty_tree_proof() -> Result<(), DataStoreError> {
     let items: Vec<(&str, &str)> = Vec::new();
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "x";
 
-    let proof = merkle.prove(key);
+    let proof = merkle.prove(key)?;
     assert!(proof.0.is_empty());
+
+    Ok(())
 }
 
 #[test]
-fn test_range_proof() {
+fn test_range_proof() -> Result<(), DataStoreError> {
     let mut items = vec![("doa", "verb"), ("doe", "reindeer"), ("dog", "puppy"), ("ddd", "ok")];
     items.sort();
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(items[start].0);
+    let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(items[end].0);
+    let end_proof = merkle.prove(items[end].0)?;
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);
@@ -290,11 +304,13 @@ fn test_range_proof() {
         vals.push(&items[i].1);
     }
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+
+    Ok(())
 }
 
 #[test]
-fn test_range_proof_with_non_existent_proof() {
+fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
     let mut items = vec![
         (std::str::from_utf8(&[0x7]).unwrap(), "verb"),
         (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
@@ -304,13 +320,13 @@ fn test_range_proof_with_non_existent_proof() {
     ];
 
     items.sort();
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(std::str::from_utf8(&[0x2]).unwrap());
+    let mut proof = merkle.prove(std::str::from_utf8(&[0x2]).unwrap())?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(std::str::from_utf8(&[0x8]).unwrap());
+    let end_proof = merkle.prove(std::str::from_utf8(&[0x8]).unwrap())?;
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);
@@ -322,11 +338,13 @@ fn test_range_proof_with_non_existent_proof() {
         vals.push(&items[i].1);
     }
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+
+    Ok(())
 }
 
 #[test]
-#[should_panic]
+#[allow(unused_must_use)]
 fn test_range_proof_with_invalid_non_existent_proof() {
     let mut items = vec![
         (std::str::from_utf8(&[0x8]).unwrap(), "verb"),
@@ -341,12 +359,12 @@ fn test_range_proof_with_invalid_non_existent_proof() {
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(std::str::from_utf8(&[0x3]).unwrap());
-    assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(std::str::from_utf8(&[0x7]).unwrap());
-    assert!(!end_proof.0.is_empty());
+    let mut proof = merkle.as_ref().unwrap().prove(std::str::from_utf8(&[0x3]).unwrap());
+    assert!(!proof.as_ref().unwrap().0.is_empty());
+    let end_proof = merkle.as_ref().unwrap().prove(std::str::from_utf8(&[0x7]).unwrap());
+    assert!(!end_proof.as_ref().unwrap().0.is_empty());
 
-    proof.concat_proofs(end_proof);
+    proof.as_mut().unwrap().concat_proofs(end_proof.unwrap());
 
     let mut keys = Vec::new();
     let mut vals = Vec::new();
@@ -356,22 +374,25 @@ fn test_range_proof_with_invalid_non_existent_proof() {
         vals.push(&items[i].1);
     }
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+    merkle
+        .unwrap()
+        .verify_range_proof(proof.as_ref().unwrap(), &items[start].0, &items[end].0, keys, vals)
+        .is_err();
 }
 
 #[test]
 // The start and end nodes are both the same.
-fn test_one_element_range_proof() {
+fn test_one_element_range_proof() -> Result<(), DataStoreError> {
     let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
     items.sort();
 
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut start_proof = merkle.prove(&items[start].0);
+    let mut start_proof = merkle.prove(&items[start].0)?;
     assert!(!start_proof.0.is_empty());
-    let end_proof = merkle.prove(&items[start].0); // start and end nodes are the same
+    let end_proof = merkle.prove(&items[start].0)?; // start and end nodes are the same
     assert!(!end_proof.0.is_empty());
 
     start_proof.concat_proofs(end_proof);
@@ -383,22 +404,24 @@ fn test_one_element_range_proof() {
         vals.push(&items[i].1);
     }
 
-    assert!(merkle.verify_range_proof(&start_proof, &items[start].0, &items[end].0, keys, vals));
+    assert!(merkle.verify_range_proof(&start_proof, &items[start].0, &items[end].0, keys, vals)?);
+
+    Ok(())
 }
 
 #[test]
 // The range proof starts from 0 (root) to the last one
-fn test_all_elements_proof() {
+fn test_all_elements_proof() -> Result<(), DataStoreError> {
     let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
     items.sort();
 
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0);
+    let mut proof = merkle.prove(&items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0); // start and end nodes are the same
+    let end_proof = merkle.prove(&items[end].0)?; // start and end nodes are the same
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);
@@ -410,5 +433,7 @@ fn test_all_elements_proof() {
         vals.push(&items[i].1);
     }
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+
+    Ok(())
 }

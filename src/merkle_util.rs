@@ -8,21 +8,21 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DataStoreError {
-    #[error("inserting data")]
+    #[error("failed to insert data")]
     InsertionError,
-    #[error("removing data")]
+    #[error("failed to remove data")]
     RemovalError,
-    #[error("getting data")]
+    #[error("failed to get data")]
     GetError,
-    #[error("root hash")]
+    #[error("failed to generate root hash")]
     RootHashError,
-    #[error("dumping data")]
+    #[error("failed to dump data")]
     DumpError,
     #[error("invalid utf8")]
     UTF8Error,
     #[error("bad proof")]
     ProofError,
-    #[error("proof verification")]
+    #[error("failed to verify proof")]
     ProofVerificationError,
 }
 
