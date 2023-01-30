@@ -187,7 +187,7 @@ func caminoAdvanceTimeTo(
 					Addrs:     []ids.ShortID{validatorAddr},
 				}
 
-				ownerID, err := GetOwnerID(owner)
+				ownerID, err := txs.GetOwnerID(owner)
 				if err != nil {
 					return err
 				}
@@ -237,12 +237,4 @@ func caminoAdvanceTimeTo(
 	}
 
 	return nil
-}
-
-func GetOwnerID(owner *secp256k1fx.OutputOwners) (ids.ID, error) {
-	ownerBytes, err := txs.Codec.Marshal(txs.Version, owner)
-	if err != nil {
-		return ids.Empty, fmt.Errorf("couldn't marshal owner: %w", err)
-	}
-	return hashing.ComputeHash256Array(ownerBytes), nil
 }

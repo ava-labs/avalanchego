@@ -268,7 +268,7 @@ func (h *handler) Lock(
 
 	var toOwnerID *ids.ID
 	if to != nil && appliedLockState == locked.StateUnlocked {
-		id, err := GetOwnerID(OwnedWrapper{*to})
+		id, err := txs.GetOwnerID(to)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -277,7 +277,7 @@ func (h *handler) Lock(
 
 	var changeOwnerID *ids.ID
 	if change != nil {
-		id, err := GetOwnerID(OwnedWrapper{*change})
+		id, err := txs.GetOwnerID(change)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -317,7 +317,7 @@ func (h *handler) Lock(
 			continue
 		}
 
-		outOwnerID, err := GetOwnerID(out)
+		outOwnerID, err := txs.GetOutputOwnerID(out)
 		if err != nil {
 			// We couldn't get owner of this output, so move on to the next one
 			continue
@@ -886,7 +886,7 @@ func (h *handler) VerifyLockUTXOs(
 
 		ownerID := &ids.Empty
 		if *otherLockTxID != ids.Empty {
-			id, err := GetOwnerID(out)
+			id, err := txs.GetOutputOwnerID(out)
 			if err != nil {
 				return err
 			}
@@ -931,7 +931,7 @@ func (h *handler) VerifyLockUTXOs(
 
 		ownerID := &ids.Empty
 		if *otherLockTxID != ids.Empty {
-			id, err := GetOwnerID(out)
+			id, err := txs.GetOutputOwnerID(out)
 			if err != nil {
 				return err
 			}
@@ -1111,7 +1111,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			}
 
 			// calculating consumed amounts
-			ownerID, err := GetOwnerID(out)
+			ownerID, err := txs.GetOutputOwnerID(out)
 			if err != nil {
 				return nil, err
 			}
@@ -1172,7 +1172,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 
 		producedAmount := out.Amount()
 
-		ownerID, err := GetOwnerID(out)
+		ownerID, err := txs.GetOutputOwnerID(out)
 		if err != nil {
 			return nil, err
 		}

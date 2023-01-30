@@ -39,11 +39,11 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 	_, validatorAddr1, validatorOwner1 := generateKeyAndOwner(t)
 	_, validatorAddr2, validatorOwner2 := generateKeyAndOwner(t)
 	_, validatorAddr4, validatorOwner4 := generateKeyAndOwner(t)
-	validatorOwnerID1, err := GetOwnerID(&validatorOwner1)
+	validatorOwnerID1, err := txs.GetOwnerID(&validatorOwner1)
 	require.NoError(t, err)
-	validatorOwnerID2, err := GetOwnerID(&validatorOwner2)
+	validatorOwnerID2, err := txs.GetOwnerID(&validatorOwner2)
 	require.NoError(t, err)
-	validatorOwnerID4, err := GetOwnerID(&validatorOwner4)
+	validatorOwnerID4, err := txs.GetOwnerID(&validatorOwner4)
 	require.NoError(t, err)
 
 	baseState := func(c *gomock.Controller) *state.MockState {
@@ -234,47 +234,69 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 }
 
 func TestCaminoStateChangesApply(t *testing.T) {
+	lastRewardImportTimestamp := uint64(11)
+	notDistributedValidatorReward := uint64(111)
+	someOwner := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{feeRewardAddr},
+	}
+
 	testCases := map[string]struct {
-		diff               func(*gomock.Controller, []*avax.UTXO) *state.MockDiff
-		caminoStateChanges func([]*avax.UTXO) *caminoStateChanges
+		diff               func(*gomock.Controller, []*avax.UTXO, map[ids.ID]*state.Claimable) *state.MockDiff
+		caminoStateChanges func([]*avax.UTXO, map[ids.ID]*state.Claimable) *caminoStateChanges
 		utxos              []*avax.UTXO
+		claimables         map[ids.ID]*state.Claimable
 	}{
 		"OK": {
-			diff: func(c *gomock.Controller, utxos []*avax.UTXO) *state.MockDiff {
+			diff: func(c *gomock.Controller, utxos []*avax.UTXO, claimables map[ids.ID]*state.Claimable) *state.MockDiff {
 				diff := state.NewMockDiff(c)
 				for _, utxo := range utxos {
 					diff.EXPECT().AddUTXO(utxo)
 				}
+				for ownerID, claimable := range claimables {
+					diff.EXPECT().SetClaimable(ownerID, claimable)
+				}
+				diff.EXPECT().SetLastRewardImportTimestamp(lastRewardImportTimestamp)
+				diff.EXPECT().SetNotDistributedValidatorReward(notDistributedValidatorReward)
 				return diff
+			},
+			caminoStateChanges: func(utxos []*avax.UTXO, claimables map[ids.ID]*state.Claimable) *caminoStateChanges {
+				return &caminoStateChanges{
+					AddedUTXOs:                    utxos,
+					Claimables:                    claimables,
+					LastRewardImportTimestamp:     &lastRewardImportTimestamp,
+					NotDistributedValidatorReward: &notDistributedValidatorReward,
+				}
 			},
 			utxos: []*avax.UTXO{
 				{
 					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
 					Asset:  avax.Asset{ID: avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: 100,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{feeRewardAddr},
-						},
+						Amt:          100,
+						OutputOwners: someOwner,
 					},
 				},
 				{
 					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 1},
 					Asset:  avax.Asset{ID: avaxAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: 110,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{feeRewardAddr},
-						},
+						Amt:          110,
+						OutputOwners: someOwner,
 					},
 				},
 			},
-			caminoStateChanges: func(utxos []*avax.UTXO) *caminoStateChanges {
-				return &caminoStateChanges{
-					AddedUTXOs: utxos,
-				}
+			claimables: map[ids.ID]*state.Claimable{
+				ids.GenerateTestID(): {
+					Owner:           &someOwner,
+					ValidatorReward: 11,
+					DepositReward:   12,
+				},
+				ids.GenerateTestID(): {
+					Owner:           &someOwner,
+					ValidatorReward: 21,
+					DepositReward:   22,
+				},
 			},
 		},
 	}
@@ -284,7 +306,7 @@ func TestCaminoStateChangesApply(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			tt.caminoStateChanges(tt.utxos).Apply(tt.diff(ctrl, tt.utxos))
+			tt.caminoStateChanges(tt.utxos, tt.claimables).Apply(tt.diff(ctrl, tt.utxos, tt.claimables))
 		})
 	}
 }

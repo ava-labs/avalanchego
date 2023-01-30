@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -479,6 +480,61 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 	)
 
 	return errs.Err
+}
+
+type GetClaimablesArgs struct {
+	platformapi.Owner
+
+	DepositTxIDs []ids.ID `json:"depositTxIDs"`
+}
+
+type GetClaimablesReply struct {
+	DepositRewards        uint64 `json:"depositRewards"`
+	ValidatorRewards      uint64 `json:"validatorRewards"`
+	ExpiredDepositRewards uint64 `json:"expiredDepositRewards"`
+}
+
+// GetClaimables returns the amount of claimable tokens for given owner
+func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, response *GetClaimablesReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetClaimables called")
+
+	claimableOwner, err := s.getOutputOwner(&args.Owner)
+	if err != nil {
+		return err
+	}
+
+	ownerID, err := txs.GetOwnerID(claimableOwner)
+	if err != nil {
+		return err
+	}
+
+	claimable, err := s.vm.state.GetClaimable(ownerID)
+	if err != nil {
+		return err
+	}
+
+	for i := range args.DepositTxIDs {
+		deposit, err := s.vm.state.GetDeposit(args.DepositTxIDs[i])
+		if err != nil {
+			return err
+		}
+		offer, err := s.vm.state.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+		response.DepositRewards, err = math.Add64(
+			response.DepositRewards,
+			deposit.ClaimableReward(offer, s.vm.clock.Unix()),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	response.ValidatorRewards = claimable.ValidatorReward
+	response.ExpiredDepositRewards = claimable.DepositReward
+
+	return nil
 }
 
 func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
