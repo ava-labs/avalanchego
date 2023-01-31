@@ -125,7 +125,7 @@ type PermissionlessValidator struct {
 	Staked                []UTXO                    `json:"staked,omitempty"`
 	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
 	// The delegators delegating to this validator
-	Delegators []PrimaryDelegator `json:"delegators"`
+	Delegators *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.

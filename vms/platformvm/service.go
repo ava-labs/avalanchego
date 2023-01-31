@@ -725,7 +725,8 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	return attr, nil
 }
 
-// GetCurrentValidators returns current validators and delegators
+// GetCurrentValidators returns the current validators. If specific nodeIDs
+// are provided, delegators are also returned
 func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
 
@@ -748,6 +749,11 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		for currentStakerIterator.Next() {
 			staker := currentStakerIterator.Value()
 			if args.SubnetID != staker.SubnetID {
+				continue
+			}
+			if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority &&
+				staker.Priority != txs.SubnetPermissionedValidatorCurrentPriority &&
+				staker.Priority != txs.SubnetPermissionlessValidatorCurrentPriority {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)
@@ -878,13 +884,19 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 	}
 
-	for i, vdrIntf := range reply.Validators {
-		vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
-		if !ok {
-			continue
+	if numNodeIDs != 0 {
+		for i, vdrIntf := range reply.Validators {
+			vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
+			if !ok {
+				continue
+			}
+			delegators, ok := vdrToDelegators[vdr.NodeID]
+			if !ok {
+				delegators = []platformapi.PrimaryDelegator{}
+			}
+			vdr.Delegators = &delegators
+			reply.Validators[i] = vdr
 		}
-		vdr.Delegators = vdrToDelegators[vdr.NodeID]
-		reply.Validators[i] = vdr
 	}
 
 	return nil
@@ -909,7 +921,8 @@ type GetPendingValidatorsReply struct {
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetPendingValidators returns the list of pending validators
+// GetPendingValidators returns the pending validators. If specific nodeIDs
+// are provided, delegators are also returned
 func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetPendingValidators called")
 
@@ -930,6 +943,11 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 		for pendingStakerIterator.Next() { // Iterates in order of increasing stop time
 			staker := pendingStakerIterator.Value()
 			if args.SubnetID != staker.SubnetID {
+				continue
+			}
+			if staker.Priority != txs.PrimaryNetworkValidatorPendingPriority &&
+				staker.Priority != txs.SubnetPermissionedValidatorPendingPriority &&
+				staker.Priority != txs.SubnetPermissionlessValidatorPendingPriority {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)

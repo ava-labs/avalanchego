@@ -105,17 +105,20 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			return nil, err
 		}
 
-		clientDelegators := make([]ClientDelegator, len(apiValidator.Delegators))
-		for j, apiDelegator := range apiValidator.Delegators {
-			rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
-			if err != nil {
-				return nil, err
-			}
+		var clientDelegators []ClientDelegator
+		if apiValidator.Delegators != nil {
+			clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
+			for j, apiDelegator := range *apiValidator.Delegators {
+				rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
+				if err != nil {
+					return nil, err
+				}
 
-			clientDelegators[j] = ClientDelegator{
-				ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
-				RewardOwner:     rewardOwner,
-				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+				clientDelegators[j] = ClientDelegator{
+					ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
+					RewardOwner:     rewardOwner,
+					PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+				}
 			}
 		}
 
