@@ -21,6 +21,7 @@ import (
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestEmptyKey,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
 	TestNewBatchClosed,
@@ -118,6 +119,36 @@ func TestKeyEmptyValue(t *testing.T, db Database) {
 	value, err := db.Get(key)
 	require.NoError(err)
 	require.Len(value, len(val))
+}
+
+func TestEmptyKey(t *testing.T, db Database) {
+	require := require.New(t)
+
+	var (
+		nilKey   = []byte(nil)
+		emptyKey = []byte{}
+		val1     = []byte("hi")
+		val2     = []byte("hello")
+	)
+
+	// Test that nil key can be retrieved by empty key
+	_, err := db.Get(nilKey)
+	require.Equal(ErrNotFound, err)
+
+	err = db.Put(nilKey, val1)
+	require.NoError(err)
+
+	value, err := db.Get(emptyKey)
+	require.NoError(err)
+	require.Equal(value, val1)
+
+	// Test that empty key can be retrieved by nil key
+	err = db.Put(emptyKey, val2)
+	require.NoError(err)
+
+	value, err = db.Get(nilKey)
+	require.NoError(err)
+	require.Equal(value, val2)
 }
 
 // TestSimpleKeyValueClosed tests to make sure that Put + Get + Delete + Has
