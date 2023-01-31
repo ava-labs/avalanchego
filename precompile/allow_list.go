@@ -6,7 +6,6 @@ package precompile
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,9 +22,12 @@ const (
 )
 
 var (
-	AllowListNoRole  AllowListRole = AllowListRole(common.BigToHash(big.NewInt(0))) // No role assigned - this is equivalent to common.Hash{} and deletes the key from the DB when set
-	AllowListEnabled AllowListRole = AllowListRole(common.BigToHash(big.NewInt(1))) // Deployers are allowed to create new contracts
-	AllowListAdmin   AllowListRole = AllowListRole(common.BigToHash(big.NewInt(2))) // Admin - allowed to modify both the admin and deployer list as well as deploy contracts
+	// No role assigned - this is equivalent to common.Hash{} and deletes the key from the DB when set
+	AllowListNoRole = AllowListRole(common.BigToHash(common.Big0))
+	// Enabled - allowed to use state-changing precompile functions without modifying status of other admins or enableds
+	AllowListEnabled = AllowListRole(common.BigToHash(common.Big1))
+	// Admin - allowed to modify both the admin and enabled list, as well as to use state-changing precompile functions
+	AllowListAdmin = AllowListRole(common.BigToHash(common.Big2))
 
 	// AllowList function signatures
 	setAdminSignature      = CalculateFunctionSelector("setAdmin(address)")
