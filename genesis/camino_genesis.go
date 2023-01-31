@@ -231,6 +231,8 @@ func buildXGenesis(config *Config, hrp string) ([]byte, string, error) {
 		}
 		utils.Sort(xAllocations)
 
+		avax.InitialState["fixedCap"] = []interface{}{}
+
 		for _, allocation := range xAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
