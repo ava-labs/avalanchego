@@ -45,9 +45,10 @@ Typically, custom codes are required in only those areas.
 package precompile
 
 import (
-	"math/big"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
