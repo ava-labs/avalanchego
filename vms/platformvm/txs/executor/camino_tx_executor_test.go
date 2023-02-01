@@ -1549,7 +1549,12 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestAddAdressStateTxExecutor(t *testing.T) {
+func TestAddAddressStateTxExecutor(t *testing.T) {
+	var (
+		bob   = preFundedKeys[0].PublicKey().Address()
+		alice = preFundedKeys[1].PublicKey().Address()
+	)
+
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
@@ -1580,164 +1585,203 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 	require.True(t, ok)
 	unlockedUTXOAmount := out.Amount()
 
-	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
+	signers := [][]*crypto.PrivateKeySECP256K1R{
+		{preFundedKeys[0]},
+	}
 
 	outputOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
-		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].PublicKey().Address()},
+		Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
 	}
 	sigIndices := []uint32{0}
 
 	tests := map[string]struct {
 		stateAddress  ids.ShortID
 		targetAddress ids.ShortID
-		flag          uint64
-		state         uint8
+		txFlag        uint8
+		existingState uint64
 		expectedErr   error
+		expectedState uint64
 		remove        bool
 	}{
-		"Flag: AddressStateRoleAdmin": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleAdmin),
-			state:         txs.AddressStateRoleAdmin,
+		// Bob has Admin State, and he is trying to give himself Admin Role (again)
+		"State: Admin, Flag: Admin, Add, Same Address": {
+			stateAddress:  bob,
+			targetAddress: bob,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRoleAdminBit,
+			remove:        false,
+		},
+		// Bob has KYC State, and he is trying to give himself KYC Role (again)
+		"State: KYC, Flag: KYC, Add, Same Address": {
+			stateAddress:  bob,
+			targetAddress: bob,
+			txFlag:        txs.AddressStateRoleKyc,
+			existingState: txs.AddressStateRoleKycBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleAdminBit": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateRoleAdminBit,
-			state:         txs.AddressStateRoleAdmin,
-			expectedErr:   nil,
+		// Bob has KYC Role, and he is trying to give himself Admin Role
+		"State: KYC, Flag: Admin, Add, Same Address": {
+			stateAddress:  bob,
+			targetAddress: bob,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleKycBit,
+			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleKyc Add": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         txs.AddressStateRoleKyc,
-			expectedErr:   nil,
+		// Bob has Admin State, and he is trying to give Alice Admin Role
+		"State: Admin, Flag: Admin, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleAdminBit,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleKyc Remove": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         txs.AddressStateRoleKyc,
-			expectedErr:   nil,
+		// Bob has Admin State, and he is trying to give Alice KYC Role
+		"State: Admin, Flag: kyc, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleKyc,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleKycBit,
+			remove:        false,
+		},
+		// Bob has Admin State, and he is trying to remove from Alice the KYC Role
+		"State: Admin, Flag: kyc, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleKyc,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit,
 			remove:        true,
 		},
-		"Flag: AddressStateRoleKyc Add, Different Target Address": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         txs.AddressStateRoleKyc,
-			expectedErr:   nil,
+		// Bob has Admin State, and he is trying to give Alice the KYC Verified State
+		"State: Admin, Flag: KYC Verified, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateKycVerified,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycVerifiedBit,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleKycBit Add": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateRoleKycBit,
-			state:         txs.AddressStateRoleAdmin,
-			expectedErr:   errInvalidRoles,
+		// Bob has Admin State, and he is trying to give Alice the Validator Role
+		"State: Admin, Flag: Validator, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleValidator,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleValidatorBit,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleBits Add": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateRoleBits,
-			state:         txs.AddressStateRoleAdmin,
-			expectedErr:   nil,
-			remove:        false,
-		},
-		"Flag: AddressStateRoleBits Remove": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateRoleBits,
-			state:         txs.AddressStateRoleAdmin,
-			expectedErr:   nil,
+		// Bob has Admin State, and he is trying to remove from Alice the Validator Role
+		"State: Admin, Flag: Validator, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleValidator,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit,
 			remove:        true,
 		},
-		"Flag: AddressStateRoleBits Add, Different Target Address": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
-			flag:          txs.AddressStateRoleBits,
-			state:         txs.AddressStateRoleAdmin,
-			expectedErr:   nil,
+		// Bob has Admin State, and he is trying to give Alice the KYC Expired State
+		"State: Admin, Flag: KYC Expired, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateKycExpired,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycExpiredBit,
 			remove:        false,
 		},
-		"Flag: AddressStateKycVerifiedBit": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
-			flag:          txs.AddressStateKycVerifiedBit,
-			state:         txs.AddressStateRoleAdmin,
+		// Bob has Admin State, and he is trying to give Alice the Consortium State
+		"State: Admin, Flag: Consortium, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateConsortium,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateConsortiumBit,
+			remove:        false,
+		},
+		// Bob has KYC State, and he is trying to give Alice KYC Expired State
+		"State: KYC, Flag: KYC Expired, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateKycExpired,
+			existingState: txs.AddressStateRoleKycBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycExpiredBit,
+			remove:        false,
+		},
+		// Bob has KYC State, and he is trying to give Alice KYC Expired State
+		"State: KYC, Flag: KYC Verified, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateKycVerified,
+			existingState: txs.AddressStateRoleKycBit,
+			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycVerifiedBit,
+			remove:        false,
+		},
+		// Bob has KYC State, and he is trying to give Alice Validator Role
+		"State: KYC, Flag: Validator, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleValidator,
+			existingState: txs.AddressStateRoleKycBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateKycBits": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateKycBits,
-			state:         txs.AddressStateRoleKyc,
+		// Bob has Validator State, and he is trying to give Alice Validator Role
+		"State: Validator, Flag: Validator, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleValidator,
+			existingState: txs.AddressStateRoleValidatorBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateKycBits, Different Target Address": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
-			flag:          txs.AddressStateKycBits,
-			state:         txs.AddressStateRoleKyc,
+		// Bob has Validator State, and he is trying to give Alice KYC Role
+		"State: Validator, Flag: KYC, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleKyc,
+			existingState: txs.AddressStateRoleValidatorBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateValidBits Add": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateValidBits,
-			state:         txs.AddressStateRoleValidator,
-			expectedErr:   nil,
-			remove:        false,
-		},
-		"Flag: AddressStateValidBits Remove": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          txs.AddressStateValidBits,
-			state:         txs.AddressStateRoleValidator,
-			expectedErr:   nil,
-			remove:        true,
-		},
-		"Flag: AddressStateRoleAdmin Add, State: AddressStateKycExpired": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleAdmin),
-			state:         txs.AddressStateKycExpired,
+		// Bob has Validator State, and he is trying to give Alice Admin Role
+		"State: Validator, Flag: Admin, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleValidatorBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Flag: AddressStateRoleKyc Add, State: AddressStateRoleValidatorBit": {
-			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
-			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         uint8(txs.AddressStateRoleValidatorBit),
-			expectedErr:   txs.ErrInvalidState,
-			remove:        false,
-		},
+		// Some Address has Admin State, and he is trying to give Alice Admin Role
 		"Wrong address": {
 			stateAddress:  ids.GenerateTestShortID(),
-			targetAddress: ids.GenerateTestShortID(),
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         txs.AddressStateRoleKyc,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleAdminBit,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
-		"Empty address": {
+		// An Empty Address has Admin State, and he is trying to give Alice Admin Role
+		"Empty State Address": {
 			stateAddress:  ids.ShortEmpty,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleAdminBit,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		// Bob has Admin State, and he is trying to give Admin Role to an Empty Address
+		"Empty Target Address": {
+			stateAddress:  bob,
 			targetAddress: ids.ShortEmpty,
-			flag:          uint64(txs.AddressStateRoleKyc),
-			state:         txs.AddressStateRoleKyc,
+			txFlag:        txs.AddressStateRoleAdmin,
+			existingState: txs.AddressStateRoleAdminBit,
 			expectedErr:   txs.ErrEmptyAddress,
 			remove:        false,
 		},
@@ -1758,8 +1802,8 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			addressStateTx := &txs.AddressStateTx{
 				BaseTx:  baseTx,
-				Address: tt.stateAddress,
-				State:   tt.state,
+				Address: tt.targetAddress,
+				State:   tt.txFlag,
 				Remove:  tt.remove,
 			}
 
@@ -1777,11 +1821,15 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 				},
 			}
 
-			executor.State.SetAddressStates(tt.stateAddress, tt.flag)
-			executor.State.SetAddressStates(tt.targetAddress, tt.flag)
+			executor.State.SetAddressStates(tt.stateAddress, tt.existingState)
 
 			err = addressStateTx.Visit(&executor)
-			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedErr, err)
+
+			if err == nil {
+				targetStates, _ := executor.State.GetAddressStates(tt.targetAddress)
+				require.Equal(t, targetStates, tt.expectedState)
+			}
 		})
 	}
 }
