@@ -751,9 +751,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			if args.SubnetID != staker.SubnetID {
 				continue
 			}
-			if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority &&
-				staker.Priority != txs.SubnetPermissionedValidatorCurrentPriority &&
-				staker.Priority != txs.SubnetPermissionlessValidatorCurrentPriority {
+			if !staker.IsCurrentValidator() {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)
@@ -945,9 +943,7 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 			if args.SubnetID != staker.SubnetID {
 				continue
 			}
-			if staker.Priority != txs.PrimaryNetworkValidatorPendingPriority &&
-				staker.Priority != txs.SubnetPermissionedValidatorPendingPriority &&
-				staker.Priority != txs.SubnetPermissionlessValidatorPendingPriority {
+			if !staker.IsPendingValidator() {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)
