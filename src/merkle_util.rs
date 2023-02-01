@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum DataStoreError {
     #[error("failed to insert data")]
     InsertionError,
@@ -24,6 +24,8 @@ pub enum DataStoreError {
     ProofError,
     #[error("failed to verify proof")]
     ProofVerificationError,
+    #[error("no keys or values found in proof")]
+    ProofEmptyKeyValuesError,
 }
 
 pub struct MerkleSetup {

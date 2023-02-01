@@ -437,3 +437,32 @@ fn test_all_elements_proof() -> Result<(), DataStoreError> {
 
     Ok(())
 }
+
+#[test]
+// Special case when there is a provided edge proof but zero key/value pairs.
+fn test_missing_key_value_pairs() -> Result<(), DataStoreError> {
+    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+    items.sort();
+
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(&items[start].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[end].0)?; // start and end nodes are the same
+    assert!(!end_proof.0.is_empty());
+
+    proof.concat_proofs(end_proof);
+
+    // key and value vectors are intentionally empty
+    let keys: Vec<&&str> = Vec::new();
+    let vals: Vec<&&str> = Vec::new();
+
+    assert_eq!(
+        merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals),
+        Err(DataStoreError::ProofVerificationError)
+    );
+
+    Ok(())
+}

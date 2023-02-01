@@ -27,6 +27,7 @@ pub enum ProofError {
     NodeNotInTrie,
     InvalidNode,
     EmptyRange,
+    EmptyKeyValues,
 }
 
 impl From<DataStoreError> for ProofError {
@@ -34,6 +35,7 @@ impl From<DataStoreError> for ProofError {
         match d {
             DataStoreError::InsertionError => ProofError::NodesInsertionError,
             DataStoreError::RootHashError => ProofError::InvalidNode,
+            DataStoreError::ProofEmptyKeyValuesError => ProofError::EmptyKeyValues,
             _ => ProofError::InvalidProof,
         }
     }
@@ -161,6 +163,10 @@ impl Proof {
     ) -> Result<bool, ProofError> {
         if keys.len() != vals.len() {
             return Err(ProofError::InconsistentProofData)
+        }
+
+        if keys.is_empty() {
+            return Err(ProofError::EmptyKeyValues)
         }
 
         // Ensure the received batch is monotonic increasing and contains no deletions
