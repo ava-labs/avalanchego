@@ -44,6 +44,10 @@ the EVM, but instead makes in-place changes to the state tree. This ensures
 that the database size is small and stable during the course of running
 firewood. Firewood exists to provide a very fast storage layer for [qEVM](https://github.com/ava-labs/qevm) to use in a custom subnet.
 
+## License
+firewood is licensed by the Ecosystem License. For more information, see the
+[LICENSE file](./LICENSE.md).
+
 ## Build
 Firewood currently is Linux-only, as it has a dependency on the asynchronous
 I/O provided by the Linux kernel (see `libaio`). Unfortunately, Docker is not
