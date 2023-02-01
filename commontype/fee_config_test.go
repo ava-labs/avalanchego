@@ -30,6 +30,22 @@ func TestVerify(t *testing.T) {
 		expectedError string
 	}{
 		{
+			name: "nil gasLimit in FeeConfig",
+			config: &FeeConfig{
+				// GasLimit:        big.NewInt(8_000_000)
+				TargetBlockRate: 2, // in seconds
+
+				MinBaseFee:               big.NewInt(25_000_000_000),
+				TargetGas:                big.NewInt(15_000_000),
+				BaseFeeChangeDenominator: big.NewInt(36),
+
+				MinBlockGasCost:  big.NewInt(0),
+				MaxBlockGasCost:  big.NewInt(1_000_000),
+				BlockGasCostStep: big.NewInt(200_000),
+			},
+			expectedError: "gasLimit cannot be nil",
+		},
+		{
 			name:          "invalid GasLimit in FeeConfig",
 			config:        func() *FeeConfig { c := validFeeConfig; c.GasLimit = big.NewInt(0); return &c }(),
 			expectedError: "gasLimit = 0 cannot be less than or equal to 0",

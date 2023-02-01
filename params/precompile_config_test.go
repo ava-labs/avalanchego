@@ -118,9 +118,11 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 			upgrades: []PrecompileUpgrade{
 				{
 					FeeManagerConfig: precompile.NewFeeManagerConfig(big.NewInt(3), admins, nil,
-						&commontype.FeeConfig{
-							GasLimit: big.NewInt(-1),
-						}),
+						func() *commontype.FeeConfig {
+							feeConfig := DefaultFeeConfig
+							feeConfig.GasLimit = big.NewInt(-1)
+							return &feeConfig
+						}()),
 				},
 			},
 			expectedError: "gasLimit = -1 cannot be less than or equal to 0",
@@ -130,9 +132,11 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 			upgrades: []PrecompileUpgrade{
 				{
 					FeeManagerConfig: precompile.NewFeeManagerConfig(big.NewInt(3), admins, nil,
-						&commontype.FeeConfig{
-							GasLimit: big.NewInt(0),
-						}),
+						func() *commontype.FeeConfig {
+							feeConfig := DefaultFeeConfig
+							feeConfig.GasLimit = common.Big0
+							return &feeConfig
+						}()),
 				},
 			},
 			expectedError: "gasLimit = 0 cannot be less than or equal to 0",
@@ -173,9 +177,11 @@ func TestVerifyPrecompiles(t *testing.T) {
 			name: "invalid initial fee manager config",
 			upgrade: PrecompileUpgrade{
 				FeeManagerConfig: precompile.NewFeeManagerConfig(big.NewInt(3), admins, nil,
-					&commontype.FeeConfig{
-						GasLimit: big.NewInt(-1),
-					}),
+					func() *commontype.FeeConfig {
+						feeConfig := DefaultFeeConfig
+						feeConfig.GasLimit = big.NewInt(-1)
+						return &feeConfig
+					}()),
 			},
 			expectedError: "gasLimit = -1 cannot be less than or equal to 0",
 		},

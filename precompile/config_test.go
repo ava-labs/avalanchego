@@ -82,9 +82,12 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 		{
 			name: "invalid initial fee manager config",
 			config: NewFeeManagerConfig(big.NewInt(3), admins, nil,
-				&commontype.FeeConfig{
-					GasLimit: big.NewInt(0),
-				}),
+				func() *commontype.FeeConfig {
+					feeConfig := validFeeConfig
+					feeConfig.GasLimit = big.NewInt(0)
+					return &feeConfig
+				}()),
+
 			expectedError: "gasLimit = 0 cannot be less than or equal to 0",
 		},
 		{
