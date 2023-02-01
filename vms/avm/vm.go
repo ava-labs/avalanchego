@@ -71,6 +71,8 @@ var (
 )
 
 type VM struct {
+	common.AppHandler
+
 	Factory
 	metrics
 	avax.AddressManager
@@ -148,6 +150,8 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	_ common.AppSender,
 ) error {
+	vm.AppHandler = common.NewNoOpAppHandler(ctx.Log)
+
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
 		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
@@ -1079,38 +1083,6 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 		return assetID, nil
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
-}
-
-func (*VM) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-func (*VM) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
-	return nil
-}
-
-func (*VM) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppGossip(context.Context, ids.NodeID, []byte) error {
-	return nil
 }
 
 // UniqueTx de-duplicates the transaction.

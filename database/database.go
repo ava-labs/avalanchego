@@ -35,6 +35,8 @@ type KeyValueWriter interface {
 	//
 	// If [value] is nil or an empty slice, then when it's retrieved
 	// it may be nil or an empty slice.
+	//
+	// Similarly, a nil [key] is treated the same as an empty slice.
 	Put(key []byte, value []byte) error
 }
 
