@@ -1,5 +1,60 @@
 # Release Notes
 
+## [v1.9.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.8)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `22`.
+
+### Networking
+
+- Added TCP proxy support for p2p network traffic
+- Added p2p network client utility for directly messaging the p2p network
+
+### Consensus
+
+- Guaranteed delivery of App messages to the VM, regardless of sync status
+- Added `EngineType` to consensus context
+
+### MerkleDB - Alpha
+
+- Added initial implementation of a path-based merkle-radix tree
+- Added initial implementation of state sync powered by the merkledb
+
+### APIs
+
+- Updated `platform.getCurrentValidators` to return `uptime` as a percentage
+- Updated `platform.get*Validators` to avoid iterating over the staker set when requesting specific nodeIDs
+- Cached staker data in `platform.get*Validators` to significantly reduce DB IO
+- Added `stakeAmount` and `weight` to all staker responses in P-chain APIs
+- Deprecated `stakeAmount` in staker responses from P-chain APIs
+- Removed `creationTxFee` from `info.GetTxFeeResponse`
+- Removed `address` from `platformvm.GetBalanceRequest`
+
+### Fixes
+
+- Fixed `RemoveSubnetValidatorTx` weight diff corruption
+- Released network lock before attempting to close a peer connection
+- Fixed X-Chain last accepted block initialization to use the genesis block, not the stop vertex after linearization
+- Removed plugin directory handling from AMI generation
+- Removed copy of plugins directory from tar script
+
+### Cleanup
+
+- Removed unused rpm packaging scripts
+- Removed engine dependency from chain registrants
+- Removed unused field from chain handler log
+- Linted custom test `chains.Manager`
+- Used generic btree implementation
+- Deleted `utils.CopyBytes`
+- Updated rjeczalik/notify from v0.9.2 to v0.9.3
+
+### Miscellaneous
+
+- Added AVM `state.Chain` interface
+- Added generic atomic value utility
+- Added test for the AMI builder during RCs
+- Converted cache implementations to use generics
+- Added optional cache eviction callback
+
 ## [v1.9.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.7)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `22`.
