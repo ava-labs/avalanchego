@@ -216,6 +216,9 @@ func (d *diff) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 
 func (d *diff) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 	if claimable, ok := d.caminoDiff.modifiedClaimables[ownerID]; ok {
+		if claimable == nil {
+			return nil, database.ErrNotFound
+		}
 		return claimable, nil
 	}
 

@@ -28,6 +28,9 @@ func (cs *caminoState) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 
 func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 	if claimable, ok := cs.modifiedClaimables[ownerID]; ok {
+		if claimable == nil {
+			return nil, database.ErrNotFound
+		}
 		return claimable, nil
 	}
 

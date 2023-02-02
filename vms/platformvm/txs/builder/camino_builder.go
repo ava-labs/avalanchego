@@ -31,6 +31,7 @@ var (
 	errTxIsNotCommitted = errors.New("tx is not committed")
 	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongTxType      = errors.New("wrong transaction type")
+	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 )
 
 type CaminoBuilder interface {
@@ -115,7 +116,7 @@ func (b *caminoBuilder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	caminoGenesis, err := b.builder.state.CaminoConfig()
+	caminoGenesis, err := b.state.CaminoConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	if caminoGenesis, err := b.builder.state.CaminoConfig(); err != nil {
+	if caminoGenesis, err := b.state.CaminoConfig(); err != nil {
 		return nil, err
 	} else if !caminoGenesis.VerifyNodeSignature {
 		return tx, nil
@@ -220,7 +221,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 }
 
 func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
-	if state, err := b.builder.state.CaminoConfig(); err != nil {
+	if state, err := b.state.CaminoConfig(); err != nil {
 		return nil, err
 	} else if !state.LockModeBondDeposit {
 		return b.builder.NewRewardValidatorTx(txID)
@@ -284,6 +285,14 @@ func (b *caminoBuilder) NewDepositTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
+	caminoGenesis, err := b.state.CaminoConfig()
+	if err != nil {
+		return nil, err
+	}
+	if !caminoGenesis.LockModeBondDeposit {
+		return nil, errWrongLockMode
+	}
+
 	ins, outs, signers, err := b.Lock(keys, amount, b.cfg.TxFee, locked.StateDeposited, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -317,9 +326,13 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	var ins []*avax.TransferableInput
-	var outs []*avax.TransferableOutput
-	var signers [][]*crypto.PrivateKeySECP256K1R
+	caminoGenesis, err := b.state.CaminoConfig()
+	if err != nil {
+		return nil, err
+	}
+	if !caminoGenesis.LockModeBondDeposit {
+		return nil, errWrongLockMode
+	}
 
 	// unlocking
 	ins, outs, signers, err := b.UnlockDeposit(b.state, keys, lockTxIDs)
@@ -364,6 +377,14 @@ func (b *caminoBuilder) NewClaimRewardTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
+	caminoGenesis, err := b.state.CaminoConfig()
+	if err != nil {
+		return nil, err
+	}
+	if !caminoGenesis.LockModeBondDeposit {
+		return nil, errWrongLockMode
+	}
+
 	ins, outs, signers, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)

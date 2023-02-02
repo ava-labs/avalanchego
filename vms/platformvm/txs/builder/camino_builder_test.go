@@ -274,6 +274,10 @@ func TestUnlockDepositTx(t *testing.T) {
 }
 
 func TestNewClaimRewardTx(t *testing.T) {
+	caminoConfig := &state.CaminoConfig{
+		LockModeBondDeposit: true,
+	}
+
 	depositTxID1 := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
 
@@ -299,6 +303,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"OK, single deposit tx": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
@@ -325,6 +330,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"OK, two deposit tx": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
@@ -356,6 +362,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"OK, two deposit tx, owner keys intersect": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().UTXOIDs(rewardOwner1Addr[:], ids.Empty, math.MaxInt).Return([]ids.ID{}, nil)
@@ -395,6 +402,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"Fail, deposit errored": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
@@ -414,6 +422,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"Fail, deposit not committed": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
@@ -433,6 +442,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"Fail, deposit isn't deposit": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
@@ -456,6 +466,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"Fail, deposit rewards owner isn't secp type (shouldn't happen)": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)
@@ -479,6 +490,7 @@ func TestNewClaimRewardTx(t *testing.T) {
 		"Fail, missing deposit signer": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// utxo fetching for utxo handler Lock(..)
 				s.EXPECT().UTXOIDs(feeAddr[:], ids.Empty, math.MaxInt).Return([]ids.ID{feeUTXO.InputID()}, nil)
 				s.EXPECT().GetUTXO(feeUTXO.InputID()).Return(feeUTXO, nil)

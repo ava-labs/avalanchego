@@ -655,7 +655,7 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 		return errWrongLockMode
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
 
@@ -758,6 +758,10 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 }
 
 func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
@@ -841,7 +845,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		e.Tx.Creds[:len(e.Tx.Creds)-2], // base tx creds
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
-		locked.StateBonded,
+		locked.StateUnlocked,
 	); err != nil {
 		return err
 	}
@@ -890,6 +894,10 @@ func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
 }
 
 func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
