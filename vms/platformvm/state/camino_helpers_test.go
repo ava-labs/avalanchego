@@ -4,11 +4,24 @@
 package state
 
 import (
+	"testing"
+	"time"
+
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 )
 
 func generateBaseTx(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *txs.BaseTx {
@@ -36,4 +49,28 @@ func generateBaseTx(assetID ids.ID, amount uint64, outputOwners secp256k1fx.Outp
 			},
 		},
 	}
+}
+
+func newEmptyState(t *testing.T) *state {
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	newState, err := new(
+		memdb.New(),
+		metrics.Noop,
+		&config.Config{
+			Validators: vdrs,
+		},
+		&snow.Context{},
+		prometheus.NewRegistry(),
+		reward.NewCalculator(reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, newState)
+	return newState
 }

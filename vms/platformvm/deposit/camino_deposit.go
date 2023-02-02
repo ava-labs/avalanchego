@@ -150,6 +150,7 @@ func (deposit *Deposit) ClaimableReward(offer *Offer, claimTime uint64) uint64 {
 func (deposit *Deposit) TotalReward(offer *Offer) uint64 {
 	bigTotalRewardAmount := (&big.Int{}).SetUint64(deposit.Amount)
 
+	// rewardsPeriodDuration = deposit.Duration - offer.NoRewardsPeriodDuration
 	bigRewardsPeriodDuration := (&big.Int{}).SetUint64(uint64(deposit.Duration - offer.NoRewardsPeriodDuration))
 	bigInterestRateNominator := (&big.Int{}).SetUint64(offer.InterestRateNominator)
 

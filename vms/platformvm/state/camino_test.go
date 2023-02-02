@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	root_genesis "github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -26,18 +27,130 @@ import (
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
 )
 
-var (
-	id           = ids.GenerateTestID()
-	shortID      = ids.GenerateTestShortID()
-	shortID2     = ids.GenerateTestShortID()
-	initialAdmin = ids.GenerateTestShortID()
+const (
+	testNetworkID = 10 // To be used in tests
 )
+
+func TestSupplyInState(t *testing.T) {
+	require := require.New(t)
+
+	tests := map[string]struct {
+		s             *state
+		genesisConfig root_genesis.Config
+	}{
+		"LockModeDepositBond: true with NodeID and Deposit": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(true, initialNodeID, true),
+		},
+		"LockModeDepositBond: true with NodeID": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(true, initialNodeID, false),
+		},
+		"LockModeDepositBond: true": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(true, ids.EmptyNodeID, false),
+		},
+		"LockModeDepositBond: false with NodeID and Deposit": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(false, initialNodeID, true),
+		},
+		"LockModeDepositBond: false with NodeID": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(false, initialNodeID, false),
+		},
+		"LockModeDepositBond: false": {
+			s:             newEmptyState(t),
+			genesisConfig: defaultConfig(false, ids.EmptyNodeID, false),
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			genBytes, _, err := root_genesis.FromConfig(&tt.genesisConfig)
+			require.NoError(err)
+
+			err = tt.s.sync(genBytes)
+			require.NoError(err)
+
+			expectedSupply := getExpectedSupply(tt.genesisConfig, tt.s, genBytes, require)
+
+			require.EqualValues(expectedSupply, tt.s.currentSupply)
+		})
+	}
+}
+
+func getExpectedSupply(config root_genesis.Config, s *state, genBytes []byte, require *require.Assertions) uint64 {
+	var totalXAmount, totalPAmount, totalIAmount uint64
+
+	for _, alloc := range config.Allocations {
+		totalIAmount += alloc.InitialAmount
+
+		for _, unlockSchedule := range alloc.UnlockSchedule {
+			totalIAmount += unlockSchedule.Amount
+		}
+	}
+	for _, alloc := range config.Camino.Allocations {
+		totalXAmount += alloc.XAmount
+		for _, palloc := range alloc.PlatformAllocations {
+			totalPAmount += palloc.Amount
+		}
+	}
+
+	allocationsSum := totalXAmount + totalPAmount + totalIAmount
+
+	offers := make(map[ids.ID]genesis.DepositOffer, len(config.Camino.DepositOffers))
+	for _, offer := range config.Camino.DepositOffers {
+		offerID, _ := offer.ID()
+		offers[offerID] = offer
+	}
+
+	totalRewardAmount := uint64(0)
+	for _, alloc := range config.Camino.Allocations {
+		for _, palloc := range alloc.PlatformAllocations {
+			if palloc.DepositOfferID != ids.Empty {
+				depositOffer, err := s.GetDepositOffer(palloc.DepositOfferID)
+				require.NoError(err)
+
+				dep := deposit.Deposit{
+					Amount:   palloc.Amount,
+					Duration: uint32(palloc.DepositDuration),
+				}
+
+				totalRewardAmount += dep.TotalReward(depositOffer)
+			}
+		}
+	}
+
+	if totalRewardAmount == 0 {
+		genesisState, _ := genesis.ParseState(genBytes)
+
+		for _, vdrTx := range genesisState.Validators {
+			tx, _ := vdrTx.Unsigned.(txs.ValidatorTx)
+			stakeAmount := tx.Weight()
+			stakeDuration := tx.EndTime().Sub(tx.StartTime())
+			totalRewardAmount += s.rewards.Calculate(
+				stakeDuration,
+				stakeAmount,
+				s.currentSupply,
+			)
+		}
+	}
+
+	return allocationsSum + totalRewardAmount
+}
 
 func TestSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s, _ := newInitializedState(require)
+
+	var (
+		id           = ids.GenerateTestID()
+		shortID      = ids.GenerateTestShortID()
+		shortID2     = ids.GenerateTestShortID()
+		initialAdmin = ids.GenerateTestShortID()
+	)
 
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 
@@ -120,7 +233,7 @@ func TestSyncGenesis(t *testing.T) {
 						Address: shortID,
 						State:   txs.AddressStateRoleValidatorBit,
 					},
-				}, depositTxs),
+				}, depositTxs, initialAdmin),
 			},
 			cs: *wrappers.IgnoreError(newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())).(*caminoState),
 			want: caminoDiff{
@@ -162,7 +275,107 @@ func TestSyncGenesis(t *testing.T) {
 	}
 }
 
-func defaultGenesisState(addresses []genesis.AddressState, deposits []*txs.Tx) *genesis.State {
+func defaultConfig(lockModeBondDeposit bool, nodeID ids.NodeID, deposit bool) root_genesis.Config {
+	var (
+		defaultMinValidatorStake = 5 * units.MilliAvax
+		minStake                 = root_genesis.GetStakingConfig(testNetworkID).MinValidatorStake
+		minStakeDuration         = uint64(1000)
+		depositOfferID           = ids.Empty
+		initialAdmin             = ids.GenerateTestShortID()
+	)
+
+	depositOffers := []genesis.DepositOffer{
+		{
+			InterestRateNominator:   1,
+			Start:                   2,
+			End:                     3,
+			MinAmount:               4,
+			MinDuration:             5,
+			MaxDuration:             6,
+			UnlockPeriodDuration:    7,
+			NoRewardsPeriodDuration: 2,
+			Flags:                   9,
+		},
+	}
+
+	if deposit {
+		depositOfferID, _ = depositOffers[0].ID()
+		depositOffers[0].OfferID = depositOfferID
+	}
+
+	var caminoAllocations []root_genesis.CaminoAllocation
+	var allocations []root_genesis.Allocation
+
+	platformAllocations := []root_genesis.PlatformAllocation{
+		{
+			Amount:            minStake,
+			NodeID:            nodeID,
+			ValidatorDuration: defaultMinValidatorStake,
+			DepositDuration:   5,
+			TimestampOffset:   10,
+			DepositOfferID:    depositOfferID,
+			Memo:              "",
+		},
+	}
+
+	if lockModeBondDeposit {
+		caminoAllocations = []root_genesis.CaminoAllocation{
+			{
+				ETHAddr:  initialAdmin,
+				AVAXAddr: initialAdmin,
+				XAmount:  10 * defaultMinValidatorStake,
+				AddressStates: root_genesis.AddressStates{
+					ConsortiumMember: true,
+					KYCVerified:      true,
+				},
+				PlatformAllocations: platformAllocations,
+			},
+		}
+	} else {
+		allocations = []root_genesis.Allocation{
+			{
+				ETHAddr:       initialAdmin,
+				AVAXAddr:      initialAdmin,
+				InitialAmount: minStake,
+				UnlockSchedule: []root_genesis.LockedAmount{
+					{
+						Amount:   1,
+						Locktime: 0,
+					},
+				},
+			},
+		}
+	}
+
+	config := root_genesis.Config{
+		NetworkID:                  0,
+		Allocations:                allocations,
+		StartTime:                  10,
+		InitialStakeDuration:       minStakeDuration,
+		InitialStakeDurationOffset: 10,
+		InitialStakedFunds:         []ids.ShortID{initialAdmin},
+		InitialStakers: []root_genesis.Staker{
+			{
+				NodeID:        nodeID,
+				RewardAddress: initialAdmin,
+			},
+		},
+		Camino: root_genesis.Camino{
+			VerifyNodeSignature:      true,
+			LockModeBondDeposit:      lockModeBondDeposit,
+			InitialAdmin:             initialAdmin,
+			DepositOffers:            depositOffers,
+			Allocations:              caminoAllocations,
+			InitialMultisigAddresses: nil,
+		},
+		CChainGenesis: "",
+		Message:       "",
+	}
+
+	return config
+}
+
+func defaultGenesisState(addresses []genesis.AddressState, deposits []*txs.Tx, initialAdmin ids.ShortID) *genesis.State {
 	return &genesis.State{
 		UTXOs: []*avax.UTXO{
 			{
