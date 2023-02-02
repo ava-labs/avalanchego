@@ -30,10 +30,14 @@ const (
 )
 
 var (
-	ErrCommitted             = errors.New("view has been committed")
-	ErrChangedBaseRoot       = errors.New("the trie this view was based on has changed its root")
-	ErrEditLocked            = errors.New("view has been edit locked. Any view generated from this view would be corrupted by edits")
-	ErrOddLengthWithValue    = errors.New("the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length")
+	ErrCommitted       = errors.New("view has been committed")
+	ErrChangedBaseRoot = errors.New("the trie this view was based on has changed its root")
+	ErrEditLocked      = errors.New(
+		"view has been edit locked. Any view generated from this view would be corrupted by edits",
+	)
+	ErrOddLengthWithValue = errors.New(
+		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
+	)
 	ErrGetClosestNodeFailure = errors.New("GetClosestNode failed to return the closest node")
 	ErrStartAfterEnd         = errors.New("start key > end key")
 
@@ -104,7 +108,10 @@ func (t *trieView) NewView(ctx context.Context) (TrieView, error) {
 // Returns a new view on top of this one with memory allocated to store the
 // [estimatedChanges] number of key/value changes.
 // Assumes this view stack is unlocked.
-func (t *trieView) NewPreallocatedView(ctx context.Context, estimatedChanges int) (TrieView, error) {
+func (t *trieView) NewPreallocatedView(
+	ctx context.Context,
+	estimatedChanges int,
+) (TrieView, error) {
 	t.lockStack()
 	defer t.unlockStack()
 
@@ -178,9 +185,6 @@ func (t *trieView) CalculateIDs(ctx context.Context) error {
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes this view stack is locked.
 func (t *trieView) calculateIDs(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateIDs")
-	defer span.End()
-
 	if !t.needsRecalculation {
 		return nil
 	}
@@ -189,6 +193,12 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 		// never be edited, so [t.needsRecalculation] should always be false.
 		return ErrCommitted
 	}
+
+	// We wait to create the span until after checking that we need to actually
+	// calculateIDs to make traces more useful (otherwise there may be a span
+	// per key modified even though IDs are not re-calculated).
+	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateIDs")
+	defer span.End()
 
 	// ensure that the view under this one is up to date before potentially pulling in nodes from it
 	if t.baseView != nil {
@@ -323,7 +333,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // Returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
-func (t *trieView) GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error) {
+func (t *trieView) GetRangeProof(
+	ctx context.Context,
+	start, end []byte,
+	maxLength int,
+) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
@@ -337,7 +351,11 @@ func (t *trieView) GetRangeProof(ctx context.Context, start, end []byte, maxLeng
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
 // Assumes this view stack is locked.
-func (t *trieView) getRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error) {
+func (t *trieView) getRangeProof(
+	ctx context.Context,
+	start, end []byte,
+	maxLength int,
+) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getRangeProof")
 	defer span.End()
 
@@ -737,9 +755,10 @@ func (t *trieView) remove(ctx context.Context, key []byte) error {
 }
 
 // Returns nil iff at least one of the following is true:
-//  - The root of the db hasn't changed since this view was created.
-//  - This view's root is the same as the db's root.
-//  - This method returns nil for the view under this one.
+//   - The root of the db hasn't changed since this view was created.
+//   - This view's root is the same as the db's root.
+//   - This method returns nil for the view under this one.
+//
 // Assumes this view stack is locked.
 func (t *trieView) validateDBRoot(ctx context.Context) error {
 	dbRoot := t.db.getMerkleRoot()
@@ -869,7 +888,10 @@ func (t *trieView) deleteEmptyNodes(ctx context.Context, node *node) error {
 // 2. True if the node is an exact match with the [fullPath].
 // 3. Any error that occurred while following the path.
 // Assumes this view stack is locked.
-func (t *trieView) getClosestNode(ctx context.Context, fullPath path) (closestNode *node, exactMatch bool, err error) {
+func (t *trieView) getClosestNode(
+	ctx context.Context,
+	fullPath path,
+) (closestNode *node, exactMatch bool, err error) {
 	// all paths start at the root
 	currentNode := t.root
 	matchedPathIndex := 0
@@ -928,10 +950,11 @@ func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
 }
 
 // Returns:
-// 1. The value at [key] iff the following return value is true.
-// 2. True if the value at [key] exists in the caches.
-//    If false, the [key] may be in the trie, just not in the caches.
-// 3. database.ErrNotFound if the value isn't in the trie at all (not just the caches).
+//  1. The value at [key] iff the following return value is true.
+//  2. True if the value at [key] exists in the caches.
+//     If false, the [key] may be in the trie, just not in the caches.
+//  3. database.ErrNotFound if the value isn't in the trie at all (not just the caches).
+//
 // Assumes this view stack is locked.
 func (t *trieView) getCachedValue(key path) ([]byte, bool, error) {
 	if change, ok := t.changes.values[key]; ok {
@@ -1028,7 +1051,11 @@ func (t *trieView) calculateIDsConcurrent(
 
 // hash all changed nodes synchronously.
 // Assumes this view stack is locked.
-func (t *trieView) calculateIDsSync(ctx context.Context, readyNodes map[path]*node, dependencyCounts map[path]int) error {
+func (t *trieView) calculateIDsSync(
+	ctx context.Context,
+	readyNodes map[path]*node,
+	dependencyCounts map[path]int,
+) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.hashingSync")
 	defer span.End()
 
@@ -1067,7 +1094,11 @@ func (t *trieView) calculateIDsSync(ctx context.Context, readyNodes map[path]*no
 
 // Inserts a key/value pair into the trie.
 // Assumes this view stack is locked.
-func (t *trieView) insertIntoTrie(ctx context.Context, key path, value Maybe[[]byte]) (*node, error) {
+func (t *trieView) insertIntoTrie(
+	ctx context.Context,
+	key path,
+	value Maybe[[]byte],
+) (*node, error) {
 	// find the node that most closely matches the keyPath
 	closestNode, exactMatch, err := t.getClosestNode(ctx, key)
 	if err != nil {
