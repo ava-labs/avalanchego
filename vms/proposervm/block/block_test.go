@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/stretchr/testify/require"
 )
 
 func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) {
