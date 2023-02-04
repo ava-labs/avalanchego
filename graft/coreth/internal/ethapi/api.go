@@ -1243,9 +1243,6 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 	if head.BlockGasCost != nil {
 		result["blockGasCost"] = (*hexutil.Big)(head.BlockGasCost)
 	}
-	if head.ExtraStateRoot != (common.Hash{}) {
-		result["extraStateRoot"] = head.ExtraStateRoot
-	}
 
 	return result
 }
