@@ -176,7 +176,6 @@ var (
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	errMissingAtomicTxs               = errors.New("cannot build a block with non-empty extra data and zero atomic transactions")
-	errInvalidExtraStateRoot          = errors.New("invalid ExtraStateRoot")
 )
 
 var originalStderr *os.File
@@ -813,19 +812,6 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		size += txSize
 	}
 
-	// In Cortina the block header must include the atomic trie root.
-	if rules.IsCortina {
-		// Pass common.Hash{} as the current block's hash to the atomic backend, this avoids
-		// pinning changes to the atomic trie in memory, as we are still computing the header
-		// for this block and don't have its hash yet. Here we calculate the root of the atomic
-		// trie to store in the block header.
-		atomicTrieRoot, err := vm.atomicBackend.InsertTxs(common.Hash{}, header.Number.Uint64(), header.ParentHash, batchAtomicTxs)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		header.ExtraStateRoot = atomicTrieRoot
-	}
-
 	// If there is a non-zero number of transactions, marshal them and return the byte slice
 	// for the block's extra data along with the contribution and gas used.
 	if len(batchAtomicTxs) > 0 {
@@ -882,17 +868,9 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 			}
 		}
 		// Update the atomic backend with [txs] from this block.
-		atomicRoot, err := vm.atomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
+		_, err := vm.atomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
 		if err != nil {
 			return nil, nil, err
-		}
-		if rules.IsCortina {
-			// In Cortina, the atomic trie root should be in ExtraStateRoot.
-			if header.ExtraStateRoot != atomicRoot {
-				return nil, nil, fmt.Errorf(
-					"%w: (expected %s) (got %s)", errInvalidExtraStateRoot, header.ExtraStateRoot, atomicRoot,
-				)
-			}
 		}
 	}
 
