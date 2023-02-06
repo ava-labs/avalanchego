@@ -14,19 +14,30 @@ well as our review and merge procedures quick and simple.
 
 ## Coding guidelines
 
-Please make sure your contributions adhere to our coding guidelines:
+Please make sure your contributions adhere to our coding and documentation
+guidelines:
 
 - Code must adhere to the official Go
   [formatting](https://golang.org/doc/effective_go.html#formatting) guidelines
   (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
-- Code must be documented adhering to the official Go
-  [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
 - Pull requests need to be based on and opened against the `master` branch.
 - Pull reuqests should include a detailed description
 - Commits are required to be signed. See [here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
   for information on signing commits.
 - Commit messages should be prefixed with the package(s) they modify.
   - E.g. "eth, rpc: make trace configs optional"
+
+## Documentation guidelines
+
+- Code should be well commented, so it is easier to read and maintain.
+ Any complex sections or invariants should be documented explicitly.
+- Code must be documented adhering to the official Go
+  [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
+- Changes with user facing impact (e.g., addition or modification of flags and
+ options) should be accompanied by a link to a pull request to the [avalanche-docs](https://github.com/ava-labs/avalanche-docs)
+ repository. [example](https://github.com/ava-labs/avalanche-docs/pull/1119/files). 
+- Changes that modify a package significantly or add new features should
+ either update the existing or include a new `README.md` file in that package.
 
 ## Can I have feature X
 
