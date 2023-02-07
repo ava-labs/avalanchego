@@ -13,13 +13,11 @@ import (
 
 // AddressState flags, max 63
 const (
-	AddressStateRoleAdmin        = uint8(0)
-	AddressStateRoleAdminBit     = uint64(0b1)
-	AddressStateRoleKyc          = uint8(1)
-	AddressStateRoleKycBit       = uint64(0b10)
-	AddressStateRoleValidator    = uint8(2)
-	AddressStateRoleValidatorBit = uint64(0b100)
-	AddressStateRoleBits         = uint64(0b111)
+	AddressStateRoleAdmin    = uint8(0)
+	AddressStateRoleAdminBit = uint64(0b1)
+	AddressStateRoleKyc      = uint8(1)
+	AddressStateRoleKycBit   = uint64(0b10)
+	AddressStateRoleBits     = uint64(0b11)
 
 	AddressStateKycVerified    = uint8(32)
 	AddressStateKycVerifiedBit = uint64(0b00100000000000000000000000000000000)
@@ -28,9 +26,6 @@ const (
 	AddressStateConsortium     = uint8(34)
 	AddressStateConsortiumBit  = uint64(0b10000000000000000000000000000000000)
 	AddressStateKycBits        = uint64(0b11100000000000000000000000000000000)
-
-	AddressStateRegisteredNode    = uint8(38)
-	AddressStateRegisteredNodeBit = uint64(0b100000000000000000000000000000000000000)
 
 	AddressStateMax       = uint8(63)
 	AddressStateValidBits = AddressStateRoleBits | AddressStateKycBits

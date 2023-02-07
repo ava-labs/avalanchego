@@ -155,7 +155,9 @@ func caminoAdvanceTimeTo(
 				continue
 			}
 
-			validatorAddr, err := parentState.GetNodeConsortiumMember(staker.NodeID)
+			validatorAddr, err := parentState.GetShortIDLink(
+				ids.ShortID(staker.NodeID), state.ShortLinkKeyRegisterNode,
+			)
 			if err != nil {
 				return err
 			}

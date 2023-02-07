@@ -101,7 +101,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &addr0)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
 			expectedErr: nil,
 		},
@@ -119,7 +119,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &addr0)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
 			expectedErr: errTimestampNotBeforeStartTime,
 		},
@@ -137,7 +137,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &addr0)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
 			expectedErr: errFutureStakeTime,
 		},
@@ -155,7 +155,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(caminoPreFundedNodeIDs[0], &addr0)
+				env.state.SetShortIDLink(ids.ShortID(caminoPreFundedNodeIDs[0]), state.ShortLinkKeyRegisterNode, &addr0)
 			},
 			expectedErr: errValidatorExists,
 		},
@@ -173,7 +173,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID2, &addr0)
+				env.state.SetShortIDLink(ids.ShortID(nodeID2), state.ShortLinkKeyRegisterNode, &addr0)
 				staker, err := state.NewCurrentStaker(
 					tx.ID(),
 					tx.Unsigned.(*txs.CaminoAddValidatorTx),
@@ -202,7 +202,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &addr1)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr1)
 				utxoIDs, err := env.state.UTXOIDs(caminoPreFundedKeys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				require.NoError(t, err)
 				for _, utxoID := range utxoIDs {
@@ -225,7 +225,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &addr0)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 			},
 			expectedErr: errConsortiumSignatureMissing,
 		},
@@ -243,7 +243,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, &msigAlias)
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &msigAlias)
 				env.state.SetMultisigAlias(&multisig.Alias{
 					ID: msigAlias,
 					Owners: &secp256k1fx.OutputOwners{
@@ -588,7 +588,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 
 	_, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 	addr0 := caminoPreFundedKeys[0].Address()
-	env.state.SetNodeConsortiumMember(nodeID, &addr0)
+	env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
 
 	existingTxID := ids.GenerateTestID()
 	env.config.BanffTime = env.state.GetTimestamp()
@@ -1637,7 +1637,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateRoleAdmin,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleAdminBit,
+			expectedState: txs.AddressStateRoleAdminBit,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to give Alice KYC Role
@@ -1646,7 +1646,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateRoleKyc,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleKycBit,
+			expectedState: txs.AddressStateRoleKycBit,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to remove from Alice the KYC Role
@@ -1655,7 +1655,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateRoleKyc,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit,
+			expectedState: 0,
 			remove:        true,
 		},
 		// Bob has Admin State, and he is trying to give Alice the KYC Verified State
@@ -1664,26 +1664,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateKycVerified,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycVerifiedBit,
+			expectedState: txs.AddressStateKycVerifiedBit,
 			remove:        false,
-		},
-		// Bob has Admin State, and he is trying to give Alice the Validator Role
-		"State: Admin, Flag: Validator, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleValidator,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateRoleValidatorBit,
-			remove:        false,
-		},
-		// Bob has Admin State, and he is trying to remove from Alice the Validator Role
-		"State: Admin, Flag: Validator, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleValidator,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit,
-			remove:        true,
 		},
 		// Bob has Admin State, and he is trying to give Alice the KYC Expired State
 		"State: Admin, Flag: KYC Expired, Add, Different Address": {
@@ -1691,7 +1673,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateKycExpired,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycExpiredBit,
+			expectedState: txs.AddressStateKycExpiredBit,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to give Alice the Consortium State
@@ -1700,7 +1682,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateConsortium,
 			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateConsortiumBit,
+			expectedState: txs.AddressStateConsortiumBit,
 			remove:        false,
 		},
 		// Bob has KYC State, and he is trying to give Alice KYC Expired State
@@ -1709,7 +1691,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateKycExpired,
 			existingState: txs.AddressStateRoleKycBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycExpiredBit,
+			expectedState: txs.AddressStateKycExpiredBit,
 			remove:        false,
 		},
 		// Bob has KYC State, and he is trying to give Alice KYC Expired State
@@ -1718,43 +1700,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateKycVerified,
 			existingState: txs.AddressStateRoleKycBit,
-			expectedState: txs.AddressStateRegisteredNodeBit | txs.AddressStateKycVerifiedBit,
-			remove:        false,
-		},
-		// Bob has KYC State, and he is trying to give Alice Validator Role
-		"State: KYC, Flag: Validator, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleValidator,
-			existingState: txs.AddressStateRoleKycBit,
-			expectedErr:   errInvalidRoles,
-			remove:        false,
-		},
-		// Bob has Validator State, and he is trying to give Alice Validator Role
-		"State: Validator, Flag: Validator, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleValidator,
-			existingState: txs.AddressStateRoleValidatorBit,
-			expectedErr:   errInvalidRoles,
-			remove:        false,
-		},
-		// Bob has Validator State, and he is trying to give Alice KYC Role
-		"State: Validator, Flag: KYC, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleKyc,
-			existingState: txs.AddressStateRoleValidatorBit,
-			expectedErr:   errInvalidRoles,
-			remove:        false,
-		},
-		// Bob has Validator State, and he is trying to give Alice Admin Role
-		"State: Validator, Flag: Admin, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleValidatorBit,
-			expectedErr:   errInvalidRoles,
+			expectedState: txs.AddressStateKycVerifiedBit,
 			remove:        false,
 		},
 		// Some Address has Admin State, and he is trying to give Alice Admin Role

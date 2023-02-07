@@ -186,12 +186,12 @@ func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
 	return parentState.GetMultisigAlias(alias)
 }
 
-func (d *diff) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
-	d.caminoDiff.modifiedConsortiumMemberNodes[nodeID] = addr
+func (d *diff) SetShortIDLink(id ids.ShortID, key ShortLinkKey, link *ids.ShortID) {
+	d.caminoDiff.modifiedShortLinks[toShortLinkKey(id, key)] = link
 }
 
-func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
-	if addr, ok := d.caminoDiff.modifiedConsortiumMemberNodes[nodeID]; ok {
+func (d *diff) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, error) {
+	if addr, ok := d.caminoDiff.modifiedShortLinks[toShortLinkKey(id, key)]; ok {
 		if addr == nil {
 			return ids.ShortEmpty, database.ErrNotFound
 		}
@@ -203,7 +203,7 @@ func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 		return ids.ShortEmpty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.GetNodeConsortiumMember(nodeID)
+	return parentState.GetShortIDLink(id, key)
 }
 
 func (d *diff) SetLastRewardImportTimestamp(timestamp uint64) {
@@ -273,8 +273,9 @@ func (d *diff) ApplyCaminoState(baseState State) {
 		baseState.SetMultisigAlias(v)
 	}
 
-	for nodeID, addr := range d.caminoDiff.modifiedConsortiumMemberNodes {
-		baseState.SetNodeConsortiumMember(nodeID, addr)
+	for fullKey, link := range d.caminoDiff.modifiedShortLinks {
+		id, key := fromShortLinkKey(fullKey)
+		baseState.SetShortIDLink(id, key, link)
 	}
 
 	for ownerID, claimable := range d.caminoDiff.modifiedClaimables {

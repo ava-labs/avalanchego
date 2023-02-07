@@ -85,10 +85,10 @@ type CaminoDiff interface {
 	GetMultisigAlias(ids.ShortID) (*multisig.Alias, error)
 	SetMultisigAlias(*multisig.Alias)
 
-	// Consortium member nodes
+	// ShortIDsLink
 
-	SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID)
-	GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error)
+	SetShortIDLink(id ids.ShortID, key ShortLinkKey, link *ids.ShortID)
+	GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, error)
 
 	// Claimable & rewards
 
@@ -129,7 +129,7 @@ type caminoDiff struct {
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*deposit.Deposit
 	modifiedMultisigOwners                map[ids.ShortID]*multisig.Alias
-	modifiedConsortiumMemberNodes         map[ids.NodeID]*ids.ShortID
+	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
 	modifiedRewardImportTimestamp         *uint64
 	modifiedNotDistributedValidatorReward *uint64
@@ -159,9 +159,9 @@ type caminoState struct {
 	// MSIG aliases
 	multisigOwnersDB database.Database
 
-	// Consortium member nodes
-	consortiumMemberNodesCache cache.Cacher
-	consortiumMemberNodesDB    database.Database
+	// shortIDs link
+	shortLinksCache cache.Cacher
+	shortLinksDB    database.Database
 
 	//  Claimable & rewards
 	claimableDB database.Database
@@ -169,12 +169,12 @@ type caminoState struct {
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:         make(map[ids.ShortID]uint64),
-		modifiedDepositOffers:         make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:              make(map[ids.ID]*deposit.Deposit),
-		modifiedMultisigOwners:        make(map[ids.ShortID]*multisig.Alias),
-		modifiedConsortiumMemberNodes: make(map[ids.NodeID]*ids.ShortID),
-		modifiedClaimables:            make(map[ids.ID]*Claimable),
+		modifiedAddressStates:  make(map[ids.ShortID]uint64),
+		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
+		modifiedDeposits:       make(map[ids.ID]*deposit.Deposit),
+		modifiedMultisigOwners: make(map[ids.ShortID]*multisig.Alias),
+		modifiedShortLinks:     make(map[ids.ID]*ids.ShortID),
+		modifiedClaimables:     make(map[ids.ID]*Claimable),
 	}
 }
 
@@ -226,8 +226,8 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		multisigOwnersDB: prefixdb.New(multisigOwnersPrefix, baseDB),
 
 		// Consortium member nodes
-		consortiumMemberNodesCache: consortiumMemberNodesCache,
-		consortiumMemberNodesDB:    prefixdb.New(consortiumMemberNodesPrefix, baseDB),
+		shortLinksCache: consortiumMemberNodesCache,
+		shortLinksDB:    prefixdb.New(consortiumMemberNodesPrefix, baseDB),
 
 		//  Claimable & rewards
 		claimableDB: prefixdb.New(claimablesPrefix, baseDB),
@@ -287,14 +287,16 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding consortium member nodes
 
 	for _, consortiumMemberNode := range g.Camino.ConsortiumMembersNodeIDs {
-		cs.SetNodeConsortiumMember(consortiumMemberNode.NodeID, &consortiumMemberNode.ConsortiumMemberAddress)
-		addrState, err := cs.GetAddressStates(consortiumMemberNode.ConsortiumMemberAddress)
-		if err != nil {
-			return err
-		}
-		cs.SetAddressStates(
+		cs.SetShortIDLink(
+			ids.ShortID(consortiumMemberNode.NodeID),
+			ShortLinkKeyRegisterNode,
+			&consortiumMemberNode.ConsortiumMemberAddress,
+		)
+		backLink := ids.ShortID(consortiumMemberNode.NodeID)
+		cs.SetShortIDLink(
 			consortiumMemberNode.ConsortiumMemberAddress,
-			addrState|txs.AddressStateRegisteredNodeBit,
+			ShortLinkKeyRegisterNode,
+			&backLink,
 		)
 	}
 
@@ -457,7 +459,7 @@ func (cs *caminoState) Write() error {
 	if err := cs.writeMultisigOwners(); err != nil {
 		return err
 	}
-	if err := cs.writeNodeConsortiumMembers(); err != nil {
+	if err := cs.writeShortLinks(); err != nil {
 		return err
 	}
 	if err := cs.writeClaimableAndValidatorRewards(); err != nil {
@@ -475,7 +477,7 @@ func (cs *caminoState) Close() error {
 		cs.depositOffersDB.Close(),
 		cs.depositsDB.Close(),
 		cs.multisigOwnersDB.Close(),
-		cs.consortiumMemberNodesDB.Close(),
+		cs.shortLinksDB.Close(),
 		cs.claimableDB.Close(),
 	)
 	return errs.Err

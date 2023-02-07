@@ -484,6 +484,35 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 	return errs.Err
 }
 
+func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSONAddress, response *api.JSONAddress) error {
+	var id ids.ShortID
+	isNodeID := false
+	if nodeID, err := ids.NodeIDFromString(args.Address); err == nil {
+		id = ids.ShortID(nodeID)
+		isNodeID = true
+	} else {
+		id, err = avax.ParseServiceAddress(s.addrManager, args.Address)
+		if err != nil {
+			return err
+		}
+	}
+
+	link, err := s.vm.state.GetShortIDLink(id, state.ShortLinkKeyRegisterNode)
+	if err != nil {
+		return err
+	}
+
+	if isNodeID {
+		response.Address, err = s.addrManager.FormatLocalAddress(link)
+		if err != nil {
+			return err
+		}
+	} else {
+		response.Address = ids.NodeID(link).String()
+	}
+	return nil
+}
+
 type GetClaimablesArgs struct {
 	platformapi.Owner
 

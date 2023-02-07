@@ -45,7 +45,8 @@ var (
 	errNotConsortiumMember        = errors.New("address isn't consortium member")
 	errConsortiumMemberHasNode    = errors.New("consortium member already has registered node")
 	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
-	errNotNodeOwner               = errors.New("node is registered for another consortium member address")
+	errNodeNotRegistered          = errors.New("no address registered for this node")
+	errNotNodeOwner               = errors.New("node is registered for another address")
 	errDepositCredentialMissmatch = errors.New("deposit credential isn't matching")
 	errDepositNotFound            = errors.New("deposit tx not found")
 	errNotSECPOwner               = errors.New("owner is not *secp256k1fx.OutputOwners")
@@ -120,9 +121,12 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 	// verify that node owned by consortium member
 
-	consortiumMemberAddress, err := e.State.GetNodeConsortiumMember(tx.NodeID())
+	consortiumMemberAddress, err := e.State.GetShortIDLink(
+		ids.ShortID(tx.NodeID()),
+		state.ShortLinkKeyRegisterNode,
+	)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errNotConsortiumMember, err)
+		return fmt.Errorf("%w: %s", errNodeNotRegistered, err)
 	}
 
 	// verifying consortium member signatures
@@ -780,8 +784,13 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	newNodeIDEmpty := tx.NewNodeID == ids.EmptyNodeID
 	oldNodeIDEmpty := tx.OldNodeID == ids.EmptyNodeID
 
-	if oldNodeIDEmpty && !newNodeIDEmpty &&
-		consortiumMemberAddressState&txs.AddressStateRegisteredNodeBit != 0 {
+	linkedNodeID, err := e.State.GetShortIDLink(tx.ConsortiumMemberAddress, state.ShortLinkKeyRegisterNode)
+	haslinkedNode := err != database.ErrNotFound
+	if err != nil {
+		return err
+	}
+
+	if oldNodeIDEmpty && haslinkedNode {
 		return errConsortiumMemberHasNode
 	}
 
@@ -803,25 +812,13 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	// verify old nodeID ownership
 
-	if !oldNodeIDEmpty {
-		oldNodeOwnerAddr, err := e.State.GetNodeConsortiumMember(tx.OldNodeID)
-		if err != nil {
-			return err
-		}
-		if oldNodeOwnerAddr != tx.ConsortiumMemberAddress {
-			return errNotNodeOwner
-		}
+	if !oldNodeIDEmpty && (!haslinkedNode || tx.OldNodeID != ids.NodeID(linkedNodeID)) {
+		return errNotNodeOwner
 	}
 
 	// verify new nodeID cred
 
 	if !newNodeIDEmpty {
-		// there mustn't be an existing entry
-		if oldNodeIDEmpty {
-			if _, err := e.State.GetNodeConsortiumMember(tx.NewNodeID); err == nil {
-				return errNotNodeOwner
-			}
-		}
 		if err := e.Backend.Fx.VerifyPermission(
 			e.Tx.Unsigned,
 			&secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -860,23 +857,20 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	utxo.Produce(e.State, txID, tx.Outs)
 
 	if !oldNodeIDEmpty {
-		e.State.SetNodeConsortiumMember(tx.OldNodeID, nil)
+		e.State.SetShortIDLink(ids.ShortID(tx.OldNodeID), state.ShortLinkKeyRegisterNode, nil)
+		e.State.SetShortIDLink(tx.ConsortiumMemberAddress, state.ShortLinkKeyRegisterNode, nil)
 	}
 
 	if !newNodeIDEmpty {
-		e.State.SetNodeConsortiumMember(tx.NewNodeID, &tx.ConsortiumMemberAddress)
-	}
-
-	newConsortiumMemberAddressState := consortiumMemberAddressState
-
-	if oldNodeIDEmpty && !newNodeIDEmpty {
-		newConsortiumMemberAddressState |= txs.AddressStateRegisteredNodeBit
-	} else if newNodeIDEmpty {
-		newConsortiumMemberAddressState &^= txs.AddressStateRegisteredNodeBit
-	}
-
-	if newConsortiumMemberAddressState != consortiumMemberAddressState {
-		e.State.SetAddressStates(tx.ConsortiumMemberAddress, newConsortiumMemberAddressState)
+		e.State.SetShortIDLink(ids.ShortID(tx.NewNodeID),
+			state.ShortLinkKeyRegisterNode,
+			&tx.ConsortiumMemberAddress,
+		)
+		link := ids.ShortID(tx.NewNodeID)
+		e.State.SetShortIDLink(tx.ConsortiumMemberAddress,
+			state.ShortLinkKeyRegisterNode,
+			&link,
+		)
 	}
 
 	return nil
@@ -973,10 +967,6 @@ func verifyAccess(roles, statesBit uint64) error {
 	case (roles & txs.AddressStateRoleAdminBit) != 0:
 	case (txs.AddressStateKycBits & statesBit) != 0:
 		if (roles & txs.AddressStateRoleKycBit) == 0 {
-			return errInvalidRoles
-		}
-	case (txs.AddressStateRegisteredNodeBit & statesBit) != 0:
-		if (roles & txs.AddressStateRoleValidatorBit) == 0 {
 			return errInvalidRoles
 		}
 	case (txs.AddressStateRoleBits & statesBit) != 0:

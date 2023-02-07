@@ -83,12 +83,12 @@ func (s *state) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
 	return s.caminoState.GetMultisigAlias(alias)
 }
 
-func (s *state) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
-	s.caminoState.SetNodeConsortiumMember(nodeID, addr)
+func (s *state) SetShortIDLink(id ids.ShortID, key ShortLinkKey, link *ids.ShortID) {
+	s.caminoState.SetShortIDLink(id, key, link)
 }
 
-func (s *state) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
-	return s.caminoState.GetNodeConsortiumMember(nodeID)
+func (s *state) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, error) {
+	return s.caminoState.GetShortIDLink(id, key)
 }
 
 func (s *state) SetLastRewardImportTimestamp(timestamp uint64) {

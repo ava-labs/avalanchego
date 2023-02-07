@@ -91,9 +91,9 @@ func TestCaminoAdvanceTimeTo(t *testing.T) {
 
 				baseState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				baseState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
-				baseState.EXPECT().GetNodeConsortiumMember(nodeID1).Return(validatorAddr1, nil)
-				baseState.EXPECT().GetNodeConsortiumMember(nodeID2).Return(validatorAddr2, nil)
-				baseState.EXPECT().GetNodeConsortiumMember(nodeID4).Return(validatorAddr4, nil)
+				baseState.EXPECT().GetShortIDLink(ids.ShortID(nodeID1), state.ShortLinkKeyRegisterNode).Return(validatorAddr1, nil)
+				baseState.EXPECT().GetShortIDLink(ids.ShortID(nodeID2), state.ShortLinkKeyRegisterNode).Return(validatorAddr2, nil)
+				baseState.EXPECT().GetShortIDLink(ids.ShortID(nodeID4), state.ShortLinkKeyRegisterNode).Return(validatorAddr4, nil)
 				baseState.EXPECT().GetNotDistributedValidatorReward().Return(uint64(1), nil)
 				baseState.EXPECT().GetClaimable(validatorOwnerID1).Return(&state.Claimable{
 					Owner:           &validatorOwner1,
