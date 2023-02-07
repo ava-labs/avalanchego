@@ -69,7 +69,7 @@ func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
 	key, err := secp256k1.ParsePubKey(b)
 	return &PublicKeySECP256K1R{
 		pk:    key,
-		bytes: b,
+		bytes: key.SerializeCompressed(),
 	}, err
 }
 
