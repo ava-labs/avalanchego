@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -10,41 +10,44 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	nodeID         = ids.GenerateTestNodeID()
-	depositOfferID = ids.GenerateTestID()
-	shortID2       = ids.GenerateTestShortID()
+	nodeID   = ids.GenerateTestNodeID()
+	shortID2 = ids.GenerateTestShortID()
 )
 
 func TestUnparse(t *testing.T) {
-	type fields struct {
-		VerifyNodeSignature      bool
-		LockModeBondDeposit      bool
-		InitialAdmin             ids.ShortID
-		DepositOffers            []genesis.DepositOffer
-		Allocations              []CaminoAllocation
-		InitialMultisigAddresses []genesis.MultisigAlias
-	}
 	type args struct {
 		networkID uint32
 	}
 	tests := map[string]struct {
-		fields fields
+		camino Camino
 		args   args
 		want   UnparsedCamino
 		err    error
 	}{
 		"success": {
 			args: args{networkID: 12345},
-			fields: fields{
+			camino: Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        sampleShortID,
-				DepositOffers:       nil,
+				DepositOffers: []DepositOffer{{
+					InterestRateNominator:   1,
+					Start:                   2,
+					End:                     3,
+					MinAmount:               4,
+					MinDuration:             5,
+					MaxDuration:             6,
+					UnlockPeriodDuration:    7,
+					NoRewardsPeriodDuration: 8,
+					Memo:                    "offer memo",
+					Flags:                   deposit.OfferFlagLocked,
+				}},
 				Allocations: []CaminoAllocation{{
 					ETHAddr:       sampleShortID,
 					AVAXAddr:      sampleShortID,
@@ -54,7 +57,10 @@ func TestUnparse(t *testing.T) {
 						Amount:            1,
 						NodeID:            nodeID,
 						ValidatorDuration: 1,
-						DepositOfferID:    depositOfferID,
+						DepositDuration:   1,
+						DepositOfferMemo:  "deposit offer memo",
+						TimestampOffset:   1,
+						Memo:              "some str",
 					}},
 				}},
 				InitialMultisigAddresses: []genesis.MultisigAlias{{
@@ -67,7 +73,20 @@ func TestUnparse(t *testing.T) {
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        "X-" + wrappers.IgnoreError(address.FormatBech32("local", sampleShortID.Bytes())).(string),
-				DepositOffers:       []UnparsedDepositOffer{},
+				DepositOffers: []UnparsedDepositOffer{{
+					InterestRateNominator:   1,
+					StartOffset:             2,
+					EndOffset:               3,
+					MinAmount:               4,
+					MinDuration:             5,
+					MaxDuration:             6,
+					UnlockPeriodDuration:    7,
+					NoRewardsPeriodDuration: 8,
+					Memo:                    "offer memo",
+					Flags: UnparsedDepositOfferFlags{
+						Locked: true,
+					},
+				}},
 				Allocations: []UnparsedCaminoAllocation{{
 					ETHAddr:       "0x" + hex.EncodeToString(sampleShortID.Bytes()),
 					AVAXAddr:      "X-" + wrappers.IgnoreError(address.FormatBech32("local", sampleShortID.Bytes())).(string),
@@ -77,7 +96,10 @@ func TestUnparse(t *testing.T) {
 						Amount:            1,
 						NodeID:            nodeID.String(),
 						ValidatorDuration: 1,
-						DepositOfferID:    depositOfferID.String(),
+						DepositDuration:   1,
+						DepositOfferMemo:  "deposit offer memo",
+						TimestampOffset:   1,
+						Memo:              "some str",
 					}},
 				}},
 				InitialMultisigAddresses: []UnparsedMultisigAlias{{
@@ -90,15 +112,7 @@ func TestUnparse(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := Camino{
-				VerifyNodeSignature:      tt.fields.VerifyNodeSignature,
-				LockModeBondDeposit:      tt.fields.LockModeBondDeposit,
-				InitialAdmin:             tt.fields.InitialAdmin,
-				DepositOffers:            tt.fields.DepositOffers,
-				Allocations:              tt.fields.Allocations,
-				InitialMultisigAddresses: tt.fields.InitialMultisigAddresses,
-			}
-			got, err := c.Unparse(tt.args.networkID, 0)
+			got, err := tt.camino.Unparse(tt.args.networkID, 0)
 
 			if tt.err != nil {
 				require.ErrorContains(t, err, tt.err.Error())

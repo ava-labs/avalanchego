@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -176,17 +175,15 @@ func TestUnlockDepositTx(t *testing.T) {
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		DepositOffers: []genesis.DepositOffer{
-			{
-				UnlockPeriodDuration:  60,
-				InterestRateNominator: 0,
-				Start:                 uint64(time.Now().Add(-60 * time.Hour).Unix()),
-				End:                   uint64(time.Now().Add(+60 * time.Hour).Unix()),
-				MinAmount:             1,
-				MinDuration:           60,
-				MaxDuration:           60,
-			},
-		},
+		DepositOffers: []*deposits.Offer{{
+			UnlockPeriodDuration:  60,
+			InterestRateNominator: 0,
+			Start:                 uint64(time.Now().Add(-60 * time.Hour).Unix()),
+			End:                   uint64(time.Now().Add(+60 * time.Hour).Unix()),
+			MinAmount:             1,
+			MinDuration:           60,
+			MaxDuration:           60,
+		}},
 	}
 	testKey, err := testKeyfactory.NewPrivateKey()
 	require.NoError(t, err)

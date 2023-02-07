@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 func (cs *caminoState) AddDepositOffer(offer *deposit.Offer) {
@@ -89,22 +88,4 @@ func (cs *caminoState) writeDepositOffers() error {
 		}
 	}
 	return nil
-}
-
-func ParseDepositOfferFromGenesisOffer(genesisOffer *genesis.DepositOffer) (*deposit.Offer, error) {
-	offer := &deposit.Offer{
-		InterestRateNominator:   genesisOffer.InterestRateNominator,
-		Start:                   genesisOffer.Start,
-		End:                     genesisOffer.End,
-		MinAmount:               genesisOffer.MinAmount,
-		MinDuration:             genesisOffer.MinDuration,
-		MaxDuration:             genesisOffer.MaxDuration,
-		UnlockPeriodDuration:    genesisOffer.UnlockPeriodDuration,
-		NoRewardsPeriodDuration: genesisOffer.NoRewardsPeriodDuration,
-		Flags:                   genesisOffer.Flags,
-	}
-	if err := offer.SetID(); err != nil {
-		return nil, err
-	}
-	return offer, nil
 }

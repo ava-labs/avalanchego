@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -22,7 +23,6 @@ import (
 )
 
 var (
-	errNonExistingOffer             = errors.New("non existing deposit offer")
 	errWrongUTXONumber              = errors.New("not matching amount of utxo deposits and utxos")
 	errWrongValidatorNumber         = errors.New("not matching amount of validator deposits and validators")
 	errWrongDepositsAndStakedNumber = errors.New("not matching amount of deposit definitions ad validator staked outs")
@@ -41,7 +41,7 @@ type Camino struct {
 	LockModeBondDeposit        bool                    `json:"lockModeBondDeposit"`
 	InitialAdmin               ids.ShortID             `json:"initialAdmin"`
 	AddressStates              []genesis.AddressState  `json:"addressStates"`
-	DepositOffers              []genesis.DepositOffer  `json:"depositOffers"`
+	DepositOffers              []*deposit.Offer        `json:"depositOffers"`
 	ValidatorDeposits          [][]UTXODeposit         `json:"validatorDeposits"`
 	ValidatorConsortiumMembers []ids.ShortID           `json:"validatorConsortiumMembers"`
 	UTXODeposits               []UTXODeposit           `json:"utxoDeposits"`
@@ -82,16 +82,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	genesisBlocks := map[uint64]*genesis.Block{}
 	consortiumMemberNodes := make([]genesis.ConsortiumMemberNodeID, len(args.Validators))
 
-	offers := make(map[ids.ID]genesis.DepositOffer, len(args.Camino.DepositOffers))
-	for i := range args.Camino.DepositOffers {
-		offer := args.Camino.DepositOffers[i]
-		offerID, err := offer.ID()
-		if err != nil {
-			return err
-		}
-		offers[offerID] = offer
-	}
-
 	for validatorIndex, vdr := range args.Validators {
 		vdr := vdr
 		validatorTx, err := makeValidator(
@@ -125,7 +115,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 			innerOut := output.Out.(*locked.Out).TransferableOut.(*secp256k1fx.TransferOutput)
 
 			utxo, depositTx, err := makeUTXOAndDeposit(
-				offers,
 				uint64(vdr.Staked[i].Amount),
 				bondTxID,
 				args.Camino.ValidatorDeposits[validatorIndex][i],
@@ -180,7 +169,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 
 		utxo, depositTx, err := makeUTXOAndDeposit(
-			offers,
 			uint64(apiUTXO.Amount),
 			ids.Empty,
 			args.Camino.UTXODeposits[i],
@@ -250,6 +238,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	}
 
 	camino := args.Camino.ParseToGenesis()
+
 	camino.Blocks = make([]*genesis.Block, 0, len(genesisBlocks))
 	for _, genesisBlock := range genesisBlocks {
 		if len(genesisBlock.UnlockedUTXOsTxs) != 0 {
@@ -366,7 +355,6 @@ func makeValidator(
 }
 
 func makeUTXOAndDeposit(
-	offers map[ids.ID]genesis.DepositOffer,
 	amount uint64,
 	bondTxID ids.ID,
 	deposit UTXODeposit,
@@ -394,11 +382,6 @@ func makeUTXOAndDeposit(
 	txID := bondTxID
 	depositTxID := ids.Empty
 	if deposit.OfferID != ids.Empty {
-		_, ok := offers[deposit.OfferID]
-		if !ok {
-			return nil, nil, errNonExistingOffer
-		}
-
 		ins := []*avax.TransferableInput{}
 		if bondTxID != ids.Empty {
 			ins = append(ins, &avax.TransferableInput{

@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -30,7 +31,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 
 	avaxAssetID := ids.ID{}
 
-	depositOffer := []genesis.DepositOffer{{
+	depositOffer := &deposit.Offer{
 		InterestRateNominator:   1,
 		Start:                   2,
 		End:                     3,
@@ -40,9 +41,10 @@ func TestBuildCaminoGenesis(t *testing.T) {
 		UnlockPeriodDuration:    7,
 		NoRewardsPeriodDuration: 8,
 		Flags:                   9,
-	}}
-	depositOfferID, ok := depositOffer[0].ID()
-	require.NoError(t, ok)
+		Memo:                    []byte("some memo"),
+	}
+	require.NoError(t, depositOffer.SetID())
+
 	weight := json.Uint64(987654321)
 
 	tests := map[string]struct {
@@ -81,18 +83,18 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					LockModeBondDeposit:        true,
 					ValidatorConsortiumMembers: []ids.ShortID{addr},
 					ValidatorDeposits: [][]UTXODeposit{{{
-						depositOfferID,
+						depositOffer.ID,
 						10,
 						10,
 						"",
 					}}},
 					UTXODeposits: []UTXODeposit{{
-						depositOfferID,
+						depositOffer.ID,
 						10,
 						10,
 						"",
 					}},
-					DepositOffers: depositOffer,
+					DepositOffers: []*deposit.Offer{depositOffer},
 				},
 				Time:          5,
 				InitialSupply: 0,
@@ -187,7 +189,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 								}},
 							},
 						},
-						DepositOfferID:  depositOfferID,
+						DepositOfferID:  depositOffer.ID,
 						DepositDuration: 10,
 						RewardsOwner: &secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -224,7 +226,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 								}},
 							},
 						},
-						DepositOfferID:  depositOfferID,
+						DepositOfferID:  depositOffer.ID,
 						DepositDuration: 10,
 						RewardsOwner: &secp256k1fx.OutputOwners{
 							Threshold: 1,
@@ -296,7 +298,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 						LockModeBondDeposit: true,
 						InitialAdmin:        ids.ShortEmpty,
 						AddressStates:       []genesis.AddressState{},
-						DepositOffers:       depositOffer,
+						DepositOffers:       []*deposit.Offer{depositOffer},
 						Blocks: []*genesis.Block{
 							{
 								Timestamp:  0,
@@ -356,7 +358,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					ValidatorDeposits: [][]UTXODeposit{
 						{
 							{
-								depositOfferID,
+								depositOffer.ID,
 								10,
 								10,
 								"",
@@ -365,13 +367,13 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 					UTXODeposits: []UTXODeposit{
 						{
-							depositOfferID,
+							depositOffer.ID,
 							10,
 							10,
 							"",
 						},
 					},
-					DepositOffers: depositOffer,
+					DepositOffers: []*deposit.Offer{depositOffer},
 				},
 				Time:          5,
 				InitialSupply: 0,
@@ -502,71 +504,6 @@ func TestBuildCaminoGenesis(t *testing.T) {
 			reply:       BuildGenesisReply{},
 			expectedErr: errWrongDepositsAndStakedNumber,
 		},
-		"Non Existing Deposit Offer": {
-			args: BuildGenesisArgs{
-				AvaxAssetID: ids.ID{},
-				NetworkID:   0,
-				UTXOs: []UTXO{
-					{
-						Address: addrStr,
-						Amount:  10,
-					},
-				},
-				Validators: []PermissionlessValidator{
-					{
-						Staker: Staker{
-							StartTime: 0,
-							EndTime:   20,
-							NodeID:    nodeID,
-						},
-						RewardOwner: &Owner{
-							Threshold: 1,
-							Addresses: []string{addrStr},
-						},
-						Staked: []UTXO{{
-							Amount:  weight,
-							Address: addrStr,
-						}},
-					},
-				},
-				Chains: []Chain{
-					{
-						VMID:     ids.GenerateTestID(),
-						SubnetID: ids.GenerateTestID(),
-					},
-				},
-				Camino: Camino{
-					VerifyNodeSignature: true,
-					LockModeBondDeposit: true,
-					InitialAdmin:        ids.ShortID{},
-					AddressStates:       nil,
-					DepositOffers:       nil,
-					ValidatorConsortiumMembers: []ids.ShortID{
-						ids.GenerateTestShortID(),
-					},
-					ValidatorDeposits: [][]UTXODeposit{
-						{
-							{
-								ids.GenerateTestID(),
-								10,
-								10,
-								"",
-							},
-						},
-					},
-					UTXODeposits: []UTXODeposit{
-						{
-							ids.GenerateTestID(),
-							10,
-							10,
-							"",
-						},
-					},
-				},
-			},
-			reply:       BuildGenesisReply{},
-			expectedErr: errNonExistingOffer,
-		},
 		"UTXO Has No Value": {
 			args: BuildGenesisArgs{
 				AvaxAssetID: ids.ID{},
@@ -604,7 +541,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					ValidatorDeposits: [][]UTXODeposit{
 						{
 							{
-								depositOfferID,
+								depositOffer.ID,
 								10,
 								10,
 								"",
@@ -613,13 +550,13 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 					UTXODeposits: []UTXODeposit{
 						{
-							depositOfferID,
+							depositOffer.ID,
 							10,
 							10,
 							"",
 						},
 					},
-					DepositOffers: depositOffer,
+					DepositOffers: []*deposit.Offer{depositOffer},
 				},
 				Time:          5,
 				InitialSupply: 0,

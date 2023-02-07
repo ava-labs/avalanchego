@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -1837,7 +1836,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 	currentTime := time.Now()
 
-	testDepositOffer := genesis.DepositOffer{
+	testDepositOffer := &deposits.Offer{
 		InterestRateNominator:   0,
 		Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 		End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -1880,7 +1879,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos:          []*avax.UTXO{},
 			generateIns:    noInputs,
@@ -1892,7 +1891,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1918,7 +1917,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1943,7 +1942,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1970,7 +1969,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1996,7 +1995,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2020,18 +2019,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   0,
-						Start:                   uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						MinAmount:               1,
-						MinDuration:             60,
-						MaxDuration:             60,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 0,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   0,
+					Start:                   uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					MinAmount:               1,
+					MinDuration:             60,
+					MaxDuration:             60,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 0,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2057,18 +2054,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   0,
-						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						MinAmount:               1,
-						MinDuration:             60,
-						MaxDuration:             60,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 0,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   0,
+					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					MinAmount:               1,
+					MinDuration:             60,
+					MaxDuration:             60,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 0,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2094,18 +2089,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   0,
-						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						MinAmount:               1,
-						MinDuration:             100,
-						MaxDuration:             100,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 40,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   0,
+					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					MinAmount:               1,
+					MinDuration:             100,
+					MaxDuration:             100,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 40,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2131,18 +2124,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   0,
-						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						MinAmount:               1,
-						MinDuration:             60,
-						MaxDuration:             30,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 0,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   0,
+					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					MinAmount:               1,
+					MinDuration:             60,
+					MaxDuration:             30,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 0,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2168,18 +2159,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   0,
-						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						MinAmount:               defaultCaminoValidatorWeight * 2,
-						MinDuration:             60,
-						MaxDuration:             60,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 0,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   0,
+					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					MinAmount:               defaultCaminoValidatorWeight * 2,
+					MinDuration:             60,
+					MaxDuration:             60,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 0,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2205,9 +2194,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, existingTxID),
@@ -2232,9 +2219,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
@@ -2261,9 +2246,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, dummyOutputOwners, ids.Empty, ids.Empty),
@@ -2289,9 +2272,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
@@ -2317,18 +2298,16 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					{
-						InterestRateNominator:   1000 * units.MegaAvax,
-						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
-						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
-						MinAmount:               1,
-						MinDuration:             60,
-						MaxDuration:             60,
-						UnlockPeriodDuration:    60,
-						NoRewardsPeriodDuration: 0,
-					},
-				},
+				DepositOffers: []*deposits.Offer{{
+					InterestRateNominator:   1000 * units.MegaAvax,
+					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
+					MinAmount:               1,
+					MinDuration:             60,
+					MaxDuration:             60,
+					UnlockPeriodDuration:    60,
+					NoRewardsPeriodDuration: 0,
+				}},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2354,9 +2333,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2382,9 +2359,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance+10, outputOwners, ids.Empty, ids.Empty),
@@ -2411,9 +2386,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
@@ -2440,9 +2413,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee+defaultCaminoValidatorWeight/2, outputOwners, ids.Empty, ids.Empty),
@@ -2470,9 +2441,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []genesis.DepositOffer{
-					testDepositOffer,
-				},
+				DepositOffers:       []*deposits.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2577,20 +2546,18 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	depositTxID := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
 
-	genesisDepositOffer := genesis.DepositOffer{
+	depositOffer := &deposits.Offer{
 		MinAmount:            1,
 		MinDuration:          60,
 		MaxDuration:          100,
 		UnlockPeriodDuration: 50,
 	}
-
-	depositOffer, err := state.ParseDepositOfferFromGenesisOffer(&genesisDepositOffer)
-	require.NoError(t, err)
+	require.NoError(t, depositOffer.SetID())
 
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		DepositOffers:       []genesis.DepositOffer{genesisDepositOffer},
+		DepositOffers:       []*deposits.Offer{depositOffer},
 	}
 
 	deposit := &deposits.Deposit{

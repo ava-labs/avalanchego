@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -31,7 +31,7 @@ func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 	c := Camino{
 		VerifyNodeSignature:      uc.VerifyNodeSignature,
 		LockModeBondDeposit:      uc.LockModeBondDeposit,
-		DepositOffers:            make([]genesis.DepositOffer, len(uc.DepositOffers)),
+		DepositOffers:            make([]DepositOffer, len(uc.DepositOffers)),
 		Allocations:              make([]CaminoAllocation, len(uc.Allocations)),
 		InitialMultisigAddresses: make([]genesis.MultisigAlias, len(uc.InitialMultisigAddresses)),
 	}
@@ -128,7 +128,7 @@ type UnparsedPlatformAllocation struct {
 	ValidatorDuration uint64 `json:"validatorDuration,omitempty"`
 	DepositDuration   uint64 `json:"depositDuration,omitempty"`
 	TimestampOffset   uint64 `json:"timestampOffset,omitempty"`
-	DepositOfferID    string `json:"depositOfferID,omitempty"`
+	DepositOfferMemo  string `json:"depositOfferMemo,omitempty"`
 	Memo              string `json:"memo,omitempty"`
 }
 
@@ -137,17 +137,9 @@ func (ua UnparsedPlatformAllocation) Parse() (PlatformAllocation, error) {
 		Amount:            ua.Amount,
 		ValidatorDuration: ua.ValidatorDuration,
 		DepositDuration:   ua.DepositDuration,
+		DepositOfferMemo:  ua.DepositOfferMemo,
 		TimestampOffset:   ua.TimestampOffset,
 		Memo:              ua.Memo,
-	}
-
-	depositOfferID := ids.Empty
-	if ua.DepositOfferID != "" {
-		parsedDepositOfferID, err := ids.FromString(ua.DepositOfferID)
-		if err != nil {
-			return a, err
-		}
-		depositOfferID = parsedDepositOfferID
 	}
 
 	nodeID := ids.EmptyNodeID
@@ -160,7 +152,6 @@ func (ua UnparsedPlatformAllocation) Parse() (PlatformAllocation, error) {
 	}
 
 	a.NodeID = nodeID
-	a.DepositOfferID = depositOfferID
 
 	return a, nil
 }
@@ -217,7 +208,6 @@ func (uma UnparsedMultisigAlias) Parse() (genesis.MultisigAlias, error) {
 }
 
 type UnparsedDepositOffer struct {
-	OfferID                 string                    `json:"offerID"`
 	InterestRateNominator   uint64                    `json:"interestRateNominator"`
 	StartOffset             uint64                    `json:"startOffset"`
 	EndOffset               uint64                    `json:"endOffset"`
@@ -226,6 +216,7 @@ type UnparsedDepositOffer struct {
 	MaxDuration             uint32                    `json:"maxDuration"`
 	UnlockPeriodDuration    uint32                    `json:"unlockPeriodDuration"`
 	NoRewardsPeriodDuration uint32                    `json:"noRewardsPeriodDuration"`
+	Memo                    string                    `json:"memo"`
 	Flags                   UnparsedDepositOfferFlags `json:"flags"`
 }
 
@@ -233,14 +224,15 @@ type UnparsedDepositOfferFlags struct {
 	Locked bool `json:"locked"`
 }
 
-func (udo UnparsedDepositOffer) Parse(startTime uint64) (genesis.DepositOffer, error) {
-	do := genesis.DepositOffer{
+func (udo UnparsedDepositOffer) Parse(startTime uint64) (DepositOffer, error) {
+	do := DepositOffer{
 		InterestRateNominator:   udo.InterestRateNominator,
 		MinAmount:               udo.MinAmount,
 		MinDuration:             udo.MinDuration,
 		MaxDuration:             udo.MaxDuration,
 		UnlockPeriodDuration:    udo.UnlockPeriodDuration,
 		NoRewardsPeriodDuration: udo.NoRewardsPeriodDuration,
+		Memo:                    udo.Memo,
 	}
 
 	offerStartTime, err := math.Add64(startTime, udo.StartOffset)
@@ -259,44 +251,5 @@ func (udo UnparsedDepositOffer) Parse(startTime uint64) (genesis.DepositOffer, e
 		do.Flags |= deposit.OfferFlagLocked
 	}
 
-	if offerID, err := ids.FromString(udo.OfferID); err != nil {
-		return do, err
-	} else {
-		do.OfferID = offerID
-	}
-
 	return do, nil
-}
-
-func (udo *UnparsedDepositOffer) Unparse(do genesis.DepositOffer, startime uint64) error {
-	udo.InterestRateNominator = do.InterestRateNominator
-	udo.MinAmount = do.MinAmount
-	udo.MinDuration = do.MinDuration
-	udo.MaxDuration = do.MaxDuration
-	udo.UnlockPeriodDuration = do.UnlockPeriodDuration
-	udo.NoRewardsPeriodDuration = do.NoRewardsPeriodDuration
-
-	offerID, err := do.ID()
-	if err != nil {
-		return err
-	}
-	udo.OfferID = offerID.String()
-
-	offerStartOffset, err := math.Sub(do.Start, startime)
-	if err != nil {
-		return err
-	}
-	udo.StartOffset = offerStartOffset
-
-	offerEndOffset, err := math.Sub(do.End, startime)
-	if err != nil {
-		return err
-	}
-	udo.EndOffset = offerEndOffset
-
-	if do.Flags&deposit.OfferFlagLocked != 0 {
-		udo.Flags.Locked = true
-	}
-
-	return nil
 }

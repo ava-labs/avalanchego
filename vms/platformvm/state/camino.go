@@ -301,14 +301,8 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding deposit offers
 
 	depositOffers := make(map[ids.ID]*deposit.Offer, len(g.Camino.DepositOffers))
-	for _, genesisOffer := range g.Camino.DepositOffers {
-		genesisOffer := genesisOffer
-		offer, err := ParseDepositOfferFromGenesisOffer(&genesisOffer)
-		if err != nil {
-			return err
-		}
+	for _, offer := range g.Camino.DepositOffers {
 		depositOffers[offer.ID] = offer
-
 		cs.AddDepositOffer(offer)
 	}
 

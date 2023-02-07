@@ -1,9 +1,11 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package deposit
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -25,15 +27,16 @@ var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
 type Offer struct {
 	ID ids.ID
 
-	InterestRateNominator   uint64 `serialize:"true"`
-	Start                   uint64 `serialize:"true"`
-	End                     uint64 `serialize:"true"`
-	MinAmount               uint64 `serialize:"true"`
-	MinDuration             uint32 `serialize:"true"`
-	MaxDuration             uint32 `serialize:"true"`
-	UnlockPeriodDuration    uint32 `serialize:"true"`
-	NoRewardsPeriodDuration uint32 `serialize:"true"`
-	Flags                   uint64 `serialize:"true"`
+	InterestRateNominator   uint64 `serialize:"true" json:"InterestRateNominator"`
+	Start                   uint64 `serialize:"true" json:"Start"`
+	End                     uint64 `serialize:"true" json:"End"`
+	MinAmount               uint64 `serialize:"true" json:"MinAmount"`
+	MinDuration             uint32 `serialize:"true" json:"MinDuration"`
+	MaxDuration             uint32 `serialize:"true" json:"MaxDuration"`
+	UnlockPeriodDuration    uint32 `serialize:"true" json:"UnlockPeriodDuration"`
+	NoRewardsPeriodDuration uint32 `serialize:"true" json:"NoRewardsPeriodDuration"`
+	Memo                    []byte `serialize:"true" json:"Memo"`
+	Flags                   uint64 `serialize:"true" json:"Flags"`
 }
 
 // Sets offer id from its bytes hash
@@ -58,6 +61,42 @@ func (o *Offer) EndTime() time.Time {
 
 func (o *Offer) InterestRateFloat64() float64 {
 	return float64(o.InterestRateNominator) / float64(interestRateDenominator)
+}
+
+func (o *Offer) Verify() error {
+	if o.Start >= o.End {
+		return fmt.Errorf(
+			"deposit offer starttime (%v) is not before its endtime (%v)",
+			o.Start,
+			o.End,
+		)
+	}
+
+	if o.MinDuration > o.MaxDuration {
+		return errors.New("deposit minimum duration is greater than maximum duration")
+	}
+
+	if o.MinDuration == 0 {
+		return errors.New("deposit offer has zero minimum duration")
+	}
+
+	if o.MinDuration < o.NoRewardsPeriodDuration {
+		return fmt.Errorf(
+			"deposit offer minimum duration (%v) is less than no-rewards period duration (%v)",
+			o.MinDuration,
+			o.NoRewardsPeriodDuration,
+		)
+	}
+
+	if o.MinDuration < o.UnlockPeriodDuration {
+		return fmt.Errorf(
+			"deposit offer minimum duration (%v) is less than unlock period duration (%v)",
+			o.MinDuration,
+			o.UnlockPeriodDuration,
+		)
+	}
+
+	return nil
 }
 
 type Deposit struct {

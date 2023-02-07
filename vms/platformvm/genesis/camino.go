@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -26,13 +26,18 @@ type Camino struct {
 	LockModeBondDeposit      bool                     `serialize:"true"`
 	InitialAdmin             ids.ShortID              `serialize:"true"`
 	AddressStates            []AddressState           `serialize:"true"`
-	DepositOffers            []DepositOffer           `serialize:"true"`
+	DepositOffers            []*deposit.Offer         `serialize:"true"`
 	Blocks                   []*Block                 `serialize:"true"` // arranged in a block order
 	ConsortiumMembersNodeIDs []ConsortiumMemberNodeID `serialize:"true"`
 	InitialMultisigAddresses []MultisigAlias          `serialize:"true"`
 }
 
 func (c *Camino) Init() error {
+	for _, offer := range c.DepositOffers {
+		if err := offer.SetID(); err != nil {
+			return err
+		}
+	}
 	for _, block := range c.Blocks {
 		if err := block.Init(); err != nil {
 			return err
@@ -49,72 +54,6 @@ type ConsortiumMemberNodeID struct {
 type AddressState struct {
 	Address ids.ShortID `serialize:"true"`
 	State   uint64      `serialize:"true"`
-}
-
-type DepositOffer struct {
-	OfferID                 ids.ID `serialize:"false"`
-	InterestRateNominator   uint64 `serialize:"true" json:"interestRateNominator"`
-	Start                   uint64 `serialize:"true" json:"start"`
-	End                     uint64 `serialize:"true" json:"end"`
-	MinAmount               uint64 `serialize:"true" json:"minAmount"`
-	MinDuration             uint32 `serialize:"true" json:"minDuration"`
-	MaxDuration             uint32 `serialize:"true" json:"maxDuration"`
-	UnlockPeriodDuration    uint32 `serialize:"true" json:"unlockPeriodDuration"`
-	NoRewardsPeriodDuration uint32 `serialize:"true" json:"noRewardsPeriodDuration"`
-	Flags                   uint64 `serialize:"true" json:"flags"`
-}
-
-// Gets offer id from its bytes hash
-func (offer DepositOffer) ID() (ids.ID, error) {
-	bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, offer)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return hashing.ComputeHash256Array(bytes), nil
-}
-
-func (offer DepositOffer) Verify() error {
-	if offer.Start >= offer.End {
-		return fmt.Errorf(
-			"deposit offer starttime (%v) is not before its endtime (%v)",
-			offer.Start,
-			offer.End,
-		)
-	}
-
-	if offer.MinDuration > offer.MaxDuration {
-		return errors.New("deposit minimum duration is greater than maximum duration")
-	}
-
-	if offer.MinDuration == 0 {
-		return errors.New("deposit offer has zero minimum duration")
-	}
-
-	if offer.MinDuration < offer.NoRewardsPeriodDuration {
-		return fmt.Errorf(
-			"deposit offer minimum duration (%v) is less than no-rewards period duration (%v)",
-			offer.MinDuration,
-			offer.NoRewardsPeriodDuration,
-		)
-	}
-
-	if offer.MinDuration < offer.UnlockPeriodDuration {
-		return fmt.Errorf(
-			"deposit offer minimum duration (%v) is less than unlock period duration (%v)",
-			offer.MinDuration,
-			offer.UnlockPeriodDuration,
-		)
-	}
-
-	calcID, err := offer.ID()
-	if err != nil {
-		return err
-	}
-	if offer.OfferID != calcID {
-		return fmt.Errorf("deposit offer ID (%s) mismatched with the calculated one (%s)", offer.OfferID, calcID)
-	}
-
-	return nil
 }
 
 type MultisigAlias struct {

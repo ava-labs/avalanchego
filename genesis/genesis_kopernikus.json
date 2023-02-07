@@ -6,7 +6,7 @@
     "initialAdmin": "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3",
     "depositOffers": [
       {
-        "offerID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
+        "memo": "presale3y",
         "interestRateNominator": 80000,
         "startOffset": 0,
         "endOffset": 112795200,
@@ -20,7 +20,7 @@
         }
       },
       {
-        "offerID": "2AySgbKZp8PP95KCsttY68uKJyFbsATHnE73jk1P9fSppmqV45",
+        "memo": "team5y",
         "interestRateNominator": 0,
         "startOffset": 0,
         "endOffset": 160099200,
@@ -34,7 +34,7 @@
         }
       },
       {
-        "offerID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
+        "memo": "presale4y",
         "interestRateNominator": 90000,
         "startOffset": 0,
         "endOffset": 144331200,
@@ -48,7 +48,7 @@
         }
       },
       {
-        "offerID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
+        "memo": "presale5y",
         "interestRateNominator": 100000,
         "startOffset": 0,
         "endOffset": 175867200,
@@ -62,7 +62,7 @@
         }
       },
       {
-        "offerID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
+        "memo": "undeposittest1y",
         "interestRateNominator": 90000,
         "startOffset": 0,
         "endOffset": 32745600,
@@ -76,7 +76,7 @@
         }
       },
       {
-        "offerID": "2vGw1ZaUWWGxhAm69Dt13zw5sUvmtCbzVTvvzPp34Ch5qEznBg",
+        "memo": "flexdeposittest1",
         "interestRateNominator": 110000,
         "startOffset": 0,
         "endOffset": 64281600,
@@ -90,7 +90,7 @@
         }
       },
       {
-        "offerID": "24zEuyv4zBvF2pGPbzwVYhCxPQUfuqD4pWDRfJrJapXBhFfxDh",
+        "memo": "flexdeposittest2",
         "interestRateNominator": 210000,
         "startOffset": 0,
         "endOffset": 64281600,
@@ -120,14 +120,14 @@
             "validatorDuration": 31536000,
             "depositDuration": 110376000,
             "timestampOffset": 0,
-            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
+            "depositOfferMemo": "presale3y",
             "memo": "KOPERNIKUS"
           },
           {
             "amount": 10000000000000000,
             "depositDuration": 110376000,
             "timestampOffset": 0,
-            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
+            "depositOfferMemo": "presale3y"
           },
           {
             "amount": 4000000000000
@@ -150,7 +150,7 @@
             "amount": 600000000000000,
             "depositDuration": 110376000,
             "timestampOffset": 0,
-            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
+            "depositOfferMemo": "presale3y"
           }
         ]
       }
