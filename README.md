@@ -246,4 +246,3 @@ To officially support a new platform, one must satisfy the following requirement
 **We and our community welcome responsible disclosures.**
 
 Please refer to our [Security Policy](SECURITY.md) and [Security Advisories](https://github.com/ava-labs/avalanchego/security/advisories).
-
