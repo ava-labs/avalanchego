@@ -62,7 +62,7 @@ type pushGossiper struct {
 
 	// [recentTxs] prevent us from over-gossiping the
 	// same transaction in a short period of time.
-	recentTxs *cache.LRU
+	recentTxs *cache.LRU[common.Hash, interface{}]
 
 	codec  codec.Manager
 	signer types.Signer
@@ -86,7 +86,7 @@ func (vm *VM) createGossiper(stats GossipStats) Gossiper {
 		txsToGossip:          make(map[common.Hash]*types.Transaction),
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
-		recentTxs:            &cache.LRU{Size: recentCacheSize},
+		recentTxs:            &cache.LRU[common.Hash, interface{}]{Size: recentCacheSize},
 		codec:                vm.networkCodec,
 		signer:               types.LatestSigner(vm.blockChain.Config()),
 		stats:                stats,
