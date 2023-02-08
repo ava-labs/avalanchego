@@ -58,7 +58,7 @@ type Mempool struct {
 	issuedTxs map[ids.ID]*Tx
 	// discardedTxs is an LRU Cache of transactions that have been discarded after failing
 	// verification.
-	discardedTxs *cache.LRU
+	discardedTxs *cache.LRU[ids.ID, *Tx]
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
 	Pending chan struct{}
@@ -78,7 +78,7 @@ func NewMempool(AVAXAssetID ids.ID, maxSize int) *Mempool {
 	return &Mempool{
 		AVAXAssetID:  AVAXAssetID,
 		issuedTxs:    make(map[ids.ID]*Tx),
-		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
+		discardedTxs: &cache.LRU[ids.ID, *Tx]{Size: discardedTxsCacheSize},
 		currentTxs:   make(map[ids.ID]*Tx),
 		Pending:      make(chan struct{}, 1),
 		txHeap:       newTxHeap(maxSize),
@@ -314,7 +314,7 @@ func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
 		return tx, false, true
 	}
 	if tx, exists := m.discardedTxs.Get(txID); exists {
-		return tx.(*Tx), true, true
+		return tx, true, true
 	}
 
 	return nil, false, false

@@ -67,8 +67,8 @@ type pushGossiper struct {
 
 	// [recentAtomicTxs] and [recentEthTxs] prevent us from over-gossiping the
 	// same transaction in a short period of time.
-	recentAtomicTxs *cache.LRU
-	recentEthTxs    *cache.LRU
+	recentAtomicTxs *cache.LRU[ids.ID, interface{}]
+	recentEthTxs    *cache.LRU[common.Hash, interface{}]
 
 	codec codec.Manager
 	stats GossipSentStats
@@ -93,8 +93,8 @@ func (vm *VM) createGossiper(stats GossipStats) Gossiper {
 		ethTxsToGossip:       make(map[common.Hash]*types.Transaction),
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
-		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
-		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
+		recentAtomicTxs:      &cache.LRU[ids.ID, interface{}]{Size: recentCacheSize},
+		recentEthTxs:         &cache.LRU[common.Hash, interface{}]{Size: recentCacheSize},
 		codec:                vm.networkCodec,
 		stats:                stats,
 	}

@@ -477,7 +477,7 @@ func (vm *VM) Initialize(
 
 	vm.chainConfig = g.Config
 	vm.networkID = vm.ethConfig.NetworkId
-	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
+	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU[ids.ID, *crypto.PublicKeySECP256K1R]{Size: secpFactoryCacheSize}}
 
 	vm.codec = Codec
 
