@@ -840,7 +840,7 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
-	keysNotInSet := make([][]byte, 0, len(keySet))
+	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
 		if len(end) != 0 && bytes.Compare(key, end) > 0 {

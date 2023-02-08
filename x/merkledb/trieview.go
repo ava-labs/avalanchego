@@ -219,7 +219,7 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 
 	// determine all changed node's ancestors and gather dependency data
 	for key, nodeChange := range t.changes.nodes {
-		if _, ok := seen[key]; ok || nodeChange.after == nil {
+		if seen.Contains(key) || nodeChange.after == nil {
 			continue
 		}
 		if _, ok := dependencyCounts[key]; !ok {
@@ -229,13 +229,12 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 		currentNodeKey := key
 
 		parent := t.parents[nodeChange.after.key]
-		_, alreadySeen := seen[currentNodeKey]
 
 		// all ancestors of a modified node need to have their ID updated
 		// if the ancestors have already been seen or there is no parent, we can stop
-		for ; !alreadySeen && parent != nil; _, alreadySeen = seen[currentNodeKey] {
+		for !seen.Contains(currentNodeKey) && parent != nil {
 			// mark the previous node as handled
-			seen[currentNodeKey] = struct{}{}
+			seen.Add(currentNodeKey)
 
 			// move on to the parent of the previous node
 			currentNodeKey = parent.key
@@ -254,7 +253,7 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 
 	// perform hashing in topological order
 	var err error
-	if len(seen) >= minNodeCountForConcurrentHashing {
+	if seen.Len() >= minNodeCountForConcurrentHashing {
 		err = t.calculateIDsConcurrent(ctx, readyNodes, dependencyCounts)
 	} else {
 		err = t.calculateIDsSync(ctx, readyNodes, dependencyCounts)
