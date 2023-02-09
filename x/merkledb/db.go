@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -596,8 +595,7 @@ func (db *Database) Insert(ctx context.Context, k, v []byte) error {
 
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
-		db:   db,
-		data: linkedhashmap.New[string, batchOp](),
+		db: db,
 	}
 }
 
@@ -674,7 +672,7 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 }
 
 // Assumes [db.lock] is held.
-func (db *Database) commitBatch(ops linkedhashmap.LinkedHashmap[string, batchOp]) error {
+func (db *Database) commitBatch(ops []batchOp) error {
 	view, err := db.prepareBatchView(context.Background(), ops)
 	if err != nil {
 		return err
@@ -932,22 +930,21 @@ func (db *Database) getKeyValues(
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareBatchView(
 	ctx context.Context,
-	ops linkedhashmap.LinkedHashmap[string, batchOp],
+	ops []batchOp,
 ) (*trieView, error) {
-	view, err := db.newPreallocatedView(ctx, ops.Len())
+	view, err := db.newPreallocatedView(ctx, len(ops))
 	if err != nil {
 		return nil, err
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
 
 	// write into the trie
-	it := ops.NewIterator()
-	for it.Next() {
-		if it.Value().delete {
-			if err := view.remove(ctx, []byte(it.Key())); err != nil {
+	for _, op := range ops {
+		if op.delete {
+			if err := view.remove(ctx, op.key); err != nil {
 				return nil, err
 			}
-		} else if err := view.insert(ctx, []byte(it.Key()), it.Value().value); err != nil {
+		} else if err := view.insert(ctx, op.key, op.value); err != nil {
 			return nil, err
 		}
 	}

@@ -7,12 +7,12 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 )
 
 var _ database.Batch = &batch{}
 
 type batchOp struct {
+	key    []byte
 	value  []byte
 	delete bool
 }
@@ -21,29 +21,27 @@ type batchOp struct {
 // when Write is called.
 type batch struct {
 	db   *Database
-	data linkedhashmap.LinkedHashmap[string, batchOp]
+	data []batchOp
 	size int
 }
 
 // on [Write], put key, value into the database
 func (b *batch) Put(key []byte, value []byte) error {
-	b.putOp(
-		key,
-		batchOp{
-			value: slices.Clone(value),
-		},
-	)
+	b.data = append(b.data, batchOp{
+		key:   slices.Clone(key),
+		value: slices.Clone(value),
+	})
+	b.size += len(key) + len(value)
 	return nil
 }
 
 // on [Write], delete key from database
 func (b *batch) Delete(key []byte) error {
-	b.putOp(
-		key,
-		batchOp{
-			delete: true,
-		},
-	)
+	b.data = append(b.data, batchOp{
+		key:    slices.Clone(key),
+		delete: true,
+	})
+	b.size += len(key)
 	return nil
 }
 
@@ -60,20 +58,17 @@ func (b *batch) Write() error {
 }
 
 func (b *batch) Reset() {
-	b.data = linkedhashmap.New[string, batchOp]()
+	b.data = nil
 	b.size = 0
 }
 
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	it := b.data.NewIterator()
-	for it.Next() {
-		key := []byte(it.Key())
-		op := it.Value()
+	for _, op := range b.data {
 		if op.delete {
-			if err := w.Delete(key); err != nil {
+			if err := w.Delete(op.key); err != nil {
 				return err
 			}
-		} else if err := w.Put(key, op.value); err != nil {
+		} else if err := w.Put(op.key, op.value); err != nil {
 			return err
 		}
 	}
@@ -82,14 +77,4 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 
 func (b *batch) Inner() database.Batch {
 	return b
-}
-
-func (b *batch) putOp(key []byte, op batchOp) {
-	stringKey := string(key)
-	lenKey := len(key)
-	if existing, ok := b.data.Get(stringKey); ok {
-		b.size -= lenKey + len(existing.value)
-	}
-	b.data.Put(stringKey, op)
-	b.size += lenKey + len(op.value)
 }
