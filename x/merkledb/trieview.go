@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -986,62 +987,84 @@ func (t *trieView) calculateIDsConcurrent(
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	// nodes that are ready to be hashed
-	readyNodesChan := make(chan *node, len(dependencyCounts))
+	numThreads := runtime.NumCPU()
+	readyNodesChan := make(chan *node, len(readyNodes))   // nodes that are ready to be hashed
+	updateParentChan := make(chan *node, len(readyNodes)) // parent nodes that need to be updated
 
-	updateParentChan := make(chan *node, len(readyNodes))
+	// This iteration is guaranteed not to block because [readyNodesChan] is the
+	// exact right size.
+	//
+	// Invariant: There must be at least one node ready to hash.
+	for _, n := range readyNodes {
+		readyNodesChan <- n
+	}
 
-	// update the parents with the new hash and add them to [readyNodesChan]
-	// if there are no remaining unhashed dependencies
+	// allHashed is used to wait for all hashing goroutines to finish
+	var allHashed sync.WaitGroup
+
+	// Note: minNodeCountForConcurrentHashing is likely larger than the number
+	// of CPUs so this will not spawn unused goroutines.
+	//
+	// Invariant: numThreads > 0.
+	allHashed.Add(numThreads)
+	for i := 0; i < numThreads; i++ {
+		eg.Go(func() error {
+			defer allHashed.Done()
+			for currentNode := range readyNodesChan {
+				if err := currentNode.calculateID(t.db.metrics); err != nil {
+					return err
+				}
+
+				// Now that the node has been hashed, notify its parent to
+				// reduce its dependency count.
+				updateParentChan <- currentNode
+			}
+			return nil
+		})
+	}
+
+	// Update the parents with the node's new hash and add the parent to
+	// [readyNodesChan] if there are no remaining unhashed children.
 	eg.Go(func() error {
 		for currentNode := range updateParentChan {
-			// record newly hashed ID
+			// Record the node's new hash.
 			if err := t.recordNodeChange(ctx, currentNode); err != nil {
 				return err
 			}
 
-			// if the node has a parent, update it with the child ID
+			// If the node has a parent, update its child ID
 			parent, ok := t.parents[currentNode.key]
 			if !ok {
 				continue
 			}
 			parent.addChild(currentNode)
+
 			dependencyCounts[parent.key]--
-			// if the parent node has no more unhashed dependencies, then the parent is ready to be hashed
+
+			// If the parent has more dependencies, then we need to wait until
+			// those children are hashed.
 			if dependencyCounts[parent.key] != 0 {
 				continue
 			}
-			readyNodesChan <- parent
-			delete(dependencyCounts, parent.key)
 
-			// if there are no more dependencies being tracked, then no more nodes will become ready
+			// All of the parent's children have updated their hashes, so the
+			// parent is now ready to be hashed.
+			//
+			// Invariant: A push into [readyNodesChan] can never block here
+			// because this is only executed after removing an element from
+			// [readyNodesChan] and there are no other sources of nodes being
+			// pushed into the channel at this point.
+			readyNodesChan <- parent
+
+			delete(dependencyCounts, parent.key)
+			// If there are no more dependencies being tracked, then no more
+			// nodes will become ready.
 			if len(dependencyCounts) == 0 {
 				close(readyNodesChan)
 			}
 		}
 		return nil
 	})
-
-	var allHashed sync.WaitGroup
-	hashNode := func(currentNode *node) {
-		eg.Go(func() error {
-			defer allHashed.Done()
-			if err := currentNode.calculateID(t.db.metrics); err != nil {
-				return err
-			}
-			updateParentChan <- currentNode
-			return nil
-		})
-	}
-
-	for _, n := range readyNodes {
-		allHashed.Add(1)
-		hashNode(n)
-	}
-	for n := range readyNodesChan {
-		allHashed.Add(1)
-		hashNode(n)
-	}
 
 	allHashed.Wait()
 	close(updateParentChan)
