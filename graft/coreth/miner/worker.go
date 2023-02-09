@@ -130,7 +130,9 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	var gasLimit uint64
-	if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
+	if w.chainConfig.IsCortina(big.NewInt(timestamp)) {
+		gasLimit = params.CortinaGasLimit
+	} else if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
 		gasLimit = params.ApricotPhase1GasLimit
 	} else {
 		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
