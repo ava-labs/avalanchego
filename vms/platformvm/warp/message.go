@@ -1,9 +1,9 @@
 // Copyright (C) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package teleporter
+package warp
 
-// Message defines the standard format for a Teleporter cross-subnet message.
+// Message defines the standard format for a Warp message.
 type Message struct {
 	UnsignedMessage `serialize:"true"`
 	Signature       Signature `serialize:"true"`
