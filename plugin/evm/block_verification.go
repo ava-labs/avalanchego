@@ -98,7 +98,14 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	}
 
 	// Enforce static gas limit after ApricotPhase1 (prior to ApricotPhase1 it's handled in processing).
-	if rules.IsApricotPhase1 {
+	if rules.IsCortina {
+		if ethHeader.GasLimit != params.CortinaGasLimit {
+			return fmt.Errorf(
+				"expected gas limit to be %d after cortina but got %d",
+				params.CortinaGasLimit, ethHeader.GasLimit,
+			)
+		}
+	} else if rules.IsApricotPhase1 {
 		if ethHeader.GasLimit != params.ApricotPhase1GasLimit {
 			return fmt.Errorf(
 				"expected gas limit to be %d after apricot phase 1 but got %d",

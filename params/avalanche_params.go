@@ -19,6 +19,7 @@ const (
 	AvalancheAtomicTxFee = units.MilliAvax
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
+	CortinaGasLimit       uint64 = 15_000_000
 
 	ApricotPhase3ExtraDataSize            uint64 = 80
 	ApricotPhase3MinBaseFee               int64  = 75_000_000_000
