@@ -50,6 +50,7 @@ var (
 	errMissingQuotes           = errors.New("first and last characters should be quotes")
 	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
 	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", SECP256K1RSKLen)
+	errInvalidPublicKeyLength  = fmt.Errorf("public key has unexpected length, expected %d", SECP256K1RPKLen)
 
 	_ RecoverableFactory = (*FactorySECP256K1R)(nil)
 	_ PublicKey          = (*PublicKeySECP256K1R)(nil)
@@ -66,6 +67,10 @@ func (*FactorySECP256K1R) NewPrivateKey() (PrivateKey, error) {
 }
 
 func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
+	if len(b) != SECP256K1RPKLen {
+		return nil, errInvalidPublicKeyLength
+	}
+
 	key, err := secp256k1.ParsePubKey(b)
 	return &PublicKeySECP256K1R{
 		pk:    key,
