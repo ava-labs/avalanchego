@@ -672,7 +672,7 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 }
 
 // Assumes [db.lock] is held.
-func (db *Database) commitBatch(ops []batchOp) error {
+func (db *Database) commitBatch(ops []database.BatchOp) error {
 	view, err := db.prepareBatchView(context.Background(), ops)
 	if err != nil {
 		return err
@@ -930,7 +930,7 @@ func (db *Database) getKeyValues(
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareBatchView(
 	ctx context.Context,
-	ops []batchOp,
+	ops []database.BatchOp,
 ) (*trieView, error) {
 	view, err := db.newPreallocatedView(ctx, len(ops))
 	if err != nil {
@@ -940,11 +940,11 @@ func (db *Database) prepareBatchView(
 
 	// write into the trie
 	for _, op := range ops {
-		if op.delete {
-			if err := view.remove(ctx, op.key); err != nil {
+		if op.Delete {
+			if err := view.remove(ctx, op.Key); err != nil {
 				return nil, err
 			}
-		} else if err := view.insert(ctx, op.key, op.value); err != nil {
+		} else if err := view.insert(ctx, op.Key, op.Value); err != nil {
 			return nil, err
 		}
 	}

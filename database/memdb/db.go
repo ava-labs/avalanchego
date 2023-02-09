@@ -11,7 +11,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/nodb"
 )
 
 const (
@@ -131,7 +130,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	defer db.lock.RUnlock()
 
 	if db.db == nil {
-		return &nodb.Iterator{Err: database.ErrClosed}
+		return &database.IteratorError{
+			Err: database.ErrClosed,
+		}
 	}
 
 	startString := string(start)
@@ -171,32 +172,10 @@ func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 	return nil, nil
 }
 
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
-}
-
 type batch struct {
-	db     *Database
-	writes []keyValue
-	size   int
-}
+	database.BatchOps
 
-func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{slices.Clone(key), slices.Clone(value), false})
-	b.size += len(key) + len(value)
-	return nil
-}
-
-func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{slices.Clone(key), nil, true})
-	b.size += len(key)
-	return nil
-}
-
-func (b *batch) Size() int {
-	return b.size
+	db *Database
 }
 
 func (b *batch) Write() error {
@@ -207,40 +186,16 @@ func (b *batch) Write() error {
 		return database.ErrClosed
 	}
 
-	for _, kv := range b.writes {
-		key := string(kv.key)
-		if kv.delete {
-			delete(b.db.db, key)
+	for _, op := range b.Ops {
+		if op.Delete {
+			delete(b.db.db, string(op.Key))
 		} else {
-			b.db.db[key] = kv.value
+			b.db.db[string(op.Key)] = op.Value
 		}
 	}
 	return nil
 }
 
-func (b *batch) Reset() {
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
-	} else {
-		b.writes = b.writes[:0]
-	}
-	b.size = 0
-}
-
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			if err := w.Delete(keyvalue.key); err != nil {
-				return err
-			}
-		} else if err := w.Put(keyvalue.key, keyvalue.value); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Inner returns itself
 func (b *batch) Inner() database.Batch {
 	return b
 }
