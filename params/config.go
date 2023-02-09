@@ -672,3 +672,53 @@ func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockC
 		precompile.CheckConfigure(c, parentTimestamp, blockContext, config, statedb)
 	}
 }
+
+// OverrideConfig returns a copy of [original] with network upgrades enabled by [override] enabled,
+// along with a boolean that indicates whether the copy is canonical (equivalent to the original).
+// Note: the Clique-part is _not_ deep copied
+func OverrideConfig(original *ChainConfig, override *ChainConfig) (*ChainConfig, bool) {
+	copy := new(ChainConfig)
+	*copy = *original
+	canon := true
+
+	// Apply network upgrades (after Berlin) to the copy.
+	// Note in coreth, ApricotPhase2 is the "equivalent" to Berlin.
+	if timestamp := override.ApricotPhase2BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase2BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase3BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase3BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase4BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase4BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase5BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase5BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhasePre6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhasePre6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhasePost6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhasePost6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.BanffBlockTimestamp; timestamp != nil {
+		copy.BanffBlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.CortinaBlockTimestamp; timestamp != nil {
+		copy.CortinaBlockTimestamp = timestamp
+		canon = false
+	}
+
+	return copy, canon
+}

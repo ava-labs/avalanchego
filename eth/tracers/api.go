@@ -27,12 +27,14 @@
 package tracers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -88,18 +90,35 @@ type Backend interface {
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error)
 }
 
+// baseAPI holds the collection of common methods for API and FileTracerAPI.
+type baseAPI struct {
+	backend Backend
+}
+
 // API is the collection of tracing APIs exposed over the private debugging endpoint.
 type API struct {
-	backend Backend
+	baseAPI
 }
 
 // NewAPI creates a new API definition for the tracing methods of the Ethereum service.
 func NewAPI(backend Backend) *API {
-	return &API{backend: backend}
+	return &API{baseAPI{backend: backend}}
+}
+
+// FileTracerAPI is the collection of additional tracing APIs exposed over the private
+// debugging endpoint that log their output to a file.
+type FileTracerAPI struct {
+	baseAPI
+}
+
+// NewFileTracerAPI creates a new API definition for the tracing methods of the Ethererum
+// service that log their output to a file.
+func NewFileTracerAPI(backend Backend) *FileTracerAPI {
+	return &FileTracerAPI{baseAPI{backend: backend}}
 }
 
 type chainContext struct {
-	api *API
+	api *baseAPI
 	ctx context.Context
 }
 
@@ -124,13 +143,13 @@ func (context *chainContext) GetHeader(hash common.Hash, number uint64) *types.H
 
 // chainContext constructs the context reader which is used by the evm for reading
 // the necessary chain context.
-func (api *API) chainContext(ctx context.Context) core.ChainContext {
+func (api *baseAPI) chainContext(ctx context.Context) core.ChainContext {
 	return &chainContext{api: api, ctx: ctx}
 }
 
 // blockByNumber is the wrapper of the chain access function offered by the backend.
 // It will return an error if the block is not found.
-func (api *API) blockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
+func (api *baseAPI) blockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
 	block, err := api.backend.BlockByNumber(ctx, number)
 	if err != nil {
 		return nil, err
@@ -143,7 +162,7 @@ func (api *API) blockByNumber(ctx context.Context, number rpc.BlockNumber) (*typ
 
 // blockByHash is the wrapper of the chain access function offered by the backend.
 // It will return an error if the block is not found.
-func (api *API) blockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+func (api *baseAPI) blockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	block, err := api.backend.BlockByHash(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -159,7 +178,7 @@ func (api *API) blockByHash(ctx context.Context, hash common.Hash) (*types.Block
 //
 // Note this function is friendly for the light client which can only retrieve the
 // historical(before the CHT) header/block by number.
-func (api *API) blockByNumberAndHash(ctx context.Context, number rpc.BlockNumber, hash common.Hash) (*types.Block, error) {
+func (api *baseAPI) blockByNumberAndHash(ctx context.Context, number rpc.BlockNumber, hash common.Hash) (*types.Block, error) {
 	block, err := api.blockByNumber(ctx, number)
 	if err != nil {
 		return nil, err
@@ -463,12 +482,22 @@ func (api *API) TraceBlockByHash(ctx context.Context, hash common.Hash, config *
 
 // TraceBlock returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
-func (api *API) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *TraceConfig) ([]*txTraceResult, error) {
+func (api *baseAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *TraceConfig) ([]*txTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.Decode(bytes.NewReader(blob), block); err != nil {
 		return nil, fmt.Errorf("could not decode block: %v", err)
 	}
 	return api.traceBlock(ctx, block, config)
+}
+
+// TraceBlockFromFile returns the structured logs created during the execution of
+// EVM and returns them as a JSON object.
+func (api *FileTracerAPI) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
+	blob, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("could not read file: %v", err)
+	}
+	return api.TraceBlock(ctx, blob, config)
 }
 
 // TraceBadBlock returns the structured logs created during the execution of
@@ -490,6 +519,17 @@ func (api *API) TraceBadBlock(ctx context.Context, hash common.Hash, config *Tra
 		return nil, fmt.Errorf("bad block %#x not found", hash)
 	}
 	return api.traceBlock(ctx, block, config)
+}
+
+// StandardTraceBlockToFile dumps the structured logs created during the
+// execution of EVM to the local file system and returns a list of files
+// to the caller.
+func (api *FileTracerAPI) StandardTraceBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
+	block, err := api.blockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	return api.standardTraceBlockToFile(ctx, block, config)
 }
 
 // IntermediateRoots executes a block (bad- or canon- or side-), and returns a list
@@ -545,10 +585,31 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	return roots, nil
 }
 
+// StandardTraceBadBlockToFile dumps the structured logs created during the
+// execution of EVM against a block pulled from the pool of bad ones to the
+// local file system and returns a list of files to the caller.
+func (api *FileTracerAPI) StandardTraceBadBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
+	// Search for the bad block corresponding to [hash].
+	var (
+		badBlocks, _ = api.backend.BadBlocks()
+		block        *types.Block
+	)
+	for _, badBlock := range badBlocks {
+		if hash == block.Hash() {
+			block = badBlock
+			break
+		}
+	}
+	if block == nil {
+		return nil, fmt.Errorf("bad block %#x not found", hash)
+	}
+	return api.standardTraceBlockToFile(ctx, block, config)
+}
+
 // traceBlock configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requested tracer.
-func (api *API) traceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*txTraceResult, error) {
+func (api *baseAPI) traceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*txTraceResult, error) {
 	if block.NumberU64() == 0 {
 		return nil, errors.New("genesis is not traceable")
 	}
@@ -628,6 +689,127 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		return nil, failed
 	}
 	return results, nil
+}
+
+// standardTraceBlockToFile configures a new tracer which uses standard JSON output,
+// and traces either a full block or an individual transaction. The return value will
+// be one filename per transaction traced.
+func (api *FileTracerAPI) standardTraceBlockToFile(ctx context.Context, block *types.Block, config *StdTraceConfig) ([]string, error) {
+	// If we're tracing a single transaction, make sure it's present
+	if config != nil && config.TxHash != (common.Hash{}) {
+		if !containsTx(block, config.TxHash) {
+			return nil, fmt.Errorf("transaction %#x not found in block", config.TxHash)
+		}
+	}
+	if block.NumberU64() == 0 {
+		return nil, errors.New("genesis is not traceable")
+	}
+	parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
+	if err != nil {
+		return nil, err
+	}
+	reexec := defaultTraceReexec
+	if config != nil && config.Reexec != nil {
+		reexec = *config.Reexec
+	}
+	statedb, err := api.backend.StateAtBlock(ctx, parent, reexec, nil, true, false)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve the tracing configurations, or use default values
+	var (
+		logConfig logger.Config
+		txHash    common.Hash
+	)
+	if config != nil {
+		logConfig = config.Config
+		txHash = config.TxHash
+	}
+	logConfig.Debug = true
+
+	// Execute transaction, either tracing all or just the requested one
+	var (
+		dumps       []string
+		signer      = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Timestamp())
+		chainConfig = api.backend.ChainConfig()
+		vmctx       = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
+		canon       = true
+	)
+	// Check if there are any overrides: the caller may wish to enable a future
+	// fork when executing this block. Note, such overrides are only applicable to the
+	// actual specified block, not any preceding blocks that we have to go through
+	// in order to obtain the state.
+	// Therefore, it's perfectly valid to specify `"futureForkBlock": 0`, to enable `futureFork`
+	if config != nil && config.Overrides != nil {
+		chainConfig, canon = params.OverrideConfig(chainConfig, config.Overrides)
+	}
+	for i, tx := range block.Transactions() {
+		// Prepare the transaction for un-traced execution
+		var (
+			msg, _    = tx.AsMessage(signer, block.BaseFee())
+			txContext = core.NewEVMTxContext(msg)
+			vmConf    vm.Config
+			dump      *os.File
+			writer    *bufio.Writer
+			err       error
+		)
+		// If the transaction needs tracing, swap out the configs
+		if tx.Hash() == txHash || txHash == (common.Hash{}) {
+			// Generate a unique temporary file to dump it into
+			prefix := fmt.Sprintf("block_%#x-%d-%#x-", block.Hash().Bytes()[:4], i, tx.Hash().Bytes()[:4])
+			if !canon {
+				prefix = fmt.Sprintf("%valt-", prefix)
+			}
+			dump, err = os.CreateTemp(os.TempDir(), prefix)
+			if err != nil {
+				return nil, err
+			}
+			dumps = append(dumps, dump.Name())
+
+			// Swap out the noop logger to the standard tracer
+			writer = bufio.NewWriter(dump)
+			vmConf = vm.Config{
+				Debug:                   true,
+				Tracer:                  logger.NewJSONLogger(&logConfig, writer),
+				EnablePreimageRecording: true,
+			}
+		}
+		// Execute the transaction and flush any traces to disk
+		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
+		statedb.Prepare(tx.Hash(), i)
+		_, err = core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas()))
+		if writer != nil {
+			writer.Flush()
+		}
+		if dump != nil {
+			dump.Close()
+			log.Info("Wrote standard trace", "file", dump.Name())
+		}
+		if err != nil {
+			return dumps, err
+		}
+		// Finalize the state so any modifications are written to the trie
+		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
+		statedb.Finalise(vmenv.ChainConfig().IsEIP158(block.Number()))
+
+		// If we've traced the transaction we were looking for, abort
+		if tx.Hash() == txHash {
+			break
+		}
+	}
+	return dumps, nil
+}
+
+// containsTx reports whether the transaction with a certain hash
+// is contained within the specified block.
+func containsTx(block *types.Block, hash common.Hash) bool {
+	for _, tx := range block.Transactions() {
+		if tx.Hash() == hash {
+			return true
+		}
+	}
+	return false
 }
 
 // TraceTransaction returns the structured logs created during the execution of EVM
@@ -726,7 +908,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 // traceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
-func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig) (interface{}, error) {
+func (api *baseAPI) traceTx(ctx context.Context, message core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig) (interface{}, error) {
 	var (
 		tracer    Tracer
 		err       error
@@ -777,6 +959,11 @@ func APIs(backend Backend) []rpc.API {
 			Namespace: "debug",
 			Service:   NewAPI(backend),
 			Name:      "debug-tracer",
+		},
+		{
+			Namespace: "debug",
+			Service:   NewFileTracerAPI(backend),
+			Name:      "debug-file-tracer",
 		},
 	}
 }
