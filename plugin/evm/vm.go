@@ -15,6 +15,7 @@ import (
 	"time"
 
 	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/subnet-evm/handlers"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -34,8 +35,6 @@ import (
 	"github.com/ava-labs/subnet-evm/rpc"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
-	"github.com/ava-labs/subnet-evm/sync/handlers"
-	handlerstats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/subnet-evm/trie"
 
 	// Force-load tracer engine to trigger registration
@@ -606,13 +605,9 @@ func (vm *VM) setAppRequestHandlers() {
 			Cache: vm.config.StateSyncServerTrieCache,
 		},
 	)
-	syncRequestHandler := handlers.NewSyncHandler(
-		vm.blockChain,
-		evmTrieDB,
-		vm.networkCodec,
-		handlerstats.NewHandlerStats(metrics.Enabled),
-	)
-	vm.Network.SetRequestHandler(syncRequestHandler)
+
+	networkHandler := handlers.NewNetworkHandler(vm.blockChain, evmTrieDB, vm.networkCodec)
+	vm.Network.SetRequestHandler(networkHandler)
 }
 
 // setCrossChainAppRequestHandler sets the request handlers for the VM to serve cross chain

@@ -44,7 +44,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 
 	expectedSig, err := snowCtx.TeleporterSigner.Sign(unsignedMsg)
 	require.NoError(t, err)
-	require.Equal(t, expectedSig, signature)
+	require.Equal(t, expectedSig, signature[:])
 }
 
 func TestAddAndGetUnknownMessage(t *testing.T) {
@@ -84,5 +84,5 @@ func TestZeroSizedCache(t *testing.T) {
 
 	expectedSig, err := snowCtx.TeleporterSigner.Sign(unsignedMsg)
 	require.NoError(t, err)
-	require.Equal(t, expectedSig, signature)
+	require.Equal(t, expectedSig, signature[:])
 }

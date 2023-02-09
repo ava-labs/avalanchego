@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
 )
@@ -24,14 +25,14 @@ type WarpBackend interface {
 	AddMessage(ctx context.Context, unsignedMessage *teleporter.UnsignedMessage) error
 
 	// GetSignature returns the signature of the requested message hash.
-	GetSignature(ctx context.Context, messageHash ids.ID) ([]byte, error)
+	GetSignature(ctx context.Context, messageHash ids.ID) ([bls.SignatureLen]byte, error)
 }
 
 // warpBackend implements WarpBackend, keeps track of warp messages, and generates message signatures.
 type warpBackend struct {
 	db             database.Database
 	snowCtx        *snow.Context
-	signatureCache *cache.LRU[ids.ID, []byte]
+	signatureCache *cache.LRU[ids.ID, [bls.SignatureLen]byte]
 }
 
 // NewWarpBackend creates a new WarpBackend, and initializes the signature cache and message tracking database.
@@ -39,7 +40,7 @@ func NewWarpBackend(snowCtx *snow.Context, db database.Database, signatureCacheS
 	return &warpBackend{
 		db:             db,
 		snowCtx:        snowCtx,
-		signatureCache: &cache.LRU[ids.ID, []byte]{Size: signatureCacheSize},
+		signatureCache: &cache.LRU[ids.ID, [bls.SignatureLen]byte]{Size: signatureCacheSize},
 	}
 }
 
@@ -53,35 +54,39 @@ func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *teleporte
 		return fmt.Errorf("failed to put warp signature in db: %w", err)
 	}
 
-	signature, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
+	var signature [bls.SignatureLen]byte
+	sig, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
 	if err != nil {
 		return fmt.Errorf("failed to sign warp message: %w", err)
 	}
 
-	w.signatureCache.Put(ids.ID(messageID), signature)
+	copy(signature[:], sig)
+	w.signatureCache.Put(messageID, signature)
 	return nil
 }
 
-func (w *warpBackend) GetSignature(ctx context.Context, messageID ids.ID) ([]byte, error) {
+func (w *warpBackend) GetSignature(ctx context.Context, messageID ids.ID) ([bls.SignatureLen]byte, error) {
 	if sig, ok := w.signatureCache.Get(messageID); ok {
 		return sig, nil
 	}
 
 	unsignedMessageBytes, err := w.db.Get(messageID[:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
+		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
 	}
 
 	unsignedMessage, err := teleporter.ParseUnsignedMessage(unsignedMessageBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse unsigned message %s: %w", messageID.String(), err)
+		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to parse unsigned message %s: %w", messageID.String(), err)
 	}
 
-	signature, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
+	var signature [bls.SignatureLen]byte
+	sig, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign warp message: %w", err)
+		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to sign warp message: %w", err)
 	}
 
+	copy(signature[:], sig)
 	w.signatureCache.Put(messageID, signature)
 	return signature, nil
 }

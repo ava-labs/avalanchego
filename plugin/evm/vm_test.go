@@ -3157,3 +3157,26 @@ func TestCrossChainMessagestoVM(t *testing.T) {
 	require.NoError(err)
 	require.True(calledSendCrossChainAppResponseFn, "sendCrossChainAppResponseFn was not called")
 }
+
+func TestSignatureRequestsToVM(t *testing.T) {
+	_, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
+
+	defer func() {
+		err := vm.Shutdown(context.Background())
+		require.NoError(t, err)
+	}()
+
+	// Generate a SignatureRequest for an unknown message
+	var signatureRequest message.Request = message.SignatureRequest{
+		MessageID: ids.GenerateTestID(),
+	}
+
+	requestBytes, err := message.Codec.Marshal(message.Version, &signatureRequest)
+	require.NoError(t, err)
+
+	// Currently with warp not being initialized we just need to make sure the NoopSignatureRequestHandler does not
+	// panic/crash when sent a SignatureRequest.
+	// TODO: We will need to update the test when warp is initialized to check for expected response.
+	err = vm.Network.AppRequest(context.Background(), ids.GenerateTestNodeID(), 1, time.Now().Add(60*time.Second), requestBytes)
+	require.NoError(t, err)
+}
