@@ -725,8 +725,9 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	return attr, nil
 }
 
-// GetCurrentValidators returns the current validators. If specific nodeIDs
-// are provided, delegators are also returned
+// GetCurrentValidators returns the current validators. If a single nodeID
+// is provided, full delegators information is also returned. Otherwise only
+// delegators' number and total weight is returned.
 func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
 
@@ -882,18 +883,31 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 	}
 
-	if numNodeIDs != 0 {
-		for i, vdrIntf := range reply.Validators {
-			vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
-			if !ok {
-				continue
-			}
-			delegators, ok := vdrToDelegators[vdr.NodeID]
-			if !ok {
-				delegators = []platformapi.PrimaryDelegator{}
-			}
+	// handle delegators' information
+	for i, vdrIntf := range reply.Validators {
+		vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
+		if !ok {
+			continue
+		}
+		delegators, ok := vdrToDelegators[vdr.NodeID]
+		if !ok {
+			delegators = []platformapi.PrimaryDelegator{}
+		}
+		if numNodeIDs == 1 {
+			// queried a specific validator, load all of its delegators
 			vdr.Delegators = &delegators
 			reply.Validators[i] = vdr
+		} else {
+			// multiple validators selected, just load summaries of
+			// their delegators (count and total weight)
+			cnt := json.Uint64(len(delegators))
+			vdr.DelegatorCount = &cnt
+
+			w := json.Uint64(0)
+			for _, d := range delegators {
+				w += d.Weight
+			}
+			vdr.DelegatorWeight = &w
 		}
 	}
 
