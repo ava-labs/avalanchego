@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: teleporter/message.proto
+// source: warp/message.proto
 
-package teleporter
+package warp
 
 import (
 	context "context"
@@ -35,7 +35,7 @@ func NewSignerClient(cc grpc.ClientConnInterface) SignerClient {
 
 func (c *signerClient) Sign(ctx context.Context, in *SignRequest, opts ...grpc.CallOption) (*SignResponse, error) {
 	out := new(SignResponse)
-	err := c.cc.Invoke(ctx, "/teleporter.Signer/Sign", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/warp.Signer/Sign", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func _Signer_Sign_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/teleporter.Signer/Sign",
+		FullMethod: "/warp.Signer/Sign",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SignerServer).Sign(ctx, req.(*SignRequest))
@@ -92,7 +92,7 @@ func _Signer_Sign_Handler(srv interface{}, ctx context.Context, dec func(interfa
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Signer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "teleporter.Signer",
+	ServiceName: "warp.Signer",
 	HandlerType: (*SignerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -101,5 +101,5 @@ var Signer_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "teleporter/message.proto",
+	Metadata: "warp/message.proto",
 }

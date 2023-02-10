@@ -21,7 +21,7 @@
 
 ## Introduction
 
-The Merkle Trie is a data structure that allows efficient and secure verification of the contents. It a combination of a [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [Radix Trie](https://en.wikipedia.org/wiki/Radix_tree).
+The Merkle Trie is a data structure that allows efficient and secure verification of the contents. It is a combination of a [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and a [Radix Trie](https://en.wikipedia.org/wiki/Radix_tree).
 
 The trie contains `Merkle Nodes`, which store key/value and children information.
 

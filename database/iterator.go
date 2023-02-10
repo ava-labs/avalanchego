@@ -7,6 +7,8 @@
 
 package database
 
+var _ Iterator = (*IteratorError)(nil)
+
 // Iterator iterates over a database's key/value pairs.
 //
 // When it encounters an error any seek will return false and will yield no key/
@@ -60,3 +62,26 @@ type Iteratee interface {
 	// key.
 	NewIteratorWithStartAndPrefix(start, prefix []byte) Iterator
 }
+
+// IteratorError does nothing and returns the provided error
+type IteratorError struct {
+	Err error
+}
+
+func (*IteratorError) Next() bool {
+	return false
+}
+
+func (i *IteratorError) Error() error {
+	return i.Err
+}
+
+func (*IteratorError) Key() []byte {
+	return nil
+}
+
+func (*IteratorError) Value() []byte {
+	return nil
+}
+
+func (*IteratorError) Release() {}

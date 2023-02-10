@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -596,8 +595,7 @@ func (db *Database) Insert(ctx context.Context, k, v []byte) error {
 
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
-		db:   db,
-		data: linkedhashmap.New[string, batchOp](),
+		db: db,
 	}
 }
 
@@ -674,7 +672,7 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 }
 
 // Assumes [db.lock] is held.
-func (db *Database) commitBatch(ops linkedhashmap.LinkedHashmap[string, batchOp]) error {
+func (db *Database) commitBatch(ops []database.BatchOp) error {
 	view, err := db.prepareBatchView(context.Background(), ops)
 	if err != nil {
 		return err
@@ -840,7 +838,7 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
-	keysNotInSet := make([][]byte, 0, len(keySet))
+	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
 		if len(end) != 0 && bytes.Compare(key, end) > 0 {
@@ -932,22 +930,21 @@ func (db *Database) getKeyValues(
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareBatchView(
 	ctx context.Context,
-	ops linkedhashmap.LinkedHashmap[string, batchOp],
+	ops []database.BatchOp,
 ) (*trieView, error) {
-	view, err := db.newPreallocatedView(ctx, ops.Len())
+	view, err := db.newPreallocatedView(ctx, len(ops))
 	if err != nil {
 		return nil, err
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
 
 	// write into the trie
-	it := ops.NewIterator()
-	for it.Next() {
-		if it.Value().delete {
-			if err := view.remove(ctx, []byte(it.Key())); err != nil {
+	for _, op := range ops {
+		if op.Delete {
+			if err := view.remove(ctx, op.Key); err != nil {
 				return nil, err
 			}
-		} else if err := view.insert(ctx, []byte(it.Key()), it.Value().value); err != nil {
+		} else if err := view.insert(ctx, op.Key, op.Value); err != nil {
 			return nil, err
 		}
 	}

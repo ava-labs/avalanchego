@@ -7,6 +7,8 @@
 
 package database
 
+import "golang.org/x/exp/slices"
+
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
 type Batch interface {
@@ -37,4 +39,55 @@ type Batcher interface {
 	// NewBatch creates a write-only database that buffers changes to its host db
 	// until a final write is called.
 	NewBatch() Batch
+}
+
+type BatchOp struct {
+	Key    []byte
+	Value  []byte
+	Delete bool
+}
+
+type BatchOps struct {
+	Ops  []BatchOp
+	size int
+}
+
+func (b *BatchOps) Put(key, value []byte) error {
+	b.Ops = append(b.Ops, BatchOp{
+		Key:   slices.Clone(key),
+		Value: slices.Clone(value),
+	})
+	b.size += len(key) + len(value)
+	return nil
+}
+
+func (b *BatchOps) Delete(key []byte) error {
+	b.Ops = append(b.Ops, BatchOp{
+		Key:    slices.Clone(key),
+		Delete: true,
+	})
+	b.size += len(key)
+	return nil
+}
+
+func (b *BatchOps) Size() int {
+	return b.size
+}
+
+func (b *BatchOps) Reset() {
+	b.Ops = b.Ops[:0]
+	b.size = 0
+}
+
+func (b *BatchOps) Replay(w KeyValueWriterDeleter) error {
+	for _, op := range b.Ops {
+		if op.Delete {
+			if err := w.Delete(op.Key); err != nil {
+				return err
+			}
+		} else if err := w.Put(op.Key, op.Value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
