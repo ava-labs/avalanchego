@@ -47,7 +47,9 @@ type ClientPermissionlessValidator struct {
 	Connected             *bool
 	Signer                *signer.ProofOfPossession
 	// The delegators delegating to this validator
-	Delegators []ClientDelegator
+	DelegatorCount  *uint64
+	DelegatorWeight *uint64
+	Delegators      []ClientDelegator
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -131,6 +133,8 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			Uptime:                (*float32)(apiValidator.Uptime),
 			Connected:             &apiValidator.Connected,
 			Signer:                apiValidator.Signer,
+			DelegatorCount:        (*uint64)(apiValidator.DelegatorCount),
+			DelegatorWeight:       (*uint64)(apiValidator.DelegatorWeight),
 			Delegators:            clientDelegators,
 		}
 	}

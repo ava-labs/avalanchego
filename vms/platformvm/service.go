@@ -747,6 +747,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		if err != nil {
 			return err
 		}
+		// TODO: avoid iterating over delegators here.
 		for currentStakerIterator.Next() {
 			staker := currentStakerIterator.Value()
 			if args.SubnetID != staker.SubnetID {
@@ -768,6 +769,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			}
 			targetStakers = append(targetStakers, staker)
 
+			// TODO: avoid iterating over delegators when numNodeIDs > 1.
 			delegatorsIt, err := s.vm.state.GetCurrentDelegatorIterator(args.SubnetID, nodeID)
 			if err != nil {
 				return err
@@ -907,8 +909,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		if numNodeIDs == 1 {
 			// queried a specific validator, load all of its delegators
 			vdr.Delegators = &delegators
-			reply.Validators[i] = vdr
 		}
+		reply.Validators[i] = vdr
 	}
 
 	return nil

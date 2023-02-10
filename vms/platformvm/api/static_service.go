@@ -126,8 +126,8 @@ type PermissionlessValidator struct {
 	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
 
 	// The delegators delegating to this validator
-	DelegatorCount  *json.Uint64        `json:"delegatorsCount,omitempty"`
-	DelegatorWeight *json.Uint64        `json:"delegatorsWeight,omitempty"`
+	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
+	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
