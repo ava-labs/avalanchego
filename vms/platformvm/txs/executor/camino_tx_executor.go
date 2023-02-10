@@ -786,7 +786,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	linkedNodeID, err := e.State.GetShortIDLink(tx.ConsortiumMemberAddress, state.ShortLinkKeyRegisterNode)
 	haslinkedNode := err != database.ErrNotFound
-	if err != nil {
+	if haslinkedNode && err != nil {
 		return err
 	}
 
