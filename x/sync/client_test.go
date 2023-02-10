@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
@@ -41,7 +42,7 @@ func sendRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, StateSyncVersion)
+	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
 	require.NoError(err)
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
