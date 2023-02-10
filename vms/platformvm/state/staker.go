@@ -82,18 +82,6 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func (s *Staker) IsCurrentValidator() bool {
-	return s.Priority == txs.PrimaryNetworkValidatorCurrentPriority ||
-		s.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-		s.Priority == txs.SubnetPermissionlessValidatorCurrentPriority
-}
-
-func (s *Staker) IsPendingValidator() bool {
-	return s.Priority == txs.PrimaryNetworkValidatorPendingPriority ||
-		s.Priority == txs.SubnetPermissionedValidatorPendingPriority ||
-		s.Priority == txs.SubnetPermissionlessValidatorPendingPriority
-}
-
 func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {

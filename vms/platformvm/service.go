@@ -752,9 +752,6 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			if args.SubnetID != staker.SubnetID {
 				continue
 			}
-			if !staker.IsCurrentValidator() {
-				continue
-			}
 			targetStakers = append(targetStakers, staker)
 		}
 		currentStakerIterator.Release()
@@ -845,17 +842,20 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			reply.Validators = append(reply.Validators, vdr)
 
 		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:
-			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
-			if err != nil {
-				return err
-			}
-
 			var rewardOwner *platformapi.Owner
-			owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok {
-				rewardOwner, err = s.getAPIOwner(owner)
+			// If we are handling multiple nodeIDs, we don't return the
+			// delegator information.
+			if numNodeIDs == 1 {
+				attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
 				if err != nil {
 					return err
+				}
+				owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
+				if ok {
+					rewardOwner, err = s.getAPIOwner(owner)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -891,23 +891,23 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 		delegators, ok := vdrToDelegators[vdr.NodeID]
 		if !ok {
+			// If we are expected to populate the delegators field, we should
+			// always return a non-nil value.
 			delegators = []platformapi.PrimaryDelegator{}
 		}
+		delegatorCount := json.Uint64(len(delegators))
+		delegatorWeight := json.Uint64(0)
+		for _, d := range delegators {
+			delegatorWeight += d.Weight
+		}
+
+		vdr.DelegatorCount = &delegatorCount
+		vdr.DelegatorWeight = &delegatorWeight
+
 		if numNodeIDs == 1 {
 			// queried a specific validator, load all of its delegators
 			vdr.Delegators = &delegators
 			reply.Validators[i] = vdr
-		} else {
-			// multiple validators selected, just load summaries of
-			// their delegators (count and total weight)
-			cnt := json.Uint64(len(delegators))
-			vdr.DelegatorCount = &cnt
-
-			w := json.Uint64(0)
-			for _, d := range delegators {
-				w += d.Weight
-			}
-			vdr.DelegatorWeight = &w
 		}
 	}
 
@@ -926,8 +926,7 @@ type GetPendingValidatorsArgs struct {
 	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
-// GetPendingValidatorsReply are the results from calling GetPendingValidators.
-// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
+// GetPendingValidators returns the lists of pending validators and delegators
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
@@ -955,9 +954,6 @@ func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidato
 		for pendingStakerIterator.Next() { // Iterates in order of increasing stop time
 			staker := pendingStakerIterator.Value()
 			if args.SubnetID != staker.SubnetID {
-				continue
-			}
-			if !staker.IsPendingValidator() {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)
