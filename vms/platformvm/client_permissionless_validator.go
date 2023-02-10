@@ -47,7 +47,9 @@ type ClientPermissionlessValidator struct {
 	Connected             *bool
 	Signer                *signer.ProofOfPossession
 	// The delegators delegating to this validator
-	Delegators []ClientDelegator
+	DelegatorCount  *uint64
+	DelegatorWeight *uint64
+	Delegators      []ClientDelegator
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -105,17 +107,20 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			return nil, err
 		}
 
-		clientDelegators := make([]ClientDelegator, len(apiValidator.Delegators))
-		for j, apiDelegator := range apiValidator.Delegators {
-			rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
-			if err != nil {
-				return nil, err
-			}
+		var clientDelegators []ClientDelegator
+		if apiValidator.Delegators != nil {
+			clientDelegators = make([]ClientDelegator, len(*apiValidator.Delegators))
+			for j, apiDelegator := range *apiValidator.Delegators {
+				rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
+				if err != nil {
+					return nil, err
+				}
 
-			clientDelegators[j] = ClientDelegator{
-				ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
-				RewardOwner:     rewardOwner,
-				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+				clientDelegators[j] = ClientDelegator{
+					ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
+					RewardOwner:     rewardOwner,
+					PotentialReward: (*uint64)(apiDelegator.PotentialReward),
+				}
 			}
 		}
 
@@ -128,6 +133,8 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			Uptime:                (*float32)(apiValidator.Uptime),
 			Connected:             &apiValidator.Connected,
 			Signer:                apiValidator.Signer,
+			DelegatorCount:        (*uint64)(apiValidator.DelegatorCount),
+			DelegatorWeight:       (*uint64)(apiValidator.DelegatorWeight),
 			Delegators:            clientDelegators,
 		}
 	}
