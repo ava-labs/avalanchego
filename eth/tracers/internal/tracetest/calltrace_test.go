@@ -49,7 +49,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	// Force-load native, to trigger registration
+	// Force-load native and js packages to trigger registration
+	_ "github.com/ava-labs/coreth/eth/tracers/js"
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
 )
 
@@ -132,6 +133,12 @@ type callTracerTest struct {
 	Input        string          `json:"input"`
 	TracerConfig json.RawMessage `json:"tracerConfig"`
 	Result       *callTrace      `json:"result"`
+}
+
+// Iterates over all the input-output datasets in the tracer test harness and
+// runs the JavaScript tracers against them.
+func TestCallTracerLegacy(t *testing.T) {
+	testCallTracer("callTracerLegacy", "call_tracer_legacy", t)
 }
 
 func TestCallTracerNative(t *testing.T) {
