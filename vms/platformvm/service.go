@@ -928,14 +928,13 @@ type GetPendingValidatorsArgs struct {
 	NodeIDs []ids.NodeID `json:"nodeIDs"`
 }
 
-// GetPendingValidators returns the lists of pending validators and delegators
+// GetPendingValidatorsReply are the results from calling GetPendingValidators.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetPendingValidators returns the pending validators. If specific nodeIDs
-// are provided, delegators are also returned
+// GetPendingValidators returns the lists of pending validators and delegators.
 func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetPendingValidators called")
 
