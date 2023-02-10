@@ -3305,6 +3305,17 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		change                  *secp256k1fx.OutputOwners
 	}
 
+	linkNode := func(addr ids.ShortID, node ids.NodeID) {
+		link := ids.ShortID(node)
+		env.state.SetShortIDLink(addr, state.ShortLinkKeyRegisterNode, &link)
+		env.state.SetShortIDLink(link, state.ShortLinkKeyRegisterNode, &addr)
+	}
+
+	unlinkNode := func(addr ids.ShortID, node ids.NodeID) {
+		env.state.SetShortIDLink(addr, state.ShortLinkKeyRegisterNode, nil)
+		env.state.SetShortIDLink(ids.ShortID(node), state.ShortLinkKeyRegisterNode, nil)
+	}
+
 	tests := map[string]struct {
 		generateArgs   func() args
 		preExecute     func(*testing.T, *txs.Tx)
@@ -3335,6 +3346,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				linkNode(caminoPreFundedKeys[4].Address(), newNodeID)
 			},
 			expectedErr: errConsortiumMemberHasNode,
 		},
@@ -3350,6 +3362,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				linkNode(caminoPreFundedKeys[4].Address(), caminoPreFundedNodeIDs[4])
 			},
 			expectedNodeID: newNodeID,
 		},
@@ -3365,7 +3378,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
-				env.state.SetShortIDLink(caminoPreFundedKeys[4].Address(), state.ShortLinkKeyRegisterNode, nil) // force unregister of node5
+				unlinkNode(caminoPreFundedKeys[4].Address(), newNodeID)
 			},
 			expectedNodeID: newNodeID,
 		},
