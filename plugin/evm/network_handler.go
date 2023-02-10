@@ -1,20 +1,19 @@
 // (c) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers
+package evm
 
 import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/subnet-evm/handlers/stats"
-	warpHandlers "github.com/ava-labs/subnet-evm/handlers/warp"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/sync/handlers"
 	syncHandlers "github.com/ava-labs/subnet-evm/sync/handlers"
+	syncStats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/subnet-evm/trie"
+	warpHandlers "github.com/ava-labs/subnet-evm/warp/handlers"
 )
 
 var _ message.RequestHandler = &networkHandler{}
@@ -26,18 +25,18 @@ type networkHandler struct {
 	signatureRequestHandler      warpHandlers.SignatureRequestHandler
 }
 
-// NewNetworkHandler constructs the handler for serving network requests.
-func NewNetworkHandler(
-	provider handlers.SyncDataProvider,
+// newNetworkHandler constructs the handler for serving network requests.
+func newNetworkHandler(
+	provider syncHandlers.SyncDataProvider,
 	evmTrieDB *trie.Database,
 	networkCodec codec.Manager,
 ) message.RequestHandler {
-	handlerStats := stats.NewHandlerStats(metrics.Enabled)
+	syncStats := syncStats.NewHandlerStats(metrics.Enabled)
 	return &networkHandler{
 		// State sync handlers
-		stateTrieLeafsRequestHandler: syncHandlers.NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, handlerStats),
-		blockRequestHandler:          syncHandlers.NewBlockRequestHandler(provider, networkCodec, handlerStats),
-		codeRequestHandler:           syncHandlers.NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, handlerStats),
+		stateTrieLeafsRequestHandler: syncHandlers.NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, syncStats),
+		blockRequestHandler:          syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
+		codeRequestHandler:           syncHandlers.NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, syncStats),
 
 		// TODO: initialize actual signature request handler when warp is ready
 		signatureRequestHandler: &warpHandlers.NoopSignatureRequestHandler{},

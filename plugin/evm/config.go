@@ -84,6 +84,7 @@ type Config struct {
 
 	// Subnet EVM APIs
 	SnowmanAPIEnabled bool   `json:"snowman-api-enabled"`
+	WarpAPIEnabled    bool   `json:"warp-api-enabled"`
 	AdminAPIEnabled   bool   `json:"admin-api-enabled"`
 	AdminAPIDir       string `json:"admin-api-dir"`
 

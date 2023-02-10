@@ -15,7 +15,6 @@ import (
 	"time"
 
 	avalanchegoMetrics "github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/subnet-evm/handlers"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/subnet-evm/commontype"
@@ -36,6 +35,7 @@ import (
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/warp"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -81,9 +81,10 @@ const (
 	// and fail verification
 	maxFutureBlockTime = 10 * time.Second
 
-	decidedCacheSize    = 100
-	missingCacheSize    = 50
-	unverifiedCacheSize = 50
+	decidedCacheSize       = 100
+	missingCacheSize       = 50
+	unverifiedCacheSize    = 50
+	warpSignatureCacheSize = 500
 
 	// Prefixes for metrics gatherers
 	ethMetricsPrefix        = "eth"
@@ -102,6 +103,7 @@ var (
 	lastAcceptedKey = []byte("last_accepted_key")
 	acceptedPrefix  = []byte("snowman_accepted")
 	metadataPrefix  = []byte("metadata")
+	warpPrefix      = []byte("warp")
 	ethDBPrefix     = []byte("ethdb")
 )
 
@@ -177,6 +179,10 @@ type VM struct {
 	// block.
 	acceptedBlockDB database.Database
 
+	// [warpDB] is used to store warp message signatures
+	// set to a prefixDB with the prefix [warpPrefix]
+	warpDB database.Database
+
 	toEngine chan<- commonEng.Message
 
 	syntacticBlockValidator BlockValidator
@@ -206,6 +212,10 @@ type VM struct {
 	// State sync server and client
 	StateSyncServer
 	StateSyncClient
+
+	// Avalanche Warp Messaging backend
+	// Used to serve BLS signatures of warp messages over RPC
+	warpBackend warp.WarpBackend
 }
 
 /*
@@ -274,6 +284,7 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
+	vm.warpDB = prefixdb.New(warpPrefix, vm.db)
 
 	if vm.config.InspectDatabase {
 		start := time.Now()
@@ -414,6 +425,9 @@ func (vm *VM) Initialize(
 	vm.networkCodec = message.Codec
 	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, message.CrossChainCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests, vm.config.MaxOutboundActiveCrossChainRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
+
+	// initialize warp backend
+	vm.warpBackend = warp.NewWarpBackend(vm.ctx, vm.warpDB, warpSignatureCacheSize)
 
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
 		return err
@@ -606,7 +620,7 @@ func (vm *VM) setAppRequestHandlers() {
 		},
 	)
 
-	networkHandler := handlers.NewNetworkHandler(vm.blockChain, evmTrieDB, vm.networkCodec)
+	networkHandler := newNetworkHandler(vm.blockChain, evmTrieDB, vm.networkCodec)
 	vm.Network.SetRequestHandler(networkHandler)
 }
 
@@ -793,6 +807,13 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*commonEng.HTTPHandler
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "snowman")
+	}
+
+	if vm.config.WarpAPIEnabled {
+		if err := handler.RegisterName("warp", &warp.WarpAPI{Backend: vm.warpBackend}); err != nil {
+			return nil, err
+		}
+		enabledAPIs = append(enabledAPIs, "warp")
 	}
 
 	log.Info(fmt.Sprintf("Enabled APIs: %s", strings.Join(enabledAPIs, ", ")))
