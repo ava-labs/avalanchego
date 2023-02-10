@@ -7,8 +7,7 @@ use log;
 pub struct Options {
     /// The database path (if no path is provided, return an error). Defaults to firewood.
     #[arg(
-        long,
-        required = false,
+        required = true,
         value_name = "DB_NAME",
         default_value_t = String::from("firewood"),
         help = "Name of the database"

@@ -6,11 +6,11 @@ use log;
 #[derive(Debug, Args)]
 pub struct Options {
     /// The key to insert
-    #[arg(long, short = 'k', required = true, value_name = "KEY", help = "Key to insert")]
+    #[arg(required = true, value_name = "KEY", help = "Key to insert")]
     pub key: String,
 
     /// The value to insert
-    #[arg(long, short = 'v', required = true, value_name = "VALUE", help = "Value to insert")]
+    #[arg(required = true, value_name = "VALUE", help = "Value to insert")]
     pub value: String,
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.

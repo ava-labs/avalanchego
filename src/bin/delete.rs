@@ -6,7 +6,7 @@ use log;
 #[derive(Debug, Args)]
 pub struct Options {
     /// The key to delete
-    #[arg(long, required = true, value_name = "KEY", help = "Key to delete")]
+    #[arg(required = true, value_name = "KEY", help = "Key to delete")]
     pub key: String,
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.

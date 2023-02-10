@@ -7,11 +7,10 @@ use log;
 pub struct Options {
     /// DB Options
     #[arg(
-        long,
-        required = false,
-        default_value_t = String::from("firewood"),
+        required = true,
         value_name = "NAME",
-        help = "A name for the database.")]
+        help = "A name for the database. A good default name is firewood."
+    )]
     pub name: String,
 
     #[arg(
