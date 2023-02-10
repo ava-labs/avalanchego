@@ -3267,3 +3267,138 @@ func TestCaminoStandardTxExecutorClaimRewardTx(t *testing.T) {
 		})
 	}
 }
+
+func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env.ctx.Lock.Lock()
+	defer func() {
+		if err := shutdownCaminoEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	testKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	factory := crypto.FactorySECP256K1R{}
+	key, err := factory.NewPrivateKey()
+	require.NoError(t, err)
+	nodeID := key.PublicKey().Address()
+	newNodeKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(t, ok)
+	newNodeID := ids.NodeID(nodeID)
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{testKey.PublicKey().Address()},
+	}
+
+	type args struct {
+		oldNodeID               ids.NodeID
+		newNodeID               ids.NodeID
+		consortiumMemberAddress ids.ShortID
+		keys                    []*crypto.PrivateKeySECP256K1R
+		change                  *secp256k1fx.OutputOwners
+	}
+
+	tests := map[string]struct {
+		generateArgs   func() args
+		preExecute     func(*testing.T, *txs.Tx)
+		expectedErr    error
+		expectedNodeID ids.NodeID
+	}{
+		"not consortium member": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               ids.EmptyNodeID,
+					newNodeID:               caminoPreFundedNodeIDs[0],
+					consortiumMemberAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{caminoPreFundedNodeKeys[0], caminoPreFundedKeys[0]},
+					change:                  &outputOwners,
+				}
+			},
+			expectedErr: errNotConsortiumMember,
+		},
+		"addr has already registered node": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               ids.EmptyNodeID,
+					newNodeID:               caminoPreFundedNodeIDs[0],
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{caminoPreFundedNodeKeys[0], caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+			},
+			expectedErr: errConsortiumMemberHasNode,
+		},
+		"Happy path - addr is consortium member and changes registered node": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               caminoPreFundedNodeIDs[4],
+					newNodeID:               newNodeID,
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{newNodeKey, caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+			},
+			expectedNodeID: newNodeID,
+		},
+		"Happy path - addr is consortium member and has not yet registered a node": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               ids.EmptyNodeID,
+					newNodeID:               newNodeID,
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{newNodeKey, caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				env.state.SetShortIDLink(caminoPreFundedKeys[4].Address(), state.ShortLinkKeyRegisterNode, nil) // force unregister of node5
+			},
+			expectedNodeID: newNodeID,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			args := tt.generateArgs()
+			tx, err := env.txBuilder.NewRegisterNodeTx(
+				args.oldNodeID, args.newNodeID, args.consortiumMemberAddress, args.keys, args.change)
+			require.NoError(t, err)
+
+			if tt.preExecute != nil {
+				tt.preExecute(t, tx)
+			}
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(t, err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      tx,
+				},
+			}
+			err = tx.Unsigned.Visit(&executor)
+			require.ErrorIs(t, err, tt.expectedErr)
+
+			if tt.expectedNodeID != ids.EmptyNodeID {
+				registeredNode, err := onAcceptState.GetShortIDLink(args.consortiumMemberAddress, state.ShortLinkKeyRegisterNode)
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedNodeID, ids.NodeID(registeredNode))
+			}
+		})
+	}
+}
