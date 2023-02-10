@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // ContextInitializable represents an object that can be initialized
@@ -46,7 +46,7 @@ type Context struct {
 	BCLookup     ids.AliaserReader
 	Metrics      metrics.OptionalGatherer
 
-	TeleporterSigner teleporter.Signer
+	WarpSigner warp.Signer
 
 	// snowman++ attributes
 	ValidatorState validators.State // interface for P-Chain validators

@@ -5,7 +5,10 @@ package database
 
 import (
 	"bytes"
+	"io"
 	"testing"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +33,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestBatchReuse,
 	TestBatchRewrite,
 	TestBatchReplay,
+	TestBatchReplayPropagateError,
 	TestBatchInner,
 	TestBatchLargeSize,
 	TestIteratorSnapshot,
@@ -341,6 +345,7 @@ func TestBatchReset(t *testing.T, db Database) {
 
 	batch.Reset()
 
+	require.Zero(batch.Size())
 	require.NoError(batch.Write())
 
 	has, err := db.Has(key)
@@ -376,6 +381,7 @@ func TestBatchReuse(t *testing.T, db Database) {
 
 	batch.Reset()
 
+	require.Zero(batch.Size())
 	require.NoError(batch.Put(key2, value2))
 	require.NoError(batch.Write())
 
@@ -425,6 +431,46 @@ func TestBatchRewrite(t *testing.T, db Database) {
 // TestBatchReplay tests to make sure that batches will correctly replay their
 // contents.
 func TestBatchReplay(t *testing.T, db Database) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	require := require.New(t)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
+
+	batch := db.NewBatch()
+	require.NotNil(batch)
+
+	require.NoError(batch.Put(key1, value1))
+	require.NoError(batch.Put(key2, value2))
+	require.NoError(batch.Delete(key1))
+	require.NoError(batch.Delete(key2))
+	require.NoError(batch.Put(key1, value2))
+
+	for i := 0; i < 2; i++ {
+		mockBatch := NewMockBatch(ctrl)
+		gomock.InOrder(
+			mockBatch.EXPECT().Put(key1, value1).Times(1),
+			mockBatch.EXPECT().Put(key2, value2).Times(1),
+			mockBatch.EXPECT().Delete(key1).Times(1),
+			mockBatch.EXPECT().Delete(key2).Times(1),
+			mockBatch.EXPECT().Put(key1, value2).Times(1),
+		)
+
+		require.NoError(batch.Replay(mockBatch))
+	}
+}
+
+// TestBatchReplayPropagateError tests to make sure that batches will correctly
+// propagate any returned error during Replay.
+func TestBatchReplayPropagateError(t *testing.T, db Database) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -439,28 +485,17 @@ func TestBatchReplay(t *testing.T, db Database) {
 	require.NoError(batch.Put(key1, value1))
 	require.NoError(batch.Put(key2, value2))
 
-	secondBatch := db.NewBatch()
-	require.NotNil(secondBatch)
+	mockBatch := NewMockBatch(ctrl)
+	gomock.InOrder(
+		mockBatch.EXPECT().Put(key1, value1).Return(ErrClosed).Times(1),
+	)
+	require.Equal(ErrClosed, batch.Replay(mockBatch))
 
-	require.NoError(batch.Replay(secondBatch))
-	require.NoError(secondBatch.Write())
-
-	has, err := db.Has(key1)
-	require.NoError(err)
-	require.True(has)
-
-	v, err := db.Get(key1)
-	require.NoError(err)
-	require.Equal(value1, v)
-
-	thirdBatch := db.NewBatch()
-	require.NotNil(thirdBatch)
-
-	require.NoError(thirdBatch.Delete(key1))
-	require.NoError(thirdBatch.Delete(key2))
-	require.NoError(db.Close())
-	require.Equal(ErrClosed, batch.Replay(db))
-	require.Equal(ErrClosed, thirdBatch.Replay(db))
+	mockBatch = NewMockBatch(ctrl)
+	gomock.InOrder(
+		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
+	)
+	require.Equal(io.ErrClosedPipe, batch.Replay(mockBatch))
 }
 
 // TestBatchInner tests to make sure that inner can be used to write to the

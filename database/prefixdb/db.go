@@ -10,7 +10,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -156,7 +155,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	defer db.lock.RUnlock()
 
 	if db.closed {
-		return &nodb.Iterator{Err: database.ErrClosed}
+		return &database.IteratorError{
+			Err: database.ErrClosed,
+		}
 	}
 	prefixedStart := db.prefix(start)
 	prefixedPrefix := db.prefix(prefix)
@@ -228,12 +229,6 @@ func (db *Database) prefix(key []byte) []byte {
 	return prefixedKey
 }
 
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
-}
-
 // Batch of database operations
 type batch struct {
 	database.Batch
@@ -242,7 +237,7 @@ type batch struct {
 	// Each key is prepended with the database's prefix.
 	// Each byte slice underlying a key should be returned to the pool
 	// when this batch is reset.
-	writes []keyValue
+	ops []database.BatchOp
 }
 
 // Assumes that it is OK for the argument to b.Batch.Put
@@ -252,7 +247,10 @@ type batch struct {
 func (b *batch) Put(key, value []byte) error {
 	prefixedKey := b.db.prefix(key)
 	copiedValue := slices.Clone(value)
-	b.writes = append(b.writes, keyValue{prefixedKey, copiedValue, false})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:   prefixedKey,
+		Value: copiedValue,
+	})
 	return b.Batch.Put(prefixedKey, copiedValue)
 }
 
@@ -261,7 +259,10 @@ func (b *batch) Put(key, value []byte) error {
 // [key] may be modified after this method returns.
 func (b *batch) Delete(key []byte) error {
 	prefixedKey := b.db.prefix(key)
-	b.writes = append(b.writes, keyValue{prefixedKey, nil, true})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:    prefixedKey,
+		Delete: true,
+	})
 	return b.Batch.Delete(prefixedKey)
 }
 
@@ -282,15 +283,15 @@ func (b *batch) Reset() {
 	// Don't return the byte buffers underneath each value back to the pool
 	// because we assume in batch.Replay that it's not safe to modify the
 	// value argument to w.Put.
-	for _, kv := range b.writes {
-		b.db.bufferPool.Put(kv.key)
+	for _, op := range b.ops {
+		b.db.bufferPool.Put(op.Key)
 	}
 
 	// Clear b.writes
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
+		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
-		b.writes = b.writes[:0]
+		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()
 }
@@ -299,14 +300,14 @@ func (b *batch) Reset() {
 // Assumes it's safe to modify the key argument to w.Delete and w.Put
 // after those methods return.
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, keyvalue := range b.writes {
-		keyWithoutPrefix := keyvalue.key[len(b.db.dbPrefix):]
-		if keyvalue.delete {
+	for _, op := range b.ops {
+		keyWithoutPrefix := op.Key[len(b.db.dbPrefix):]
+		if op.Delete {
 			if err := w.Delete(keyWithoutPrefix); err != nil {
 				return err
 			}
 		} else {
-			if err := w.Put(keyWithoutPrefix, keyvalue.value); err != nil {
+			if err := w.Put(keyWithoutPrefix, op.Value); err != nil {
 				return err
 			}
 		}

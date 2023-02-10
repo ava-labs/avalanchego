@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -128,7 +127,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	defer db.lock.RUnlock()
 
 	if db.closed {
-		return &nodb.Iterator{Err: database.ErrClosed}
+		return &database.IteratorError{
+			Err: database.ErrClosed,
+		}
 	}
 	return &iterator{
 		Iterator: db.db.NewIteratorWithStartAndPrefix(start, prefix),
@@ -174,21 +175,18 @@ func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	return db.db.HealthCheck(ctx)
 }
 
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
-}
-
 type batch struct {
 	database.Batch
 
-	db     *Database
-	writes []keyValue
+	db  *Database
+	ops []database.BatchOp
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{slices.Clone(key), slices.Clone(value), false})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:   slices.Clone(key),
+		Value: slices.Clone(value),
+	})
 	encValue, err := b.db.encrypt(value)
 	if err != nil {
 		return err
@@ -197,7 +195,10 @@ func (b *batch) Put(key, value []byte) error {
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{slices.Clone(key), nil, true})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:    slices.Clone(key),
+		Delete: true,
+	})
 	return b.Batch.Delete(key)
 }
 
@@ -214,22 +215,22 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
+		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
-		b.writes = b.writes[:0]
+		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()
 }
 
 // Replay replays the batch contents.
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			if err := w.Delete(keyvalue.key); err != nil {
+	for _, op := range b.ops {
+		if op.Delete {
+			if err := w.Delete(op.Key); err != nil {
 				return err
 			}
-		} else if err := w.Put(keyvalue.key, keyvalue.value); err != nil {
+		} else if err := w.Put(op.Key, op.Value); err != nil {
 			return err
 		}
 	}

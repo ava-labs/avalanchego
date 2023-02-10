@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gteleporter
+package gwarp
 
 import (
 	"context"
@@ -15,17 +15,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
+	pb "github.com/ava-labs/avalanchego/proto/pb/warp"
 )
 
 const bufSize = 1024 * 1024
 
 type testSigner struct {
 	client  *Client
-	server  teleporter.Signer
+	server  warp.Signer
 	sk      *bls.SecretKey
 	chainID ids.ID
 	closeFn func()
@@ -40,7 +40,7 @@ func setupSigner(t testing.TB) *testSigner {
 	chainID := ids.GenerateTestID()
 
 	s := &testSigner{
-		server:  teleporter.NewSigner(sk, chainID),
+		server:  warp.NewSigner(sk, chainID),
 		sk:      sk,
 		chainID: chainID,
 	}
@@ -78,7 +78,7 @@ func setupSigner(t testing.TB) *testSigner {
 }
 
 func TestInterface(t *testing.T) {
-	for _, test := range teleporter.SignerTests {
+	for _, test := range warp.SignerTests {
 		s := setupSigner(t)
 		test(t, s.client, s.sk, s.chainID)
 		s.closeFn()

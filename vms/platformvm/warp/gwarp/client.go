@@ -1,17 +1,17 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gteleporter
+package gwarp
 
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
+	pb "github.com/ava-labs/avalanchego/proto/pb/warp"
 )
 
-var _ teleporter.Signer = (*Client)(nil)
+var _ warp.Signer = (*Client)(nil)
 
 type Client struct {
 	client pb.SignerClient
@@ -21,7 +21,7 @@ func NewClient(client pb.SignerClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) Sign(unsignedMsg *teleporter.UnsignedMessage) ([]byte, error) {
+func (c *Client) Sign(unsignedMsg *warp.UnsignedMessage) ([]byte, error) {
 	resp, err := c.client.Sign(context.Background(), &pb.SignRequest{
 		SourceChainId:      unsignedMsg.SourceChainID[:],
 		DestinationChainId: unsignedMsg.DestinationChainID[:],
