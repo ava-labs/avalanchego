@@ -664,9 +664,24 @@ func TestGetCurrentValidators(t *testing.T) {
 		}
 		found = true
 
-		require.Equal(1, len(vdr.Delegators))
-		delegator := vdr.Delegators[0]
-		require.Equal(delegator.NodeID, vdr.NodeID)
+		require.Nil(vdr.Delegators)
+
+		innerArgs := GetCurrentValidatorsArgs{
+			SubnetID: constants.PrimaryNetworkID,
+			NodeIDs:  []ids.NodeID{vdr.NodeID},
+		}
+		innerResponse := GetCurrentValidatorsReply{}
+		err = service.GetCurrentValidators(nil, &innerArgs, &innerResponse)
+		require.NoError(err)
+		require.Len(innerResponse.Validators, 1)
+
+		innerVdr := innerResponse.Validators[0].(pchainapi.PermissionlessValidator)
+		require.Equal(vdr.NodeID, innerVdr.NodeID)
+
+		require.NotNil(innerVdr.Delegators)
+		require.Equal(1, len(*innerVdr.Delegators))
+		delegator := (*innerVdr.Delegators)[0]
+		require.Equal(delegator.NodeID, innerVdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
 		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
 		require.Equal(uint64(delegator.Weight), stakeAmount)

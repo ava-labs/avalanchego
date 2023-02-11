@@ -27,11 +27,6 @@ const (
 var (
 	_ Client = &client{}
 
-	StateSyncVersion = &version.Application{
-		Major: 1,
-		Minor: 7,
-		Patch: 13,
-	}
 	errInvalidRangeProof = errors.New("failed to verify range proof")
 	errTooManyLeaves     = errors.New("response contains more than requested leaves")
 )
@@ -49,26 +44,29 @@ type Client interface {
 }
 
 type client struct {
-	networkClient    NetworkClient
-	stateSyncNodes   []ids.NodeID
-	stateSyncNodeIdx uint32
-	log              logging.Logger
-	metrics          SyncMetrics
+	networkClient       NetworkClient
+	stateSyncNodes      []ids.NodeID
+	stateSyncNodeIdx    uint32
+	stateSyncMinVersion *version.Application
+	log                 logging.Logger
+	metrics             SyncMetrics
 }
 
 type ClientConfig struct {
-	NetworkClient    NetworkClient
-	StateSyncNodeIDs []ids.NodeID
-	Log              logging.Logger
-	Metrics          SyncMetrics
+	NetworkClient       NetworkClient
+	StateSyncNodeIDs    []ids.NodeID
+	StateSyncMinVersion *version.Application
+	Log                 logging.Logger
+	Metrics             SyncMetrics
 }
 
 func NewClient(config *ClientConfig) Client {
 	c := &client{
-		networkClient:  config.NetworkClient,
-		stateSyncNodes: config.StateSyncNodeIDs,
-		log:            config.Log,
-		metrics:        config.Metrics,
+		networkClient:       config.NetworkClient,
+		stateSyncNodes:      config.StateSyncNodeIDs,
+		stateSyncMinVersion: config.StateSyncMinVersion,
+		log:                 config.Log,
+		metrics:             config.Metrics,
 	}
 	return c
 }
@@ -182,7 +180,7 @@ func (c *client) get(ctx context.Context, requestBytes []byte) ([]byte, ids.Node
 		startTime = time.Now()
 	)
 	if len(c.stateSyncNodes) == 0 {
-		response, nodeID, err = c.networkClient.RequestAny(ctx, StateSyncVersion, requestBytes)
+		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, requestBytes)
 	} else {
 		// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 		// we do this every attempt to ensure we get a different node each time if possible.

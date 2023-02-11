@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter/gteleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/gwarp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
@@ -48,9 +48,9 @@ import (
 	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-	teleporterpb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
+	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
 )
 
 var (
@@ -191,7 +191,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
-	teleporterSignerClient := gteleporter.NewClient(teleporterpb.NewSignerClient(clientConn))
+	warpSignerClient := gwarp.NewClient(warppb.NewSignerClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
@@ -234,8 +234,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		BCLookup:     bcLookupClient,
 		Metrics:      metrics.NewOptionalGatherer(),
 
-		// Signs teleporter messages
-		TeleporterSigner: teleporterSignerClient,
+		// Signs warp messages
+		WarpSigner: warpSignerClient,
 
 		ValidatorState: validatorStateClient,
 		// TODO: support remaining snowman++ fields

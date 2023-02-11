@@ -1,14 +1,13 @@
 // Copyright (C) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package teleporter
+package warp
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// UnsignedMessage defines the standard format for an unsigned Teleporter
-// cross-subnet message.
+// UnsignedMessage defines the standard format for an unsigned Warp message.
 type UnsignedMessage struct {
 	SourceChainID      ids.ID `serialize:"true"`
 	DestinationChainID ids.ID `serialize:"true"`

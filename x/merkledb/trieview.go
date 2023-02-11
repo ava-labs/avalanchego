@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -30,10 +31,14 @@ const (
 )
 
 var (
-	ErrCommitted             = errors.New("view has been committed")
-	ErrChangedBaseRoot       = errors.New("the trie this view was based on has changed its root")
-	ErrEditLocked            = errors.New("view has been edit locked. Any view generated from this view would be corrupted by edits")
-	ErrOddLengthWithValue    = errors.New("the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length")
+	ErrCommitted       = errors.New("view has been committed")
+	ErrChangedBaseRoot = errors.New("the trie this view was based on has changed its root")
+	ErrEditLocked      = errors.New(
+		"view has been edit locked. Any view generated from this view would be corrupted by edits",
+	)
+	ErrOddLengthWithValue = errors.New(
+		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
+	)
 	ErrGetClosestNodeFailure = errors.New("GetClosestNode failed to return the closest node")
 	ErrStartAfterEnd         = errors.New("start key > end key")
 
@@ -104,7 +109,10 @@ func (t *trieView) NewView(ctx context.Context) (TrieView, error) {
 // Returns a new view on top of this one with memory allocated to store the
 // [estimatedChanges] number of key/value changes.
 // Assumes this view stack is unlocked.
-func (t *trieView) NewPreallocatedView(ctx context.Context, estimatedChanges int) (TrieView, error) {
+func (t *trieView) NewPreallocatedView(
+	ctx context.Context,
+	estimatedChanges int,
+) (TrieView, error) {
 	t.lockStack()
 	defer t.unlockStack()
 
@@ -178,9 +186,6 @@ func (t *trieView) CalculateIDs(ctx context.Context) error {
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes this view stack is locked.
 func (t *trieView) calculateIDs(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateIDs")
-	defer span.End()
-
 	if !t.needsRecalculation {
 		return nil
 	}
@@ -189,6 +194,12 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 		// never be edited, so [t.needsRecalculation] should always be false.
 		return ErrCommitted
 	}
+
+	// We wait to create the span until after checking that we need to actually
+	// calculateIDs to make traces more useful (otherwise there may be a span
+	// per key modified even though IDs are not re-calculated).
+	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateIDs")
+	defer span.End()
 
 	// ensure that the view under this one is up to date before potentially pulling in nodes from it
 	if t.baseView != nil {
@@ -209,7 +220,7 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 
 	// determine all changed node's ancestors and gather dependency data
 	for key, nodeChange := range t.changes.nodes {
-		if _, ok := seen[key]; ok || nodeChange.after == nil {
+		if seen.Contains(key) || nodeChange.after == nil {
 			continue
 		}
 		if _, ok := dependencyCounts[key]; !ok {
@@ -219,13 +230,12 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 		currentNodeKey := key
 
 		parent := t.parents[nodeChange.after.key]
-		_, alreadySeen := seen[currentNodeKey]
 
 		// all ancestors of a modified node need to have their ID updated
 		// if the ancestors have already been seen or there is no parent, we can stop
-		for ; !alreadySeen && parent != nil; _, alreadySeen = seen[currentNodeKey] {
+		for !seen.Contains(currentNodeKey) && parent != nil {
 			// mark the previous node as handled
-			seen[currentNodeKey] = struct{}{}
+			seen.Add(currentNodeKey)
 
 			// move on to the parent of the previous node
 			currentNodeKey = parent.key
@@ -244,7 +254,7 @@ func (t *trieView) calculateIDs(ctx context.Context) error {
 
 	// perform hashing in topological order
 	var err error
-	if len(seen) >= minNodeCountForConcurrentHashing {
+	if seen.Len() >= minNodeCountForConcurrentHashing {
 		err = t.calculateIDsConcurrent(ctx, readyNodes, dependencyCounts)
 	} else {
 		err = t.calculateIDsSync(ctx, readyNodes, dependencyCounts)
@@ -323,7 +333,11 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // Returns a range proof for (at least part of) the key range [start, end].
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
-func (t *trieView) GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error) {
+func (t *trieView) GetRangeProof(
+	ctx context.Context,
+	start, end []byte,
+	maxLength int,
+) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
@@ -337,7 +351,11 @@ func (t *trieView) GetRangeProof(ctx context.Context, start, end []byte, maxLeng
 // The returned proof's [KeyValues] has at most [maxLength] values.
 // [maxLength] must be > 0.
 // Assumes this view stack is locked.
-func (t *trieView) getRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error) {
+func (t *trieView) getRangeProof(
+	ctx context.Context,
+	start, end []byte,
+	maxLength int,
+) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getRangeProof")
 	defer span.End()
 
@@ -737,9 +755,10 @@ func (t *trieView) remove(ctx context.Context, key []byte) error {
 }
 
 // Returns nil iff at least one of the following is true:
-//  - The root of the db hasn't changed since this view was created.
-//  - This view's root is the same as the db's root.
-//  - This method returns nil for the view under this one.
+//   - The root of the db hasn't changed since this view was created.
+//   - This view's root is the same as the db's root.
+//   - This method returns nil for the view under this one.
+//
 // Assumes this view stack is locked.
 func (t *trieView) validateDBRoot(ctx context.Context) error {
 	dbRoot := t.db.getMerkleRoot()
@@ -869,7 +888,10 @@ func (t *trieView) deleteEmptyNodes(ctx context.Context, node *node) error {
 // 2. True if the node is an exact match with the [fullPath].
 // 3. Any error that occurred while following the path.
 // Assumes this view stack is locked.
-func (t *trieView) getClosestNode(ctx context.Context, fullPath path) (closestNode *node, exactMatch bool, err error) {
+func (t *trieView) getClosestNode(
+	ctx context.Context,
+	fullPath path,
+) (closestNode *node, exactMatch bool, err error) {
 	// all paths start at the root
 	currentNode := t.root
 	matchedPathIndex := 0
@@ -928,10 +950,11 @@ func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
 }
 
 // Returns:
-// 1. The value at [key] iff the following return value is true.
-// 2. True if the value at [key] exists in the caches.
-//    If false, the [key] may be in the trie, just not in the caches.
-// 3. database.ErrNotFound if the value isn't in the trie at all (not just the caches).
+//  1. The value at [key] iff the following return value is true.
+//  2. True if the value at [key] exists in the caches.
+//     If false, the [key] may be in the trie, just not in the caches.
+//  3. database.ErrNotFound if the value isn't in the trie at all (not just the caches).
+//
 // Assumes this view stack is locked.
 func (t *trieView) getCachedValue(key path) ([]byte, bool, error) {
 	if change, ok := t.changes.values[key]; ok {
@@ -964,62 +987,84 @@ func (t *trieView) calculateIDsConcurrent(
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	// nodes that are ready to be hashed
-	readyNodesChan := make(chan *node, len(dependencyCounts))
+	numThreads := runtime.NumCPU()
+	readyNodesChan := make(chan *node, len(readyNodes))   // nodes that are ready to be hashed
+	updateParentChan := make(chan *node, len(readyNodes)) // parent nodes that need to be updated
 
-	updateParentChan := make(chan *node, len(readyNodes))
+	// This iteration is guaranteed not to block because [readyNodesChan] is the
+	// exact right size.
+	//
+	// Invariant: There must be at least one node ready to hash.
+	for _, n := range readyNodes {
+		readyNodesChan <- n
+	}
 
-	// update the parents with the new hash and add them to [readyNodesChan]
-	// if there are no remaining unhashed dependencies
+	// allHashed is used to wait for all hashing goroutines to finish
+	var allHashed sync.WaitGroup
+
+	// Note: minNodeCountForConcurrentHashing is likely larger than the number
+	// of CPUs so this will not spawn unused goroutines.
+	//
+	// Invariant: numThreads > 0.
+	allHashed.Add(numThreads)
+	for i := 0; i < numThreads; i++ {
+		eg.Go(func() error {
+			defer allHashed.Done()
+			for currentNode := range readyNodesChan {
+				if err := currentNode.calculateID(t.db.metrics); err != nil {
+					return err
+				}
+
+				// Now that the node has been hashed, notify its parent to
+				// reduce its dependency count.
+				updateParentChan <- currentNode
+			}
+			return nil
+		})
+	}
+
+	// Update the parents with the node's new hash and add the parent to
+	// [readyNodesChan] if there are no remaining unhashed children.
 	eg.Go(func() error {
 		for currentNode := range updateParentChan {
-			// record newly hashed ID
+			// Record the node's new hash.
 			if err := t.recordNodeChange(ctx, currentNode); err != nil {
 				return err
 			}
 
-			// if the node has a parent, update it with the child ID
+			// If the node has a parent, update its child ID
 			parent, ok := t.parents[currentNode.key]
 			if !ok {
 				continue
 			}
 			parent.addChild(currentNode)
+
 			dependencyCounts[parent.key]--
-			// if the parent node has no more unhashed dependencies, then the parent is ready to be hashed
+
+			// If the parent has more dependencies, then we need to wait until
+			// those children are hashed.
 			if dependencyCounts[parent.key] != 0 {
 				continue
 			}
-			readyNodesChan <- parent
-			delete(dependencyCounts, parent.key)
 
-			// if there are no more dependencies being tracked, then no more nodes will become ready
+			// All of the parent's children have updated their hashes, so the
+			// parent is now ready to be hashed.
+			//
+			// Invariant: A push into [readyNodesChan] can never block here
+			// because this is only executed after removing an element from
+			// [readyNodesChan] and there are no other sources of nodes being
+			// pushed into the channel at this point.
+			readyNodesChan <- parent
+
+			delete(dependencyCounts, parent.key)
+			// If there are no more dependencies being tracked, then no more
+			// nodes will become ready.
 			if len(dependencyCounts) == 0 {
 				close(readyNodesChan)
 			}
 		}
 		return nil
 	})
-
-	var allHashed sync.WaitGroup
-	hashNode := func(currentNode *node) {
-		eg.Go(func() error {
-			defer allHashed.Done()
-			if err := currentNode.calculateID(t.db.metrics); err != nil {
-				return err
-			}
-			updateParentChan <- currentNode
-			return nil
-		})
-	}
-
-	for _, n := range readyNodes {
-		allHashed.Add(1)
-		hashNode(n)
-	}
-	for n := range readyNodesChan {
-		allHashed.Add(1)
-		hashNode(n)
-	}
 
 	allHashed.Wait()
 	close(updateParentChan)
@@ -1028,7 +1073,11 @@ func (t *trieView) calculateIDsConcurrent(
 
 // hash all changed nodes synchronously.
 // Assumes this view stack is locked.
-func (t *trieView) calculateIDsSync(ctx context.Context, readyNodes map[path]*node, dependencyCounts map[path]int) error {
+func (t *trieView) calculateIDsSync(
+	ctx context.Context,
+	readyNodes map[path]*node,
+	dependencyCounts map[path]int,
+) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.hashingSync")
 	defer span.End()
 
@@ -1067,7 +1116,11 @@ func (t *trieView) calculateIDsSync(ctx context.Context, readyNodes map[path]*no
 
 // Inserts a key/value pair into the trie.
 // Assumes this view stack is locked.
-func (t *trieView) insertIntoTrie(ctx context.Context, key path, value Maybe[[]byte]) (*node, error) {
+func (t *trieView) insertIntoTrie(
+	ctx context.Context,
+	key path,
+	value Maybe[[]byte],
+) (*node, error) {
 	// find the node that most closely matches the keyPath
 	closestNode, exactMatch, err := t.getClosestNode(ctx, key)
 	if err != nil {

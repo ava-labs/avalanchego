@@ -1,7 +1,7 @@
 // Copyright (C) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package teleporter
+package warp
 
 import (
 	"math"
@@ -13,7 +13,7 @@ import (
 
 const codecVersion = 0
 
-// Codec does serialization and deserialization for Teleporter messages.
+// Codec does serialization and deserialization for Warp messages.
 var c codec.Manager
 
 func init() {

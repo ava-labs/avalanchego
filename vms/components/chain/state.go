@@ -484,3 +484,9 @@ func (s *State) LastAcceptedBlock() *BlockWrapper {
 func (s *State) LastAcceptedBlockInternal() snowman.Block {
 	return s.LastAcceptedBlock().Block
 }
+
+// IsProcessing returns whether [blkID] is processing in consensus
+func (s *State) IsProcessing(blkID ids.ID) bool {
+	_, ok := s.verifiedBlocks[blkID]
+	return ok
+}
