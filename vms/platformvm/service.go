@@ -725,7 +725,9 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	return attr, nil
 }
 
-// GetCurrentValidators returns current validators and delegators
+// GetCurrentValidators returns the current validators. If a single nodeID
+// is provided, full delegators information is also returned. Otherwise only
+// delegators' number and total weight is returned.
 func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetCurrentValidators called")
 
@@ -745,6 +747,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		if err != nil {
 			return err
 		}
+		// TODO: avoid iterating over delegators here.
 		for currentStakerIterator.Next() {
 			staker := currentStakerIterator.Value()
 			if args.SubnetID != staker.SubnetID {
@@ -766,6 +769,7 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			}
 			targetStakers = append(targetStakers, staker)
 
+			// TODO: avoid iterating over delegators when numNodeIDs > 1.
 			delegatorsIt, err := s.vm.state.GetCurrentDelegatorIterator(args.SubnetID, nodeID)
 			if err != nil {
 				return err
@@ -840,17 +844,20 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			reply.Validators = append(reply.Validators, vdr)
 
 		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:
-			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
-			if err != nil {
-				return err
-			}
-
 			var rewardOwner *platformapi.Owner
-			owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok {
-				rewardOwner, err = s.getAPIOwner(owner)
+			// If we are handling multiple nodeIDs, we don't return the
+			// delegator information.
+			if numNodeIDs == 1 {
+				attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
 				if err != nil {
 					return err
+				}
+				owner, ok := attr.rewardsOwner.(*secp256k1fx.OutputOwners)
+				if ok {
+					rewardOwner, err = s.getAPIOwner(owner)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -878,12 +885,31 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 	}
 
+	// handle delegators' information
 	for i, vdrIntf := range reply.Validators {
 		vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
 		if !ok {
 			continue
 		}
-		vdr.Delegators = vdrToDelegators[vdr.NodeID]
+		delegators, ok := vdrToDelegators[vdr.NodeID]
+		if !ok {
+			// If we are expected to populate the delegators field, we should
+			// always return a non-nil value.
+			delegators = []platformapi.PrimaryDelegator{}
+		}
+		delegatorCount := json.Uint64(len(delegators))
+		delegatorWeight := json.Uint64(0)
+		for _, d := range delegators {
+			delegatorWeight += d.Weight
+		}
+
+		vdr.DelegatorCount = &delegatorCount
+		vdr.DelegatorWeight = &delegatorWeight
+
+		if numNodeIDs == 1 {
+			// queried a specific validator, load all of its delegators
+			vdr.Delegators = &delegators
+		}
 		reply.Validators[i] = vdr
 	}
 
@@ -903,13 +929,12 @@ type GetPendingValidatorsArgs struct {
 }
 
 // GetPendingValidatorsReply are the results from calling GetPendingValidators.
-// Unlike GetCurrentValidatorsReply, each validator has a null delegator list.
 type GetPendingValidatorsReply struct {
 	Validators []interface{} `json:"validators"`
 	Delegators []interface{} `json:"delegators"`
 }
 
-// GetPendingValidators returns the list of pending validators
+// GetPendingValidators returns the lists of pending validators and delegators.
 func (s *Service) GetPendingValidators(_ *http.Request, args *GetPendingValidatorsArgs, reply *GetPendingValidatorsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetPendingValidators called")
 
