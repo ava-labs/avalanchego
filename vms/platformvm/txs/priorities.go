@@ -57,6 +57,11 @@ func (p Priority) IsValidator() bool {
 	return p.IsCurrentValidator() || p.IsPendingValidator()
 }
 
+func (p Priority) IsPermissionedValidator() bool {
+	return p == SubnetPermissionedValidatorCurrentPriority ||
+		p == SubnetPermissionedValidatorPendingPriority
+}
+
 func (p Priority) IsDelegator() bool {
 	return p.IsCurrentDelegator() || p.IsPendingDelegator()
 }
