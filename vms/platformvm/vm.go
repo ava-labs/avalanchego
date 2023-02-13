@@ -227,7 +227,7 @@ func (vm *VM) Initialize(
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)
-	vm.Builder = blockbuilder.New(
+	vm.Builder = blockbuilder.CaminoNew(
 		mempool,
 		vm.txBuilder,
 		vm.txExecutorBackend,
