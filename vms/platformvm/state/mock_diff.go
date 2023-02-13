@@ -672,18 +672,6 @@ func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSupply), arg0, arg1)
 }
 
-// SetLastRewardImportTimestamp mocks base method.
-func (m *MockDiff) SetLastRewardImportTimestamp(arg0 uint64) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastRewardImportTimestamp", arg0)
-}
-
-// SetLastRewardImportTimestamp indicates an expected call of SetLastRewardImportTimestamp.
-func (mr *MockDiffMockRecorder) SetLastRewardImportTimestamp(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastRewardImportTimestamp", reflect.TypeOf((*MockDiff)(nil).SetLastRewardImportTimestamp), arg0)
-}
-
 // SetMultisigAlias mocks base method.
 func (m *MockDiff) SetMultisigAlias(arg0 *multisig.Alias) {
 	m.ctrl.T.Helper()

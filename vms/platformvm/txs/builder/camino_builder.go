@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -17,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -26,12 +29,17 @@ import (
 var (
 	_ CaminoBuilder = (*caminoBuilder)(nil)
 
+	fakeTreasuryKey      = crypto.FakePrivateKey(treasury.Addr)
+	fakeTreasuryKeychain = secp256k1fx.NewKeychain(fakeTreasuryKey)
+
 	errKeyMissing       = errors.New("couldn't find key matching address")
 	errWrongNodeKeyType = errors.New("node key type isn't *crypto.PrivateKeySECP256K1R")
 	errTxIsNotCommitted = errors.New("tx is not committed")
 	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongTxType      = errors.New("wrong transaction type")
+	errWrongOutType     = errors.New("wrong output type")
 	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNoUTXOsForImport = errors.New("no utxos for import")
 )
 
 type CaminoBuilder interface {
@@ -78,6 +86,8 @@ type CaminoTxBuilder interface {
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
+
+	NewRewardsImportTx() (*txs.Tx, error)
 }
 
 func NewCamino(
@@ -487,6 +497,99 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	if err != nil {
 		return nil, err
 	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
+	caminoGenesis, err := b.state.CaminoConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if !caminoGenesis.LockModeBondDeposit {
+		return nil, errWrongLockMode
+	}
+
+	allUTXOsBytes, _, _, err := b.ctx.SharedMemory.Indexed(
+		b.ctx.CChainID,
+		treasury.AddrTraitsBytes,
+		ids.ShortEmpty[:], ids.Empty[:], MaxPageSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	now := b.clk.Unix()
+
+	utxos := []*avax.UTXO{}
+	for _, utxoBytes := range allUTXOsBytes {
+		utxo := &avax.TimedUTXO{}
+		if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			// that means that this could be simple, not-timed utxo
+			continue
+		}
+
+		if utxo.Timestamp <= now-atomic.SharedMemorySyncBound {
+			utxos = append(utxos, &utxo.UTXO)
+		}
+	}
+
+	if len(utxos) == 0 {
+		return nil, errNoUTXOsForImport
+	}
+
+	// Calculating imported amount, getting utxoids
+
+	utxoIDs := make([][]byte, len(utxos))
+	importedAmount := uint64(0)
+	for i, utxo := range utxos {
+		utxoID := utxo.InputID()
+		utxoIDs[i] = utxoID[:]
+		secpOut, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, errWrongOutType
+		}
+		importedAmount, err = math.Add64(importedAmount, secpOut.Amt)
+		if err != nil {
+			return nil, fmt.Errorf("can't compact imported UTXOs: %w", err)
+		}
+	}
+
+	ins := make([]*avax.TransferableInput, len(utxos))
+
+	for i, utxo := range utxos {
+		inputIntf, _, err := fakeTreasuryKeychain.Spend(utxo.Out, now)
+		if err != nil {
+			return nil, err
+		}
+		input, ok := inputIntf.(avax.TransferableIn)
+		if !ok {
+			return nil, err
+		}
+		ins[i] = &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  utxo.Asset,
+			In:     input,
+		}
+	}
+
+	avax.SortTransferableInputs(ins)
+
+	utx := &txs.RewardsImportTx{
+		ImportedInputs: ins,
+		Out: &avax.TransferableOutput{
+			Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          importedAmount,
+				OutputOwners: *treasury.Owner,
+			},
+		},
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 

@@ -8,12 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/golang/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 
@@ -40,7 +42,7 @@ func TestCaminoEnv(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ false, true, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ false, true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		err := shutdownCaminoEnvironment(env)
@@ -54,7 +56,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -298,7 +300,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -580,7 +582,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -752,7 +754,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 	}{
 		"Locked out - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{
-				generateTestOut(ids.ID{}, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -764,7 +766,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Locked in - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+				generateTestIn(avaxAssetID, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -774,7 +776,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		},
 		"Locked out - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{
-				generateTestOut(ids.ID{}, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
@@ -786,7 +788,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		"Locked in - LockModeBondDeposit: false": {
 			outs: []*avax.TransferableOutput{},
 			ins: []*avax.TransferableInput{
-				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+				generateTestIn(avaxAssetID, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
 			caminoConfig: api.Camino{
@@ -860,7 +862,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run("ExportTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -891,7 +893,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 					NetworkID:    env.ctx.NetworkID,
 					BlockchainID: env.ctx.ChainID,
 					Ins: []*avax.TransferableInput{
-						generateTestIn(ids.ID{}, 10, ids.Empty, ids.Empty, sigIndices),
+						generateTestIn(avaxAssetID, 10, ids.Empty, ids.Empty, sigIndices),
 					},
 					Outs: []*avax.TransferableOutput{
 						generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
@@ -910,7 +912,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("ImportTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -938,7 +940,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("AddressStateTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -965,7 +967,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("CreateChainTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -991,7 +993,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("CreateSubnetTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1016,7 +1018,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("TransformSubnetTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1043,7 +1045,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("AddSubnetValidatorTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1077,7 +1079,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		})
 
 		t.Run("RemoveSubnetValidatorTx "+name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				err := shutdownCaminoEnvironment(env)
@@ -1100,6 +1102,31 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			executor := generateExecutor(removeSubnetValidatorTx, env)
 
 			err := executor.RemoveSubnetValidatorTx(removeSubnetValidatorTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("RegisterNodeTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownCaminoEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			registerNodeTx := &txs.RegisterNodeTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				ConsortiumMemberAuth: &secp256k1fx.Input{},
+			}
+
+			executor := generateExecutor(registerNodeTx, env)
+
+			err := executor.RegisterNodeTx(registerNodeTx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1213,7 +1240,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, true, tt.caminoConfig, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {
@@ -1283,7 +1310,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		LockModeBondDeposit: true,
 	}
 
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	env.config.BanffTime = env.state.GetTimestamp()
 
@@ -1531,7 +1558,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	})
 
 	// We need to start again the environment because the staker is already removed from the previous test
-	env = newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env = newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	env.config.BanffTime = env.state.GetTimestamp()
 
@@ -1561,7 +1588,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		LockModeBondDeposit: true,
 	}
 
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		err := shutdownCaminoEnvironment(env)
@@ -2414,7 +2441,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoGenesisConf, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, tt.caminoGenesisConf)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {
@@ -3017,7 +3044,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err = shutdownCaminoEnvironment(env); err != nil {
@@ -3233,7 +3260,7 @@ func TestCaminoStandardTxExecutorClaimRewardTx(t *testing.T) {
 			if tt.baseState != nil {
 				state = tt.baseState(ctrl, state)
 			}
-			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, state)
+			env := newCaminoEnvironmentWithMocks( /*postBanff*/ true, false, nil, caminoGenesisConf, state, nil)
 			defer require.NoError(shutdownCaminoEnvironment(env))
 			env.ctx.Lock.Lock()
 
@@ -3275,7 +3302,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownCaminoEnvironment(env); err != nil {
@@ -3418,6 +3445,329 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 	}
 }
 
+func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
+	ctx, _ := defaultCtx(nil)
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+	caminoStateConf := &state.CaminoConfig{
+		VerifyNodeSignature: caminoGenesisConf.VerifyNodeSignature,
+		LockModeBondDeposit: caminoGenesisConf.LockModeBondDeposit,
+	}
+
+	blockTime := time.Unix(1000, 0)
+
+	baseState := func(c *gomock.Controller) *state.MockState {
+		s := state.NewMockState(c)
+		// shutdown
+		s.EXPECT().SetHeight(uint64(math.MaxUint64))
+		s.EXPECT().Commit()
+		s.EXPECT().Close()
+		return s
+	}
+
+	shmWithUTXOs := func(t *testing.T, c *gomock.Controller, utxos []*avax.TimedUTXO) *atomic.MockSharedMemory {
+		shm := atomic.NewMockSharedMemory(c)
+		utxoIDs := make([][]byte, len(utxos))
+		var utxosBytes [][]byte
+		if len(utxos) != 0 {
+			utxosBytes = make([][]byte, len(utxos))
+		}
+		for i, utxo := range utxos {
+			var toMarshal interface{} = utxo
+			if utxo.Timestamp == 0 {
+				toMarshal = utxo.UTXO
+			}
+			utxoID := utxo.InputID()
+			utxoIDs[i] = utxoID[:]
+			utxoBytes, err := txs.Codec.Marshal(txs.Version, toMarshal)
+			require.NoError(t, err)
+			utxosBytes[i] = utxoBytes
+		}
+		shm.EXPECT().Indexed(ctx.CChainID, treasury.AddrTraitsBytes,
+			ids.ShortEmpty[:], ids.Empty[:], maxPageSize).Return(utxosBytes, nil, nil, nil)
+		return shm
+	}
+
+	tests := map[string]struct {
+		baseState              func(*gomock.Controller) *state.MockState
+		state                  func(*gomock.Controller, *txs.RewardsImportTx, ids.ID) *state.MockDiff
+		sharedMemory           func(*testing.T, *gomock.Controller, []*avax.TimedUTXO) *atomic.MockSharedMemory
+		utx                    func([]*avax.TimedUTXO) *txs.RewardsImportTx
+		signers                [][]*crypto.PrivateKeySECP256K1R
+		utxos                  []*avax.TimedUTXO // sorted by txID
+		expectedAtomicInputs   func([]*avax.TimedUTXO) set.Set[ids.ID]
+		expectedAtomicRequests func([]*avax.TimedUTXO) map[ids.ID]*atomic.Requests
+		expectedErr            error
+	}{
+		"Imported inputs don't contain all reward utxos that are ready to be imported": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(blockTime)
+				return s
+			},
+			sharedMemory: shmWithUTXOs,
+			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
+				return &txs.RewardsImportTx{
+					Out: generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+					ImportedInputs: []*avax.TransferableInput{
+						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
+						generateTestInFromUTXO(&utxos[1].UTXO, []uint32{0}),
+					},
+				}
+			},
+			utxos: []*avax.TimedUTXO{
+				{
+					UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+			},
+			expectedErr: errInputsUTXOSMismatch,
+		},
+		"Imported input doesn't match reward utxo": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(blockTime)
+				return s
+			},
+			sharedMemory: shmWithUTXOs,
+			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
+				return &txs.RewardsImportTx{
+					Out: generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					ImportedInputs: []*avax.TransferableInput{
+						generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					},
+				}
+			},
+			utxos: []*avax.TimedUTXO{{
+				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+			}},
+			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
+				return set.Set[ids.ID]{}
+			},
+			expectedErr: errImportedUTXOMissmatch,
+		},
+		"Input & utxo amount missmatch": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(blockTime)
+				return s
+			},
+			sharedMemory: shmWithUTXOs,
+			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
+				return &txs.RewardsImportTx{
+					Out: generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+					ImportedInputs: []*avax.TransferableInput{{
+						UTXOID: utxos[0].UTXOID,
+						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   2,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					}},
+				}
+			},
+			utxos: []*avax.TimedUTXO{{
+				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+			}},
+			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
+				return set.Set[ids.ID]{}
+			},
+			expectedErr: errInputAmountMissmatch,
+		},
+		"OK": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(blockTime)
+
+				nodeID1 := ids.GenerateTestNodeID()
+				nodeID2 := ids.GenerateTestNodeID()
+				nodeID3 := ids.GenerateTestNodeID()
+				nodeID4 := ids.GenerateTestNodeID()
+				_, validatorAddr1, validatorOwner1 := generateKeyAndOwner(t)
+				_, validatorAddr2, validatorOwner2 := generateKeyAndOwner(t)
+				_, validatorAddr4, validatorOwner4 := generateKeyAndOwner(t)
+
+				currentStakerIterator := state.NewMockStakerIterator(c)
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID1,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID2,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID3,
+					SubnetID: ids.GenerateTestID(),
+				})
+				currentStakerIterator.EXPECT().Next().Return(true)
+				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
+					NodeID:   nodeID4,
+					SubnetID: constants.PrimaryNetworkID,
+				})
+				currentStakerIterator.EXPECT().Next().Return(false)
+				currentStakerIterator.EXPECT().Release()
+
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
+				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID1), state.ShortLinkKeyRegisterNode).Return(validatorAddr1, nil)
+				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID2), state.ShortLinkKeyRegisterNode).Return(validatorAddr2, nil)
+				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID4), state.ShortLinkKeyRegisterNode).Return(validatorAddr4, nil)
+				s.EXPECT().GetNotDistributedValidatorReward().Return(uint64(1), nil) // old
+				s.EXPECT().SetNotDistributedValidatorReward(uint64(2))               // new
+				validatorOwnerID1, err := txs.GetOwnerID(&validatorOwner1)
+				require.NoError(t, err)
+				validatorOwnerID2, err := txs.GetOwnerID(&validatorOwner2)
+				require.NoError(t, err)
+				validatorOwnerID4, err := txs.GetOwnerID(&validatorOwner4)
+				require.NoError(t, err)
+
+				s.EXPECT().GetClaimable(validatorOwnerID1).Return(&state.Claimable{
+					Owner:           &validatorOwner1,
+					ValidatorReward: 10,
+					DepositReward:   100,
+				}, nil)
+				s.EXPECT().GetClaimable(validatorOwnerID2).Return(&state.Claimable{
+					Owner:           &validatorOwner2,
+					ValidatorReward: 20,
+					DepositReward:   200,
+				}, nil)
+				s.EXPECT().GetClaimable(validatorOwnerID4).Return(nil, database.ErrNotFound)
+
+				s.EXPECT().SetClaimable(validatorOwnerID1, &state.Claimable{
+					Owner:           &validatorOwner1,
+					ValidatorReward: 11,
+					DepositReward:   100,
+				})
+				s.EXPECT().SetClaimable(validatorOwnerID2, &state.Claimable{
+					Owner:           &validatorOwner2,
+					ValidatorReward: 21,
+					DepositReward:   200,
+				})
+				s.EXPECT().SetClaimable(validatorOwnerID4, &state.Claimable{
+					Owner:           &validatorOwner4,
+					ValidatorReward: 1,
+				})
+
+				s.EXPECT().AddUTXO(&avax.UTXO{
+					UTXOID: avax.UTXOID{TxID: txID},
+					Asset:  utx.Out.Asset,
+					Out:    utx.Out.Out,
+				})
+
+				return s
+			},
+			sharedMemory: shmWithUTXOs,
+			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
+				return &txs.RewardsImportTx{
+					ImportedInputs: []*avax.TransferableInput{
+						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
+						generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
+					},
+					Out: generateTestOut(ctx.AVAXAssetID, 4, *treasury.Owner, ids.Empty, ids.Empty),
+				}
+			},
+			utxos: []*avax.TimedUTXO{
+				{
+					UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO: *generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound + 1,
+				},
+			},
+			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
+				return set.Set[ids.ID]{
+					utxos[0].InputID(): struct{}{},
+					utxos[2].InputID(): struct{}{},
+				}
+			},
+			expectedAtomicRequests: func(utxos []*avax.TimedUTXO) map[ids.ID]*atomic.Requests {
+				utxoID0 := utxos[0].InputID()
+				utxoID2 := utxos[2].InputID()
+				return map[ids.ID]*atomic.Requests{ctx.CChainID: {
+					RemoveRequests: [][]byte{utxoID0[:], utxoID2[:]},
+				}}
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			env := newCaminoEnvironmentWithMocks(
+				true,
+				false,
+				nil,
+				caminoGenesisConf,
+				tt.baseState(ctrl),
+				tt.sharedMemory(t, ctrl, tt.utxos),
+			)
+			defer require.NoError(shutdownCaminoEnvironment(env))
+			env.ctx.Lock.Lock()
+
+			utx := tt.utx(tt.utxos)
+			// utx.ImportedInputs must be already sorted cause of utxos sort
+			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
+			require.NoError(err)
+
+			e := &CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   tt.state(ctrl, utx, tx.ID()),
+					Tx:      tx,
+				},
+			}
+
+			require.ErrorIs(tx.Unsigned.Visit(e), tt.expectedErr)
+
+			if tt.expectedAtomicInputs != nil {
+				require.Equal(tt.expectedAtomicInputs(tt.utxos), e.Inputs)
+			} else {
+				require.Nil(e.Inputs)
+			}
+
+			if tt.expectedAtomicRequests != nil {
+				require.Equal(tt.expectedAtomicRequests(tt.utxos), e.AtomicRequests)
+			} else {
+				require.Nil(e.AtomicRequests)
+			}
+		})
+	}
+}
+
 func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 	addr := caminoPreFundedKeys[0].Address()
 	nodeAddress := caminoPreFundedNodeKeys[0].Address()
@@ -3488,7 +3838,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 				LockModeBondDeposit: true,
 				InitialAdmin:        addr,
 			}
-			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {

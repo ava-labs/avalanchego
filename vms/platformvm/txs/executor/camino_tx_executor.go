@@ -8,21 +8,27 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+// Max number of items allowed in a page
+const maxPageSize = 1024
 
 var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
@@ -53,6 +59,9 @@ var (
 	errNotSECPOwner               = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongCredentialsNumber     = errors.New("unexpected number of credentials")
 	errWrongOwnerType             = errors.New("wrong owner type")
+	errImportedUTXOMissmatch      = errors.New("imported input doesn't match expected utxo")
+	errInputAmountMissmatch       = errors.New("utxo amount doesn't match input amount")
+	errInputsUTXOSMismatch        = errors.New("number of inputs is different from number of utxos")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -890,6 +899,165 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 			state.ShortLinkKeyRegisterNode,
 			&link,
 		)
+	}
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) error {
+	caminoConfig, err := e.State.CaminoConfig()
+	if err != nil {
+		return err
+	}
+
+	if !caminoConfig.LockModeBondDeposit {
+		return errWrongLockMode
+	}
+
+	outs := tx.Outputs()
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	// Getting all treasury utxos exported from c-chain, collecting ones that are old enough
+
+	allUTXOBytes, _, _, err := e.Ctx.SharedMemory.Indexed(
+		e.Ctx.CChainID,
+		treasury.AddrTraitsBytes,
+		ids.ShortEmpty[:], ids.Empty[:], maxPageSize,
+	)
+	if err != nil {
+		return fmt.Errorf("error fetching atomic UTXOs: %w", err)
+	}
+
+	chainTimestamp := uint64(e.State.GetTimestamp().Unix())
+
+	utxos := []*avax.UTXO{}
+	for _, utxoBytes := range allUTXOBytes {
+		utxo := &avax.TimedUTXO{}
+		if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			// that means that this could be simple, not-timed utxo
+			continue
+		}
+
+		if utxo.Timestamp <= chainTimestamp-atomic.SharedMemorySyncBound {
+			utxos = append(utxos, &utxo.UTXO)
+		}
+	}
+
+	// Verifying that utxos match inputs
+
+	if len(tx.ImportedInputs) != len(utxos) {
+		return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.ImportedInputs), len(utxos), errInputsUTXOSMismatch)
+	}
+
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	e.Inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoID := in.UTXOID.InputID()
+		utxo := utxos[i]
+
+		if utxo.InputID() != utxoID {
+			return errImportedUTXOMissmatch
+		}
+
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			// should never happen
+			return locked.ErrWrongOutType
+		}
+
+		if out.Amt != in.In.Amount() {
+			return fmt.Errorf("utxo.Amt %d, input.Amt %d: %w", out.Amt, in.In.Amount(), errInputAmountMissmatch)
+		}
+
+		e.Inputs.Add(utxoID)
+		utxoIDs[i] = utxoID[:]
+	}
+
+	// Getting active validators
+
+	currentStakerIterator, err := e.State.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	defer currentStakerIterator.Release()
+
+	validators := set.Set[ids.ShortID]{}
+	for currentStakerIterator.Next() {
+		staker := currentStakerIterator.Value()
+		if staker.SubnetID != constants.PrimaryNetworkID {
+			continue
+		}
+
+		validatorAddr, err := e.State.GetShortIDLink(
+			ids.ShortID(staker.NodeID),
+			state.ShortLinkKeyRegisterNode,
+		)
+		if err != nil {
+			return err
+		}
+		validators.Add(validatorAddr)
+	}
+
+	// Set not distributed validator reward
+
+	notDistributedAmount, err := e.State.GetNotDistributedValidatorReward()
+	if err != nil {
+		return err
+	}
+
+	amountToDistribute, err := math.Add64(tx.Out.Out.Amount(), notDistributedAmount)
+	if err != nil {
+		return err
+	}
+
+	addedReward := amountToDistribute / uint64(validators.Len())
+	newNotDistributedAmount := amountToDistribute - addedReward*uint64(validators.Len())
+
+	if newNotDistributedAmount != notDistributedAmount {
+		e.State.SetNotDistributedValidatorReward(newNotDistributedAmount)
+	}
+
+	// Set claimables
+
+	if addedReward != 0 {
+		for validatorAddr := range validators {
+			owner := &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{validatorAddr},
+			}
+
+			ownerID, err := txs.GetOwnerID(owner)
+			if err != nil {
+				return err
+			}
+
+			claimable, err := e.State.GetClaimable(ownerID)
+			if err == database.ErrNotFound {
+				claimable = &state.Claimable{
+					Owner: owner,
+				}
+			} else if err != nil {
+				return err
+			}
+
+			claimable.ValidatorReward, err = math.Add64(claimable.ValidatorReward, addedReward)
+			if err != nil {
+				return err
+			}
+
+			e.State.SetClaimable(ownerID, claimable)
+		}
+	}
+
+	utxo.Produce(e.State, e.Tx.ID(), outs)
+
+	e.AtomicRequests = map[ids.ID]*atomic.Requests{
+		e.Ctx.CChainID: {
+			RemoveRequests: utxoIDs,
+		},
 	}
 
 	return nil

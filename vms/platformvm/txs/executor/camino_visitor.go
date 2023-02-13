@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -29,6 +29,10 @@ func (*StandardTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
 	return errWrongTxType
 }
 
+func (*StandardTxExecutor) RewardsImportTx(*txs.RewardsImportTx) error {
+	return errWrongTxType
+}
+
 // Proposal
 
 func (*ProposalTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
@@ -48,6 +52,10 @@ func (*ProposalTxExecutor) ClaimRewardTx(*txs.ClaimRewardTx) error {
 }
 
 func (*ProposalTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) RewardsImportTx(*txs.RewardsImportTx) error {
 	return errWrongTxType
 }
 
@@ -73,6 +81,10 @@ func (*AtomicTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
 	return errWrongTxType
 }
 
+func (*AtomicTxExecutor) RewardsImportTx(*txs.RewardsImportTx) error {
+	return errWrongTxType
+}
+
 // MemPool
 
 func (v *MempoolTxVerifier) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -92,5 +104,9 @@ func (v *MempoolTxVerifier) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 }
 
 func (v *MempoolTxVerifier) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) RewardsImportTx(tx *txs.RewardsImportTx) error {
 	return v.standardTx(tx)
 }

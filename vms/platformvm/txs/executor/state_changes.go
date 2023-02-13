@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -18,10 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -71,7 +69,6 @@ func VerifyNewChainTime(
 
 type StateChanges interface {
 	Apply(onAccept state.Diff)
-	AtomicChanges() (set.Set[ids.ID], map[ids.ID]*atomic.Requests)
 	Len() int
 }
 

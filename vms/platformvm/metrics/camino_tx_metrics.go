@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -17,7 +17,8 @@ type caminoTxMetrics struct {
 	numDepositTxs,
 	numUnlockDepositTxs,
 	numClaimRewardTxs,
-	numRegisterNodeTxs prometheus.Counter
+	numRegisterNodeTxs,
+	numRewardsImportTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -38,6 +39,7 @@ func newCaminoTxMetrics(
 		numUnlockDepositTxs: newTxMetric(namespace, "unlock_deposit", registerer, &errs),
 		numClaimRewardTxs:   newTxMetric(namespace, "claim_reward", registerer, &errs),
 		numRegisterNodeTxs:  newTxMetric(namespace, "register_node", registerer, &errs),
+		numRewardsImportTxs: newTxMetric(namespace, "rewards_import", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -64,6 +66,10 @@ func (*txMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
 	return nil
 }
 
+func (*txMetrics) RewardsImportTx(*txs.RewardsImportTx) error {
+	return nil
+}
+
 // camino metrics
 
 func (m *caminoTxMetrics) AddressStateTx(*txs.AddressStateTx) error {
@@ -87,6 +93,11 @@ func (m *caminoTxMetrics) ClaimRewardTx(*txs.ClaimRewardTx) error {
 }
 
 func (m *caminoTxMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
+	m.numRegisterNodeTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) RewardsImportTx(*txs.RewardsImportTx) error {
 	m.numRegisterNodeTxs.Inc()
 	return nil
 }

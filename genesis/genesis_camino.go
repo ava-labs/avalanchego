@@ -40,8 +40,7 @@ var (
 				SupplyCap:          1000 * units.MegaAvax,
 			},
 			CaminoConfig: config.CaminoConfig{
-				DaoProposalBondAmount:  1 * units.KiloAvax,
-				ValidatorsRewardPeriod: 60 * 60, // seconds
+				DaoProposalBondAmount: 1 * units.KiloAvax,
 			},
 		},
 	}

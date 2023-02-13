@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -129,9 +129,7 @@ func (v *verifier) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
 	onAcceptState.SetTimestamp(nextChainTime)
 	changes.Apply(onAcceptState)
 
-	inputs, requests := changes.AtomicChanges()
-
-	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState, inputs, requests)
+	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
@@ -177,7 +175,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		return err
 	}
 
-	return v.standardBlock(b, onAcceptState, nil, nil)
+	return v.standardBlock(b, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
@@ -407,19 +405,12 @@ func (v *verifier) proposalBlock(
 func (v *verifier) standardBlock(
 	b *blocks.ApricotStandardBlock,
 	onAcceptState state.Diff,
-	inputs set.Set[ids.ID],
-	requests map[ids.ID]*atomic.Requests,
 ) error {
-	if requests == nil {
-		requests = make(map[ids.ID]*atomic.Requests)
-	}
-
 	blkState := &blockState{
-		statelessBlock:     b,
-		onAcceptState:      onAcceptState,
-		timestamp:          onAcceptState.GetTimestamp(),
-		atomicRequests:     requests,
-		standardBlockState: standardBlockState{inputs: inputs},
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
 	// Finally we process the transactions

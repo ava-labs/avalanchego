@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -9,4 +9,5 @@ type CaminoVisitor interface {
 	UnlockDepositTx(*UnlockDepositTx) error
 	ClaimRewardTx(*ClaimRewardTx) error
 	RegisterNodeTx(*RegisterNodeTx) error
+	RewardsImportTx(*RewardsImportTx) error
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -34,8 +34,38 @@ func (ins *innerSortTransferableInputs) Swap(i, j int) {
 	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
 }
 
-// SortTransferableInputsWithSigners sorts the inputs and signers based on the
-// input's utxo ID
+// SortTransferableInputs sorts the inputs based on the utxoid
 func SortTransferableInputs(ins []*TransferableInput) {
 	sort.Sort(&innerSortTransferableInputs{ins: ins})
+}
+
+type innerSortTransferableTimedUTXOs struct {
+	utxos []*TimedUTXO
+}
+
+func (utxos *innerSortTransferableTimedUTXOs) Less(i, j int) bool {
+	iID, iIndex := utxos.utxos[i].InputSource()
+	jID, jIndex := utxos.utxos[j].InputSource()
+
+	switch bytes.Compare(iID[:], jID[:]) {
+	case -1:
+		return true
+	case 0:
+		return iIndex < jIndex
+	default:
+		return false
+	}
+}
+
+func (utxos *innerSortTransferableTimedUTXOs) Len() int {
+	return len(utxos.utxos)
+}
+
+func (utxos *innerSortTransferableTimedUTXOs) Swap(i, j int) {
+	utxos.utxos[j], utxos.utxos[i] = utxos.utxos[i], utxos.utxos[j]
+}
+
+// SortTransferableUTXOs sorts the utxos based on the utxoid
+func SortTransferableTimedUTXOs(utxos []*TimedUTXO) {
+	sort.Sort(&innerSortTransferableTimedUTXOs{utxos: utxos})
 }

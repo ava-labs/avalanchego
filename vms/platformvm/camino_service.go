@@ -570,6 +570,26 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 	return nil
 }
 
+// GetHeight returns the height of the last accepted block
+func (s *Service) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("Platform: GetLastAcceptedBlock called")
+
+	ctx := r.Context()
+	lastAcceptedID, err := s.vm.LastAccepted(ctx)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
+	}
+	block, err := s.vm.manager.GetStatelessBlock(lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("couldn't get block with id %s: %w", lastAcceptedID, err)
+	}
+
+	block.InitCtx(s.vm.ctx)
+	reply.Encoding = formatting.JSON
+	reply.Block = block
+	return nil
+}
+
 func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
 	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)

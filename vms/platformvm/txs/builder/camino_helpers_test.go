@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -543,4 +543,91 @@ func generateKeyAndOwner() (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1
 		Threshold: 1,
 		Addrs:     []ids.ShortID{addr},
 	}
+}
+
+func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.TransferableInput {
+	var in avax.TransferableIn
+	switch out := utxo.Out.(type) {
+	case *secp256k1fx.TransferOutput:
+		in = &secp256k1fx.TransferInput{
+			Amt:   out.Amount(),
+			Input: secp256k1fx.Input{SigIndices: sigIndices},
+		}
+	case *locked.Out:
+		in = &locked.In{
+			IDs: out.IDs,
+			TransferableIn: &secp256k1fx.TransferInput{
+				Amt:   out.Amount(),
+				Input: secp256k1fx.Input{SigIndices: sigIndices},
+			},
+		}
+	default:
+		panic("unknown utxo.Out type")
+	}
+
+	// to be sure that utxoid.id is set in both entities
+	utxo.InputID()
+	return &avax.TransferableInput{
+		UTXOID: utxo.UTXOID,
+		Asset:  utxo.Asset,
+		In:     in,
+	}
+}
+
+func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
+	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
+		Amt:          amount,
+		OutputOwners: outputOwners,
+	}
+	if depositTxID != ids.Empty || bondTxID != ids.Empty {
+		out = &locked.Out{
+			IDs: locked.IDs{
+				DepositTxID: depositTxID,
+				BondTxID:    bondTxID,
+			},
+			TransferableOut: out,
+		}
+	}
+	return &avax.TransferableOutput{
+		Asset: avax.Asset{ID: assetID},
+		Out:   out,
+	}
+}
+
+func newCaminoBuilderWithMocks(postBanff bool, state state.State, sharedMemory atomic.SharedMemory) (*caminoBuilder, *versiondb.Database) {
+	var isBootstrapped utils.AtomicBool
+	isBootstrapped.SetValue(true)
+
+	config := defaultCaminoConfig(postBanff)
+	clk := defaultClock(postBanff)
+
+	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	ctx, _ := defaultCtx(baseDB)
+
+	if sharedMemory != nil {
+		ctx.SharedMemory = sharedMemory
+	}
+
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+
+	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
+
+	txBuilder := NewCamino(
+		ctx,
+		&config,
+		&clk,
+		fx,
+		state,
+		atomicUTXOs,
+		utxoHandler,
+	)
+
+	caminoBuilder, ok := txBuilder.(*caminoBuilder)
+	if !ok {
+		panic("not camino builder")
+	}
+
+	return caminoBuilder, baseDB
 }

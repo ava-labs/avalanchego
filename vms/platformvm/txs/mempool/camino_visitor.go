@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -34,6 +34,11 @@ func (i *issuer) RegisterNodeTx(*txs.RegisterNodeTx) error {
 	return nil
 }
 
+func (i *issuer) RewardsImportTx(*txs.RewardsImportTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 // Remover
 
 func (r *remover) AddressStateTx(*txs.AddressStateTx) error {
@@ -57,6 +62,11 @@ func (r *remover) ClaimRewardTx(*txs.ClaimRewardTx) error {
 }
 
 func (r *remover) RegisterNodeTx(*txs.RegisterNodeTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) RewardsImportTx(*txs.RewardsImportTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }

@@ -186,7 +186,7 @@ func TestDeferredStakers(t *testing.T) {
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			}
-			env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf, nil)
+			env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf)
 			env.ctx.Lock.Lock()
 			defer func() {
 				if err := shutdownCaminoEnvironment(env); err != nil {

@@ -206,10 +206,6 @@ func (d *diff) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, er
 	return parentState.GetShortIDLink(id, key)
 }
 
-func (d *diff) SetLastRewardImportTimestamp(timestamp uint64) {
-	d.caminoDiff.modifiedRewardImportTimestamp = &timestamp
-}
-
 func (d *diff) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 	d.caminoDiff.modifiedClaimables[ownerID] = claimable
 }
@@ -249,10 +245,6 @@ func (d *diff) GetNotDistributedValidatorReward() (uint64, error) {
 
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
-	if d.caminoDiff.modifiedRewardImportTimestamp != nil {
-		baseState.SetLastRewardImportTimestamp(*d.caminoDiff.modifiedRewardImportTimestamp)
-	}
-
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
 		baseState.SetNotDistributedValidatorReward(*d.caminoDiff.modifiedNotDistributedValidatorReward)
 	}

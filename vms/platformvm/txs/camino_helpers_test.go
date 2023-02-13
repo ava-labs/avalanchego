@@ -79,7 +79,8 @@ func generateTestIn(assetID ids.ID, amount uint64, depositTxID, bondTxID ids.ID,
 		}
 	}
 	return &avax.TransferableInput{
-		Asset: avax.Asset{ID: assetID},
-		In:    in,
+		UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
+		Asset:  avax.Asset{ID: assetID},
+		In:     in,
 	}
 }

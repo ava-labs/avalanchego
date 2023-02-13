@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -30,7 +30,9 @@ func (b *backendVisitor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-// signer
+func (*backendVisitor) RewardsImportTx(*txs.RewardsImportTx) error {
+	return errUnsupportedTxType
+}
 
 func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
@@ -70,4 +72,8 @@ func (s *signerVisitor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
 		return err
 	}
 	return sign(s.tx, txSigners)
+}
+
+func (*signerVisitor) RewardsImportTx(*txs.RewardsImportTx) error {
+	return errUnsupportedTxType
 }

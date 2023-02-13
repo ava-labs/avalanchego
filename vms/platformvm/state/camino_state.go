@@ -91,10 +91,6 @@ func (s *state) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, e
 	return s.caminoState.GetShortIDLink(id, key)
 }
 
-func (s *state) SetLastRewardImportTimestamp(timestamp uint64) {
-	s.caminoState.SetLastRewardImportTimestamp(timestamp)
-}
-
 func (s *state) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 	s.caminoState.SetClaimable(ownerID, claimable)
 }

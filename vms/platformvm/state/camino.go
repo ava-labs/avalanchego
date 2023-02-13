@@ -51,7 +51,6 @@ var (
 	nodeSignatureKey                 = []byte("nodeSignature")
 	depositBondModeKey               = []byte("depositBondMode")
 	notDistributedValidatorRewardKey = []byte("notDistributedValidatorReward")
-	lastRewardImportTimestampKey     = []byte("lastRewardImportTimestamp")
 
 	errWrongTxType      = errors.New("unexpected tx type")
 	errNonExistingOffer = errors.New("deposit offer doesn't exist")
@@ -92,7 +91,6 @@ type CaminoDiff interface {
 
 	// Claimable & rewards
 
-	SetLastRewardImportTimestamp(timestamp uint64)
 	SetClaimable(ownerID ids.ID, claimable *Claimable)
 	GetClaimable(ownerID ids.ID) (*Claimable, error)
 	SetNotDistributedValidatorReward(reward uint64)
@@ -131,7 +129,6 @@ type caminoDiff struct {
 	modifiedMultisigOwners                map[ids.ShortID]*multisig.Alias
 	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
-	modifiedRewardImportTimestamp         *uint64
 	modifiedNotDistributedValidatorReward *uint64
 }
 

@@ -18,10 +18,6 @@ type Claimable struct {
 	DepositReward   uint64                    `serialize:"true"`
 }
 
-func (cs *caminoState) SetLastRewardImportTimestamp(timestamp uint64) {
-	cs.caminoDiff.modifiedRewardImportTimestamp = &timestamp
-}
-
 func (cs *caminoState) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 	cs.caminoDiff.modifiedClaimables[ownerID] = claimable
 }
@@ -68,17 +64,6 @@ func (cs *caminoState) GetNotDistributedValidatorReward() (uint64, error) {
 }
 
 func (cs *caminoState) writeClaimableAndValidatorRewards() error {
-	if cs.modifiedRewardImportTimestamp != nil {
-		if err := database.PutUInt64(
-			cs.caminoDB,
-			lastRewardImportTimestampKey,
-			*cs.modifiedRewardImportTimestamp,
-		); err != nil {
-			return fmt.Errorf("failed to write rewardImportTimestamp: %w", err)
-		}
-		cs.modifiedRewardImportTimestamp = nil
-	}
-
 	if cs.modifiedNotDistributedValidatorReward != nil {
 		if err := database.PutUInt64(
 			cs.caminoDB,

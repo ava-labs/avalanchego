@@ -836,18 +836,6 @@ func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
 }
 
-// SetLastRewardImportTimestamp mocks base method.
-func (m *MockState) SetLastRewardImportTimestamp(arg0 uint64) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastRewardImportTimestamp", arg0)
-}
-
-// SetLastRewardImportTimestamp indicates an expected call of SetLastRewardImportTimestamp.
-func (mr *MockStateMockRecorder) SetLastRewardImportTimestamp(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastRewardImportTimestamp", reflect.TypeOf((*MockState)(nil).SetLastRewardImportTimestamp), arg0)
-}
-
 // SetMultisigAlias mocks base method.
 func (m *MockState) SetMultisigAlias(arg0 *multisig.Alias) {
 	m.ctrl.T.Helper()

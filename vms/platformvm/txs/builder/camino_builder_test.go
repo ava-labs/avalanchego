@@ -11,6 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -580,6 +582,109 @@ func TestNewClaimRewardTx(t *testing.T) {
 					depositRewardsOwner,
 				)
 				require.NoError(err)
+			}
+		})
+	}
+}
+
+func TestNewRewardsImportTx(t *testing.T) {
+	ctx, _ := defaultCtx(nil)
+	blockTime := time.Unix(1000, 0)
+
+	tests := map[string]struct {
+		state        func(*gomock.Controller) state.State
+		sharedMemory func(*gomock.Controller, []*avax.TimedUTXO) atomic.SharedMemory
+		utxos        []*avax.TimedUTXO
+		expectedTx   func(*testing.T, []*avax.TimedUTXO) *txs.Tx
+		expectedErr  error
+	}{
+		"OK": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
+			},
+			sharedMemory: func(c *gomock.Controller, utxos []*avax.TimedUTXO) atomic.SharedMemory {
+				shm := atomic.NewMockSharedMemory(c)
+				utxoIDs := make([][]byte, len(utxos))
+				utxosBytes := make([][]byte, len(utxos))
+				for i, utxo := range utxos {
+					var toMarshal interface{} = utxo
+					if utxo.Timestamp == 0 {
+						toMarshal = utxo.UTXO
+					}
+					utxoID := utxo.InputID()
+					utxoIDs[i] = utxoID[:]
+					utxoBytes, err := txs.Codec.Marshal(txs.Version, toMarshal)
+					require.NoError(t, err)
+					utxosBytes[i] = utxoBytes
+				}
+				shm.EXPECT().Indexed(ctx.CChainID, treasury.AddrTraitsBytes,
+					ids.ShortEmpty[:], ids.Empty[:], MaxPageSize).Return(utxosBytes, nil, nil, nil)
+				return shm
+			},
+			utxos: []*avax.TimedUTXO{
+				{
+					UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO: *generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, 10, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, 100, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				},
+				{
+					UTXO:      *generateTestUTXO(ids.ID{4}, ctx.AVAXAssetID, 1000, *treasury.Owner, ids.Empty, ids.Empty),
+					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound + 1,
+				},
+			},
+			expectedTx: func(t *testing.T, utxos []*avax.TimedUTXO) *txs.Tx {
+				tx, err := txs.NewSigned(&txs.RewardsImportTx{
+					ImportedInputs: []*avax.TransferableInput{
+						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
+						generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
+					},
+					Out:                   generateTestOut(ctx.AVAXAssetID, 101, *treasury.Owner, ids.Empty, ids.Empty),
+					SyntacticallyVerified: true,
+				}, txs.Codec, nil)
+				require.NoError(t, err)
+				return tx
+			},
+		},
+		"No utxos": {
+			state: func(ctrl *gomock.Controller) state.State {
+				s := state.NewMockState(ctrl)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
+			},
+			sharedMemory: func(c *gomock.Controller, utxos []*avax.TimedUTXO) atomic.SharedMemory {
+				shm := atomic.NewMockSharedMemory(c)
+				shm.EXPECT().Indexed(ctx.CChainID, treasury.AddrTraitsBytes,
+					ids.ShortEmpty[:], ids.Empty[:], MaxPageSize).Return(nil, nil, nil, nil)
+				return shm
+			},
+			expectedErr: errNoUTXOsForImport,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			b, db := newCaminoBuilderWithMocks(true, tt.state(ctrl), tt.sharedMemory(ctrl, tt.utxos))
+			defer func() {
+				require.NoError(db.Close())
+				ctrl.Finish()
+			}()
+			b.clk.Set(blockTime)
+
+			tx, err := b.NewRewardsImportTx()
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedTx != nil {
+				require.Equal(tx, tt.expectedTx(t, tt.utxos))
+			} else {
+				require.Nil(tx)
 			}
 		})
 	}

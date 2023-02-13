@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -50,7 +50,14 @@ func (cs *caminoState) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.Sho
 		return ids.ShortEmpty, err
 	}
 
-	return ids.ToShortID(addrBytes)
+	linkedShortID, err := ids.ToShortID(addrBytes)
+	if err != nil {
+		return ids.ShortEmpty, err
+	}
+
+	cs.shortLinksCache.Put(linkKey, linkedShortID)
+
+	return linkedShortID, nil
 }
 
 func toShortLinkKey(id ids.ShortID, key ShortLinkKey) ids.ID {

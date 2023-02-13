@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/stretchr/testify/require"
 
@@ -90,7 +91,7 @@ func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camino, mockState state.State) *caminoEnvironment {
+func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camino) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -105,10 +106,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 
-	baseState := mockState
-	if mockState == nil {
-		baseState = defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
-	}
+	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -520,19 +518,21 @@ func noOffers(_ caminoEnvironment) ids.ID {
 	return ids.Empty
 }
 
-func newMockableCaminoEnvironment(
+func newCaminoEnvironmentWithMocks(
 	postBanff bool,
 	addSubnet bool,
-	caminoVMConfig config.CaminoConfig,
+	caminoVMConfig *config.CaminoConfig,
 	caminoGenesisConf api.Camino,
-	mockState state.State,
-	mockAtomicUTXOs avax.AtomicUTXOManager,
+	mockableState state.State,
+	sharedMemory atomic.SharedMemory,
 ) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
 	config := defaultCaminoConfig(postBanff)
-	config.CaminoConfig = caminoVMConfig
+	if caminoVMConfig != nil {
+		config.CaminoConfig = *caminoVMConfig
+	}
 
 	clk := defaultClock(postBanff)
 
@@ -544,38 +544,41 @@ func newMockableCaminoEnvironment(
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 
-	baseState := mockState
-	if mockState == nil {
-		baseState = defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
+	if mockableState == nil {
+		mockableState = defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
 	}
 
-	if mockAtomicUTXOs == nil {
-		mockAtomicUTXOs = avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	if sharedMemory != nil {
+		msm = &mutableSharedMemory{
+			SharedMemory: sharedMemory,
+		}
+		ctx.SharedMemory = msm
 	}
 
-	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, baseState, fx, true)
+	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+
+	uptimes := uptime.NewManager(mockableState)
+	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, mockableState, fx, true)
 
 	txBuilder := builder.NewCamino(
 		ctx,
 		&config,
 		&clk,
 		fx,
-		baseState,
-		mockAtomicUTXOs,
+		mockableState,
+		atomicUTXOs,
 		utxoHandler,
 	)
 
 	backend := Backend{
-		Config:            &config,
-		Ctx:               ctx,
-		Clk:               &clk,
-		Bootstrapped:      &isBootstrapped,
-		Fx:                fx,
-		FlowChecker:       utxoHandler,
-		Uptimes:           uptimes,
-		Rewards:           rewards,
-		AtomicUTXOManager: mockAtomicUTXOs,
+		Config:       &config,
+		Ctx:          ctx,
+		Clk:          &clk,
+		Bootstrapped: &isBootstrapped,
+		Fx:           fx,
+		FlowChecker:  utxoHandler,
+		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
 	env := &caminoEnvironment{
@@ -586,9 +589,9 @@ func newMockableCaminoEnvironment(
 		ctx:            ctx,
 		msm:            msm,
 		fx:             fx,
-		state:          baseState,
+		state:          mockableState,
 		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    mockAtomicUTXOs,
+		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
 		utxosHandler:   utxoHandler,
 		txBuilder:      txBuilder,
