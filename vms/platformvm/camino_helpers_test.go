@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,11 +37,14 @@ const (
 
 var (
 	localStakingPath          = "../../staking/local/"
+	caminoPreFundedKeys       = crypto.BuildTestKeys()
 	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
-func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) (*VM, database.Database, *mutableSharedMemory) {
-	vm := &VM{Factory: Factory{defaultCaminoConfig(true)}}
+func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) *VM {
+	vm := &VM{
+		Factory: Factory{defaultCaminoConfig(true)},
+	}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
@@ -80,10 +82,13 @@ func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) (*VM, databa
 	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		// control keys are keys[0], keys[1], keys[2]
-		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
-		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // pays tx fee
-		keys[0].PublicKey().Address(),           // change addr
+		[]ids.ShortID{ // control keys
+			caminoPreFundedKeys[0].PublicKey().Address(),
+			caminoPreFundedKeys[1].PublicKey().Address(),
+			caminoPreFundedKeys[2].PublicKey().Address(),
+		},
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		caminoPreFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
 		panic(err)
@@ -99,7 +104,7 @@ func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) (*VM, databa
 		panic(err)
 	}
 
-	return vm, baseDBManager.Current().Database, msm
+	return vm
 }
 
 func defaultCaminoConfig(postBanff bool) config.Config {
@@ -145,11 +150,11 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 
 	caminoGenesisConfig.UTXODeposits = make([]api.UTXODeposit, len(genesisUTXOs))
-	caminoGenesisConfig.ValidatorDeposits = make([][]api.UTXODeposit, len(keys))
-	caminoGenesisConfig.ValidatorConsortiumMembers = make([]ids.ShortID, len(keys))
+	caminoGenesisConfig.ValidatorDeposits = make([][]api.UTXODeposit, len(caminoPreFundedKeys))
+	caminoGenesisConfig.ValidatorConsortiumMembers = make([]ids.ShortID, len(caminoPreFundedKeys))
 
-	genesisValidators := make([]api.PermissionlessValidator, len(keys))
-	for i, key := range keys {
+	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
+	for i, key := range caminoPreFundedKeys {
 		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
 		if err != nil {
 			panic(err)

@@ -170,7 +170,7 @@ func TestGetCaminoBalance(t *testing.T) {
 }
 
 func defaultCaminoService(t *testing.T, camino api.Camino, utxos []api.UTXO) *CaminoService {
-	vm, _, _ := newCaminoVM(camino, utxos)
+	vm := newCaminoVM(camino, utxos)
 
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

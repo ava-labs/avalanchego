@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/golang/mock/gomock"
@@ -3412,6 +3414,130 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedNodeID, ids.NodeID(registeredNode))
 			}
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
+	addr := caminoPreFundedKeys[0].Address()
+	nodeAddress := caminoPreFundedNodeKeys[0].Address()
+	outputOwners := &secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}
+
+	type args struct {
+		address    ids.ShortID
+		remove     bool
+		keys       []*crypto.PrivateKeySECP256K1R
+		changeAddr *secp256k1fx.OutputOwners
+	}
+	tests := map[string]struct {
+		generateArgs func() args
+		preExecute   func(*testing.T, *txs.Tx, state.State)
+		expectedErr  error
+		assert       func(*testing.T)
+	}{
+		"Happy path set state to deferred": {
+			generateArgs: func() args {
+				return args{
+					address:    nodeAddress,
+					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
+			expectedErr: nil,
+		},
+		"Happy path set state to active": {
+			generateArgs: func() args {
+				return args{
+					address:    nodeAddress,
+					remove:     true,
+					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx, state state.State) {
+				stakerToTransfer, err := state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(nodeAddress))
+				require.NoError(t, err)
+				state.DeleteCurrentValidator(stakerToTransfer)
+				stakerToTransfer.StartTime = stakerToTransfer.EndTime
+				state.PutPendingValidator(stakerToTransfer)
+			},
+			expectedErr: nil,
+		},
+		"Remove deferred state of an active validator": {
+			generateArgs: func() args {
+				return args{
+					address:    nodeAddress,
+					remove:     true,
+					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
+			expectedErr: errValidatorNotFound,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			caminoGenesisConf := api.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				InitialAdmin:        addr,
+			}
+			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf, nil)
+			env.ctx.Lock.Lock()
+			defer func() {
+				if err := shutdownCaminoEnvironment(env); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			env.config.BanffTime = env.state.GetTimestamp()
+			require.NoError(t, env.state.Commit())
+
+			setAddressStateArgs := tt.generateArgs()
+			tx, err := env.txBuilder.NewAddressStateTx(
+				setAddressStateArgs.address,
+				setAddressStateArgs.remove,
+				txs.AddressStateNodeDeferred,
+				setAddressStateArgs.keys,
+				setAddressStateArgs.changeAddr,
+			)
+			require.NoError(t, err)
+
+			tt.preExecute(t, tx, env.state)
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(t, err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      tx,
+				},
+			}
+
+			err = tx.Unsigned.Visit(&executor)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+			var stakerIterator state.StakerIterator
+			if setAddressStateArgs.remove {
+				stakerIterator, err = onAcceptState.GetCurrentStakerIterator()
+				require.NoError(t, err)
+			} else {
+				stakerIterator, err = onAcceptState.GetPendingStakerIterator()
+				require.NoError(t, err)
+			}
+			require.True(t, stakerIterator.Next())
+			stakerToRemove := stakerIterator.Value()
+			stakerIterator.Release()
+			require.Equal(t, stakerToRemove.NodeID, ids.NodeID(setAddressStateArgs.address))
 		})
 	}
 }
