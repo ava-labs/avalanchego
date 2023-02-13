@@ -284,6 +284,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding consortium member nodes
 
 	for _, consortiumMemberNode := range g.Camino.ConsortiumMembersNodeIDs {
+		consortiumMemberNode := consortiumMemberNode
 		cs.SetShortIDLink(
 			ids.ShortID(consortiumMemberNode.NodeID),
 			ShortLinkKeyRegisterNode,
