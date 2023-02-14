@@ -920,60 +920,56 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		return err
 	}
 
-	// Getting all treasury utxos exported from c-chain, collecting ones that are old enough
+	if e.Bootstrapped.GetValue() {
+		// Getting all treasury utxos exported from c-chain, collecting ones that are old enough
 
-	allUTXOBytes, _, _, err := e.Ctx.SharedMemory.Indexed(
-		e.Ctx.CChainID,
-		treasury.AddrTraitsBytes,
-		ids.ShortEmpty[:], ids.Empty[:], maxPageSize,
-	)
-	if err != nil {
-		return fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	chainTimestamp := uint64(e.State.GetTimestamp().Unix())
-
-	utxos := []*avax.UTXO{}
-	for _, utxoBytes := range allUTXOBytes {
-		utxo := &avax.TimedUTXO{}
-		if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-			// that means that this could be simple, not-timed utxo
-			continue
+		allUTXOBytes, _, _, err := e.Ctx.SharedMemory.Indexed(
+			e.Ctx.CChainID,
+			treasury.AddrTraitsBytes,
+			ids.ShortEmpty[:], ids.Empty[:], maxPageSize,
+		)
+		if err != nil {
+			return fmt.Errorf("error fetching atomic UTXOs: %w", err)
 		}
 
-		if utxo.Timestamp <= chainTimestamp-atomic.SharedMemorySyncBound {
-			utxos = append(utxos, &utxo.UTXO)
-		}
-	}
+		chainTimestamp := uint64(e.State.GetTimestamp().Unix())
 
-	// Verifying that utxos match inputs
+		utxos := []*avax.UTXO{}
+		for _, utxoBytes := range allUTXOBytes {
+			utxo := &avax.TimedUTXO{}
+			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+				// that means that this could be simple, not-timed utxo
+				continue
+			}
 
-	if len(tx.ImportedInputs) != len(utxos) {
-		return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.ImportedInputs), len(utxos), errInputsUTXOSMismatch)
-	}
-
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	e.Inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.UTXOID.InputID()
-		utxo := utxos[i]
-
-		if utxo.InputID() != utxoID {
-			return errImportedUTXOMissmatch
+			if utxo.Timestamp <= chainTimestamp-atomic.SharedMemorySyncBound {
+				utxos = append(utxos, &utxo.UTXO)
+			}
 		}
 
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			// should never happen
-			return locked.ErrWrongOutType
+		// Verifying that utxos match inputs
+
+		if len(tx.ImportedInputs) != len(utxos) {
+			return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.ImportedInputs), len(utxos), errInputsUTXOSMismatch)
 		}
 
-		if out.Amt != in.In.Amount() {
-			return fmt.Errorf("utxo.Amt %d, input.Amt %d: %w", out.Amt, in.In.Amount(), errInputAmountMissmatch)
-		}
+		for i, in := range tx.ImportedInputs {
+			utxo := utxos[i]
 
-		e.Inputs.Add(utxoID)
-		utxoIDs[i] = utxoID[:]
+			if utxo.InputID() != in.InputID() {
+				return errImportedUTXOMissmatch
+			}
+
+			out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+			if !ok {
+				// should never happen
+				return locked.ErrWrongOutType
+			}
+
+			if out.Amt != in.In.Amount() {
+				return fmt.Errorf("utxo.Amt %d, input.Amt %d: %w", out.Amt, in.In.Amount(), errInputAmountMissmatch)
+			}
+		}
 	}
 
 	// Getting active validators
@@ -1052,7 +1048,17 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		}
 	}
 
+	// Produce UTXOs and atomic request
+
 	utxo.Produce(e.State, e.Tx.ID(), outs)
+
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	e.Inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
+	for i := range tx.ImportedInputs {
+		utxoID := tx.ImportedInputs[i].InputID()
+		e.Inputs.Add(utxoID)
+		utxoIDs[i] = utxoID[:]
+	}
 
 	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		e.Ctx.CChainID: {

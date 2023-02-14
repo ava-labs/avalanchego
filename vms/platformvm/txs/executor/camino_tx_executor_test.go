@@ -3556,9 +3556,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
 				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
 			}},
-			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
-				return set.Set[ids.ID]{}
-			},
 			expectedErr: errImportedUTXOMissmatch,
 		},
 		"Input & utxo amount missmatch": {
@@ -3587,9 +3584,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
 				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
 			}},
-			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
-				return set.Set[ids.ID]{}
-			},
 			expectedErr: errInputAmountMissmatch,
 		},
 		"OK": {
