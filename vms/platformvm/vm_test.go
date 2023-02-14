@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -1752,19 +1753,20 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
+	gossipConfig := subnets.GossipConfig{
+		AcceptedFrontierPeerSize:  1,
+		OnAcceptPeerSize:          1,
+		AppGossipValidatorSize:    1,
+		AppGossipNonValidatorSize: 1,
+	}
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
 		externalSender,
 		chainRouter,
 		timeoutManager,
-		sender.GossipConfig{
-			AcceptedFrontierPeerSize:  1,
-			OnAcceptPeerSize:          1,
-			AppGossipValidatorSize:    1,
-			AppGossipNonValidatorSize: 1,
-		},
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		subnets.New(subnets.Config{GossipConfig: gossipConfig}),
 	)
 	require.NoError(err)
 
@@ -1782,7 +1784,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	isBootstrapped := false
-	subnet := &common.SubnetTest{
+	bootstrapTracker := &common.BootstrapTrackerTest{
 		T: t,
 		IsBootstrappedF: func() bool {
 			return isBootstrapped
@@ -1806,7 +1808,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
-		Subnet:                         subnet,
+		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
@@ -1835,10 +1837,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		bootstrapConfig.Ctx,
 		beacons,
 		msgChan,
-		nil,
 		time.Hour,
 		cpuTracker,
 		vm,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(err)
 

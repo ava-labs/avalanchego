@@ -7,11 +7,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Subnet describes the standard interface of a subnet description
-type Subnet interface {
-	// Returns true iff the subnet is done bootstrapping
+// BootstrapTracker describes the standard interface for tracking the status of
+// a subnet bootstrapping
+type BootstrapTracker interface {
+	// Returns true iff done bootstrapping
 	IsBootstrapped() bool
 
 	// Bootstrapped marks the named chain as being bootstrapped
 	Bootstrapped(chainID ids.ID)
+
+	OnBootstrapCompleted() chan struct{}
 }

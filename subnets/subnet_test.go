@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package chains
+package subnets
 
 import (
 	"testing"
@@ -18,17 +18,17 @@ func TestSubnet(t *testing.T) {
 	chainID1 := ids.GenerateTestID()
 	chainID2 := ids.GenerateTestID()
 
-	s := newSubnet()
-	s.addChain(chainID0)
+	s := New(Config{})
+	s.AddChain(chainID0)
 	require.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.Bootstrapped(chainID0)
 	require.True(s.IsBootstrapped(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 
-	s.addChain(chainID1)
+	s.AddChain(chainID1)
 	require.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.addChain(chainID2)
+	s.AddChain(chainID2)
 	require.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.Bootstrapped(chainID1)

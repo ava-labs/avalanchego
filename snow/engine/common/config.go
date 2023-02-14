@@ -18,13 +18,13 @@ type Config struct {
 	Validators validators.Set
 	Beacons    validators.Set
 
-	SampleK        int
-	Alpha          uint64
-	StartupTracker tracker.Startup
-	Sender         Sender
-	Bootstrapable  Bootstrapable
-	Subnet         Subnet
-	Timer          Timer
+	SampleK          int
+	Alpha            uint64
+	StartupTracker   tracker.Startup
+	Sender           Sender
+	Bootstrapable    Bootstrapable
+	BootstrapTracker BootstrapTracker
+	Timer            Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

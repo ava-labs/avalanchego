@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -87,10 +88,10 @@ func TestShutdown(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -212,10 +213,10 @@ func TestShutdownTimesOut(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -355,10 +356,10 @@ func TestRouterTimeout(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -674,10 +675,10 @@ func TestRouterClearTimeouts(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -950,10 +951,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -1113,10 +1114,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		requester,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -1130,10 +1131,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		responder,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -1152,8 +1153,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	chainRouter.AddChain(context.Background(), responderHandler)
 
 	// Each chain should start off with a connected message
-	require.Equal(t, 1, chainRouter.chains[requester.ChainID].Len())
-	require.Equal(t, 1, chainRouter.chains[responder.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chainHandlers[requester.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chainHandlers[responder.ChainID].Len())
 
 	// Requester sends a request to the responder
 	msgBytes := []byte("foobar")
@@ -1166,7 +1167,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		msgBytes,
 	)
 	chainRouter.HandleInbound(context.Background(), msg)
-	require.Equal(t, 2, chainRouter.chains[responder.ChainID].Len())
+	require.Equal(t, 2, chainRouter.chainHandlers[responder.ChainID].Len())
 
 	// We register the cross-chain response on the requester-side so we don't
 	// drop it.
@@ -1193,7 +1194,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		msgBytes,
 	)
 	chainRouter.HandleInbound(context.Background(), msg)
-	require.Equal(t, 2, chainRouter.chains[requester.ChainID].Len())
+	require.Equal(t, 2, chainRouter.chainHandlers[requester.ChainID].Len())
 }
 
 func TestConnectedSubnet(t *testing.T) {
