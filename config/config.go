@@ -194,7 +194,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 		passwordFilePath := v.GetString(APIAuthPasswordFileKey) // picks flag value or default
 		passwordBytes, err := os.ReadFile(passwordFilePath)
 		if err != nil {
-			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
+			return node.APIAuthConfig{}, fmt.Errorf("failed to read API auth password file: %w", err)
 		}
 		config.APIAuthPassword = strings.TrimSpace(string(passwordBytes))
 	}
