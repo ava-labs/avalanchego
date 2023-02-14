@@ -90,8 +90,14 @@ func (p *process) Start() error {
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if p.config.AttemptedNATTraversal && !p.config.Nat.SupportsNAT() {
-		log.Warn("UPnP or NAT-PMP router attach failed, you may not be listening publicly. " +
+		log.Warn("UPnP and NAT-PMP router attach failed, you may not be listening publicly. " +
 			"Please confirm the settings in your router")
+	}
+
+	if ip := p.config.IPPort.IPPort().IP; ip.IsLoopback() || ip.IsPrivate() {
+		log.Warn("P2P IP is private, you will not be publicly discoverable",
+			zap.Stringer("ip", ip),
+		)
 	}
 
 	// An empty host is treated as a wildcard to match all addresses, so it is
