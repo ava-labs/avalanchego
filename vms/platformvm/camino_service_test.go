@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
@@ -205,5 +206,103 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 		UTXOID: avax.UTXOID{TxID: txID},
 		Asset:  avax.Asset{ID: assetID},
 		Out:    out,
+	}
+}
+
+func TestCaminoService_GetAllDepositOffers(t *testing.T) {
+	type fields struct {
+		Service CaminoService
+	}
+	type args struct {
+		depositOffersArgs *GetAllDepositOffersArgs
+		response          *GetAllDepositOffersReply
+	}
+	tests := map[string]struct {
+		fields  fields
+		args    args
+		want    []*deposit.Offer
+		wantErr error
+		prepare func(service CaminoService)
+	}{
+		"success - only active offers": {
+			fields: fields{
+				Service: *defaultCaminoService(t, api.Camino{}, []api.UTXO{}),
+			},
+			args: args{
+				depositOffersArgs: &GetAllDepositOffersArgs{
+					Active: true,
+				},
+				response: &GetAllDepositOffersReply{},
+			},
+			want: []*deposit.Offer{
+				{
+					ID:    ids.FromInt(0),
+					Flags: 0,
+				},
+				{
+					ID:    ids.FromInt(1),
+					Flags: 0,
+				},
+			},
+			prepare: func(service CaminoService) {
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(0),
+					Flags: 0,
+				})
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(1),
+					Flags: 0,
+				})
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(2),
+					Flags: 1,
+				})
+			},
+		},
+		"success": {
+			fields: fields{
+				Service: *defaultCaminoService(t, api.Camino{}, []api.UTXO{}),
+			},
+			args: args{
+				depositOffersArgs: &GetAllDepositOffersArgs{},
+				response:          &GetAllDepositOffersReply{},
+			},
+			want: []*deposit.Offer{
+				{
+					ID:    ids.FromInt(0),
+					Flags: 0,
+				},
+				{
+					ID:    ids.FromInt(1),
+					Flags: 0,
+				},
+				{
+					ID:    ids.FromInt(2),
+					Flags: 1,
+				},
+			},
+			prepare: func(service CaminoService) {
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(0),
+					Flags: 0,
+				})
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(1),
+					Flags: 0,
+				})
+				service.vm.state.AddDepositOffer(&deposit.Offer{
+					ID:    ids.FromInt(2),
+					Flags: 1,
+				})
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt.prepare(tt.fields.Service)
+			err := tt.fields.Service.GetAllDepositOffers(nil, tt.args.depositOffersArgs, tt.args.response)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.ElementsMatch(t, tt.want, tt.args.response.DepositOffers)
+		})
 	}
 }

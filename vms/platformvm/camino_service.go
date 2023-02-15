@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -651,4 +652,35 @@ func (s *Service) getOutputOwner(args *platformapi.Owner) (*secp256k1fx.OutputOw
 		return ret, nil
 	}
 	return nil, nil
+}
+
+type GetAllDepositOffersArgs struct {
+	Active bool `json:"active"`
+}
+
+type GetAllDepositOffersReply struct {
+	DepositOffers []*deposit.Offer `json:"depositOffers"`
+}
+
+// GetAllDepositOffers returns an array of all deposit offers. The array can be filtered to only return active offers.
+func (s *CaminoService) GetAllDepositOffers(_ *http.Request, args *GetAllDepositOffersArgs, response *GetAllDepositOffersReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetAllDepositOffers called")
+
+	depositOffers, err := s.vm.state.GetAllDepositOffers()
+	if err != nil {
+		return err
+	}
+
+	if args.Active {
+		var activeOffers []*deposit.Offer
+		for _, offer := range depositOffers {
+			if offer.Flags&deposit.OfferFlagLocked == 0 {
+				activeOffers = append(activeOffers, offer)
+			}
+		}
+		depositOffers = activeOffers
+	}
+
+	response.DepositOffers = depositOffers
+	return nil
 }
