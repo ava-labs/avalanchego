@@ -3511,13 +3511,17 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
-				return &txs.RewardsImportTx{
-					Out: generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
-					ImportedInputs: []*avax.TransferableInput{
+				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
 						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
 						generateTestInFromUTXO(&utxos[1].UTXO, []uint32{0}),
 					},
-				}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
 			utxos: []*avax.TimedUTXO{
 				{
@@ -3545,12 +3549,16 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
-				return &txs.RewardsImportTx{
-					Out: generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
-					ImportedInputs: []*avax.TransferableInput{
+				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
 						generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					},
-				}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
 				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
@@ -3568,9 +3576,10 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
-				return &txs.RewardsImportTx{
-					Out: generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
-					ImportedInputs: []*avax.TransferableInput{{
+				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{{
 						UTXOID: utxos[0].UTXOID,
 						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
 						In: &secp256k1fx.TransferInput{
@@ -3578,7 +3587,10 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 						},
 					}},
-				}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
 				UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
@@ -3667,21 +3679,25 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 
 				s.EXPECT().AddUTXO(&avax.UTXO{
 					UTXOID: avax.UTXOID{TxID: txID},
-					Asset:  utx.Out.Asset,
-					Out:    utx.Out.Out,
+					Asset:  utx.Outs[0].Asset,
+					Out:    utx.Outs[0].Out,
 				})
 
 				return s
 			},
 			sharedMemory: shmWithUTXOs,
 			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
-				return &txs.RewardsImportTx{
-					ImportedInputs: []*avax.TransferableInput{
+				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
 						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
 						generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
 					},
-					Out: generateTestOut(ctx.AVAXAssetID, 4, *treasury.Owner, ids.Empty, ids.Empty),
-				}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 4, *treasury.Owner, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
 			utxos: []*avax.TimedUTXO{
 				{

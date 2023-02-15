@@ -28,64 +28,102 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 		expectedErr error
 	}{
 		"OK": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
-				ImportedInputs: []*avax.TransferableInput{
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 				},
-			},
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
 		},
-		"Nil tx": {
-			tx:          nil,
-			expectedErr: ErrNilTx,
+		"Zero outs": {
+			tx:          &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{}}},
+			expectedErr: errWrongOutsNumber,
+		},
+		"More than one out": {
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Outs: make([]*avax.TransferableOutput, 2),
+			}}},
+			expectedErr: errWrongOutsNumber,
+		},
+		"Out has wrong asset": {
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ids.GenerateTestID(), 1, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
+			expectedErr: errNotAVAXAsset,
 		},
 		"Not secp output": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.GenerateTestID(), ids.Empty),
-			},
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.GenerateTestID(), ids.Empty),
+				},
+			}}},
 			expectedErr: locked.ErrWrongOutType,
 		},
 		"Output owner isn't treasury owner": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 1, otherOwner, ids.Empty, ids.Empty),
-			},
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 1, otherOwner, ids.Empty, ids.Empty),
+				},
+			}}},
 			expectedErr: errNotTreasuryOwner,
 		},
+		"Input has wrong asset": {
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{
+					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					generateTestIn(ids.GenerateTestID(), 1, ids.Empty, ids.Empty, []uint32{}),
+				},
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
+			expectedErr: errNotAVAXAsset,
+		},
 		"Not secp input": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
-				ImportedInputs: []*avax.TransferableInput{
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{
 					generateTestIn(ctx.AVAXAssetID, 1, ids.GenerateTestID(), ids.Empty, []uint32{}),
 				},
-			},
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
 			expectedErr: locked.ErrWrongInType,
 		},
 		"Produced less than consumed": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
-				ImportedInputs: []*avax.TransferableInput{
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 				},
-			},
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
 			expectedErr: errProducedNotEqualConsumed,
 		},
 		"Produced more than consumed": {
-			tx: &RewardsImportTx{
-				Out: generateTestOut(ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty),
-				ImportedInputs: []*avax.TransferableInput{
+			tx: &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 				},
-			},
+				Outs: []*avax.TransferableOutput{
+					generateTestOut(ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty),
+				},
+			}}},
 			expectedErr: errProducedNotEqualConsumed,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			if tt.tx != nil {
-				avax.SortTransferableInputs(tt.tx.ImportedInputs)
+				avax.SortTransferableInputs(tt.tx.Ins)
 			}
 			require.ErrorIs(t, tt.tx.SyntacticVerify(ctx), tt.expectedErr)
 		})

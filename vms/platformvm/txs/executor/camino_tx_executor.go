@@ -949,11 +949,11 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 
 		// Verifying that utxos match inputs
 
-		if len(tx.ImportedInputs) != len(utxos) {
-			return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.ImportedInputs), len(utxos), errInputsUTXOSMismatch)
+		if len(tx.Ins) != len(utxos) {
+			return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.Ins), len(utxos), errInputsUTXOSMismatch)
 		}
 
-		for i, in := range tx.ImportedInputs {
+		for i, in := range tx.Ins {
 			utxo := utxos[i]
 
 			if utxo.InputID() != in.InputID() {
@@ -1004,7 +1004,7 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		return err
 	}
 
-	amountToDistribute, err := math.Add64(tx.Out.Out.Amount(), notDistributedAmount)
+	amountToDistribute, err := math.Add64(tx.Outs[0].Out.Amount(), notDistributedAmount)
 	if err != nil {
 		return err
 	}
@@ -1052,10 +1052,10 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 
 	utxo.Produce(e.State, e.Tx.ID(), outs)
 
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	e.Inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
-	for i := range tx.ImportedInputs {
-		utxoID := tx.ImportedInputs[i].InputID()
+	utxoIDs := make([][]byte, len(tx.Ins))
+	e.Inputs = set.NewSet[ids.ID](len(tx.Ins))
+	for i := range tx.Ins {
+		utxoID := tx.Ins[i].InputID()
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 	}

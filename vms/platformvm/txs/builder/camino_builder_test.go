@@ -641,14 +641,20 @@ func TestNewRewardsImportTx(t *testing.T) {
 				},
 			},
 			expectedTx: func(t *testing.T, utxos []*avax.TimedUTXO) *txs.Tx {
-				tx, err := txs.NewSigned(&txs.RewardsImportTx{
-					ImportedInputs: []*avax.TransferableInput{
-						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
-						generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
+				tx, err := txs.NewSigned(&txs.RewardsImportTx{BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins: []*avax.TransferableInput{
+							generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
+							generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
+						},
+						Outs: []*avax.TransferableOutput{
+							generateTestOut(ctx.AVAXAssetID, 101, *treasury.Owner, ids.Empty, ids.Empty),
+						},
 					},
-					Out:                   generateTestOut(ctx.AVAXAssetID, 101, *treasury.Owner, ids.Empty, ids.Empty),
 					SyntacticallyVerified: true,
-				}, txs.Codec, nil)
+				}}, txs.Codec, nil)
 				require.NoError(t, err)
 				return tx
 			},

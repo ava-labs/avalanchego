@@ -576,14 +576,18 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 	avax.SortTransferableInputs(ins)
 
 	utx := &txs.RewardsImportTx{
-		ImportedInputs: ins,
-		Out: &avax.TransferableOutput{
-			Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:          importedAmount,
-				OutputOwners: *treasury.Owner,
-			},
-		},
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          importedAmount,
+					OutputOwners: *treasury.Owner,
+				},
+			}},
+		}},
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {

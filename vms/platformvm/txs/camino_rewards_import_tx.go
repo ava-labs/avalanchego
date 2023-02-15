@@ -7,12 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,49 +20,13 @@ var (
 	errNotTreasuryOwner         = errors.New("not treasury owner")
 	errProducedNotEqualConsumed = errors.New("produced amount not equal to consumed amount")
 	errNotAVAXAsset             = errors.New("input assetID isn't avax assetID")
+	errWrongOutsNumber          = errors.New("wrong number of outputs")
 )
 
 // RewardsImportTx is an unsigned rewardsImportTx
 type RewardsImportTx struct {
-	// Inputs that consume UTXOs produced on the chain
-	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
-	// Output containing all imported tokens
-	Out *avax.TransferableOutput `serialize:"true" json:"output"`
-
-	SyntacticallyVerified bool
-
-	unsignedBytes []byte // Unsigned byte representation of this data
-}
-
-func (tx *RewardsImportTx) Initialize(unsignedBytes []byte) {
-	tx.unsignedBytes = unsignedBytes
-}
-
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [RewardsImportTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
-func (tx *RewardsImportTx) InitCtx(ctx *snow.Context) {
-	for _, in := range tx.ImportedInputs {
-		in.FxID = secp256k1fx.ID
-	}
-	tx.Out.FxID = secp256k1fx.ID
-	tx.Out.InitCtx(ctx)
-}
-
-func (tx *RewardsImportTx) Bytes() []byte {
-	return tx.unsignedBytes
-}
-
-func (tx *RewardsImportTx) InputIDs() set.Set[ids.ID] {
-	inputIDs := set.NewSet[ids.ID](len(tx.ImportedInputs))
-	for _, in := range tx.ImportedInputs {
-		inputIDs.Add(in.InputID())
-	}
-	return inputIDs
-}
-
-func (tx *RewardsImportTx) Outputs() []*avax.TransferableOutput {
-	return []*avax.TransferableOutput{tx.Out}
+	// Metadata, imported inputs and resulting output
+	BaseTx
 }
 
 func (tx *RewardsImportTx) SyntacticVerify(ctx *snow.Context) error {
@@ -75,13 +35,22 @@ func (tx *RewardsImportTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
+	case len(tx.Outs) != 1:
+		return fmt.Errorf("expect 1 output, but got %d: %w", len(tx.Outs), errWrongOutsNumber)
 	}
 
-	if err := tx.Out.Verify(); err != nil {
-		return fmt.Errorf("output failed verification: %w", err)
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
+		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 
-	secpOut, ok := tx.Out.Out.(*secp256k1fx.TransferOutput)
+	out := tx.Outs[0]
+
+	if outAssetID := out.AssetID(); outAssetID != ctx.AVAXAssetID {
+		return fmt.Errorf("output 0 has asset ID %s but expect %s: %w",
+			outAssetID, ctx.AVAXAssetID, errNotAVAXAsset)
+	}
+
+	secpOut, ok := out.Out.(*secp256k1fx.TransferOutput)
 	if !ok {
 		return locked.ErrWrongOutType
 	}
@@ -91,19 +60,10 @@ func (tx *RewardsImportTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 
 	importedAmount := uint64(0)
-	for i, in := range tx.ImportedInputs {
-		if err := in.Verify(); err != nil {
-			return fmt.Errorf("input failed verification: %w", err)
-		}
-
+	for i, in := range tx.Ins {
 		if inputAssetID := in.AssetID(); inputAssetID != ctx.AVAXAssetID {
-			return fmt.Errorf(
-				"input %d has asset ID %s but expect %s: %w",
-				i,
-				inputAssetID,
-				ctx.AVAXAssetID,
-				errNotAVAXAsset,
-			)
+			return fmt.Errorf("input %d has asset ID %s but expect %s: %w",
+				i, inputAssetID, ctx.AVAXAssetID, errNotAVAXAsset)
 		}
 
 		newImportedAmount, err := math.Add64(importedAmount, in.In.Amount())
@@ -113,15 +73,12 @@ func (tx *RewardsImportTx) SyntacticVerify(ctx *snow.Context) error {
 		importedAmount = newImportedAmount
 	}
 
-	if err := locked.VerifyNoLocks(tx.ImportedInputs, nil); err != nil {
-		return err
+	if out.Out.Amount() != importedAmount {
+		return errProducedNotEqualConsumed
 	}
 
-	switch {
-	case tx.Out.Out.Amount() != importedAmount:
-		return errProducedNotEqualConsumed
-	case !utils.IsSortedAndUniqueSortable(tx.ImportedInputs):
-		return errInputsNotSortedUnique
+	if err := locked.VerifyNoLocks(tx.Ins, nil); err != nil {
+		return err
 	}
 
 	// cache that this is valid
