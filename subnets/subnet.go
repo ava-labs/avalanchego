@@ -1,16 +1,13 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package chains
+package subnets
 
 import (
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -20,24 +17,12 @@ var _ Subnet = (*subnet)(nil)
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
 type Subnet interface {
-	common.Subnet
+	common.BootstrapTracker
 
-	afterBootstrapped() chan struct{}
-
-	addChain(chainID ids.ID) bool
-}
-
-type SubnetConfig struct {
-	sender.GossipConfig
-
-	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
-	ValidatorOnly       bool                 `json:"validatorOnly" yaml:"validatorOnly"`
-	ConsensusParameters avalanche.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
-
-	// ProposerMinBlockDelay is the minimum delay this node will enforce when
-	// building a snowman++ block.
-	// TODO: Remove this flag once all VMs throttle their own block production.
-	ProposerMinBlockDelay time.Duration `json:"proposerMinBlockDelay" yaml:"proposerMinBlockDelay"`
+	// AddChain adds a chain to this Subnet
+	AddChain(chainID ids.ID) bool
+	// Config returns config of this Subnet
+	Config() Config
 }
 
 type subnet struct {
@@ -46,11 +31,13 @@ type subnet struct {
 	bootstrapped     set.Set[ids.ID]
 	once             sync.Once
 	bootstrappedSema chan struct{}
+	config           Config
 }
 
-func newSubnet() Subnet {
+func New(config Config) Subnet {
 	return &subnet{
 		bootstrappedSema: make(chan struct{}),
+		config:           config,
 	}
 }
 
@@ -76,11 +63,11 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	})
 }
 
-func (s *subnet) afterBootstrapped() chan struct{} {
+func (s *subnet) OnBootstrapCompleted() chan struct{} {
 	return s.bootstrappedSema
 }
 
-func (s *subnet) addChain(chainID ids.ID) bool {
+func (s *subnet) AddChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -90,4 +77,8 @@ func (s *subnet) addChain(chainID ids.ID) bool {
 
 	s.bootstrapping.Add(chainID)
 	return true
+}
+
+func (s *subnet) Config() Config {
+	return s.config
 }

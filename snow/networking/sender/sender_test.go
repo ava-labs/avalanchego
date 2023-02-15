@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -35,11 +36,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var defaultGossipConfig = GossipConfig{
-	AcceptedFrontierPeerSize:  2,
-	OnAcceptPeerSize:          2,
-	AppGossipValidatorSize:    2,
-	AppGossipNonValidatorSize: 2,
+var defaultSubnetConfig = subnets.Config{
+	GossipConfig: subnets.GossipConfig{
+		AcceptedFrontierPeerSize:  2,
+		OnAcceptPeerSize:          2,
+		AppGossipValidatorSize:    2,
+		AppGossipNonValidatorSize: 2,
+	},
 }
 
 func TestTimeout(t *testing.T) {
@@ -99,8 +102,8 @@ func TestTimeout(t *testing.T) {
 		externalSender,
 		&chainRouter,
 		tm,
-		defaultGossipConfig,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		subnets.New(defaultSubnetConfig),
 	)
 	require.NoError(err)
 
@@ -116,10 +119,10 @@ func TestTimeout(t *testing.T) {
 		ctx2,
 		vdrs,
 		nil,
-		nil,
 		time.Hour,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -360,8 +363,8 @@ func TestReliableMessages(t *testing.T) {
 		externalSender,
 		&chainRouter,
 		tm,
-		defaultGossipConfig,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		subnets.New(defaultSubnetConfig),
 	)
 	require.NoError(t, err)
 
@@ -377,10 +380,10 @@ func TestReliableMessages(t *testing.T) {
 		ctx2,
 		vdrs,
 		nil,
-		nil,
 		1,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -490,7 +493,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, p2p.EngineType_ENGINE_TYPE_SNOWMAN, subnets.New(defaultSubnetConfig))
 	require.NoError(t, err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
@@ -505,10 +508,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		ctx2,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -805,8 +808,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				defaultGossipConfig,
 				engineType,
+				subnets.New(defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -1028,8 +1031,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				defaultGossipConfig,
 				engineType,
+				subnets.New(defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -1195,8 +1198,8 @@ func TestSender_Single_Request(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				defaultGossipConfig,
 				engineType,
+				subnets.New(defaultSubnetConfig),
 			)
 			require.NoError(err)
 

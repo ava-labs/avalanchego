@@ -18,24 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ common.Sender = (*sender)(nil)
-
-type GossipConfig struct {
-	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`
-	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
-	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize" yaml:"gossipAcceptedFrontierPeerSize"`
-	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize" yaml:"gossipOnAcceptValidatorSize"`
-	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize" yaml:"gossipOnAcceptNonValidatorSize"`
-	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize" yaml:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize" yaml:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize" yaml:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize" yaml:"appGossipPeerSize"`
-}
 
 // sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
@@ -50,7 +39,7 @@ type sender struct {
 	router   router.Router
 	timeouts timeout.Manager
 
-	gossipConfig GossipConfig
+	gossipConfig subnets.GossipConfig
 
 	// Request message type --> Counts how many of that request
 	// have failed because the node was benched
@@ -64,8 +53,8 @@ func New(
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
-	gossipConfig GossipConfig,
 	engineType p2p.EngineType,
+	subnet subnets.Subnet,
 ) (common.Sender, error) {
 	s := &sender{
 		ctx:              ctx,
@@ -73,7 +62,7 @@ func New(
 		sender:           externalSender,
 		router:           router,
 		timeouts:         timeouts,
-		gossipConfig:     gossipConfig,
+		gossipConfig:     subnet.Config().GossipConfig,
 		failedDueToBench: make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
 		engineType:       engineType,
 	}
