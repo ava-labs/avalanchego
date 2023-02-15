@@ -1007,7 +1007,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus17tldvcdnq52a29y5vplw5l4pys80jnlpcef6pg",
+        "avaxAddr": "X-columbus1xw2kqx2xzqsvnuecz2yw6fwpt87k48s277n30m",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1084,8 +1084,8 @@
         "avaxAddr": "X-columbus10jsl9f669s9dn6zpxjgerv57pmhnaup5tuefuw",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
+          "consortiumMember": true,
+          "kycVerified": true
         },
         "platformAllocations": [
           {
@@ -1132,7 +1132,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus10jsl9f669s9dn6zpxjgerv57pmhnaup5tuefuw",
+        "avaxAddr": "X-columbus1rf43hs576l0jj72haq0h4yq06lmv2pk844uygs",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -6595,6 +6595,14 @@
         ],
         "threshold": 1,
         "memo": "114"
+      },
+      {
+        "alias": "X-columbus1xw2kqx2xzqsvnuecz2yw6fwpt87k48s277n30m",
+        "addresses": [
+          "X-columbus17tldvcdnq52a29y5vplw5l4pys80jnlpcef6pg"
+        ],
+        "threshold": 1,
+        "memo": "1155"
       },
       {
         "alias": "X-columbus1w60r4cm8rm336g9w3c6nj2jx4vkq4lsrkg2ksc",
