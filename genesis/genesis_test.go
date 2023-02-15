@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "embed"
 
@@ -27,6 +28,10 @@ var (
 	invalidGenesisConfigJSON = []byte(`{
 		"networkID": 9999}}}}
 	}`)
+
+	genesisStakingCfg = &StakingConfig{
+		MaxStakeDuration: 365 * 24 * time.Hour,
+	}
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -68,7 +73,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.Allocations = []Allocation{}
 				return &thisConfig
 			}(),
-			err: "initial supply must be > 0",
+			err: errNoSupply.Error(),
 		},
 		"no initial stakers": {
 			networkID: 12345,
@@ -77,7 +82,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakers = []Staker{}
 				return &thisConfig
 			}(),
-			err: "initial stakers must be > 0",
+			err: errNoStakers.Error(),
 		},
 		"invalid initial stake duration": {
 			networkID: 12345,
@@ -86,7 +91,16 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakeDuration = 0
 				return &thisConfig
 			}(),
-			err: "initial stake duration must be > 0",
+			err: errNoStakeDuration.Error(),
+		},
+		"too large initial stake duration": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakeDuration = uint64(genesisStakingCfg.MaxStakeDuration+time.Second) / uint64(time.Second)
+				return &thisConfig
+			}(),
+			err: errStakeDurationTooHigh.Error(),
 		},
 		"invalid stake offset": {
 			networkID: 12345,
@@ -104,7 +118,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakedFunds = []ids.ShortID(nil)
 				return &thisConfig
 			}(),
-			err: "initial staked funds cannot be empty",
+			err: errNoInitiallyStakedFunds.Error(),
 		},
 		"duplicate initial staked funds": {
 			networkID: 12345,
@@ -131,7 +145,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.CChainGenesis = ""
 				return &thisConfig
 			}(),
-			err: "C-Chain genesis cannot be empty",
+			err: errNoCChainGenesis.Error(),
 		},
 		"empty message": {
 			networkID: 12345,
@@ -147,7 +161,7 @@ func TestValidateConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			err := validateConfig(test.networkID, test.config)
+			err := validateConfig(test.networkID, test.config, genesisStakingCfg)
 			if len(test.err) > 0 {
 				require.Error(err)
 				require.Contains(err.Error(), test.err)
@@ -228,7 +242,7 @@ func TestGenesisFromFile(t *testing.T) {
 				customFile = test.missingFilepath
 			}
 
-			genesisBytes, _, err := FromFile(test.networkID, customFile)
+			genesisBytes, _, err := FromFile(test.networkID, customFile, genesisStakingCfg)
 			if len(test.err) > 0 {
 				require.Error(err)
 				require.Contains(err.Error(), test.err)
@@ -317,7 +331,7 @@ func TestGenesisFromFlag(t *testing.T) {
 			}
 			content := base64.StdEncoding.EncodeToString(genBytes)
 
-			genesisBytes, _, err := FromFlag(test.networkID, content)
+			genesisBytes, _, err := FromFlag(test.networkID, content, genesisStakingCfg)
 			if len(test.err) > 0 {
 				require.Error(err)
 				require.Contains(err.Error(), test.err)

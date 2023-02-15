@@ -824,17 +824,17 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
+func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
 	if v.IsSet(GenesisConfigContentKey) {
 		genesisData := v.GetString(GenesisConfigContentKey)
-		return genesis.FromFlag(networkID, genesisData)
+		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
 	// if content is not specified go for the file
 	if v.IsSet(GenesisConfigFileKey) {
 		genesisFileName := GetExpandedArg(v, GenesisConfigFileKey)
-		return genesis.FromFile(networkID, genesisFileName)
+		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
 	// finally if file is not specified/readable go for the predefined config
@@ -1376,7 +1376,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
+	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID, &genesisStakingCfg)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
