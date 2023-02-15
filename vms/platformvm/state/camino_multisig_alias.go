@@ -9,54 +9,47 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var errWrongOwnerType = errors.New("wrong owner type")
 
-func FromGenesisMultisigAlias(msig genesis.MultisigAlias) *multisig.Alias {
-	// Important! OutputOwners expects sorted list of addresses
-	owners := msig.Addresses
-	utils.Sort(owners)
-
-	return &multisig.Alias{
-		ID:   msig.Alias,
-		Memo: types.JSONByteSlice(msig.Memo),
-		Owners: &secp256k1fx.OutputOwners{
-			Threshold: msig.Threshold,
-			Addrs:     owners,
-		},
-	}
+type msigAlias struct {
+	Memo   types.JSONByteSlice `serialize:"true"`
+	Owners verify.State        `serialize:"true"`
 }
 
 func (cs *caminoState) SetMultisigAlias(ma *multisig.Alias) {
 	cs.modifiedMultisigOwners[ma.ID] = ma
 }
 
-func (cs *caminoState) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
-	if owner, exist := cs.modifiedMultisigOwners[alias]; exist {
+func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error) {
+	if owner, exist := cs.modifiedMultisigOwners[id]; exist {
+		if owner == nil {
+			return nil, database.ErrNotFound
+		}
 		return owner, nil
 	}
 
-	maBytes, err := cs.multisigOwnersDB.Get(alias[:])
+	maBytes, err := cs.multisigOwnersDB.Get(id[:])
 	if err != nil {
 		return nil, err
 	}
 
-	multisigAlias := &multisig.Alias{}
-	_, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigAlias)
-	if err != nil {
+	multisigAlias := &msigAlias{}
+	if _, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigAlias); err != nil {
 		return nil, err
 	}
 
-	multisigAlias.ID = alias
-
-	return multisigAlias, nil
+	return &multisig.Alias{
+		ID:     id,
+		Memo:   multisigAlias.Memo,
+		Owners: multisigAlias.Owners,
+	}, nil
 }
 
 func (cs *caminoState) writeMultisigOwners() error {
@@ -67,7 +60,11 @@ func (cs *caminoState) writeMultisigOwners() error {
 				return err
 			}
 		} else {
-			aliasBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, alias)
+			multisigAlias := &msigAlias{
+				Memo:   alias.Memo,
+				Owners: alias.Owners,
+			}
+			aliasBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, multisigAlias)
 			if err != nil {
 				return fmt.Errorf("failed to serialize multisig alias: %w", err)
 			}

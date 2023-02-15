@@ -12,7 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 const (
@@ -27,16 +29,16 @@ var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
 type Offer struct {
 	ID ids.ID
 
-	InterestRateNominator   uint64 `serialize:"true" json:"InterestRateNominator"`
-	Start                   uint64 `serialize:"true" json:"Start"`
-	End                     uint64 `serialize:"true" json:"End"`
-	MinAmount               uint64 `serialize:"true" json:"MinAmount"`
-	MinDuration             uint32 `serialize:"true" json:"MinDuration"`
-	MaxDuration             uint32 `serialize:"true" json:"MaxDuration"`
-	UnlockPeriodDuration    uint32 `serialize:"true" json:"UnlockPeriodDuration"`
-	NoRewardsPeriodDuration uint32 `serialize:"true" json:"NoRewardsPeriodDuration"`
-	Memo                    []byte `serialize:"true" json:"Memo"`
-	Flags                   uint64 `serialize:"true" json:"Flags"`
+	InterestRateNominator   uint64              `serialize:"true" json:"InterestRateNominator"`
+	Start                   uint64              `serialize:"true" json:"Start"`
+	End                     uint64              `serialize:"true" json:"End"`
+	MinAmount               uint64              `serialize:"true" json:"MinAmount"`
+	MinDuration             uint32              `serialize:"true" json:"MinDuration"`
+	MaxDuration             uint32              `serialize:"true" json:"MaxDuration"`
+	UnlockPeriodDuration    uint32              `serialize:"true" json:"UnlockPeriodDuration"`
+	NoRewardsPeriodDuration uint32              `serialize:"true" json:"NoRewardsPeriodDuration"`
+	Memo                    types.JSONByteSlice `serialize:"true" json:"Memo"`
+	Flags                   uint64              `serialize:"true" json:"Flags"`
 }
 
 // Sets offer id from its bytes hash
@@ -94,6 +96,10 @@ func (o *Offer) Verify() error {
 			o.MinDuration,
 			o.UnlockPeriodDuration,
 		)
+	}
+
+	if len(o.Memo) > avax.MaxMemoSize {
+		return fmt.Errorf("deposit offer memo is larger (%d bytes) than max of %d bytes", len(o.Memo), avax.MaxMemoSize)
 	}
 
 	return nil

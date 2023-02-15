@@ -5,13 +5,13 @@ package genesis
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,7 +63,7 @@ func TestUnparse(t *testing.T) {
 						Memo:              "some str",
 					}},
 				}},
-				InitialMultisigAddresses: []genesis.MultisigAlias{{
+				InitialMultisigAddresses: []MultisigAlias{{
 					Alias:     sampleShortID,
 					Threshold: 1,
 					Addresses: []ids.ShortID{shortID2},
@@ -120,6 +120,97 @@ func TestUnparse(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSameMSigDefinitionsResultedWithSameAlias(t *testing.T) {
+	msig1 := MultisigAlias{
+		Threshold: 1,
+		Addresses: []ids.ShortID{ids.ShortEmpty},
+		Memo:      "",
+	}
+	msig2 := MultisigAlias{
+		Threshold: 1,
+		Addresses: []ids.ShortID{ids.ShortEmpty},
+		Memo:      "",
+	}
+	require.Equal(t, msig1, msig2)
+	require.Equal(t, msig1.ComputeAlias(ids.Empty), msig2.ComputeAlias(ids.Empty))
+}
+
+func TestTxIDIsPartOfAliasComputation(t *testing.T) {
+	msig := MultisigAlias{
+		Threshold: 1,
+		Addresses: []ids.ShortID{ids.ShortEmpty},
+		Memo:      "",
+	}
+	require.NotEqual(t, msig.ComputeAlias(ids.ID{1}), msig.ComputeAlias(ids.ID{2}))
+}
+
+func TestMemoIsPartOfTheMsigAliasComputation(t *testing.T) {
+	msig1 := MultisigAlias{
+		Threshold: 1,
+		Addresses: []ids.ShortID{ids.ShortEmpty},
+		Memo:      "",
+	}
+	msig2 := MultisigAlias{
+		Threshold: 1,
+		Addresses: []ids.ShortID{ids.ShortEmpty},
+		Memo:      "memo",
+	}
+	require.NotEqual(t, msig1.ComputeAlias(ids.Empty), msig2.ComputeAlias(ids.Empty))
+}
+
+func TestKnownValueAliasComputationTests(t *testing.T) {
+	knownValueTests := []struct {
+		txID          ids.ID
+		addresses     []ids.ShortID
+		threshold     uint32
+		memo          string
+		expectedAlias string
+	}{
+		{
+			txID:          ids.Empty,
+			addresses:     []ids.ShortID{ids.ShortEmpty},
+			threshold:     1,
+			expectedAlias: "GaD29bC73t6v6hfMfvgFFkT2EuKdSranB",
+		},
+		{
+			txID:          ids.ID{1},
+			addresses:     []ids.ShortID{ids.ShortEmpty},
+			threshold:     1,
+			expectedAlias: "Ku5QCiKfFu8qPzs8gdcFmkT7HXnEMReUT",
+		},
+		{
+			txID:          ids.Empty,
+			addresses:     []ids.ShortID{ids.ShortEmpty},
+			threshold:     1,
+			memo:          "Camino Go!",
+			expectedAlias: "A2JCzPKavqD1D87YgNRZoC36rehf5EZmR",
+		},
+		{
+			txID:          ids.Empty,
+			addresses:     []ids.ShortID{ids.ShortEmpty, {1}},
+			threshold:     2,
+			expectedAlias: "9zT6zU8VuiqcyrqfDWniTsYM2a3NHxiYh",
+		},
+		{
+			txID:          ids.Empty,
+			addresses:     []ids.ShortID{ids.ShortEmpty, {1}, {2}},
+			threshold:     2,
+			expectedAlias: "88s5CJ4AatRWp3JEb3vDxgd5Ds6Hq2W4u",
+		},
+	}
+
+	for _, tt := range knownValueTests {
+		t.Run(fmt.Sprintf("t-%d-%s-%s", tt.threshold, tt.memo, tt.expectedAlias[:7]), func(t *testing.T) {
+			msig := MultisigAlias{
+				Threshold: tt.threshold,
+				Addresses: tt.addresses,
+				Memo:      tt.memo,
+			}
+			require.Equal(t, tt.expectedAlias, msig.ComputeAlias(tt.txID).String())
 		})
 	}
 }

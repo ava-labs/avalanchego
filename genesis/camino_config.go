@@ -4,24 +4,26 @@
 package genesis
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 type Camino struct {
-	VerifyNodeSignature      bool                    `json:"verifyNodeSignature"`
-	LockModeBondDeposit      bool                    `json:"lockModeBondDeposit"`
-	InitialAdmin             ids.ShortID             `json:"initialAdmin"`
-	DepositOffers            []DepositOffer          `json:"depositOffers"`
-	Allocations              []CaminoAllocation      `json:"allocations"`
-	InitialMultisigAddresses []genesis.MultisigAlias `json:"initialMultisigAddresses"`
+	VerifyNodeSignature      bool               `json:"verifyNodeSignature"`
+	LockModeBondDeposit      bool               `json:"lockModeBondDeposit"`
+	InitialAdmin             ids.ShortID        `json:"initialAdmin"`
+	DepositOffers            []DepositOffer     `json:"depositOffers"`
+	Allocations              []CaminoAllocation `json:"allocations"`
+	InitialMultisigAddresses []MultisigAlias    `json:"initialMultisigAddresses"`
 }
 
 func (c Camino) Unparse(networkID uint32, starttime uint64) (UnparsedCamino, error) {
@@ -34,7 +36,7 @@ func (c Camino) Unparse(networkID uint32, starttime uint64) (UnparsedCamino, err
 	}
 
 	avaxAddr, err := address.Format(
-		"X",
+		configChainIDAlias,
 		constants.GetHRP(networkID),
 		c.InitialAdmin.Bytes(),
 	)
@@ -58,8 +60,8 @@ func (c Camino) Unparse(networkID uint32, starttime uint64) (UnparsedCamino, err
 		}
 	}
 
-	for i, ma := range c.InitialMultisigAddresses {
-		err = uc.InitialMultisigAddresses[i].Unparse(ma, networkID)
+	for i := range c.InitialMultisigAddresses {
+		uc.InitialMultisigAddresses[i], err = c.InitialMultisigAddresses[i].Unparse(networkID)
 		if err != nil {
 			return uc, err
 		}
@@ -102,7 +104,7 @@ func (a CaminoAllocation) Unparse(networkID uint32) (UnparsedCaminoAllocation, e
 		PlatformAllocations: make([]UnparsedPlatformAllocation, len(a.PlatformAllocations)),
 	}
 	avaxAddr, err := address.Format(
-		"X",
+		configChainIDAlias,
 		constants.GetHRP(networkID),
 		a.AVAXAddr.Bytes(),
 	)
@@ -151,27 +153,56 @@ func (a PlatformAllocation) Unparse() (UnparsedPlatformAllocation, error) {
 	return ua, nil
 }
 
-func (uma *UnparsedMultisigAlias) Unparse(msigAlias genesis.MultisigAlias, networkID uint32) error {
-	addresses := make([]string, len(msigAlias.Addresses))
-	for i, elem := range msigAlias.Addresses {
-		addr, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), elem.Bytes())
-		if err != nil {
-			return fmt.Errorf("while unparsing cannot format multisig address %s: %w", addr, err)
-		}
-		addresses[i] = addr
+type MultisigAlias struct {
+	Alias     ids.ShortID   `serialize:"true" json:"alias"`
+	Threshold uint32        `serialize:"true" json:"threshold"`
+	Addresses []ids.ShortID `serialize:"true" json:"addresses"`
+	Memo      string        `serialize:"true" json:"memo"`
+}
+
+func (ma MultisigAlias) Unparse(networkID uint32) (UnparsedMultisigAlias, error) {
+	uma := UnparsedMultisigAlias{
+		Threshold: ma.Threshold,
+		Addresses: make([]string, len(ma.Addresses)),
+		Memo:      ma.Memo,
 	}
 
-	alias, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), msigAlias.Alias.Bytes())
+	for i, elem := range ma.Addresses {
+		addr, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), elem.Bytes())
+		if err != nil {
+			return uma, fmt.Errorf("while unparsing cannot format multisig address %s: %w", addr, err)
+		}
+		uma.Addresses[i] = addr
+	}
+
+	alias, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), ma.Alias.Bytes())
 	if err != nil {
-		return fmt.Errorf("while unparsing cannot format multisig alias %s: %w", msigAlias.Alias, err)
+		return uma, fmt.Errorf("while unparsing cannot format multisig alias %s: %w", ma.Alias, err)
 	}
 
 	uma.Alias = alias
-	uma.Addresses = addresses
-	uma.Threshold = msigAlias.Threshold
-	uma.Memo = msigAlias.Memo
 
-	return nil
+	return uma, nil
+}
+
+func (ma MultisigAlias) ComputeAlias(txID ids.ID) ids.ShortID {
+	txIDBytes := txID[:]
+	thresholdBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(thresholdBytes, ma.Threshold)
+	memoLen := len(ma.Memo)
+	allBytes := make([]byte, 32+4+memoLen+20*len(ma.Addresses))
+
+	copy(allBytes, txIDBytes)
+	copy(allBytes[32:], thresholdBytes)
+	copy(allBytes[32+4:], ma.Memo)
+
+	beg := 32 + 4 + memoLen
+	for _, addr := range ma.Addresses {
+		copy(allBytes[beg:], addr.Bytes())
+		beg += 20
+	}
+
+	return multisig.ComputeAliasID(hashing.ComputeHash256Array(allBytes))
 }
 
 type AddressStates struct {

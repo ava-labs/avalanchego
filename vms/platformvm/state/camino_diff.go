@@ -175,6 +175,9 @@ func (d *diff) SetMultisigAlias(owner *multisig.Alias) {
 
 func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
 	if msigOwner, ok := d.caminoDiff.modifiedMultisigOwners[alias]; ok {
+		if msigOwner == nil {
+			return nil, database.ErrNotFound
+		}
 		return msigOwner, nil
 	}
 

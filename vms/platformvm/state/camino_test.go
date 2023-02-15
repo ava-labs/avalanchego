@@ -116,7 +116,7 @@ func getExpectedSupply(
 					configOffer, ok := offers[palloc.DepositOfferMemo]
 					require.True(ok)
 
-					offer, err := root_genesis.ParseDepositOfferFromConfig(configOffer)
+					offer, err := root_genesis.DepositOfferFromConfig(configOffer)
 					require.NoError(err)
 
 					dep := deposit.Deposit{

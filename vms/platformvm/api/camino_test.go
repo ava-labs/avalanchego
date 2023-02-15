@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -95,6 +96,14 @@ func TestBuildCaminoGenesis(t *testing.T) {
 						"",
 					}},
 					DepositOffers: []*deposit.Offer{depositOffer},
+					MultisigAliases: []*multisig.Alias{{
+						ID:   addr,
+						Memo: []byte("some memo"),
+						Owners: &secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{addr},
+						},
+					}},
 				},
 				Time:          5,
 				InitialSupply: 0,
@@ -315,7 +324,14 @@ func TestBuildCaminoGenesis(t *testing.T) {
 							ConsortiumMemberAddress: addr,
 							NodeID:                  nodeID,
 						}},
-						InitialMultisigAddresses: []genesis.MultisigAlias{},
+						MultisigAliases: []*multisig.Alias{{
+							ID:   addr,
+							Memo: []byte("some memo"),
+							Owners: &secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						}},
 					},
 				}, nil
 			},

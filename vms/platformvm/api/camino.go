@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -37,25 +38,25 @@ type UTXODeposit struct {
 }
 
 type Camino struct {
-	VerifyNodeSignature        bool                    `json:"verifyNodeSignature"`
-	LockModeBondDeposit        bool                    `json:"lockModeBondDeposit"`
-	InitialAdmin               ids.ShortID             `json:"initialAdmin"`
-	AddressStates              []genesis.AddressState  `json:"addressStates"`
-	DepositOffers              []*deposit.Offer        `json:"depositOffers"`
-	ValidatorDeposits          [][]UTXODeposit         `json:"validatorDeposits"`
-	ValidatorConsortiumMembers []ids.ShortID           `json:"validatorConsortiumMembers"`
-	UTXODeposits               []UTXODeposit           `json:"utxoDeposits"`
-	InitialMultisigAddresses   []genesis.MultisigAlias `json:"initialMultisigAddresses"`
+	VerifyNodeSignature        bool                   `json:"verifyNodeSignature"`
+	LockModeBondDeposit        bool                   `json:"lockModeBondDeposit"`
+	InitialAdmin               ids.ShortID            `json:"initialAdmin"`
+	AddressStates              []genesis.AddressState `json:"addressStates"`
+	DepositOffers              []*deposit.Offer       `json:"depositOffers"`
+	ValidatorDeposits          [][]UTXODeposit        `json:"validatorDeposits"`
+	ValidatorConsortiumMembers []ids.ShortID          `json:"validatorConsortiumMembers"`
+	UTXODeposits               []UTXODeposit          `json:"utxoDeposits"`
+	MultisigAliases            []*multisig.Alias      `json:"multisigAliases"`
 }
 
 func (c Camino) ParseToGenesis() genesis.Camino {
 	return genesis.Camino{
-		VerifyNodeSignature:      c.VerifyNodeSignature,
-		LockModeBondDeposit:      c.LockModeBondDeposit,
-		InitialAdmin:             c.InitialAdmin,
-		AddressStates:            c.AddressStates,
-		DepositOffers:            c.DepositOffers,
-		InitialMultisigAddresses: c.InitialMultisigAddresses,
+		VerifyNodeSignature: c.VerifyNodeSignature,
+		LockModeBondDeposit: c.LockModeBondDeposit,
+		InitialAdmin:        c.InitialAdmin,
+		AddressStates:       c.AddressStates,
+		DepositOffers:       c.DepositOffers,
+		MultisigAliases:     c.MultisigAliases,
 	}
 }
 

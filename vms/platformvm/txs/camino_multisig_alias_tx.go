@@ -6,10 +6,9 @@ package txs
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
 
 var _ UnsignedTx = (*MultisigAliasTx)(nil)
@@ -18,10 +17,8 @@ var _ UnsignedTx = (*MultisigAliasTx)(nil)
 type MultisigAliasTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
-	// ID of this multisig alias
-	Alias ids.ShortID `serialize:"true" json:"alias"`
-	// Secp256K1fx owners which need to sign
-	Owner fx.Owner `serialize:"true" json:"owner"`
+	// Multisig alias definition. MultisigAlias.ID must be empty, if its the new alias
+	MultisigAlias multisig.Alias `serialize:"true"`
 	// Auth that allows existing owners to change an alias
 	ChangeAuth verify.Verifiable `serialize:"true" json:"changeAuthorization"`
 }
@@ -31,7 +28,7 @@ type MultisigAliasTx struct {
 // the addresses can be json marshalled into human readable format
 func (tx *MultisigAliasTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
-	tx.Owner.InitCtx(ctx)
+	tx.MultisigAlias.InitCtx(ctx)
 }
 
 // SyntacticVerify returns nil if [tx] is valid
@@ -46,7 +43,7 @@ func (tx *MultisigAliasTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(tx.Owner, tx.ChangeAuth); err != nil {
+	if err := verify.All(&tx.MultisigAlias, tx.ChangeAuth); err != nil {
 		return fmt.Errorf("failed to verify owner or change auth: %w", err)
 	}
 

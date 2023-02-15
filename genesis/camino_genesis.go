@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -26,11 +27,13 @@ import (
 	pchaintxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var (
-	errEmptyAllocation  = errors.New("allocation with zero value")
-	errNonExistingOffer = errors.New("allocation deposit offer memo doesn't match any offer")
+	errEmptyAllocation    = errors.New("allocation with zero value")
+	errNonExistingOffer   = errors.New("allocation deposit offer memo doesn't match any offer")
+	errWrongMisgAliasAddr = errors.New("wrong msig alias addr")
 )
 
 func validateCaminoConfig(config *Config) error {
@@ -72,7 +75,7 @@ func validateCaminoConfig(config *Config) error {
 	offers := make(map[string]*deposit.Offer, len(config.Camino.DepositOffers))
 	offerIDs := set.NewSet[ids.ID](len(config.Camino.DepositOffers))
 	for _, configOffer := range config.Camino.DepositOffers {
-		offer, err := ParseDepositOfferFromConfig(configOffer)
+		offer, err := DepositOfferFromConfig(configOffer)
 		if err != nil {
 			return err
 		}
@@ -185,15 +188,28 @@ func validateCaminoConfig(config *Config) error {
 	// validate msig aliases
 	txID := ids.Empty
 	uniqAliases := set.NewSet[ids.ShortID](len(config.Camino.InitialMultisigAddresses))
-	for _, msig := range config.Camino.InitialMultisigAddresses {
-		if err = msig.Verify(txID); err != nil {
+	for _, configMsigAlias := range config.Camino.InitialMultisigAddresses {
+		if expectedAlias := configMsigAlias.ComputeAlias(txID); configMsigAlias.Alias != expectedAlias {
+			hrp := constants.GetHRP(config.NetworkID)
+			expectedMsigAliasAddr, _ := address.Format(configChainIDAlias, hrp, expectedAlias.Bytes())
+			msigAliasAddr, _ := address.Format(configChainIDAlias, hrp, configMsigAlias.Alias.Bytes())
+			return fmt.Errorf("%w: expected %s, but got %s",
+				errWrongMisgAliasAddr, expectedMsigAliasAddr, msigAliasAddr)
+		}
+
+		msigAlias, err := MultisigAliasFromConfig(configMsigAlias)
+		if err != nil {
+			return err
+		}
+
+		if err = msigAlias.Verify(); err != nil {
 			return fmt.Errorf("wrong msig alias definition: %w", err)
 		}
 
-		if uniqAliases.Contains(msig.Alias) {
-			return fmt.Errorf("duplicated Multisig alias: %s (%s)", msig.Alias.Hex(), msig.Memo)
+		if uniqAliases.Contains(configMsigAlias.Alias) {
+			return fmt.Errorf("duplicated Multisig alias: %s (%s)", configMsigAlias.Alias.Hex(), configMsigAlias.Memo)
 		}
-		uniqAliases.Add(msig.Alias)
+		uniqAliases.Add(configMsigAlias.Alias)
 	}
 
 	if nodes.Len() == 0 {
@@ -205,10 +221,9 @@ func validateCaminoConfig(config *Config) error {
 
 func caminoArgFromConfig(config *Config) api.Camino {
 	return api.Camino{
-		VerifyNodeSignature:      config.Camino.VerifyNodeSignature,
-		LockModeBondDeposit:      config.Camino.LockModeBondDeposit,
-		InitialAdmin:             config.Camino.InitialAdmin,
-		InitialMultisigAddresses: config.Camino.InitialMultisigAddresses,
+		VerifyNodeSignature: config.Camino.VerifyNodeSignature,
+		LockModeBondDeposit: config.Camino.LockModeBondDeposit,
+		InitialAdmin:        config.Camino.InitialAdmin,
 	}
 }
 
@@ -320,13 +335,24 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	offerIDs := make(map[string]ids.ID, len(config.Camino.DepositOffers))
 	platformvmArgs.Camino.DepositOffers = make([]*deposit.Offer, len(config.Camino.DepositOffers))
 	for i := range config.Camino.DepositOffers {
-		offer, err := ParseDepositOfferFromConfig(config.Camino.DepositOffers[i])
+		offer, err := DepositOfferFromConfig(config.Camino.DepositOffers[i])
 		if err != nil {
 			return nil, ids.Empty, err
 		}
 
 		offerIDs[config.Camino.DepositOffers[i].Memo] = offer.ID
 		platformvmArgs.Camino.DepositOffers[i] = offer
+	}
+
+	// Getting args from multisig aliases
+
+	platformvmArgs.Camino.MultisigAliases = make([]*multisig.Alias, len(config.Camino.InitialMultisigAddresses))
+	for i := range config.Camino.InitialMultisigAddresses {
+		multisigAlias, err := MultisigAliasFromConfig(config.Camino.InitialMultisigAddresses[i])
+		if err != nil {
+			return nil, ids.Empty, err
+		}
+		platformvmArgs.Camino.MultisigAliases[i] = multisigAlias
 	}
 
 	// Getting args from allocations
@@ -525,12 +551,7 @@ func GetGenesisBlocksIDs(genesisBytes []byte, genesis *genesis.Genesis) ([]ids.I
 	return blockIDs, nil
 }
 
-func ParseDepositOfferFromConfig(configDepositOffer DepositOffer) (*deposit.Offer, error) {
-	memo, err := formatting.Encode(defaultEncoding, []byte(configDepositOffer.Memo))
-	if err != nil {
-		return nil, fmt.Errorf("couldn't encode deposit offer memo: %w", err)
-	}
-
+func DepositOfferFromConfig(configDepositOffer DepositOffer) (*deposit.Offer, error) {
 	offer := &deposit.Offer{
 		InterestRateNominator:   configDepositOffer.InterestRateNominator,
 		Start:                   configDepositOffer.Start,
@@ -540,11 +561,22 @@ func ParseDepositOfferFromConfig(configDepositOffer DepositOffer) (*deposit.Offe
 		MaxDuration:             configDepositOffer.MaxDuration,
 		UnlockPeriodDuration:    configDepositOffer.UnlockPeriodDuration,
 		NoRewardsPeriodDuration: configDepositOffer.NoRewardsPeriodDuration,
-		Memo:                    []byte(memo),
+		Memo:                    types.JSONByteSlice(configDepositOffer.Memo),
 		Flags:                   configDepositOffer.Flags,
 	}
 	if err := offer.SetID(); err != nil {
 		return nil, err
 	}
 	return offer, nil
+}
+
+func MultisigAliasFromConfig(configMsigAlias MultisigAlias) (*multisig.Alias, error) {
+	return &multisig.Alias{
+		Owners: &secp256k1fx.OutputOwners{
+			Threshold: configMsigAlias.Threshold,
+			Addrs:     configMsigAlias.Addresses,
+		},
+		Memo: types.JSONByteSlice(configMsigAlias.Memo),
+		ID:   configMsigAlias.Alias,
+	}, nil
 }

@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var errCannotParseInitialAdmin = errors.New("cannot parse initialAdmin from genesis")
@@ -33,7 +31,7 @@ func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 		LockModeBondDeposit:      uc.LockModeBondDeposit,
 		DepositOffers:            make([]DepositOffer, len(uc.DepositOffers)),
 		Allocations:              make([]CaminoAllocation, len(uc.Allocations)),
-		InitialMultisigAddresses: make([]genesis.MultisigAlias, len(uc.InitialMultisigAddresses)),
+		InitialMultisigAddresses: make([]MultisigAlias, len(uc.InitialMultisigAddresses)),
 	}
 
 	_, _, avaxAddrBytes, err := address.Parse(uc.InitialAdmin)
@@ -169,42 +167,28 @@ type UnparsedMultisigAlias struct {
 	Memo      string   `json:"memo,omitempty"`
 }
 
-func (uma UnparsedMultisigAlias) Parse() (genesis.MultisigAlias, error) {
-	ma := genesis.MultisigAlias{}
-
-	var (
-		err                   error
-		aliasBytes, addrBytes []byte
-		alias                 ids.ShortID
-		addrs                 = make([]ids.ShortID, len(uma.Addresses))
-	)
-
-	if _, _, aliasBytes, err = address.Parse(uma.Alias); err == nil {
-		alias, err = ids.ToShortID(aliasBytes)
+func (uma UnparsedMultisigAlias) Parse() (MultisigAlias, error) {
+	ma := MultisigAlias{
+		Threshold: uma.Threshold,
+		Memo:      uma.Memo,
+		Addresses: make([]ids.ShortID, len(uma.Addresses)),
 	}
+
+	alias, err := address.ParseToID(uma.Alias)
 	if err != nil {
 		return ma, err
 	}
+	ma.Alias = alias
 
-	for i, addr := range uma.Addresses {
-		if _, _, addrBytes, err = address.Parse(addr); err == nil {
-			addrs[i], err = ids.ToShortID(addrBytes)
-		}
+	for i, unparsedAddr := range uma.Addresses {
+		addr, err := address.ParseToID(unparsedAddr)
 		if err != nil {
 			return ma, err
 		}
+		ma.Addresses[i] = addr
 	}
 
-	if len(uma.Memo) > avax.MaxMemoSize {
-		return ma, fmt.Errorf("msig alias memo is larger (%d bytes) than max of %d bytes", len(uma.Memo), avax.MaxMemoSize)
-	}
-
-	return genesis.MultisigAlias{
-		Alias:     alias,
-		Addresses: addrs,
-		Threshold: uma.Threshold,
-		Memo:      uma.Memo,
-	}, nil
+	return ma, nil
 }
 
 type UnparsedDepositOffer struct {

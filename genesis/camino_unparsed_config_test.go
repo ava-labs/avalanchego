@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -158,7 +157,7 @@ func TestParse(t *testing.T) {
 						Memo:              "some str",
 					}},
 				}},
-				InitialMultisigAddresses: []genesis.MultisigAlias{{
+				InitialMultisigAddresses: []MultisigAlias{{
 					Alias:     sampleShortID,
 					Threshold: 1,
 					Addresses: []ids.ShortID{shortID2},

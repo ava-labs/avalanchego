@@ -308,9 +308,8 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 	// adding msig aliases
 
-	for _, gma := range g.Camino.InitialMultisigAddresses {
-		owner := FromGenesisMultisigAlias(gma)
-		cs.SetMultisigAlias(owner)
+	for _, multisigAlias := range g.Camino.MultisigAliases {
+		cs.SetMultisigAlias(multisigAlias)
 	}
 
 	// adding blocks (validators and deposits)
