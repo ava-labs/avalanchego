@@ -6,15 +6,14 @@ package tests
 import (
 	"bufio"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 // Loads a list of secp256k1 hex-encoded private keys from the file, new-line separated.
-func LoadHexTestKeys(filePath string) (keys []*crypto.PrivateKeySECP256K1R, err error) {
+func LoadHexTestKeys(filePath string) (keys []*secp256k1.PrivateKey, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -37,22 +36,13 @@ func LoadHexTestKeys(filePath string) (keys []*crypto.PrivateKeySECP256K1R, err 
 	return keys, nil
 }
 
-var keyFactory = new(crypto.FactorySECP256K1R)
+var keyFactory = new(secp256k1.Factory)
 
-func decodeHexPrivateKey(enc string) (*crypto.PrivateKeySECP256K1R, error) {
-	rawPk := strings.Replace(enc, crypto.PrivateKeyPrefix, "", 1)
-	var skBytes []byte
+func decodeHexPrivateKey(enc string) (*secp256k1.PrivateKey, error) {
+	rawPk := strings.Replace(enc, secp256k1.PrivateKeyPrefix, "", 1)
 	skBytes, err := hex.DecodeString(rawPk)
 	if err != nil {
 		return nil, err
 	}
-	rpk, err := keyFactory.ToPrivateKey(skBytes)
-	if err != nil {
-		return nil, err
-	}
-	privKey, ok := rpk.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		return nil, fmt.Errorf("invalid type %T", rpk)
-	}
-	return privKey, nil
+	return keyFactory.ToPrivateKey(skBytes)
 }

@@ -12,7 +12,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	crypto "github.com/ava-labs/avalanchego/utils/crypto"
+	secp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -41,7 +41,7 @@ func (m *MockBuilder) EXPECT() *MockBuilderMockRecorder {
 }
 
 // NewAddDelegatorTx mocks base method.
-func (m *MockBuilder) NewAddDelegatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 []*crypto.PrivateKeySECP256K1R, arg6 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewAddDelegatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 []*secp256k1.PrivateKey, arg6 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewAddDelegatorTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -56,7 +56,7 @@ func (mr *MockBuilderMockRecorder) NewAddDelegatorTx(arg0, arg1, arg2, arg3, arg
 }
 
 // NewAddSubnetValidatorTx mocks base method.
-func (m *MockBuilder) NewAddSubnetValidatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ID, arg5 []*crypto.PrivateKeySECP256K1R, arg6 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewAddSubnetValidatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ID, arg5 []*secp256k1.PrivateKey, arg6 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewAddSubnetValidatorTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -71,7 +71,7 @@ func (mr *MockBuilderMockRecorder) NewAddSubnetValidatorTx(arg0, arg1, arg2, arg
 }
 
 // NewAddValidatorTx mocks base method.
-func (m *MockBuilder) NewAddValidatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 uint32, arg6 []*crypto.PrivateKeySECP256K1R, arg7 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewAddValidatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 uint32, arg6 []*secp256k1.PrivateKey, arg7 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewAddValidatorTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -101,7 +101,7 @@ func (mr *MockBuilderMockRecorder) NewAdvanceTimeTx(arg0 interface{}) *gomock.Ca
 }
 
 // NewCreateChainTx mocks base method.
-func (m *MockBuilder) NewCreateChainTx(arg0 ids.ID, arg1 []byte, arg2 ids.ID, arg3 []ids.ID, arg4 string, arg5 []*crypto.PrivateKeySECP256K1R, arg6 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewCreateChainTx(arg0 ids.ID, arg1 []byte, arg2 ids.ID, arg3 []ids.ID, arg4 string, arg5 []*secp256k1.PrivateKey, arg6 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewCreateChainTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -116,7 +116,7 @@ func (mr *MockBuilderMockRecorder) NewCreateChainTx(arg0, arg1, arg2, arg3, arg4
 }
 
 // NewCreateSubnetTx mocks base method.
-func (m *MockBuilder) NewCreateSubnetTx(arg0 uint32, arg1 []ids.ShortID, arg2 []*crypto.PrivateKeySECP256K1R, arg3 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewCreateSubnetTx(arg0 uint32, arg1 []ids.ShortID, arg2 []*secp256k1.PrivateKey, arg3 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewCreateSubnetTx", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -131,7 +131,7 @@ func (mr *MockBuilderMockRecorder) NewCreateSubnetTx(arg0, arg1, arg2, arg3 inte
 }
 
 // NewExportTx mocks base method.
-func (m *MockBuilder) NewExportTx(arg0 uint64, arg1 ids.ID, arg2 ids.ShortID, arg3 []*crypto.PrivateKeySECP256K1R, arg4 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewExportTx(arg0 uint64, arg1 ids.ID, arg2 ids.ShortID, arg3 []*secp256k1.PrivateKey, arg4 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewExportTx", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -146,7 +146,7 @@ func (mr *MockBuilderMockRecorder) NewExportTx(arg0, arg1, arg2, arg3, arg4 inte
 }
 
 // NewImportTx mocks base method.
-func (m *MockBuilder) NewImportTx(arg0 ids.ID, arg1 ids.ShortID, arg2 []*crypto.PrivateKeySECP256K1R, arg3 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewImportTx(arg0 ids.ID, arg1 ids.ShortID, arg2 []*secp256k1.PrivateKey, arg3 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewImportTx", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*txs.Tx)
@@ -161,7 +161,7 @@ func (mr *MockBuilderMockRecorder) NewImportTx(arg0, arg1, arg2, arg3 interface{
 }
 
 // NewRemoveSubnetValidatorTx mocks base method.
-func (m *MockBuilder) NewRemoveSubnetValidatorTx(arg0 ids.NodeID, arg1 ids.ID, arg2 []*crypto.PrivateKeySECP256K1R, arg3 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewRemoveSubnetValidatorTx(arg0 ids.NodeID, arg1 ids.ID, arg2 []*secp256k1.PrivateKey, arg3 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewRemoveSubnetValidatorTx", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*txs.Tx)

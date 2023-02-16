@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -32,7 +32,7 @@ var (
 	errUnknownSubnetAuthType = errors.New("unknown subnet auth type")
 	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
-	emptySig [crypto.SECP256K1RSigLen]byte
+	emptySig [secp256k1.SignatureLen]byte
 )
 
 // signerVisitor handles signing transactions for the signer
@@ -272,7 +272,7 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 		tx.Creds = make([]verify.Verifiable, expectedLen)
 	}
 
-	sigCache := make(map[ids.ShortID][crypto.SECP256K1RSigLen]byte)
+	sigCache := make(map[ids.ShortID][secp256k1.SignatureLen]byte)
 	for credIndex, inputSigners := range txSigners {
 		credIntf := tx.Creds[credIndex]
 		if credIntf == nil {
@@ -285,7 +285,7 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 			return errUnknownCredentialType
 		}
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
-			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, expectedLen)
+			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
 		}
 
 		for sigIndex, signer := range inputSigners {

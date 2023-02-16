@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -36,14 +36,14 @@ type User interface {
 	GetAddresses() ([]ids.ShortID, error)
 
 	// PutKeys persists [privKeys]
-	PutKeys(privKeys ...*crypto.PrivateKeySECP256K1R) error
+	PutKeys(privKeys ...*secp256k1.PrivateKey) error
 
 	// GetKey returns the private key that controls the given address
-	GetKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error)
+	GetKey(address ids.ShortID) (*secp256k1.PrivateKey, error)
 }
 
 type user struct {
-	factory crypto.FactorySECP256K1R
+	factory secp256k1.Factory
 	db      *encdb.Database
 }
 
@@ -77,8 +77,8 @@ func (u *user) GetAddresses() ([]ids.ShortID, error) {
 	return addresses, err
 }
 
-func (u *user) PutKeys(privKeys ...*crypto.PrivateKeySECP256K1R) error {
-	toStore := make([]*crypto.PrivateKeySECP256K1R, 0, len(privKeys))
+func (u *user) PutKeys(privKeys ...*secp256k1.PrivateKey) error {
+	toStore := make([]*secp256k1.PrivateKey, 0, len(privKeys))
 	for _, privKey := range privKeys {
 		address := privKey.PublicKey().Address() // address the privKey controls
 		hasAddress, err := u.db.Has(address.Bytes())
@@ -120,20 +120,12 @@ func (u *user) PutKeys(privKeys ...*crypto.PrivateKeySECP256K1R) error {
 	return u.db.Put(addressesKey, addressBytes)
 }
 
-func (u *user) GetKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
+func (u *user) GetKey(address ids.ShortID) (*secp256k1.PrivateKey, error) {
 	bytes, err := u.db.Get(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	skIntf, err := u.factory.ToPrivateKey(bytes)
-	if err != nil {
-		return nil, err
-	}
-	sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		return nil, fmt.Errorf("expected private key to be type *crypto.PrivateKeySECP256K1R but is type %T", skIntf)
-	}
-	return sk, nil
+	return u.factory.ToPrivateKey(bytes)
 }
 
 func (u *user) Close() error {
@@ -141,7 +133,7 @@ func (u *user) Close() error {
 }
 
 // Create and store a new key that will be controlled by this user.
-func NewKey(u User) (*crypto.PrivateKeySECP256K1R, error) {
+func NewKey(u User) (*secp256k1.PrivateKey, error) {
 	keys, err := NewKeys(u, 1)
 	if err != nil {
 		return nil, err
@@ -150,18 +142,14 @@ func NewKey(u User) (*crypto.PrivateKeySECP256K1R, error) {
 }
 
 // Create and store [numKeys] new keys that will be controlled by this user.
-func NewKeys(u User, numKeys int) ([]*crypto.PrivateKeySECP256K1R, error) {
-	factory := crypto.FactorySECP256K1R{}
+func NewKeys(u User, numKeys int) ([]*secp256k1.PrivateKey, error) {
+	factory := secp256k1.Factory{}
 
-	keys := make([]*crypto.PrivateKeySECP256K1R, numKeys)
+	keys := make([]*secp256k1.PrivateKey, numKeys)
 	for i := range keys {
-		skIntf, err := factory.NewPrivateKey()
+		sk, err := factory.NewPrivateKey()
 		if err != nil {
 			return nil, err
-		}
-		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		if !ok {
-			return nil, fmt.Errorf("expected private key to be type *crypto.PrivateKeySECP256K1R but is type %T", skIntf)
 		}
 		keys[i] = sk
 	}
