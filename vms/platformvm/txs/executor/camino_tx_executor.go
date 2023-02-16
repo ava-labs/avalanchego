@@ -1144,11 +1144,16 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	txID := e.Tx.ID()
 
 	if tx.State == txs.AddressStateNodeDeferred {
+		nodeShortID, err := e.State.GetShortIDLink(tx.Address, state.ShortLinkKeyRegisterNode)
+		if err != nil {
+			return fmt.Errorf("couldn't get consortium member registered nodeID: %w", err)
+		}
+		nodeID := ids.NodeID(nodeShortID)
 		if tx.Remove {
 			// transfer staker to from pending to current stakers set
-			stakerToRemove, err := e.State.GetPendingValidator(constants.PrimaryNetworkID, ids.NodeID(tx.Address))
+			stakerToRemove, err := e.State.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 			if err != nil {
-				return fmt.Errorf("validator with nodeID %s, does not exist in pending stakers set: %w", ids.NodeID(tx.Address), errValidatorNotFound)
+				return fmt.Errorf("validator with nodeID %s, does not exist in pending stakers set: %w", nodeID, errValidatorNotFound)
 			}
 			e.State.DeletePendingValidator(stakerToRemove)
 			stakerToAdd := copyStaker(stakerToRemove)
@@ -1158,9 +1163,9 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 			e.State.PutCurrentValidator(stakerToAdd)
 		} else {
 			// transfer staker to from current to pending stakers set
-			stakerToRemove, err := e.State.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(tx.Address))
+			stakerToRemove, err := e.State.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 			if err != nil {
-				return fmt.Errorf("validator with nodeID %s, does not exist in current stakers set: %w", ids.NodeID(tx.Address), errValidatorNotFound)
+				return fmt.Errorf("validator with nodeID %s, does not exist in current stakers set: %w", nodeID, errValidatorNotFound)
 			}
 			e.State.DeleteCurrentValidator(stakerToRemove)
 			stakerToAdd := copyStaker(stakerToRemove)

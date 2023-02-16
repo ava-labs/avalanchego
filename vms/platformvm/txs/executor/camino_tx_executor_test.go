@@ -3779,12 +3779,13 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
-	addr := caminoPreFundedKeys[0].Address()
-	nodeAddress := caminoPreFundedNodeKeys[0].Address()
+	consortiumMemberAddress := caminoPreFundedKeys[0].Address()
+	consortiumMemberKey := caminoPreFundedKeys[0]
+	nodeID := caminoPreFundedNodeIDs[0]
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
-		Addrs:     []ids.ShortID{addr},
+		Addrs:     []ids.ShortID{consortiumMemberAddress},
 	}
 
 	type args struct {
@@ -3802,8 +3803,8 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 		"Happy path set state to deferred": {
 			generateArgs: func() args {
 				return args{
-					address:    nodeAddress,
-					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					address:    consortiumMemberAddress,
+					keys:       []*crypto.PrivateKeySECP256K1R{consortiumMemberKey},
 					changeAddr: outputOwners,
 				}
 			},
@@ -3813,14 +3814,14 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 		"Happy path set state to active": {
 			generateArgs: func() args {
 				return args{
-					address:    nodeAddress,
+					address:    consortiumMemberAddress,
 					remove:     true,
-					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					keys:       []*crypto.PrivateKeySECP256K1R{consortiumMemberKey},
 					changeAddr: outputOwners,
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx, state state.State) {
-				stakerToTransfer, err := state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(nodeAddress))
+				stakerToTransfer, err := state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 				require.NoError(t, err)
 				state.DeleteCurrentValidator(stakerToTransfer)
 				stakerToTransfer.StartTime = stakerToTransfer.EndTime
@@ -3831,7 +3832,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 		"Remove deferred state of an active validator": {
 			generateArgs: func() args {
 				return args{
-					address:    nodeAddress,
+					address:    consortiumMemberAddress,
 					remove:     true,
 					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
 					changeAddr: outputOwners,
@@ -3846,7 +3847,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			caminoGenesisConf := api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				InitialAdmin:        addr,
+				InitialAdmin:        consortiumMemberAddress,
 			}
 			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 			env.ctx.Lock.Lock()
@@ -3882,8 +3883,8 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			}
 
 			err = tx.Unsigned.Visit(&executor)
+			require.ErrorIs(t, err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.ErrorIs(t, err, tt.expectedErr)
 				return
 			}
 			var stakerIterator state.StakerIterator
@@ -3897,7 +3898,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			require.True(t, stakerIterator.Next())
 			stakerToRemove := stakerIterator.Value()
 			stakerIterator.Release()
-			require.Equal(t, stakerToRemove.NodeID, ids.NodeID(setAddressStateArgs.address))
+			require.Equal(t, stakerToRemove.NodeID, nodeID)
 		})
 	}
 }

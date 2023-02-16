@@ -37,6 +37,8 @@ func TestDeferredStakers(t *testing.T) {
 	type staker struct {
 		nodeID                          ids.NodeID
 		nodeKey                         *crypto.PrivateKeySECP256K1R
+		nodeOwnerAddr                   ids.ShortID
+		nodeOwnerKey                    *crypto.PrivateKeySECP256K1R
 		startTime, endTime, suspendTime time.Time
 	}
 	type test struct {
@@ -59,46 +61,61 @@ func TestDeferredStakers(t *testing.T) {
 
 	nodeIDs := make([]ids.NodeID, 6)
 	nodeKeys := make([]*crypto.PrivateKeySECP256K1R, 6)
+	nodeOwnerAddresses := make([]ids.ShortID, 6)
+	nodeOwnerKeys := make([]*crypto.PrivateKeySECP256K1R, 6)
 	for i := range [6]int{} {
 		nodeKeys[i], nodeIDs[i] = nodeid.GenerateCaminoNodeKeyAndID()
+		nodeOwnerKeys[i], nodeOwnerAddresses[i], _ = generateKeyAndOwner(t)
 	}
 
 	staker1 := staker{
-		nodeID:    nodeIDs[0],
-		nodeKey:   nodeKeys[0],
-		startTime: defaultGenesisTime.Add(1 * time.Minute),
-		endTime:   defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		nodeID:        nodeIDs[0],
+		nodeKey:       nodeKeys[0],
+		nodeOwnerAddr: nodeOwnerAddresses[0],
+		nodeOwnerKey:  nodeOwnerKeys[0],
+		startTime:     defaultGenesisTime.Add(1 * time.Minute),
+		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
-		nodeID:    nodeIDs[1],
-		nodeKey:   nodeKeys[1],
-		startTime: staker1.startTime.Add(1 * time.Minute),
-		endTime:   staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		nodeID:        nodeIDs[1],
+		nodeKey:       nodeKeys[1],
+		nodeOwnerAddr: nodeOwnerAddresses[1],
+		nodeOwnerKey:  nodeOwnerKeys[1],
+		startTime:     staker1.startTime.Add(1 * time.Minute),
+		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
 	}
 	staker3 := staker{
-		nodeID:    nodeIDs[2],
-		nodeKey:   nodeKeys[2],
-		startTime: staker2.startTime.Add(1 * time.Minute),
-		endTime:   staker2.endTime.Add(1 * time.Minute),
+		nodeID:        nodeIDs[2],
+		nodeKey:       nodeKeys[2],
+		nodeOwnerAddr: nodeOwnerAddresses[2],
+		nodeOwnerKey:  nodeOwnerKeys[2],
+		startTime:     staker2.startTime.Add(1 * time.Minute),
+		endTime:       staker2.endTime.Add(1 * time.Minute),
 	}
 	staker3Sub := staker{
-		nodeID:    nodeIDs[2],
-		nodeKey:   nodeKeys[2],
-		startTime: staker3.startTime.Add(1 * time.Minute),
-		endTime:   staker3.endTime.Add(-1 * time.Minute),
+		nodeID:        nodeIDs[2],
+		nodeKey:       nodeKeys[2],
+		nodeOwnerAddr: nodeOwnerAddresses[3],
+		nodeOwnerKey:  nodeOwnerKeys[3],
+		startTime:     staker3.startTime.Add(1 * time.Minute),
+		endTime:       staker3.endTime.Add(-1 * time.Minute),
 	}
 	staker4 := staker{
-		nodeID:    nodeIDs[4],
-		nodeKey:   nodeKeys[4],
-		startTime: staker2.endTime,
-		endTime:   staker3.endTime,
+		nodeID:        nodeIDs[4],
+		nodeKey:       nodeKeys[4],
+		nodeOwnerAddr: nodeOwnerAddresses[4],
+		nodeOwnerKey:  nodeOwnerKeys[4],
+		startTime:     staker2.endTime,
+		endTime:       staker3.endTime,
 	}
 	staker5 := staker{
-		nodeID:      nodeIDs[5],
-		nodeKey:     nodeKeys[5],
-		startTime:   staker2.startTime,
-		endTime:     staker2.endTime,
-		suspendTime: staker3.startTime,
+		nodeID:        nodeIDs[5],
+		nodeKey:       nodeKeys[5],
+		nodeOwnerAddr: nodeOwnerAddresses[5],
+		nodeOwnerKey:  nodeOwnerKeys[5],
+		startTime:     staker2.startTime,
+		endTime:       staker2.endTime,
+		suspendTime:   staker3.startTime,
 	}
 
 	tests := []test{
@@ -206,6 +223,7 @@ func TestDeferredStakers(t *testing.T) {
 					staker.startTime,
 					staker.endTime,
 					staker.nodeID,
+					staker.nodeOwnerAddr,
 					[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], staker.nodeKey},
 				)
 				require.NoError(err)
@@ -260,7 +278,7 @@ func TestDeferredStakers(t *testing.T) {
 
 				for _, staker := range test.suspendedStakers {
 					if newTime == staker.suspendTime {
-						_, err = suspendValidator(env, ids.ShortID(staker.nodeID), caminoPreFundedKeys[0])
+						_, err = suspendValidator(env, staker.nodeOwnerAddr, caminoPreFundedKeys[0])
 						require.NoError(err)
 					}
 				}
@@ -310,9 +328,17 @@ func addCaminoPendingValidator(
 	startTime time.Time,
 	endTime time.Time,
 	nodeID ids.NodeID,
+	nodeOwnerAddr ids.ShortID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (*txs.Tx, error) {
-	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+	env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &nodeOwnerAddr)
+	link := ids.ShortID(nodeID)
+	env.state.SetShortIDLink(nodeOwnerAddr, state.ShortLinkKeyRegisterNode, &link)
+	if err := env.state.Commit(); err != nil {
+		return nil, err
+	}
+
+	tx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -327,24 +353,24 @@ func addCaminoPendingValidator(
 	}
 
 	staker, err := state.NewPendingStaker(
-		addPendingValidatorTx.ID(),
-		addPendingValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx),
+		tx.ID(),
+		tx.Unsigned.(*txs.CaminoAddValidatorTx),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	env.state.PutPendingValidator(staker)
-	env.state.AddTx(addPendingValidatorTx, status.Committed)
+	env.state.AddTx(tx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
 	if err := env.state.Commit(); err != nil {
 		return nil, err
 	}
-	return addPendingValidatorTx, nil
+	return tx, nil
 }
 
-func suspendValidator(env *caminoEnvironment, nodeAddress ids.ShortID, key *crypto.PrivateKeySECP256K1R) (*txs.Tx, error) {
+func suspendValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *crypto.PrivateKeySECP256K1R) (*txs.Tx, error) {
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
@@ -352,7 +378,7 @@ func suspendValidator(env *caminoEnvironment, nodeAddress ids.ShortID, key *cryp
 	}
 
 	tx, err := env.txBuilder.NewAddressStateTx(
-		nodeAddress,
+		nodeOwnerAddress,
 		false,
 		txs.AddressStateNodeDeferred,
 		[]*crypto.PrivateKeySECP256K1R{key},

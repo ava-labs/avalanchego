@@ -38,7 +38,11 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	require.NoError(err)
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
-	nodeAddress := nodeKey.PublicKey().Address()
+
+	key, err := testKeyFactory.NewPrivateKey()
+	require.NoError(err)
+	consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(ok)
 
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -64,6 +68,51 @@ func TestRewardSuspendedValidator(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
+	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
+	vm.state.AddUTXO(utxo)
+	err = vm.state.Commit()
+	require.NoError(err)
+
+	// Set consortium member
+	tx, err := vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
+		false,
+		txs.AddressStateConsortium,
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		outputOwners,
+	)
+	require.NoError(err)
+	err = vm.Builder.AddUnverifiedTx(tx)
+	require.NoError(err)
+	blk, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	err = blk.Verify(context.Background())
+	require.NoError(err)
+	err = blk.Accept(context.Background())
+	require.NoError(err)
+	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
+	require.NoError(err)
+
+	// Register node
+	tx, err = vm.txBuilder.NewRegisterNodeTx(
+		ids.EmptyNodeID,
+		nodeID,
+		consortiumMemberKey.Address(),
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		outputOwners,
+	)
+	require.NoError(err)
+	err = vm.Builder.AddUnverifiedTx(tx)
+	require.NoError(err)
+	blk, err = vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	err = blk.Verify(context.Background())
+	require.NoError(err)
+	err = blk.Accept(context.Background())
+	require.NoError(err)
+	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
+	require.NoError(err)
+
 	// Add the validator
 	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
@@ -75,7 +124,7 @@ func TestRewardSuspendedValidator(t *testing.T) {
 		nodeID,
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey},
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -91,14 +140,14 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	err = vm.state.Commit()
 	require.NoError(err)
 
-	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
+	utxo = generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
 	vm.state.AddUTXO(utxo)
 	err = vm.state.Commit()
 	require.NoError(err)
 
 	// Suspend the validator
-	tx, err := vm.txBuilder.NewAddressStateTx(
-		nodeAddress,
+	tx, err = vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateNodeDeferred,
 		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -107,7 +156,7 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	require.NoError(err)
 	err = vm.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	err = blk.Verify(context.Background())
 	require.NoError(err)
@@ -135,7 +184,7 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[0].(*blockexecutor.Block)
@@ -181,7 +230,11 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	require.NoError(err)
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
-	nodeAddress := nodeKey.PublicKey().Address()
+
+	key, err := testKeyFactory.NewPrivateKey()
+	require.NoError(err)
+	consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(ok)
 
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -206,6 +259,51 @@ func TestRewardReactivatedValidator(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
+
+	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
+	vm.state.AddUTXO(utxo)
+	err = vm.state.Commit()
+	require.NoError(err)
+
+	// Set consortium member
+	tx, err := vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
+		false,
+		txs.AddressStateConsortium,
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		outputOwners,
+	)
+	require.NoError(err)
+	err = vm.Builder.AddUnverifiedTx(tx)
+	require.NoError(err)
+	blk, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	err = blk.Verify(context.Background())
+	require.NoError(err)
+	err = blk.Accept(context.Background())
+	require.NoError(err)
+	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
+	require.NoError(err)
+
+	// Register node
+	tx, err = vm.txBuilder.NewRegisterNodeTx(
+		ids.EmptyNodeID,
+		nodeID,
+		consortiumMemberKey.Address(),
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		outputOwners,
+	)
+	require.NoError(err)
+	err = vm.Builder.AddUnverifiedTx(tx)
+	require.NoError(err)
+	blk, err = vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	err = blk.Verify(context.Background())
+	require.NoError(err)
+	err = blk.Accept(context.Background())
+	require.NoError(err)
+	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
+	require.NoError(err)
 
 	// Add the validator
 	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
@@ -234,14 +332,14 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	err = vm.state.Commit()
 	require.NoError(err)
 
-	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
+	utxo = generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
 	vm.state.AddUTXO(utxo)
 	err = vm.state.Commit()
 	require.NoError(err)
 
 	// Suspend the validator
-	tx, err := vm.txBuilder.NewAddressStateTx(
-		nodeAddress,
+	tx, err = vm.txBuilder.NewAddressStateTx(
+		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateNodeDeferred,
 		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -250,7 +348,7 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	require.NoError(err)
 	err = vm.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	err = blk.Verify(context.Background())
 	require.NoError(err)
@@ -267,7 +365,7 @@ func TestRewardReactivatedValidator(t *testing.T) {
 
 	// Reactivate the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
-		nodeAddress,
+		consortiumMemberKey.Address(),
 		true,
 		txs.AddressStateNodeDeferred,
 		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -304,7 +402,7 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[0].(*blockexecutor.Block)
