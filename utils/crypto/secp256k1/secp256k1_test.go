@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package crypto
+package secp256k1
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 func TestRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := FactorySECP256K1R{}
+	f := Factory{}
 	key, err := f.NewPrivateKey()
 	require.NoError(err)
 
@@ -39,7 +39,7 @@ func TestRecover(t *testing.T) {
 func TestCachedRecover(t *testing.T) {
 	require := require.New(t)
 
-	f := FactorySECP256K1R{Cache: cache.LRU[ids.ID, *PublicKeySECP256K1R]{Size: 1}}
+	f := Factory{Cache: cache.LRU[ids.ID, *PublicKey]{Size: 1}}
 	key, err := f.NewPrivateKey()
 	require.NoError(err)
 
@@ -58,7 +58,7 @@ func TestCachedRecover(t *testing.T) {
 }
 
 func TestExtensive(t *testing.T) {
-	f := FactorySECP256K1R{}
+	f := Factory{}
 
 	hash := hashing.ComputeHash256([]byte{1, 2, 3})
 	for i := 0; i < 1000; i++ {
@@ -71,7 +71,7 @@ func TestExtensive(t *testing.T) {
 }
 
 func TestGenRecreate(t *testing.T) {
-	f := FactorySECP256K1R{}
+	f := Factory{}
 
 	for i := 0; i < 1000; i++ {
 		sk, err := f.NewPrivateKey()
@@ -90,7 +90,7 @@ func TestGenRecreate(t *testing.T) {
 }
 
 func TestVerifyMutatedSignature(t *testing.T) {
-	factory := FactorySECP256K1R{}
+	factory := Factory{}
 
 	sk, err := factory.NewPrivateKey()
 	require.NoError(t, err)
@@ -113,15 +113,14 @@ func TestVerifyMutatedSignature(t *testing.T) {
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
 
-	f := FactorySECP256K1R{}
-	keyIntf, err := f.NewPrivateKey()
+	f := Factory{}
+	key, err := f.NewPrivateKey()
 	require.NoError(err)
-	key := keyIntf.(*PrivateKeySECP256K1R)
 
 	keyJSON, err := key.MarshalJSON()
 	require.NoError(err)
 
-	key2 := PrivateKeySECP256K1R{}
+	key2 := PrivateKey{}
 	err = key2.UnmarshalJSON(keyJSON)
 	require.NoError(err)
 	require.Equal(key.PublicKey().Address(), key2.PublicKey().Address())
@@ -161,7 +160,7 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			require := require.New(t)
 
-			foo := PrivateKeySECP256K1R{}
+			foo := PrivateKey{}
 			err := foo.UnmarshalJSON(tt.in)
 			require.Error(err)
 		})
@@ -217,7 +216,7 @@ func TestSigning(t *testing.T) {
 		},
 	}
 
-	key := BuildTestKeys()[0]
+	key := TestKeys()[0]
 
 	for _, tt := range tests {
 		t.Run(string(tt.msg), func(t *testing.T) {

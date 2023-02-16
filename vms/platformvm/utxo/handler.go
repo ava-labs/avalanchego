@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -75,7 +75,7 @@ type Spender interface {
 	//                   the staking period
 	// - [signers] the proof of ownership of the funds being moved
 	Spend(
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		amount uint64,
 		fee uint64,
 		changeAddr ids.ShortID,
@@ -83,7 +83,7 @@ type Spender interface {
 		[]*avax.TransferableInput, // inputs
 		[]*avax.TransferableOutput, // returnedOutputs
 		[]*avax.TransferableOutput, // stakedOutputs
-		[][]*crypto.PrivateKeySECP256K1R, // signers
+		[][]*secp256k1.PrivateKey, // signers
 		error,
 	)
 
@@ -92,10 +92,10 @@ type Spender interface {
 	Authorize(
 		state state.Chain,
 		subnetID ids.ID,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 	) (
 		verify.Verifiable, // Input that names owners
-		[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
+		[]*secp256k1.PrivateKey, // Keys that prove ownership
 		error,
 	)
 }
@@ -168,7 +168,7 @@ type handler struct {
 }
 
 func (h *handler) Spend(
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	amount uint64,
 	fee uint64,
 	changeAddr ids.ShortID,
@@ -176,7 +176,7 @@ func (h *handler) Spend(
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // returnedOutputs
 	[]*avax.TransferableOutput, // stakedOutputs
-	[][]*crypto.PrivateKeySECP256K1R, // signers
+	[][]*secp256k1.PrivateKey, // signers
 	error,
 ) {
 	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
@@ -196,7 +196,7 @@ func (h *handler) Spend(
 	ins := []*avax.TransferableInput{}
 	returnedOuts := []*avax.TransferableOutput{}
 	stakedOuts := []*avax.TransferableOutput{}
-	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	signers := [][]*secp256k1.PrivateKey{}
 
 	// Amount of AVAX that has been staked
 	amountStaked := uint64(0)
@@ -412,10 +412,10 @@ func (h *handler) Spend(
 func (h *handler) Authorize(
 	state state.Chain,
 	subnetID ids.ID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 ) (
 	verify.Verifiable, // Input that names owners
-	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
+	[]*secp256k1.PrivateKey, // Keys that prove ownership
 	error,
 ) {
 	subnetTx, _, err := state.GetTx(subnetID)

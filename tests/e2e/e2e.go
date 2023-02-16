@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -78,7 +78,7 @@ type TestEnvinronment struct {
 	uris   []string
 
 	testKeysMu sync.RWMutex
-	testKeys   []*crypto.PrivateKeySECP256K1R
+	testKeys   []*secp256k1.PrivateKey
 
 	snapMu  sync.RWMutex
 	snapped bool
@@ -253,13 +253,13 @@ func (te *TestEnvinronment) GetURIs() []string {
 	return us
 }
 
-func (te *TestEnvinronment) setTestKeys(ks []*crypto.PrivateKeySECP256K1R) {
+func (te *TestEnvinronment) setTestKeys(ks []*secp256k1.PrivateKey) {
 	te.testKeysMu.Lock()
 	te.testKeys = ks
 	te.testKeysMu.Unlock()
 }
 
-func (te *TestEnvinronment) GetTestKeys() ([]*crypto.PrivateKeySECP256K1R, []ids.ShortID, *secp256k1fx.Keychain) {
+func (te *TestEnvinronment) GetTestKeys() ([]*secp256k1.PrivateKey, []ids.ShortID, *secp256k1fx.Keychain) {
 	te.testKeysMu.RLock()
 	testKeys := te.testKeys
 	te.testKeysMu.RUnlock()

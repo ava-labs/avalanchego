@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package crypto
+package secp256k1
 
 import (
 	"errors"
@@ -21,17 +21,15 @@ import (
 )
 
 const (
-	// SECP256K1RSigLen is the number of bytes in a secp2561k recoverable
-	// signature
-	SECP256K1RSigLen = 65
+	// SignatureLen is the number of bytes in a secp2561k recoverable signature
+	SignatureLen = 65
 
-	// SECP256K1RSKLen is the number of bytes in a secp2561k recoverable private
+	// PrivateKeyLen is the number of bytes in a secp2561k recoverable private
 	// key
-	SECP256K1RSKLen = 32
+	PrivateKeyLen = 32
 
-	// SECP256K1RPKLen is the number of bytes in a secp2561k recoverable public
-	// key
-	SECP256K1RPKLen = 33
+	// PublicKeyLen is the number of bytes in a secp2561k recoverable public key
+	PublicKeyLen = 33
 
 	// from the decred library:
 	// compactSigMagicOffset is a value used when creating the compact signature
@@ -49,52 +47,48 @@ var (
 	errCompressed              = errors.New("wasn't expecting a compressed key")
 	errMissingQuotes           = errors.New("first and last characters should be quotes")
 	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
-	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", SECP256K1RSKLen)
-	errInvalidPublicKeyLength  = fmt.Errorf("public key has unexpected length, expected %d", SECP256K1RPKLen)
+	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", PrivateKeyLen)
+	errInvalidPublicKeyLength  = fmt.Errorf("public key has unexpected length, expected %d", PublicKeyLen)
 	errInvalidSigLen           = errors.New("invalid signature length")
 	errMutatedSig              = errors.New("signature was mutated from its original format")
-
-	_ RecoverableFactory = (*FactorySECP256K1R)(nil)
-	_ PublicKey          = (*PublicKeySECP256K1R)(nil)
-	_ PrivateKey         = (*PrivateKeySECP256K1R)(nil)
 )
 
-type FactorySECP256K1R struct {
-	Cache cache.LRU[ids.ID, *PublicKeySECP256K1R]
+type Factory struct {
+	Cache cache.LRU[ids.ID, *PublicKey]
 }
 
-func (*FactorySECP256K1R) NewPrivateKey() (PrivateKey, error) {
+func (*Factory) NewPrivateKey() (*PrivateKey, error) {
 	k, err := secp256k1.GeneratePrivateKey()
-	return &PrivateKeySECP256K1R{sk: k}, err
+	return &PrivateKey{sk: k}, err
 }
 
-func (*FactorySECP256K1R) ToPublicKey(b []byte) (PublicKey, error) {
-	if len(b) != SECP256K1RPKLen {
+func (*Factory) ToPublicKey(b []byte) (*PublicKey, error) {
+	if len(b) != PublicKeyLen {
 		return nil, errInvalidPublicKeyLength
 	}
 
 	key, err := secp256k1.ParsePubKey(b)
-	return &PublicKeySECP256K1R{
+	return &PublicKey{
 		pk:    key,
 		bytes: b,
 	}, err
 }
 
-func (*FactorySECP256K1R) ToPrivateKey(b []byte) (PrivateKey, error) {
-	if len(b) != SECP256K1RSKLen {
+func (*Factory) ToPrivateKey(b []byte) (*PrivateKey, error) {
+	if len(b) != PrivateKeyLen {
 		return nil, errInvalidPrivateKeyLength
 	}
-	return &PrivateKeySECP256K1R{
+	return &PrivateKey{
 		sk:    secp256k1.PrivKeyFromBytes(b),
 		bytes: b,
 	}, nil
 }
 
-func (f *FactorySECP256K1R) RecoverPublicKey(msg, sig []byte) (PublicKey, error) {
+func (f *Factory) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
 	return f.RecoverHashPublicKey(hashing.ComputeHash256(msg), sig)
 }
 
-func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, error) {
+func (f *Factory) RecoverHashPublicKey(hash, sig []byte) (*PublicKey, error) {
 	cacheBytes := make([]byte, len(hash)+len(sig))
 	copy(cacheBytes, hash)
 	copy(cacheBytes[len(hash):], sig)
@@ -121,23 +115,23 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 		return nil, errCompressed
 	}
 
-	pubkey := &PublicKeySECP256K1R{pk: rawPubkey}
+	pubkey := &PublicKey{pk: rawPubkey}
 	f.Cache.Put(id, pubkey)
 	return pubkey, nil
 }
 
-type PublicKeySECP256K1R struct {
+type PublicKey struct {
 	pk    *secp256k1.PublicKey
 	addr  ids.ShortID
 	bytes []byte
 }
 
-func (k *PublicKeySECP256K1R) Verify(msg, sig []byte) bool {
+func (k *PublicKey) Verify(msg, sig []byte) bool {
 	return k.VerifyHash(hashing.ComputeHash256(msg), sig)
 }
 
-func (k *PublicKeySECP256K1R) VerifyHash(hash, sig []byte) bool {
-	factory := FactorySECP256K1R{}
+func (k *PublicKey) VerifyHash(hash, sig []byte) bool {
+	factory := Factory{}
 	pk, err := factory.RecoverHashPublicKey(hash, sig)
 	if err != nil {
 		return false
@@ -146,11 +140,11 @@ func (k *PublicKeySECP256K1R) VerifyHash(hash, sig []byte) bool {
 }
 
 // ToECDSA returns the ecdsa representation of this public key
-func (k *PublicKeySECP256K1R) ToECDSA() *stdecdsa.PublicKey {
+func (k *PublicKey) ToECDSA() *stdecdsa.PublicKey {
 	return k.pk.ToECDSA()
 }
 
-func (k *PublicKeySECP256K1R) Address() ids.ShortID {
+func (k *PublicKey) Address() ids.ShortID {
 	if k.addr == ids.ShortEmpty {
 		addr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(k.Bytes()))
 		if err != nil {
@@ -161,67 +155,67 @@ func (k *PublicKeySECP256K1R) Address() ids.ShortID {
 	return k.addr
 }
 
-func (k *PublicKeySECP256K1R) Bytes() []byte {
+func (k *PublicKey) Bytes() []byte {
 	if k.bytes == nil {
 		k.bytes = k.pk.SerializeCompressed()
 	}
 	return k.bytes
 }
 
-type PrivateKeySECP256K1R struct {
+type PrivateKey struct {
 	sk    *secp256k1.PrivateKey
-	pk    *PublicKeySECP256K1R
+	pk    *PublicKey
 	bytes []byte
 }
 
-func (k *PrivateKeySECP256K1R) PublicKey() PublicKey {
+func (k *PrivateKey) PublicKey() *PublicKey {
 	if k.pk == nil {
-		k.pk = &PublicKeySECP256K1R{pk: k.sk.PubKey()}
+		k.pk = &PublicKey{pk: k.sk.PubKey()}
 	}
 	return k.pk
 }
 
-func (k *PrivateKeySECP256K1R) Address() ids.ShortID {
+func (k *PrivateKey) Address() ids.ShortID {
 	return k.PublicKey().Address()
 }
 
-func (k *PrivateKeySECP256K1R) Sign(msg []byte) ([]byte, error) {
+func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {
 	return k.SignHash(hashing.ComputeHash256(msg))
 }
 
-func (k *PrivateKeySECP256K1R) SignHash(hash []byte) ([]byte, error) {
+func (k *PrivateKey) SignHash(hash []byte) ([]byte, error) {
 	sig := ecdsa.SignCompact(k.sk, hash, false) // returns [v || r || s]
 	return rawSigToSig(sig)
 }
 
 // ToECDSA returns the ecdsa representation of this private key
-func (k *PrivateKeySECP256K1R) ToECDSA() *stdecdsa.PrivateKey {
+func (k *PrivateKey) ToECDSA() *stdecdsa.PrivateKey {
 	return k.sk.ToECDSA()
 }
 
-func (k *PrivateKeySECP256K1R) Bytes() []byte {
+func (k *PrivateKey) Bytes() []byte {
 	if k.bytes == nil {
 		k.bytes = k.sk.Serialize()
 	}
 	return k.bytes
 }
 
-func (k *PrivateKeySECP256K1R) String() string {
+func (k *PrivateKey) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
 	keyStr, _ := cb58.Encode(k.Bytes())
 	return PrivateKeyPrefix + keyStr
 }
 
-func (k *PrivateKeySECP256K1R) MarshalJSON() ([]byte, error) {
+func (k *PrivateKey) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + k.String() + "\""), nil
 }
 
-func (k *PrivateKeySECP256K1R) MarshalText() ([]byte, error) {
+func (k *PrivateKey) MarshalText() ([]byte, error) {
 	return []byte(k.String()), nil
 }
 
-func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
+func (k *PrivateKey) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == nullStr { // If "null", do nothing
 		return nil
@@ -244,46 +238,46 @@ func (k *PrivateKeySECP256K1R) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if len(keyBytes) != SECP256K1RSKLen {
+	if len(keyBytes) != PrivateKeyLen {
 		return errInvalidPrivateKeyLength
 	}
 
-	*k = PrivateKeySECP256K1R{
+	*k = PrivateKey{
 		sk:    secp256k1.PrivKeyFromBytes(keyBytes),
 		bytes: keyBytes,
 	}
 	return nil
 }
 
-func (k *PrivateKeySECP256K1R) UnmarshalText(text []byte) error {
+func (k *PrivateKey) UnmarshalText(text []byte) error {
 	return k.UnmarshalJSON(text)
 }
 
 // raw sig has format [v || r || s] whereas the sig has format [r || s || v]
 func rawSigToSig(sig []byte) ([]byte, error) {
-	if len(sig) != SECP256K1RSigLen {
+	if len(sig) != SignatureLen {
 		return nil, errInvalidSigLen
 	}
 	recCode := sig[0]
 	copy(sig, sig[1:])
-	sig[SECP256K1RSigLen-1] = recCode - compactSigMagicOffset
+	sig[SignatureLen-1] = recCode - compactSigMagicOffset
 	return sig, nil
 }
 
 // sig has format [r || s || v] whereas the raw sig has format [v || r || s]
 func sigToRawSig(sig []byte) ([]byte, error) {
-	if len(sig) != SECP256K1RSigLen {
+	if len(sig) != SignatureLen {
 		return nil, errInvalidSigLen
 	}
-	newSig := make([]byte, SECP256K1RSigLen)
-	newSig[0] = sig[SECP256K1RSigLen-1] + compactSigMagicOffset
+	newSig := make([]byte, SignatureLen)
+	newSig[0] = sig[SignatureLen-1] + compactSigMagicOffset
 	copy(newSig[1:], sig)
 	return newSig, nil
 }
 
 // verifies the signature format in format [r || s || v]
 func verifySECP256K1RSignatureFormat(sig []byte) error {
-	if len(sig) != SECP256K1RSigLen {
+	if len(sig) != SignatureLen {
 		return errInvalidSigLen
 	}
 

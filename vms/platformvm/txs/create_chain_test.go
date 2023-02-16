@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -19,7 +19,7 @@ import (
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	testSubnet1ID := ids.GenerateTestID()
-	testSubnet1ControlKeys := []*crypto.PrivateKeySECP256K1R{
+	testSubnet1ControlKeys := []*secp256k1.PrivateKey{
 		preFundedKeys[0],
 		preFundedKeys[1],
 	}
@@ -32,7 +32,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		vmID        ids.ID
 		fxIDs       []ids.ID
 		chainName   string
-		keys        []*crypto.PrivateKeySECP256K1R
+		keys        []*secp256k1.PrivateKey
 		setup       func(*CreateChainTx) *CreateChainTx
 	}
 
@@ -45,7 +45,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(*CreateChainTx) *CreateChainTx {
 				return nil
 			},
@@ -58,7 +58,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.VMID = ids.ID{}
 				return tx
@@ -72,7 +72,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.SubnetID = ids.ID{}
 				return tx
@@ -86,7 +86,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.SubnetID = ctx.ChainID
 				return tx
@@ -100,7 +100,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.ChainName = string(make([]byte, MaxNameLen+1))
 				return tx
@@ -114,7 +114,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.ChainName = "⌘"
 				return tx
@@ -128,7 +128,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			vmID:        constants.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
-			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			setup: func(tx *CreateChainTx) *CreateChainTx {
 				tx.GenesisData = make([]byte, MaxGenesisLen+1)
 				return tx
@@ -177,7 +177,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			SubnetAuth:  subnetAuth,
 		}
 
-		signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
+		signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 		stx, err := NewSigned(createChainTx, Codec, signers)
 		require.NoError(t, err)
 

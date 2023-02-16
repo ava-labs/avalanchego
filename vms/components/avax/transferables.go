@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -167,7 +167,7 @@ func (in *TransferableInput) Less(other *TransferableInput) bool {
 
 type innerSortTransferableInputsWithSigners struct {
 	ins     []*TransferableInput
-	signers [][]*crypto.PrivateKeySECP256K1R
+	signers [][]*secp256k1.PrivateKey
 }
 
 func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
@@ -195,7 +195,7 @@ func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
 
 // SortTransferableInputsWithSigners sorts the inputs and signers based on the
 // input's utxo ID
-func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) {
+func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*secp256k1.PrivateKey) {
 	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 

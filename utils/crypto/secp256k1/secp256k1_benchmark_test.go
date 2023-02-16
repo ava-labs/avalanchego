@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package crypto
+package secp256k1
 
 import (
 	"testing"
@@ -16,7 +16,7 @@ const NumVerifies = 1
 var (
 	hashes [][]byte
 
-	keys []PublicKey
+	keys []*PublicKey
 	sigs [][]byte
 )
 
@@ -30,7 +30,7 @@ func init() {
 	}
 
 	// Setup signatures:
-	f := &FactorySECP256K1R{}
+	f := &Factory{}
 	for i := uint64(0); i < NumVerifies; i++ {
 		privateKey, err := f.NewPrivateKey()
 		if err != nil {

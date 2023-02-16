@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -32,7 +32,7 @@ var (
 	errUnknownOutputType     = errors.New("unknown output type")
 	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
-	emptySig [crypto.SECP256K1RSigLen]byte
+	emptySig [secp256k1.SignatureLen]byte
 
 	_ Signer = (*signer)(nil)
 )
@@ -268,7 +268,7 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 		tx.Creds = make([]*fxs.FxCredential, expectedLen)
 	}
 
-	sigCache := make(map[ids.ShortID][crypto.SECP256K1RSigLen]byte)
+	sigCache := make(map[ids.ShortID][secp256k1.SignatureLen]byte)
 	for credIndex, inputSigners := range txSigners {
 		fxCred := tx.Creds[credIndex]
 		if fxCred == nil {
@@ -294,7 +294,7 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 		}
 
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
-			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, expectedLen)
+			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
 		}
 
 		for sigIndex, signer := range inputSigners {

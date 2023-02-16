@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -26,7 +26,7 @@ func TestNewExportTx(t *testing.T) {
 	type test struct {
 		description        string
 		destinationChainID ids.ID
-		sourceKeys         []*crypto.PrivateKeySECP256K1R
+		sourceKeys         []*secp256k1.PrivateKey
 		timestamp          time.Time
 		shouldErr          bool
 		shouldVerify       bool
@@ -38,7 +38,7 @@ func TestNewExportTx(t *testing.T) {
 		{
 			description:        "P->X export",
 			destinationChainID: xChainID,
-			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          defaultValidateStartTime,
 			shouldErr:          false,
 			shouldVerify:       true,
@@ -46,7 +46,7 @@ func TestNewExportTx(t *testing.T) {
 		{
 			description:        "P->C export",
 			destinationChainID: cChainID,
-			sourceKeys:         []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.ApricotPhase5Time,
 			shouldErr:          false,
 			shouldVerify:       true,

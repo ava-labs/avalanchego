@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 // Test user password, must meet minimum complexity/length requirements
@@ -37,11 +37,11 @@ func TestUserClosedDB(t *testing.T) {
 	_, err = GetKeychain(u, nil)
 	require.Error(err, "closed db should have caused an error")
 
-	factory := crypto.FactorySECP256K1R{}
+	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
 	require.NoError(err)
 
-	err = u.PutKeys(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.PutKeys(sk)
 	require.Error(err, "closed db should have caused an error")
 }
 
@@ -57,15 +57,15 @@ func TestUser(t *testing.T) {
 	require.NoError(err)
 	require.Empty(addresses, "new user shouldn't have address")
 
-	factory := crypto.FactorySECP256K1R{}
+	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
 	require.NoError(err)
 
-	err = u.PutKeys(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.PutKeys(sk)
 	require.NoError(err)
 
 	// Putting the same key multiple times should be a noop
-	err = u.PutKeys(sk.(*crypto.PrivateKeySECP256K1R))
+	err = u.PutKeys(sk)
 	require.NoError(err)
 
 	addr := sk.PublicKey().Address()

@@ -1,13 +1,13 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package crypto
+package secp256k1
 
 import (
 	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
-func BuildTestKeys() []*PrivateKeySECP256K1R {
+func TestKeys() []*PrivateKey {
 	var (
 		keyStrings = []string{
 			"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
@@ -16,8 +16,8 @@ func BuildTestKeys() []*PrivateKeySECP256K1R {
 			"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 			"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 		}
-		keys    = make([]*PrivateKeySECP256K1R, len(keyStrings))
-		factory = FactorySECP256K1R{}
+		keys    = make([]*PrivateKey, len(keyStrings))
+		factory = Factory{}
 	)
 
 	for i, key := range keyStrings {
@@ -26,12 +26,10 @@ func BuildTestKeys() []*PrivateKeySECP256K1R {
 			panic(err)
 		}
 
-		pk, err := factory.ToPrivateKey(privKeyBytes)
+		keys[i], err = factory.ToPrivateKey(privKeyBytes)
 		if err != nil {
 			panic(err)
 		}
-
-		keys[i] = pk.(*PrivateKeySECP256K1R)
 	}
 	return keys
 }

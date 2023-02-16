@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -58,7 +58,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,7 +169,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -251,7 +251,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -303,7 +303,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 		Creds: []*fxs.FxCredential{
 			{
 				Verifiable: &secp256k1fx.Credential{
-					Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+					Sigs: [][secp256k1.SignatureLen]byte{{}},
 				},
 			},
 		},
@@ -354,7 +354,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -400,7 +400,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -451,7 +451,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			}},
 		},
 	}}
-	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -495,7 +495,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -546,7 +546,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 			}},
 		},
 	}}
-	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -591,7 +591,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		},
 	}}
 
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -688,7 +688,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			}},
 		},
 	}}
-	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -836,7 +836,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			}},
 		},
 	}}
-	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := pendingTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -885,7 +885,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		},
 		Creds: []*fxs.FxCredential{{
 			Verifiable: &secp256k1fx.Credential{
-				Sigs: [][crypto.SECP256K1RSigLen]byte{{}},
+				Sigs: [][secp256k1.SignatureLen]byte{{}},
 			},
 		}},
 	}
@@ -1006,7 +1006,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1060,7 +1060,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		}},
 	}}
 
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1123,7 +1123,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 			},
 		}},
 	}}
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1188,7 +1188,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		}},
 	}}
 
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1268,7 +1268,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 			},
 		}},
 	}}
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{
 		{
 			keys[0],
 		},
@@ -1397,7 +1397,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 			},
 		}},
 	}}
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1461,7 +1461,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 			},
 		}},
 	}}
-	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[1]}}); err != nil {
+	if err := rawTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[1]}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1558,7 +1558,7 @@ func TestExportTxSemanticVerifyTransferCustomAsset(t *testing.T) {
 
 	err := rawTx.SignSECP256K1Fx(
 		vm.parser.Codec(),
-		[][]*crypto.PrivateKeySECP256K1R{
+		[][]*secp256k1.PrivateKey{
 			{keys[0]},
 			{keys[0]},
 		},
