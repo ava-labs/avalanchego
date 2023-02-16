@@ -51,6 +51,8 @@ var (
 	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
 	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", SECP256K1RSKLen)
 	errInvalidPublicKeyLength  = fmt.Errorf("public key has unexpected length, expected %d", SECP256K1RPKLen)
+	errInvalidSigLen           = errors.New("invalid signature length")
+	errMutatedSig              = errors.New("signature was mutated from its original format")
 
 	_ RecoverableFactory = (*FactorySECP256K1R)(nil)
 	_ PublicKey          = (*PublicKeySECP256K1R)(nil)
