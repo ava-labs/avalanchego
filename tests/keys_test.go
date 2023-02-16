@@ -6,8 +6,9 @@ package tests
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 func TestLoadTestKeys(t *testing.T) {
