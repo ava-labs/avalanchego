@@ -1441,10 +1441,6 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	// when we reset txPool we should explicitly check if fee struct for min base fee has changed
 	// so that we can correctly drop txs with < minBaseFee from tx pool.
-	// TODO: this should be checking IsSubnetEVM since we also support minimumFee for SubnetEVM
-	// without requiring FeeConfigManager is enabled.
-	// This is already being set by SetMinFee when gas price updater starts.
-	// However tests are currently failing if we change this check to IsSubnetEVM.
 	if pool.chainconfig.IsFeeConfigManager(new(big.Int).SetUint64(newHead.Time)) {
 		feeConfig, _, err := pool.chain.GetFeeConfigAt(newHead)
 		if err != nil {
