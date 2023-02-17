@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -734,14 +734,14 @@ func (vm *VM) Spend(
 ) (
 	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64, len(amounts))
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amount := amounts[assetID]
@@ -801,13 +801,13 @@ func (vm *VM) SpendNFT(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -873,14 +873,14 @@ func (vm *VM) SpendAll(
 ) (
 	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64)
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amountSpent := amountsSpent[assetID]
@@ -923,13 +923,13 @@ func (vm *VM) Mint(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -997,13 +997,13 @@ func (vm *VM) MintNFT(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration

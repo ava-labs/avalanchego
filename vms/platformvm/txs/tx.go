@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -38,7 +38,7 @@ type Tx struct {
 func NewSigned(
 	unsigned UnsignedTx,
 	c codec.Manager,
-	signers [][]*crypto.PrivateKeySECP256K1R,
+	signers [][]*secp256k1.PrivateKey,
 ) (*Tx, error) {
 	res := &Tx{Unsigned: unsigned}
 	return res, res.Sign(c, signers)
@@ -124,7 +124,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Sign this transaction with the provided signers
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
-func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
@@ -134,7 +134,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 	hash := hashing.ComputeHash256(unsignedBytes)
 	for _, keys := range signers {
 		cred := &secp256k1fx.Credential{
-			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+			Sigs: make([][secp256k1.SignatureLen]byte, len(keys)),
 		}
 		for i, key := range keys {
 			sig, err := key.SignHash(hash) // Sign hash

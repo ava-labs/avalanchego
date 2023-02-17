@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -321,7 +321,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			outs: []*avax.TransferableOutput{},
 			creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][crypto.SECP256K1RSigLen]byte{
+					Sigs: [][secp256k1.SignatureLen]byte{
 						{},
 					},
 				},

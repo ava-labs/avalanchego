@@ -9,7 +9,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -21,15 +21,15 @@ import (
 
 const (
 	VMRQKeyStr          = "vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE"
-	VMRQKeyFormattedStr = crypto.PrivateKeyPrefix + VMRQKeyStr
+	VMRQKeyFormattedStr = secp256k1.PrivateKeyPrefix + VMRQKeyStr
 
 	EWOQKeyStr          = "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	EWOQKeyFormattedStr = crypto.PrivateKeyPrefix + EWOQKeyStr
+	EWOQKeyFormattedStr = secp256k1.PrivateKeyPrefix + EWOQKeyStr
 )
 
 var (
-	VMRQKey *crypto.PrivateKeySECP256K1R
-	EWOQKey *crypto.PrivateKeySECP256K1R
+	VMRQKey *secp256k1.PrivateKey
+	EWOQKey *secp256k1.PrivateKey
 
 	//go:embed genesis_local.json
 	localGenesisConfigJSON []byte
@@ -72,16 +72,13 @@ func init() {
 	ewoqBytes, err := cb58.Decode(EWOQKeyStr)
 	errs.Add(err)
 
-	factory := crypto.FactorySECP256K1R{}
-	vmrqIntf, err := factory.ToPrivateKey(vmrqBytes)
+	factory := secp256k1.Factory{}
+	VMRQKey, err = factory.ToPrivateKey(vmrqBytes)
 	errs.Add(err)
-	ewoqIntf, err := factory.ToPrivateKey(ewoqBytes)
+	EWOQKey, err = factory.ToPrivateKey(ewoqBytes)
 	errs.Add(err)
 
 	if errs.Err != nil {
 		panic(errs.Err)
 	}
-
-	VMRQKey = vmrqIntf.(*crypto.PrivateKeySECP256K1R)
-	EWOQKey = ewoqIntf.(*crypto.PrivateKeySECP256K1R)
 }

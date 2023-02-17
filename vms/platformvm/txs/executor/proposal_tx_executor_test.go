@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -40,7 +40,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			newValidatorID,                  // node ID
 			rewardAddress,                   // Reward Address
 			reward.PercentDenominator,       // Shares
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
 		require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			newValidatorID,                  // node ID
 			rewardAddress,                   // Reward Address
 			reward.PercentDenominator,       // Shared
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		endTime       uint64
 		nodeID        ids.NodeID
 		rewardAddress ids.ShortID
-		feeKeys       []*crypto.PrivateKeySECP256K1R
+		feeKeys       []*secp256k1.PrivateKey
 		setup         func(*environment)
 		AP3Time       time.Time
 		shouldErr     bool
@@ -111,7 +111,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -123,7 +123,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime * 2).Unix()),
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -135,7 +135,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -147,7 +147,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -159,7 +159,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -171,7 +171,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -183,31 +183,31 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     false,
 			description:   "valid",
 		},
 		{
-			stakeAmount:   dummyH.config.MinDelegatorStake,                  // weight
-			startTime:     uint64(currentTimestamp.Unix()),                  // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),            // end time
-			nodeID:        nodeID,                                           // node ID
-			rewardAddress: rewardAddress,                                    // Reward Address
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]}, // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
+			startTime:     uint64(currentTimestamp.Unix()),           // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
+			nodeID:        nodeID,                                    // node ID
+			rewardAddress: rewardAddress,                             // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
 			description:   "starts validating at current timestamp",
 		},
 		{
-			stakeAmount:   dummyH.config.MinDelegatorStake,                  // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()),          // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),            // end time
-			nodeID:        nodeID,                                           // node ID
-			rewardAddress: rewardAddress,                                    // Reward Address
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[1]}, // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
+			startTime:     uint64(defaultValidateStartTime.Unix()),   // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
+			nodeID:        nodeID,                                    // node ID
+			rewardAddress: rewardAddress,                             // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]}, // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
@@ -232,7 +232,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultValidateEndTime,
 			shouldErr:     false,
@@ -244,7 +244,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			endTime:       newValidatorEndTime,   // same end time as for primary network
 			nodeID:        newValidatorID,
 			rewardAddress: rewardAddress,
-			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultGenesisTime,
 			shouldErr:     true,
@@ -318,7 +318,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultValidateEndTime.Unix())+1,
 			ids.NodeID(nodeID),
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -350,7 +350,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultValidateEndTime.Unix()),
 			ids.NodeID(nodeID),
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -387,7 +387,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		pendingDSValidatorID,         // node ID
 		nodeID,                       // reward address
 		reward.PercentDenominator,    // shares
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -400,7 +400,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -446,7 +446,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -476,7 +476,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -506,7 +506,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(dsEndTime.Unix()),   // same end time as for primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -539,7 +539,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -571,7 +571,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),   // end time
 		ids.NodeID(nodeID),                      // node ID
 		testSubnet1.ID(),                        // subnet ID
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -597,7 +597,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultValidateEndTime.Unix()),   // end time
 			ids.NodeID(nodeID),                      // node ID
 			testSubnet1.ID(),                        // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -631,7 +631,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -660,7 +660,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -696,7 +696,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], preFundedKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -731,7 +731,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
-			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -785,7 +785,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -815,7 +815,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -845,7 +845,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -876,7 +876,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
@@ -920,7 +920,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
-			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
