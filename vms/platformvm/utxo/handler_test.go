@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -41,11 +40,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	h := &handler{
 		ctx: snow.DefaultContextTest(),
 		clk: &mockable.Clock{},
-		utxosReader: avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		),
-		fx: fx,
+		fx:  fx,
 	}
 
 	// The handler time during a test, unless [chainTimestamp] is set

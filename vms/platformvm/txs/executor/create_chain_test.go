@@ -201,7 +201,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 
 			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
