@@ -67,7 +67,6 @@ func testSetup(
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,

@@ -687,7 +687,6 @@ func (m *manager) createAvalancheChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
@@ -956,7 +955,6 @@ func (m *manager) createSnowmanChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,

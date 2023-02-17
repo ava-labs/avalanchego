@@ -1802,7 +1802,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
-		Validators:                     beacons,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Len(),
 		StartupTracker:                 startup,

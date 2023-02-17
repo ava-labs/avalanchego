@@ -44,7 +44,6 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 
 	commonConfig := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
