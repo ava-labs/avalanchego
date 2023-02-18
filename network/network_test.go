@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -337,10 +338,59 @@ func TestSend(t *testing.T) {
 
 	toSend := set.Set[ids.NodeID]{}
 	toSend.Add(nodeIDs[1])
-	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
+	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
 	require.EqualValues(toSend, sentTo)
 
 	inboundGetMsg := <-received
+	require.Equal(message.GetOp, inboundGetMsg.Op())
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestSendAndGossipWithFilter(t *testing.T) {
+	require := require.New(t)
+
+	received := make(chan message.InboundMessage)
+	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+		t,
+		[]router.InboundHandler{
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+				t.Fatal("unexpected message received")
+			}),
+			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+				received <- msg
+			}),
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+				t.Fatal("unexpected message received")
+			}),
+		},
+	)
+
+	net0 := networks[0]
+
+	mc := newMessageCreator(t)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	require.NoError(err)
+
+	toSend := set.NewSet[ids.NodeID](3)
+	validNodeID := nodeIDs[1]
+	toSend.Add(nodeIDs...)
+	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
+	require.Len(sentTo, 1)
+	require.Contains(sentTo, validNodeID)
+
+	inboundGetMsg := <-received
+	require.Equal(message.GetOp, inboundGetMsg.Op())
+
+	// Test Gossip now
+	sentTo = net0.Gossip(outboundGetMsg, constants.PrimaryNetworkID, 0, 0, len(nodeIDs), newNodeIDConnector(validNodeID))
+	require.Len(sentTo, 1)
+	require.Contains(sentTo, validNodeID)
+
+	inboundGetMsg = <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	for _, net := range networks {

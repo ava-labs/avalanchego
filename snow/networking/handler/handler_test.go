@@ -54,7 +54,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -138,7 +138,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -220,7 +220,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		1,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -292,7 +292,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -363,7 +363,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		connector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 

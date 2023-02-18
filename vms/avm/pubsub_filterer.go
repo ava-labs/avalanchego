@@ -10,18 +10,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ pubsub.Filterer = (*filterer)(nil)
+var _ pubsub.Filterer = (*connector)(nil)
 
-type filterer struct {
+type connector struct {
 	tx *txs.Tx
 }
 
 func NewPubSubFilterer(tx *txs.Tx) pubsub.Filterer {
-	return &filterer{tx: tx}
+	return &connector{tx: tx}
 }
 
 // Apply the filter on the addresses.
-func (f *filterer) Filter(filters []pubsub.Filter) ([]bool, interface{}) {
+func (f *connector) Filter(filters []pubsub.Filter) ([]bool, interface{}) {
 	resp := make([]bool, len(filters))
 	for _, utxo := range f.tx.UTXOs() {
 		addressable, ok := utxo.Out.(avax.Addressable)

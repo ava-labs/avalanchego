@@ -103,7 +103,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(defaultSubnetConfig),
+		subnets.New(ctx.NodeID, defaultSubnetConfig),
 	)
 	require.NoError(err)
 
@@ -122,7 +122,7 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -288,13 +288,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Send messages to disconnected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		return nil
 	}
 	sendAll()
 
 	// Send messages to connected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		return nodeIDs
 	}
 	sendAll()
@@ -364,7 +364,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(defaultSubnetConfig),
+		subnets.New(ctx.NodeID, defaultSubnetConfig),
 	)
 	require.NoError(t, err)
 
@@ -383,7 +383,7 @@ func TestReliableMessages(t *testing.T) {
 		1,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -493,7 +493,15 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, p2p.EngineType_ENGINE_TYPE_SNOWMAN, subnets.New(defaultSubnetConfig))
+	sender, err := New(
+		ctx,
+		mc,
+		externalSender,
+		&chainRouter,
+		tm,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		subnets.New(ctx.NodeID, defaultSubnetConfig),
+	)
 	require.NoError(t, err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
@@ -511,7 +519,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(subnets.Config{}),
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -634,7 +642,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
@@ -681,7 +689,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
@@ -725,7 +733,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
@@ -770,7 +778,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
@@ -809,7 +817,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(defaultSubnetConfig),
+				subnets.New(ctx.NodeID, defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -908,7 +916,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -938,7 +946,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -970,7 +978,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -1002,7 +1010,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -1032,7 +1040,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(defaultSubnetConfig),
+				subnets.New(ctx.NodeID, defaultSubnetConfig),
 			)
 			require.NoError(err)
 
@@ -1130,7 +1138,7 @@ func TestSender_Single_Request(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID,
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -1169,7 +1177,7 @@ func TestSender_Single_Request(t *testing.T) {
 					gomock.Any(), // Outbound message
 					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID,
-					snowCtx.ValidatorOnly.Get(),
+					gomock.Any(),
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
@@ -1199,7 +1207,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(defaultSubnetConfig),
+				subnets.New(ctx.NodeID, defaultSubnetConfig),
 			)
 			require.NoError(err)
 

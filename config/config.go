@@ -1073,11 +1073,16 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			subnetConfig, err := parseSubnetConfigs(rawSubnetConfigBytes, getDefaultSubnetConfig(v))
-			if err != nil {
+			config := getDefaultSubnetConfig(v)
+			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
-			res[subnetID] = subnetConfig
+
+			if err := config.Valid(); err != nil {
+				return nil, err
+			}
+
+			res[subnetID] = config
 		}
 	}
 	return res, nil
@@ -1115,25 +1120,20 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		if err != nil {
 			return nil, err
 		}
-		config, err := parseSubnetConfigs(file, getDefaultSubnetConfig(v))
-		if err != nil {
+
+		config := getDefaultSubnetConfig(v)
+		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, err
 		}
+
+		if err := config.Valid(); err != nil {
+			return nil, err
+		}
+
 		subnetConfigs[subnetID] = config
 	}
 
 	return subnetConfigs, nil
-}
-
-func parseSubnetConfigs(data []byte, defaultSubnetConfig subnets.Config) (subnets.Config, error) {
-	if err := json.Unmarshal(data, &defaultSubnetConfig); err != nil {
-		return subnets.Config{}, err
-	}
-
-	if err := defaultSubnetConfig.ConsensusParameters.Valid(); err != nil {
-		return subnets.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
-	}
-	return defaultSubnetConfig, nil
 }
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
@@ -1356,7 +1356,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	primaryNetworkConfig := getDefaultSubnetConfig(v)
-	if err := primaryNetworkConfig.ConsensusParameters.Valid(); err != nil {
+	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
 	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig

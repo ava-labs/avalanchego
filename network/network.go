@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -305,8 +306,8 @@ func NewNetwork(
 	return n, nil
 }
 
-func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, validatorOnly bool) set.Set[ids.NodeID] {
-	peers := n.getPeers(nodeIDs, subnetID, validatorOnly)
+func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID] {
+	peers := n.getPeers(nodeIDs, subnetID, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
 		msg.Op(),
 		nodeIDs.Len()-len(peers),
@@ -317,12 +318,12 @@ func (n *network) Send(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID],
 func (n *network) Gossip(
 	msg message.OutboundMessage,
 	subnetID ids.ID,
-	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
 	numPeersToSend int,
+	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
-	peers := n.samplePeers(subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
+	peers := n.samplePeers(subnetID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend, allower)
 	return n.send(msg, peers)
 }
 
@@ -839,7 +840,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
-	validatorOnly bool,
+	allower subnets.Allower,
 ) []peer.Peer {
 	peers := make([]peer.Peer, 0, nodeIDs.Len())
 
@@ -857,7 +858,9 @@ func (n *network) getPeers(
 			continue
 		}
 
-		if validatorOnly && !validators.Contains(n.config.Validators, subnetID, nodeID) {
+		isValidator := validators.Contains(n.config.Validators, subnetID, nodeID)
+		// check if the peer is allowed to connect to the subnet
+		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
 		}
 
@@ -869,15 +872,21 @@ func (n *network) getPeers(
 
 func (n *network) samplePeers(
 	subnetID ids.ID,
-	validatorOnly bool,
 	numValidatorsToSample,
 	numNonValidatorsToSample int,
 	numPeersToSample int,
+	allower subnets.Allower,
 ) []peer.Peer {
-	if validatorOnly {
-		numValidatorsToSample += numNonValidatorsToSample + numPeersToSample
-		numNonValidatorsToSample = 0
-		numPeersToSample = 0
+	subnetValidators, ok := n.config.Validators.Get(subnetID)
+	if !ok {
+		return nil
+	}
+
+	// If there are fewer validators than [numValidatorsToSample], then only
+	// sample [numValidatorsToSample] validators.
+	subnetValidatorsLen := subnetValidators.Len()
+	if subnetValidatorsLen < numValidatorsToSample {
+		numValidatorsToSample = subnetValidatorsLen
 	}
 
 	n.peersLock.RLock()
@@ -892,12 +901,19 @@ func (n *network) samplePeers(
 				return false
 			}
 
+			peerID := p.ID()
+			isValidator := subnetValidators.Contains(peerID)
+			// check if the peer is allowed to connect to the subnet
+			if !allower.IsAllowed(peerID, isValidator) {
+				return false
+			}
+
 			if numPeersToSample > 0 {
 				numPeersToSample--
 				return true
 			}
 
-			if validators.Contains(n.config.Validators, subnetID, p.ID()) {
+			if isValidator {
 				numValidatorsToSample--
 				return numValidatorsToSample >= 0
 			}
@@ -1392,10 +1408,10 @@ func (n *network) runTimers() {
 func (n *network) gossipPeerLists() {
 	peers := n.samplePeers(
 		constants.PrimaryNetworkID,
-		false,
 		int(n.config.PeerListValidatorGossipSize),
 		int(n.config.PeerListNonValidatorGossipSize),
 		int(n.config.PeerListPeersGossipSize),
+		subnets.NoOpAllower,
 	)
 
 	for _, p := range peers {

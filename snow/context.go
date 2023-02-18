@@ -83,9 +83,6 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
-
-	// Indicates this chain is available to only validators.
-	ValidatorOnly utils.Atomic[bool]
 }
 
 func DefaultContextTest() *Context {

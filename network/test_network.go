@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -35,7 +36,8 @@ import (
 var (
 	errClosed = errors.New("closed")
 
-	_ net.Listener = (*noopListener)(nil)
+	_ net.Listener    = (*noopListener)(nil)
+	_ subnets.Allower = (*nodeIDConnector)(nil)
 )
 
 type noopListener struct {
@@ -245,4 +247,16 @@ func NewTestNetwork(
 		),
 		router,
 	)
+}
+
+type nodeIDConnector struct {
+	nodeID ids.NodeID
+}
+
+func newNodeIDConnector(nodeID ids.NodeID) *nodeIDConnector {
+	return &nodeIDConnector{nodeID: nodeID}
+}
+
+func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID, _ bool) bool {
+	return nodeID == f.nodeID
 }
