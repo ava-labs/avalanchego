@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -35,6 +36,14 @@ func (t *BaseTx) SetBytes(bytes []byte) {
 
 func (t *BaseTx) Bytes() []byte {
 	return t.bytes
+}
+
+func (t *BaseTx) InputIDs() set.Set[ids.ID] {
+	inputIDs := set.NewSet[ids.ID](len(t.Ins))
+	for _, in := range t.Ins {
+		inputIDs.Add(in.InputID())
+	}
+	return inputIDs
 }
 
 func (t *BaseTx) SyntacticVerify(
