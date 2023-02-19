@@ -10,8 +10,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -19,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -39,7 +38,7 @@ var (
 	time2 = time.Unix(2, 0)
 )
 
-func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "batchedParseBlockCachingTestKey"
 
 	// create mock
@@ -77,19 +76,16 @@ func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (pl
 		)
 	}
 
-	return New(vm), ctrl
+	return vm, ctrl
 }
 
 func TestBatchedParseBlockCaching(t *testing.T) {
 	require := require.New(t)
 	testKey := batchedParseBlockCachingTestKey
 
-	mockedPlugin, ctrl := batchedParseBlockCachingTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	ctx := snow.DefaultContextTest()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)

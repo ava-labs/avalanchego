@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 
-	"google.golang.org/grpc"
-
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -52,15 +50,13 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	serverAddr := serverListener.Addr().String()
+
+	server := grpcutils.NewServer()
+	closer.Add(server)
+	responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
 
 	// Start responsewriter gRPC service.
-	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpcutils.NewDefaultServer(opts)
-		closer.Add(server)
-		responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
-		return server
-	})
+	go grpcutils.Serve(serverListener, server)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -70,7 +66,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	req := &httppb.HTTPRequest{
 		ResponseWriter: &httppb.ResponseWriter{
-			ServerAddr: serverAddr,
+			ServerAddr: serverListener.Addr().String(),
 			Header:     make([]*httppb.Element, 0, len(r.Header)),
 		},
 		Request: &httppb.Request{

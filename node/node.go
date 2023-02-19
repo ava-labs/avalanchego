@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -79,6 +77,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
@@ -178,6 +177,9 @@ type Node struct {
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
+
+	// Manages shutdown of a VM process
+	runtimeManager runtime.Manager
 
 	resourceManager resource.Manager
 
@@ -804,6 +806,9 @@ func (n *Node) initVMs() error {
 		return errs.Err
 	}
 
+	// initialize vm runtime manager
+	n.runtimeManager = runtime.NewManager()
+
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
@@ -811,6 +816,7 @@ func (n *Node) initVMs() error {
 			Manager:         n.Config.VMManager,
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
+			RuntimeTracker:  n.runtimeManager,
 		}),
 		VMRegisterer: vmRegisterer,
 	})
@@ -1398,9 +1404,9 @@ func (n *Node) shutdown() {
 		)
 	}
 
-	// Make sure all plugin subprocesses are killed
-	n.Log.Info("cleaning up plugin subprocesses")
-	plugin.CleanupClients()
+	// Ensure all runtimes are shutdown
+	n.Log.Info("cleaning up plugin runtimes")
+	n.runtimeManager.Stop(context.TODO())
 
 	if n.DBManager != nil {
 		if err := n.DBManager.Close(); err != nil {

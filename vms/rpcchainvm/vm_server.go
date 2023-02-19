@@ -16,7 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
@@ -155,7 +154,11 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 			return nil, err
 		}
 
-		clientConn, err := grpcutils.Dial(vDBReq.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
+		clientConn, err := grpcutils.Dial(
+			vDBReq.ServerAddr,
+			grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
+			grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
+		)
 		if err != nil {
 			// Ignore closing errors to return the original error
 			_ = vm.connCloser.Close()
@@ -176,7 +179,11 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 	vm.dbManager = dbManager
 
-	clientConn, err := grpcutils.Dial(req.ServerAddr, grpcutils.DialOptsWithMetrics(grpcClientMetrics)...)
+	clientConn, err := grpcutils.Dial(
+		req.ServerAddr,
+		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
+		grpcutils.WithChainStreamInterceptor(grpcClientMetrics.StreamClientInterceptor()),
+	)
 	if err != nil {
 		// Ignore closing errors to return the original error
 		_ = vm.connCloser.Close()
@@ -328,20 +335,17 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 		if err != nil {
 			return nil, err
 		}
-		serverAddr := serverListener.Addr().String()
+		server := grpcutils.NewServer()
+		vm.serverCloser.Add(server)
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 
-		// Start the gRPC server which serves the HTTP service
-		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			server := grpcutils.NewDefaultServer(opts)
-			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
-			return server
-		})
+		// Start HTTP service
+		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverAddr,
+			ServerAddr:  serverListener.Addr().String(),
 		})
 	}
 	return resp, nil
@@ -360,20 +364,17 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 		if err != nil {
 			return nil, err
 		}
-		serverAddr := serverListener.Addr().String()
+		server := grpcutils.NewServer()
+		vm.serverCloser.Add(server)
+		httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 
-		// Start the gRPC server which serves the HTTP service
-		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			server := grpcutils.NewDefaultServer(opts)
-			vm.serverCloser.Add(server)
-			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
-			return server
-		})
+		// Start HTTP service
+		go grpcutils.Serve(serverListener, server)
 
 		resp.Handlers = append(resp.Handlers, &vmpb.Handler{
 			Prefix:      prefix,
 			LockOptions: uint32(handler.LockOptions),
-			ServerAddr:  serverAddr,
+			ServerAddr:  serverListener.Addr().String(),
 		})
 	}
 	return resp, nil

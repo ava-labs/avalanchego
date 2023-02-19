@@ -10,9 +10,9 @@ package validators
 import (
 	reflect "reflect"
 
-	set "github.com/ava-labs/avalanchego/utils/set"
 	ids "github.com/ava-labs/avalanchego/ids"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	gomock "github.com/golang/mock/gomock"
 )
 

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package vm.runtime;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/vm/manager";
+
+// Manages the lifecycle of a subnet VM process.
+service Runtime {
+  // Initialize a VM Runtime.
+  rpc Initialize(InitializeRequest) returns (google.protobuf.Empty);
+}
+
+message InitializeRequest {
+  // ProtocolVersion is used to identify incompatibilities with AvalancheGo and a VM.
+  uint32 protocol_version = 1;
+  // Address of the gRPC server endpoint serving the handshake logic.
+  // Example: 127.0.0.1:50001
+  string addr = 2;
+}

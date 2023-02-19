@@ -12,7 +12,7 @@ import (
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
-func Test_convertWriteResponse(t *testing.T) {
+func TestConvertWriteResponse(t *testing.T) {
 	require := require.New(t)
 
 	scenerios := map[string]struct {

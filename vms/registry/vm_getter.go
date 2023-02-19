@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 )
 
 var (
@@ -38,6 +39,7 @@ type VMGetterConfig struct {
 	Manager         vms.Manager
 	PluginDirectory string
 	CPUTracker      resource.ProcessTracker
+	RuntimeTracker  runtime.Tracker
 }
 
 type vmGetter struct {
@@ -100,6 +102,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 		unregisteredVMs[vmID] = rpcchainvm.NewFactory(
 			filepath.Join(getter.config.PluginDirectory, file.Name()),
 			getter.config.CPUTracker,
+			getter.config.RuntimeTracker,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil
