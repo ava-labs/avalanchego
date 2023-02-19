@@ -45,7 +45,10 @@ type Handler interface {
 	health.Checker
 
 	Context() *snow.ConsensusContext
-	IsValidator(nodeID ids.NodeID) bool
+	// ShouldHandle returns true if the node with the given ID is allowed to send
+	// messages to this chain. If the node is not allowed to send messages to
+	// this chain, the message should be dropped.
+	ShouldHandle(nodeID ids.NodeID) bool
 
 	SetStateSyncer(engine common.StateSyncer)
 	StateSyncer() common.StateSyncer
@@ -106,6 +109,8 @@ type handler struct {
 	closed chan struct{}
 
 	subnetConnector validators.SubnetConnector
+
+	subnetAllower subnets.Allower
 }
 
 // Initialize this consensus handler
@@ -131,6 +136,7 @@ func New(
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
 		subnetConnector:  subnetConnector,
+		subnetAllower:    subnet,
 	}
 
 	var err error
@@ -155,10 +161,8 @@ func (h *handler) Context() *snow.ConsensusContext {
 	return h.ctx
 }
 
-func (h *handler) IsValidator(nodeID ids.NodeID) bool {
-	return !h.ctx.ValidatorOnly.Get() ||
-		nodeID == h.ctx.NodeID ||
-		h.validators.Contains(nodeID)
+func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
+	return h.subnetAllower.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
 func (h *handler) SetStateSyncer(engine common.StateSyncer) {

@@ -75,6 +75,7 @@ type Spender interface {
 	//                   the staking period
 	// - [signers] the proof of ownership of the funds being moved
 	Spend(
+		utxoReader avax.UTXOReader,
 		keys []*secp256k1.PrivateKey,
 		amount uint64,
 		fee uint64,
@@ -149,25 +150,23 @@ type Handler interface {
 func NewHandler(
 	ctx *snow.Context,
 	clk *mockable.Clock,
-	utxoReader avax.UTXOReader,
 	fx fx.Fx,
 ) Handler {
 	return &handler{
-		ctx:         ctx,
-		clk:         clk,
-		utxosReader: utxoReader,
-		fx:          fx,
+		ctx: ctx,
+		clk: clk,
+		fx:  fx,
 	}
 }
 
 type handler struct {
-	ctx         *snow.Context
-	clk         *mockable.Clock
-	utxosReader avax.UTXOReader
-	fx          fx.Fx
+	ctx *snow.Context
+	clk *mockable.Clock
+	fx  fx.Fx
 }
 
 func (h *handler) Spend(
+	utxoReader avax.UTXOReader,
 	keys []*secp256k1.PrivateKey,
 	amount uint64,
 	fee uint64,
@@ -183,7 +182,7 @@ func (h *handler) Spend(
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, err := avax.GetAllUTXOs(h.utxosReader, addrs) // The UTXOs controlled by [keys]
+	utxos, err := avax.GetAllUTXOs(utxoReader, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

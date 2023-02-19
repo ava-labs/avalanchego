@@ -42,6 +42,14 @@ func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	return utxos
 }
 
+func (t *ImportTx) InputIDs() set.Set[ids.ID] {
+	inputs := t.BaseTx.InputIDs()
+	for _, in := range t.ImportedIns {
+		inputs.Add(in.InputID())
+	}
+	return inputs
+}
+
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *ImportTx) ConsumedAssetIDs() set.Set[ids.ID] {
 	assets := t.BaseTx.AssetIDs()

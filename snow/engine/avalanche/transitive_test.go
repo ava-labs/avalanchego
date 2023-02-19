@@ -2710,7 +2710,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -2987,7 +2986,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -3152,7 +3150,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 

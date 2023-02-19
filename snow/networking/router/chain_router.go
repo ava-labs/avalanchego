@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	errUnknownChain = errors.New("received message for unknown chain")
+	errUnknownChain  = errors.New("received message for unknown chain")
+	errUnallowedNode = errors.New("received message from non-allowed node")
 
 	_ Router              = (*ChainRouter)(nil)
 	_ benchlist.Benchable = (*ChainRouter)(nil)
@@ -242,12 +243,23 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	// Get the chain, if it exists
 	chain, exists := cr.chainHandlers[destinationChainID]
-	if !exists || !chain.IsValidator(nodeID) {
+	if !exists {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
+		)
+		msg.OnFinishedHandling()
+		return
+	}
+
+	if !chain.ShouldHandle(nodeID) {
+		cr.log.Debug("dropping message",
+			zap.Stringer("messageOp", op),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", destinationChainID),
+			zap.Error(errUnallowedNode),
 		)
 		msg.OnFinishedHandling()
 		return

@@ -272,7 +272,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 			// default to primary subnet config
 			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
 		}
-		sb = subnets.New(sbConfig)
+		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
 	}
 	addedChain := sb.AddChain(chainParams.ID)
@@ -458,10 +458,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
 		Registerer:        consensusMetrics,
-	}
-
-	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		ctx.ValidatorOnly.Set(subnetConfig.ValidatorOnly)
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -687,7 +683,6 @@ func (m *manager) createAvalancheChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
@@ -961,7 +956,6 @@ func (m *manager) createSnowmanChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
@@ -1117,7 +1111,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	}
 
 	m.subnetsLock.Lock()
-	sb := subnets.New(sbConfig)
+	sb := subnets.New(m.NodeID, sbConfig)
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)
 	m.subnetsLock.Unlock()

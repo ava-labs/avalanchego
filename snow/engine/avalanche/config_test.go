@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func DefaultConfig() (common.Config, bootstrap.Config, Config) {
@@ -34,7 +35,7 @@ func DefaultConfig() (common.Config, bootstrap.Config, Config) {
 		VM:         bootstrapConfig.VM,
 		Manager:    bootstrapConfig.Manager,
 		Sender:     bootstrapConfig.Sender,
-		Validators: bootstrapConfig.Validators,
+		Validators: validators.NewSet(),
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
 				K:                       1,

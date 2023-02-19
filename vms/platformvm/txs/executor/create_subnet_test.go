@@ -55,7 +55,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				require.NoError(shutdownEnvironment(env))
 			}()
 
-			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
 			require.NoError(err)
 
 			// Create the tx

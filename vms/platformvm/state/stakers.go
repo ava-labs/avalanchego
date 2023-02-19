@@ -128,7 +128,7 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validator.validator = staker
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorAdded = true
+	validatorDiff.validatorStatus = added
 	validatorDiff.validator = staker
 
 	v.stakers.ReplaceOrInsert(staker)
@@ -140,7 +140,7 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorDeleted = true
+	validatorDiff.validatorStatus = deleted
 	validatorDiff.validator = staker
 
 	v.stakers.Delete(staker)
@@ -233,7 +233,9 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{}
+		validatorDiff = &diffValidator{
+			validatorStatus: unmodified,
+		}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff
@@ -247,11 +249,12 @@ type diffStakers struct {
 }
 
 type diffValidator struct {
-	// Invariant: [validatorAdded] and [validatorDeleted] will not be set at the
-	// same time.
-	validatorAdded   bool
-	validatorDeleted bool
-	validator        *Staker
+	// validatorStatus describes whether a validator has been added or removed.
+	//
+	// validatorStatus is not affected by delegators ops so unmodified does not
+	// mean that diffValidator hasn't change, since delegators may have changed.
+	validatorStatus diffValidatorStatus
+	validator       *Staker
 
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
@@ -259,38 +262,27 @@ type diffValidator struct {
 
 // GetValidator attempts to fetch the validator with the given subnetID and
 // nodeID.
-//
-// Returns:
-//  1. If the validator was added in this diff, [staker, true] will be returned.
-//  2. If the validator was removed in this diff, [nil, true] will be returned.
-//  3. If the validator was not modified by this diff, [nil, false] will be
-//     returned.
-//
 // Invariant: Assumes that the validator will never be removed and then added.
-func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
+func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, diffValidatorStatus) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {
-		return nil, false
+		return nil, unmodified
 	}
 
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		return nil, false
+		return nil, unmodified
 	}
 
-	switch {
-	case validatorDiff.validatorAdded:
-		return validatorDiff.validator, true
-	case validatorDiff.validatorDeleted:
-		return nil, true
-	default:
-		return nil, false
+	if validatorDiff.validatorStatus == added {
+		return validatorDiff.validator, added
 	}
+	return nil, validatorDiff.validatorStatus
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorAdded = true
+	validatorDiff.validatorStatus = added
 	validatorDiff.validator = staker
 
 	if s.addedStakers == nil {
@@ -301,12 +293,14 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.validatorAdded {
-		validatorDiff.validatorAdded = false
+	if validatorDiff.validatorStatus == added {
+		// This validator was added and immediately removed in this diff. We
+		// treat it as if it was never added.
+		validatorDiff.validatorStatus = unmodified
 		s.addedStakers.Delete(validatorDiff.validator)
 		validatorDiff.validator = nil
 	} else {
-		validatorDiff.validatorDeleted = true
+		validatorDiff.validatorStatus = deleted
 		validatorDiff.validator = staker
 		if s.deletedStakers == nil {
 			s.deletedStakers = make(map[ids.ID]*Staker)
@@ -387,7 +381,9 @@ func (s *diffStakers) getOrCreateDiff(subnetID ids.ID, nodeID ids.NodeID) *diffV
 	}
 	validatorDiff, ok := subnetValidatorDiffs[nodeID]
 	if !ok {
-		validatorDiff = &diffValidator{}
+		validatorDiff = &diffValidator{
+			validatorStatus: unmodified,
+		}
 		subnetValidatorDiffs[nodeID] = validatorDiff
 	}
 	return validatorDiff

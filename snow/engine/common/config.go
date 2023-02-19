@@ -14,9 +14,8 @@ import (
 // Config wraps the common configurations that are needed by a Snow consensus
 // engine
 type Config struct {
-	Ctx        *snow.ConsensusContext
-	Validators validators.Set
-	Beacons    validators.Set
+	Ctx     *snow.ConsensusContext
+	Beacons validators.Set
 
 	SampleK          int
 	Alpha            uint64

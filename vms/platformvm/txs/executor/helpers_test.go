@@ -130,7 +130,7 @@ func newEnvironment(postBanff bool) *environment {
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
+	utxoHandler := utxo.NewHandler(ctx, &clk, fx)
 
 	txBuilder := builder.New(
 		ctx,

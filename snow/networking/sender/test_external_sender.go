@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -23,8 +24,8 @@ type ExternalSenderTest struct {
 
 	CantSend, CantGossip bool
 
-	SendF   func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, validatorOnly bool) set.Set[ids.NodeID]
-	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int) set.Set[ids.NodeID]
+	SendF   func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
+	GossipF func(msg message.OutboundMessage, subnetID ids.ID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int, allower subnets.Allower) set.Set[ids.NodeID]
 }
 
 // Default set the default callable value to [cant]
@@ -37,10 +38,10 @@ func (s *ExternalSenderTest) Send(
 	msg message.OutboundMessage,
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
-	validatorOnly bool,
+	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
 	if s.SendF != nil {
-		return s.SendF(msg, nodeIDs, subnetID, validatorOnly)
+		return s.SendF(msg, nodeIDs, subnetID, allower)
 	}
 	if s.CantSend {
 		if s.TB != nil {
@@ -57,13 +58,13 @@ func (s *ExternalSenderTest) Send(
 func (s *ExternalSenderTest) Gossip(
 	msg message.OutboundMessage,
 	subnetID ids.ID,
-	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
 	numPeersToSend int,
+	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
 	if s.GossipF != nil {
-		return s.GossipF(msg, subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
+		return s.GossipF(msg, subnetID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend, allower)
 	}
 	if s.CantGossip {
 		if s.TB != nil {

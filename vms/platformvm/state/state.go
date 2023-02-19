@@ -1591,10 +1591,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			nodeID := nodeID
 
 			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorDeleted,
+				Decrease: validatorDiff.validatorStatus == deleted,
 			}
-			switch {
-			case validatorDiff.validatorAdded:
+			switch validatorDiff.validatorStatus {
+			case added:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
 
@@ -1618,7 +1618,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
-			case validatorDiff.validatorDeleted:
+			case deleted:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
 
@@ -1678,7 +1678,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if weightDiff.Decrease {
 				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
-				if validatorDiff.validatorAdded {
+				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
 					err = validators.Add(
 						s.cfg.Validators,
@@ -1776,13 +1776,13 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	if validatorDiff.validatorAdded {
+	switch validatorDiff.validatorStatus {
+	case added:
 		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
-	}
-	if validatorDiff.validatorDeleted {
+	case deleted:
 		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)

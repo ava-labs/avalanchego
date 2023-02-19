@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func DefaultConfigs() Config {
@@ -15,7 +16,7 @@ func DefaultConfigs() Config {
 	return Config{
 		Ctx:        commonCfg.Ctx,
 		Sender:     commonCfg.Sender,
-		Validators: commonCfg.Validators,
+		Validators: validators.NewSet(),
 		VM:         &block.TestVM{},
 		Params: snowball.Parameters{
 			K:                       1,

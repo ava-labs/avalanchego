@@ -281,6 +281,12 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		if p.Err != nil {
 			return p.Err
 		}
+		if numElts == 0 {
+			// Returning here prevents execution of the (expensive) reflect
+			// calls below which check if the slice is []byte and, if it is,
+			// the call of value.Bytes()
+			return nil
+		}
 		// If this is a slice of bytes, manually pack the bytes rather
 		// than calling marshal on each byte. This improves performance.
 		if elemKind := value.Type().Elem().Kind(); elemKind == reflect.Uint8 {

@@ -99,20 +99,6 @@ func (mr *MockHandlerMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockHandler)(nil).HealthCheck), arg0)
 }
 
-// IsValidator mocks base method.
-func (m *MockHandler) IsValidator(arg0 ids.NodeID) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsValidator", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsValidator indicates an expected call of IsValidator.
-func (mr *MockHandlerMockRecorder) IsValidator(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsValidator", reflect.TypeOf((*MockHandler)(nil).IsValidator), arg0)
-}
-
 // Len mocks base method.
 func (m *MockHandler) Len() int {
 	m.ctrl.T.Helper()
@@ -197,6 +183,20 @@ func (m *MockHandler) SetStateSyncer(arg0 common.StateSyncer) {
 func (mr *MockHandlerMockRecorder) SetStateSyncer(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStateSyncer", reflect.TypeOf((*MockHandler)(nil).SetStateSyncer), arg0)
+}
+
+// ShouldHandle mocks base method.
+func (m *MockHandler) ShouldHandle(arg0 ids.NodeID) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldHandle", arg0)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ShouldHandle indicates an expected call of ShouldHandle.
+func (mr *MockHandlerMockRecorder) ShouldHandle(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldHandle", reflect.TypeOf((*MockHandler)(nil).ShouldHandle), arg0)
 }
 
 // Start mocks base method.

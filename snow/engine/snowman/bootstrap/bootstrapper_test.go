@@ -75,7 +75,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
@@ -125,7 +124,6 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	commonCfg := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        sampleK,
 		Alpha:                          alpha,
