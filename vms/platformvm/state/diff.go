@@ -105,20 +105,20 @@ func (d *diff) SetCurrentSupply(subnetID ids.ID, currentSupply uint64) {
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
-	newValidator, ok := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
-	if ok {
-		if newValidator == nil {
-			return nil, database.ErrNotFound
-		}
+	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
+	switch status {
+	case added:
 		return newValidator, nil
+	case deleted:
+		return nil, database.ErrNotFound
+	default:
+		// If the validator wasn't modified in this diff, ask the parent state.
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		return parentState.GetCurrentValidator(subnetID, nodeID)
 	}
-
-	// If the validator wasn't modified in this diff, ask the parent state.
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetCurrentValidator(subnetID, nodeID)
 }
 
 func (d *diff) PutCurrentValidator(staker *Staker) {
@@ -168,20 +168,20 @@ func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
-	newValidator, ok := d.pendingStakerDiffs.GetValidator(subnetID, nodeID)
-	if ok {
-		if newValidator == nil {
-			return nil, database.ErrNotFound
-		}
+	newValidator, status := d.pendingStakerDiffs.GetValidator(subnetID, nodeID)
+	switch status {
+	case added:
 		return newValidator, nil
+	case deleted:
+		return nil, database.ErrNotFound
+	default:
+		// If the validator wasn't modified in this diff, ask the parent state.
+		parentState, ok := d.stateVersions.GetState(d.parentID)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		}
+		return parentState.GetPendingValidator(subnetID, nodeID)
 	}
-
-	// If the validator wasn't modified in this diff, ask the parent state.
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-	return parentState.GetPendingValidator(subnetID, nodeID)
 }
 
 func (d *diff) PutPendingValidator(staker *Staker) {
@@ -437,10 +437,10 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorAdded {
+			switch validatorDiff.validatorStatus {
+			case added:
 				baseState.PutCurrentValidator(validatorDiff.validator)
-			}
-			if validatorDiff.validatorDeleted {
+			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
 
@@ -457,10 +457,10 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnetValidatorDiffs := range d.pendingStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorAdded {
+			switch validatorDiff.validatorStatus {
+			case added:
 				baseState.PutPendingValidator(validatorDiff.validator)
-			}
-			if validatorDiff.validatorDeleted {
+			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
 			}
 
