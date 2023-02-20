@@ -26,7 +26,7 @@ var (
 // RewardsImportTx is an unsigned rewardsImportTx
 type RewardsImportTx struct {
 	// Metadata, imported inputs and resulting output
-	BaseTx
+	BaseTx `serialize:"true"`
 }
 
 func (tx *RewardsImportTx) SyntacticVerify(ctx *snow.Context) error {
