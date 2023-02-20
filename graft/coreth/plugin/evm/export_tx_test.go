@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -54,7 +54,7 @@ func createExportTxOptions(t *testing.T, vm *VM, issuer chan engCommon.Message, 
 	}
 
 	// Import the funds
-	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func createExportTxOptions(t *testing.T, vm *VM, issuer chan engCommon.Message, 
 	// Use the funds to create 3 conflicting export transactions sending the funds to each of the test addresses
 	exportTxs := make([]*Tx, 0, 3)
 	for _, addr := range testShortIDAddrs {
-		exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, uint64(5000000), vm.ctx.XChainID, addr, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+		exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, uint64(5000000), vm.ctx.XChainID, addr, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -366,7 +366,7 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -523,7 +523,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	tests := []struct {
 		name      string
 		tx        *Tx
-		signers   [][]*crypto.PrivateKeySECP256K1R
+		signers   [][]*secp256k1.PrivateKey
 		baseFee   *big.Int
 		rules     params.Rules
 		shouldErr bool
@@ -531,7 +531,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "valid",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -547,7 +547,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = constants.PlatformChainID
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
 			baseFee:   initialBaseFee,
@@ -561,7 +561,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = constants.PlatformChainID
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
 			baseFee:   initialBaseFee,
@@ -575,7 +575,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = ids.GenerateTestID()
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
 			baseFee:   initialBaseFee,
@@ -589,7 +589,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = constants.PlatformChainID
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -605,7 +605,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = constants.PlatformChainID
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -621,7 +621,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.DestinationChain = ids.GenerateTestID()
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -637,7 +637,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.ExportedOutputs = nil
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -653,7 +653,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.NetworkID++
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -669,7 +669,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.BlockchainID = ids.GenerateTestID()
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -686,7 +686,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.Ins[2].Amount = 0
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -711,7 +711,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				}}
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -752,7 +752,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.ExportedOutputs = exportOutputs
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -769,7 +769,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				validExportTx.Ins[2] = validExportTx.Ins[1]
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -796,7 +796,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				}
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -823,7 +823,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				}
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -835,7 +835,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "too many signatures",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
@@ -848,7 +848,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "too few signatures",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 			},
@@ -859,7 +859,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "too many signatures on credential",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{key, testKeys[1]},
 				{key},
 				{key},
@@ -871,7 +871,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "too few signatures on credential",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{},
 				{key},
 				{key},
@@ -883,7 +883,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name: "wrong signature on credential",
 			tx:   &Tx{UnsignedAtomicTx: validExportTx},
-			signers: [][]*crypto.PrivateKeySECP256K1R{
+			signers: [][]*secp256k1.PrivateKey{
 				{testKeys[1]},
 				{key},
 				{key},
@@ -895,7 +895,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		{
 			name:      "no signatures",
 			tx:        &Tx{UnsignedAtomicTx: validExportTx},
-			signers:   [][]*crypto.PrivateKeySECP256K1R{},
+			signers:   [][]*secp256k1.PrivateKey{},
 			baseFee:   initialBaseFee,
 			rules:     apricotRulesPhase3,
 			shouldErr: true,
@@ -986,7 +986,7 @@ func TestExportTxAccept(t *testing.T) {
 
 	tx := &Tx{UnsignedAtomicTx: exportTx}
 
-	signers := [][]*crypto.PrivateKeySECP256K1R{
+	signers := [][]*secp256k1.PrivateKey{
 		{key},
 		{key},
 		{key},
@@ -1120,7 +1120,7 @@ func TestExportTxVerify(t *testing.T) {
 	avax.SortTransferableOutputs(exportTx.ExportedOutputs, Codec)
 	// Pass in a list of signers here with the appropriate length
 	// to avoid causing a nil-pointer error in the helper method
-	emptySigners := make([][]*crypto.PrivateKeySECP256K1R, 2)
+	emptySigners := make([][]*secp256k1.PrivateKey, 2)
 	SortEVMInputsAndSigners(exportTx.Ins, emptySigners)
 
 	ctx := NewContext()
@@ -1374,7 +1374,7 @@ func TestExportTxGasCost(t *testing.T) {
 
 	tests := map[string]struct {
 		UnsignedExportTx *UnsignedExportTx
-		Keys             [][]*crypto.PrivateKeySECP256K1R
+		Keys             [][]*secp256k1.PrivateKey
 
 		BaseFee         *big.Int
 		ExpectedGasUsed uint64
@@ -1408,7 +1408,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     1,
 			BaseFee:         big.NewInt(1),
@@ -1440,7 +1440,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 11230,
 			ExpectedFee:     1,
 			BaseFee:         big.NewInt(1),
@@ -1473,7 +1473,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     30750,
 			BaseFee:         big.NewInt(25 * params.GWei),
@@ -1505,7 +1505,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0]}},
 			ExpectedGasUsed: 1230,
 			ExpectedFee:     276750,
 			BaseFee:         big.NewInt(225 * params.GWei),
@@ -1549,7 +1549,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0], testKeys[0], testKeys[0]}},
 			ExpectedGasUsed: 3366,
 			ExpectedFee:     84150,
 			BaseFee:         big.NewInt(25 * params.GWei),
@@ -1593,7 +1593,7 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			Keys:            [][]*secp256k1.PrivateKey{{testKeys[0], testKeys[0], testKeys[0]}},
 			ExpectedGasUsed: 3366,
 			ExpectedFee:     757350,
 			BaseFee:         big.NewInt(225 * params.GWei),
@@ -1721,7 +1721,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1752,7 +1752,7 @@ func TestNewExportTx(t *testing.T) {
 			parent = vm.LastAcceptedBlockInternal().(*Block)
 			exportAmount := uint64(5000000)
 
-			tx, err = vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err = vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1911,7 +1911,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1948,7 +1948,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tx, err = vm.newExportTx(tid, exportAmount, vm.ctx.XChainID, exportId, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err = vm.newExportTx(tid, exportAmount, vm.ctx.XChainID, exportId, initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
