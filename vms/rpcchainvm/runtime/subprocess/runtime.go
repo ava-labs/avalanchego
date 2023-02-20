@@ -80,7 +80,6 @@ func Bootstrap(
 			cmd.Env = append(cmd.Env, env)
 		}
 	}
-	cmd.Stdin = os.Stdin
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
