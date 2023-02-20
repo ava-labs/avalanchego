@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -73,6 +74,12 @@ func Bootstrap(
 
 	serverAddr := listener.Addr()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", runtime.EngineAddressKey, serverAddr.String()))
+	// pass golang debug env to subprocess
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "GRPC_") || strings.HasPrefix(env, "GODEBUG") {
+			cmd.Env = append(cmd.Env, env)
+		}
+	}
 	cmd.Stdin = os.Stdin
 
 	stdoutPipe, err := cmd.StdoutPipe()
