@@ -4,7 +4,6 @@
 package subprocess
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -16,15 +15,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
-
-const bufSize = 64 * units.KiB
 
 type Config struct {
 	// Stderr of the VM process written to this writer.
@@ -98,7 +94,7 @@ func Bootstrap(
 
 	// start stdout collector
 	go func() {
-		err := ioCollector(log, stdoutPipe, config.Stdout)
+		_, err := io.Copy(config.Stdout, stdoutPipe)
 		if err != nil {
 			log.Error("stdout collector failed",
 				zap.Error(err),
@@ -111,7 +107,7 @@ func Bootstrap(
 
 	// start stderr collector
 	go func() {
-		err := ioCollector(log, stderrPipe, config.Stderr)
+		_, err := io.Copy(config.Stderr, stderrPipe)
 		if err != nil {
 			log.Error("stderr collector failed",
 				zap.Error(err),
@@ -147,31 +143,4 @@ func Bootstrap(
 		Addr: intitializer.vmAddr,
 	}
 	return status, stopper, nil
-}
-
-// Collects output from piped IO of a subnet VM and writes to the coresponding
-// writer.
-func ioCollector(logger logging.Logger, reader io.ReadCloser, writer io.Writer) error {
-	bufReader := bufio.NewReaderSize(reader, bufSize)
-	for {
-		logLine, _, err := bufReader.ReadLine()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("failed to read pipe: %w", err)
-		}
-
-		if _, err = writer.Write(logLine); err != nil {
-			logger.Error("collector failed to write",
-				zap.Error(err),
-			)
-			continue
-		}
-		if _, err = writer.Write([]byte{'\n'}); err != nil {
-			logger.Error("collector failed to write",
-				zap.Error(err),
-			)
-		}
-	}
 }
