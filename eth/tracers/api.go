@@ -742,7 +742,7 @@ func (api *FileTracerAPI) standardTraceBlockToFile(ctx context.Context, block *t
 	// in order to obtain the state.
 	// Therefore, it's perfectly valid to specify `"futureForkBlock": 0`, to enable `futureFork`
 	if config != nil && config.Overrides != nil {
-		chainConfig, canon = params.OverrideConfig(chainConfig, config.Overrides)
+		chainConfig, canon = overrideConfig(chainConfig, config.Overrides)
 	}
 	for i, tx := range block.Transactions() {
 		// Prepare the transaction for un-traced execution
@@ -966,4 +966,53 @@ func APIs(backend Backend) []rpc.API {
 			Name:      "debug-file-tracer",
 		},
 	}
+}
+
+// overrideConfig returns a copy of [original] with network upgrades enabled by [override] enabled,
+// along with a boolean that indicates whether the copy is canonical (equivalent to the original).
+func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) (*params.ChainConfig, bool) {
+	copy := new(params.ChainConfig)
+	*copy = *original
+	canon := true
+
+	// Apply network upgrades (after Berlin) to the copy.
+	// Note in coreth, ApricotPhase2 is the "equivalent" to Berlin.
+	if timestamp := override.ApricotPhase2BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase2BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase3BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase3BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase4BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase4BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase5BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase5BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhasePre6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhasePre6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhase6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhase6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.ApricotPhasePost6BlockTimestamp; timestamp != nil {
+		copy.ApricotPhasePost6BlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.BanffBlockTimestamp; timestamp != nil {
+		copy.BanffBlockTimestamp = timestamp
+		canon = false
+	}
+	if timestamp := override.CortinaBlockTimestamp; timestamp != nil {
+		copy.CortinaBlockTimestamp = timestamp
+		canon = false
+	}
+
+	return copy, canon
 }
