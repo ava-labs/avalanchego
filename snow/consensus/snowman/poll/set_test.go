@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -55,12 +56,12 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	require.True(t, added)
@@ -71,7 +72,7 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
@@ -108,12 +109,12 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	require.True(t, added)
@@ -124,7 +125,7 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
@@ -161,17 +162,17 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
 	require.True(t, added)
@@ -184,7 +185,7 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vtx2 := ids.ID{2}
 	vtx3 := ids.ID{3}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
@@ -227,7 +228,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -272,7 +273,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -310,13 +311,13 @@ func TestSetString(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag: (Size = 1)
-            ID[NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
+            NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
         received Bag: (Size = 0)`
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")

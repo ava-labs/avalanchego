@@ -1,22 +1,22 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ids
+package bag
 
 import (
-	"crypto/rand"
+	"math/rand"
 	"testing"
 )
 
+func init() {
+	rand.Seed(1337) // for determinism
+}
+
 func BenchmarkBagListSmall(b *testing.B) {
 	smallLen := 5
-	bag := Bag{}
+	bag := Bag[int]{}
 	for i := 0; i < smallLen; i++ {
-		var id ID
-		if _, err := rand.Read(id[:]); err != nil {
-			b.Fatal(err)
-		}
-		bag.Add(id)
+		bag.Add(rand.Int()) // #nosec G404
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -26,13 +26,9 @@ func BenchmarkBagListSmall(b *testing.B) {
 
 func BenchmarkBagListMedium(b *testing.B) {
 	mediumLen := 25
-	bag := Bag{}
+	bag := Bag[int]{}
 	for i := 0; i < mediumLen; i++ {
-		var id ID
-		if _, err := rand.Read(id[:]); err != nil {
-			b.Fatal(err)
-		}
-		bag.Add(id)
+		bag.Add(rand.Int()) // #nosec G404
 	}
 	b.ResetTimer()
 
@@ -43,13 +39,9 @@ func BenchmarkBagListMedium(b *testing.B) {
 
 func BenchmarkBagListLarge(b *testing.B) {
 	largeLen := 100000
-	bag := Bag{}
+	bag := Bag[int]{}
 	for i := 0; i < largeLen; i++ {
-		var id ID
-		if _, err := rand.Read(id[:]); err != nil {
-			b.Fatal(err)
-		}
-		bag.Add(id)
+		bag.Add(rand.Int()) // #nosec G404
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

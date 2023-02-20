@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -56,7 +57,7 @@ type Consensus interface {
 	// Collects the results of a network poll. Assumes all transactions
 	// have been previously added. Returns true if any statuses or preferences
 	// changed. Returns if a critical error has occurred.
-	RecordPoll(context.Context, ids.Bag) (bool, error)
+	RecordPoll(context.Context, bag.Bag[ids.ID]) (bool, error)
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such

@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -614,7 +615,7 @@ func (t *Transitive) issueRepoll(ctx context.Context) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{} // IDs of validators to be sampled
+	vdrBag := bag.Bag[ids.NodeID]{} // IDs of validators to be sampled
 	vdrBag.Add(vdrIDs...)
 
 	vdrList := vdrBag.List()

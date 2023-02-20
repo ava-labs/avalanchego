@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 func TestNoEarlyTermResults(t *testing.T) {
@@ -15,7 +16,7 @@ func TestNoEarlyTermResults(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(vdr1)
 
 	factory := NewNoEarlyTermFactory()
@@ -43,7 +44,7 @@ func TestNoEarlyTermString(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -55,9 +56,9 @@ func TestNoEarlyTermString(t *testing.T) {
 	poll.Vote(vdr1, votes)
 
 	expected := `waiting on Bag: (Size = 1)
-    ID[NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp]: Count = 1
+    NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received UniqueBag: (Size = 1)
-    ID[SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg]: Members = 0000000000000002`
+    SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 0000000000000002`
 	if result := poll.String(); expected != result {
 		t.Fatalf("Poll should have returned %s but returned %s", expected, result)
 	}
@@ -70,7 +71,7 @@ func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,

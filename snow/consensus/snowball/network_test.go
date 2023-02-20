@@ -7,6 +7,7 @@ import (
 	"math/rand"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -75,7 +76,7 @@ func (n *Network) Round() {
 			count = n.params.K
 		}
 		indices, _ := s.Sample(count)
-		sampledColors := ids.Bag{}
+		sampledColors := bag.Bag[ids.ID]{}
 		for _, index := range indices {
 			peer := n.nodes[int(index)]
 			sampledColors.Add(peer.Preference())

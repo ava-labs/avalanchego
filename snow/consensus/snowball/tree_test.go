@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -28,12 +29,12 @@ func TestSnowballSingleton(t *testing.T) {
 
 	require.False(tree.Finalized())
 
-	oneRed := ids.Bag{}
+	oneRed := bag.Bag[ids.ID]{}
 	oneRed.Add(Red)
 	require.True(tree.RecordPoll(oneRed))
 	require.False(tree.Finalized())
 
-	empty := ids.Bag{}
+	empty := bag.Bag[ids.ID]{}
 	require.False(tree.RecordPoll(empty))
 	require.False(tree.Finalized())
 
@@ -50,7 +51,7 @@ func TestSnowballSingleton(t *testing.T) {
 
 	// Because the tree is already finalized, RecordPoll can return either true
 	// or false.
-	oneBlue := ids.Bag{}
+	oneBlue := bag.Bag[ids.ID]{}
 	oneBlue.Add(Blue)
 	tree.RecordPoll(oneBlue)
 	require.Equal(Red, tree.Preference())
@@ -68,7 +69,7 @@ func TestSnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	require.False(tree.Finalized())
 
-	oneRed := ids.Bag{}
+	oneRed := bag.Bag[ids.ID]{}
 	oneRed.Add(Red)
 	require.True(tree.RecordPoll(oneRed))
 
@@ -98,13 +99,13 @@ func TestSnowballBinary(t *testing.T) {
 	require.Equal(Red, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneBlue := ids.Bag{}
+	oneBlue := bag.Bag[ids.ID]{}
 	oneBlue.Add(Blue)
 	require.True(tree.RecordPoll(oneBlue))
 	require.Equal(Blue, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneRed := ids.Bag{}
+	oneRed := bag.Bag[ids.ID]{}
 	oneRed.Add(Red)
 	require.True(tree.RecordPoll(oneRed))
 	require.Equal(Blue, tree.Preference())
@@ -146,7 +147,7 @@ func TestSnowballLastBinary(t *testing.T) {
 	require.Equal(zero, tree.Preference())
 	require.False(tree.Finalized())
 
-	oneBag := ids.Bag{}
+	oneBag := bag.Bag[ids.ID]{}
 	oneBag.Add(one)
 	require.True(tree.RecordPoll(oneBag))
 	require.Equal(one, tree.Preference())
@@ -192,7 +193,7 @@ func TestSnowballAddPreviouslyRejected(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	zeroBag := ids.Bag{}
+	zeroBag := bag.Bag[ids.ID]{}
 	zeroBag.Add(zero)
 	require.True(tree.RecordPoll(zeroBag))
 
@@ -243,7 +244,7 @@ func TestSnowballNewUnary(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	oneBag := ids.Bag{}
+	oneBag := bag.Bag[ids.ID]{}
 	oneBag.Add(one)
 	require.True(tree.RecordPoll(oneBag))
 
@@ -296,7 +297,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	zeroBag := ids.Bag{}
+	zeroBag := bag.Bag[ids.ID]{}
 	zeroBag.Add(zero)
 	require.True(tree.RecordPoll(zeroBag))
 
@@ -313,7 +314,7 @@ func TestSnowballTransitiveReset(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	emptyBag := ids.Bag{}
+	emptyBag := bag.Bag[ids.ID]{}
 	require.False(tree.RecordPoll(emptyBag))
 
 	{
@@ -374,13 +375,13 @@ func TestSnowballTrinary(t *testing.T) {
 	require.Equal(Green, tree.Preference())
 	require.False(tree.Finalized())
 
-	redBag := ids.Bag{}
+	redBag := bag.Bag[ids.ID]{}
 	redBag.Add(Red)
 	require.True(tree.RecordPoll(redBag))
 	require.Equal(Red, tree.Preference())
 	require.False(tree.Finalized())
 
-	blueBag := ids.Bag{}
+	blueBag := bag.Bag[ids.ID]{}
 	blueBag.Add(Blue)
 	require.True(tree.RecordPoll(blueBag))
 	require.Equal(Red, tree.Preference())
@@ -388,7 +389,7 @@ func TestSnowballTrinary(t *testing.T) {
 
 	// Here is a case where voting for a color makes a different color become
 	// the preferred color. This is intended behavior.
-	greenBag := ids.Bag{}
+	greenBag := bag.Bag[ids.ID]{}
 	greenBag.Add(Green)
 	require.True(tree.RecordPoll(greenBag))
 	require.Equal(Blue, tree.Preference())
@@ -428,20 +429,20 @@ func TestSnowballCloseTrinary(t *testing.T) {
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
-	yellowBag := ids.Bag{}
+	yellowBag := bag.Bag[ids.ID]{}
 	yellowBag.Add(yellow)
 	require.True(tree.RecordPoll(yellowBag))
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
-	magentaBag := ids.Bag{}
+	magentaBag := bag.Bag[ids.ID]{}
 	magentaBag.Add(magenta)
 	require.True(tree.RecordPoll(magentaBag))
 	require.Equal(yellow, tree.Preference())
 	require.False(tree.Finalized())
 
 	// Cyan has already been rejected here, so these are not successful polls.
-	cyanBag := ids.Bag{}
+	cyanBag := bag.Bag[ids.ID]{}
 	cyanBag.Add(cyan)
 	require.False(tree.RecordPoll(cyanBag))
 	require.Equal(yellow, tree.Preference())
@@ -471,7 +472,7 @@ func TestSnowballAddRejected(t *testing.T) {
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0010Bag := ids.Bag{}
+	c0010Bag := bag.Bag[ids.ID]{}
 	c0010Bag.Add(c0010)
 	require.True(tree.RecordPoll(c0010Bag))
 
@@ -518,7 +519,7 @@ func TestSnowballResetChild(t *testing.T) {
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0000Bag := ids.Bag{}
+	c0000Bag := bag.Bag[ids.ID]{}
 	c0000Bag.Add(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
@@ -533,7 +534,7 @@ func TestSnowballResetChild(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	emptyBag := ids.Bag{}
+	emptyBag := bag.Bag[ids.ID]{}
 	require.False(tree.RecordPoll(emptyBag))
 
 	{
@@ -579,7 +580,7 @@ func TestSnowballResetSibling(t *testing.T) {
 	require.Equal(c0000, tree.Preference())
 	require.False(tree.Finalized())
 
-	c0100Bag := ids.Bag{}
+	c0100Bag := bag.Bag[ids.ID]{}
 	c0100Bag.Add(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 
@@ -594,7 +595,7 @@ func TestSnowballResetSibling(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c1000Bag := ids.Bag{}
+	c1000Bag := bag.Bag[ids.ID]{}
 	c1000Bag.Add(c1000)
 	require.True(tree.RecordPoll(c1000Bag))
 
@@ -715,7 +716,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0000Bag := ids.Bag{}
+	c0000Bag := bag.Bag[ids.ID]{}
 	c0000Bag.Add(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
@@ -732,7 +733,7 @@ func TestSnowballFineGrained(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0010Bag := ids.Bag{}
+	c0010Bag := bag.Bag[ids.ID]{}
 	c0010Bag.Add(c0010)
 	require.True(tree.RecordPoll(c0010Bag))
 
@@ -839,7 +840,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0000Bag := ids.Bag{}
+	c0000Bag := bag.Bag[ids.ID]{}
 	c0000Bag.Add(c0000)
 	require.True(tree.RecordPoll(c0000Bag))
 
@@ -867,7 +868,7 @@ func TestSnowballFilterBinaryChildren(t *testing.T) {
 		require.False(tree.Finalized())
 	}
 
-	c0100Bag := ids.Bag{}
+	c0100Bag := bag.Bag[ids.ID]{}
 	c0100Bag.Add(c0100)
 	require.True(tree.RecordPoll(c0100Bag))
 

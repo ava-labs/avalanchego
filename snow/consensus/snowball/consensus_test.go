@@ -5,6 +5,7 @@ package snowball
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 var (
@@ -31,7 +32,7 @@ func (b *Byzantine) Preference() ids.ID {
 	return b.preference
 }
 
-func (*Byzantine) RecordPoll(ids.Bag) bool {
+func (*Byzantine) RecordPoll(bag.Bag[ids.ID]) bool {
 	return false
 }
 
