@@ -41,10 +41,10 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 ### Coreth
 
-- Enable state sync by default when syncing from an empty database
-- Increase block gas limit to 15M for Cortina Network Upgrade
-- Add back file tracer endpoint
-- Add back JS tracer
+- Enabled state sync by default when syncing from an empty database
+- Increased block gas limit to 15M for `Cortina` Network Upgrade
+- Added back file tracer endpoint
+- Added back JS tracer
 
 ### Miscellaneous
 
