@@ -8,10 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // ParseLocalAddress takes in an address for this chain and produces the ID
@@ -52,11 +52,11 @@ func ParseEthAddress(addrStr string) (common.Address, error) {
 }
 
 // GetEthAddress returns the ethereum address derived from [privKey]
-func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))
+func GetEthAddress(privKey *secp256k1.PrivateKey) common.Address {
+	return PublicKeyToEthAddress(privKey.PublicKey())
 }
 
 // PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey *crypto.PublicKeySECP256K1R) common.Address {
-	return ethcrypto.PubkeyToAddress(*(pubKey.ToECDSA()))
+func PublicKeyToEthAddress(pubKey *secp256k1.PublicKey) common.Address {
+	return crypto.PubkeyToAddress(*(pubKey.ToECDSA()))
 }

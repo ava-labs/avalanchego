@@ -5,11 +5,10 @@ package evm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -23,7 +22,7 @@ var (
 )
 
 type user struct {
-	secpFactory *crypto.FactorySECP256K1R
+	secpFactory *secp256k1.Factory
 	// This user's database, acquired from the keystore
 	db *encdb.Database
 }
@@ -66,7 +65,7 @@ func (u *user) controlsAddress(address common.Address) (bool, error) {
 }
 
 // putAddress persists that this user controls address controlled by [privKey]
-func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
+func (u *user) putAddress(privKey *secp256k1.PrivateKey) error {
 	if privKey == nil {
 		return errKeyNil
 	}
@@ -106,7 +105,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 }
 
 // Key returns the private key that controls the given address
-func (u *user) getKey(address common.Address) (*crypto.PrivateKeySECP256K1R, error) {
+func (u *user) getKey(address common.Address) (*secp256k1.PrivateKey, error) {
 	if u.db == nil {
 		return nil, errDBNil
 		//} else if address.IsZero() {
@@ -117,23 +116,16 @@ func (u *user) getKey(address common.Address) (*crypto.PrivateKeySECP256K1R, err
 	if err != nil {
 		return nil, err
 	}
-	sk, err := u.secpFactory.ToPrivateKey(bytes)
-	if err != nil {
-		return nil, err
-	}
-	if sk, ok := sk.(*crypto.PrivateKeySECP256K1R); ok {
-		return sk, nil
-	}
-	return nil, fmt.Errorf("expected private key to be type *crypto.PrivateKeySECP256K1R but is type %T", sk)
+	return u.secpFactory.ToPrivateKey(bytes)
 }
 
 // Return all private keys controlled by this user
-func (u *user) getKeys() ([]*crypto.PrivateKeySECP256K1R, error) {
+func (u *user) getKeys() ([]*secp256k1.PrivateKey, error) {
 	addrs, err := u.getAddresses()
 	if err != nil {
 		return nil, err
 	}
-	keys := make([]*crypto.PrivateKeySECP256K1R, len(addrs))
+	keys := make([]*secp256k1.PrivateKey, len(addrs))
 	for i, addr := range addrs {
 		key, err := u.getKey(addr)
 		if err != nil {
