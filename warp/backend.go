@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var _ WarpBackend = &warpBackend{}
@@ -22,7 +22,7 @@ var _ WarpBackend = &warpBackend{}
 // The backend is also used to query for warp message signatures by the signature request handler.
 type WarpBackend interface {
 	// AddMessage signs [unsignedMessage] and adds it to the warp backend database
-	AddMessage(ctx context.Context, unsignedMessage *teleporter.UnsignedMessage) error
+	AddMessage(ctx context.Context, unsignedMessage *avalancheWarp.UnsignedMessage) error
 
 	// GetSignature returns the signature of the requested message hash.
 	GetSignature(ctx context.Context, messageHash ids.ID) ([bls.SignatureLen]byte, error)
@@ -44,7 +44,7 @@ func NewWarpBackend(snowCtx *snow.Context, db database.Database, signatureCacheS
 	}
 }
 
-func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *teleporter.UnsignedMessage) error {
+func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *avalancheWarp.UnsignedMessage) error {
 	messageID := hashing.ComputeHash256Array(unsignedMessage.Bytes())
 
 	// In the case when a node restarts, and possibly changes its bls key, the cache gets emptied but the database does not.
@@ -55,7 +55,7 @@ func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *teleporte
 	}
 
 	var signature [bls.SignatureLen]byte
-	sig, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
+	sig, err := w.snowCtx.WarpSigner.Sign(unsignedMessage)
 	if err != nil {
 		return fmt.Errorf("failed to sign warp message: %w", err)
 	}
@@ -75,13 +75,13 @@ func (w *warpBackend) GetSignature(ctx context.Context, messageID ids.ID) ([bls.
 		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
 	}
 
-	unsignedMessage, err := teleporter.ParseUnsignedMessage(unsignedMessageBytes)
+	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(unsignedMessageBytes)
 	if err != nil {
 		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to parse unsigned message %s: %w", messageID.String(), err)
 	}
 
 	var signature [bls.SignatureLen]byte
-	sig, err := w.snowCtx.TeleporterSigner.Sign(unsignedMessage)
+	sig, err := w.snowCtx.WarpSigner.Sign(unsignedMessage)
 	if err != nil {
 		return [bls.SignatureLen]byte{}, fmt.Errorf("failed to sign warp message: %w", err)
 	}

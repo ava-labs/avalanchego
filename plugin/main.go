@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -29,5 +30,5 @@ func main() {
 		fmt.Printf("failed to set fd limit correctly due to: %s", err)
 		os.Exit(1)
 	}
-	rpcchainvm.Serve(&evm.VM{})
+	rpcchainvm.Serve(context.Background(), &evm.VM{})
 }
