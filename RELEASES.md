@@ -39,6 +39,13 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Fixed `--public-ip` and `--public-ip-resolution-service` CLI flag descriptions
 - Updated `README.md` to explicitly reference `SECURITY.md`
 
+### Coreth
+
+- Enable state sync by default when syncing from an empty database
+- Increase block gas limit to 15M for Cortina Network Upgrade
+- Add back file tracer endpoint
+- Add back JS tracer
+
 ### Miscellaneous
 
 - Added `allowedNodes` to the subnet config for `validatorOnly` subnets
