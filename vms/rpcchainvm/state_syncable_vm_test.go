@@ -6,11 +6,10 @@ package rpcchainvm
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-
-	"github.com/hashicorp/go-plugin"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
 var (
@@ -67,7 +72,7 @@ type StateSyncEnabledMock struct {
 	*mocks.MockStateSyncableVM
 }
 
-func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "stateSyncEnabledTestKey"
 
 	// create mock
@@ -86,10 +91,10 @@ func stateSyncEnabledTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plu
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "getOngoingSyncStateSummaryTestKey"
 
 	// create mock
@@ -107,10 +112,10 @@ func getOngoingSyncStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "getLastStateSummaryTestKey"
 
 	// create mock
@@ -128,10 +133,10 @@ func getLastStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "parseStateSummaryTestKey"
 
 	// create mock
@@ -150,10 +155,10 @@ func parseStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Pl
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "getStateSummaryTestKey"
 
 	// create mock
@@ -171,10 +176,10 @@ func getStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plug
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "acceptStateSummaryTestKey"
 
 	// create mock
@@ -217,10 +222,10 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "lastAcceptedBlockPostStateSummaryAcceptTestKey"
 
 	// create mock
@@ -256,47 +261,50 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 		)
 	}
 
-	return New(ssVM), ctrl
+	return ssVM, ctrl
 }
 
-func buildClientHelper(require *require.Assertions, testKey string, mockedPlugin plugin.Plugin) (*VMClient, *plugin.Client) {
+func buildClientHelper(require *require.Assertions, testKey string) (*VMClient, runtime.Stopper) {
 	process := helperProcess(testKey)
-	c := plugin.NewClient(&plugin.ClientConfig{
-		Cmd:              process,
-		HandshakeConfig:  TestHandshake,
-		Plugins:          plugin.PluginSet{testKey: mockedPlugin},
-		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-	})
 
-	_, err := c.Start()
-	require.NoErrorf(err, "failed to start plugin: %v", err)
-	require.True(c.Protocol() == plugin.ProtocolGRPC)
+	log := logging.NewLogger(
+		testKey,
+		logging.NewWrappedCore(
+			logging.Info,
+			originalStderr,
+			logging.Colors.ConsoleEncoder(),
+		),
+	)
 
-	// Get the plugin client.
-	client, err := c.Client()
-	require.NoErrorf(err, "failed to get plugin client: %v", err)
+	listener, err := grpcutils.NewListener()
+	require.NoError(err)
 
-	// Grab the vm implementation.
-	raw, err := client.Dispense(testKey)
-	require.NoErrorf(err, "failed to dispense plugin: %v", err)
+	status, stopper, err := subprocess.Bootstrap(
+		context.Background(),
+		listener,
+		process,
+		&subprocess.Config{
+			Stderr:           log,
+			Stdout:           io.Discard,
+			Log:              log,
+			HandshakeTimeout: runtime.DefaultHandshakeTimeout,
+		},
+	)
+	require.NoError(err)
 
-	// Get vm client.
-	vm, ok := raw.(*VMClient)
-	require.True(ok)
+	clientConn, err := grpcutils.Dial(status.Addr)
+	require.NoError(err)
 
-	return vm, c
+	return NewClient(vmpb.NewVMClient(clientConn)), stopper
 }
 
 func TestStateSyncEnabled(t *testing.T) {
 	require := require.New(t)
 	testKey := stateSyncEnabledTestKey
 
-	mockedPlugin, ctrl := stateSyncEnabledTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// test state sync not implemented
 	// Note that enabled == false is returned rather than
@@ -325,12 +333,9 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := getOngoingSyncStateSummaryTestKey
 
-	mockedPlugin, ctrl := getOngoingSyncStateSummaryTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetOngoingSyncStateSummary(context.Background())
@@ -353,12 +358,9 @@ func TestGetLastStateSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := getLastStateSummaryTestKey
 
-	mockedPlugin, ctrl := getLastStateSummaryTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetLastStateSummary(context.Background())
@@ -381,12 +383,9 @@ func TestParseStateSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := parseStateSummaryTestKey
 
-	mockedPlugin, ctrl := parseStateSummaryTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
@@ -413,12 +412,9 @@ func TestGetStateSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := getStateSummaryTestKey
 
-	mockedPlugin, ctrl := getStateSummaryTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
@@ -441,12 +437,9 @@ func TestAcceptStateSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := acceptStateSummaryTestKey
 
-	mockedPlugin, ctrl := acceptStateSummaryTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// retrieve the summary first
 	summary, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
@@ -474,12 +467,9 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	require := require.New(t)
 	testKey := lastAcceptedBlockPostStateSummaryAcceptTestKey
 
-	mockedPlugin, ctrl := lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snow.DefaultContextTest()

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 // Consensus represents a general snow instance that can be used directly to
@@ -32,7 +33,7 @@ type Consensus interface {
 	//
 	// If the consensus instance was previously finalized, the function may
 	// return true or false.
-	RecordPoll(votes ids.Bag) bool
+	RecordPoll(votes bag.Bag[ids.ID]) bool
 
 	// RecordUnsuccessfulPoll resets the snowflake counters of this consensus
 	// instance

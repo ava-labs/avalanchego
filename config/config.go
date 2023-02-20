@@ -86,7 +86,6 @@ var (
 func GetRunnerConfig(v *viper.Viper) runner.Config {
 	return runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
-		PluginMode:            v.GetBool(PluginModeKey),
 	}
 }
 

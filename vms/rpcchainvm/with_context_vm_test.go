@@ -10,8 +10,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -49,7 +47,7 @@ type ContextEnabledBlockMock struct {
 	*mocks.MockWithVerifyContext
 }
 
-func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugin, *gomock.Controller) {
+func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
 	// test key is "contextTestKey"
 
 	// create mock
@@ -90,19 +88,16 @@ func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (plugin.Plugi
 		)
 	}
 
-	return New(ctxVM), ctrl
+	return ctxVM, ctrl
 }
 
 func TestContextVMSummary(t *testing.T) {
 	require := require.New(t)
 	testKey := contextTestKey
 
-	mockedPlugin, ctrl := contextEnabledTestPlugin(t, false /*loadExpectations*/)
-	defer ctrl.Finish()
-
 	// Create and start the plugin
-	vm, c := buildClientHelper(require, testKey, mockedPlugin)
-	defer c.Kill()
+	vm, stopper := buildClientHelper(require, testKey)
+	defer stopper.Stop(context.Background())
 
 	ctx := snow.DefaultContextTest()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)

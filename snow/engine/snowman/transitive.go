@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -694,7 +695,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++
@@ -723,7 +724,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++

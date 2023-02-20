@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -41,7 +42,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 	if v.response == ids.Empty {
 		results = v.t.polls.Drop(v.requestID, v.vdr)
 	} else {
@@ -94,8 +95,8 @@ func (v *voter) Update(ctx context.Context) {
 // Note: bubbleVotes does not bubbleVotes to all of the ancestors in consensus,
 // just the most recent one. bubbling to the rest of the ancestors, which may
 // also be in consensus is handled in RecordPoll.
-func (v *voter) bubbleVotes(ctx context.Context, votes ids.Bag) ids.Bag {
-	bubbledVotes := ids.Bag{}
+func (v *voter) bubbleVotes(ctx context.Context, votes bag.Bag[ids.ID]) bag.Bag[ids.ID] {
+	bubbledVotes := bag.Bag[ids.ID]{}
 
 votesLoop:
 	for _, vote := range votes.List() {

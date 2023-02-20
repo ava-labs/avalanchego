@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 var (
@@ -22,15 +23,15 @@ func NewNoEarlyTermFactory() Factory {
 	return noEarlyTermFactory{}
 }
 
-func (noEarlyTermFactory) New(vdrs ids.NodeIDBag) Poll {
+func (noEarlyTermFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 	return &noEarlyTermPoll{polled: vdrs}
 }
 
 // noEarlyTermPoll finishes when all polled validators either respond to the
 // query or a timeout occurs
 type noEarlyTermPoll struct {
-	votes  ids.UniqueBag
-	polled ids.NodeIDBag
+	votes  bag.UniqueBag[ids.ID]
+	polled bag.Bag[ids.NodeID]
 }
 
 // Vote registers a response for this poll
@@ -51,7 +52,7 @@ func (p *noEarlyTermPoll) Finished() bool {
 }
 
 // Result returns the result of this poll
-func (p *noEarlyTermPoll) Result() ids.UniqueBag {
+func (p *noEarlyTermPoll) Result() bag.UniqueBag[ids.ID] {
 	return p.votes
 }
 

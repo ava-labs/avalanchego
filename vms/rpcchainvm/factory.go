@@ -4,99 +4,78 @@
 package rpcchainvm
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"io"
-	"path/filepath"
-
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
-	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
+
+	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var (
-	errWrongVM = errors.New("wrong vm type")
-
-	_ vms.Factory = (*factory)(nil)
-)
+var _ vms.Factory = (*factory)(nil)
 
 type factory struct {
 	path           string
 	processTracker resource.ProcessTracker
+	runtimeTracker runtime.Tracker
 }
 
-func NewFactory(path string, processTracker resource.ProcessTracker) vms.Factory {
+func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTracker runtime.Tracker) vms.Factory {
 	return &factory{
 		path:           path,
 		processTracker: processTracker,
+		runtimeTracker: runtimeTracker,
 	}
 }
 
 func (f *factory) New(ctx *snow.Context) (interface{}, error) {
-	config := &plugin.ClientConfig{
-		HandshakeConfig: Handshake,
-		Plugins:         PluginMap,
-		Cmd:             subprocess.New(f.path),
-		AllowedProtocols: []plugin.Protocol{
-			plugin.ProtocolGRPC,
-		},
-		// We kill this client by calling kill() when the chain running this VM
-		// shuts down. However, there are some cases where the VM's Shutdown
-		// method is not called. Namely, if:
-		// 1) The node shuts down after the client is created but before the
-		//    chain is registered with the message router.
-		// 2) The chain doesn't handle a shutdown message before the node times
-		//    out on the chain's shutdown and dies, leaving the shutdown message
-		//    unhandled.
-		// We set managed to true so that we can call plugin.CleanupClients on
-		// node shutdown to ensure every plugin subprocess is killed.
-		Managed:         true,
-		GRPCDialOptions: grpcutils.DefaultDialOptions,
+	config := &subprocess.Config{
+		HandshakeTimeout: runtime.DefaultHandshakeTimeout,
 	}
+
 	// createStaticHandlers will send a nil ctx to disable logs
 	// TODO: create a separate log file and no-op ctx
 	if ctx != nil {
 		config.Stderr = ctx.Log
-		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: ctx.Log,
-			Level:  hclog.Info,
-		})
+		config.Stdout = ctx.Log
+		config.Log = ctx.Log
 	} else {
 		config.Stderr = io.Discard
-		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: io.Discard,
-		})
-	}
-	client := plugin.NewClient(config)
-
-	pluginName := filepath.Base(f.path)
-	pluginErr := func(err error) error {
-		return fmt.Errorf("plugin: %q: %w", pluginName, err)
+		config.Stdout = io.Discard
+		config.Log = logging.NoLog{}
 	}
 
-	rpcClient, err := client.Client()
+	listener, err := grpcutils.NewListener()
 	if err != nil {
-		client.Kill()
-		return nil, pluginErr(err)
+		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
 
-	raw, err := rpcClient.Dispense("vm")
+	status, stopper, err := subprocess.Bootstrap(
+		context.TODO(),
+		listener,
+		subprocess.NewCmd(f.path),
+		config,
+	)
 	if err != nil {
-		client.Kill()
-		return nil, pluginErr(err)
+		return nil, err
 	}
 
-	vm, ok := raw.(*VMClient)
-	if !ok {
-		client.Kill()
-		return nil, pluginErr(errWrongVM)
+	clientConn, err := grpcutils.Dial(status.Addr)
+	if err != nil {
+		return nil, err
 	}
 
-	vm.SetProcess(ctx, client, f.processTracker)
+	vm := NewClient(vmpb.NewVMClient(clientConn))
+	vm.SetProcess(ctx, stopper, status.Pid, f.processTracker)
+
+	f.runtimeTracker.TrackRuntime(stopper)
+
 	return vm, nil
 }

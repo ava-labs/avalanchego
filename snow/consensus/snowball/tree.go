@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 var (
@@ -67,13 +68,16 @@ func (t *Tree) Add(choice ids.ID) {
 	}
 }
 
-func (t *Tree) RecordPoll(votes ids.Bag) bool {
+func (t *Tree) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	// Get the assumed decided prefix of the root node.
 	decidedPrefix := t.node.DecidedPrefix()
 
 	// If any of the bits differ from the preference in this prefix, the vote is
 	// for a rejected operation. So, we filter out these invalid votes.
-	filteredVotes := votes.Filter(0, decidedPrefix, t.Preference())
+	preference := t.Preference()
+	filteredVotes := votes.Filter(func(id ids.ID) bool {
+		return ids.EqualSubset(0, decidedPrefix, preference, id)
+	})
 
 	// Now that the votes have been restricted to valid votes, pass them into
 	// the first snowball instance
@@ -131,7 +135,7 @@ type node interface {
 	Add(newChoice ids.ID) node
 	// Apply the votes, reset the model if needed
 	// Returns the new node and whether the vote was successful
-	RecordPoll(votes ids.Bag, shouldReset bool) (newChild node, successful bool)
+	RecordPoll(votes bag.Bag[ids.ID], shouldReset bool) (newChild node, successful bool)
 	// Returns true if consensus has been reached on this node
 	Finalized() bool
 
@@ -400,7 +404,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	return u // Do nothing, the choice was already rejected
 }
 
-func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) (node, bool) {
+func (u *unaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 	// We are guaranteed that the votes are of IDs that have previously been
 	// added. This ensures that the provided votes all have the same bits in the
 	// range [u.decidedPrefix, u.commonPrefix) as in u.preference.
@@ -510,10 +514,12 @@ func (b *binaryNode) Add(id ids.ID) node {
 	return b
 }
 
-func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) (node, bool) {
+func (b *binaryNode) RecordPoll(votes bag.Bag[ids.ID], reset bool) (node, bool) {
 	// The list of votes we are passed is split into votes for bit 0 and votes
 	// for bit 1
-	splitVotes := votes.Split(uint(b.bit))
+	splitVotes := votes.Split(func(id ids.ID) bool {
+		return id.Bit(uint(b.bit)) == 1
+	})
 
 	bit := 0
 	// We only care about which bit is set if a successful poll can happen
@@ -542,8 +548,10 @@ func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) (node, bool) {
 	if child := b.children[bit]; child != nil {
 		// The votes are filtered to ensure that they are votes that should
 		// count for the child
-		filteredVotes := prunedVotes.Filter(
-			b.bit+1, child.DecidedPrefix(), b.preferences[bit])
+		decidedPrefix := child.DecidedPrefix()
+		filteredVotes := prunedVotes.Filter(func(id ids.ID) bool {
+			return ids.EqualSubset(b.bit+1, decidedPrefix, b.preferences[bit], id)
+		})
 
 		newChild, _ := child.RecordPoll(filteredVotes, b.shouldReset[bit])
 		if b.snowball.Finalized() {

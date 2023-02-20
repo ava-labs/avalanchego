@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -106,7 +107,7 @@ func (n *Network) Round() error {
 	s := sampler.NewUniform()
 	_ = s.Initialize(uint64(len(n.nodes)))
 	indices, _ := s.Sample(n.params.K)
-	sampledColors := ids.Bag{}
+	sampledColors := bag.Bag[ids.ID]{}
 	for _, index := range indices {
 		peer := n.nodes[int(index)]
 		sampledColors.Add(peer.Preference())

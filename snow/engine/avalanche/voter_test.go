@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -27,7 +28,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	vdr2 := ids.NodeID{2}
 	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -36,7 +37,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.NodeIDBag{}
+	vdrs = bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -118,7 +119,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	vdr2 := ids.NodeID{2}
 	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -127,7 +128,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.NodeIDBag{}
+	vdrs = bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -136,7 +137,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.NodeIDBag{}
+	vdrs = bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr2,
 		vdr3,
@@ -252,7 +253,7 @@ func TestSharedDependency(t *testing.T) {
 	vdr2 := ids.NodeID{2}
 	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -261,7 +262,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.NodeIDBag{}
+	vdrs = bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -270,7 +271,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.NodeIDBag{}
+	vdrs = bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr2,
 		vdr3,

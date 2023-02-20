@@ -5,67 +5,90 @@ package rpcchainvm
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
 
-	"github.com/hashicorp/go-plugin"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
+	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
-var (
-	// Handshake is a common handshake that is shared by plugin and host.
-	Handshake = plugin.HandshakeConfig{
-		ProtocolVersion:  version.RPCChainVMProtocol,
-		MagicCookieKey:   "VM_PLUGIN",
-		MagicCookieValue: "dynamic",
+const defaultRuntimeDialTimeout = 5 * time.Second
+
+// The address of the Runtime server is expected to be passed via ENV `runtime.EngineAddressKey`.
+// This address is used by the Runtime client to send Initialize RPC to server.
+//
+// Serve starts the RPC Chain VM server and performs a handshake with the VM runtime service.
+func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
+	shutdownHandler := make(chan os.Signal, 2)
+	signal.Notify(shutdownHandler, os.Interrupt, syscall.SIGTERM)
+
+	server := newVMServer(vm, opts...)
+
+	go func(ctx context.Context) {
+		select {
+		case <-shutdownHandler:
+			fmt.Println("runtime engine: received shutdown signal")
+		case <-ctx.Done():
+			fmt.Println("runtime engine: context has been cancelled")
+		}
+		server.GracefulStop()
+		fmt.Println("vm server: graceful termination success")
+	}(ctx)
+
+	// address of Runtime server from ENV
+	runtimeAddr := os.Getenv(runtime.EngineAddressKey)
+	if runtimeAddr == "" {
+		return fmt.Errorf("required env var missing: %q", runtime.EngineAddressKey)
 	}
 
-	// PluginMap is the map of plugins we can dispense.
-	PluginMap = map[string]plugin.Plugin{
-		"vm": &vmPlugin{},
+	clientConn, err := grpcutils.Dial(runtimeAddr)
+	if err != nil {
+		return fmt.Errorf("failed to create client conn: %w", err)
 	}
 
-	_ plugin.Plugin     = (*vmPlugin)(nil)
-	_ plugin.GRPCPlugin = (*vmPlugin)(nil)
-)
+	client := gruntime.NewClient(runtimepb.NewRuntimeClient(clientConn))
 
-type vmPlugin struct {
-	plugin.NetRPCUnsupportedPlugin
-	// Concrete implementation, written in Go. This is only used for plugins
-	// that are written in Go.
-	vm block.ChainVM
-}
+	listener, err := grpcutils.NewListener()
+	if err != nil {
+		return fmt.Errorf("failed to create new listener: %w", err)
+	}
 
-// New will be called by the server side of the plugin to pass into the server
-// side PluginMap for dispatching.
-func New(vm block.ChainVM) plugin.Plugin {
-	return &vmPlugin{vm: vm}
-}
+	ctx, cancel := context.WithTimeout(ctx, defaultRuntimeDialTimeout)
+	defer cancel()
+	err = client.Initialize(ctx, version.RPCChainVMProtocol, listener.Addr().String())
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("failed to initialize vm runtime: %w", err)
+	}
 
-// GRPCServer registers a new GRPC server.
-func (p *vmPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
-	vmpb.RegisterVMServer(s, NewServer(p.vm))
+	// start RPC Chain VM server
+	grpcutils.Serve(listener, server)
+
 	return nil
 }
 
-// GRPCClient returns a new GRPC client
-func (*vmPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
-	return NewClient(vmpb.NewVMClient(c)), nil
-}
+// Returns an RPC Chain VM server serving health and VM services.
+func newVMServer(vm block.ChainVM, opts ...grpcutils.ServerOption) *grpc.Server {
+	server := grpcutils.NewServer(opts...)
+	vmpb.RegisterVMServer(server, NewServer(vm))
 
-// Serve serves a ChainVM plugin using sane gRPC server defaults.
-func Serve(vm block.ChainVM) {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: Handshake,
-		Plugins: map[string]plugin.Plugin{
-			"vm": New(vm),
-		},
-		// ensure proper defaults
-		GRPCServer: grpcutils.NewDefaultServer,
-	})
+	health := health.NewServer()
+	health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(server, health)
+
+	return server
 }

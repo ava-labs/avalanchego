@@ -6,8 +6,6 @@ package gkeystore
 import (
 	"context"
 
-	"google.golang.org/grpc"
-
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
@@ -43,21 +41,19 @@ func (s *Server) GetDatabase(
 
 	closer := dbCloser{Database: db}
 
-	// start the db server
 	serverListener, err := grpcutils.NewListener()
 	if err != nil {
 		return nil, err
 	}
-	serverAddr := serverListener.Addr().String()
 
-	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpcutils.NewDefaultServer(opts)
-		closer.closer.Add(server)
-		db := rpcdb.NewServer(&closer)
-		rpcdbpb.RegisterDatabaseServer(server, db)
-		return server
-	})
-	return &keystorepb.GetDatabaseResponse{ServerAddr: serverAddr}, nil
+	server := grpcutils.NewServer()
+	closer.closer.Add(server)
+	rpcdbpb.RegisterDatabaseServer(server, rpcdb.NewServer(&closer))
+
+	// start the db server
+	go grpcutils.Serve(serverListener, server)
+
+	return &keystorepb.GetDatabaseResponse{ServerAddr: serverListener.Addr().String()}, nil
 }
 
 type dbCloser struct {

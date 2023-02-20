@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 
 	sets "github.com/ava-labs/avalanchego/utils/set"
 )
@@ -26,7 +27,7 @@ func NewEarlyTermNoTraversalFactory(alpha int) Factory {
 	return &earlyTermNoTraversalFactory{alpha: alpha}
 }
 
-func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
+func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 	return &earlyTermNoTraversalPoll{
 		polled: vdrs,
 		alpha:  f.alpha,
@@ -37,8 +38,8 @@ func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
 // the result of the poll. However, does not terminate tightly with this bound.
 // It terminates as quickly as it can without performing any DAG traversals.
 type earlyTermNoTraversalPoll struct {
-	votes  ids.UniqueBag
-	polled ids.NodeIDBag
+	votes  bag.UniqueBag[ids.ID]
+	polled bag.Bag[ids.NodeID]
 	alpha  int
 }
 
@@ -82,7 +83,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 }
 
 // Result returns the result of this poll
-func (p *earlyTermNoTraversalPoll) Result() ids.UniqueBag {
+func (p *earlyTermNoTraversalPoll) Result() bag.UniqueBag[ids.ID] {
 	return p.votes
 }
 

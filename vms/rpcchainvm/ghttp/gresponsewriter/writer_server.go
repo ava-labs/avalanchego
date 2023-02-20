@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn"
@@ -99,17 +98,16 @@ func (s *Server) Hijack(context.Context, *emptypb.Empty) (*responsewriterpb.Hija
 	if err != nil {
 		return nil, err
 	}
-	serverAddr := serverListener.Addr().String()
 
+	server := grpcutils.NewServer()
 	closer := grpcutils.ServerCloser{}
-	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpcutils.NewDefaultServer(opts)
-		closer.Add(server)
-		connpb.RegisterConnServer(server, gconn.NewServer(conn, &closer))
-		readerpb.RegisterReaderServer(server, greader.NewServer(readWriter))
-		writerpb.RegisterWriterServer(server, gwriter.NewServer(readWriter))
-		return server
-	})
+	closer.Add(server)
+
+	connpb.RegisterConnServer(server, gconn.NewServer(conn, &closer))
+	readerpb.RegisterReaderServer(server, greader.NewServer(readWriter))
+	writerpb.RegisterWriterServer(server, gwriter.NewServer(readWriter))
+
+	go grpcutils.Serve(serverListener, server)
 
 	local := conn.LocalAddr()
 	remote := conn.RemoteAddr()
@@ -119,6 +117,6 @@ func (s *Server) Hijack(context.Context, *emptypb.Empty) (*responsewriterpb.Hija
 		LocalString:   local.String(),
 		RemoteNetwork: remote.Network(),
 		RemoteString:  remote.String(),
-		ServerAddr:    serverAddr,
+		ServerAddr:    serverListener.Addr().String(),
 	}, nil
 }
