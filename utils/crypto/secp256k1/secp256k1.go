@@ -10,9 +10,9 @@ import (
 
 	stdecdsa "crypto/ecdsa"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v3/ecdsa"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 
-	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
