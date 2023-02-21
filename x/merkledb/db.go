@@ -1025,9 +1025,6 @@ func (db *Database) putNodeInCache(key path, n *node) {
 func (db *Database) getNodeInCache(key path) (*node, bool) {
 	// TODO Cache metrics
 	if node, ok := db.nodeCache.Get(key); ok {
-		if node == nil {
-			return nil, true
-		}
 		return node, true
 	}
 	return nil, false
