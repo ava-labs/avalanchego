@@ -1,6 +1,8 @@
 package crypto
 
-import "github.com/ava-labs/avalanchego/utils/crypto/bls"
+import (
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+)
 
 var (
 	_ BLSSigner = (*BLSKeySigner)(nil)
@@ -15,11 +17,17 @@ type BLSSigner interface {
 
 // BLSKeySigner signs ips with a BLS key.
 type BLSKeySigner struct {
-	SecretKey *bls.SecretKey
+	secretKey *bls.SecretKey
+}
+
+func NewBLSSigner(sk *bls.SecretKey) BLSSigner {
+	return BLSKeySigner{
+		secretKey: sk,
+	}
 }
 
 func (b BLSKeySigner) Sign(msg []byte) []byte {
-	return bls.SignatureToBytes(bls.Sign(b.SecretKey, msg))
+	return bls.SignatureToBytes(bls.Sign(b.secretKey, msg))
 }
 
 // NoOpBLSSigner is a signer that always returns an empty signature.

@@ -27,9 +27,7 @@ func TestBuildBlsSigned(t *testing.T) {
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-	blsSigner := crypto.BLSKeySigner{
-		SecretKey: sk,
-	}
+	blsSigner := crypto.NewBLSSigner(sk)
 
 	builtBlock, err := BuildBlsSigned(
 		parentID,
@@ -38,7 +36,7 @@ func TestBuildBlsSigned(t *testing.T) {
 		proposerID,
 		innerBlockBytes,
 		chainID,
-		&blsSigner,
+		blsSigner,
 	)
 	require.NoError(err)
 

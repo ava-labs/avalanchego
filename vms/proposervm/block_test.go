@@ -62,9 +62,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-	blsSigner := crypto.BLSKeySigner{
-		SecretKey: sk,
-	}
+	blsSigner := crypto.NewBLSSigner(sk)
 
 	vm := &VM{
 		ChainVM:        innerVM,
@@ -76,7 +74,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		Windower:    windower,
 		stakingCert: testCert.Leaf,
 		tlsSigner:   &tlsSigner,
-		blsSigner:   &blsSigner,
+		blsSigner:   blsSigner,
 	}
 
 	blk := &postForkCommonComponents{

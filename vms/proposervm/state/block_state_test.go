@@ -75,9 +75,7 @@ func testBlsSignedBlockState(a *require.Assertions, bs BlockState) {
 
 	sk, err := bls.NewSecretKey()
 	a.NoError(err)
-	blsSigner := crypto.BLSKeySigner{
-		SecretKey: sk,
-	}
+	blsSigner := crypto.NewBLSSigner(sk)
 
 	b, err := block.BuildBlsSigned(
 		parentID,
@@ -86,7 +84,7 @@ func testBlsSignedBlockState(a *require.Assertions, bs BlockState) {
 		nodeID,
 		innerBlockBytes,
 		chainID,
-		&blsSigner,
+		blsSigner,
 	)
 	a.NoError(err)
 

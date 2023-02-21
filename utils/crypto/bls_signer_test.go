@@ -49,9 +49,7 @@ func TestBLSSigner(t *testing.T) {
 			r.NoError(err)
 
 			// sign the ip
-			signer := BLSKeySigner{
-				SecretKey: sk,
-			}
+			signer := NewBLSSigner(sk)
 			sig := signer.Sign(test.args.msg)
 
 			// verify the signature of the ip against the public key

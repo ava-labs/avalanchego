@@ -133,10 +133,7 @@ func New(
 
 	var blsSigner crypto.BLSSigner
 	if blsSecretKey != nil {
-		s := crypto.BLSKeySigner{
-			SecretKey: blsSecretKey,
-		}
-		blsSigner = s
+		blsSigner = crypto.NewBLSSigner(blsSecretKey)
 	}
 
 	return &VM{
