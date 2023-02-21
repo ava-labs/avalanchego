@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -27,7 +27,9 @@ func TestBuildBlsSigned(t *testing.T) {
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-	blsSigner := signer.NewBLSSigner(sk)
+	blsSigner := crypto.BLSKeySigner{
+		SecretKey: sk,
+	}
 
 	builtBlock, err := BuildBlsSigned(
 		parentID,
@@ -65,7 +67,7 @@ func TestBuildCertSigned(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	tlsSigner, err := signer.NewTLSSigner(tlsCert)
+	tlsSigner, err := crypto.NewTLSSigner(tlsCert)
 	require.NoError(err)
 
 	builtBlock, err := BuildCertSigned(

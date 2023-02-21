@@ -6,16 +6,16 @@ package peer
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/signer"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// DynamicIPSigner will return a signedIP for the current value of our dynamic IP.
-type DynamicIPSigner struct {
+// IPSigner will return a signedIP for the current value of our dynamic IP.
+type IPSigner struct {
 	ip     ips.DynamicIPPort
 	clock  mockable.Clock
-	signer signer.Signer
+	signer crypto.MultiSigner
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
@@ -24,11 +24,11 @@ type DynamicIPSigner struct {
 	signedIP *SignedIP
 }
 
-func NewDynamicIPSigner(
+func NewIPSigner(
 	ip ips.DynamicIPPort,
-	signer signer.Signer,
-) *DynamicIPSigner {
-	return &DynamicIPSigner{
+	signer crypto.MultiSigner,
+) *IPSigner {
+	return &IPSigner{
 		ip:     ip,
 		signer: signer,
 	}
@@ -39,7 +39,7 @@ func NewDynamicIPSigner(
 // GetSignedIP, then the same [SignedIP] will be returned.
 //
 // It's safe for multiple goroutines to concurrently call GetSignedIP.
-func (s *DynamicIPSigner) GetSignedIP() (*SignedIP, error) {
+func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 	// Optimistically, the IP should already be signed. By grabbing a read lock
 	// here we enable full concurrency of new connections.
 	s.signedIPLock.RLock()

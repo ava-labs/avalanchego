@@ -22,13 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -72,8 +72,8 @@ type VM struct {
 	blsSigningActivationTime time.Time
 
 	stakingCert *x509.Certificate
-	tlsSigner   *signer.TLSSigner
-	blsSigner   *signer.BLSSigner
+	tlsSigner   *crypto.TLSSigner
+	blsSigner   crypto.BLSSigner
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -126,15 +126,17 @@ func New(
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 
-	tlsSigner, err := signer.NewTLSSigner(stakingCert)
+	tlsSigner, err := crypto.NewTLSSigner(stakingCert)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating tls signer %w", err)
 	}
 
-	var blsSigner *signer.BLSSigner
+	var blsSigner crypto.BLSSigner
 	if blsSecretKey != nil {
-		s := signer.NewBLSSigner(blsSecretKey)
-		blsSigner = &s
+		s := crypto.BLSKeySigner{
+			SecretKey: blsSecretKey,
+		}
+		blsSigner = s
 	}
 
 	return &VM{

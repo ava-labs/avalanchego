@@ -182,6 +182,11 @@ func NewTestNetwork(
 	}
 	tlsConfig := peer.TLSConfig(*tlsCert, nil)
 	networkConfig.TLSConfig = tlsConfig
+	signer, err := peer.NewPreBanffSigner(tlsCert)
+	if err != nil {
+		return nil, err
+	}
+	networkConfig.IPSigner = signer
 
 	validatorManager := validators.NewManager()
 	beacons := validators.NewSet()

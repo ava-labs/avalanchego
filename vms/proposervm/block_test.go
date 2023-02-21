@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -57,12 +57,14 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	testCert, err := staking.NewTLSCert()
 	require.NoError(err)
-	tlsSigner, err := signer.NewTLSSigner(testCert)
+	tlsSigner, err := crypto.NewTLSSigner(testCert)
 	require.NoError(err)
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-	blsSigner := signer.NewBLSSigner(sk)
+	blsSigner := crypto.BLSKeySigner{
+		SecretKey: sk,
+	}
 
 	vm := &VM{
 		ChainVM:        innerVM,

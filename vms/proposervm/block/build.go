@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -44,7 +44,7 @@ func BuildCertSigned(
 	cert *x509.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
-	tlsSigner *signer.TLSSigner,
+	tlsSigner *crypto.TLSSigner,
 ) (SignedBlock, error) {
 	block := &statelessCertSignedBlock{
 		StatelessBlock: statelessUnsignedBlock{
@@ -94,7 +94,7 @@ func BuildBlsSigned(
 	nodeID ids.NodeID,
 	innerBlockBytes []byte,
 	chainID ids.ID,
-	blsSigner *signer.BLSSigner,
+	blsSigner crypto.BLSSigner,
 ) (SignedBlock, error) {
 	block := &statelessBlsSignedBlock{
 		BlockParentID:     parentID,

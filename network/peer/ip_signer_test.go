@@ -25,10 +25,10 @@ func TestIPSigner(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	key, err := NewBanffSigner(tlsCert)
+	key, err := NewPreBanffSigner(tlsCert)
 	require.NoError(err)
 
-	s := NewDynamicIPSigner(dynIP, key)
+	s := NewIPSigner(dynIP, key)
 
 	s.clock.Set(time.Unix(10, 0))
 

@@ -20,9 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -112,7 +112,7 @@ type peer struct {
 	conn net.Conn
 
 	// [ipVerifier] verifies messages from this peer.
-	ipVerifier signer.Verifier
+	ipVerifier crypto.MultiVerifier
 
 	// [cert] is this peer's certificate, specifically the leaf of the
 	// certificate chain they provided.
@@ -188,7 +188,7 @@ func Start(
 	p := &peer{
 		Config:             config,
 		conn:               conn,
-		ipVerifier:         NewBanffVerifier(cert),
+		ipVerifier:         NewPreBanffVerifier(cert),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,

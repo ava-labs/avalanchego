@@ -11,10 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -129,8 +129,8 @@ type Config struct {
 	// true.
 	CompressionEnabled bool `json:"compressionEnabled"`
 
-	// IPSigner this node's key which is used to sign IPs.
-	IPSigner signer.Signer `json:"-"`
+	// IPSigner is the signer that is used to sign IPs.
+	IPSigner crypto.MultiSigner `json:"-"`
 
 	// TrackedSubnets of the node.
 	TrackedSubnets set.Set[ids.ID] `json:"-"`

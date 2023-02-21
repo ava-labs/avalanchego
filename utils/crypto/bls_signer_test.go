@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package signer
+package crypto
 
 import (
 	"testing"
@@ -13,8 +13,7 @@ import (
 
 func TestBLSSigner(t *testing.T) {
 	type args struct {
-		msg       []byte
-		signature []byte
+		msg []byte
 	}
 
 	tests := []struct {
@@ -39,13 +38,6 @@ func TestBLSSigner(t *testing.T) {
 				msg: []byte{1, 2, 3, 3, 5},
 			},
 		},
-		{
-			name: "overwrite previous signature",
-			args: args{
-				msg:       []byte{1, 2, 3, 3, 5},
-				signature: []byte{6, 7, 8, 9, 0},
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -57,7 +49,9 @@ func TestBLSSigner(t *testing.T) {
 			r.NoError(err)
 
 			// sign the ip
-			signer := NewBLSSigner(sk)
+			signer := BLSKeySigner{
+				SecretKey: sk,
+			}
 			sig := signer.Sign(test.args.msg)
 
 			// verify the signature of the ip against the public key

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -216,7 +216,8 @@ func (b *statelessBlsSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID
 	}
 
 	headerBytes := header.Bytes()
-	return signer.BLSVerifier{
+	_, err = crypto.BLSKeyVerifier{
 		PublicKey: blsPubKey,
 	}.Verify(headerBytes, b.Signature)
+	return err
 }

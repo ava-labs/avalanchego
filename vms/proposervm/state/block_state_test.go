@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -31,7 +31,7 @@ func testCertSignedBlockState(a *require.Assertions, bs BlockState) {
 	tlsCert, err := staking.NewTLSCert()
 	a.NoError(err)
 
-	tlsSigner, err := signer.NewTLSSigner(tlsCert)
+	tlsSigner, err := crypto.NewTLSSigner(tlsCert)
 	a.NoError(err)
 
 	b, err := block.BuildCertSigned(
@@ -75,7 +75,9 @@ func testBlsSignedBlockState(a *require.Assertions, bs BlockState) {
 
 	sk, err := bls.NewSecretKey()
 	a.NoError(err)
-	blsSigner := signer.NewBLSSigner(sk)
+	blsSigner := crypto.BLSKeySigner{
+		SecretKey: sk,
+	}
 
 	b, err := block.BuildBlsSigned(
 		parentID,

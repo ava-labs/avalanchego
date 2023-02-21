@@ -4,10 +4,14 @@
 package peer
 
 import (
-	"github.com/ava-labs/avalanchego/signer"
+	"errors"
+
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var errFailedBLSVerification = errors.New("failed bls verification")
 
 // UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
@@ -18,7 +22,7 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer signer.Signer) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(signer crypto.MultiSigner) (*SignedIP, error) {
 	tlsSig, err := signer.SignTLS(ip.bytes())
 	if err != nil {
 		return nil, err
@@ -49,13 +53,22 @@ type SignedIP struct {
 	BLSSignature []byte
 }
 
-func (ip *SignedIP) Verify(verifier signer.Verifier) error {
-	errs := wrappers.Errs{}
+func (ip *SignedIP) Verify(verifier crypto.MultiVerifier) error {
+	if err := verifier.VerifyTLS(
+		ip.UnsignedIP.bytes(),
+		ip.TLSSignature,
+	); err != nil {
+		return err
+	}
 
-	errs.Add(
-		verifier.VerifyTLS(ip.UnsignedIP.bytes(), ip.TLSSignature),
-		verifier.VerifyBLS(ip.UnsignedIP.bytes(), ip.BLSSignature),
-	)
+	if ok, err := verifier.VerifyBLS(
+		ip.UnsignedIP.bytes(),
+		ip.BLSSignature,
+	); err != nil {
+		return err
+	} else if !ok {
+		return errFailedBLSVerification
+	}
 
-	return errs.Err
+	return nil
 }
