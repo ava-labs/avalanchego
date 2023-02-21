@@ -60,9 +60,7 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{
-		WhitelistedSubnetsKey: fmt.Sprintf("Use --%s instead", TrackSubnetsKey),
-	}
+	deprecatedKeys = map[string]string{}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -842,15 +840,10 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 }
 
 func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
-	var trackSubnets string
-	if v.IsSet(TrackSubnetsKey) {
-		trackSubnets = v.GetString(TrackSubnetsKey)
-	} else {
-		trackSubnets = v.GetString(WhitelistedSubnetsKey)
-	}
-
-	trackedSubnetIDs := set.Set[ids.ID]{}
-	for _, subnet := range strings.Split(trackSubnets, ",") {
+	trackSubnetsStr := v.GetString(TrackSubnetsKey)
+	trackSubnetsStrs := strings.Split(trackSubnetsStr, ",")
+	trackedSubnetIDs := set.NewSet[ids.ID](len(trackSubnetsStrs))
+	for _, subnet := range trackSubnetsStrs {
 		if subnet == "" {
 			continue
 		}

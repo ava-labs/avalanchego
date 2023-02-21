@@ -263,7 +263,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.RewardConfig.MintingPeriod, "Consumption period of the staking function")
 	fs.Uint64(StakeSupplyCapKey, genesis.LocalParams.RewardConfig.SupplyCap, "Supply cap of the staking function")
 	// Subnets
-	fs.String(WhitelistedSubnetsKey, "", fmt.Sprintf("[DEPRECATED] Use --%s", TrackSubnetsKey))
 	fs.String(TrackSubnetsKey, "", "List of subnets for the node to track. A node tracking a subnet will track the uptimes of the subnet validators and attempt to sync all the chains in the subnet. Before validating a subnet, a node should be tracking the subnet to avoid impacting their subnet validation uptime")
 
 	// State syncing
