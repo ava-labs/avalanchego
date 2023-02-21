@@ -51,6 +51,16 @@ func (t *OperationTx) InputUTXOs() []*avax.UTXOID {
 	return utxos
 }
 
+func (t *OperationTx) InputIDs() set.Set[ids.ID] {
+	inputs := t.BaseTx.InputIDs()
+	for _, op := range t.Ops {
+		for _, utxo := range op.UTXOIDs {
+			inputs.Add(utxo.InputID())
+		}
+	}
+	return inputs
+}
+
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *OperationTx) ConsumedAssetIDs() set.Set[ids.ID] {
 	assets := t.AssetIDs()

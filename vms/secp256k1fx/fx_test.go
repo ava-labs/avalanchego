@@ -12,13 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
 	txBytes  = []byte{0, 1, 2, 3, 4, 5}
-	sigBytes = [crypto.SECP256K1RSigLen]byte{ // signature of addr on txBytes
+	sigBytes = [secp256k1.SignatureLen]byte{ // signature of addr on txBytes
 		0x0e, 0x33, 0x4e, 0xbc, 0x67, 0xa7, 0x3f, 0xe8,
 		0x24, 0x33, 0xac, 0xa3, 0x47, 0x88, 0xa6, 0x3d,
 		0x58, 0xe5, 0x8e, 0xf0, 0x3a, 0xd5, 0x84, 0xf1,
@@ -35,7 +35,7 @@ var (
 		0x39, 0x1a, 0xe7, 0xf0,
 	}
 	addr2     ids.ShortID
-	sig2Bytes [crypto.SECP256K1RSigLen]byte // signature of addr2 on txBytes
+	sig2Bytes [secp256k1.SignatureLen]byte // signature of addr2 on txBytes
 )
 
 func init() {
@@ -97,7 +97,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -132,7 +132,7 @@ func TestFxVerifyTransferNilTx(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -158,7 +158,7 @@ func TestFxVerifyTransferNilOutput(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -188,7 +188,7 @@ func TestFxVerifyTransferNilInput(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -255,7 +255,7 @@ func TestFxVerifyTransferInvalidOutput(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -291,7 +291,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -327,7 +327,7 @@ func TestFxVerifyTransferTimelocked(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -363,7 +363,7 @@ func TestFxVerifyTransferTooManySigners(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 			{},
 		},
@@ -400,7 +400,7 @@ func TestFxVerifyTransferTooFewSigners(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{},
+		Sigs: [][secp256k1.SignatureLen]byte{},
 	}
 
 	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), errTooFewSigners)
@@ -434,7 +434,7 @@ func TestFxVerifyTransferMismatchedSigners(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 			{},
 		},
@@ -472,7 +472,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			{},
 		},
 	}
@@ -511,7 +511,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -550,7 +550,7 @@ func TestFxVerifyTransferSigIndexOOB(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -603,7 +603,7 @@ func TestFxVerifyOperation(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -654,7 +654,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -683,7 +683,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -782,7 +782,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -826,7 +826,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -875,7 +875,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -922,7 +922,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 		},
 	}
 	cred := &Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}
@@ -957,7 +957,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 0, no sigs, has addrs",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{}},
 			&OutputOwners{
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
@@ -968,7 +968,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 0, no sigs, no addrs",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{}},
 			&OutputOwners{
 				Threshold: 0,
 				Addrs:     []ids.ShortID{},
@@ -979,7 +979,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 1 sig",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -990,7 +990,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 0, 1 sig (too many sigs)",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 0,
 				Addrs:     []ids.ShortID{addr},
@@ -1001,7 +1001,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 0 sigs (too few sigs)",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -1012,7 +1012,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 1 incorrect sig",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -1023,7 +1023,7 @@ func TestVerifyPermission(t *testing.T) {
 			"repeated sig",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
@@ -1034,7 +1034,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, repeated address and repeated sig",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 1}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr},
@@ -1045,7 +1045,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, 2 sigs",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 1}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
@@ -1056,7 +1056,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 2, 2 sigs reversed (should be sorted)",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{1, 0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sig2Bytes, sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sig2Bytes, sigBytes}},
 			&OutputOwners{
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
@@ -1067,7 +1067,7 @@ func TestVerifyPermission(t *testing.T) {
 			"threshold 1, 1 sig, index out of bounds",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{1}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr},
@@ -1078,7 +1078,7 @@ func TestVerifyPermission(t *testing.T) {
 			"too many signers",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0, 1}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr, addr2},
@@ -1089,7 +1089,7 @@ func TestVerifyPermission(t *testing.T) {
 			"number of signatures doesn't match",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{addr, addr2},
@@ -1100,7 +1100,7 @@ func TestVerifyPermission(t *testing.T) {
 			"output is locked",
 			&TestTx{UnsignedBytes: txBytes},
 			&Input{SigIndices: []uint32{0}},
-			&Credential{Sigs: [][crypto.SECP256K1RSigLen]byte{sigBytes, sig2Bytes}},
+			&Credential{Sigs: [][secp256k1.SignatureLen]byte{sigBytes, sig2Bytes}},
 			&OutputOwners{
 				Threshold: 1,
 				Locktime:  uint64(now.Add(time.Second).Unix()),

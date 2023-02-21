@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -87,10 +88,10 @@ func TestShutdown(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -212,10 +213,10 @@ func TestShutdownTimesOut(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -355,10 +356,10 @@ func TestRouterTimeout(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(err)
 
@@ -674,10 +675,10 @@ func TestRouterClearTimeouts(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -934,7 +935,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	ctx := snow.DefaultConsensusContextTest()
-	ctx.ValidatorOnly.Set(true)
+	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
 	err = vdrs.Add(vID, nil, ids.Empty, 1)
@@ -950,10 +951,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -1030,30 +1031,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	wg.Wait()
 	require.True(t, calledF) // should be called since this is a validator request
-
-	// register a validator request
-	reqID++
-	chainRouter.RegisterRequest(
-		context.Background(),
-		vID,
-		ctx.ChainID,
-		ctx.ChainID,
-		reqID,
-		message.ChitsOp,
-		message.InternalQueryFailed(vID, ctx.ChainID, reqID, engineType),
-	)
-	require.Equal(t, 1, chainRouter.timedRequests.Len())
-
-	// remove it from validators
-	err = vdrs.RemoveWeight(vID, 1)
-	require.NoError(t, err)
-
-	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nil, nID, engineType)
-	chainRouter.HandleInbound(context.Background(), inMsg)
-
-	// shouldn't clear out timed request, as the request should be cleared when
-	// the GetFailed message is sent
-	require.Equal(t, 1, chainRouter.timedRequests.Len())
 }
 
 func TestRouterCrossChainMessages(t *testing.T) {
@@ -1113,10 +1090,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		requester,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(requester.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -1130,10 +1107,10 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		responder,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(responder.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -1152,8 +1129,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	chainRouter.AddChain(context.Background(), responderHandler)
 
 	// Each chain should start off with a connected message
-	require.Equal(t, 1, chainRouter.chains[requester.ChainID].Len())
-	require.Equal(t, 1, chainRouter.chains[responder.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chainHandlers[requester.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chainHandlers[responder.ChainID].Len())
 
 	// Requester sends a request to the responder
 	msgBytes := []byte("foobar")
@@ -1166,7 +1143,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		msgBytes,
 	)
 	chainRouter.HandleInbound(context.Background(), msg)
-	require.Equal(t, 2, chainRouter.chains[responder.ChainID].Len())
+	require.Equal(t, 2, chainRouter.chainHandlers[responder.ChainID].Len())
 
 	// We register the cross-chain response on the requester-side so we don't
 	// drop it.
@@ -1193,7 +1170,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		msgBytes,
 	)
 	chainRouter.HandleInbound(context.Background(), msg)
-	require.Equal(t, 2, chainRouter.chains[requester.ChainID].Len())
+	require.Equal(t, 2, chainRouter.chainHandlers[requester.ChainID].Len())
 }
 
 func TestConnectedSubnet(t *testing.T) {
@@ -1292,4 +1269,164 @@ func TestConnectedSubnet(t *testing.T) {
 
 	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
 	chainRouter.Disconnected(peerNodeID)
+}
+
+func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
+	// Create a timeout manager
+	maxTimeout := 25 * time.Millisecond
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     maxTimeout,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	go tm.Dispatch()
+
+	// Create a router
+	chainRouter := ChainRouter{}
+	err = chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Millisecond,
+		set.Set[ids.ID]{},
+		true,
+		set.Set[ids.ID]{},
+		nil,
+		HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	// Create bootstrapper, engine and handler
+	calledF := false
+	wg := sync.WaitGroup{}
+
+	ctx := snow.DefaultConsensusContextTest()
+	allowedID := ids.GenerateTestNodeID()
+	allowedSet := set.NewSet[ids.NodeID](1)
+	allowedSet.Add(allowedID)
+	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
+
+	vdrs := validators.NewSet()
+	vID := ids.GenerateTestNodeID()
+	err = vdrs.Add(vID, nil, ids.Empty, 1)
+	require.NoError(t, err)
+
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	require.NoError(t, err)
+
+	handler, err := handler.New(
+		ctx,
+		vdrs,
+		nil,
+		time.Second,
+		resourceTracker,
+		validators.UnhandledSubnetConnector,
+		sb,
+	)
+	require.NoError(t, err)
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
+		defer wg.Done()
+		calledF = true
+		return nil
+	}
+	handler.SetBootstrapper(bootstrapper)
+	ctx.State.Set(snow.EngineState{
+		Type:  engineType,
+		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
+	})
+	engine := &common.EngineTest{T: t}
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	engine.Default(false)
+	handler.SetConsensus(engine)
+
+	chainRouter.AddChain(context.Background(), handler)
+
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
+	handler.Start(context.Background(), false)
+
+	var inMsg message.InboundMessage
+	dummyContainerID := ids.GenerateTestID()
+	reqID := uint32(0)
+
+	// Non-validator case
+	nID := ids.GenerateTestNodeID()
+
+	calledF = false
+	inMsg = message.InboundPullQuery(
+		ctx.ChainID,
+		reqID,
+		time.Hour,
+		dummyContainerID,
+		nID,
+		engineType,
+	)
+	chainRouter.HandleInbound(context.Background(), inMsg)
+
+	require.False(t, calledF) // should not be called for unallowed node ID
+
+	// Allowed NodeID case
+	calledF = false
+	reqID++
+	inMsg = message.InboundPullQuery(
+		ctx.ChainID,
+		reqID,
+		time.Hour,
+		dummyContainerID,
+		allowedID,
+		engineType,
+	)
+	wg.Add(1)
+	chainRouter.HandleInbound(context.Background(), inMsg)
+
+	wg.Wait()
+	require.True(t, calledF) // should be called since this is a allowed node request
+
+	// Validator case
+	calledF = false
+	reqID++
+	inMsg = message.InboundPullQuery(
+		ctx.ChainID,
+		reqID,
+		time.Hour,
+		dummyContainerID,
+		vID,
+		engineType,
+	)
+	wg.Add(1)
+	chainRouter.HandleInbound(context.Background(), inMsg)
+
+	wg.Wait()
+	require.True(t, calledF) // should be called since this is a validator request
 }

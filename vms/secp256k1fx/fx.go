@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -40,7 +40,7 @@ var (
 // Fx describes the secp256k1 feature extension
 type Fx struct {
 	VM           VM
-	SECPFactory  crypto.FactorySECP256K1R
+	SECPFactory  secp256k1.Factory
 	bootstrapped bool
 }
 
@@ -52,8 +52,10 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log := fx.VM.Logger()
 	log.Debug("initializing secp256k1 fx")
 
-	fx.SECPFactory = crypto.FactorySECP256K1R{
-		Cache: cache.LRU[ids.ID, *crypto.PublicKeySECP256K1R]{Size: defaultCacheSize},
+	fx.SECPFactory = secp256k1.Factory{
+		Cache: cache.LRU[ids.ID, *secp256k1.PublicKey]{
+			Size: defaultCacheSize,
+		},
 	}
 	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}

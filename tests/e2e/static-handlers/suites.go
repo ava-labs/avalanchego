@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -122,8 +122,8 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		})
 
 	ginkgo.It("can make calls to platformvm static api", func() {
-		keys := []*crypto.PrivateKeySECP256K1R{}
-		factory := crypto.FactorySECP256K1R{}
+		keys := []*secp256k1.PrivateKey{}
+		factory := secp256k1.Factory{}
 		for _, key := range []string{
 			"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
 			"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
@@ -135,7 +135,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			gomega.Expect(err).Should(gomega.BeNil())
 			pk, err := factory.ToPrivateKey(privKeyBytes)
 			gomega.Expect(err).Should(gomega.BeNil())
-			keys = append(keys, pk.(*crypto.PrivateKeySECP256K1R))
+			keys = append(keys, pk)
 		}
 
 		genesisUTXOs := make([]api.UTXO, len(keys))

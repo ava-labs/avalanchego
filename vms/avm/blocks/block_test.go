@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -21,7 +21,7 @@ import (
 var (
 	networkID uint32 = 10
 	chainID          = ids.GenerateTestID()
-	keys             = crypto.BuildTestKeys()
+	keys             = secp256k1.TestKeys()
 	assetID          = ids.GenerateTestID()
 )
 
@@ -95,7 +95,7 @@ func createTestTxs(cm codec.Manager) ([]*txs.Tx, error) {
 			}},
 			Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}}}
-		if err := tx.SignSECP256K1Fx(cm, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+		if err := tx.SignSECP256K1Fx(cm, [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
 			return nil, err
 		}
 		testTxs = append(testTxs, tx)

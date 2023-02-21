@@ -36,6 +36,7 @@ var (
 
 	errEndOfTime       = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks = errors.New("no pending blocks")
+	errChainNotSynced  = errors.New("chain not synced")
 )
 
 type Builder interface {
@@ -124,6 +125,10 @@ func (b *builder) Preferred() (snowman.Block, error) {
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
+	if !b.txExecutorBackend.Bootstrapped.Get() {
+		return errChainNotSynced
+	}
+
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same

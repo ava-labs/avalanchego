@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -87,7 +88,7 @@ func NewSet(
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
 // should be made.
-func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
+func (s *set) Add(requestID uint32, vdrs bag.Bag[ids.NodeID]) bool {
 	if _, exists := s.polls.Get(requestID); exists {
 		s.log.Debug("dropping poll",
 			zap.String("reason", "duplicated request"),
@@ -111,7 +112,7 @@ func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
+func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []bag.Bag[ids.ID] {
 	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",
@@ -139,8 +140,8 @@ func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
 }
 
 // processFinishedPolls checks for other dependent finished polls and returns them all if finished
-func (s *set) processFinishedPolls() []ids.Bag {
-	var results []ids.Bag
+func (s *set) processFinishedPolls() []bag.Bag[ids.ID] {
+	var results []bag.Bag[ids.ID]
 
 	// iterate from oldest to newest
 	iter := s.polls.NewIterator()
@@ -171,7 +172,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
+func (s *set) Drop(requestID uint32, vdr ids.NodeID) []bag.Bag[ids.ID] {
 	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",

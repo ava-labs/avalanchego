@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -30,17 +30,15 @@ func TestNewImportTx(t *testing.T) {
 		description   string
 		sourceChainID ids.ID
 		sharedMemory  atomic.SharedMemory
-		sourceKeys    []*crypto.PrivateKeySECP256K1R
+		sourceKeys    []*secp256k1.PrivateKey
 		timestamp     time.Time
 		shouldErr     bool
 		shouldVerify  bool
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	sourceKeyIntf, err := factory.NewPrivateKey()
+	factory := secp256k1.Factory{}
+	sourceKey, err := factory.NewPrivateKey()
 	require.NoError(t, err)
-
-	sourceKey := sourceKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	cnt := new(byte)
 
@@ -106,7 +104,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
 				},
 			),
-			sourceKeys: []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys: []*secp256k1.PrivateKey{sourceKey},
 			shouldErr:  true,
 		},
 		{
@@ -118,7 +116,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			shouldErr:    false,
 			shouldVerify: true,
 		},
@@ -131,7 +129,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			timestamp:    env.config.ApricotPhase5Time,
 			shouldErr:    false,
 			shouldVerify: true,
@@ -146,7 +144,7 @@ func TestNewImportTx(t *testing.T) {
 					customAssetID:       1,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			timestamp:    env.config.BanffTime,
 			shouldErr:    false,
 			shouldVerify: true,

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -435,7 +436,7 @@ func (dg *Directed) Issued(tx Tx) bool {
 	return ok
 }
 
-func (dg *Directed) RecordPoll(ctx context.Context, votes ids.Bag) (bool, error) {
+func (dg *Directed) RecordPoll(ctx context.Context, votes bag.Bag[ids.ID]) (bool, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
 	// This is also used to track the number of polls required to accept/reject

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -23,7 +23,7 @@ var (
 	chainID                = ids.ID{5, 4, 3, 2, 1}
 	platformChainID        = ids.Empty.Prefix(0)
 
-	keys = crypto.BuildTestKeys()
+	keys = secp256k1.TestKeys()
 
 	assetID = ids.ID{1, 2, 3}
 )

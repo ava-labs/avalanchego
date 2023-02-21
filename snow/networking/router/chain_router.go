@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	errUnknownChain = errors.New("received message for unknown chain")
+	errUnknownChain  = errors.New("received message for unknown chain")
+	errUnallowedNode = errors.New("received message from non-allowed node")
 
 	_ Router              = (*ChainRouter)(nil)
 	_ benchlist.Benchable = (*ChainRouter)(nil)
@@ -57,10 +58,10 @@ type peer struct {
 // that they are working on.
 // Invariant: P-chain must be registered before processing any messages
 type ChainRouter struct {
-	clock  mockable.Clock
-	log    logging.Logger
-	lock   sync.Mutex
-	chains map[ids.ID]handler.Handler
+	clock         mockable.Clock
+	log           logging.Logger
+	lock          sync.Mutex
+	chainHandlers map[ids.ID]handler.Handler
 
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
@@ -102,7 +103,7 @@ func (cr *ChainRouter) Initialize(
 	metricsRegisterer prometheus.Registerer,
 ) error {
 	cr.log = log
-	cr.chains = make(map[ids.ID]handler.Handler)
+	cr.chainHandlers = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout
 	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
@@ -241,13 +242,24 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
-	chain, exists := cr.chains[destinationChainID]
-	if !exists || !chain.IsValidator(nodeID) {
+	chain, exists := cr.chainHandlers[destinationChainID]
+	if !exists {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
+		)
+		msg.OnFinishedHandling()
+		return
+	}
+
+	if !chain.ShouldHandle(nodeID) {
+		cr.log.Debug("dropping message",
+			zap.Stringer("messageOp", op),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("chainID", destinationChainID),
+			zap.Error(errUnallowedNode),
 		)
 		msg.OnFinishedHandling()
 		return
@@ -321,8 +333,8 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 func (cr *ChainRouter) Shutdown(ctx context.Context) {
 	cr.log.Info("shutting down chain router")
 	cr.lock.Lock()
-	prevChains := cr.chains
-	cr.chains = map[ids.ID]handler.Handler{}
+	prevChains := cr.chainHandlers
+	cr.chainHandlers = map[ids.ID]handler.Handler{}
 	cr.lock.Unlock()
 
 	for _, chain := range prevChains {
@@ -355,7 +367,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	chain.SetOnStopped(func() {
 		cr.removeChain(ctx, chainID)
 	})
-	cr.chains[chainID] = chain
+	cr.chainHandlers[chainID] = chain
 
 	// Notify connected validators
 	subnetID := chain.Context().SubnetID
@@ -426,7 +438,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	// Therefore, we only update the chains during the connection of the primary
 	// network, which is guaranteed to happen for every peer.
 	if cr.stakingEnabled || subnetID == constants.PrimaryNetworkID {
-		for _, chain := range cr.chains {
+		for _, chain := range cr.chainHandlers {
 			// If staking is disabled, send a Connected message to every chain
 			// when connecting to the primary network
 			if subnetID == chain.Context().SubnetID || !cr.stakingEnabled {
@@ -455,7 +467,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	// set, disconnect. we cannot put a subnet-only validator check here since
 	// if a validator connects then it leaves validator-set, it would not be
 	// disconnected properly.
-	for _, chain := range cr.chains {
+	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
@@ -480,7 +492,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	// Even if there is no chain in the subnet.
 	msg := message.InternalDisconnected(nodeID)
 
-	for _, chain := range cr.chains {
+	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
@@ -510,7 +522,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 
 	msg := message.InternalConnected(nodeID, peer.version)
 
-	for _, chain := range cr.chains {
+	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
@@ -568,7 +580,7 @@ func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 // messages can't be routed to it
 func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 	cr.lock.Lock()
-	chain, exists := cr.chains[chainID]
+	chain, exists := cr.chainHandlers[chainID]
 	if !exists {
 		cr.log.Debug("can't remove unknown chain",
 			zap.Stringer("chainID", chainID),
@@ -576,7 +588,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 		cr.lock.Unlock()
 		return
 	}
-	delete(cr.chains, chainID)
+	delete(cr.chainHandlers, chainID)
 	cr.lock.Unlock()
 
 	chain.Stop(ctx)
@@ -644,7 +656,7 @@ func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID i
 	// that cares about the connectivity of all subnets. Others chains learn
 	// about the connectivity of their own subnet when they receive a
 	// *message.Connected.
-	platformChain, ok := cr.chains[constants.PlatformChainID]
+	platformChain, ok := cr.chainHandlers[constants.PlatformChainID]
 	if !ok {
 		cr.log.Error("trying to issue InternalConnectedSubnet message, but platform chain is not registered",
 			zap.Stringer("nodeID", nodeID),

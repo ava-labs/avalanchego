@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -71,6 +71,8 @@ var (
 )
 
 type VM struct {
+	common.AppHandler
+
 	Factory
 	metrics
 	avax.AddressManager
@@ -148,6 +150,8 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	_ common.AppSender,
 ) error {
+	vm.AppHandler = common.NewNoOpAppHandler(ctx.Log)
+
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
 		if err := stdjson.Unmarshal(configBytes, &avmConfig); err != nil {
@@ -730,14 +734,14 @@ func (vm *VM) Spend(
 ) (
 	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64, len(amounts))
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amount := amounts[assetID]
@@ -797,13 +801,13 @@ func (vm *VM) SpendNFT(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -869,14 +873,14 @@ func (vm *VM) SpendAll(
 ) (
 	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	amountsSpent := make(map[ids.ID]uint64)
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amountSpent := amountsSpent[assetID]
@@ -919,13 +923,13 @@ func (vm *VM) Mint(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -993,13 +997,13 @@ func (vm *VM) MintNFT(
 	to ids.ShortID,
 ) (
 	[]*txs.Operation,
-	[][]*crypto.PrivateKeySECP256K1R,
+	[][]*secp256k1.PrivateKey,
 	error,
 ) {
 	time := vm.clock.Unix()
 
 	ops := []*txs.Operation{}
-	keys := [][]*crypto.PrivateKeySECP256K1R{}
+	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -1079,38 +1083,6 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 		return assetID, nil
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
-}
-
-func (*VM) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-func (*VM) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
-	return nil
-}
-
-func (*VM) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (*VM) AppGossip(context.Context, ids.NodeID, []byte) error {
-	return nil
 }
 
 // UniqueTx de-duplicates the transaction.

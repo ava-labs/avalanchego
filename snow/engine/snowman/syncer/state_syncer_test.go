@@ -108,7 +108,6 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	commonCfg := common.Config{
 		Ctx:            snow.DefaultConsensusContextTest(),
-		Validators:     vdrs,
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          alpha,

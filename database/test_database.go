@@ -5,10 +5,14 @@ package database
 
 import (
 	"bytes"
-	"crypto/rand"
+	"io"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/slices"
 
 	"golang.org/x/sync/errgroup"
 
@@ -19,6 +23,7 @@ import (
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestEmptyKey,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
 	TestNewBatchClosed,
@@ -28,6 +33,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestBatchReuse,
 	TestBatchRewrite,
 	TestBatchReplay,
+	TestBatchReplayPropagateError,
 	TestBatchInner,
 	TestBatchLargeSize,
 	TestIteratorSnapshot,
@@ -59,46 +65,39 @@ var FuzzTests = []func(*testing.F, Database){
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
 // calls return the expected values.
 func TestSimpleKeyValue(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
 	value := []byte("world")
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
-	} else if v, err := db.Get(key); err != ErrNotFound {
-		t.Fatalf("Expected %s on db.Get for missing key %s. Returned 0x%x", ErrNotFound, key, v)
-	} else if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.False(has)
 
-	if err := db.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on db.Put: %s", err)
-	}
+	_, err = db.Get(key)
+	require.Equal(ErrNotFound, err)
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(key); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
+	require.NoError(db.Delete(key))
+	require.NoError(db.Put(key, value))
 
-	if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	has, err = db.Has(key)
+	require.NoError(err)
+	require.True(has)
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
-	} else if v, err := db.Get(key); err != ErrNotFound {
-		t.Fatalf("Expected %s on db.Get for missing key %s. Returned 0x%x", ErrNotFound, key, v)
-	} else if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	v, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value, v)
+
+	require.NoError(db.Delete(key))
+
+	has, err = db.Has(key)
+	require.NoError(err)
+	require.False(has)
+
+	_, err = db.Get(key)
+	require.Equal(ErrNotFound, err)
+
+	require.NoError(db.Delete(key))
 }
 
 func TestKeyEmptyValue(t *testing.T, db Database) {
@@ -110,101 +109,112 @@ func TestKeyEmptyValue(t *testing.T, db Database) {
 	_, err := db.Get(key)
 	require.Equal(ErrNotFound, err)
 
-	err = db.Put(key, val)
-	require.NoError(err)
+	require.NoError(db.Put(key, val))
 
 	value, err := db.Get(key)
 	require.NoError(err)
-	require.Len(value, len(val))
+	require.Empty(value)
+}
+
+func TestEmptyKey(t *testing.T, db Database) {
+	require := require.New(t)
+
+	var (
+		nilKey   = []byte(nil)
+		emptyKey = []byte{}
+		val1     = []byte("hi")
+		val2     = []byte("hello")
+	)
+
+	// Test that nil key can be retrieved by empty key
+	_, err := db.Get(nilKey)
+	require.Equal(ErrNotFound, err)
+
+	require.NoError(db.Put(nilKey, val1))
+
+	value, err := db.Get(emptyKey)
+	require.NoError(err)
+	require.Equal(value, val1)
+
+	// Test that empty key can be retrieved by nil key
+	require.NoError(db.Put(emptyKey, val2))
+
+	value, err = db.Get(nilKey)
+	require.NoError(err)
+	require.Equal(value, val2)
 }
 
 // TestSimpleKeyValueClosed tests to make sure that Put + Get + Delete + Has
 // calls return the correct error when the database has been closed.
 func TestSimpleKeyValueClosed(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
 	value := []byte("world")
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
-	} else if v, err := db.Get(key); err != ErrNotFound {
-		t.Fatalf("Expected %s on db.Get for missing key %s. Returned 0x%x", ErrNotFound, key, v)
-	} else if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.False(has)
 
-	if err := db.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on db.Put: %s", err)
-	}
+	_, err = db.Get(key)
+	require.Equal(ErrNotFound, err)
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(key); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
+	require.NoError(db.Delete(key))
+	require.NoError(db.Put(key, value))
 
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
+	has, err = db.Has(key)
+	require.NoError(err)
+	require.True(has)
 
-	if _, err := db.Has(key); err != ErrClosed {
-		t.Fatalf("Expected %s on db.Has after close", ErrClosed)
-	} else if _, err := db.Get(key); err != ErrClosed {
-		t.Fatalf("Expected %s on db.Get after close", ErrClosed)
-	} else if err := db.Put(key, value); err != ErrClosed {
-		t.Fatalf("Expected %s on db.Put after close", ErrClosed)
-	} else if err := db.Delete(key); err != ErrClosed {
-		t.Fatalf("Expected %s on db.Delete after close", ErrClosed)
-	} else if err := db.Close(); err != ErrClosed {
-		t.Fatalf("Expected %s on db.Close after close", ErrClosed)
-	}
+	v, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value, v)
+
+	require.NoError(db.Close())
+
+	_, err = db.Has(key)
+	require.Equal(ErrClosed, err)
+
+	_, err = db.Get(key)
+	require.Equal(ErrClosed, err)
+
+	require.Equal(ErrClosed, db.Put(key, value))
+	require.Equal(ErrClosed, db.Delete(key))
+	require.Equal(ErrClosed, db.Close())
 }
 
 // TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
 // to Database.Put and Database.Get.
 func TestMemorySafetyDatabase(t *testing.T, db Database) {
-	key := []byte("key")
+	require := require.New(t)
+
+	key := []byte("1key")
+	keyCopy := slices.Clone(key)
 	value := []byte("value")
-	key2 := []byte("key2")
+	key2 := []byte("2key")
 	value2 := []byte("value2")
 
 	// Put both K/V pairs in the database
-	if err := db.Put(key, value); err != nil {
-		t.Fatal(err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(db.Put(key, value))
+	require.NoError(db.Put(key2, value2))
+
 	// Get the value for [key]
 	gotVal, err := db.Get(key)
-	if err != nil {
-		t.Fatalf("should have been able to get value but got %s", err)
-	} else if !bytes.Equal(gotVal, value) {
-		t.Fatal("got the wrong value")
-	}
+	require.NoError(err)
+	require.Equal(value, gotVal)
+
 	// Modify [key]; make sure the value we got before hasn't changed
-	key = key2
+	key[0] = key2[0]
 	gotVal2, err := db.Get(key)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case !bytes.Equal(gotVal2, value2):
-		t.Fatal("got wrong value")
-	case !bytes.Equal(gotVal, value):
-		t.Fatal("value changed")
-	}
+	require.NoError(err)
+	require.Equal(value2, gotVal2)
+	require.Equal(value, gotVal)
+
 	// Reset [key] to its original value and make sure it's correct
-	key = []byte("key")
+	key[0] = keyCopy[0]
 	gotVal, err = db.Get(key)
-	if err != nil {
-		t.Fatalf("should have been able to get value but got %s", err)
-	} else if !bytes.Equal(gotVal, value) {
-		t.Fatal("got the wrong value")
-	}
+	require.NoError(err)
+	require.Equal(value, gotVal)
 }
 
 // TestNewBatchClosed tests to make sure that calling NewBatch on a closed
@@ -212,8 +222,7 @@ func TestMemorySafetyDatabase(t *testing.T, db Database) {
 func TestNewBatchClosed(t *testing.T, db Database) {
 	require := require.New(t)
 
-	err := db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 
 	batch := db.NewBatch()
 	require.NotNil(batch)
@@ -221,174 +230,138 @@ func TestNewBatchClosed(t *testing.T, db Database) {
 	key := []byte("hello")
 	value := []byte("world")
 
-	err = batch.Put(key, value)
-	require.NoError(err)
-	require.Greater(batch.Size(), 0)
-
-	err = batch.Write()
-	require.ErrorIs(err, ErrClosed)
+	require.NoError(batch.Put(key, value))
+	require.Positive(batch.Size())
+	require.Equal(ErrClosed, batch.Write())
 }
 
 // TestBatchPut tests to make sure that batched writes work as expected.
 func TestBatchPut(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
 	value := []byte("world")
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if size := batch.Size(); size <= 0 {
-		t.Fatalf("batch.Size: Returned: %d ; Expected: > 0", size)
-	}
+	require.NoError(batch.Put(key, value))
+	require.Positive(batch.Size())
+	require.NoError(batch.Write())
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.True(has)
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(key); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	} else if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	v, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value, v)
 
-	if batch := db.NewBatch(); batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	} else if err := batch.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Close(); err != nil {
-		t.Fatalf("Error while closing the database: %s", err)
-	} else if err := batch.Write(); err != ErrClosed {
-		t.Fatalf("Expected %s on batch.Write", ErrClosed)
-	}
+	require.NoError(db.Delete(key))
+
+	batch = db.NewBatch()
+	require.NotNil(batch)
+
+	require.NoError(batch.Put(key, value))
+	require.NoError(db.Close())
+	require.Equal(ErrClosed, batch.Write())
 }
 
 // TestBatchDelete tests to make sure that batched deletes work as expected.
 func TestBatchDelete(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
 	value := []byte("world")
 
-	if err := db.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on db.Put: %s", err)
-	}
+	require.NoError(db.Put(key, value))
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on batch.Delete: %s", err)
-	}
+	require.NoError(batch.Delete(key))
+	require.NoError(batch.Write())
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.False(has)
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
-	} else if v, err := db.Get(key); err != ErrNotFound {
-		t.Fatalf("Expected %s on db.Get for missing key %s. Returned 0x%x", ErrNotFound, key, v)
-	} else if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	}
+	_, err = db.Get(key)
+	require.Equal(ErrNotFound, err)
+
+	require.NoError(db.Delete(key))
 }
 
 // TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
 // to Batch.Put.
 func TestMemorySafetyBatch(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
+	keyCopy := slices.Clone(key)
 	value := []byte("world")
-	valueCopy := []byte("world")
+	valueCopy := slices.Clone(value)
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
 	// Put a key in the batch
-	if err := batch.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if size := batch.Size(); size <= 0 {
-		t.Fatalf("batch.Size: Returned: %d ; Expected: > 0", size)
-	}
+	require.NoError(batch.Put(key, value))
+	require.Positive(batch.Size())
 
 	// Modify the key
-	keyCopy := key
-	key = []byte("jello")
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	key[0] = 'j'
+	require.NoError(batch.Write())
 
 	// Make sure the original key was written to the database
-	if has, err := db.Has(keyCopy); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(keyCopy); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(valueCopy, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
+	has, err := db.Has(keyCopy)
+	require.NoError(err)
+	require.True(has)
+
+	v, err := db.Get(keyCopy)
+	require.NoError(err)
+	require.Equal(valueCopy, v)
 
 	// Make sure the new key wasn't written to the database
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatal("database shouldn't have the new key")
-	}
+	has, err = db.Has(key)
+	require.NoError(err)
+	require.False(has)
 }
 
 // TestBatchReset tests to make sure that a batch drops un-written operations
 // when it is reset.
 func TestBatchReset(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello")
 	value := []byte("world")
 
-	if err := db.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on db.Put: %s", err)
-	}
+	require.NoError(db.Put(key, value))
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on batch.Delete: %s", err)
-	}
+	require.NoError(batch.Delete(key))
 
 	batch.Reset()
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	require.Zero(batch.Size())
+	require.NoError(batch.Write())
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(key); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.True(has)
+
+	v, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value, v)
 }
 
 // TestBatchReuse tests to make sure that a batch can be reused once it is
 // reset.
 func TestBatchReuse(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -396,100 +369,73 @@ func TestBatchReuse(t *testing.T, db Database) {
 	value2 := []byte("world2")
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(batch.Put(key1, value1))
+	require.NoError(batch.Write())
+	require.NoError(db.Delete(key1))
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
-
-	if err := db.Delete(key1); err != nil {
-		t.Fatalf("Unexpected error on database.Delete: %s", err)
-	}
-
-	if has, err := db.Has(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key1)
-	}
+	has, err := db.Has(key1)
+	require.NoError(err)
+	require.False(has)
 
 	batch.Reset()
 
-	if err := batch.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.Zero(batch.Size())
+	require.NoError(batch.Put(key2, value2))
+	require.NoError(batch.Write())
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	has, err = db.Has(key1)
+	require.NoError(err)
+	require.False(has)
 
-	if has, err := db.Has(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key1)
-	} else if has, err := db.Has(key2); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key2)
-	} else if v, err := db.Get(key2); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value2, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value2)
-	}
+	has, err = db.Has(key2)
+	require.NoError(err)
+	require.True(has)
+
+	v, err := db.Get(key2)
+	require.NoError(err)
+	require.Equal(value2, v)
 }
 
 // TestBatchRewrite tests to make sure that write can be called multiple times
 // on a batch and the values will be updated correctly.
 func TestBatchRewrite(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello1")
 	value := []byte("world1")
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(batch.Put(key, value))
+	require.NoError(batch.Write())
+	require.NoError(db.Delete(key))
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	has, err := db.Has(key)
+	require.NoError(err)
+	require.False(has)
 
-	if err := db.Delete(key); err != nil {
-		t.Fatalf("Unexpected error on database.Delete: %s", err)
-	}
+	require.NoError(batch.Write())
 
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if has {
-		t.Fatalf("db.Has unexpectedly returned true on key %s", key)
-	}
+	has, err = db.Has(key)
+	require.NoError(err)
+	require.True(has)
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
-
-	if has, err := db.Has(key); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key)
-	} else if v, err := db.Get(key); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value)
-	}
+	v, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(value, v)
 }
 
 // TestBatchReplay tests to make sure that batches will correctly replay their
 // contents.
 func TestBatchReplay(t *testing.T, db Database) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -497,64 +443,66 @@ func TestBatchReplay(t *testing.T, db Database) {
 	value2 := []byte("world2")
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
-	if err := batch.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := batch.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(batch.Put(key1, value1))
+	require.NoError(batch.Put(key2, value2))
+	require.NoError(batch.Delete(key1))
+	require.NoError(batch.Delete(key2))
+	require.NoError(batch.Put(key1, value2))
 
-	secondBatch := db.NewBatch()
-	if secondBatch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	for i := 0; i < 2; i++ {
+		mockBatch := NewMockBatch(ctrl)
+		gomock.InOrder(
+			mockBatch.EXPECT().Put(key1, value1).Times(1),
+			mockBatch.EXPECT().Put(key2, value2).Times(1),
+			mockBatch.EXPECT().Delete(key1).Times(1),
+			mockBatch.EXPECT().Delete(key2).Times(1),
+			mockBatch.EXPECT().Put(key1, value2).Times(1),
+		)
 
-	if err := batch.Replay(secondBatch); err != nil {
-		t.Fatalf("Unexpected error on batch.Replay: %s", err)
+		require.NoError(batch.Replay(mockBatch))
 	}
+}
 
-	if err := secondBatch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+// TestBatchReplayPropagateError tests to make sure that batches will correctly
+// propagate any returned error during Replay.
+func TestBatchReplayPropagateError(t *testing.T, db Database) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	if has, err := db.Has(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key1)
-	} else if v, err := db.Get(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value1, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value1)
-	}
+	require := require.New(t)
 
-	thirdBatch := db.NewBatch()
-	if thirdBatch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
 
-	if err := thirdBatch.Delete(key1); err != nil {
-		t.Fatalf("Unexpected error on batch.Delete: %s", err)
-	} else if err := thirdBatch.Delete(key2); err != nil {
-		t.Fatalf("Unexpected error on batch.Delete: %s", err)
-	}
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
 
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
+	batch := db.NewBatch()
+	require.NotNil(batch)
 
-	if err := batch.Replay(db); err != ErrClosed {
-		t.Fatalf("Expected %s on batch.Replay", ErrClosed)
-	} else if err := thirdBatch.Replay(db); err != ErrClosed {
-		t.Fatalf("Expected %s on batch.Replay", ErrClosed)
-	}
+	require.NoError(batch.Put(key1, value1))
+	require.NoError(batch.Put(key2, value2))
+
+	mockBatch := NewMockBatch(ctrl)
+	gomock.InOrder(
+		mockBatch.EXPECT().Put(key1, value1).Return(ErrClosed).Times(1),
+	)
+	require.Equal(ErrClosed, batch.Replay(mockBatch))
+
+	mockBatch = NewMockBatch(ctrl)
+	gomock.InOrder(
+		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
+	)
+	require.Equal(io.ErrClosedPipe, batch.Replay(mockBatch))
 }
 
 // TestBatchInner tests to make sure that inner can be used to write to the
 // database.
 func TestBatchInner(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -562,70 +510,54 @@ func TestBatchInner(t *testing.T, db Database) {
 	value2 := []byte("world2")
 
 	firstBatch := db.NewBatch()
-	if firstBatch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(firstBatch)
 
-	if err := firstBatch.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(firstBatch.Put(key1, value1))
 
 	secondBatch := db.NewBatch()
-	if secondBatch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(firstBatch)
 
-	if err := secondBatch.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(secondBatch.Put(key2, value2))
 
 	innerFirstBatch := firstBatch.Inner()
+	require.NotNil(innerFirstBatch)
+
 	innerSecondBatch := secondBatch.Inner()
+	require.NotNil(innerSecondBatch)
 
-	if err := innerFirstBatch.Replay(innerSecondBatch); err != nil {
-		t.Fatalf("Unexpected error on batch.Replay: %s", err)
-	}
+	require.NoError(innerFirstBatch.Replay(innerSecondBatch))
+	require.NoError(innerSecondBatch.Write())
 
-	if err := innerSecondBatch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	has, err := db.Has(key1)
+	require.NoError(err)
+	require.True(has)
 
-	if has, err := db.Has(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key1)
-	} else if v, err := db.Get(key1); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value1, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value1)
-	} else if has, err := db.Has(key2); err != nil {
-		t.Fatalf("Unexpected error on db.Has: %s", err)
-	} else if !has {
-		t.Fatalf("db.Has unexpectedly returned false on key %s", key2)
-	} else if v, err := db.Get(key2); err != nil {
-		t.Fatalf("Unexpected error on db.Get: %s", err)
-	} else if !bytes.Equal(value2, v) {
-		t.Fatalf("db.Get: Returned: 0x%x ; Expected: 0x%x", v, value2)
-	}
+	v, err := db.Get(key1)
+	require.NoError(err)
+	require.Equal(value1, v)
+
+	has, err = db.Has(key2)
+	require.NoError(err)
+	require.True(has)
+
+	v, err = db.Get(key2)
+	require.NoError(err)
+	require.Equal(value2, v)
 }
 
 // TestBatchLargeSize tests to make sure that the batch can support a large
 // amount of entries.
 func TestBatchLargeSize(t *testing.T, db Database) {
-	totalSize := 8 * units.MiB   // 8 MiB
-	elementSize := 4 * units.KiB // 4 KiB
-	pairSize := 2 * elementSize  // 8 KiB
+	require := require.New(t)
 
-	bytes := make([]byte, totalSize)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	totalSize := 8 * units.MiB
+	elementSize := 4 * units.KiB
+	pairSize := 2 * elementSize // 8 KiB
+
+	bytes := utils.RandomBytes(totalSize)
 
 	batch := db.NewBatch()
-	if batch == nil {
-		t.Fatalf("db.NewBatch returned nil")
-	}
+	require.NotNil(batch)
 
 	for len(bytes) > pairSize {
 		key := bytes[:elementSize]
@@ -634,141 +566,108 @@ func TestBatchLargeSize(t *testing.T, db Database) {
 		value := bytes[:elementSize]
 		bytes = bytes[elementSize:]
 
-		if err := batch.Put(key, value); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(batch.Put(key, value))
 	}
 
-	if err := batch.Write(); err != nil {
-		t.Fatalf("Unexpected error on batch.Write: %s", err)
-	}
+	require.NoError(batch.Write())
 }
 
 // TestIteratorSnapshot tests to make sure the database iterates over a snapshot
 // of the database at the time of the iterator creation.
 func TestIteratorSnapshot(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
 	key2 := []byte("hello2")
 	value2 := []byte("world2")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
-	if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key2, value2))
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key1) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key1)
-	} else if value := iterator.Value(); !bytes.Equal(value, value1) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != nil {
-		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
-	}
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
 // TestIterator tests to make sure the database iterates over the database
 // contents lexicographically.
 func TestIterator(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
 	key2 := []byte("hello2")
 	value2 := []byte("world2")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key1) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key1)
-	} else if value := iterator.Value(); !bytes.Equal(value, value1) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key2) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key2)
-	} else if value := iterator.Value(); !bytes.Equal(value, value2) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value2)
-	} else if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != nil {
-		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
-	}
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.True(iterator.Next())
+	require.Equal(key2, iterator.Key())
+	require.Equal(value2, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
 // TestIteratorStart tests to make sure the the iterator can be configured to
 // start mid way through the database.
 func TestIteratorStart(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
 	key2 := []byte("hello2")
 	value2 := []byte("world2")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	iterator := db.NewIteratorWithStart(key2)
-	if iterator == nil {
-		t.Fatalf("db.NewIteratorWithStart returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key2) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key2)
-	} else if value := iterator.Value(); !bytes.Equal(value, value2) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value2)
-	} else if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != nil {
-		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
-	}
+	require.True(iterator.Next())
+	require.Equal(key2, iterator.Key())
+	require.Equal(value2, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
 // TestIteratorPrefix tests to make sure the iterator can be configured to skip
 // keys missing the provided prefix.
 func TestIteratorPrefix(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello")
 	value1 := []byte("world1")
 
@@ -778,40 +677,30 @@ func TestIteratorPrefix(t *testing.T, db Database) {
 	key3 := []byte("joy")
 	value3 := []byte("world3")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key3, value3); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
 	iterator := db.NewIteratorWithPrefix([]byte("h"))
-	if iterator == nil {
-		t.Fatalf("db.NewIteratorWithPrefix returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key1) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key1)
-	} else if value := iterator.Value(); !bytes.Equal(value, value1) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != nil {
-		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
-	}
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
 // TestIteratorStartPrefix tests to make sure that the iterator can start mid
 // way through the database while skipping a prefix.
 func TestIteratorStartPrefix(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -821,46 +710,34 @@ func TestIteratorStartPrefix(t *testing.T, db Database) {
 	key3 := []byte("hello3")
 	value3 := []byte("world3")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key3, value3); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
 	iterator := db.NewIteratorWithStartAndPrefix(key1, []byte("h"))
-	if iterator == nil {
-		t.Fatalf("db.NewIteratorWithStartAndPrefix returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key1) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key1)
-	} else if value := iterator.Value(); !bytes.Equal(value, value1) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	} else if key := iterator.Key(); !bytes.Equal(key, key3) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key3)
-	} else if value := iterator.Value(); !bytes.Equal(value, value3) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value3)
-	} else if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != nil {
-		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
-	}
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.True(iterator.Next())
+	require.Equal(key3, iterator.Key())
+	require.Equal(value3, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
 // TestIteratorMemorySafety tests to make sure that keys can values are able to
 // be modified from the returned iterator.
 func TestIteratorMemorySafety(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -870,18 +747,13 @@ func TestIteratorMemorySafety(t *testing.T, db Database) {
 	key3 := []byte("hello3")
 	value3 := []byte("world3")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key3, value3); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
 	keys := [][]byte{}
@@ -907,99 +779,68 @@ func TestIteratorMemorySafety(t *testing.T, db Database) {
 		expectedKey := expectedKeys[i]
 		expectedValue := expectedValues[i]
 
-		if !bytes.Equal(key, expectedKey) {
-			t.Fatalf("Wrong key")
-		}
-		if !bytes.Equal(value, expectedValue) {
-			t.Fatalf("Wrong key")
-		}
+		require.Equal(expectedKey, key)
+		require.Equal(expectedValue, value)
 	}
 }
 
 // TestIteratorClosed tests to make sure that an iterator that was created with
 // a closed database will report a closed error correctly.
 func TestIteratorClosed(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
-
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Close())
 
 	{
 		iterator := db.NewIterator()
-		if iterator == nil {
-			t.Fatalf("db.NewIterator returned nil")
-		}
+		require.NotNil(iterator)
+
 		defer iterator.Release()
 
-		if iterator.Next() {
-			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-		} else if key := iterator.Key(); key != nil {
-			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-		} else if value := iterator.Value(); value != nil {
-			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-		} else if err := iterator.Error(); err != ErrClosed {
-			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
-		}
+		require.False(iterator.Next())
+		require.Nil(iterator.Key())
+		require.Nil(iterator.Value())
+		require.Equal(ErrClosed, iterator.Error())
 	}
 
 	{
 		iterator := db.NewIteratorWithPrefix(nil)
-		if iterator == nil {
-			t.Fatalf("db.NewIteratorWithPrefix returned nil")
-		}
+		require.NotNil(iterator)
+
 		defer iterator.Release()
 
-		if iterator.Next() {
-			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-		} else if key := iterator.Key(); key != nil {
-			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-		} else if value := iterator.Value(); value != nil {
-			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-		} else if err := iterator.Error(); err != ErrClosed {
-			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
-		}
+		require.False(iterator.Next())
+		require.Nil(iterator.Key())
+		require.Nil(iterator.Value())
+		require.Equal(ErrClosed, iterator.Error())
 	}
 
 	{
 		iterator := db.NewIteratorWithStart(nil)
-		if iterator == nil {
-			t.Fatalf("db.NewIteratorWithStart returned nil")
-		}
+		require.NotNil(iterator)
+
 		defer iterator.Release()
 
-		if iterator.Next() {
-			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-		} else if key := iterator.Key(); key != nil {
-			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-		} else if value := iterator.Value(); value != nil {
-			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-		} else if err := iterator.Error(); err != ErrClosed {
-			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
-		}
+		require.False(iterator.Next())
+		require.Nil(iterator.Key())
+		require.Nil(iterator.Value())
+		require.Equal(ErrClosed, iterator.Error())
 	}
 
 	{
 		iterator := db.NewIteratorWithStartAndPrefix(nil, nil)
-		if iterator == nil {
-			t.Fatalf("db.NewIteratorWithStartAndPrefix returned nil")
-		}
+		require.NotNil(iterator)
+
 		defer iterator.Release()
 
-		if iterator.Next() {
-			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-		} else if key := iterator.Key(); key != nil {
-			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-		} else if value := iterator.Value(); value != nil {
-			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-		} else if err := iterator.Error(); err != ErrClosed {
-			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
-		}
+		require.False(iterator.Next())
+		require.Nil(iterator.Key())
+		require.Nil(iterator.Value())
+		require.Equal(ErrClosed, iterator.Error())
 	}
 }
 
@@ -1009,86 +850,62 @@ func TestIteratorClosed(t *testing.T, db Database) {
 // Additionally tests that an iterator that has already called Next() can still serve
 // its current value after the underlying DB was closed.
 func TestIteratorError(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
+
 	key2 := []byte("hello2")
 	value2 := []byte("world2")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
-	if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
+
 	defer iterator.Release()
 
 	// Call Next() and ensure that if the database is closed, the iterator
 	// can still report the current contents.
-	if !iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
-
-	if itKey := iterator.Key(); !bytes.Equal(itKey, key1) {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", itKey, key1)
-	}
-	if itValue := iterator.Value(); !bytes.Equal(itValue, value1) {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", itValue, value1)
-	}
+	require.True(iterator.Next())
+	require.NoError(db.Close())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
 
 	// Subsequent calls to the iterator should return false and report an error
-	if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	}
-	if err := iterator.Error(); err != ErrClosed {
-		t.Fatalf("iterator.Error Returned: %v ; Expected: %v", err, ErrClosed)
-	}
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.Equal(ErrClosed, iterator.Error())
 }
 
 // TestIteratorErrorAfterRelease tests to make sure that an iterator that was
 // released still reports the error correctly.
 func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key := []byte("hello1")
 	value := []byte("world1")
 
-	if err := db.Put(key, value); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
-
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
+	require.NoError(db.Put(key, value))
+	require.NoError(db.Close())
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
 
 	iterator.Release()
 
-	if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
-	}
-	if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	}
-	if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	}
-	if err := iterator.Error(); err != ErrClosed {
-		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
-	}
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.Equal(ErrClosed, iterator.Error())
 }
 
 // TestCompactNoPanic tests to make sure compact never panics.
 func TestCompactNoPanic(t *testing.T, db Database) {
+	require := require.New(t)
+
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
@@ -1098,25 +915,13 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	key3 := []byte("hello3")
 	value3 := []byte("world3")
 
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key3, value3); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
-	if err := db.Compact(nil, nil); err != nil {
-		t.Fatalf("Unexpected error on db.Compact")
-	}
-
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
-
-	if err := db.Compact(nil, nil); err != ErrClosed {
-		t.Fatalf("Expected error %s on db.Close but got %s", ErrClosed, err)
-	}
+	require.NoError(db.Compact(nil, nil))
+	require.NoError(db.Close())
+	require.Equal(ErrClosed, db.Compact(nil, nil))
 }
 
 // TestClear tests to make sure the deletion helper works as expected.
@@ -1132,28 +937,21 @@ func TestClear(t *testing.T, db Database) {
 	key3 := []byte("hello3")
 	value3 := []byte("world3")
 
-	err := db.Put(key1, value1)
-	require.NoError(err)
-
-	err = db.Put(key2, value2)
-	require.NoError(err)
-
-	err = db.Put(key3, value3)
-	require.NoError(err)
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
 	count, err := Count(db)
 	require.NoError(err)
 	require.Equal(3, count)
 
-	err = Clear(db, db)
-	require.NoError(err)
+	require.NoError(Clear(db, db))
 
 	count, err = Count(db)
 	require.NoError(err)
 	require.Equal(0, count)
 
-	err = db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 }
 
 // TestClearPrefix tests to make sure prefix deletion works as expected.
@@ -1169,21 +967,15 @@ func TestClearPrefix(t *testing.T, db Database) {
 	key3 := []byte("hello3")
 	value3 := []byte("world3")
 
-	err := db.Put(key1, value1)
-	require.NoError(err)
-
-	err = db.Put(key2, value2)
-	require.NoError(err)
-
-	err = db.Put(key3, value3)
-	require.NoError(err)
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
 	count, err := Count(db)
 	require.NoError(err)
 	require.Equal(3, count)
 
-	err = ClearPrefix(db, db, []byte("hello"))
-	require.NoError(err)
+	require.NoError(ClearPrefix(db, db, []byte("hello")))
 
 	count, err = Count(db)
 	require.NoError(err)
@@ -1201,8 +993,7 @@ func TestClearPrefix(t *testing.T, db Database) {
 	require.NoError(err)
 	require.False(has)
 
-	err = db.Close()
-	require.NoError(err)
+	require.NoError(db.Close())
 }
 
 func TestModifyValueAfterPut(t *testing.T, db Database) {
@@ -1210,10 +1001,9 @@ func TestModifyValueAfterPut(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
-	err := db.Put(key, value)
-	require.NoError(err)
+	require.NoError(db.Put(key, value))
 
 	// Modify the value that was Put into the database
 	// to see if the database copied the value correctly.
@@ -1228,17 +1018,15 @@ func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
 	batch := db.NewBatch()
-	err := batch.Put(key, value)
-	require.NoError(err)
+	require.NoError(batch.Put(key, value))
 
 	// Modify the value that was Put into the Batch and then Write the
 	// batch to the database.
 	value[0] = 2
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Write())
 
 	// Verify that the value written to the database contains matches the original
 	// value of the byte slice when Put was called.
@@ -1252,11 +1040,10 @@ func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
 
 	key := []byte{1}
 	value := []byte{1, 2}
-	originalValue := utils.CopyBytes(value)
+	originalValue := slices.Clone(value)
 
 	batch := db.NewBatch()
-	err := batch.Put(key, value)
-	require.NoError(err)
+	require.NoError(batch.Put(key, value))
 
 	// Modify the value that was Put into the Batch and then Write the
 	// batch to the database.
@@ -1264,10 +1051,8 @@ func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
 
 	// Create a new batch and replay the batch onto this one before writing it to the DB.
 	replayBatch := db.NewBatch()
-	err = batch.Replay(replayBatch)
-	require.NoError(err)
-	err = replayBatch.Write()
-	require.NoError(err)
+	require.NoError(batch.Replay(replayBatch))
+	require.NoError(replayBatch.Write())
 
 	// Verify that the value written to the database contains matches the original
 	// value of the byte slice when Put was called.
@@ -1340,15 +1125,13 @@ func TestPutGetEmpty(t *testing.T, db Database) {
 
 	key := []byte("hello")
 
-	err := db.Put(key, nil)
-	require.NoError(err)
+	require.NoError(db.Put(key, nil))
 
 	value, err := db.Get(key)
 	require.NoError(err)
 	require.Empty(value) // May be nil or empty byte slice.
 
-	err = db.Put(key, []byte{})
-	require.NoError(err)
+	require.NoError(db.Put(key, []byte{}))
 
 	value, err = db.Get(key)
 	require.NoError(err)
@@ -1359,8 +1142,7 @@ func FuzzKeyValue(f *testing.F, db Database) {
 	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
 		require := require.New(t)
 
-		err := db.Put(key, value)
-		require.NoError(err)
+		require.NoError(db.Put(key, value))
 
 		exists, err := db.Has(key)
 		require.NoError(err)
@@ -1370,14 +1152,13 @@ func FuzzKeyValue(f *testing.F, db Database) {
 		require.NoError(err)
 		require.True(bytes.Equal(value, gotVal))
 
-		err = db.Delete(key)
-		require.NoError(err)
+		require.NoError(db.Delete(key))
 
 		exists, err = db.Has(key)
 		require.NoError(err)
 		require.False(exists)
 
 		_, err = db.Get(key)
-		require.ErrorIs(err, ErrNotFound)
+		require.Equal(ErrNotFound, err)
 	})
 }

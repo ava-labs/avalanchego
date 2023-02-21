@@ -894,3 +894,44 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 		t.Fatalf("Parsed blk1 reported incorrect height. Expected %d got %d", blk1.Height(), parsedBlk1.Height())
 	}
 }
+
+func TestIsProcessing(t *testing.T) {
+	testBlks := NewTestBlocks(2)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	chainState := NewState(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
+	})
+
+	// Parse blk1
+	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
+	require.NoError(t, err)
+
+	// Check that it is not processing in consensus
+	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+
+	// Verify blk1
+	err = parsedBlk1.Verify(context.Background())
+	require.NoError(t, err)
+
+	// Check that it is processing in consensus
+	require.True(t, chainState.IsProcessing(parsedBlk1.ID()))
+
+	// Accept blk1
+	err = parsedBlk1.Accept(context.Background())
+	require.NoError(t, err)
+
+	// Check that it is no longer processing in consensus
+	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+}

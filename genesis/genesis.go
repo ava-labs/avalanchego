@@ -33,6 +33,7 @@ const (
 )
 
 var (
+	errStakeDurationTooHigh   = errors.New("initial stake duration larger than maximum configured")
 	errNoInitiallyStakedFunds = errors.New("initial staked funds cannot be empty")
 	errNoSupply               = errors.New("initial supply must be > 0")
 	errNoStakeDuration        = errors.New("initial stake duration must be > 0")
@@ -106,7 +107,7 @@ func validateInitialStakedFunds(config *Config) error {
 
 // validateConfig returns an error if the provided
 // *Config is not considered valid.
-func validateConfig(networkID uint32, config *Config) error {
+func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig) error {
 	if networkID != config.NetworkID {
 		return fmt.Errorf(
 			"networkID %d specified but genesis config contains networkID %d",
@@ -137,6 +138,12 @@ func validateConfig(networkID uint32, config *Config) error {
 	// 15 minutes.
 	if config.InitialStakeDuration == 0 {
 		return errNoStakeDuration
+	}
+
+	// Initial stake duration of genesis validators must be
+	// not larger than maximal stake duration specified for any validator.
+	if config.InitialStakeDuration > uint64(stakingCfg.MaxStakeDuration.Seconds()) {
+		return errStakeDurationTooHigh
 	}
 
 	if len(config.InitialStakers) == 0 {
@@ -183,7 +190,7 @@ func validateConfig(networkID uint32, config *Config) error {
 //  1. The byte representation of the genesis state of the platform chain
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
-func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
+func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
@@ -198,7 +205,7 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
 	}
 
-	if err := validateConfig(networkID, config); err != nil {
+	if err := validateConfig(networkID, config, stakingCfg); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
 	}
 
@@ -224,7 +231,7 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 //  1. The byte representation of the genesis state of the platform chain
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
-func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
+func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
@@ -239,7 +246,7 @@ func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("unable to load genesis content from flag: %w", err)
 	}
 
-	if err := validateConfig(networkID, customConfig); err != nil {
+	if err := validateConfig(networkID, customConfig, stakingCfg); err != nil {
 		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
 	}
 

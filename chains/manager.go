@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -52,7 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
@@ -76,9 +76,10 @@ const (
 )
 
 var (
-	errUnknownVMType    = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped  = errors.New("subnets not bootstrapped")
+	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped        = errors.New("subnets not bootstrapped")
+	errNoPlatformSubnetConfig = errors.New("subnet config for platform chain not found")
 
 	_ Manager = (*manager)(nil)
 )
@@ -116,7 +117,7 @@ type Manager interface {
 
 	// Starts the chain creator with the initial platform chain parameters, must
 	// be called once.
-	StartChainCreator(platformChain ChainParameters)
+	StartChainCreator(platformChain ChainParameters) error
 
 	Shutdown()
 }
@@ -169,7 +170,6 @@ type ManagerConfig struct {
 	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
-	ConsensusParams             avcon.Parameters           // The consensus parameters (alpha, beta, etc.) for new chains
 	Validators                  validators.Manager         // Validators validating on this chain
 	NodeID                      ids.NodeID                 // The ID of this node
 	NetworkID                   uint32                     // ID of the network this node is connected to
@@ -182,18 +182,16 @@ type ManagerConfig struct {
 	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
-	RetryBootstrap              bool                    // Should Bootstrap be retried
-	RetryBootstrapWarnFrequency int                     // Max number of times to retry bootstrap before warning the node operator
-	SubnetConfigs               map[ids.ID]SubnetConfig // ID -> SubnetConfig
-	ChainConfigs                map[string]ChainConfig  // alias -> ChainConfig
+	RetryBootstrap              bool                      // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                       // Max number of times to retry bootstrap before warning the node operator
+	SubnetConfigs               map[ids.ID]subnets.Config // ID -> SubnetConfig
+	ChainConfigs                map[string]ChainConfig    // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 	Metrics          metrics.MultiGatherer
 
 	ConsensusGossipFrequency time.Duration
-
-	GossipConfig sender.GossipConfig
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -233,7 +231,7 @@ type manager struct {
 	subnetsLock sync.Mutex
 	// Key: Subnet's ID
 	// Value: Subnet description
-	subnets map[ids.ID]Subnet
+	subnets map[ids.ID]subnets.Subnet
 
 	chainsLock sync.Mutex
 	// Key: Chain's ID
@@ -249,7 +247,7 @@ func New(config *ManagerConfig) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
-		subnets:                make(map[ids.ID]Subnet),
+		subnets:                make(map[ids.ID]subnets.Subnet),
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
@@ -266,18 +264,24 @@ func (m *manager) Router() router.Router {
 // Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	m.subnetsLock.Lock()
-	sb, exists := m.subnets[chainParams.SubnetID]
+	subnetID := chainParams.SubnetID
+	sb, exists := m.subnets[subnetID]
 	if !exists {
-		sb = newSubnet()
+		sbConfig, ok := m.SubnetConfigs[subnetID]
+		if !ok {
+			// default to primary subnet config
+			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
+		}
+		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
 	}
-	addedChain := sb.addChain(chainParams.ID)
+	addedChain := sb.AddChain(chainParams.ID)
 	m.subnetsLock.Unlock()
 
 	if !addedChain {
 		m.Log.Debug("skipping chain creation",
 			zap.String("reason", "chain already staged"),
-			zap.Stringer("subnetID", chainParams.SubnetID),
+			zap.Stringer("subnetID", subnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -287,7 +291,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Warn("skipping chain creation",
 			zap.String("reason", "couldn't enqueue chain"),
-			zap.Stringer("subnetID", chainParams.SubnetID),
+			zap.Stringer("subnetID", subnetID),
 			zap.Stringer("chainID", chainParams.ID),
 			zap.Stringer("vmID", chainParams.VMID),
 		)
@@ -399,7 +403,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 }
 
 // Create a chain
-func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, error) {
+func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*chain, error) {
 	if chainParams.ID != constants.PlatformChainID && chainParams.VMID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
@@ -446,7 +450,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			BCLookup:     m,
 			Metrics:      vmMetrics,
 
-			TeleporterSigner: teleporter.NewSigner(m.StakingBLSKey, chainParams.ID),
+			WarpSigner: warp.NewSigner(m.StakingBLSKey, chainParams.ID),
 
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
@@ -454,10 +458,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
 		Registerer:        consensusMetrics,
-	}
-
-	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		ctx.ValidatorOnly.Set(subnetConfig.ValidatorOnly)
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -493,14 +493,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		}
 	}
 
-	consensusParams := m.ConsensusParams
-	// short circuit it before reading from subnetConfigs
-	if chainParams.SubnetID != constants.PrimaryNetworkID {
-		if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-			consensusParams = subnetConfig.ConsensusParameters
-		}
-	}
-
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.StakingEnabled {
@@ -529,7 +521,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			beacons,
 			vm,
 			fxs,
-			consensusParams,
 			bootstrapWeight,
 			sb,
 		)
@@ -544,7 +535,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			beacons,
 			vm,
 			fxs,
-			consensusParams.Parameters,
 			bootstrapWeight,
 			sb,
 		)
@@ -575,9 +565,8 @@ func (m *manager) createAvalancheChain(
 	beacons validators.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
-	consensusParams avcon.Parameters,
 	bootstrapWeight uint64,
-	sb Subnet,
+	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -607,14 +596,6 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	gossipConfig := m.GossipConfig
-	// short circuit it before reading from subnetConfigs
-	if ctx.SubnetID != constants.PrimaryNetworkID {
-		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
-			gossipConfig = subnetConfig.GossipConfig
-		}
-	}
-
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
 		ctx,
@@ -622,8 +603,8 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		gossipConfig,
 		p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		sb,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -676,6 +657,7 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
+	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -686,10 +668,10 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		vdrs,
 		msgChan,
-		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
+		sb,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -701,13 +683,12 @@ func (m *manager) createAvalancheChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		Subnet:                         sb,
+		BootstrapTracker:               sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
@@ -798,9 +779,8 @@ func (m *manager) createSnowmanChain(
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
-	consensusParams snowball.Parameters,
 	bootstrapWeight uint64,
-	sb Subnet,
+	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -824,14 +804,6 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	gossipConfig := m.GossipConfig
-	// short circuit it before reading from subnetConfigs
-	if ctx.SubnetID != constants.PrimaryNetworkID {
-		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
-			gossipConfig = subnetConfig.GossipConfig
-		}
-	}
-
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
 		ctx,
@@ -839,8 +811,8 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		gossipConfig,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		sb,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -953,6 +925,7 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
+	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -963,10 +936,10 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		vdrs,
 		msgChan,
-		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.ResourceTracker,
 		subnetConnector,
+		sb,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
@@ -978,13 +951,12 @@ func (m *manager) createSnowmanChain(
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
-		Validators:                     vdrs,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		Subnet:                         sb,
+		BootstrapTracker:               sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
@@ -1012,7 +984,7 @@ func (m *manager) createSnowmanChain(
 		VM:            vm,
 		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
-		Params:        consensusParams,
+		Params:        consensusParams.Parameters,
 		Consensus:     consensus,
 	}
 	engine, err := smeng.New(engineConfig)
@@ -1125,21 +1097,29 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 }
 
 // Starts chain creation loop to process queued chains
-func (m *manager) StartChainCreator(platform ChainParameters) {
+func (m *manager) StartChainCreator(platformParams ChainParameters) error {
+	// Get the Primary Network's subnet config. If it wasn't registered, then we
+	// throw a fatal error.
+	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
+	if !ok {
+		return errNoPlatformSubnetConfig
+	}
+
 	m.subnetsLock.Lock()
-	sb := newSubnet()
-	m.subnets[platform.SubnetID] = sb
-	sb.addChain(platform.ID)
+	sb := subnets.New(m.NodeID, sbConfig)
+	m.subnets[platformParams.SubnetID] = sb
+	sb.AddChain(platformParams.ID)
 	m.subnetsLock.Unlock()
 
 	// The P-chain is created synchronously to ensure that `VM.Initialize` has
 	// finished before returning from this function. This is required because
 	// the P-chain initializes state that the rest of the node initialization
 	// depends on.
-	m.createChain(platform)
+	m.createChain(platformParams)
 
 	m.Log.Info("starting chain creator")
 	go m.dispatchChainCreator()
+	return nil
 }
 
 func (m *manager) dispatchChainCreator() {

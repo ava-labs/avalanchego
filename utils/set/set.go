@@ -5,18 +5,20 @@ package set
 
 import (
 	"bytes"
-	"encoding/json"
+
+	stdjson "encoding/json"
 
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // The minimum capacity of a set
 const minSetSize = 16
 
-var _ json.Marshaler = (*Set[int])(nil)
+var _ stdjson.Marshaler = (*Set[int])(nil)
 
 // Set is a set of elements.
 type Set[T comparable] map[T]struct{}
@@ -153,6 +155,20 @@ func (s *Set[T]) Pop() (T, bool) {
 	return utils.Zero[T](), false
 }
 
+func (s *Set[T]) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == json.Null {
+		return nil
+	}
+	var elts []T
+	if err := stdjson.Unmarshal(b, &elts); err != nil {
+		return err
+	}
+	s.Clear()
+	s.Add(elts...)
+	return nil
+}
+
 func (s *Set[_]) MarshalJSON() ([]byte, error) {
 	var (
 		eltBytes = make([][]byte, len(*s))
@@ -160,7 +176,7 @@ func (s *Set[_]) MarshalJSON() ([]byte, error) {
 		err      error
 	)
 	for elt := range *s {
-		eltBytes[i], err = json.Marshal(elt)
+		eltBytes[i], err = stdjson.Marshal(elt)
 		if err != nil {
 			return nil, err
 		}

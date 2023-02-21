@@ -22,11 +22,14 @@ type entry[K comparable, V any] struct {
 // LRU is a key value store with bounded size. If the size is attempted to be
 // exceeded, then an element is removed from the cache before the insertion is
 // done, based on evicting the least recently used value.
-type LRU[K comparable, _ any] struct {
+type LRU[K comparable, V any] struct {
 	lock      sync.Mutex
 	entryMap  map[K]*list.Element
 	entryList *list.List
 	Size      int
+	// OnEviction is called with an internal lock held, and therefore should
+	// never call any methods on the cache internally.
+	OnEviction func(V)
 }
 
 func (c *LRU[K, V]) Put(key K, value V) {
@@ -76,6 +79,9 @@ func (c *LRU[K, V]) resize() {
 
 		val := e.Value.(*entry[K, V])
 		delete(c.entryMap, val.Key)
+		if c.OnEviction != nil {
+			c.OnEviction(val.Value)
+		}
 	}
 }
 
@@ -90,6 +96,9 @@ func (c *LRU[K, V]) put(key K, value V) {
 
 			val := e.Value.(*entry[K, V])
 			delete(c.entryMap, val.Key)
+			if c.OnEviction != nil {
+				c.OnEviction(val.Value)
+			}
 			val.Key = key
 			val.Value = value
 		} else {
@@ -120,18 +129,30 @@ func (c *LRU[K, V]) get(key K) (V, bool) {
 	return utils.Zero[V](), false
 }
 
-func (c *LRU[K, _]) evict(key K) {
+func (c *LRU[K, V]) evict(key K) {
 	c.init()
 	c.resize()
 
 	if e, ok := c.entryMap[key]; ok {
 		c.entryList.Remove(e)
 		delete(c.entryMap, key)
+
+		if c.OnEviction != nil {
+			val := e.Value.(*entry[K, V])
+			c.OnEviction(val.Value)
+		}
 	}
 }
 
-func (c *LRU[K, _]) flush() {
+func (c *LRU[K, V]) flush() {
 	c.init()
+
+	if c.OnEviction != nil {
+		for _, v := range c.entryMap {
+			val := v.Value.(*entry[K, V])
+			c.OnEviction(val.Value)
+		}
+	}
 
 	c.entryMap = make(map[K]*list.Element, minCacheSize)
 	c.entryList = list.New()

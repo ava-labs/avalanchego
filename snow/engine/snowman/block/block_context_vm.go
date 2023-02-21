@@ -33,6 +33,14 @@ type BuildBlockWithContextChainVM interface {
 	BuildBlockWithContext(ctx context.Context, blockCtx *Context) (snowman.Block, error)
 }
 
+// WithVerifyContext defines the interface a Block can optionally implement to
+// consider the P-Chain height when verifying itself.
+//
+// As with all Blocks, it is guaranteed for verification to be called in
+// topological order.
+//
+// If the status of the block is Accepted or Rejected; VerifyWithContext will
+// never be called.
 type WithVerifyContext interface {
 	// Returns true if [VerifyWithContext] should be called.
 	// Returns false if [Verify] should be called.
@@ -48,5 +56,13 @@ type WithVerifyContext interface {
 	// It is guaranteed that the Parent has been successfully verified.
 	//
 	// This method may be called again with a different context.
+	//
+	// If nil is returned, it is guaranteed that either Accept or Reject will be
+	// called on this block, unless the VM is shut down.
+	//
+	// Note: During `Accept` the block context is not provided. This implies
+	// that the block context provided here can not be used to alter any
+	// potential state transition that assumes network agreement. The block
+	// context should only be used to determine the validity of the block.
 	VerifyWithContext(context.Context, *Context) error
 }

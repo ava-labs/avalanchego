@@ -40,5 +40,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	runner.Run(runnerConfig, nodeConfig)
+	runner.Run(nodeConfig)
 }

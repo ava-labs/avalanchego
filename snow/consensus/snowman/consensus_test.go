@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -152,7 +153,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		t.Fatalf("expected %d blocks to be processing but returned %d", 1, numProcessing)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -487,7 +488,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -549,7 +550,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(firstBlock.ID())
 
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
@@ -615,7 +616,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), firstBlock))
 	require.NoError(sm.Add(context.Background(), secondBlock))
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(firstBlock.ID())
 	votes.Add(secondBlock.ID())
 
@@ -656,7 +657,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(GenesisID)
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -726,7 +727,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	//     2
 	// Tail = 0
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -817,7 +818,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	//    / \
 	//   2   3
 
-	votesFor2 := ids.Bag{}
+	votesFor2 := bag.Bag[ids.ID]{}
 	votesFor2.Add(block2.ID())
 	if err := sm.RecordPoll(context.Background(), votesFor2); err != nil {
 		t.Fatal(err)
@@ -827,7 +828,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference listed")
 	}
 
-	emptyVotes := ids.Bag{}
+	emptyVotes := bag.Bag[ids.ID]{}
 	if err := sm.RecordPoll(context.Background(), emptyVotes); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
@@ -842,7 +843,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference listed")
 	}
 
-	votesFor3 := ids.Bag{}
+	votesFor3 := bag.Bag[ids.ID]{}
 	votesFor3.Add(block3.ID())
 	if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
@@ -899,13 +900,13 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	validVotes := ids.Bag{}
+	validVotes := bag.Bag[ids.ID]{}
 	validVotes.Add(block.ID())
 	if err := sm.RecordPoll(context.Background(), validVotes); err != nil {
 		t.Fatal(err)
 	}
 
-	invalidVotes := ids.Bag{}
+	invalidVotes := bag.Bag[ids.ID]{}
 	invalidVotes.Add(unknownBlockID)
 	if err := sm.RecordPoll(context.Background(), invalidVotes); err != nil {
 		t.Fatal(err)
@@ -999,7 +1000,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	votes0_2_4 := ids.Bag{}
+	votes0_2_4 := bag.Bag[ids.ID]{}
 	votes0_2_4.Add(
 		block0.ID(),
 		block2.ID(),
@@ -1035,7 +1036,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should have rejected")
 	}
 
-	dep2_2_2 := ids.Bag{}
+	dep2_2_2 := bag.Bag[ids.ID]{}
 	dep2_2_2.AddCount(block2.ID(), 3)
 	if err := sm.RecordPoll(context.Background(), dep2_2_2); err != nil {
 		t.Fatal(err)
@@ -1124,7 +1125,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
 	// when the first bit is 1, the following bits have been decided to follow
 	// the 255 remaining bits of [block0].
-	votes0 := ids.Bag{}
+	votes0 := bag.Bag[ids.ID]{}
 	votes0.Add(block0.ID())
 	err = sm.RecordPoll(context.Background(), votes0)
 	require.NoError(err)
@@ -1163,7 +1164,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// [block0]. When [block0] is accepted, [block1] and [block2] are rejected
 	// as conflicting. [block2]'s child, [block3], is then rejected
 	// transitively.
-	votes3 := ids.Bag{}
+	votes3 := bag.Bag[ids.ID]{}
 	votes3.Add(block3.ID())
 	err = sm.RecordPoll(context.Background(), votes3)
 	require.NoError(err)
@@ -1232,7 +1233,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
 	// the following bits have been decided to follow the 254 remaining bits of
 	// [block0].
-	votes0 := ids.Bag{}
+	votes0 := bag.Bag[ids.ID]{}
 	votes0.Add(block0.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
@@ -1268,7 +1269,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// dropped. Although the votes for [block3] are still applied, [block3] will
 	// only be marked as accepted after [block2] is marked as accepted; which
 	// will never happen.
-	votes3 := ids.Bag{}
+	votes3 := bag.Bag[ids.ID]{}
 	votes3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
@@ -1360,7 +1361,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		t.Fatalf("Shouldn't have reported b2 as being preferred")
 	}
 
-	b2Votes := ids.Bag{}
+	b2Votes := bag.Bag[ids.ID]{}
 	b2Votes.Add(b2Block.ID())
 
 	if err := sm.RecordPoll(context.Background(), b2Votes); err != nil {
@@ -1384,7 +1385,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should have reported b2 as being preferred")
 	}
 
-	a1Votes := ids.Bag{}
+	a1Votes := bag.Bag[ids.ID]{}
 	a1Votes.Add(a1Block.ID())
 
 	if err := sm.RecordPoll(context.Background(), a1Votes); err != nil {
@@ -1571,7 +1572,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on accepted the block")
@@ -1621,7 +1622,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting the block's sibling")
@@ -1681,7 +1682,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
 	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on transitively rejecting the block")

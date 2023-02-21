@@ -18,24 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ common.Sender = (*sender)(nil)
-
-type GossipConfig struct {
-	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`
-	AcceptedFrontierNonValidatorSize uint `json:"gossipAcceptedFrontierNonValidatorSize" yaml:"gossipAcceptedFrontierNonValidatorSize"`
-	AcceptedFrontierPeerSize         uint `json:"gossipAcceptedFrontierPeerSize" yaml:"gossipAcceptedFrontierPeerSize"`
-	OnAcceptValidatorSize            uint `json:"gossipOnAcceptValidatorSize" yaml:"gossipOnAcceptValidatorSize"`
-	OnAcceptNonValidatorSize         uint `json:"gossipOnAcceptNonValidatorSize" yaml:"gossipOnAcceptNonValidatorSize"`
-	OnAcceptPeerSize                 uint `json:"gossipOnAcceptPeerSize" yaml:"gossipOnAcceptPeerSize"`
-	AppGossipValidatorSize           uint `json:"appGossipValidatorSize" yaml:"appGossipValidatorSize"`
-	AppGossipNonValidatorSize        uint `json:"appGossipNonValidatorSize" yaml:"appGossipNonValidatorSize"`
-	AppGossipPeerSize                uint `json:"appGossipPeerSize" yaml:"appGossipPeerSize"`
-}
 
 // sender is a wrapper around an ExternalSender.
 // Messages to this node are put directly into [router] rather than
@@ -50,12 +39,11 @@ type sender struct {
 	router   router.Router
 	timeouts timeout.Manager
 
-	gossipConfig GossipConfig
-
 	// Request message type --> Counts how many of that request
 	// have failed because the node was benched
 	failedDueToBench map[message.Op]prometheus.Counter
 	engineType       p2p.EngineType
+	subnet           subnets.Subnet
 }
 
 func New(
@@ -64,8 +52,8 @@ func New(
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
-	gossipConfig GossipConfig,
 	engineType p2p.EngineType,
+	subnet subnets.Subnet,
 ) (common.Sender, error) {
 	s := &sender{
 		ctx:              ctx,
@@ -73,9 +61,9 @@ func New(
 		sender:           externalSender,
 		router:           router,
 		timeouts:         timeouts,
-		gossipConfig:     gossipConfig,
 		failedDueToBench: make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
 		engineType:       engineType,
+		subnet:           subnet,
 	}
 
 	for _, op := range message.ConsensusRequestOps {
@@ -149,7 +137,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -212,7 +200,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -289,7 +277,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -352,7 +340,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -424,7 +412,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -489,7 +477,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -563,7 +551,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -623,7 +611,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -703,7 +691,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -743,7 +731,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -817,7 +805,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -869,7 +857,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -976,7 +964,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -1102,7 +1090,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -1177,7 +1165,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -1318,7 +1306,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			outMsg,
 			nodeIDs,
 			s.ctx.SubnetID,
-			s.ctx.ValidatorOnly.Get(),
+			s.subnet,
 		)
 	} else {
 		s.ctx.Log.Error("failed to build message",
@@ -1399,7 +1387,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -1437,7 +1425,7 @@ func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs set.Set[ids.No
 		outMsg,
 		nodeIDs,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		for nodeID := range nodeIDs {
@@ -1473,17 +1461,18 @@ func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 		return nil
 	}
 
-	validatorSize := int(s.gossipConfig.AppGossipValidatorSize)
-	nonValidatorSize := int(s.gossipConfig.AppGossipNonValidatorSize)
-	peerSize := int(s.gossipConfig.AppGossipPeerSize)
+	gossipConfig := s.subnet.Config().GossipConfig
+	validatorSize := int(gossipConfig.AppGossipValidatorSize)
+	nonValidatorSize := int(gossipConfig.AppGossipNonValidatorSize)
+	peerSize := int(gossipConfig.AppGossipPeerSize)
 
 	sentTo := s.sender.Gossip(
 		outMsg,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
 		validatorSize,
 		nonValidatorSize,
 		peerSize,
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -1518,13 +1507,14 @@ func (s *sender) SendGossip(_ context.Context, container []byte) {
 		return
 	}
 
+	gossipConfig := s.subnet.Config().GossipConfig
 	sentTo := s.sender.Gossip(
 		outMsg,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
-		int(s.gossipConfig.AcceptedFrontierValidatorSize),
-		int(s.gossipConfig.AcceptedFrontierNonValidatorSize),
-		int(s.gossipConfig.AcceptedFrontierPeerSize),
+		int(gossipConfig.AcceptedFrontierValidatorSize),
+		int(gossipConfig.AcceptedFrontierNonValidatorSize),
+		int(gossipConfig.AcceptedFrontierPeerSize),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -1563,13 +1553,14 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) 
 		return nil
 	}
 
+	gossipConfig := s.subnet.Config().GossipConfig
 	sentTo := s.sender.Gossip(
 		outMsg,
 		s.ctx.SubnetID,
-		s.ctx.ValidatorOnly.Get(),
-		int(s.gossipConfig.OnAcceptValidatorSize),
-		int(s.gossipConfig.OnAcceptNonValidatorSize),
-		int(s.gossipConfig.OnAcceptPeerSize),
+		int(gossipConfig.OnAcceptValidatorSize),
+		int(gossipConfig.OnAcceptNonValidatorSize),
+		int(gossipConfig.OnAcceptPeerSize),
+		s.subnet,
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",

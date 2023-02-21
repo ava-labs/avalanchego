@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -78,6 +76,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
@@ -176,6 +175,9 @@ type Node struct {
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
+
+	// Manages shutdown of a VM process
+	runtimeManager runtime.Manager
 
 	resourceManager resource.Manager
 
@@ -537,7 +539,7 @@ func (n *Node) initIndexer() error {
 
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should be created.
-func (n *Node) initChains(genesisBytes []byte) {
+func (n *Node) initChains(genesisBytes []byte) error {
 	n.Log.Info("initializing chains")
 
 	platformChain := chains.ChainParameters{
@@ -549,7 +551,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 	}
 
 	// Start the chain creator with the Platform Chain
-	n.chainManager.StartChainCreator(platformChain)
+	return n.chainManager.StartChainCreator(platformChain)
 }
 
 func (n *Node) initMetrics() {
@@ -697,7 +699,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
-		ConsensusParams:                         n.Config.ConsensusParams,
 		Validators:                              n.vdrs,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
@@ -718,7 +719,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
 		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
-		GossipConfig:                            n.Config.GossipConfig,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
@@ -804,6 +804,9 @@ func (n *Node) initVMs() error {
 		return errs.Err
 	}
 
+	// initialize vm runtime manager
+	n.runtimeManager = runtime.NewManager()
+
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
@@ -811,6 +814,7 @@ func (n *Node) initVMs() error {
 			Manager:         n.Config.VMManager,
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
+			RuntimeTracker:  n.runtimeManager,
 		}),
 		VMRegisterer: vmRegisterer,
 	})
@@ -1329,7 +1333,9 @@ func (n *Node) Initialize(
 	n.initProfiler()
 
 	// Start the Platform chain
-	n.initChains(n.Config.GenesisBytes)
+	if err := n.initChains(n.Config.GenesisBytes); err != nil {
+		return fmt.Errorf("couldn't initialize chains: %w", err)
+	}
 	return nil
 }
 
@@ -1396,9 +1402,9 @@ func (n *Node) shutdown() {
 		)
 	}
 
-	// Make sure all plugin subprocesses are killed
-	n.Log.Info("cleaning up plugin subprocesses")
-	plugin.CleanupClients()
+	// Ensure all runtimes are shutdown
+	n.Log.Info("cleaning up plugin runtimes")
+	n.runtimeManager.Stop(context.TODO())
 
 	if n.DBManager != nil {
 		if err := n.DBManager.Close(); err != nil {

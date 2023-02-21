@@ -4,29 +4,19 @@
 package gsharedmemory
 
 import (
-	"context"
 	"io"
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-)
-
-const (
-	bufSize = units.MiB
 )
 
 func TestInterface(t *testing.T) {
@@ -56,27 +46,19 @@ func TestInterface(t *testing.T) {
 }
 
 func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database) (atomic.SharedMemory, io.Closer) {
-	listener := bufconn.Listen(bufSize)
+	listener, err := grpcutils.NewListener()
+	if err != nil {
+		t.Fatalf("Failed to create listener: %s", err)
+	}
 	serverCloser := grpcutils.ServerCloser{}
 
-	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpcutils.NewDefaultServer(opts)
-		sharedmemorypb.RegisterSharedMemoryServer(server, NewServer(sm, db))
-		serverCloser.Add(server)
-		return server
-	}
+	server := grpcutils.NewServer()
+	sharedmemorypb.RegisterSharedMemoryServer(server, NewServer(sm, db))
+	serverCloser.Add(server)
 
-	go grpcutils.Serve(listener, serverFunc)
+	go grpcutils.Serve(listener, server)
 
-	dialer := grpc.WithContextDialer(
-		func(context.Context, string) (net.Conn, error) {
-			return listener.Dial()
-		},
-	)
-
-	dopts := grpcutils.DefaultDialOptions
-	dopts = append(dopts, dialer)
-	conn, err := grpcutils.Dial("", dopts...)
+	conn, err := grpcutils.Dial(listener.Addr().String())
 	if err != nil {
 		t.Fatalf("Failed to dial: %s", err)
 	}

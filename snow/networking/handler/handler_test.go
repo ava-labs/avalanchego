@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 )
@@ -50,10 +51,10 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -134,10 +135,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -216,10 +217,10 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		1,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -288,10 +289,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		ctx,
 		vdrs,
 		msgFromVMChan,
-		nil,
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 
@@ -359,10 +360,10 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		ctx,
 		vdrs,
 		nil,
-		nil,
 		time.Second,
 		resourceTracker,
 		connector,
+		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
 	require.NoError(t, err)
 

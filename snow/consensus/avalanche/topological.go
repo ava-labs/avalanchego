@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -95,9 +96,9 @@ type Topological struct {
 	kahnNodes map[ids.ID]kahnNode
 
 	// Used in [pushVotes]. Should only be accessed in that method.
-	// We use this one instance instead of creating a new ids.UniqueBag
+	// We use this one instance instead of creating a new bag.UniqueBag[ids.ID]
 	// during each call to [pushVotes].
-	votes ids.UniqueBag
+	votes bag.UniqueBag[ids.ID]
 }
 
 type kahnNode struct {
@@ -118,7 +119,7 @@ func (ta *Topological) Initialize(
 	ta.ctx = chainCtx
 	ta.params = params
 	ta.leaves = set.Set[ids.ID]{}
-	ta.votes = ids.UniqueBag{}
+	ta.votes = bag.UniqueBag[ids.ID]{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
 	latencyMetrics, err := metrics.NewLatency("vtx", "vertex/vertices", chainCtx.Log, "", chainCtx.Registerer)
@@ -231,7 +232,7 @@ func (ta *Topological) Preferences() set.Set[ids.ID] {
 	return ta.preferred
 }
 
-func (ta *Topological) RecordPoll(ctx context.Context, responses ids.UniqueBag) error {
+func (ta *Topological) RecordPoll(ctx context.Context, responses bag.UniqueBag[ids.ID]) error {
 	// Register a new poll call
 	ta.pollNumber++
 
@@ -249,7 +250,7 @@ func (ta *Topological) RecordPoll(ctx context.Context, responses ids.UniqueBag) 
 	if partialVotes.Len() < ta.params.Alpha {
 		// Because there were less than alpha total returned votes, we can skip
 		// the traversals and fail the poll.
-		_, err := ta.cg.RecordPoll(ctx, ids.Bag{})
+		_, err := ta.cg.RecordPoll(ctx, bag.Bag[ids.ID]{})
 		return err
 	}
 
@@ -312,7 +313,7 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
-func (ta *Topological) calculateInDegree(responses ids.UniqueBag) error {
+func (ta *Topological) calculateInDegree(responses bag.UniqueBag[ids.ID]) error {
 	// Clear the kahn node set
 	for k := range ta.kahnNodes {
 		delete(ta.kahnNodes, k)
@@ -399,7 +400,7 @@ func (ta *Topological) markAncestorInDegrees(
 
 // Count the number of votes for each operation by pushing votes upwards through
 // vertex ancestors.
-func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
+func (ta *Topological) pushVotes(ctx context.Context) (bag.Bag[ids.ID], error) {
 	ta.votes.Clear()
 	txConflicts := make(map[ids.ID]set.Set[ids.ID], minMapSize)
 
@@ -412,7 +413,7 @@ func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 		if !ok {
 			// Should never happen because we just checked that [ta.leaves] is
 			// not empty.
-			return ids.Bag{}, errNoLeaves
+			return bag.Bag[ids.ID]{}, errNoLeaves
 		}
 
 		kahn := ta.kahnNodes[leaf]
@@ -421,7 +422,7 @@ func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 			vtx := tv.vtx
 			txs, err := vtx.Txs(ctx)
 			if err != nil {
-				return ids.Bag{}, err
+				return bag.Bag[ids.ID]{}, err
 			}
 			for _, tx := range txs {
 				// Give the votes to the consumer
@@ -447,7 +448,7 @@ func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 
 			parents, err := vtx.Parents()
 			if err != nil {
-				return ids.Bag{}, err
+				return bag.Bag[ids.ID]{}, err
 			}
 			for _, dep := range parents {
 				depID := dep.ID()
@@ -467,7 +468,7 @@ func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 	}
 
 	// Create bag of votes for conflicting transactions
-	conflictingVotes := make(ids.UniqueBag)
+	conflictingVotes := make(bag.UniqueBag[ids.ID])
 	for txID, conflicts := range txConflicts {
 		for conflictTxID := range conflicts {
 			conflictingVotes.UnionSet(txID, ta.votes.GetSet(conflictTxID))

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // ContextInitializable represents an object that can be initialized
@@ -46,7 +46,7 @@ type Context struct {
 	BCLookup     ids.AliaserReader
 	Metrics      metrics.OptionalGatherer
 
-	TeleporterSigner teleporter.Signer
+	WarpSigner warp.Signer
 
 	// snowman++ attributes
 	ValidatorState validators.State // interface for P-Chain validators
@@ -83,9 +83,6 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
-
-	// Indicates this chain is available to only validators.
-	ValidatorOnly utils.Atomic[bool]
 }
 
 func DefaultContextTest() *Context {

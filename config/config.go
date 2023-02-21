@@ -33,9 +33,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -86,7 +86,6 @@ var (
 func GetRunnerConfig(v *viper.Viper) runner.Config {
 	return runner.Config{
 		DisplayVersionAndExit: v.GetBool(VersionKey),
-		PluginMode:            v.GetBool(PluginModeKey),
 	}
 }
 
@@ -284,8 +283,8 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	return config, nil
 }
 
-func getGossipConfig(v *viper.Viper) sender.GossipConfig {
-	return sender.GossipConfig{
+func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
+	return subnets.GossipConfig{
 		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
 		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
 		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
@@ -423,7 +422,9 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, consensusParameters avalanche.Parameters) (benchlist.Config, error) {
+	alpha := consensusParameters.Alpha
+	k := consensusParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
@@ -822,17 +823,17 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
+func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
 	if v.IsSet(GenesisConfigContentKey) {
 		genesisData := v.GetString(GenesisConfigContentKey)
-		return genesis.FromFlag(networkID, genesisData)
+		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
 	// if content is not specified go for the file
 	if v.IsSet(GenesisConfigFileKey) {
 		genesisFileName := GetExpandedArg(v, GenesisConfigFileKey)
-		return genesis.FromFile(networkID, genesisFileName)
+		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
 	// finally if file is not specified/readable go for the predefined config
@@ -1046,14 +1047,16 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
-func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+// getSubnetConfigsFromFlags reads subnet configs from the correct place
+// (flag or file) and returns a non-nil map.
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	if v.IsSet(SubnetConfigContentKey) {
 		return getSubnetConfigsFromFlags(v, subnetIDs)
 	}
 	return getSubnetConfigsFromDir(v, subnetIDs)
 }
 
-func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	subnetConfigContentB64 := v.GetString(SubnetConfigContentKey)
 	subnetConfigContent, err := base64.StdEncoding.DecodeString(subnetConfigContentB64)
 	if err != nil {
@@ -1066,32 +1069,38 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]c
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 
-	res := make(map[ids.ID]chains.SubnetConfig)
+	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			subnetConfig, err := parseSubnetConfigs(rawSubnetConfigBytes, getDefaultSubnetConfig(v))
-			if err != nil {
+			config := getDefaultSubnetConfig(v)
+			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
-			res[subnetID] = subnetConfig
+
+			if err := config.Valid(); err != nil {
+				return nil, err
+			}
+
+			res[subnetID] = config
 		}
 	}
 	return res, nil
 }
 
 // getSubnetConfigs reads SubnetConfigs to node config map
-func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
+
+	subnetConfigs := make(map[ids.ID]subnets.Config)
 	if len(subnetConfigPath) == 0 {
 		// subnet config path does not exist but not explicitly specified, so ignore it
-		return make(map[ids.ID]chains.SubnetConfig), nil
+		return subnetConfigs, nil
 	}
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
-	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
@@ -1110,29 +1119,24 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]cha
 		if err != nil {
 			return nil, err
 		}
-		config, err := parseSubnetConfigs(file, getDefaultSubnetConfig(v))
-		if err != nil {
+
+		config := getDefaultSubnetConfig(v)
+		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, err
 		}
+
+		if err := config.Valid(); err != nil {
+			return nil, err
+		}
+
 		subnetConfigs[subnetID] = config
 	}
 
 	return subnetConfigs, nil
 }
 
-func parseSubnetConfigs(data []byte, defaultSubnetConfig chains.SubnetConfig) (chains.SubnetConfig, error) {
-	if err := json.Unmarshal(data, &defaultSubnetConfig); err != nil {
-		return chains.SubnetConfig{}, err
-	}
-
-	if err := defaultSubnetConfig.ConsensusParameters.Valid(); err != nil {
-		return chains.SubnetConfig{}, fmt.Errorf("invalid consensus parameters: %w", err)
-	}
-	return defaultSubnetConfig, nil
-}
-
-func getDefaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
-	return chains.SubnetConfig{
+func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
+	return subnets.Config{
 		ConsensusParameters:   getConsensusConfig(v),
 		ValidatorOnly:         false,
 		GossipConfig:          getGossipConfig(v),
@@ -1256,11 +1260,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Consensus Parameters
-	nodeConfig.ConsensusParams = getConsensusConfig(v)
-	if err := nodeConfig.ConsensusParams.Valid(); err != nil {
-		return node.Config{}, err
-	}
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	if nodeConfig.ConsensusShutdownTimeout < 0 {
 		return node.Config{}, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
@@ -1349,10 +1348,22 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	nodeConfig.GossipConfig = getGossipConfig(v)
+	// Subnet Configs
+	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
+
+	primaryNetworkConfig := getDefaultSubnetConfig(v)
+	if err := primaryNetworkConfig.Valid(); err != nil {
+		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
+	}
+	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
+
+	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1364,7 +1375,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
+	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID, &genesisStakingCfg)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
@@ -1381,16 +1393,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Subnet Configs
-	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
-	}
-	nodeConfig.SubnetConfigs = subnetConfigs
-
 	// Node health
 	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(nodeConfig.ConsensusParams.Parameters),
+		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters),
 	}
 
 	for subnetID, config := range subnetConfigs {

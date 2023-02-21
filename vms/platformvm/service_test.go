@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -94,8 +94,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	require.NoError(t, err)
 
-	privKey := pk.(*crypto.PrivateKeySECP256K1R)
-	err = user.PutKeys(privKey, keys[0])
+	err = user.PutKeys(pk, keys[0])
 	require.NoError(t, err)
 }
 
@@ -173,11 +172,9 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := crypto.FactorySECP256K1R{}
-	recipientKeyIntf, err := factory.NewPrivateKey()
+	factory := secp256k1.Factory{}
+	recipientKey, err := factory.NewPrivateKey()
 	require.NoError(err)
-
-	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
 
@@ -222,7 +219,7 @@ func TestGetTxStatus(t *testing.T) {
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
 	require.NoError(err)
 
 	mutableSharedMemory.SharedMemory = oldSharedMemory
@@ -279,7 +276,7 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					nil,
 					"chain name",
-					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -294,7 +291,7 @@ func TestGetTx(t *testing.T) {
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
-					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -306,7 +303,7 @@ func TestGetTx(t *testing.T) {
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
-					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -501,7 +498,7 @@ func TestGetStake(t *testing.T) {
 		delegatorEndTime,
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
@@ -550,7 +547,7 @@ func TestGetStake(t *testing.T) {
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
 		0,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
@@ -632,7 +629,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		delegatorEndTime,
 		validatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
@@ -664,9 +661,24 @@ func TestGetCurrentValidators(t *testing.T) {
 		}
 		found = true
 
-		require.Equal(1, len(vdr.Delegators))
-		delegator := vdr.Delegators[0]
-		require.Equal(delegator.NodeID, vdr.NodeID)
+		require.Nil(vdr.Delegators)
+
+		innerArgs := GetCurrentValidatorsArgs{
+			SubnetID: constants.PrimaryNetworkID,
+			NodeIDs:  []ids.NodeID{vdr.NodeID},
+		}
+		innerResponse := GetCurrentValidatorsReply{}
+		err = service.GetCurrentValidators(nil, &innerArgs, &innerResponse)
+		require.NoError(err)
+		require.Len(innerResponse.Validators, 1)
+
+		innerVdr := innerResponse.Validators[0].(pchainapi.PermissionlessValidator)
+		require.Equal(vdr.NodeID, innerVdr.NodeID)
+
+		require.NotNil(innerVdr.Delegators)
+		require.Equal(1, len(*innerVdr.Delegators))
+		delegator := (*innerVdr.Delegators)[0]
+		require.Equal(delegator.NodeID, innerVdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
 		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
 		require.Equal(uint64(delegator.Weight), stakeAmount)
@@ -725,7 +737,7 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				nil,
 				"chain name",
-				[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				keys[0].PublicKey().Address(), // change addr
 			)
 			require.NoError(err)
