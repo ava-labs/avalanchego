@@ -35,8 +35,11 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -78,7 +81,11 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 	)
 
 	// Configure any stateful precompiles that should go into effect during this block.
-	p.config.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time), block, statedb)
+	err := ApplyPrecompileActivations(p.config, new(big.Int).SetUint64(parent.Time), block, statedb)
+	if err != nil {
+		log.Error("failed to configure precompiles processing block", "hash", block.Hash(), "number", block.NumberU64(), "timestamp", block.Time(), "err", err)
+		return nil, nil, 0, err
+	}
 
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
@@ -162,4 +169,52 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
 	return applyTransaction(msg, config, author, gp, statedb, header.Number, header.Hash(), tx, usedGas, vmenv)
+}
+
+// ApplyPrecompileActivations checks if any of the precompiles specified by the chain config are enabled or disabled by the block
+// transition from [parentTimestamp] to the timestamp set in [blockContext]. If this is the case, it calls [Configure]
+// to apply the necessary state transitions for the upgrade.
+// This function is called:
+// - within genesis setup to configure the starting state for precompiles enabled at genesis,
+// - during block processing to update the state before processing the given block.
+// - during block producing to apply the precompile upgrades before producing the block.
+func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *big.Int, blockContext contract.BlockContext, statedb *state.StateDB) error {
+	blockTimestamp := blockContext.Timestamp()
+	// Note: RegisteredModules returns precompiles sorted by module addresses.
+	// This ensures that the order we call Configure for each precompile is consistent.
+	// This ensures even if precompiles read/write state other than their own they will observe
+	// an identical global state in a deterministic order when they are configured.
+	for _, module := range modules.RegisteredModules() {
+		key := module.ConfigKey
+		for _, activatingConfig := range c.GetActivatingPrecompileConfigs(module.Address, parentTimestamp, blockTimestamp, c.PrecompileUpgrades) {
+			// If this transition activates the upgrade, configure the stateful precompile.
+			// (or deconfigure it if it is being disabled.)
+			if activatingConfig.IsDisabled() {
+				log.Info("Disabling precompile", "name", key)
+				statedb.Suicide(module.Address)
+				// Calling Finalise here effectively commits Suicide call and wipes the contract state.
+				// This enables re-configuration of the same contract state in the same block.
+				// Without an immediate Finalise call after the Suicide, a reconfigured precompiled state can be wiped out
+				// since Suicide will be committed after the reconfiguration.
+				statedb.Finalise(true)
+			} else {
+				module, ok := modules.GetPrecompileModule(key)
+				if !ok {
+					return fmt.Errorf("could not find module for activating precompile, name: %s", key)
+				}
+				log.Info("Activating new precompile", "name", key, "config", activatingConfig)
+				// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
+				// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
+				statedb.SetNonce(module.Address, 1)
+				// Set the code of the precompile's address to a non-zero length byte slice to ensure that the precompile
+				// can be called from within Solidity contracts. Solidity adds a check before invoking a contract to ensure
+				// that it does not attempt to invoke a non-existent contract.
+				statedb.SetCode(module.Address, []byte{0x1})
+				if err := module.Configure(c, activatingConfig, statedb, blockContext); err != nil {
+					return fmt.Errorf("could not configure precompile, name: %s, reason: %w", key, err)
+				}
+			}
+		}
+	}
+	return nil
 }

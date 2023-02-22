@@ -21,7 +21,11 @@ import (
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/precompile"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -2172,7 +2176,9 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.ContractDeployerAllowListConfig = precompile.NewContractDeployerAllowListConfig(big.NewInt(time.Now().Unix()), testEthAddrs, nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(time.Now().Unix()), testEthAddrs, nil),
+	}
 
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
@@ -2193,9 +2199,9 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	role := precompile.GetContractDeployerAllowListStatus(genesisState, testEthAddrs[0])
-	if role != precompile.AllowListNoRole {
-		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
+	role := deployerallowlist.GetContractDeployerAllowListStatus(genesisState, testEthAddrs[0])
+	if role != allowlist.NoRole {
+		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", allowlist.NoRole, role)
 	}
 
 	// Send basic transaction to construct a simple block and confirm that the precompile state configuration in the worker behaves correctly.
@@ -2223,9 +2229,9 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	role = precompile.GetContractDeployerAllowListStatus(blkState, testEthAddrs[0])
-	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected allow list status to be set to Admin: %s, but found: %s", precompile.AllowListAdmin, role)
+	role = deployerallowlist.GetContractDeployerAllowListStatus(blkState, testEthAddrs[0])
+	if role != allowlist.AdminRole {
+		t.Fatalf("Expected allow list status to be set role %s, but found: %s", allowlist.AdminRole, role)
 	}
 }
 
@@ -2236,7 +2242,9 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(0), testEthAddrs[0:1], nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(0), testEthAddrs[0:1], nil),
+	}
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2258,13 +2266,13 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}
 
 	// Check that address 0 is whitelisted and address 1 is not
-	role := precompile.GetTxAllowListStatus(genesisState, testEthAddrs[0])
-	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", precompile.AllowListAdmin, role)
+	role := txallowlist.GetTxAllowListStatus(genesisState, testEthAddrs[0])
+	if role != allowlist.AdminRole {
+		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", allowlist.AdminRole, role)
 	}
-	role = precompile.GetTxAllowListStatus(genesisState, testEthAddrs[1])
-	if role != precompile.AllowListNoRole {
-		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
+	role = txallowlist.GetTxAllowListStatus(genesisState, testEthAddrs[1])
+	if role != allowlist.NoRole {
+		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", allowlist.NoRole, role)
 	}
 
 	// Submit a successful transaction
@@ -2285,7 +2293,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}
 
 	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
-	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
+	if err := errs[0]; !errors.Is(err, vmerrs.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
@@ -2312,7 +2320,9 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 		t.Fatal(err)
 	}
 	enableAllowListTimestamp := time.Unix(0, 0) // enable at genesis
-	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1], nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1], nil),
+	}
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2353,13 +2363,13 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}
 
 	// Check that address 0 is whitelisted and address 1 is not
-	role := precompile.GetTxAllowListStatus(genesisState, testEthAddrs[0])
-	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", precompile.AllowListAdmin, role)
+	role := txallowlist.GetTxAllowListStatus(genesisState, testEthAddrs[0])
+	if role != allowlist.AdminRole {
+		t.Fatalf("Expected allow list status to be set to admin: %s, but found: %s", allowlist.AdminRole, role)
 	}
-	role = precompile.GetTxAllowListStatus(genesisState, testEthAddrs[1])
-	if role != precompile.AllowListNoRole {
-		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", precompile.AllowListNoRole, role)
+	role = txallowlist.GetTxAllowListStatus(genesisState, testEthAddrs[1])
+	if role != allowlist.NoRole {
+		t.Fatalf("Expected allow list status to be set to no role: %s, but found: %s", allowlist.NoRole, role)
 	}
 
 	// Submit a successful transaction
@@ -2380,7 +2390,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}
 
 	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
-	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
+	if err := errs[0]; !errors.Is(err, vmerrs.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
 
@@ -2424,7 +2434,9 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.FeeManagerConfig = precompile.NewFeeManagerConfig(big.NewInt(0), testEthAddrs[0:1], nil, nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		feemanager.ConfigKey: feemanager.NewConfig(big.NewInt(0), testEthAddrs[0:1], nil, nil),
+	}
 
 	// set a lower fee config now
 	testLowFeeConfig := commontype.FeeConfig{
@@ -2462,13 +2474,13 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	}
 
 	// Check that address 0 is whitelisted and address 1 is not
-	role := precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[0])
-	if role != precompile.AllowListAdmin {
-		t.Fatalf("Expected fee manager list status to be set to admin: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
+	role := feemanager.GetFeeManagerStatus(genesisState, testEthAddrs[0])
+	if role != allowlist.AdminRole {
+		t.Fatalf("Expected fee manager list status to be set to admin: %s, but found: %s", allowlist.AdminRole, role)
 	}
-	role = precompile.GetFeeConfigManagerStatus(genesisState, testEthAddrs[1])
-	if role != precompile.AllowListNoRole {
-		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
+	role = feemanager.GetFeeManagerStatus(genesisState, testEthAddrs[1])
+	if role != allowlist.NoRole {
+		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", allowlist.NoRole, role)
 	}
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
 	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
@@ -2480,13 +2492,13 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	testHighFeeConfig := testLowFeeConfig
 	testHighFeeConfig.MinBaseFee = big.NewInt(28_000_000_000)
 
-	data, err := precompile.PackSetFeeConfig(testHighFeeConfig)
+	data, err := feemanager.PackSetFeeConfig(testHighFeeConfig)
 	require.NoError(t, err)
 
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:   genesis.Config.ChainID,
 		Nonce:     uint64(0),
-		To:        &precompile.FeeConfigManagerAddress,
+		To:        &feemanager.ContractAddress,
 		Gas:       testLowFeeConfig.GasLimit.Uint64(),
 		Value:     common.Big0,
 		GasFeeCap: testLowFeeConfig.MinBaseFee, // give low fee, it should work since we still haven't applied high fees
@@ -2522,7 +2534,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	tx2 := types.NewTx(&types.DynamicFeeTx{
 		ChainID:   genesis.Config.ChainID,
 		Nonce:     uint64(1),
-		To:        &precompile.FeeConfigManagerAddress,
+		To:        &feemanager.ContractAddress,
 		Gas:       genesis.Config.FeeConfig.GasLimit.Uint64(),
 		Value:     common.Big0,
 		GasFeeCap: testLowFeeConfig.MinBaseFee, // this is too low for applied config, should fail
@@ -2664,7 +2676,9 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
-	genesis.Config.RewardManagerConfig = precompile.NewRewardManagerConfig(common.Big0, testEthAddrs[0:1], nil, nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(common.Big0, testEthAddrs[0:1], nil, nil),
+	}
 	genesis.Config.AllowFeeRecipients = true // enable this in genesis to test if this is recognized by the reward manager
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
@@ -2705,12 +2719,12 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	testAddr := common.HexToAddress("0x9999991111")
-	data, err := precompile.PackSetRewardAddress(testAddr)
+	data, err := rewardmanager.PackSetRewardAddress(testAddr)
 	require.NoError(t, err)
 
-	gas := 21000 + 240 + precompile.SetRewardAddressGasCost // 21000 for tx, 240 for tx data
+	gas := 21000 + 240 + rewardmanager.SetRewardAddressGasCost // 21000 for tx, 240 for tx data
 
-	tx := types.NewTransaction(uint64(0), precompile.RewardManagerAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
+	tx := types.NewTransaction(uint64(0), rewardmanager.ContractAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
 
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	require.NoError(t, err)
@@ -2804,7 +2818,9 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
-	genesis.Config.RewardManagerConfig = precompile.NewRewardManagerConfig(common.Big0, testEthAddrs[0:1], nil, nil)
+	genesis.Config.GenesisPrecompiles = params.Precompiles{
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(common.Big0, testEthAddrs[0:1], nil, nil),
+	}
 	genesis.Config.AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
@@ -2841,12 +2857,12 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	data, err := precompile.PackAllowFeeRecipients()
+	data, err := rewardmanager.PackAllowFeeRecipients()
 	require.NoError(t, err)
 
-	gas := 21000 + 240 + precompile.AllowFeeRecipientsGasCost // 21000 for tx, 240 for tx data
+	gas := 21000 + 240 + rewardmanager.AllowFeeRecipientsGasCost // 21000 for tx, 240 for tx data
 
-	tx := types.NewTransaction(uint64(0), precompile.RewardManagerAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
+	tx := types.NewTransaction(uint64(0), rewardmanager.ContractAddress, big.NewInt(1), gas, big.NewInt(testMinGasPrice), data)
 
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	require.NoError(t, err)

@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -317,7 +318,7 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		feeLastChangedAt *big.Int
 		feeConfig        commontype.FeeConfig
 	)
-	if oracle.backend.ChainConfig().IsFeeConfigManager(new(big.Int).SetUint64(head.Time)) {
+	if oracle.backend.ChainConfig().IsPrecompileEnabled(feemanager.ContractAddress, new(big.Int).SetUint64(head.Time)) {
 		feeConfig, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
 		if err != nil {
 			return nil, nil, err

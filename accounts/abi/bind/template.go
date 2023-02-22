@@ -31,30 +31,30 @@ import "github.com/ava-labs/subnet-evm/accounts/abi"
 // tmplData is the data structure required to fill the binding template.
 type tmplData struct {
 	Package   string                   // Name of the package to place the generated file in
-	Contracts map[string]*tmplContract // List of contracts to generate into this file
+	Contracts map[string]*TmplContract // List of contracts to generate into this file
 	Libraries map[string]string        // Map the bytecode's link pattern to the library name
-	Structs   map[string]*tmplStruct   // Contract struct type definitions
+	Structs   map[string]*TmplStruct   // Contract struct type definitions
 }
 
-// tmplContract contains the data needed to generate an individual contract binding.
-type tmplContract struct {
+// TmplContract contains the data needed to generate an individual contract binding.
+type TmplContract struct {
 	Type        string                 // Type name of the main contract binding
 	InputABI    string                 // JSON ABI used as the input to generate the binding from
 	InputBin    string                 // Optional EVM bytecode used to generate deploy code from
 	FuncSigs    map[string]string      // Optional map: string signature -> 4-byte signature
 	Constructor abi.Method             // Contract constructor for deploy parametrization
-	Calls       map[string]*tmplMethod // Contract calls that only read state data
-	Transacts   map[string]*tmplMethod // Contract calls that write state data
-	Fallback    *tmplMethod            // Additional special fallback function
-	Receive     *tmplMethod            // Additional special receive function
+	Calls       map[string]*TmplMethod // Contract calls that only read state data
+	Transacts   map[string]*TmplMethod // Contract calls that write state data
+	Fallback    *TmplMethod            // Additional special fallback function
+	Receive     *TmplMethod            // Additional special receive function
 	Events      map[string]*tmplEvent  // Contract events accessors
 	Libraries   map[string]string      // Same as tmplData, but filtered to only keep what the contract needs
 	Library     bool                   // Indicator whether the contract is a library
 }
 
-// tmplMethod is a wrapper around an abi.Method that contains a few preprocessed
+// TmplMethod is a wrapper around an abi.Method that contains a few preprocessed
 // and cached data fields.
-type tmplMethod struct {
+type TmplMethod struct {
 	Original   abi.Method // Original method as parsed by the abi package
 	Normalized abi.Method // Normalized version of the parsed method (capitalized names, non-anonymous args/returns)
 	Structured bool       // Whether the returns should be accumulated into a struct
@@ -75,9 +75,9 @@ type tmplField struct {
 	SolKind abi.Type // Raw abi type information
 }
 
-// tmplStruct is a wrapper around an abi.tuple and contains an auto-generated
+// TmplStruct is a wrapper around an abi.tuple and contains an auto-generated
 // struct name.
-type tmplStruct struct {
+type TmplStruct struct {
 	Name   string       // Auto-generated struct name(before solidity v0.5.11) or raw name.
 	Fields []*tmplField // Struct fields definition depends on the binding language.
 }
@@ -335,7 +335,7 @@ var (
 			if err != nil {
 				return *outstruct, err
 			}
-			{{range $i, $t := .Normalized.Outputs}} 
+			{{range $i, $t := .Normalized.Outputs}}
 			outstruct.{{.Name}} = *abi.ConvertType(out[{{$i}}], new({{bindtype .Type $structs}})).(*{{bindtype .Type $structs}}){{end}}
 
 			return *outstruct, err
@@ -345,7 +345,7 @@ var (
 			}
 			{{range $i, $t := .Normalized.Outputs}}
 			out{{$i}} := *abi.ConvertType(out[{{$i}}], new({{bindtype .Type $structs}})).(*{{bindtype .Type $structs}}){{end}}
-			
+
 			return {{range $i, $t := .Normalized.Outputs}}out{{$i}}, {{end}} err
 			{{end}}
 		}
@@ -388,7 +388,7 @@ var (
 		}
 	{{end}}
 
-	{{if .Fallback}} 
+	{{if .Fallback}}
 		// Fallback is a paid mutator transaction binding the contract fallback function.
 		//
 		// Solidity: {{.Fallback.Original.String}}
@@ -402,16 +402,16 @@ var (
 		func (_{{$contract.Type}} *{{$contract.Type}}Session) Fallback(calldata []byte) (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.Fallback(&_{{$contract.Type}}.TransactOpts, calldata)
 		}
-	
+
 		// Fallback is a paid mutator transaction binding the contract fallback function.
-		// 
+		//
 		// Solidity: {{.Fallback.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}TransactorSession) Fallback(calldata []byte) (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.Fallback(&_{{$contract.Type}}.TransactOpts, calldata)
 		}
 	{{end}}
 
-	{{if .Receive}} 
+	{{if .Receive}}
 		// Receive is a paid mutator transaction binding the contract receive function.
 		//
 		// Solidity: {{.Receive.Original.String}}
@@ -425,9 +425,9 @@ var (
 		func (_{{$contract.Type}} *{{$contract.Type}}Session) Receive() (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.Receive(&_{{$contract.Type}}.TransactOpts)
 		}
-	
+
 		// Receive is a paid mutator transaction binding the contract receive function.
-		// 
+		//
 		// Solidity: {{.Receive.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}TransactorSession) Receive() (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.Receive(&_{{$contract.Type}}.TransactOpts)
@@ -700,7 +700,7 @@ import java.util.*;
 	// Fallback is a paid mutator transaction binding the contract fallback function.
 	//
 	// Solidity: {{.Fallback.Original.String}}
-	public Transaction Fallback(TransactOpts opts, byte[] calldata) throws Exception { 
+	public Transaction Fallback(TransactOpts opts, byte[] calldata) throws Exception {
 		return this.Contract.rawTransact(opts, calldata);
 	}
     {{end}}
@@ -709,7 +709,7 @@ import java.util.*;
 	// Receive is a paid mutator transaction binding the contract receive function.
 	//
 	// Solidity: {{.Receive.Original.String}}
-	public Transaction Receive(TransactOpts opts) throws Exception { 
+	public Transaction Receive(TransactOpts opts) throws Exception {
 		return this.Contract.rawTransact(opts, null);
 	}
     {{end}}

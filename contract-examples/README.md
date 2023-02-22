@@ -44,7 +44,7 @@ $ yarn
 
 `ExampleDeployerList` shows how `ContractDeployerAllowList` precompile can be used in a smart contract. It uses `IAllowList` to interact with `ContractDeployerAllowList` precompile. When the precompile is activated only those allowed can deploy contracts.
 
-`ExampleFeeManager` shows how a contract can change fee configuration with the `FeeConfigManager` precompile.
+`ExampleFeeManager` shows how a contract can change fee configuration with the `FeeManager` precompile.
 
 All of these `NativeMinter`, `FeeManager` and `AllowList` contracts should be enabled by a chain config in genesis or as an upgrade. See the example genesis under [Tests](#tests) section.
 

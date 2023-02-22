@@ -128,7 +128,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 
 	bigTimestamp := new(big.Int).SetUint64(timestamp)
 	var gasLimit uint64
-	// The fee config manager relies on the state of the parent block to set the fee config
+	// The fee manager relies on the state of the parent block to set the fee config
 	// because the fee config may be changed by the current block.
 	feeConfig, _, err := w.chain.GetFeeConfigAt(parent.Header())
 	if err != nil {
@@ -186,7 +186,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
 	// Configure any stateful precompiles that should go into effect during this block.
-	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), types.NewBlockWithHeader(header), env.state)
+	err = core.ApplyPrecompileActivations(w.chainConfig, new(big.Int).SetUint64(parent.Time()), types.NewBlockWithHeader(header), env.state)
+	if err != nil {
+		log.Error("failed to configure precompiles mining new block", "parent", parent.Hash(), "number", header.Number, "timestamp", header.Time, "err", err)
+		return nil, err
+	}
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)

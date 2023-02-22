@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./AllowList.sol";
 import "./IFeeManager.sol";
 
-// ExampleFeeManager shows how FeeConfigManager precompile can be used in a smart contract
+// ExampleFeeManager shows how FeeManager precompile can be used in a smart contract
 // All methods of [allowList] can be directly called. There are example calls as tasks in hardhat.config.ts file.
 contract ExampleFeeManager is AllowList {
   // Precompiled Fee Manager Contract Address
