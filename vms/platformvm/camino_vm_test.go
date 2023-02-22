@@ -114,7 +114,6 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	require.NoError(err)
 
 	// Add the validator
-	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := defaultValidateEndTime.Add(-1 * time.Hour)
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
@@ -171,6 +170,10 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
+	// Verify that the validator's owner's deferred state and consortium member is true
+	ownerState, _ := vm.state.GetAddressStates(consortiumMemberKey.Address())
+	require.Equal(ownerState, txs.AddressStateNodeDeferredBit|txs.AddressStateConsortiumBit)
+
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
@@ -217,6 +220,10 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify that the validator's owner's deferred state is false
+	ownerState, _ = vm.state.GetAddressStates(consortiumMemberKey.Address())
+	require.Equal(ownerState, txs.AddressStateConsortiumBit)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())

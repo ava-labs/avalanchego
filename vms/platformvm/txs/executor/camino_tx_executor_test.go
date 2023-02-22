@@ -192,6 +192,35 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			},
 			expectedErr: errValidatorExists,
 		},
+		"Validator in deferred validator set of primary network": {
+			generateArgs: func() args {
+				return args{
+					stakeAmount:   env.config.MinValidatorStake,
+					startTime:     uint64(defaultGenesisTime.Add(1 * time.Second).Unix()),
+					endTime:       uint64(defaultGenesisTime.Add(1 * time.Second).Add(defaultMinStakingDuration).Unix()),
+					nodeID:        nodeID2,
+					rewardAddress: ids.ShortEmpty,
+					shares:        reward.PercentDenominator,
+					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+					changeAddr:    ids.ShortEmpty,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetShortIDLink(ids.ShortID(nodeID2), state.ShortLinkKeyRegisterNode, &addr0)
+				staker, err := state.NewCurrentStaker(
+					tx.ID(),
+					tx.Unsigned.(*txs.CaminoAddValidatorTx),
+					0,
+				)
+				require.NoError(t, err)
+				env.state.PutDeferredValidator(staker)
+				env.state.AddTx(tx, status.Committed)
+				dummyHeight := uint64(1)
+				env.state.SetHeight(dummyHeight)
+				require.NoError(t, env.state.Commit())
+			},
+			expectedErr: errValidatorExists,
+		},
 		"AddValidatorTx flow check failed": {
 			generateArgs: func() args {
 				return args{
@@ -3345,6 +3374,8 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		env.state.SetShortIDLink(ids.ShortID(node), state.ShortLinkKeyRegisterNode, nil)
 	}
 
+	_, testNodeID := nodeid.GenerateCaminoNodeKeyAndID()
+
 	tests := map[string]struct {
 		generateArgs   func() args
 		preExecute     func(*testing.T, *txs.Tx)
@@ -3379,7 +3410,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			},
 			expectedErr: errConsortiumMemberHasNode,
 		},
-		"Happy path - addr is consortium member and changes registered node": {
+		"addr is consortium member and changes node in current validator's set": {
 			generateArgs: func() args {
 				return args{
 					oldNodeID:               caminoPreFundedNodeIDs[4],
@@ -3392,6 +3423,62 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
 				linkNode(caminoPreFundedKeys[4].Address(), caminoPreFundedNodeIDs[4])
+			},
+			expectedErr: errValidatorExists,
+		},
+		"addr is consortium member and changes node in pending validator's set": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               caminoPreFundedNodeIDs[3],
+					newNodeID:               newNodeID,
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{newNodeKey, caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				linkNode(caminoPreFundedKeys[4].Address(), caminoPreFundedNodeIDs[3])
+				staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, caminoPreFundedNodeIDs[3])
+				require.NoError(t, err)
+				env.state.DeleteCurrentValidator(staker)
+				env.state.PutPendingValidator(staker)
+			},
+			expectedErr: errValidatorExists,
+		},
+		"addr is consortium member and changes node in deferred validator's set": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               caminoPreFundedNodeIDs[2],
+					newNodeID:               newNodeID,
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{newNodeKey, caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				linkNode(caminoPreFundedKeys[4].Address(), caminoPreFundedNodeIDs[2])
+				staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, caminoPreFundedNodeIDs[2])
+				require.NoError(t, err)
+				env.state.DeleteCurrentValidator(staker)
+				env.state.PutDeferredValidator(staker)
+			},
+			expectedErr: errValidatorExists,
+		},
+		"Happy path - addr is consortium member and changes registered node (not in any validator's set)": {
+			generateArgs: func() args {
+				return args{
+					oldNodeID:               testNodeID,
+					newNodeID:               newNodeID,
+					consortiumMemberAddress: caminoPreFundedKeys[4].PublicKey().Address(),
+					keys:                    []*crypto.PrivateKeySECP256K1R{newNodeKey, caminoPreFundedKeys[4]},
+					change:                  &outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetAddressStates(caminoPreFundedKeys[4].Address(), txs.AddressStateConsortiumBit)
+				linkNode(caminoPreFundedKeys[4].Address(), testNodeID)
 			},
 			expectedNodeID: newNodeID,
 		},

@@ -187,14 +187,8 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 			)
 		}
 
-		if _, err := GetValidator(e.State, constants.PrimaryNetworkID, tx.Validator.NodeID); err == nil {
-			return errValidatorExists
-		} else if err != database.ErrNotFound {
-			return fmt.Errorf(
-				"failed to find whether %s is a primary network validator: %w",
-				tx.Validator.NodeID,
-				err,
-			)
+		if err := validatorExists(e.State, constants.PrimaryNetworkID, tx.Validator.NodeID); err != nil {
+			return err
 		}
 
 		rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -494,6 +488,33 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	} else {
 		e.OnCommitState.DeleteDeferredValidator(stakerToRemove)
 		e.OnAbortState.DeleteDeferredValidator(stakerToRemove)
+		// Reset deferred bit on node owner address for onCommitState
+		nodeOwnerAddressOnCommit, err := e.OnCommitState.GetShortIDLink(
+			ids.ShortID(stakerToRemove.NodeID),
+			state.ShortLinkKeyRegisterNode,
+		)
+		if err != nil {
+			return err
+		}
+		nodeOwnerAddressStateOnCommit, err := e.OnCommitState.GetAddressStates(nodeOwnerAddressOnCommit)
+		if err != nil {
+			return err
+		}
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^txs.AddressStateNodeDeferredBit)
+
+		// Reset deferred bit on node owner address for onAbortState
+		nodeOwnerAddressOnAbort, err := e.OnAbortState.GetShortIDLink(
+			ids.ShortID(stakerToRemove.NodeID),
+			state.ShortLinkKeyRegisterNode,
+		)
+		if err != nil {
+			return err
+		}
+		nodeOwnerAddressStateOnAbort, err := e.OnAbortState.GetAddressStates(nodeOwnerAddressOnAbort)
+		if err != nil {
+			return err
+		}
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^txs.AddressStateNodeDeferredBit)
 	}
 
 	txID := e.Tx.ID()
@@ -842,6 +863,14 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	if !oldNodeIDEmpty && (!haslinkedNode || tx.OldNodeID != ids.NodeID(linkedNodeID)) {
 		return errNotNodeOwner
+	}
+
+	// verify that the old node does not exist in any of the pending, current or deferred validator sets
+
+	if !oldNodeIDEmpty {
+		if err := validatorExists(e.State, constants.PrimaryNetworkID, tx.OldNodeID); err != nil {
+			return err
+		}
 	}
 
 	// verify new nodeID cred
@@ -1204,4 +1233,19 @@ func verifyAddrsOwner(addrs secp256k1fx.RecoverMap, owner *secp256k1fx.OutputOwn
 		}
 	}
 	return errors.New("missing signature")
+}
+
+func validatorExists(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) error {
+	if _, err := GetValidator(state, subnetID, nodeID); err == nil {
+		return errValidatorExists
+	} else if _, err := state.GetDeferredValidator(subnetID, nodeID); err == nil {
+		return errValidatorExists
+	} else if err != database.ErrNotFound {
+		return fmt.Errorf(
+			"failed to find whether %s is a primary network validator: %w",
+			nodeID,
+			err,
+		)
+	}
+	return nil
 }
