@@ -19,7 +19,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -80,12 +79,6 @@ var (
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 )
-
-func GetRunnerConfig(v *viper.Viper) runner.Config {
-	return runner.Config{
-		DisplayVersionAndExit: v.GetBool(VersionKey),
-	}
-}
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
