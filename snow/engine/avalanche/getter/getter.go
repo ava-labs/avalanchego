@@ -38,7 +38,7 @@ func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer,
 		"bs",
 		"get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
-		commonCfg.Ctx.Registerer,
+		commonCfg.Ctx.AvalancheRegisterer,
 	)
 	return gh, err
 }

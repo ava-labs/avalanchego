@@ -132,7 +132,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
 		}))
 		if err != nil {
@@ -152,7 +152,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
 		}))
 		if err != nil {
@@ -172,7 +172,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
 		}))
 		if err != nil {
@@ -605,7 +605,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 	ctx := snow.DefaultConsensusContextTest()
 	reg := prometheus.NewRegistry()
-	ctx.Registerer = reg
+	ctx.AvalancheRegisterer = reg
 	err := graph.Initialize(ctx, params)
 	if err != nil {
 		t.Fatal(err)

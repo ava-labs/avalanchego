@@ -58,7 +58,7 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 		executedStateTransitions: math.MaxInt32,
 	}
 
-	if err := b.metrics.Initialize("bs", config.Ctx.Registerer); err != nil {
+	if err := b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer); err != nil {
 		return nil, err
 	}
 

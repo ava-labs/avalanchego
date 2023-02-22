@@ -73,9 +73,20 @@ func New(
 				Help: fmt.Sprintf("# of times a %s request was not sent because the node was benched", op),
 			},
 		)
-		if err := ctx.Registerer.Register(counter); err != nil {
-			return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
+
+		switch engineType {
+		case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
+			if err := ctx.Registerer.Register(counter); err != nil {
+				return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
+			}
+		case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
+			if err := ctx.AvalancheRegisterer.Register(counter); err != nil {
+				return nil, fmt.Errorf("couldn't register metric for %s: %w", op, err)
+			}
+		default:
+			return nil, fmt.Errorf("unknown engine type %s", engineType)
 		}
+
 		s.failedDueToBench[op] = counter
 	}
 	return s, nil

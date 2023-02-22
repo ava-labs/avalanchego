@@ -63,7 +63,15 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// Registers all common and snowman consensus metrics. Unlike the avalanche
+	// consensus engine metrics, we do not prefix the name with the engine name,
+	// as snowman is used for all chains by default.
 	Registerer Registerer
+	// Only used to register Avalanche consensus metrics. Previously, all
+	// metrics were prefixed with "avalanche_{chainID}_". Now we add avalanche
+	// to the prefix, "avalanche_{chainID}_avalanche_", to differentiate
+	// consensus operations after the DAG linearization.
+	AvalancheRegisterer Registerer
 
 	// DecisionAcceptor is the callback that will be fired whenever a VM is
 	// notified that their object, either a block in snowman or a transaction
@@ -100,9 +108,10 @@ func DefaultContextTest() *Context {
 
 func DefaultConsensusContextTest() *ConsensusContext {
 	return &ConsensusContext{
-		Context:           DefaultContextTest(),
-		Registerer:        prometheus.NewRegistry(),
-		DecisionAcceptor:  noOpAcceptor{},
-		ConsensusAcceptor: noOpAcceptor{},
+		Context:             DefaultContextTest(),
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
+		DecisionAcceptor:    noOpAcceptor{},
+		ConsensusAcceptor:   noOpAcceptor{},
 	}
 }
