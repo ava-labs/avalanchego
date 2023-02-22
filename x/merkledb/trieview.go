@@ -57,10 +57,6 @@ type trieView struct {
 	// but will when their ID is recalculated.
 	changes *changeSummary
 
-	// Key/value pairs we've already fetched from [baseTrie].
-	// A Nothing value indicates that the key has been removed.
-	baseValuesCache map[path]Maybe[[]byte]
-
 	// Key/value pairs that have been inserted/removed but not
 	// yet reflected in the trie's structure. This allows us to
 	// defer the cost of updating the trie until we calculate node IDs.
@@ -82,10 +78,6 @@ type trieView struct {
 
 	// The root of the trie represented by this view.
 	root *node
-
-	// Nodes we've already fetched from [baseTrie].
-	// A nil value indicates that the node isn't in [baseTrie].
-	baseNodesCache map[path]*node
 
 	// True if the IDs of nodes in this view need to be recalculated.
 	needsRecalculation bool
@@ -152,8 +144,6 @@ func newTrieView(
 		basedOnRoot:           baseRoot,
 		changes:               changes,
 		estimatedSize:         estimatedSize,
-		baseNodesCache:        make(map[path]*node, defaultPreallocationSize),
-		baseValuesCache:       make(map[path]Maybe[[]byte], defaultPreallocationSize),
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
 	}
 	var err error
@@ -711,21 +701,20 @@ func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 
 // Assumes this view stack is locked.
 func (t *trieView) getValue(ctx context.Context, key path) ([]byte, error) {
-	value, hasLocal, err := t.getCachedValue(key)
-	if hasLocal {
-		return value, err
+	if change, ok := t.changes.values[key]; ok {
+		t.db.metrics.ViewValueCacheHit()
+		if change.after.IsNothing() {
+			return nil, database.ErrNotFound
+		}
+		return change.after.value, nil
 	}
+	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the base trie
-	value, err = t.baseTrie.getValue(ctx, key)
+	value, err := t.baseTrie.getValue(ctx, key)
 	if err != nil {
-		if err == database.ErrNotFound {
-			// Cache the miss.
-			t.baseValuesCache[key] = Nothing[[]byte]()
-		}
 		return nil, err
 	}
-	t.baseValuesCache[key] = Some(value)
 	return value, nil
 }
 
@@ -958,32 +947,6 @@ func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
 	return n.clone(), nil
 }
 
-// Returns:
-//  1. The value at [key] iff the following return value is true.
-//  2. True if the value at [key] exists in the caches.
-//     If false, the [key] may be in the trie, just not in the caches.
-//  3. database.ErrNotFound if the value isn't in the trie at all (not just the caches).
-//
-// Assumes this view stack is locked.
-func (t *trieView) getCachedValue(key path) ([]byte, bool, error) {
-	if change, ok := t.changes.values[key]; ok {
-		t.db.metrics.ViewValueCacheHit()
-		if change.after.IsNothing() {
-			return nil, true, database.ErrNotFound
-		}
-		return change.after.value, true, nil
-	}
-	if maybeVal, ok := t.baseValuesCache[key]; ok {
-		t.db.metrics.ViewValueCacheHit()
-		if maybeVal.IsNothing() {
-			return nil, true, database.ErrNotFound
-		}
-		return maybeVal.value, true, nil
-	}
-	t.db.metrics.ViewValueCacheMiss()
-	return nil, false, nil
-}
-
 // Inserts a key/value pair into the trie.
 // Assumes this view stack is locked.
 func (t *trieView) insertIntoTrie(
@@ -1118,8 +1081,6 @@ func (t *trieView) recordKeyChange(ctx context.Context, key path, after *node) e
 		return nil
 	}
 
-	delete(t.baseNodesCache, key)
-
 	before, err := t.baseTrie.getNode(ctx, key)
 	if err != nil {
 		if err != database.ErrNotFound {
@@ -1151,8 +1112,6 @@ func (t *trieView) recordValueChange(ctx context.Context, key path, value Maybe[
 		existing.after = value
 		return nil
 	}
-
-	delete(t.baseValuesCache, key)
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
@@ -1243,29 +1202,14 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 		return nodeChange.after, nil
 	}
 
-	// check for the key within the nodes we have already grabbed from the base trie
-	if node, haveLocal := t.baseNodesCache[key]; haveLocal {
-		t.db.metrics.ViewNodeCacheHit()
-		if node == nil {
-			return nil, database.ErrNotFound
-		}
-		return node, nil
-	}
-	t.db.metrics.ViewNodeCacheMiss()
-
 	// get the node from the base trie and store a localy copy
 	baseTrieNode, err := t.baseTrie.getNode(ctx, key)
 	if err != nil {
-		if err == database.ErrNotFound {
-			// Cache the miss
-			t.baseNodesCache[key] = nil
-		}
 		return nil, err
 	}
 
 	// copy the node so any alterations to it don't affect the base trie
 	node := baseTrieNode.clone()
-	t.baseNodesCache[key] = node
 
 	// only need to initialize the id if it's from the base trie.
 	// nodes in the current view change list have already been initialized.
