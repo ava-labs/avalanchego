@@ -37,6 +37,22 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
+// blkIDFromBlkWithNoSignature is an helper to calculate block ID for blocks to be built
+func blkIDFromBlkWithNoSignature(blockWithEmptySignature SignedBlock) (ids.ID, error) {
+	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockWithEmptySignature)
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. Because we are marshalling the
+	// block with an empty signature, we only need to strip off the length
+	// prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
+	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
+	return hashing.ComputeHash256Array(unsignedBytes), nil
+}
+
 func BuildCertSigned(
 	parentID ids.ID,
 	timestamp time.Time,
@@ -54,24 +70,18 @@ func BuildCertSigned(
 		},
 		Certificate: cert.Raw,
 		InnerBlock:  blockBytes,
-		timestamp:   timestamp, // TODO ABENEGIA: why don't we use initialize here somewhere??
-		cert:        cert,
-		proposer:    ids.NodeIDFromCert(cert),
-	}
-	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+		timestamp: timestamp,
+		cert:      cert,
+		proposer:  ids.NodeIDFromCert(cert),
+	}
+
+	var blockIntf SignedBlock = block
+	blkID, err := blkIDFromBlkWithNoSignature(blockIntf)
 	if err != nil {
 		return nil, err
 	}
-
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. Because we are marshalling the
-	// block with an empty signature, we only need to strip off the length
-	// prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
-	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
+	block.id = blkID
 
 	header, err := buildHeader(chainID, parentID, block.id)
 	if err != nil {
@@ -105,22 +115,14 @@ func BuildBlsSigned(
 		BlockProposer: nodeID,
 		InnerBlock:    innerBlockBytes,
 
-		timestamp: timestamp, // TODO ABENEGIA: similarly to CertSigned block we don't use initialize here. Not great
+		timestamp: timestamp,
 	}
 	var blockIntf SignedBlock = block
-
-	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+	blkID, err := blkIDFromBlkWithNoSignature(blockIntf)
 	if err != nil {
 		return nil, err
 	}
-
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. Because we are marshalling the
-	// block with an empty signature, we only need to strip off the length
-	// prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
-	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
+	block.id = blkID
 
 	header, err := buildHeader(chainID, parentID, block.id)
 	if err != nil {
