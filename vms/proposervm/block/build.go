@@ -24,10 +24,10 @@ func BuildUnsigned(
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
 			PChainHeight: pChainHeight,
-			Certificate:  nil,
-			Block:        blockBytes,
 		},
-		timestamp: timestamp,
+		Certificate: nil,
+		InnerBlock:  blockBytes,
+		timestamp:   timestamp,
 	}
 
 	bytes, err := c.Marshal(codecVersion, &block)
@@ -51,12 +51,12 @@ func BuildCertSigned(
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
 			PChainHeight: pChainHeight,
-			Certificate:  cert.Raw,
-			Block:        blockBytes,
 		},
-		timestamp: timestamp, // TODO ABENEGIA: why don't we use initialize here somewhere??
-		cert:      cert,
-		proposer:  ids.NodeIDFromCert(cert),
+		Certificate: cert.Raw,
+		InnerBlock:  blockBytes,
+		timestamp:   timestamp, // TODO ABENEGIA: why don't we use initialize here somewhere??
+		cert:        cert,
+		proposer:    ids.NodeIDFromCert(cert),
 	}
 	var blockIntf SignedBlock = block
 
@@ -97,11 +97,13 @@ func BuildBlsSigned(
 	blsSigner crypto.BLSSigner,
 ) (SignedBlock, error) {
 	block := &statelessBlsSignedBlock{
-		BlockParentID:     parentID,
-		BlockTimestamp:    timestamp.Unix(),
-		BlockPChainHeight: pChainHeight,
-		BlockProposer:     nodeID,
-		InnerBlockBytes:   innerBlockBytes,
+		StatelessBlock: statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+		},
+		BlockProposer: nodeID,
+		InnerBlock:    innerBlockBytes,
 
 		timestamp: timestamp, // TODO ABENEGIA: similarly to CertSigned block we don't use initialize here. Not great
 	}

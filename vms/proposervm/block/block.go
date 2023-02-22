@@ -44,18 +44,16 @@ type SignedBlock interface {
 	Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error
 }
 
-// NOTE ABENEGIA: statelessUnsignedBlock not reused for bls signed blocks
-// since certificate is not needed
 type statelessUnsignedBlock struct {
 	ParentID     ids.ID `serialize:"true"`
 	Timestamp    int64  `serialize:"true"`
 	PChainHeight uint64 `serialize:"true"`
-	Certificate  []byte `serialize:"true"`
-	Block        []byte `serialize:"true"`
 }
 
 type statelessCertSignedBlock struct {
 	StatelessBlock statelessUnsignedBlock `serialize:"true"`
+	Certificate    []byte                 `serialize:"true"`
+	InnerBlock     []byte                 `serialize:"true"`
 	Signature      []byte                 `serialize:"true"`
 
 	id        ids.ID
@@ -74,7 +72,7 @@ func (b *statelessCertSignedBlock) ParentID() ids.ID {
 }
 
 func (b *statelessCertSignedBlock) Block() []byte {
-	return b.StatelessBlock.Block
+	return b.InnerBlock
 }
 
 func (b *statelessCertSignedBlock) Bytes() []byte {
@@ -92,11 +90,11 @@ func (b *statelessCertSignedBlock) initialize(bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
-	if len(b.StatelessBlock.Certificate) == 0 {
+	if len(b.Certificate) == 0 {
 		return nil
 	}
 
-	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
+	cert, err := x509.ParseCertificate(b.Certificate)
 	if err != nil {
 		return err
 	}
@@ -124,7 +122,7 @@ func (b *statelessCertSignedBlock) Proposer() ids.NodeID {
 
 func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error {
 	if !shouldHaveProposer {
-		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
+		if len(b.Signature) > 0 || len(b.Certificate) > 0 {
 			return errUnexpectedProposer
 		}
 		return nil
@@ -146,12 +144,10 @@ func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.I
 }
 
 type statelessBlsSignedBlock struct {
-	BlockParentID     ids.ID     `serialize:"true"`
-	BlockTimestamp    int64      `serialize:"true"`
-	BlockPChainHeight uint64     `serialize:"true"`
-	BlockProposer     ids.NodeID `serialize:"true"`
-	InnerBlockBytes   []byte     `serialize:"true"`
-	Signature         []byte     `serialize:"true"`
+	StatelessBlock statelessUnsignedBlock `serialize:"true"`
+	BlockProposer  ids.NodeID             `serialize:"true"`
+	InnerBlock     []byte                 `serialize:"true"`
+	Signature      []byte                 `serialize:"true"`
 
 	id        ids.ID
 	timestamp time.Time
@@ -163,11 +159,11 @@ func (b *statelessBlsSignedBlock) ID() ids.ID {
 }
 
 func (b *statelessBlsSignedBlock) ParentID() ids.ID {
-	return b.BlockParentID
+	return b.StatelessBlock.ParentID
 }
 
 func (b *statelessBlsSignedBlock) Block() []byte {
-	return b.InnerBlockBytes
+	return b.InnerBlock
 }
 
 func (b *statelessBlsSignedBlock) Bytes() []byte {
@@ -176,7 +172,7 @@ func (b *statelessBlsSignedBlock) Bytes() []byte {
 
 func (b *statelessBlsSignedBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
-	b.timestamp = time.Unix(b.BlockTimestamp, 0)
+	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 
 	// The serialized form of the block is the unsignedBytes followed by the
 	// signature, which is prefixed by a uint32. So, we need to strip off the
@@ -188,7 +184,7 @@ func (b *statelessBlsSignedBlock) initialize(bytes []byte) error {
 }
 
 func (b *statelessBlsSignedBlock) PChainHeight() uint64 {
-	return b.BlockPChainHeight
+	return b.StatelessBlock.PChainHeight
 }
 
 func (b *statelessBlsSignedBlock) Timestamp() time.Time {
@@ -210,7 +206,7 @@ func (b *statelessBlsSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID
 		return errMissingProposer
 	}
 
-	header, err := buildHeader(chainID, b.BlockParentID, b.id)
+	header, err := buildHeader(chainID, b.StatelessBlock.ParentID, b.id)
 	if err != nil {
 		return err
 	}
