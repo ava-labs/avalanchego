@@ -42,14 +42,14 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	vm := &vertex.TestVM{}
 	vm.T = t
 
-	isBootstrapped := false
-	bootstrapTracker := &subnets.SyncTrackerTest{
+	isSynced := false
+	subnetStateTracker := &subnets.SyncTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isBootstrapped
+			return isSynced
 		},
 		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
+			isSynced = true
 		},
 	}
 
@@ -84,7 +84,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		Alpha:                          peers.Weight()/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
+		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

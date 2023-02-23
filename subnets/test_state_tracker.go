@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ SyncTracker = (*SyncTrackerTest)(nil)
+var _ StateTracker = (*SyncTrackerTest)(nil)
 
 // SyncTrackerTest is a test subnet
 type SyncTrackerTest struct {

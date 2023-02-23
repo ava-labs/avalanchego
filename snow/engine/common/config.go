@@ -18,13 +18,13 @@ type Config struct {
 	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 
-	SampleK          int
-	Alpha            uint64
-	StartupTracker   tracker.Startup
-	Sender           Sender
-	Bootstrapable    Bootstrapable
-	BootstrapTracker subnets.SyncTracker
-	Timer            Timer
+	SampleK            int
+	Alpha              uint64
+	StartupTracker     tracker.Startup
+	Sender             Sender
+	Bootstrapable      Bootstrapable
+	SubnetStateTracker subnets.StateTracker
+	Timer              Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

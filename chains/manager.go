@@ -699,7 +699,7 @@ func (m *manager) createAvalancheChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		BootstrapTracker:               sb,
+		SubnetStateTracker:             sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
@@ -967,7 +967,7 @@ func (m *manager) createSnowmanChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		BootstrapTracker:               sb,
+		SubnetStateTracker:             sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,

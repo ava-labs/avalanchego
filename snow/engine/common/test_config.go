@@ -13,13 +13,13 @@ import (
 
 // DefaultConfigTest returns a test configuration
 func DefaultConfigTest() Config {
-	isBootstrapped := false
-	bootstrapTracker := &subnets.SyncTrackerTest{
+	isSynced := false
+	subnetStateTracker := &subnets.SyncTrackerTest{
 		IsSyncedF: func() bool {
-			return isBootstrapped
+			return isSynced
 		},
 		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
+			isSynced = true
 		},
 	}
 
@@ -35,7 +35,7 @@ func DefaultConfigTest() Config {
 		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
-		BootstrapTracker:               bootstrapTracker,
+		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

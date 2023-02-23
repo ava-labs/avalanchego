@@ -21,7 +21,7 @@ type Allower interface {
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
 type Subnet interface {
-	SyncTracker
+	StateTracker
 
 	// AddChain adds a chain to this Subnet
 	AddChain(chainID ids.ID) bool

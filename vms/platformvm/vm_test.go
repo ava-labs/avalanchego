@@ -1783,14 +1783,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	isBootstrapped := false
-	bootstrapTracker := &subnets.SyncTrackerTest{
+	isSynced := false
+	subnetStateTracker := &subnets.SyncTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isBootstrapped
+			return isSynced
 		},
 		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
+			isSynced = true
 		},
 	}
 
@@ -1807,7 +1807,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
+		SubnetStateTracker:             subnetStateTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

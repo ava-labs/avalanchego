@@ -48,14 +48,14 @@ func testSetup(
 
 	sender.Default(true)
 
-	isBootstrapped := false
-	bootstrapTracker := &subnets.SyncTrackerTest{
+	isSynced := false
+	subnetStateTracker := &subnets.SyncTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isBootstrapped
+			return isSynced
 		},
 		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
+			isSynced = true
 		},
 	}
 
@@ -72,7 +72,7 @@ func testSetup(
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
+		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

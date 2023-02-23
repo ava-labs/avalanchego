@@ -7,9 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// SyncTracker describes the standard interface for tracking the status of
+// StateTracker describes the standard interface for tracking the status of
 // a subnet syncing
-type SyncTracker interface {
+type StateTracker interface {
 	// Returns true iff done bootstrapping
 	IsSynced() bool
 

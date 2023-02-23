@@ -32,14 +32,14 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	isBootstrapped := false
-	bootstrapTracker := &subnets.SyncTrackerTest{
+	isSynced := false
+	subnetStateTracker := &subnets.SyncTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isBootstrapped
+			return isSynced
 		},
 		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
+			isSynced = true
 		},
 	}
 
@@ -49,7 +49,7 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
+		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
