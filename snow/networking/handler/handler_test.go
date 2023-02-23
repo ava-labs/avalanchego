@@ -80,10 +80,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.SetChainState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
@@ -174,10 +172,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping,
-	})
+	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.SetChainState(snow.Bootstrapping)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -244,10 +240,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.SetChainState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -317,10 +311,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 	handler.SetConsensus(engine)
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp, // assumed bootstrap is done
-	})
+	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.SetChainState(snow.NormalOp) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -384,10 +376,8 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		return ctx
 	}
 	handler.SetConsensus(engine)
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp, // assumed bootstrap is done
-	})
+	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.SetChainState(snow.NormalOp) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -48,16 +47,17 @@ func testSetup(
 
 	sender.Default(true)
 
-	isSynced := false
-	subnetStateTracker := &subnets.SyncTrackerTest{
+	var currentState snow.State = snow.Initializing
+	ctx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isSynced
+			return currentState == snow.NormalOp
 		},
 		SetStateF: func(chainID ids.ID, state snow.State) {
-			if state == snow.NormalOp {
-				isSynced = true
-			}
+			currentState = state
+		},
+		GetStateF: func(chainID ids.ID) snow.State {
+			return currentState
 		},
 	}
 
@@ -74,7 +74,6 @@ func testSetup(
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

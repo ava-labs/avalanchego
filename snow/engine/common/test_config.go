@@ -8,20 +8,22 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/subnets"
 )
 
 // DefaultConfigTest returns a test configuration
 func DefaultConfigTest() Config {
-	isSynced := false
-	subnetStateTracker := &subnets.SyncTrackerTest{
+	ctx := snow.DefaultConsensusContextTest()
+
+	var currentState snow.State = snow.Initializing
+	ctx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
 		IsSyncedF: func() bool {
-			return isSynced
+			return currentState == snow.NormalOp
 		},
 		SetStateF: func(chainID ids.ID, state snow.State) {
-			if state == snow.NormalOp {
-				isSynced = true
-			}
+			currentState = state
+		},
+		GetStateF: func(chainID ids.ID) snow.State {
+			return currentState
 		},
 	}
 
@@ -32,12 +34,11 @@ func DefaultConfigTest() Config {
 	beacons.RegisterCallbackListener(startupTracker)
 
 	return Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            ctx,
 		Beacons:                        beacons,
 		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
-		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

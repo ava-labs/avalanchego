@@ -411,10 +411,8 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp,
-	})
+	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	t.Ctx.SetChainState(snow.NormalOp)
 	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)

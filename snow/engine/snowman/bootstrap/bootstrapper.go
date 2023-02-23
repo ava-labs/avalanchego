@@ -122,10 +122,8 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
-	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping,
-	})
+	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	b.Ctx.SetChainState(snow.Bootstrapping)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
@@ -280,7 +278,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.SubnetStateTracker.IsSynced() {
+	if !b.Config.Ctx.IsSynced() {
 		return b.Restart(ctx, true)
 	}
 	b.fetchETA.Set(0)
@@ -590,11 +588,11 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.SubnetStateTracker.SetState(b.Ctx.ChainID, snow.NormalOp)
+	b.Config.Ctx.SetState(b.Ctx.ChainID, snow.NormalOp)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Config.SubnetStateTracker.IsSynced() {
+	if !b.Config.Ctx.IsSynced() {
 		if !b.Config.SharedCfg.Restarted {
 			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {

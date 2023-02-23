@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -32,26 +31,27 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	isSynced := false
-	subnetStateTracker := &subnets.SyncTrackerTest{
+	ctx := snow.DefaultConsensusContextTest()
+	var currentState snow.State = snow.Initializing
+	ctx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isSynced
+			return currentState == snow.NormalOp
 		},
 		SetStateF: func(chainID ids.ID, state snow.State) {
-			if state == snow.NormalOp {
-				isSynced = true
-			}
+			currentState = state
+		},
+		GetStateF: func(chainID ids.ID) snow.State {
+			return currentState
 		},
 	}
 
 	commonConfig := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            ctx,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		SubnetStateTracker:             subnetStateTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,

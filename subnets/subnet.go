@@ -21,7 +21,7 @@ type Allower interface {
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
 type Subnet interface {
-	StateTracker
+	snow.SubnetStateTracker
 
 	// AddChain adds a chain to this Subnet
 	AddChain(chainID ids.ID) bool
@@ -89,7 +89,7 @@ func (s *subnet) GetState(chainID ids.ID) snow.State {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	return snow.Initializing
+	return s.chainToState[chainID]
 }
 
 func (s *subnet) OnSyncCompleted() chan struct{} {

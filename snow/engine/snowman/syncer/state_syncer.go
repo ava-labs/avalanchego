@@ -384,10 +384,8 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
-	ss.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.StateSyncing,
-	})
+	ss.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ss.Ctx.SetChainState(snow.StateSyncing)
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}

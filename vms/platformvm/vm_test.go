@@ -1783,16 +1783,17 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	isSynced := false
-	subnetStateTracker := &subnets.SyncTrackerTest{
+	var currentState snow.State = snow.Initializing
+	consensusCtx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
 		T: t,
 		IsSyncedF: func() bool {
-			return isSynced
+			return currentState == snow.NormalOp
 		},
 		SetStateF: func(chainID ids.ID, state snow.State) {
-			if state == snow.NormalOp {
-				isSynced = true
-			}
+			currentState = state
+		},
+		GetStateF: func(chainID ids.ID) snow.State {
+			return currentState
 		},
 	}
 
@@ -1809,7 +1810,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
-		SubnetStateTracker:             subnetStateTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

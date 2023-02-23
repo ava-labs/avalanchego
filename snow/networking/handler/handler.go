@@ -450,7 +450,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.State.Get().State == snow.NormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.GetChainState() == snow.NormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
@@ -836,7 +836,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 }
 
 func (h *handler) getEngine() (common.Engine, error) {
-	state := h.ctx.State.Get().State
+	state := h.ctx.GetChainState()
 	switch state {
 	case snow.StateSyncing:
 		return h.stateSyncer, nil

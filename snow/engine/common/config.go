@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/subnets"
 )
 
 // Config wraps the common configurations that are needed by a Snow consensus
@@ -18,13 +17,12 @@ type Config struct {
 	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 
-	SampleK            int
-	Alpha              uint64
-	StartupTracker     tracker.Startup
-	Sender             Sender
-	Bootstrapable      Bootstrapable
-	SubnetStateTracker subnets.StateTracker
-	Timer              Timer
+	SampleK        int
+	Alpha          uint64
+	StartupTracker tracker.Startup
+	Sender         Sender
+	Bootstrapable  Bootstrapable
+	Timer          Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
@@ -52,7 +50,7 @@ func (c *Config) Context() *snow.ConsensusContext {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (c *Config) IsBootstrapped() bool {
-	return c.Ctx.State.Get().State == snow.NormalOp
+	return c.Ctx.GetChainState() == snow.NormalOp
 }
 
 // Shared among common.bootstrapper and snowman/avalanche bootstrapper

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -83,14 +84,23 @@ type ConsensusContext struct {
 	// accepted.
 	ConsensusAcceptor Acceptor
 
-	// State indicates the current state of this consensus instance.
-	State utils.Atomic[EngineState]
+	SubnetStateTracker
+
+	CurrentEngineType utils.Atomic[p2p.EngineType]
 
 	// True iff this chain is executing transactions as part of bootstrapping.
 	Executing utils.Atomic[bool]
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
+}
+
+func (cc *ConsensusContext) GetChainState() State {
+	return cc.SubnetStateTracker.GetState(cc.CChainID)
+}
+
+func (cc *ConsensusContext) SetChainState(state State) {
+	cc.SubnetStateTracker.SetState(cc.CChainID, state)
 }
 
 func DefaultContextTest() *Context {
@@ -113,5 +123,6 @@ func DefaultConsensusContextTest() *ConsensusContext {
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		DecisionAcceptor:    noOpAcceptor{},
 		ConsensusAcceptor:   noOpAcceptor{},
+		SubnetStateTracker:  &SubnetStateTrackerTest{},
 	}
 }

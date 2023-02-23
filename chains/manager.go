@@ -300,8 +300,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 
 // createChain creates and starts the chain
 // Note: it is expected for the subnet to already have the chain registered as
-//
-//	bootstrapping before this function is called
+// bootstrapping before this function is called
 func (m *manager) createChain(chainParams ChainParameters) {
 	m.Log.Info("creating chain",
 		zap.Stringer("subnetID", chainParams.SubnetID),
@@ -467,6 +466,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		},
 		DecisionAcceptor:    m.DecisionAcceptorGroup,
 		ConsensusAcceptor:   m.ConsensusAcceptorGroup,
+		SubnetStateTracker:  sb,
 		Registerer:          consensusMetrics,
 		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
@@ -699,7 +699,6 @@ func (m *manager) createAvalancheChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		SubnetStateTracker:             sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
@@ -967,7 +966,6 @@ func (m *manager) createSnowmanChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		SubnetStateTracker:             sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
@@ -1074,7 +1072,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get().State == snow.NormalOp
+	return chain.Context().GetChainState() == snow.NormalOp
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
