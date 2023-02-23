@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -29,5 +30,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	rpcchainvm.Serve(&evm.VM{IsPlugin: true})
+	rpcchainvm.Serve(context.Background(), &evm.VM{IsPlugin: true})
 }
