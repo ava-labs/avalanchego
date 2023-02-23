@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -79,7 +80,8 @@ type Database struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache cache.LRU[path, *node]
+	nodeCache     onEvictCache[path, *node]
+	onEvictionErr utils.Atomic[error]
 
 	valueCache cache.LRU[string, Maybe[[]byte]]
 
@@ -115,10 +117,7 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = cache.LRU[path, *node]{
-		Size:       config.NodeCacheSize,
-		OnEviction: trieDB.OnEviction,
-	}
+	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
 
 	root, err := trieDB.initializeRootIfNeeded(ctx)
 	if err != nil {
@@ -179,7 +178,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 	}
 	currentViewSize := 0
 	viewSizeLimit := math.Max(
-		db.nodeCache.Size/rebuildViewSizeFractionOfCacheSize,
+		db.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
 	for it.Next() {
@@ -261,21 +260,38 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 
 func (db *Database) Close() error {
 	db.lock.Lock()
-	defer func() {
-		_ = db.metadataDB.Close() // TODO add logger and log error
-		_ = db.nodeDB.Close()     // TODO add logger and log error
-		db.lock.Unlock()
-	}()
+	defer db.lock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
 
 	db.closed = true
 
-	// flush [nodeCache] to persist intermediary nodes to disk.
-	db.nodeCache.Flush()
+	defer func() {
+		_ = db.metadataDB.Close()
+		_ = db.nodeDB.Close()
+	}()
+
+	if err := db.onEvictionErr.Get(); err != nil {
+		// If there was an error during cache eviction,
+		// [db.nodeCache] and [db.nodeDB] are in an inconsistent state.
+		// Do not write cached nodes to disk or mark clean shutdown.
+		return nil
+	}
+
+	// Flush [nodeCache] to persist intermediary nodes to disk.
+	if err := db.nodeCache.Flush(); err != nil {
+		// There was an error during cache eviction.
+		// Don't commit to disk.
+		return err
+	}
+
 	if err := db.nodeDB.Commit(); err != nil {
 		return err
 	}
 
-	// after intermediary nodes are persisted, we can mark a clean shutdown.
+	// Successfully wrote intermediate nodes.
 	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
@@ -629,26 +645,34 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-// OnEviction persists intermediary nodes to [nodeDB] as they are evicted from
-// [nodeCache].
-// Note that this is called by [db.nodeCache] with that cache's lock held, so
-// the movement of the node from [db.nodeCache] to [db.nodeDB] is atomic.
-// That is, as soon as [db.nodeCache] reports that it no longer has an evicted
-// node, the node is guaranteed to be in [db.nodeDB].
-func (db *Database) OnEviction(node *node) {
+// If [node] is an intermediary node, puts it in [nodeDB].
+// Note this is called by [db.nodeCache] with its lock held, so
+// the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
+// As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
+// Non-nil error is fatal -- causes [db] to close.
+func (db *Database) onEviction(node *node) error {
 	if node == nil || node.hasValue() {
 		// only persist intermediary nodes
-		return
+		return nil
 	}
+
 	nodeBytes, err := node.marshal()
 	if err != nil {
-		// TODO: Handle this error correctly
-		panic(err)
+		db.onEvictionErr.Set(err)
+		// Prevent reads/writes from/to [db.nodeDB] to avoid inconsistent state.
+		_ = db.nodeDB.Close()
+		// This is a fatal error.
+		go db.Close()
+		return err
 	}
-	if err = db.nodeDB.Put(node.key.Bytes(), nodeBytes); err != nil {
-		// TODO: Handle this error correctly
-		panic(err)
+
+	if err := db.nodeDB.Put(node.key.Bytes(), nodeBytes); err != nil {
+		db.onEvictionErr.Set(err)
+		_ = db.nodeDB.Close()
+		go db.Close()
+		return err
 	}
+	return nil
 }
 
 // Inserts the key/value pair into the db.
@@ -756,7 +780,9 @@ func (db *Database) commitChanges(ctx context.Context, changes *changeSummary) e
 	db.root = rootChange.after
 
 	for key, nodeChange := range changes.nodes {
-		db.putNodeInCache(key, nodeChange.after)
+		if err := db.putNodeInCache(key, nodeChange.after); err != nil {
+			return err
+		}
 	}
 
 	_, valuesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeValues")
@@ -873,7 +899,9 @@ func (db *Database) getNode(_ context.Context, key path) (*node, error) {
 	if err != nil {
 		if err == database.ErrNotFound {
 			// Cache the miss.
-			db.putNodeInCache(key, nil)
+			if err := db.putNodeInCache(key, nil); err != nil {
+				return nil, err
+			}
 		}
 		return nil, err
 	}
@@ -883,8 +911,8 @@ func (db *Database) getNode(_ context.Context, key path) (*node, error) {
 		return nil, err
 	}
 
-	db.putNodeInCache(key, node)
-	return node.clone(), nil
+	err = db.putNodeInCache(key, node)
+	return node.clone(), err
 }
 
 // Assumes [db.lock] is read locked.
@@ -1015,11 +1043,12 @@ func (db *Database) prepareRangeProofView(ctx context.Context, start []byte, pro
 // This is required because putting a node in [db.nodeCache] can cause an eviction,
 // which puts a node in [db.nodeDB], and we don't want to put anything in [db.nodeDB]
 // after [db] is closed.
-func (db *Database) putNodeInCache(key path, n *node) {
+// Non-nil error is fatal -- [db] will close.
+func (db *Database) putNodeInCache(key path, n *node) error {
 	// TODO Cache metrics
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
-	db.nodeCache.Put(key, n)
+	return db.nodeCache.Put(key, n)
 }
 
 func (db *Database) getNodeInCache(key path) (*node, bool) {
