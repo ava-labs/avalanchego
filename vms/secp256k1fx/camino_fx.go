@@ -111,6 +111,66 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 		return fmt.Errorf("out amount and input differ")
 	}
 
+	return fx.verifyMultisigCredentials(tx, &in.Input, cred, &out.OutputOwners, msig)
+}
+
+func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msigIntf interface{}) error {
+	tx, ok := txIntf.(UnsignedTx)
+	if !ok {
+		return errWrongTxType
+	}
+	in, ok := inIntf.(*Input)
+	if !ok {
+		return errWrongInputType
+	}
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return errWrongCredentialType
+	}
+	owners, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return errWrongUTXOType
+	}
+
+	msig, ok := msigIntf.(AliasGetter)
+	if !ok {
+		return errNotAliasGetter
+	}
+
+	if err := verify.All(owners, in, cred); err != nil {
+		return err
+	}
+
+	return fx.verifyMultisigCredentials(tx, in, cred, owners, msig)
+}
+
+func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msigIntf interface{}) error {
+	tx, ok := txIntf.(UnsignedTx)
+	if !ok {
+		return errWrongTxType
+	}
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return errWrongCredentialType
+	}
+	owners, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return errWrongUTXOType
+	}
+
+	msig, ok := msigIntf.(AliasGetter)
+	if !ok {
+		return errNotAliasGetter
+	}
+
+	if err := verify.All(owners, cred); err != nil {
+		return err
+	}
+
+	return fx.verifyMultisigUnorderedCredentials(tx, cred, owners, msig)
+}
+
+func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credential, owners *OutputOwners, msig AliasGetter) error {
 	if len(in.SigIndices) > len(cred.Sigs) {
 		return errTooManySigners
 	} else if len(in.SigIndices) < len(cred.Sigs) {
@@ -123,7 +183,7 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 	}
 
 	tf := func(addr ids.ShortID, visited, verified uint32) (bool, error) {
-		// check that tIn sig index matches
+		// check that input sig index matches
 		if verified >= uint32(len(in.SigIndices)) {
 			return false, errInputOutputIndexOutOfBounds
 		}
@@ -136,7 +196,27 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 		return false, nil
 	}
 
-	if err = TraverseOwners(&out.OutputOwners, msig, tf); err != nil {
+	if err = TraverseOwners(owners, msig, tf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, cred *Credential, owners *OutputOwners, msig AliasGetter) error {
+	resolved, err := fx.RecoverAddresses(tx, []verify.Verifiable{cred})
+	if err != nil {
+		return err
+	}
+
+	tf := func(addr ids.ShortID, visited, verified uint32) (bool, error) {
+		if _, exists := resolved[addr]; exists {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	if err = TraverseOwners(owners, msig, tf); err != nil {
 		return err
 	}
 

@@ -181,6 +181,34 @@ func (mr *MockFxMockRecorder) VerifyPermissionUnordered(arg0, arg1, arg2 interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPermissionUnordered", reflect.TypeOf((*MockFx)(nil).VerifyPermissionUnordered), arg0, arg1, arg2)
 }
 
+// VerifyMultisigPermission mocks base method.
+func (m *MockFx) VerifyMultisigPermission(arg0, arg1, arg2, arg3, arg4 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyMultisigPermission", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyMultisigPermission indicates an expected call of VerifyMultisigPermission.
+func (mr *MockFxMockRecorder) VerifyMultisigPermission(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigPermission", reflect.TypeOf((*MockFx)(nil).VerifyMultisigPermission), arg0, arg1, arg2, arg3, arg4)
+}
+
+// VerifyMultisigUnorderedPermission mocks base method.
+func (m *MockFx) VerifyMultisigUnorderedPermission(arg0, arg1, arg2, arg3 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyMultisigUnorderedPermission", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyMultisigUnorderedPermission indicates an expected call of VerifyMultisigUnorderedPermission.
+func (mr *MockFxMockRecorder) VerifyMultisigUnorderedPermission(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigUnorderedPermission", reflect.TypeOf((*MockFx)(nil).VerifyMultisigUnorderedPermission), arg0, arg1, arg2, arg3)
+}
+
 // MockOwner is a mock of Owner interface.
 type MockOwner struct {
 	ctrl     *gomock.Controller
