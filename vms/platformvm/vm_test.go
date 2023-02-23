@@ -319,26 +319,24 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			StakingEnabled:         true,
-			Validators:             vdrs,
-			TxFee:                  defaultTxFee,
-			CreateSubnetTxFee:      100 * defaultTxFee,
-			TransformSubnetTxFee:   100 * defaultTxFee,
-			CreateBlockchainTxFee:  100 * defaultTxFee,
-			MinValidatorStake:      defaultMinValidatorStake,
-			MaxValidatorStake:      defaultMaxValidatorStake,
-			MinDelegatorStake:      defaultMinDelegatorStake,
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			ApricotPhase3Time:      defaultValidateEndTime,
-			ApricotPhase5Time:      defaultValidateEndTime,
-			BanffTime:              banffForkTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		StakingEnabled:         true,
+		Validators:             vdrs,
+		TxFee:                  defaultTxFee,
+		CreateSubnetTxFee:      100 * defaultTxFee,
+		TransformSubnetTxFee:   100 * defaultTxFee,
+		CreateBlockchainTxFee:  100 * defaultTxFee,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		ApricotPhase3Time:      defaultValidateEndTime,
+		ApricotPhase5Time:      defaultValidateEndTime,
+		BanffTime:              banffForkTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -424,20 +422,18 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			Validators:             vdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			TxFee:                  defaultTxFee,
-			MinValidatorStake:      defaultMinValidatorStake,
-			MaxValidatorStake:      defaultMaxValidatorStake,
-			MinDelegatorStake:      defaultMinDelegatorStake,
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              banffForkTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		Validators:             vdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		TxFee:                  defaultTxFee,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		BanffTime:              banffForkTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1477,16 +1473,14 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
-	firstVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			Validators:             firstVdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              banffForkTime,
-		},
+	firstVM := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		Validators:             firstVdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		BanffTime:              banffForkTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -1568,16 +1562,14 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
-	secondVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			Validators:             secondVdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              banffForkTime,
-		},
+	secondVM := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		Validators:             secondVdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		BanffTime:              banffForkTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -1626,16 +1618,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			Validators:             vdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              banffForkTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		Validators:             vdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		BanffTime:              banffForkTime,
 	}}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -1937,16 +1927,14 @@ func TestUnverifiedParent(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			Validators:             vdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              banffForkTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		Validators:             vdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		BanffTime:              banffForkTime,
 	}}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -2102,15 +2090,13 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVdrs := validators.NewManager()
 	firstPrimaryVdrs := validators.NewSet()
 	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
-	firstVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			UptimePercentage:       .2,
-			RewardConfig:           defaultRewardConfig,
-			Validators:             firstVdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              banffForkTime,
-		},
+	firstVM := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		UptimePercentage:       .2,
+		RewardConfig:           defaultRewardConfig,
+		Validators:             firstVdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		BanffTime:              banffForkTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -2147,14 +2133,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVdrs := validators.NewManager()
 	secondPrimaryVdrs := validators.NewSet()
 	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
-	secondVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			UptimePercentage:       .21,
-			Validators:             secondVdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              banffForkTime,
-		},
+	secondVM := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		UptimePercentage:       .21,
+		Validators:             secondVdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		BanffTime:              banffForkTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -2285,15 +2269,13 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			UptimePercentage:       .2,
-			RewardConfig:           defaultRewardConfig,
-			Validators:             vdrs,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              banffForkTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		UptimePercentage:       .2,
+		RewardConfig:           defaultRewardConfig,
+		Validators:             vdrs,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		BanffTime:              banffForkTime,
 	}}
 
 	ctx := defaultContext()
@@ -2401,15 +2383,13 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrManager.Add(constants.PrimaryNetworkID, primaryVdrs)
 
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.TestManager,
-			UptimePercentage:       .2,
-			RewardConfig:           defaultRewardConfig,
-			Validators:             vdrManager,
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              mockable.MaxTime,
-		},
+	vm := &VM{Config: config.Config{
+		Chains:                 chains.TestManager,
+		UptimePercentage:       .2,
+		RewardConfig:           defaultRewardConfig,
+		Validators:             vdrManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		BanffTime:              mockable.MaxTime,
 	}}
 
 	ctx := defaultContext()

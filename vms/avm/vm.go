@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -73,7 +74,7 @@ var (
 type VM struct {
 	common.AppHandler
 
-	Factory
+	config.Config
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
