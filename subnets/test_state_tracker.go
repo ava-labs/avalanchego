@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 var _ StateTracker = (*SyncTrackerTest)(nil)
@@ -15,18 +16,18 @@ var _ StateTracker = (*SyncTrackerTest)(nil)
 type SyncTrackerTest struct {
 	T *testing.T
 
-	CantIsSynced, CantBootstrapped, CantOnSyncCompleted bool
+	CantIsSynced, CantSetState, CantGetState, CantOnSyncCompleted bool
 
-	IsSyncedF     func() bool
-	BootstrappedF func(ids.ID)
-
+	IsSyncedF        func() bool
+	SetStateF        func(chainID ids.ID, state snow.State)
+	GetStateF        func(chainID ids.ID) snow.State
 	OnSyncCompletedF func() chan struct{}
 }
 
 // Default set the default callable value to [cant]
 func (s *SyncTrackerTest) Default(cant bool) {
 	s.CantIsSynced = cant
-	s.CantBootstrapped = cant
+	s.CantSetState = cant
 	s.CantOnSyncCompleted = cant
 }
 
@@ -43,15 +44,24 @@ func (s *SyncTrackerTest) IsSynced() bool {
 	return false
 }
 
-// Bootstrapped calls BootstrappedF if it was initialized. If it wasn't
+// SetState calls SetStateF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SyncTrackerTest) Bootstrapped(chainID ids.ID) {
-	if s.BootstrappedF != nil {
-		s.BootstrappedF(chainID)
-	} else if s.CantBootstrapped && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Bootstrapped")
+func (s *SyncTrackerTest) SetState(chainID ids.ID, state snow.State) {
+	if s.SetStateF != nil {
+		s.SetStateF(chainID, state)
+	} else if s.CantSetState && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SetState")
 	}
+}
+
+func (s *SyncTrackerTest) GetState(chainID ids.ID) snow.State {
+	if s.GetStateF != nil {
+		s.GetStateF(chainID)
+	} else if s.CantGetState && s.T != nil {
+		s.T.Fatalf("Unexpectedly called GetState")
+	}
+	return snow.Initializing
 }
 
 func (s *SyncTrackerTest) OnSyncCompleted() chan struct{} {

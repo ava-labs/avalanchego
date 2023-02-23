@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 var _ Subnet = (*subnet)(nil)
@@ -33,9 +33,10 @@ type Subnet interface {
 }
 
 type subnet struct {
-	lock             sync.RWMutex
-	bootstrapping    set.Set[ids.ID]
-	bootstrapped     set.Set[ids.ID]
+	lock sync.RWMutex
+
+	chainToState map[ids.ID]snow.State
+
 	once             sync.Once
 	bootstrappedSema chan struct{}
 	config           Config
@@ -44,6 +45,7 @@ type subnet struct {
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
+		chainToState:     make(map[ids.ID]snow.State),
 		bootstrappedSema: make(chan struct{}),
 		config:           config,
 		myNodeID:         myNodeID,
@@ -54,22 +56,40 @@ func (s *subnet) IsSynced() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.bootstrapping.Len() == 0
+	return s.isSynced()
 }
 
-func (s *subnet) Bootstrapped(chainID ids.ID) {
+// isSynced assumes s.lock is held
+func (s *subnet) isSynced() bool {
+	synced := true
+	for _, st := range s.chainToState {
+		if st != snow.NormalOp {
+			synced = false
+			break
+		}
+	}
+	return synced
+}
+
+func (s *subnet) SetState(chainID ids.ID, state snow.State) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.bootstrapping.Remove(chainID)
-	s.bootstrapped.Add(chainID)
-	if s.bootstrapping.Len() > 0 {
+	s.chainToState[chainID] = state
+	if !s.isSynced() {
 		return
 	}
 
 	s.once.Do(func() {
 		close(s.bootstrappedSema)
 	})
+}
+
+func (s *subnet) GetState(chainID ids.ID) snow.State {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return snow.Initializing
 }
 
 func (s *subnet) OnSyncCompleted() chan struct{} {
@@ -80,11 +100,11 @@ func (s *subnet) AddChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.bootstrapping.Contains(chainID) || s.bootstrapped.Contains(chainID) {
+	if _, found := s.chainToState[chainID]; found {
 		return false
 	}
 
-	s.bootstrapping.Add(chainID)
+	s.chainToState[chainID] = snow.Initializing
 	return true
 }
 

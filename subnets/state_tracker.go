@@ -5,16 +5,17 @@ package subnets
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // StateTracker describes the standard interface for tracking the status of
 // a subnet syncing
 type StateTracker interface {
-	// Returns true iff done bootstrapping
+	// Returns true iff all subnet chains have complete syncing
 	IsSynced() bool
 
-	// Bootstrapped marks the named chain as being bootstrapped
-	Bootstrapped(chainID ids.ID)
+	SetState(chainID ids.ID, state snow.State)
+	GetState(chainID ids.ID) snow.State
 
 	OnSyncCompleted() chan struct{}
 }

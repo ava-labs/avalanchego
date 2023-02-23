@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -24,7 +25,7 @@ func TestSubnet(t *testing.T) {
 	s.AddChain(chainID0)
 	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.Bootstrapped(chainID0)
+	s.SetState(chainID0, snow.NormalOp)
 	require.True(s.IsSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 
 	s.AddChain(chainID1)
@@ -33,10 +34,10 @@ func TestSubnet(t *testing.T) {
 	s.AddChain(chainID2)
 	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.Bootstrapped(chainID1)
+	s.SetState(chainID1, snow.NormalOp)
 	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.Bootstrapped(chainID2)
+	s.SetState(chainID2, snow.NormalOp)
 	require.True(s.IsSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 }
 

@@ -54,8 +54,10 @@ func testSetup(
 		IsSyncedF: func() bool {
 			return isSynced
 		},
-		BootstrappedF: func(ids.ID) {
-			isSynced = true
+		SetStateF: func(chainID ids.ID, state snow.State) {
+			if state == snow.NormalOp {
+				isSynced = true
+			}
 		},
 	}
 
