@@ -52,7 +52,7 @@ const (
 	{{- if .Contract.AllowList}}
 	// This contract also uses AllowList precompile.
 	// You should also increase gas costs of functions that read from AllowList storage.
-	{{- end}}}
+	{{- end}}
 	{{- range .Contract.Funcs}}
 	{{.Normalized.Name}}GasCost uint64 = 0 {{if not .Original.IsConstant | and $contract.AllowList}} + allowlist.ReadAllowListGasCost {{end}}	// SET A GAS COST HERE
 	{{- end}}
@@ -136,7 +136,7 @@ func Set{{.Contract.Type}}AllowListStatus(stateDB contract.StateDB, address comm
 
 {{range .Contract.Funcs}}
 {{if len .Normalized.Inputs | lt 1}}
-// Unpack{{capitalise .Normalized.Name}}Input attempts to unpack [input] into the arguments for the {{capitalise .Normalized.Name}}Input{}
+// Unpack{{capitalise .Normalized.Name}}Input attempts to unpack [input] as {{capitalise .Normalized.Name}}Input
 // assumes that [input] does not include selector (omits first 4 func signature bytes)
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte) ({{capitalise .Normalized.Name}}Input, error) {
 	inputStruct := {{capitalise .Normalized.Name}}Input{}
@@ -298,7 +298,7 @@ func {{decapitalise $contract.Type}}Fallback (accessibleState contract.Accessibl
 {{- end}}
 
 // create{{.Contract.Type}}Precompile returns a StatefulPrecompiledContract with getters and setters for the precompile.
-{{if .Contract.AllowList}} // Access to the getters/setters is controlled by an allow list for ContractAddress.{{end}}
+{{- if .Contract.AllowList}} // Access to the getters/setters is controlled by an allow list for ContractAddress.{{end}}
 func create{{.Contract.Type}}Precompile() contract.StatefulPrecompiledContract {
 	var functions []*contract.StatefulPrecompileFunction
 	{{- if .Contract.AllowList}}

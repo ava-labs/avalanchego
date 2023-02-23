@@ -65,11 +65,11 @@ func (*configurator) Configure(chainConfig contract.ChainConfig, cfg precompilec
 		return fmt.Errorf("incorrect config %T: %v", config, config)
 	}
 	// CUSTOM CODE STARTS HERE
-	{{if .Contract.AllowList}}
+	{{- if .Contract.AllowList}}
 	// AllowList is activated for this precompile. Configuring allowlist addresses here.
 	return config.AllowListConfig.Configure(state, ContractAddress)
-	{{else}}
+	{{- else}}
 	return nil
-	{{end}}
+	{{- end}}
 }
 `
