@@ -231,7 +231,7 @@
         },
         "platformAllocations": [
           {
-            "amount": 553001350000000000,
+            "amount": 353001350000000000,
             "timestampOffset": 3600,
             "memo": "6+"
           }
@@ -402,7 +402,7 @@
         },
         "platformAllocations": [
           {
-            "amount": 100000000000000000,
+            "amount": 300000000000000000,
             "timestampOffset": 3600,
             "memo": "14+"
           }
@@ -1030,7 +1030,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dfmxynlz2dv50k57wwarqhe5nau7dx57ppxgt3",
+        "avaxAddr": "X-columbus19s08wlh8a79h32upup8xz5lqrne6ps6vx64fu6",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1042,6 +1042,23 @@
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
             "memo": "43"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus185x26fkaac36mssg90r82dqal3qagd0usyucqs",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "44"
           }
         ]
       },
@@ -1076,6 +1093,40 @@
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
             "memo": "51"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1vctr8ha7zna8fxdkazt5k6cnlj7fmg7enwf08a",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 215000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "52"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1emp8mkj8g24wmln7dskagu5a8r3p7qefw6gyqq",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 250000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "53"
           }
         ]
       },
@@ -1166,7 +1217,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1fzf5w8fffkxhgcafu30kd2led3qxpejqtahsxl",
+        "avaxAddr": "X-columbus1ak489h9rs6e728wvrgpkx7rzuu9hf4kusjw968",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1330,7 +1381,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wak28nvccph0repjtjjry4hatwcmues7frv5zm",
+        "avaxAddr": "X-columbus1mcs8pk0f67p9s0mmtz9eyph26kp848rdtgllk8",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1633,6 +1684,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
+            "nodeID": "NodeID-ADyRxZndN569FitkbBzpr8oSe6FnYCMUr",
+            "validatorDuration": 33264000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "88"
@@ -2380,7 +2433,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1neujngjxfe0fjrejvx9r0cq252074a3gkkdxfp",
+        "avaxAddr": "X-columbus1xz37ugnp0aaedt2ur6j7qh6mljvksn0040xwz5",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -2410,6 +2463,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
+            "nodeID": "NodeID-EPnVak5NCap1wdxJRWxKRQNaBfHi9MoVd",
+            "validatorDuration": 31276800,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "125"
@@ -3336,7 +3391,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus15wxmstyfxxx82ewdmz3usvfk20h39zqhvdqf66",
+        "avaxAddr": "X-columbus1dsp7mpvs7hk6hp9l22my4zgpz347celpuv4p94",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -3504,7 +3559,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kyrnfq2gwgx2eqkrwej4cumkjydqlj600qlczz",
+        "avaxAddr": "X-columbus1nkjv6uvpn0u7qg5g24yaey0ch3upjgcyr608j3",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -3651,7 +3706,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1f7mkhrp5pmcghqev620ukveklf293x9dpy58qu",
+        "avaxAddr": "X-columbus1txd4zzds5w07vw7hk9cwmuq3fv0e42uecnf5ut",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4472,7 +4527,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wfpafadjnzkp5xm3yr7cgmuzqftkf8jfj2xn6s",
+        "avaxAddr": "X-columbus1m56g7kzpyvwlcc3mzz9rs5x4u3xuqasq8w66s7",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4682,7 +4737,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1xysg8r87kzrm8vwx04gzzvttx902ttmppauqrq",
+        "avaxAddr": "X-columbus1xwerkdrpkuhq0u9uprvp0dms6tc7y5annjys5f",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5123,7 +5178,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zepqrffl3c5szd7y7cnhcrcrtjvxg3zd9c37dm",
+        "avaxAddr": "X-columbus14l3kw0v2j5l606lst7kfcs4g5lwvgk53gtf3dj",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5291,7 +5346,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1c3dhlnasnjcgfv4tvqzqk47l5upvka4rmfgqqs",
+        "avaxAddr": "X-columbus165l9qxyvr0rcpfverhp6tadzpufrs4vlp045g9",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5398,7 +5453,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wpxa43ech79mxs5ta9kgrg3jx03rrjc3sv6qmv",
+        "avaxAddr": "X-columbus13rwnrf69r9dk2hn582gtpy0khntcrs99wxymhs",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5692,7 +5747,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1q37excjx65fzk2kgjqesqjmp0de0nvkh4kvghy",
+        "avaxAddr": "X-columbus15dw76k56hd7x2s7k9rnvkzsv56sam5ujwtfp00",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5839,7 +5894,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
+        "avaxAddr": "X-columbus1zwvhe3ldhusktgsfaphj482sq3sw37mu6884rn",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5860,7 +5915,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
+        "avaxAddr": "X-columbus1rvaashu2n3lgc8ar5mhk2rya4q8f0tq9kulpsy",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5965,7 +6020,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ggs3tyns4th29j7tf9m46smr95x72ncssqugxq",
+        "avaxAddr": "X-columbus1j9nsdtrff2m9w97m7wsnxwyx7dvax2v2cv9mfx",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6154,7 +6209,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus14dc8m3xgfavwvwupq4krps8m5f4t2fefxlnafg",
+        "avaxAddr": "X-columbus1yp5mdt0mjgt7q956flks5m4gdjuh8xdc09a0t6",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6394,6 +6449,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
+            "nodeID": "NodeID-9pygZskxbgi5ZKicwu5ES2ZwteTK6MnMH",
+            "validatorDuration": 30412800,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "320"
@@ -6623,9 +6680,9 @@
         "memo": "147"
       },
       {
-        "alias": "X-columbus1ggs3tyns4th29j7tf9m46smr95x72ncssqugxq",
+        "alias": "X-columbus1j9nsdtrff2m9w97m7wsnxwyx7dvax2v2cv9mfx",
         "addresses": [
-          "X-columbus1hevwutyyv8lrfwrpeh2hze253lw3s03vt38kkl"
+          "X-columbus14jdzccn3vx9q7qxnr8pxt4tachwdwyd9lzfmmn"
         ],
         "threshold": 1,
         "memo": "153"
@@ -6677,12 +6734,12 @@
         "memo": "169"
       },
       {
-        "alias": "X-columbus1c3dhlnasnjcgfv4tvqzqk47l5upvka4rmfgqqs",
+        "alias": "X-columbus165l9qxyvr0rcpfverhp6tadzpufrs4vlp045g9",
         "addresses": [
           "X-columbus10a979j54ladz0y9q2672vv4ygpxgfjnugq54r3",
-          "X-columbus1llnr6mynmt7ft7kk5dfsly3qkc9l0xyta0u9mp"
+          "X-columbus17j8tn7asys029zjxj5834zrp50nrl2jzrrl60n"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "175"
       },
       {
@@ -6767,13 +6824,13 @@
         "memo": "304"
       },
       {
-        "alias": "X-columbus1zepqrffl3c5szd7y7cnhcrcrtjvxg3zd9c37dm",
+        "alias": "X-columbus14l3kw0v2j5l606lst7kfcs4g5lwvgk53gtf3dj",
         "addresses": [
           "X-columbus18dc4jdycs82yw3p9uk537kvt80snjvkyunge2d",
           "X-columbus164ga3vuv2wr0ynrtfzhcw54mdz9appxp2t6s58",
           "X-columbus17vmr4hvyl3dw9ec7clptmqt2dpd0uaqzderkkn"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "348"
       },
       {
@@ -6811,10 +6868,10 @@
         "memo": "382"
       },
       {
-        "alias": "X-columbus1wfpafadjnzkp5xm3yr7cgmuzqftkf8jfj2xn6s",
+        "alias": "X-columbus1m56g7kzpyvwlcc3mzz9rs5x4u3xuqasq8w66s7",
         "addresses": [
-          "X-columbus1uacvp9lkcdqr85myw4hyqg2wt9e3vf3vafkpzp",
-          "X-columbus1axmzzappezh88uns0cc6fys92vcztyfr6fmr5v"
+          "X-columbus1e4spjn6qc5ga3g0vmf5ad95e4cssypxswk6ynz",
+          "X-columbus1uacvp9lkcdqr85myw4hyqg2wt9e3vf3vafkpzp"
         ],
         "threshold": 1,
         "memo": "388"
@@ -6853,13 +6910,13 @@
         "memo": "421"
       },
       {
-        "alias": "X-columbus15wxmstyfxxx82ewdmz3usvfk20h39zqhvdqf66",
+        "alias": "X-columbus1dsp7mpvs7hk6hp9l22my4zgpz347celpuv4p94",
         "addresses": [
           "X-columbus1c5hzeksvkgaydyk5mvxqtdu5ud0smeqp9fk4nt",
           "X-columbus16h4jp22kqeykwsejfsqw2huaeka9hd37n4vdyv",
           "X-columbus1udmhtchhzknfrc674765p7haalzp5nthxh4zk7"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "422"
       },
       {
@@ -6945,10 +7002,10 @@
         "memo": "528"
       },
       {
-        "alias": "X-columbus1f7mkhrp5pmcghqev620ukveklf293x9dpy58qu",
+        "alias": "X-columbus1txd4zzds5w07vw7hk9cwmuq3fv0e42uecnf5ut",
         "addresses": [
-          "X-columbus1qx7x8d472llxgtg9h4wfw9q6mfzfqv7metum4c",
           "X-columbus1t326mc4mxzgv2zk4xw6wql7ld4rmgg7cksvm90",
+          "X-columbus1tk2dxqsf3ldkdlr0mtdrxsa63q3ualzv0uu44j",
           "X-columbus1cgzgtnk6gj9pnws9w6ecya0jqqckc2sm5xexnh",
           "X-columbus1c5gfpcuvdq378ex8crll8mgkae6hdylnt2jsnq",
           "X-columbus1u7mucmymjh7w6ffjh7gp4fd68uuaqd6ncmuqkx",
@@ -7010,13 +7067,13 @@
         "memo": "674"
       },
       {
-        "alias": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
+        "alias": "X-columbus1zwvhe3ldhusktgsfaphj482sq3sw37mu6884rn",
         "addresses": [
           "X-columbus1vqt5lqcw4jrleckhp3z6r3mpame8gdhxhy9j8f",
           "X-columbus13xugknzqyfptssgke9fwmkveex8z2u3tm9zn3l",
           "X-columbus1lff8ns8ra2drccej8s6gx5sqadjupj9c7txpks"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "675"
       },
       {
@@ -7058,12 +7115,12 @@
         "memo": "723"
       },
       {
-        "alias": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
+        "alias": "X-columbus1rvaashu2n3lgc8ar5mhk2rya4q8f0tq9kulpsy",
         "addresses": [
           "X-columbus1p0v0fh8mtdqau6qvjfz6ksewgznkqwrf0h0wh2",
           "X-columbus1nr4nrvdqd8s5setmuuegqs5pv4k9ncvhfq4nt7"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "728"
       },
       {
@@ -7112,13 +7169,13 @@
         "memo": "766"
       },
       {
-        "alias": "X-columbus14dc8m3xgfavwvwupq4krps8m5f4t2fefxlnafg",
+        "alias": "X-columbus1yp5mdt0mjgt7q956flks5m4gdjuh8xdc09a0t6",
         "addresses": [
           "X-columbus1rzhscga3564359xlp666j8gnjth70ps6ycnx6q",
           "X-columbus1t0yu2fp26xwdw052m4v4549hw0cnehvn2n6fje",
           "X-columbus1vnfj3q296kaaat620npvzlqlhgcthuzkvrckjn"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "777"
       },
       {
@@ -7215,13 +7272,13 @@
         "memo": "957"
       },
       {
-        "alias": "X-columbus1wpxa43ech79mxs5ta9kgrg3jx03rrjc3sv6qmv",
+        "alias": "X-columbus13rwnrf69r9dk2hn582gtpy0khntcrs99wxymhs",
         "addresses": [
           "X-columbus107pmtdx0rgq2dknf6ffxhlaehmnausdcpesjwg",
           "X-columbus13p3x5z04cfmln5mn5dj8ljr3a3rj733hgn5629",
           "X-columbus1ez6s747dce6w9f6tsl96l8ljxx36v8y8jkll4c"
         ],
-        "threshold": 2,
+        "threshold": 1,
         "memo": "975"
       },
       {

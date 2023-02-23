@@ -374,7 +374,7 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.ColumbusID,
-			expectedID: "2Tr1C2gxSoURpH1P9LPuT9hRhdpXjaMXgKULwupVfZ6vLeknvf",
+			expectedID: "2HQNxbreZbZjw5pY17Moa6SzPdjqdLBCGmzmzxF9YGH2meKqri",
 		},
 		{
 			networkID:  constants.KopernikusID,
