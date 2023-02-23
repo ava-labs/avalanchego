@@ -5,7 +5,7 @@ package secp256k1fx
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -18,6 +18,6 @@ var (
 
 type Factory struct{}
 
-func (*Factory) New(*snow.Context) (interface{}, error) {
+func (*Factory) New(logging.Logger) (interface{}, error) {
 	return &Fx{}, nil
 }
