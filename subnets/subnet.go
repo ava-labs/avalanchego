@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -22,7 +21,7 @@ type Allower interface {
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
 type Subnet interface {
-	common.BootstrapTracker
+	SyncTracker
 
 	// AddChain adds a chain to this Subnet
 	AddChain(chainID ids.ID) bool
@@ -51,7 +50,7 @@ func New(myNodeID ids.NodeID, config Config) Subnet {
 	}
 }
 
-func (s *subnet) IsBootstrapped() bool {
+func (s *subnet) IsSynced() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -73,7 +72,7 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	})
 }
 
-func (s *subnet) OnBootstrapCompleted() chan struct{} {
+func (s *subnet) OnSyncCompleted() chan struct{} {
 	return s.bootstrappedSema
 }
 

@@ -8,13 +8,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 // DefaultConfigTest returns a test configuration
 func DefaultConfigTest() Config {
 	isBootstrapped := false
-	bootstrapTracker := &BootstrapTrackerTest{
-		IsBootstrappedF: func() bool {
+	bootstrapTracker := &subnets.SyncTrackerTest{
+		IsSyncedF: func() bool {
 			return isBootstrapped
 		},
 		BootstrappedF: func(ids.ID) {

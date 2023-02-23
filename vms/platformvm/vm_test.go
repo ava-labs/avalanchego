@@ -1784,9 +1784,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &subnets.SyncTrackerTest{
 		T: t,
-		IsBootstrappedF: func() bool {
+		IsSyncedF: func() bool {
 			return isBootstrapped
 		},
 		BootstrappedF: func(ids.ID) {

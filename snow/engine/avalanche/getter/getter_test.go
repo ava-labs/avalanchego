@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -32,9 +33,9 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.CantSendGetAcceptedFrontier = false
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &subnets.SyncTrackerTest{
 		T: t,
-		IsBootstrappedF: func() bool {
+		IsSyncedF: func() bool {
 			return isBootstrapped
 		},
 		BootstrappedF: func(ids.ID) {

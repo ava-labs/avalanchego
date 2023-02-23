@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -48,9 +49,9 @@ func testSetup(
 	sender.Default(true)
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &subnets.SyncTrackerTest{
 		T: t,
-		IsBootstrappedF: func() bool {
+		IsSyncedF: func() bool {
 			return isBootstrapped
 		},
 		BootstrappedF: func(ids.ID) {

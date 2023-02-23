@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 var (
@@ -42,9 +43,9 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	vm.T = t
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &subnets.SyncTrackerTest{
 		T: t,
-		IsBootstrappedF: func() bool {
+		IsSyncedF: func() bool {
 			return isBootstrapped
 		},
 		BootstrappedF: func(ids.ID) {

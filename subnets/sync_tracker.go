@@ -1,20 +1,20 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package common
+package subnets
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// BootstrapTracker describes the standard interface for tracking the status of
-// a subnet bootstrapping
-type BootstrapTracker interface {
+// SyncTracker describes the standard interface for tracking the status of
+// a subnet syncing
+type SyncTracker interface {
 	// Returns true iff done bootstrapping
-	IsBootstrapped() bool
+	IsSynced() bool
 
 	// Bootstrapped marks the named chain as being bootstrapped
 	Bootstrapped(chainID ids.ID)
 
-	OnBootstrapCompleted() chan struct{}
+	OnSyncCompleted() chan struct{}
 }

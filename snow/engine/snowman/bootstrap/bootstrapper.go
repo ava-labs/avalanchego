@@ -280,7 +280,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsSynced() {
 		return b.Restart(ctx, true)
 	}
 	b.fetchETA.Set(0)
@@ -594,7 +594,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsSynced() {
 		if !b.Config.SharedCfg.Restarted {
 			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {

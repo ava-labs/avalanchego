@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 // Config wraps the common configurations that are needed by a Snow consensus
@@ -22,7 +23,7 @@ type Config struct {
 	StartupTracker   tracker.Startup
 	Sender           Sender
 	Bootstrapable    Bootstrapable
-	BootstrapTracker BootstrapTracker
+	BootstrapTracker subnets.SyncTracker
 	Timer            Timer
 
 	// Should Bootstrap be retried
