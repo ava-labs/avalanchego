@@ -49,6 +49,14 @@ type UTXOGetter interface {
 	GetUTXO(utxoID ids.ID) (*UTXO, error)
 }
 
+type UTXOAdder interface {
+	AddUTXO(utxo *UTXO)
+}
+
+type UTXODeleter interface {
+	DeleteUTXO(utxoID ids.ID)
+}
+
 // UTXOWriter is a thin wrapper around a database to provide storage and
 // deletion of UTXOs.
 type UTXOWriter interface {

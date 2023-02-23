@@ -84,9 +84,9 @@ var (
 // execution.
 type Chain interface {
 	Stakers
-	UTXOAdder
-	UTXOGetter
-	UTXODeleter
+	avax.UTXOAdder
+	avax.UTXOGetter
+	avax.UTXODeleter
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)

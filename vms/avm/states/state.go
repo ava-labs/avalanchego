@@ -45,9 +45,9 @@ var (
 )
 
 type Chain interface {
-	GetUTXO(utxoID ids.ID) (*avax.UTXO, error)
-	AddUTXO(utxo *avax.UTXO)
-	DeleteUTXO(utxoID ids.ID)
+	avax.UTXOGetter
+	avax.UTXOAdder
+	avax.UTXODeleter
 
 	GetTx(txID ids.ID) (*txs.Tx, error)
 	AddTx(tx *txs.Tx)
