@@ -231,7 +231,7 @@
         },
         "platformAllocations": [
           {
-            "amount": 353001350000000000,
+            "amount": 352799350000000000,
             "timestampOffset": 3600,
             "memo": "6+"
           }
@@ -1684,8 +1684,6 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "nodeID": "NodeID-ADyRxZndN569FitkbBzpr8oSe6FnYCMUr",
-            "validatorDuration": 33264000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "88"
@@ -3095,8 +3093,6 @@
         "platformAllocations": [
           {
             "amount": 2000000000000000,
-            "nodeID": "NodeID-CXYTCzyt3KysvbanQijppcsnSyixuKASv",
-            "validatorDuration": 30240000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
             "memo": "155"
@@ -5355,8 +5351,6 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "nodeID": "NodeID-4EQFrUN4H512882gcc4UPkwDueQwM49bx",
-            "validatorDuration": 31968000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "268"
@@ -6407,6 +6401,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
+            "nodeID": "NodeID-Gp6VToHm6CEY2abT6g7g4je5KEtm32NBY",
+            "validatorDuration": 31881600,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "318"
@@ -6619,8 +6615,6 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "nodeID": "NodeID-5APqagKQK2d9cMrtgR2h3bsC4GrU3UkNr",
-            "validatorDuration": 63072000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "328"
@@ -6628,6 +6622,27 @@
           {
             "amount": 1000000000000,
             "memo": "328+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1lsgwstc8edestl9v9t65kcfwjcy4gh8qv6jfc6",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "329"
+          },
+          {
+            "amount": 2000000000000,
+            "memo": "329+"
           }
         ]
       }
