@@ -55,7 +55,7 @@ func (n *caminoNetwork) CrossChainAppRequest(_ context.Context, chainID ids.ID, 
 
 	tx, err := n.txBuilder.NewRewardsImportTx()
 	if err != nil {
-		n.ctx.Log.Error("caminoCrossChainAppRequest couldn't create rewardsImportTx")
+		n.ctx.Log.Error("caminoCrossChainAppRequest couldn't create rewardsImportTx", zap.Error(err))
 		return nil // we don't want fatal here
 	}
 

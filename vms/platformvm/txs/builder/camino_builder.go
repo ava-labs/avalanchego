@@ -30,6 +30,7 @@ var (
 	_ CaminoBuilder = (*caminoBuilder)(nil)
 
 	fakeTreasuryKey      = crypto.FakePrivateKey(treasury.Addr)
+	fakeTreasuryKeyArr   = []*crypto.PrivateKeySECP256K1R{fakeTreasuryKey}
 	fakeTreasuryKeychain = secp256k1fx.NewKeychain(fakeTreasuryKey)
 
 	errKeyMissing       = errors.New("couldn't find key matching address")
@@ -72,9 +73,11 @@ type CaminoTxBuilder interface {
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
-	NewClaimRewardTx(
+	NewClaimTx(
 		depositTxIDs []ids.ID,
-		rewardAddress ids.ShortID,
+		claimableOwnerIDs []ids.ID,
+		amountToClaim []uint64,
+		claimTo *secp256k1fx.OutputOwners,
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -381,9 +384,11 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *caminoBuilder) NewClaimRewardTx(
+func (b *caminoBuilder) NewClaimTx(
 	depositTxIDs []ids.ID,
-	rewardAddress ids.ShortID,
+	claimableOwnerIDs []ids.ID,
+	amountToClaim []uint64,
+	claimTo *secp256k1fx.OutputOwners,
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
@@ -401,7 +406,7 @@ func (b *caminoBuilder) NewClaimRewardTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	depositSignersKC := secp256k1fx.NewKeychain()
+	claimableSignersKC := secp256k1fx.NewKeychain()
 
 	for _, depositTxID := range depositTxIDs {
 		depositRewardsOwner, err := getDepositRewardsOwner(b.state, depositTxID)
@@ -415,24 +420,65 @@ func (b *caminoBuilder) NewClaimRewardTx(
 		}
 
 		for _, signer := range signers {
-			depositSignersKC.Add(signer)
+			claimableSignersKC.Add(signer)
 		}
 	}
 
-	signers = append(signers, depositSignersKC.Keys)
+	for _, ownerID := range claimableOwnerIDs {
+		claimable, err := b.state.GetClaimable(ownerID)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get claimable for ownerID %s: %w", ownerID, err)
+		}
 
-	utx := &txs.ClaimRewardTx{
+		_, signers, able := kc.Match(claimable.Owner, b.clk.Unix())
+		if !able {
+			return nil, errKeyMissing
+		}
+		for _, signer := range signers {
+			claimableSignersKC.Add(signer)
+		}
+	}
+
+	totalAmountToClaim := uint64(0)
+	for _, amt := range amountToClaim {
+		totalAmountToClaim, err = math.Add64(totalAmountToClaim, amt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var claimableIns []*avax.TransferableInput
+	var claimableOuts []*avax.TransferableOutput
+	if totalAmountToClaim > 0 {
+		claimableIns, claimableOuts, _, err = b.Lock(
+			fakeTreasuryKeyArr,
+			totalAmountToClaim,
+			0,
+			locked.StateUnlocked,
+			claimTo,
+			nil,
+			0,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+		}
+	}
+
+	signers = append(signers, claimableSignersKC.Keys)
+
+	utx := &txs.ClaimTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		DepositTxs: depositTxIDs,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
-		},
+		ClaimableIns:        claimableIns,
+		ClaimableOuts:       claimableOuts,
+		DepositTxs:          depositTxIDs,
+		ClaimableOwnerIDs:   claimableOwnerIDs,
+		ClaimedAmount:       amountToClaim,
+		DepositRewardsOwner: claimTo,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

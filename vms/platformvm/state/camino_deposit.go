@@ -14,6 +14,7 @@ import (
 
 func (cs *caminoState) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
 	cs.modifiedDeposits[depositTxID] = deposit
+	cs.depositsCache.Evict(depositTxID)
 }
 
 func (cs *caminoState) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {

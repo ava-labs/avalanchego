@@ -21,7 +21,7 @@ func (*StandardTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	return errWrongTxType
 }
 
-func (*StandardTxExecutor) ClaimRewardTx(*txs.ClaimRewardTx) error {
+func (*StandardTxExecutor) ClaimTx(*txs.ClaimTx) error {
 	return errWrongTxType
 }
 
@@ -47,7 +47,7 @@ func (*ProposalTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	return errWrongTxType
 }
 
-func (*ProposalTxExecutor) ClaimRewardTx(*txs.ClaimRewardTx) error {
+func (*ProposalTxExecutor) ClaimTx(*txs.ClaimTx) error {
 	return errWrongTxType
 }
 
@@ -73,7 +73,7 @@ func (*AtomicTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	return errWrongTxType
 }
 
-func (*AtomicTxExecutor) ClaimRewardTx(*txs.ClaimRewardTx) error {
+func (*AtomicTxExecutor) ClaimTx(*txs.ClaimTx) error {
 	return errWrongTxType
 }
 
@@ -99,7 +99,7 @@ func (v *MempoolTxVerifier) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
 	return v.standardTx(tx)
 }
 
-func (v *MempoolTxVerifier) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
+func (v *MempoolTxVerifier) ClaimTx(tx *txs.ClaimTx) error {
 	return v.standardTx(tx)
 }
 

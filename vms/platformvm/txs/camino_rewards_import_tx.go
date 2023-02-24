@@ -19,7 +19,7 @@ var (
 
 	errNotTreasuryOwner         = errors.New("not treasury owner")
 	errProducedNotEqualConsumed = errors.New("produced amount not equal to consumed amount")
-	errNotAVAXAsset             = errors.New("input assetID isn't avax assetID")
+	errNotAVAXAsset             = errors.New("transferable assetID isn't avax assetID")
 	errWrongOutsNumber          = errors.New("wrong number of outputs")
 )
 

@@ -29,7 +29,9 @@ func (cs *caminoState) writeShortLinks() error {
 }
 
 func (cs *caminoState) SetShortIDLink(id ids.ShortID, key ShortLinkKey, link *ids.ShortID) {
-	cs.modifiedShortLinks[toShortLinkKey(id, key)] = link
+	linkKey := toShortLinkKey(id, key)
+	cs.modifiedShortLinks[linkKey] = link
+	cs.shortLinksCache.Evict(linkKey)
 }
 
 func (cs *caminoState) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.ShortID, error) {

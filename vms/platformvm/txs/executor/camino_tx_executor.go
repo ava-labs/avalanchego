@@ -34,34 +34,37 @@ var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
 	_ txs.Visitor = (*CaminoProposalTxExecutor)(nil)
 
-	errNodeSignatureMissing       = errors.New("last signature is not nodeID's signature")
-	errWrongLockMode              = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errRecoverAdresses            = errors.New("cannot recover addresses from credentials")
-	errInvalidRoles               = errors.New("invalid role")
-	errValidatorExists            = errors.New("node is already a validator")
-	errInvalidSystemTxBody        = errors.New("tx body doesn't match expected one")
-	errRemoveValidatorToEarly     = errors.New("attempting to remove validator before its end time")
-	errRemoveWrongValidator       = errors.New("attempting to remove wrong validator")
-	errDepositOfferNotActiveYet   = errors.New("deposit offer not active yet")
-	errDepositOfferInactive       = errors.New("deposit offer inactive")
-	errDepositToSmall             = errors.New("deposit amount is less than deposit offer minmum amount")
-	errDepositDurationToSmall     = errors.New("deposit duration is less than deposit offer minmum duration")
-	errDepositDurationToBig       = errors.New("deposit duration is greater than deposit offer maximum duration")
-	errSupplyOverflow             = errors.New("resulting total supply would be more, than allowed maximum")
-	errNotConsortiumMember        = errors.New("address isn't consortium member")
-	errValidatorNotFound          = errors.New("validator not found")
-	errConsortiumMemberHasNode    = errors.New("consortium member already has registered node")
-	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
-	errNodeNotRegistered          = errors.New("no address registered for this node")
-	errNotNodeOwner               = errors.New("node is registered for another address")
-	errDepositCredentialMissmatch = errors.New("deposit credential isn't matching")
-	errDepositNotFound            = errors.New("deposit tx not found")
-	errNotSECPOwner               = errors.New("owner is not *secp256k1fx.OutputOwners")
-	errWrongCredentialsNumber     = errors.New("unexpected number of credentials")
-	errWrongOwnerType             = errors.New("wrong owner type")
-	errImportedUTXOMissmatch      = errors.New("imported input doesn't match expected utxo")
-	errInputAmountMissmatch       = errors.New("utxo amount doesn't match input amount")
-	errInputsUTXOSMismatch        = errors.New("number of inputs is different from number of utxos")
+	errNodeSignatureMissing         = errors.New("last signature is not nodeID's signature")
+	errWrongLockMode                = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errRecoverAdresses              = errors.New("cannot recover addresses from credentials")
+	errInvalidRoles                 = errors.New("invalid role")
+	errValidatorExists              = errors.New("node is already a validator")
+	errInvalidSystemTxBody          = errors.New("tx body doesn't match expected one")
+	errRemoveValidatorToEarly       = errors.New("attempting to remove validator before its end time")
+	errRemoveWrongValidator         = errors.New("attempting to remove wrong validator")
+	errDepositOfferNotActiveYet     = errors.New("deposit offer not active yet")
+	errDepositOfferInactive         = errors.New("deposit offer inactive")
+	errDepositToSmall               = errors.New("deposit amount is less than deposit offer minmum amount")
+	errDepositDurationToSmall       = errors.New("deposit duration is less than deposit offer minmum duration")
+	errDepositDurationToBig         = errors.New("deposit duration is greater than deposit offer maximum duration")
+	errSupplyOverflow               = errors.New("resulting total supply would be more, than allowed maximum")
+	errNotConsortiumMember          = errors.New("address isn't consortium member")
+	errValidatorNotFound            = errors.New("validator not found")
+	errConsortiumMemberHasNode      = errors.New("consortium member already has registered node")
+	errConsortiumSignatureMissing   = errors.New("wrong consortium's member signature")
+	errNodeNotRegistered            = errors.New("no address registered for this node")
+	errNotNodeOwner                 = errors.New("node is registered for another address")
+	errDepositCredentialMissmatch   = errors.New("deposit credential isn't matching")
+	errClaimableCredentialMissmatch = errors.New("claimable credential isn't matching")
+	errDepositNotFound              = errors.New("deposit tx not found")
+	errNotSECPOwner                 = errors.New("owner is not *secp256k1fx.OutputOwners")
+	errWrongCredentialsNumber       = errors.New("unexpected number of credentials")
+	errWrongOwnerType               = errors.New("wrong owner type")
+	errImportedUTXOMissmatch        = errors.New("imported input doesn't match expected utxo")
+	errInputAmountMissmatch         = errors.New("utxo amount doesn't match input amount")
+	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
+	errClaimingNonTreasuryUTXO      = errors.New("claiming utxo owned by other owner, than treasury owner")
+	errWrongClaimedAmount           = errors.New("claiming more than was available to claim")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -698,7 +701,9 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 	return nil
 }
 
-func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
+func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
+	// Basic checks
+
 	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
@@ -708,13 +713,11 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 		return errWrongLockMode
 	}
 
-	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
-		return err
-	}
-
 	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
 		return err
 	}
+
+	// BaseTx / fee check
 
 	if err := e.FlowChecker.VerifyLock(
 		tx,
@@ -724,15 +727,20 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 		e.Tx.Creds[:len(e.Tx.Creds)-1],
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
-		locked.StateDeposited,
+		locked.StateUnlocked,
 	); err != nil {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
-	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
-	claimRewardTxID := e.Tx.ID()
+	// Common vars
 
-	for _, depositTxID := range tx.DepositTxs {
+	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
+	claimableCredential := e.Tx.Creds[len(e.Tx.Creds)-1]
+	txID := e.Tx.ID()
+
+	// Checking deposits sigs and creating reward outputs
+
+	for i, depositTxID := range tx.DepositTxs {
 		// getting deposit tx
 
 		signedDepositTx, txStatus, err := e.State.GetTx(depositTxID)
@@ -754,7 +762,7 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 			return errNotSECPOwner
 		}
 
-		if err := e.Fx.VerifyPermissionUnordered(tx, e.Tx.Creds[len(e.Tx.Creds)-1], depositRewardsOwner); err != nil {
+		if err := e.Fx.VerifyMultisigUnorderedPermission(tx, claimableCredential, depositRewardsOwner, e.State); err != nil {
 			return fmt.Errorf("%w: %s", errDepositCredentialMissmatch, err)
 		}
 
@@ -772,7 +780,7 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 
 		claimableReward := deposit.ClaimableReward(depositOffer, currentTimestamp)
 		if claimableReward > 0 {
-			rewardsOwner := tx.RewardsOwner
+			rewardsOwner := tx.DepositRewardsOwner
 			secpOwners, ok := rewardsOwner.(*secp256k1fx.OutputOwners)
 			if !ok {
 				return errNotSECPOwner
@@ -792,8 +800,8 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        claimRewardTxID,
-					OutputIndex: uint32(len(tx.Outs)),
+					TxID:        txID,
+					OutputIndex: uint32(len(tx.Outs) + len(tx.ClaimableOuts) + i),
 				},
 				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out,
@@ -801,11 +809,106 @@ func (e *CaminoStandardTxExecutor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
 
 			e.State.AddUTXO(utxo)
 			e.State.AddRewardUTXO(depositTxID, utxo)
+			e.State.UpdateDeposit(depositTxID, &deposits.Deposit{
+				DepositOfferID:      deposit.DepositOfferID,
+				UnlockedAmount:      deposit.UnlockedAmount,
+				ClaimedRewardAmount: deposit.ClaimedRewardAmount + claimableReward,
+				Start:               deposit.Start,
+				Duration:            deposit.Duration,
+				Amount:              deposit.Amount,
+			})
 		}
 	}
 
+	// Checking claimables sigs and claimable amounts, updating claimables in state
+
+	for i, ownerID := range tx.ClaimableOwnerIDs {
+		claimable, err := e.State.GetClaimable(ownerID)
+		if err == database.ErrNotFound {
+			// tx.ClaimedAmount[i] > 0, so we'r trying to claim more, than available
+			return errWrongClaimedAmount
+		} else if err != nil {
+			return err
+		}
+
+		if err := e.Fx.VerifyMultisigUnorderedPermission(tx, claimableCredential, claimable.Owner, e.State); err != nil {
+			return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
+		}
+
+		amountToClaim := tx.ClaimedAmount[i]
+
+		newClaimableValidatorReward := claimable.ValidatorReward
+		if amountToClaim > newClaimableValidatorReward {
+			amountToClaim -= newClaimableValidatorReward
+			newClaimableValidatorReward = 0
+		} else {
+			newClaimableValidatorReward -= amountToClaim
+			amountToClaim = 0
+		}
+
+		newClaimableDepositReward := claimable.DepositReward
+		if amountToClaim > newClaimableDepositReward {
+			amountToClaim -= newClaimableDepositReward
+			newClaimableDepositReward = 0
+		} else {
+			newClaimableDepositReward -= amountToClaim
+			amountToClaim = 0
+		}
+
+		if amountToClaim > 0 {
+			return errWrongClaimedAmount
+		}
+
+		var newClaimabe *state.Claimable
+		if newClaimableDepositReward != 0 || newClaimableValidatorReward != 0 {
+			newClaimabe = &state.Claimable{
+				Owner:           claimable.Owner,
+				ValidatorReward: newClaimableValidatorReward,
+				DepositReward:   newClaimableDepositReward,
+			}
+		}
+		e.State.SetClaimable(ownerID, newClaimabe)
+	}
+
+	// Checking treasury consume
+
+	for _, in := range tx.ClaimableIns {
+		treasuryUTXO, err := e.State.GetUTXO(in.InputID())
+		if err != nil {
+			return err
+		}
+		treasuryOut, ok := treasuryUTXO.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return locked.ErrWrongOutType
+		}
+
+		if !treasuryOut.OutputOwners.Equals(treasury.Owner) {
+			return errClaimingNonTreasuryUTXO
+		}
+
+		if treasuryOut.Amt != in.In.Amount() {
+			return fmt.Errorf("utxo.Amt %d, input.Amt %d: %w", treasuryOut.Amt, in.In.Amount(), errInputAmountMissmatch)
+		}
+	}
+
+	// Consuming / producing treasury and claimed utxos
+
+	utxo.Consume(e.State, tx.ClaimableIns)
+	for i, output := range tx.ClaimableOuts {
+		e.State.AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(tx.Outs) + i),
+			},
+			Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
+			Out:   output.Out,
+		})
+	}
+
+	// Consuming / producing fee utxos
+
 	utxo.Consume(e.State, tx.Ins)
-	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
+	utxo.Produce(e.State, txID, tx.Outs)
 
 	return nil
 }
@@ -1060,20 +1163,24 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 			}
 
 			claimable, err := e.State.GetClaimable(ownerID)
-			if err == database.ErrNotFound {
-				claimable = &state.Claimable{
-					Owner: owner,
-				}
-			} else if err != nil {
+			if err != nil && err != database.ErrNotFound {
 				return err
 			}
 
-			claimable.ValidatorReward, err = math.Add64(claimable.ValidatorReward, addedReward)
+			newClaimable := &state.Claimable{
+				Owner: owner,
+			}
+			if claimable != nil {
+				newClaimable.ValidatorReward = claimable.ValidatorReward
+				newClaimable.DepositReward = claimable.DepositReward
+			}
+
+			newClaimable.ValidatorReward, err = math.Add64(newClaimable.ValidatorReward, addedReward)
 			if err != nil {
 				return err
 			}
 
-			e.State.SetClaimable(ownerID, claimable)
+			e.State.SetClaimable(ownerID, newClaimable)
 		}
 	}
 

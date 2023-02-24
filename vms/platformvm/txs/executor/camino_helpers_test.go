@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -603,4 +604,44 @@ func newCaminoEnvironmentWithMocks(
 	}
 
 	return env
+}
+
+func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.Alias) { //nolint:unparam
+	for i := range addrs {
+		var alias *multisig.Alias
+		if len(aliases) > i {
+			alias = aliases[i]
+		}
+		if alias == nil {
+			s.EXPECT().GetMultisigAlias(addrs[i]).Return(nil, database.ErrNotFound)
+		} else {
+			s.EXPECT().GetMultisigAlias(addrs[i]).Return(alias, nil)
+		}
+	}
+}
+
+func expectVerifyLock(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+	expectGetUTXOsFromInputs(s, ins, utxos)
+}
+
+func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+	for i := range ins {
+		s.EXPECT().GetUTXO(ins[i].InputID()).Return(utxos[i], nil)
+	}
+}
+
+func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) {
+	for i := range outs {
+		s.EXPECT().AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(baseOutIndex + i),
+			},
+			Asset: outs[i].Asset,
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          outs[i].Out.Amount(),
+				OutputOwners: outs[i].Out.(*secp256k1fx.TransferOutput).OutputOwners,
+			},
+		})
+	}
 }

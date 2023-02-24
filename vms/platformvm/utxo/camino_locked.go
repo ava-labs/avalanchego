@@ -300,7 +300,7 @@ func (h *handler) Lock(
 
 		out := utxo.Out
 		lockIDs := locked.IDsEmpty
-		if lockedOut, ok := utxo.Out.(*locked.Out); ok {
+		if lockedOut, ok := out.(*locked.Out); ok {
 			// Resolves to true for StateUnlocked
 			if lockedOut.IsLockedWith(appliedLockState) {
 				// This output can't be locked with target lockState,

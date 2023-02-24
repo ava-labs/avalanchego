@@ -38,6 +38,9 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 				},
 			}}},
 		},
+		"Nil tx": {
+			expectedErr: ErrNilTx,
+		},
 		"Zero outs": {
 			tx:          &RewardsImportTx{BaseTx: BaseTx{BaseTx: avax.BaseTx{}}},
 			expectedErr: errWrongOutsNumber,

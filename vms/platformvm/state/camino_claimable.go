@@ -30,7 +30,7 @@ func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 		return claimable, nil
 	}
 
-	claimableBytes, err := cs.depositsDB.Get(ownerID[:])
+	claimableBytes, err := cs.claimableDB.Get(ownerID[:])
 	if err != nil {
 		return nil, err
 	}

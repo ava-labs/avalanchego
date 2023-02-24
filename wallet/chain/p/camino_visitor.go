@@ -22,7 +22,7 @@ func (b *backendVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
+func (b *backendVisitor) ClaimTx(tx *txs.ClaimTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
@@ -58,7 +58,7 @@ func (s *signerVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *signerVisitor) ClaimRewardTx(tx *txs.ClaimRewardTx) error {
+func (s *signerVisitor) ClaimTx(tx *txs.ClaimTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

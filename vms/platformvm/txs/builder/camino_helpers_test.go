@@ -631,3 +631,19 @@ func newCaminoBuilderWithMocks(postBanff bool, state state.State, sharedMemory a
 
 	return caminoBuilder, baseDB
 }
+
+func expectLock(s *state.MockState, allUTXOs map[ids.ShortID][]*avax.UTXO, fakeKeys bool) {
+	for addr, utxos := range allUTXOs {
+		utxoids := make([]ids.ID, len(utxos))
+		for i := range utxos {
+			utxoids[i] = utxos[i].InputID()
+		}
+		s.EXPECT().UTXOIDs(addr.Bytes(), ids.Empty, math.MaxInt).Return(utxoids, nil)
+		for _, utxo := range utxos {
+			s.EXPECT().GetUTXO(utxo.InputID()).Return(utxo, nil)
+			if !fakeKeys {
+				s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound)
+			}
+		}
+	}
+}

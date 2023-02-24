@@ -9,16 +9,15 @@ import (
 )
 
 var (
-	// Addr treasury address
-	//
-	// 0x010000000000000000000000000000000000000c
-	// P-kopernikus1qyqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvy7p25h
-	// 6HgC8KRBEhXYbF4riJyJFLSHt4U9qQDq
+	// Addr is treasury address
 	Addr = ids.ShortID{
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x0c,
 	}
+	// 0x010000000000000000000000000000000000000c
+	// P-kopernikus1qyqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvy7p25h
+	// 6HgC8KRBEhXYbF4riJyJFLSHt4U9qQDq
 
 	AddrTraitsBytes = [][]byte{Addr[:]}
 

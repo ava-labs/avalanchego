@@ -481,6 +481,78 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 	return nil
 }
 
+type ClaimArgs struct {
+	api.UserPass
+	api.JSONFromAddrs
+
+	DepositTxIDs      []ids.ID          `json:"depositTxIDs"`
+	ClaimableOwnerIDs []ids.ID          `json:"claimableOwnerIDs"`
+	AmountToClaim     []uint64          `json:"amountToClaim"`
+	ClaimTo           platformapi.Owner `json:"claimTo"`
+	Change            platformapi.Owner `json:"change"`
+}
+
+// Claim issues an ClaimTx
+func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONTxID) error {
+	s.vm.ctx.Log.Debug("Platform: Claim called")
+
+	// Parse the from addresses
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	if err != nil {
+		return err
+	}
+
+	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
+	if err != nil {
+		return err
+	}
+
+	// Get the user's keys
+	privKeys, err := keystore.GetKeychain(user, fromAddrs)
+	if err != nil {
+		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+	}
+
+	if err := user.Close(); err != nil {
+		return err
+	}
+
+	if len(privKeys.Keys) == 0 {
+		return errNoKeys
+	}
+
+	change, err := s.getOutputOwner(&args.Change)
+	if err != nil {
+		return err
+	}
+
+	claimTo, err := s.getOutputOwner(&args.ClaimTo)
+	if err != nil {
+		return err
+	}
+
+	// Create the transaction
+	tx, err := s.vm.txBuilder.NewClaimTx(
+		args.DepositTxIDs,
+		args.ClaimableOwnerIDs,
+		args.AmountToClaim,
+		claimTo,
+		privKeys.Keys,
+		change,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	reply.TxID = tx.ID()
+
+	if err := s.vm.Builder.AddUnverifiedTx(tx); err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	return nil
+}
+
 func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSONAddress, response *api.JSONAddress) error {
 	var id ids.ShortID
 	isNodeID := false
