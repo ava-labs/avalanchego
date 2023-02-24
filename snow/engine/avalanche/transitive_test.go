@@ -53,7 +53,7 @@ func (dh *dummyHandler) onDoneBootstrapping(ctx context.Context, lastReqID uint3
 }
 
 func TestEngineShutdown(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
@@ -77,7 +77,7 @@ func TestEngineShutdown(t *testing.T) {
 }
 
 func TestEngineAdd(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -180,7 +180,7 @@ func TestEngineAdd(t *testing.T) {
 }
 
 func TestEngineQuery(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -467,7 +467,7 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -657,7 +657,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 }
 
 func TestEngineBlockedIssue(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -737,7 +737,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 }
 
 func TestEngineAbandonResponse(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -815,7 +815,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 }
 
 func TestEngineScheduleRepoll(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -903,7 +903,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendTx(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.BatchSize = 2
 
@@ -1010,7 +1010,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 }
 
 func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.BatchSize = 2
 
@@ -1125,7 +1125,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 }
 
 func TestEngineIssueRepoll(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.BatchSize = 2
 
@@ -1196,7 +1196,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 }
 
 func TestEngineReissue(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.BatchSize = 2
 	engCfg.Params.BetaVirtuous = 5
@@ -1385,7 +1385,7 @@ func TestEngineReissue(t *testing.T) {
 }
 
 func TestEngineLargeIssue(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -1500,7 +1500,7 @@ func TestEngineLargeIssue(t *testing.T) {
 }
 
 func TestEngineGetVertex(t *testing.T) {
-	commonCfg, _, engCfg := DefaultConfig()
+	commonCfg, _, engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -1565,7 +1565,7 @@ func TestEngineGetVertex(t *testing.T) {
 }
 
 func TestEngineInsufficientValidators(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -1638,7 +1638,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 }
 
 func TestEnginePushGossip(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -1728,7 +1728,7 @@ func TestEnginePushGossip(t *testing.T) {
 }
 
 func TestEngineSingleQuery(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -1802,7 +1802,7 @@ func TestEngineSingleQuery(t *testing.T) {
 }
 
 func TestEngineParentBlockingInsert(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -1911,7 +1911,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 func TestEngineAbandonChit(t *testing.T) {
 	require := require.New(t)
 
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2003,7 +2003,7 @@ func TestEngineAbandonChit(t *testing.T) {
 func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 	require := require.New(t)
 
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2107,7 +2107,7 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2231,7 +2231,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2366,7 +2366,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 }
 
 func TestEngineMissingTx(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2501,7 +2501,7 @@ func TestEngineMissingTx(t *testing.T) {
 }
 
 func TestEngineIssueBlockingTx(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2566,7 +2566,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 }
 
 func TestEngineReissueAbortedVertex(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -2697,7 +2697,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 }
 
 func TestEngineBootstrappingIntoConsensus(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	vdr := ids.GenerateTestNodeID()
@@ -2970,7 +2970,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineReBootstrapFails(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig(t)
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -3134,7 +3134,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 }
 
 func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, bootCfg, engCfg := DefaultConfig(t)
 	bootCfg.Alpha = 1
 	bootCfg.RetryBootstrap = true
 	bootCfg.RetryBootstrapWarnFrequency = 4
@@ -3418,7 +3418,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -3522,7 +3522,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 }
 
 func TestEnginePartiallyValidVertex(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -3606,7 +3606,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 }
 
 func TestEngineGossip(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -3658,7 +3658,7 @@ func TestEngineGossip(t *testing.T) {
 }
 
 func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -3806,7 +3806,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -3953,7 +3953,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.ConcurrentRepolls = 3
 	engCfg.Params.BetaRogue = 3
@@ -4066,7 +4066,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDuplicatedIssuance(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 5
 	engCfg.Params.BetaRogue = 5
@@ -4182,7 +4182,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	engCfg.Params.Alpha = 2
 	engCfg.Params.K = 2
@@ -4316,7 +4316,7 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBubbleVotes(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 
 	vals := validators.NewSet()
 	engCfg.Validators = vals
@@ -4465,7 +4465,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 }
 
 func TestEngineIssue(t *testing.T) {
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4611,7 +4611,7 @@ func TestEngineIssue(t *testing.T) {
 // dependency fails verification.
 func TestAbandonTx(t *testing.T) {
 	require := require.New(t)
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
 	engCfg.Params.BetaRogue = 1
@@ -4762,7 +4762,7 @@ func TestSendMixedQuery(t *testing.T) {
 		t.Run(
 			fmt.Sprintf("is validator: %v", tt.isVdr),
 			func(t *testing.T) {
-				_, _, engCfg := DefaultConfig()
+				_, _, engCfg := DefaultConfig(t)
 				sender := &common.SenderTest{T: t}
 				engCfg.Sender = sender
 				sender.Default(true)
@@ -4890,7 +4890,7 @@ func TestSendMixedQuery(t *testing.T) {
 func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	require := require.New(t)
 
-	_, _, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig(t)
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 2
 	engCfg.Params.BetaRogue = 2

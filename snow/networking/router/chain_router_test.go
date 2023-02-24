@@ -76,7 +76,7 @@ func TestShutdown(t *testing.T) {
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -199,7 +199,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -335,7 +335,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(err)
@@ -653,7 +653,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -926,7 +926,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	calledF := false
 	wg := sync.WaitGroup{}
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
@@ -1062,7 +1062,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	// Create bootstrapper, engine and handler
-	requester := snow.DefaultConsensusContextTest()
+	requester := snow.DefaultConsensusContextTest(t)
 	requester.ChainID = ids.GenerateTestID()
 	requester.Registerer = prometheus.NewRegistry()
 	requester.Metrics = metrics.NewOptionalGatherer()
@@ -1087,7 +1087,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	responder := snow.DefaultConsensusContextTest()
+	responder := snow.DefaultConsensusContextTest(t)
 	responder.ChainID = ids.GenerateTestID()
 	responder.Registerer = prometheus.NewRegistry()
 	responder.Metrics = metrics.NewOptionalGatherer()
@@ -1203,7 +1203,7 @@ func TestConnectedSubnet(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
-	platform := snow.DefaultConsensusContextTest()
+	platform := snow.DefaultConsensusContextTest(t)
 	platform.ChainID = constants.PlatformChainID
 	platform.SubnetID = constants.PrimaryNetworkID
 	platform.Registerer = prometheus.NewRegistry()
@@ -1295,7 +1295,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	calledF := false
 	wg := sync.WaitGroup{}
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	allowedID := ids.GenerateTestNodeID()
 	allowedSet := set.NewSet[ids.NodeID](1)
 	allowedSet.Add(allowedID)

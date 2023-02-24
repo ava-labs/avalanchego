@@ -34,7 +34,7 @@ import (
 var errUnknownBlock = errors.New("unknown block")
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	peers := validators.NewSet()
 
@@ -111,7 +111,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	peers.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            snow.DefaultConsensusContextTest(t),
 		Beacons:                        peers,
 		SampleK:                        sampleK,
 		Alpha:                          alpha,

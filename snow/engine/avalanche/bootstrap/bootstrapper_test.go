@@ -32,7 +32,7 @@ var (
 )
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	peers := validators.NewSet()
 	db := memdb.New()

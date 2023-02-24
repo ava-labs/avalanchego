@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"testing"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -16,11 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfig() (common.Config, bootstrap.Config, Config) {
+func DefaultConfig(t *testing.T) (common.Config, bootstrap.Config, Config) {
 	vtxBlocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	txBlocked, _ := queue.New(memdb.New(), "", prometheus.NewRegistry())
 
-	commonCfg := common.DefaultConfigTest()
+	commonCfg := common.DefaultConfigTest(t)
 
 	bootstrapConfig := bootstrap.Config{
 		Config:     commonCfg,

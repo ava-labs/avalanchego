@@ -37,7 +37,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	// Build state syncer
 	sender := &common.SenderTest{T: t}
 	commonCfg := &common.Config{
-		Ctx:    snow.DefaultConsensusContextTest(),
+		Ctx:    snow.DefaultConsensusContextTest(t),
 		Sender: sender,
 	}
 
@@ -59,7 +59,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	require.False(enabled)
 
 	// State syncableVM case
-	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
+	commonCfg.Ctx = snow.DefaultConsensusContextTest(t) // reset metrics
 
 	fullVM := &fullVM{
 		TestVM: &block.TestVM{
@@ -107,7 +107,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          alpha,
@@ -154,7 +154,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -196,7 +196,7 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -230,7 +230,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -272,7 +272,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -365,7 +365,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -437,7 +437,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -523,7 +523,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
+		Ctx:                         snow.DefaultConsensusContextTest(t),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,
@@ -617,7 +617,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -691,7 +691,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -811,7 +811,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -917,7 +917,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -1064,7 +1064,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
+		Ctx:                         snow.DefaultConsensusContextTest(t),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,
@@ -1174,7 +1174,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:            snow.DefaultConsensusContextTest(),
+		Ctx:            snow.DefaultConsensusContextTest(t),
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          (vdrs.Weight() + 1) / 2,
@@ -1322,7 +1322,7 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	vdrs.RegisterCallbackListener(startup)
 
 	commonCfg := common.Config{
-		Ctx:                         snow.DefaultConsensusContextTest(),
+		Ctx:                         snow.DefaultConsensusContextTest(t),
 		Beacons:                     vdrs,
 		SampleK:                     vdrs.Len(),
 		Alpha:                       (vdrs.Weight() + 1) / 2,

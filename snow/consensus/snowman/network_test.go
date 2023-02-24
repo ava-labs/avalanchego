@@ -61,7 +61,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 }
 
 func (n *Network) AddNode(sm Consensus) error {
-	if err := sm.Initialize(snow.DefaultConsensusContextTest(), n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
+	if err := sm.Initialize(snow.DefaultConsensusContextTest(nil), n.params, Genesis.ID(), Genesis.Height(), Genesis.Timestamp()); err != nil {
 		return err
 	}
 

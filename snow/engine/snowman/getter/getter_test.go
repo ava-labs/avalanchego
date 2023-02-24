@@ -34,7 +34,7 @@ func testSetup(
 	t *testing.T,
 	ctrl *gomock.Controller,
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	peers := validators.NewSet()
 	sender := &common.SenderTest{}

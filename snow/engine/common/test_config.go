@@ -4,14 +4,16 @@
 package common
 
 import (
+	"testing"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // DefaultConfigTest returns a test configuration
-func DefaultConfigTest() Config {
-	ctx := snow.DefaultConsensusContextTest()
+func DefaultConfigTest(t *testing.T) Config {
+	ctx := snow.DefaultConsensusContextTest(t)
 	beacons := validators.NewSet()
 
 	connectedPeers := tracker.NewPeers()

@@ -31,7 +31,7 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        peers,

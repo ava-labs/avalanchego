@@ -84,6 +84,8 @@ type ConsensusContext struct {
 	// accepted.
 	ConsensusAcceptor Acceptor
 
+	// SubnetStateTracker tracks state of each VM associated with
+	// Context.SubnetID
 	SubnetStateTracker
 
 	CurrentEngineType utils.Atomic[p2p.EngineType]
@@ -101,39 +103,4 @@ func (cc *ConsensusContext) GetChainState() State {
 
 func (cc *ConsensusContext) SetChainState(state State) {
 	cc.SubnetStateTracker.SetState(cc.CChainID, state)
-}
-
-func DefaultContextTest() *Context {
-	return &Context{
-		NetworkID:    0,
-		SubnetID:     ids.Empty,
-		ChainID:      ids.Empty,
-		NodeID:       ids.EmptyNodeID,
-		Log:          logging.NoLog{},
-		BCLookup:     ids.NewAliaser(),
-		Metrics:      metrics.NewOptionalGatherer(),
-		ChainDataDir: "",
-	}
-}
-
-func DefaultConsensusContextTest() *ConsensusContext {
-	var currentState State = Initializing
-	return &ConsensusContext{
-		Context:             DefaultContextTest(),
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-		DecisionAcceptor:    noOpAcceptor{},
-		ConsensusAcceptor:   noOpAcceptor{},
-		SubnetStateTracker: &SubnetStateTrackerTest{
-			IsSyncedF: func() bool {
-				return currentState == NormalOp
-			},
-			SetStateF: func(chainID ids.ID, state State) {
-				currentState = state
-			},
-			GetStateF: func(chainID ids.ID) State {
-				return currentState
-			},
-		},
-	}
 }

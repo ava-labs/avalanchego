@@ -92,7 +92,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
@@ -107,7 +107,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -350,7 +350,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -366,7 +366,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -484,7 +484,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
@@ -500,7 +500,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,

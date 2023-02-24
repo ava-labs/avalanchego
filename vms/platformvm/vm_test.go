@@ -1639,7 +1639,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	ctx.SharedMemory = msm
 
-	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx := snow.DefaultConsensusContextTest(t)
 	consensusCtx.Context = ctx
 	ctx.Lock.Lock()
 

@@ -32,7 +32,7 @@ var errFatal = errors.New("error should cause handler to close")
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
 	err := vdrs.Add(vdr0, nil, ids.Empty, 1)
@@ -114,7 +114,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 func TestHandlerClosesOnError(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
 	calledNotify := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
@@ -326,7 +326,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 }
 
 func TestHandlerSubnetConnector(t *testing.T) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)

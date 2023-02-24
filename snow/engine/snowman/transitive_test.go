@@ -95,8 +95,8 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 }
 
 func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
-	commonCfg := common.DefaultConfigTest()
-	engCfg := DefaultConfigs()
+	commonCfg := common.DefaultConfigTest(t)
+	engCfg := DefaultConfigs(t)
 	return setup(t, commonCfg, engCfg)
 }
 
@@ -406,7 +406,7 @@ func TestEngineQuery(t *testing.T) {
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params = snowball.Parameters{
 		K:                       3,
 		Alpha:                   2,
@@ -898,7 +898,7 @@ func TestEngineRepoll(t *testing.T) {
 }
 
 func TestVoteCanceling(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params = snowball.Parameters{
 		K:                       3,
 		Alpha:                   2,
@@ -1027,7 +1027,7 @@ func TestVoteCanceling(t *testing.T) {
 }
 
 func TestEngineNoQuery(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1078,7 +1078,7 @@ func TestEngineNoQuery(t *testing.T) {
 }
 
 func TestEngineNoRepollQuery(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -1802,7 +1802,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params.ConcurrentRepolls = 2
 
 	vals := validators.NewSet()
@@ -1909,7 +1909,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 }
 
 func TestEngineDoubleChit(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params = snowball.Parameters{
 		K:                       2,
 		Alpha:                   2,
@@ -2050,7 +2050,7 @@ func TestEngineDoubleChit(t *testing.T) {
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params.K = 1
 	engCfg.Params.Alpha = 1
 	engCfg.Params.OptimalProcessing = 1
@@ -3111,7 +3111,7 @@ func TestMixedQueryNumPushSet(t *testing.T) {
 		t.Run(
 			fmt.Sprint(i),
 			func(t *testing.T) {
-				engCfg := DefaultConfigs()
+				engCfg := DefaultConfigs(t)
 				engCfg.Params.MixedQueryNumPushVdr = i
 				te, err := newTransitive(engCfg)
 				if err != nil {
@@ -3137,8 +3137,8 @@ func TestSendMixedQuery(t *testing.T) {
 		t.Run(
 			fmt.Sprintf("is validator: %v", tt.isVdr),
 			func(t *testing.T) {
-				engConfig := DefaultConfigs()
-				commonCfg := common.DefaultConfigTest()
+				engConfig := DefaultConfigs(t)
+				commonCfg := common.DefaultConfigTest(t)
 				// Override the parameters k and MixedQueryNumPushNonVdr,
 				// and update the validator set to have k validators.
 				engConfig.Params.Alpha = 12
@@ -3408,7 +3408,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	require := require.New(t)
 
-	engCfg := DefaultConfigs()
+	engCfg := DefaultConfigs(t)
 	engCfg.Params = snowball.Parameters{
 		K:                       1,
 		Alpha:                   1,
