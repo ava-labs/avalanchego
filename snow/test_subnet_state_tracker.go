@@ -15,9 +15,9 @@ var _ SubnetStateTracker = (*SubnetStateTrackerTest)(nil)
 type SubnetStateTrackerTest struct {
 	T *testing.T
 
-	CantIsSynced, CantSetState, CantGetState, CantOnSyncCompleted bool
+	CantIsSubnetSynced, CantSetState, CantGetState, CantOnSyncCompleted bool
 
-	IsSyncedF        func() bool
+	IsSubnetSyncedF  func() bool
 	SetStateF        func(chainID ids.ID, state State)
 	GetStateF        func(chainID ids.ID) State
 	OnSyncCompletedF func() chan struct{}
@@ -25,7 +25,7 @@ type SubnetStateTrackerTest struct {
 
 // Default set the default callable value to [cant]
 func (s *SubnetStateTrackerTest) Default(cant bool) {
-	s.CantIsSynced = cant
+	s.CantIsSubnetSynced = cant
 	s.CantSetState = cant
 	s.CantOnSyncCompleted = cant
 }
@@ -33,11 +33,11 @@ func (s *SubnetStateTrackerTest) Default(cant bool) {
 // IsSynced calls IsSyncedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail. Defaults to returning false.
-func (s *SubnetStateTrackerTest) IsSynced() bool {
-	if s.IsSyncedF != nil {
-		return s.IsSyncedF()
+func (s *SubnetStateTrackerTest) IsSubnetSynced() bool {
+	if s.IsSubnetSyncedF != nil {
+		return s.IsSubnetSyncedF()
 	}
-	if s.CantIsSynced && s.T != nil {
+	if s.CantIsSubnetSynced && s.T != nil {
 		s.T.Fatalf("Unexpectedly called IsSynced")
 	}
 	return false

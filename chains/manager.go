@@ -1081,7 +1081,7 @@ func (m *manager) subnetsNotBootstrapped() []ids.ID {
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
-		if !subnet.IsSynced() {
+		if !subnet.IsSubnetSynced() {
 			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
 		}
 	}

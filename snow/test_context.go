@@ -35,7 +35,7 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 		ConsensusAcceptor:   noOpAcceptor{},
 		SubnetStateTracker: &SubnetStateTrackerTest{
 			T: t,
-			IsSyncedF: func() bool {
+			IsSubnetSyncedF: func() bool {
 				return currentState == NormalOp
 			},
 			SetStateF: func(chainID ids.ID, state State) {

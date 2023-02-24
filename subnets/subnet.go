@@ -52,7 +52,7 @@ func New(myNodeID ids.NodeID, config Config) Subnet {
 	}
 }
 
-func (s *subnet) IsSynced() bool {
+func (s *subnet) IsSubnetSynced() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

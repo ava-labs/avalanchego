@@ -11,7 +11,7 @@ import (
 // a subnet syncing
 type SubnetStateTracker interface {
 	// Returns true iff all subnet chains have complete syncing
-	IsSynced() bool
+	IsSubnetSynced() bool
 
 	SetState(chainID ids.ID, state State)
 	GetState(chainID ids.ID) State

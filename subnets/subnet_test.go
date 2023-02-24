@@ -23,22 +23,22 @@ func TestSubnet(t *testing.T) {
 
 	s := New(myNodeID, Config{})
 	s.AddChain(chainID0)
-	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
+	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.SetState(chainID0, snow.NormalOp)
-	require.True(s.IsSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
+	require.True(s.IsSubnetSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 
 	s.AddChain(chainID1)
-	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
+	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.AddChain(chainID2)
-	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
+	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.SetState(chainID1, snow.NormalOp)
-	require.False(s.IsSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
+	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.SetState(chainID2, snow.NormalOp)
-	require.True(s.IsSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
+	require.True(s.IsSubnetSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 }
 
 func TestIsAllowed(t *testing.T) {
