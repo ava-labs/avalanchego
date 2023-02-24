@@ -38,7 +38,7 @@ var (
 	errInputsUTXOSMismatch       = errors.New("number of inputs is different from number of utxos")
 	errWrongCredentials          = errors.New("wrong credentials")
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
-	errAssetIDMismatch           = errors.New("input assetID is different from utxo asset id")
+	errAssetIDMismatch           = errors.New("utxo/input/output assetID is different from expected asset id")
 	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
 	errFailToGetDeposit          = errors.New("couldn't get deposit")
 	errUnlockedMoreThanAvailable = errors.New("unlocked more deposited tokens, than was available for unlock")
@@ -907,7 +907,17 @@ func (h *handler) VerifyLockUTXOs(
 		consumedOwnerAmounts[*otherLockTxID] = newAmount
 	}
 
-	for _, output := range outs {
+	for index, output := range outs {
+		if outputAssetID := output.AssetID(); outputAssetID != assetID {
+			return fmt.Errorf(
+				"output %d has asset ID %s but expect %s: %w",
+				index,
+				outputAssetID,
+				assetID,
+				errAssetIDMismatch,
+			)
+		}
+
 		out := output.Out
 		if _, ok := out.(*stakeable.LockOut); ok {
 			return errWrongOutType
