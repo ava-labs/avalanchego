@@ -18,5 +18,5 @@ type Factory struct {
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New(*snow.Context) (interface{}, error) {
-	return &VM{Factory: *f}, nil
+	return &VM{Config: f.Config}, nil
 }
