@@ -117,12 +117,23 @@ func DefaultContextTest() *Context {
 }
 
 func DefaultConsensusContextTest() *ConsensusContext {
+	var currentState State = Initializing
 	return &ConsensusContext{
 		Context:             DefaultContextTest(),
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
 		DecisionAcceptor:    noOpAcceptor{},
 		ConsensusAcceptor:   noOpAcceptor{},
-		SubnetStateTracker:  &SubnetStateTrackerTest{},
+		SubnetStateTracker: &SubnetStateTrackerTest{
+			IsSyncedF: func() bool {
+				return currentState == NormalOp
+			},
+			SetStateF: func(chainID ids.ID, state State) {
+				currentState = state
+			},
+			GetStateF: func(chainID ids.ID) State {
+				return currentState
+			},
+		},
 	}
 }

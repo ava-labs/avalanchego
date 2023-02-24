@@ -32,9 +32,7 @@ var errFatal = errors.New("error should cause handler to close")
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
-
 	ctx := snow.DefaultConsensusContextTest()
-
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
 	err := vdrs.Add(vdr0, nil, ids.Empty, 1)
@@ -117,7 +115,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 func TestHandlerClosesOnError(t *testing.T) {
 	closed := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
-
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)

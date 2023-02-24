@@ -47,20 +47,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	sender.Default(true)
 	vm.Default(true)
 
-	var currentState snow.State = snow.Initializing
-	ctx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
-		T: t,
-		IsSyncedF: func() bool {
-			return currentState == snow.NormalOp
-		},
-		SetStateF: func(chainID ids.ID, state snow.State) {
-			currentState = state
-		},
-		GetStateF: func(chainID ids.ID) snow.State {
-			return currentState
-		},
-	}
-
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()

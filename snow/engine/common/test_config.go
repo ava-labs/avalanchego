@@ -4,7 +4,6 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -13,20 +12,6 @@ import (
 // DefaultConfigTest returns a test configuration
 func DefaultConfigTest() Config {
 	ctx := snow.DefaultConsensusContextTest()
-
-	var currentState snow.State = snow.Initializing
-	ctx.SubnetStateTracker = &snow.SubnetStateTrackerTest{
-		IsSyncedF: func() bool {
-			return currentState == snow.NormalOp
-		},
-		SetStateF: func(chainID ids.ID, state snow.State) {
-			currentState = state
-		},
-		GetStateF: func(chainID ids.ID) snow.State {
-			return currentState
-		},
-	}
-
 	beacons := validators.NewSet()
 
 	connectedPeers := tracker.NewPeers()
