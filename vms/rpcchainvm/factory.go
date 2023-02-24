@@ -6,9 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"fmt"
-	"io"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
@@ -35,21 +33,12 @@ func NewFactory(path string, processTracker resource.ProcessTracker, runtimeTrac
 	}
 }
 
-func (f *factory) New(ctx *snow.Context) (interface{}, error) {
+func (f *factory) New(log logging.Logger) (interface{}, error) {
 	config := &subprocess.Config{
+		Stderr:           log,
+		Stdout:           log,
 		HandshakeTimeout: runtime.DefaultHandshakeTimeout,
-	}
-
-	// createStaticHandlers will send a nil ctx to disable logs
-	// TODO: create a separate log file and no-op ctx
-	if ctx != nil {
-		config.Stderr = ctx.Log
-		config.Stdout = ctx.Log
-		config.Log = ctx.Log
-	} else {
-		config.Stderr = io.Discard
-		config.Stdout = io.Discard
-		config.Log = logging.NoLog{}
+		Log:              log,
 	}
 
 	listener, err := grpcutils.NewListener()
@@ -73,7 +62,7 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 	}
 
 	vm := NewClient(vmpb.NewVMClient(clientConn))
-	vm.SetProcess(ctx, stopper, status.Pid, f.processTracker)
+	vm.SetProcess(stopper, status.Pid, f.processTracker)
 
 	f.runtimeTracker.TrackRuntime(stopper)
 

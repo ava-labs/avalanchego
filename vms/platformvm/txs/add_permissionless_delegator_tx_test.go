@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -90,7 +89,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -119,7 +118,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				stakeOut.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -143,7 +142,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -178,7 +177,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -213,7 +212,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -248,7 +247,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 2,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -283,7 +282,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 2,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -326,7 +325,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 	t.Run("invalid BaseTx", func(t *testing.T) {
 		tx := &AddPermissionlessDelegatorTx{
 			BaseTx: invalidBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 			},
 			StakeOuts: []*avax.TransferableOutput{
@@ -353,7 +352,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 		assetID := ids.GenerateTestID()
 		tx := &AddPermissionlessDelegatorTx{
 			BaseTx: validBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Wght:   1,
 			},

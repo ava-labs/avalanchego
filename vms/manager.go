@@ -12,8 +12,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 
 // A Factory creates new instances of a VM
 type Factory interface {
-	New(*snow.Context) (interface{}, error)
+	New(logging.Logger) (interface{}, error)
 }
 
 // Manager tracks a collection of VM factories, their aliases, and their
@@ -104,7 +104,8 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 
 	m.factories[vmID] = factory
 
-	vm, err := factory.New(nil)
+	// TODO: Pass in a VM specific logger
+	vm, err := factory.New(logging.NoLog{})
 	if err != nil {
 		return err
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -133,8 +133,8 @@ func ExampleWallet() {
 	addPermissionlessValidatorStartTime := time.Now()
 	startTime := time.Now().Add(time.Minute)
 	addSubnetValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
-		&validator.SubnetValidator{
-			Validator: validator.Validator{
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
 				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
@@ -156,8 +156,8 @@ func ExampleWallet() {
 
 	addPermissionlessDelegatorStartTime := time.Now()
 	addSubnetDelegatorTxID, err := pWallet.IssueAddPermissionlessDelegatorTx(
-		&validator.SubnetValidator{
-			Validator: validator.Validator{
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
 				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),

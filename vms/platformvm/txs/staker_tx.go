@@ -16,20 +16,6 @@ import (
 // delegation.
 type ValidatorTx interface {
 	UnsignedTx
-	Validator
-}
-
-type DelegatorTx interface {
-	UnsignedTx
-	Delegator
-}
-
-type StakerTx interface {
-	UnsignedTx
-	Staker
-}
-
-type Validator interface {
 	PermissionlessStaker
 
 	ValidationRewardsOwner() fx.Owner
@@ -37,10 +23,16 @@ type Validator interface {
 	Shares() uint32
 }
 
-type Delegator interface {
+type DelegatorTx interface {
+	UnsignedTx
 	PermissionlessStaker
 
 	RewardsOwner() fx.Owner
+}
+
+type StakerTx interface {
+	UnsignedTx
+	Staker
 }
 
 type PermissionlessStaker interface {

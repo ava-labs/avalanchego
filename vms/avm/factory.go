@@ -4,7 +4,7 @@
 package avm
 
 import (
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 )
@@ -15,6 +15,6 @@ type Factory struct {
 	config.Config
 }
 
-func (f *Factory) New(*snow.Context) (interface{}, error) {
+func (f *Factory) New(logging.Logger) (interface{}, error) {
 	return &VM{Config: f.Config}, nil
 }

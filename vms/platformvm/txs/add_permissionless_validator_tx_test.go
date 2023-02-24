@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -83,7 +82,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.EmptyNodeID,
 					},
 				}
@@ -95,7 +94,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 					},
 					StakeOuts: nil,
@@ -108,7 +107,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 					},
 					StakeOuts: []*avax.TransferableOutput{
@@ -133,7 +132,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -163,7 +162,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -196,7 +195,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				stakeOut.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -224,7 +223,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -263,7 +262,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -302,7 +301,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
@@ -341,7 +340,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   2,
 					},
@@ -380,7 +379,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   2,
 					},
@@ -427,7 +426,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	t.Run("invalid BaseTx", func(t *testing.T) {
 		tx := &AddPermissionlessValidatorTx{
 			BaseTx: invalidBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 			},
 			StakeOuts: []*avax.TransferableOutput{
@@ -455,7 +454,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 		assetID := ids.GenerateTestID()
 		tx := &AddPermissionlessValidatorTx{
 			BaseTx: validBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Wght:   1,
 			},

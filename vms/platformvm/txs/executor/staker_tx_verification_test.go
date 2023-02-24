@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -63,7 +62,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Ins:          []*avax.TransferableInput{},
 				},
 			},
-			Validator: validator.Validator{
+			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  1,
 				End:    1 + uint64(unsignedTransformTx.MinStakeDuration),
