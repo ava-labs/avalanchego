@@ -594,7 +594,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.Ctx.SetState(b.Ctx.ChainID, snow.NormalOp)
+	b.Config.Ctx.SetChainState(snow.NormalOp)
 	b.processedCache.Flush()
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
