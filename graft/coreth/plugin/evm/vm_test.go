@@ -657,6 +657,43 @@ func TestVMUpgrades(t *testing.T) {
 	}
 }
 
+func TestImportMissingUTXOs(t *testing.T) {
+	// make a VM with a shared memory that has an importable UTXO to build a block
+	importAmount := uint64(50000000)
+	issuer, vm, _, _, _ := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase2, "", "", map[ids.ShortID]uint64{
+		testShortIDAddrs[0]: importAmount,
+	})
+	defer func() {
+		err := vm.Shutdown(context.Background())
+		require.NoError(t, err)
+	}()
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
+	require.NoError(t, err)
+	err = vm.issueTx(importTx, true /*=local*/)
+	require.NoError(t, err)
+	<-issuer
+	blk, err := vm.BuildBlock(context.Background())
+	require.NoError(t, err)
+
+	// make another VM which is missing the UTXO in shared memory
+	_, vm2, _, _, _ := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
+	defer func() {
+		err := vm2.Shutdown(context.Background())
+		require.NoError(t, err)
+	}()
+
+	vm2Blk, err := vm2.ParseBlock(context.Background(), blk.Bytes())
+	require.NoError(t, err)
+	err = vm2Blk.Verify(context.Background())
+	require.ErrorIs(t, err, errMissingUTXOs)
+
+	// This should not result in a bad block since the missing UTXO should
+	// prevent InsertBlockManual from being called.
+	badBlocks, _ := vm2.blockChain.BadBlocks()
+	require.Len(t, badBlocks, 0)
+}
+
 // Simple test to ensure we can issue an import transaction followed by an export transaction
 // and they will be indexed correctly when accepted.
 func TestIssueAtomicTxs(t *testing.T) {
@@ -1236,6 +1273,7 @@ func TestConflictingImportTxsAcrossBlocks(t *testing.T) {
 		"apricotPhase4": genesisJSONApricotPhase4,
 		"apricotPhase5": genesisJSONApricotPhase5,
 	} {
+		genesis := genesis
 		t.Run(name, func(t *testing.T) {
 			testConflictingImportTxs(t, genesis)
 		})
