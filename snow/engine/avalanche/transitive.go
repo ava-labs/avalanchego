@@ -341,13 +341,13 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
-	t.Ctx.SetChainState(snow.NormalOp)
-	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that consensus has started: %w",
-			err)
+	if err := t.Consensus.Initialize(ctx, t.Ctx, t.Params, frontier); err != nil {
+		return fmt.Errorf("failed to initialize consensus: %w", err)
 	}
-	return t.Consensus.Initialize(ctx, t.Ctx, t.Params, frontier)
+
+	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+	t.Ctx.Start(snow.NormalOp)
+	return t.VM.SetState(ctx, snow.NormalOp)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {

@@ -324,7 +324,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
 	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
-	b.Ctx.SetChainState(snow.Bootstrapping)
+	b.Ctx.Start(snow.Bootstrapping)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
@@ -594,7 +594,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.Ctx.SetChainState(snow.NormalOp)
+	b.Config.Ctx.Done(snow.Bootstrapping)
 	b.processedCache.Flush()
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain

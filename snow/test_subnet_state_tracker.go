@@ -15,10 +15,11 @@ var _ SubnetStateTracker = (*SubnetStateTrackerTest)(nil)
 type SubnetStateTrackerTest struct {
 	T *testing.T
 
-	CantIsSubnetSynced, CantSetState, CantGetState, CantOnSyncCompleted bool
+	CantIsSubnetSynced, CantStartState, CantStopState, CantGetState, CantOnSyncCompleted bool
 
 	IsSubnetSyncedF  func() bool
-	SetStateF        func(chainID ids.ID, state State)
+	StartStateF      func(chainID ids.ID, state State)
+	StopStateF       func(chainID ids.ID, state State)
 	GetStateF        func(chainID ids.ID) State
 	OnSyncCompletedF func() chan struct{}
 }
@@ -26,7 +27,7 @@ type SubnetStateTrackerTest struct {
 // Default set the default callable value to [cant]
 func (s *SubnetStateTrackerTest) Default(cant bool) {
 	s.CantIsSubnetSynced = cant
-	s.CantSetState = cant
+	s.CantStartState = cant
 	s.CantOnSyncCompleted = cant
 }
 
@@ -46,11 +47,19 @@ func (s *SubnetStateTrackerTest) IsSubnetSynced() bool {
 // SetState calls SetStateF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SubnetStateTrackerTest) SetState(chainID ids.ID, state State) {
-	if s.SetStateF != nil {
-		s.SetStateF(chainID, state)
-	} else if s.CantSetState && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SetState")
+func (s *SubnetStateTrackerTest) StartState(chainID ids.ID, state State) {
+	if s.StartStateF != nil {
+		s.StartStateF(chainID, state)
+	} else if s.CantStartState && s.T != nil {
+		s.T.Fatalf("Unexpectedly called StartState")
+	}
+}
+
+func (s *SubnetStateTrackerTest) StopState(chainID ids.ID, state State) {
+	if s.StopStateF != nil {
+		s.StopStateF(chainID, state)
+	} else if s.CantStopState && s.T != nil {
+		s.T.Fatalf("Unexpectedly called StopState")
 	}
 }
 

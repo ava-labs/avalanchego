@@ -134,7 +134,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -238,7 +238,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -417,7 +417,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -562,7 +562,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -684,7 +684,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -805,7 +805,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -937,7 +937,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
@@ -1105,7 +1105,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},

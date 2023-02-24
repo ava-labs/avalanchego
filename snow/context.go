@@ -101,6 +101,10 @@ func (cc *ConsensusContext) GetChainState() State {
 	return cc.SubnetStateTracker.GetState(cc.CChainID)
 }
 
-func (cc *ConsensusContext) SetChainState(state State) {
-	cc.SubnetStateTracker.SetState(cc.CChainID, state)
+func (cc *ConsensusContext) Start(state State) {
+	cc.SubnetStateTracker.StartState(cc.CChainID, state)
+}
+
+func (cc *ConsensusContext) Done(state State) {
+	cc.SubnetStateTracker.StopState(cc.CChainID, state)
 }

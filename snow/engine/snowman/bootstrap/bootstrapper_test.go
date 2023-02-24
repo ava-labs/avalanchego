@@ -155,7 +155,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	// create bootstrapper
 	dummyCallback := func(context.Context, uint32) error {
 		cfg.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-		cfg.Ctx.SetChainState(snow.NormalOp)
+		cfg.Ctx.Start(snow.NormalOp)
 		return nil
 	}
 	bs, err := New(context.Background(), cfg, dummyCallback)
@@ -234,7 +234,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -339,7 +339,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -501,7 +501,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -666,7 +666,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -853,7 +853,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -997,7 +997,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -1208,7 +1208,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -1349,7 +1349,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)
@@ -1437,7 +1437,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.SetChainState(snow.NormalOp)
+			config.Ctx.Start(snow.NormalOp)
 			return nil
 		},
 	)

@@ -25,7 +25,7 @@ func TestSubnet(t *testing.T) {
 	s.AddChain(chainID0)
 	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.SetState(chainID0, snow.NormalOp)
+	s.StopState(chainID0, snow.Bootstrapping)
 	require.True(s.IsSubnetSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 
 	s.AddChain(chainID1)
@@ -34,10 +34,10 @@ func TestSubnet(t *testing.T) {
 	s.AddChain(chainID2)
 	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.SetState(chainID1, snow.NormalOp)
+	s.StopState(chainID1, snow.Bootstrapping)
 	require.False(s.IsSubnetSynced(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
-	s.SetState(chainID2, snow.NormalOp)
+	s.StopState(chainID2, snow.Bootstrapping)
 	require.True(s.IsSubnetSynced(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 }
 

@@ -26,7 +26,11 @@ func DefaultContextTest() *Context {
 }
 
 func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
-	var currentState State = Initializing
+	var (
+		startedState State = Initializing
+		stoppedState State = Initializing
+	)
+
 	return &ConsensusContext{
 		Context:             DefaultContextTest(),
 		Registerer:          prometheus.NewRegistry(),
@@ -36,13 +40,16 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 		SubnetStateTracker: &SubnetStateTrackerTest{
 			T: t,
 			IsSubnetSyncedF: func() bool {
-				return currentState == NormalOp
+				return stoppedState == Bootstrapping
 			},
-			SetStateF: func(chainID ids.ID, state State) {
-				currentState = state
+			StartStateF: func(chainID ids.ID, state State) {
+				startedState = state
+			},
+			StopStateF: func(chainID ids.ID, state State) {
+				stoppedState = state
 			},
 			GetStateF: func(chainID ids.ID) State {
-				return currentState
+				return startedState
 			},
 		},
 	}

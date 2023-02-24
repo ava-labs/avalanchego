@@ -144,7 +144,7 @@ func TestTimeout(t *testing.T) {
 	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.SetChainState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -413,7 +413,7 @@ func TestReliableMessages(t *testing.T) {
 	bootstrapper.CantGossip = false
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.SetChainState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), handler)
 
@@ -546,7 +546,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.SetChainState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), handler)
 

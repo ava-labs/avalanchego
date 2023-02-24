@@ -300,6 +300,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		)
 
 		// if we do not restart state sync, move on to bootstrapping.
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
@@ -318,6 +319,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	switch syncMode {
 	case block.StateSyncSkipped:
 		// VM did not accept the summary, move on to bootstrapping.
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	case block.StateSyncStatic:
 		// Summary was accepted and VM is state syncing.
@@ -334,6 +336,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",
 			zap.Stringer("syncMode", syncMode),
 		)
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 }
@@ -385,7 +388,7 @@ func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
 	ss.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ss.Ctx.SetChainState(snow.StateSyncing)
+	ss.Ctx.Start(snow.StateSyncing)
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}
@@ -469,6 +472,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
@@ -532,6 +536,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	}
 
 	ss.Ctx.StateSyncing.Set(false)
+	ss.Config.Ctx.Done(snow.StateSyncing)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
