@@ -98,13 +98,13 @@ type ConsensusContext struct {
 }
 
 func (cc *ConsensusContext) GetChainState() State {
-	return cc.SubnetStateTracker.GetState(cc.CChainID)
+	return cc.SubnetStateTracker.GetState(cc.ChainID)
 }
 
 func (cc *ConsensusContext) Start(state State) {
-	cc.SubnetStateTracker.StartState(cc.CChainID, state)
+	cc.SubnetStateTracker.StartState(cc.ChainID, state)
 }
 
 func (cc *ConsensusContext) Done(state State) {
-	cc.SubnetStateTracker.StopState(cc.CChainID, state)
+	cc.SubnetStateTracker.StopState(cc.ChainID, state)
 }
