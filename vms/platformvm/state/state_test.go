@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -425,7 +424,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	s, db := newUninitializedState(require)
 
 	initialValidator := &txs.AddValidatorTx{
-		Validator: validator.Validator{
+		Validator: txs.Validator{
 			NodeID: initialNodeID,
 			Start:  uint64(initialTime.Unix()),
 			End:    uint64(initialValidatorEndTime.Unix()),

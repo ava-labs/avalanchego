@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -82,7 +81,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			Ins:          inputs,
 			Outs:         outputs,
 		}},
-		Validator: validator.Validator{
+		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
@@ -199,7 +198,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Ins:          inputs,
 			Outs:         outputs,
 		}},
-		Validator: validator.Validator{
+		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
