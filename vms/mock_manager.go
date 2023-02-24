@@ -12,7 +12,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	snow "github.com/ava-labs/avalanchego/snow"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -40,7 +40,7 @@ func (m *MockFactory) EXPECT() *MockFactoryMockRecorder {
 }
 
 // New mocks base method.
-func (m *MockFactory) New(arg0 *snow.Context) (interface{}, error) {
+func (m *MockFactory) New(arg0 logging.Logger) (interface{}, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "New", arg0)
 	ret0, _ := ret[0].(interface{})

@@ -477,7 +477,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(ctx.Context)
+	vm, err := vmFactory.New(chainLog)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -491,7 +491,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
-		fx, err := fxFactory.New(ctx.Context)
+		fx, err := fxFactory.New(chainLog)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}

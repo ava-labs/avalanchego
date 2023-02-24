@@ -89,8 +89,8 @@ func (r *vmRegisterer) createStaticHandlers(
 	vmID ids.ID,
 	factory vms.Factory,
 ) (map[string]*common.HTTPHandler, error) {
-	// passing a nil ctx to the factory disables logging.
-	vm, err := factory.New(nil)
+	// TODO: Pass in a VM specific logger
+	vm, err := factory.New(logging.NoLog{})
 	if err != nil {
 		return nil, err
 	}
