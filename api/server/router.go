@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -22,7 +24,7 @@ type router struct {
 	router *mux.Router
 
 	routeLock      sync.Mutex
-	reservedRoutes map[string]bool                    // Reserves routes so that there can't be alias that conflict
+	reservedRoutes set.Set[string]                    // Reserves routes so that there can't be alias that conflict
 	aliases        map[string][]string                // Maps a route to a set of reserved routes
 	routes         map[string]map[string]http.Handler // Maps routes to a handler
 }
@@ -30,7 +32,7 @@ type router struct {
 func newRouter() *router {
 	return &router{
 		router:         mux.NewRouter(),
-		reservedRoutes: make(map[string]bool),
+		reservedRoutes: set.Set[string]{},
 		aliases:        make(map[string][]string),
 		routes:         make(map[string]map[string]http.Handler),
 	}
@@ -68,7 +70,7 @@ func (r *router) AddRouter(base, endpoint string, handler http.Handler) error {
 }
 
 func (r *router) addRouter(base, endpoint string, handler http.Handler) error {
-	if r.reservedRoutes[base] {
+	if r.reservedRoutes.Contains(base) {
 		return fmt.Errorf("couldn't route to %s as that route is either aliased or already maps to a handler", base)
 	}
 
@@ -113,13 +115,13 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 	defer r.routeLock.Unlock()
 
 	for _, alias := range aliases {
-		if r.reservedRoutes[alias] {
+		if r.reservedRoutes.Contains(alias) {
 			return fmt.Errorf("couldn't alias to %s as that route is either already aliased or already maps to a handler", alias)
 		}
 	}
 
 	for _, alias := range aliases {
-		r.reservedRoutes[alias] = true
+		r.reservedRoutes.Add(alias)
 	}
 
 	r.aliases[base] = append(r.aliases[base], aliases...)

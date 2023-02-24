@@ -20,22 +20,13 @@ func NewStopper(logger logging.Logger, cmd *exec.Cmd) runtime.Stopper {
 }
 
 type stopper struct {
-	lock     sync.Mutex
-	cmd      *exec.Cmd
-	shutdown bool
-
+	once   sync.Once
+	cmd    *exec.Cmd
 	logger logging.Logger
 }
 
 func (s *stopper) Stop(ctx context.Context) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// subsequent calls to this method are a no-op
-	if s.shutdown || s.cmd.Process == nil {
-		return
-	}
-
-	s.shutdown = true
-	stop(ctx, s.logger, s.cmd)
+	s.once.Do(func() {
+		stop(ctx, s.logger, s.cmd)
+	})
 }
