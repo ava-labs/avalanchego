@@ -5,6 +5,7 @@ package evm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -30,6 +31,8 @@ var (
 		103546, 103571, 103572, 103619,
 		103287, 103624, 103591,
 	}
+
+	errMissingUTXOs = errors.New("missing UTXOs")
 )
 
 func init() {
@@ -233,6 +236,11 @@ func (b *Block) verify(writes bool) error {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
+	// verify UTXOs named in import txs are present in shared memory.
+	if err := b.verifyUTXOsPresent(); err != nil {
+		return err
+	}
+
 	err := b.vm.blockChain.InsertBlockManual(b.ethBlock, writes)
 	if err != nil || !writes {
 		// if an error occurred inserting the block into the chain
@@ -243,6 +251,33 @@ func (b *Block) verify(writes bool) error {
 		}
 	}
 	return err
+}
+
+// verifyUTXOsPresent returns an error if any of the atomic transactions name UTXOs that
+// are not present in shared memory.
+func (b *Block) verifyUTXOsPresent() error {
+	blockHash := common.Hash(b.ID())
+	if b.vm.atomicBackend.IsBonus(b.Height(), blockHash) {
+		log.Info("skipping atomic tx verification on bonus block", "block", blockHash)
+		return nil
+	}
+
+	if !b.vm.bootstrapped {
+		return nil
+	}
+
+	// verify UTXOs named in import txs are present in shared memory.
+	for _, atomicTx := range b.atomicTxs {
+		utx := atomicTx.UnsignedAtomicTx
+		chainID, requests, err := utx.AtomicOps()
+		if err != nil {
+			return err
+		}
+		if _, err := b.vm.ctx.SharedMemory.Get(chainID, requests.RemoveRequests); err != nil {
+			return fmt.Errorf("%w: %s", errMissingUTXOs, err)
+		}
+	}
+	return nil
 }
 
 // Bytes implements the snowman.Block interface
