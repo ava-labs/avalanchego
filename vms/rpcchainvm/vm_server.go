@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -105,6 +106,10 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	nodeID, err := ids.ToNodeID(req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	publicKey, err := bls.PublicKeyFromBytes(req.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -222,6 +227,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		SubnetID:  subnetID,
 		ChainID:   chainID,
 		NodeID:    nodeID,
+		PublicKey: publicKey,
 
 		XChainID:    xChainID,
 		CChainID:    cChainID,
