@@ -124,6 +124,17 @@ func (s *subnet) GetState(chainID ids.ID) snow.State {
 	return s.currentState[chainID]
 }
 
+func (s *subnet) IsStateStopped(chainID ids.ID, state snow.State) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	chains, found := s.stopped[state]
+	if !found {
+		return false
+	}
+	return chains.Contains(chainID)
+}
+
 func (s *subnet) OnSyncCompleted() chan struct{} {
 	return s.bootstrappedSema
 }

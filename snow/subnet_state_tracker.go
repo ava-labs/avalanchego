@@ -17,7 +17,9 @@ type SubnetStateTracker interface {
 
 	StartState(chainID ids.ID, state State)
 	StopState(chainID ids.ID, state State)
+
 	GetState(chainID ids.ID) State
+	IsStateStopped(chainID ids.ID, state State) bool
 
 	OnSyncCompleted() chan struct{}
 }

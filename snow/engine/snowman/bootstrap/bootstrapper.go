@@ -302,7 +302,7 @@ func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
 		return nil
 	}
 
-	b.Ctx.StateSyncing.Set(false)
+	b.Ctx.Done(snow.StateSyncing)
 	return nil
 }
 

@@ -92,9 +92,6 @@ type ConsensusContext struct {
 
 	// True iff this chain is executing transactions as part of bootstrapping.
 	Executing utils.Atomic[bool]
-
-	// True iff this chain is currently state-syncing
-	StateSyncing utils.Atomic[bool]
 }
 
 func (cc *ConsensusContext) GetChainState() State {
@@ -107,4 +104,8 @@ func (cc *ConsensusContext) Start(state State) {
 
 func (cc *ConsensusContext) Done(state State) {
 	cc.SubnetStateTracker.StopState(cc.ChainID, state)
+}
+
+func (cc *ConsensusContext) IsDone(state State) bool {
+	return cc.SubnetStateTracker.IsStateStopped(cc.ChainID, state)
 }
