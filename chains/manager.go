@@ -448,6 +448,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			SubnetID:  chainParams.SubnetID,
 			ChainID:   chainParams.ID,
 			NodeID:    m.NodeID,
+			PublicKey: bls.PublicFromSecretKey(m.StakingBLSKey),
 
 			XChainID:    m.XChainID,
 			CChainID:    m.CChainID,
