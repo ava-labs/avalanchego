@@ -91,8 +91,8 @@ func main() {
 		if v.GetBool(deleteKey) {
 			if err := bootstrappingDB.Delete(iterator.Key()); err != nil {
 				fmt.Printf("couldn't delete key from bootstrappingDB. key: %s: err: %s", iterator.Key(), err)
-				os.Exit(1)
 				iterator.Release()
+				os.Exit(1)
 			}
 		}
 	}
@@ -110,6 +110,7 @@ func main() {
 			if err := vmDB.Delete(iterator.Key()); err != nil {
 				fmt.Printf("couldn't delete key from vmDB. key: %s: err: %s", iterator.Key(), err)
 				iterator.Release()
+				os.Exit(1)
 			}
 		}
 	}
