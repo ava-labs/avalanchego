@@ -347,7 +347,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.Done(snow.StateSyncing)
+		t.Ctx.Log.Warn("received an StateSyncDone message from the VM when VM is already fully synced")
 		return nil
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
@@ -452,12 +452,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 }
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
-	lastAccepted := t.Consensus.LastAccepted()
-	if !t.Ctx.IsDone(snow.StateSyncing) {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
-	} else {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})
-	}
+	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{t.Consensus.LastAccepted()})
 }
 
 // Build blocks if they have been requested and the number of processing blocks

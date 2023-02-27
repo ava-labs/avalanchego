@@ -105,7 +105,3 @@ func (cc *ConsensusContext) Start(state State) {
 func (cc *ConsensusContext) Done(state State) {
 	cc.SubnetStateTracker.StopState(cc.ChainID, state)
 }
-
-func (cc *ConsensusContext) IsDone(state State) bool {
-	return cc.SubnetStateTracker.IsStateStopped(cc.ChainID, state)
-}

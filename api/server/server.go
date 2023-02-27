@@ -365,7 +365,7 @@ func lockMiddleware(
 }
 
 // Reject middleware wraps a handler. If the chain that the context describes is
-// not done state-syncing/bootstrapping, writes back an error.
+// not fully synced, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if ctx.GetChainState() != snow.NormalOp {

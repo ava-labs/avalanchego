@@ -11,15 +11,14 @@ import (
 // a subnet syncing
 type SubnetStateTracker interface {
 	// Returns true iff all subnet chains have complete syncing.
-	// Currently a Subnet completes syncing when all chains have
-	// done bootstrapping (even if they have not yet started normal ops)
+	// A subnet is fully synced if all chains have completed bootstrap
+	// and state synced chains have completed state sync too-
 	IsSubnetSynced() bool
 
 	StartState(chainID ids.ID, state State)
 	StopState(chainID ids.ID, state State)
 
 	GetState(chainID ids.ID) State
-	IsStateStopped(chainID ids.ID, state State) bool
 
 	OnSyncCompleted() chan struct{}
 }

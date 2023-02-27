@@ -16,13 +16,12 @@ type SubnetStateTrackerTest struct {
 	T *testing.T
 
 	CantIsSubnetSynced, CantStartState, CantStopState,
-	CantGetState, CantIsStateStopped, CantOnSyncCompleted bool
+	CantGetState, CantOnSyncCompleted bool
 
 	IsSubnetSyncedF  func() bool
 	StartStateF      func(chainID ids.ID, state State)
 	StopStateF       func(chainID ids.ID, state State)
 	GetStateF        func(chainID ids.ID) State
-	IsStateStoppedF  func(chainID ids.ID, state State) bool
 	OnSyncCompletedF func() chan struct{}
 }
 
@@ -32,7 +31,6 @@ func (s *SubnetStateTrackerTest) Default(cant bool) {
 	s.CantStartState = cant
 	s.CantStopState = cant
 	s.CantGetState = cant
-	s.CantIsStateStopped = cant
 	s.CantOnSyncCompleted = cant
 }
 
@@ -75,15 +73,6 @@ func (s *SubnetStateTrackerTest) GetState(chainID ids.ID) State {
 		s.T.Fatalf("Unexpectedly called GetState")
 	}
 	return Initializing
-}
-
-func (s *SubnetStateTrackerTest) IsStateStopped(chainID ids.ID, state State) bool {
-	if s.IsStateStoppedF != nil {
-		return s.IsStateStoppedF(chainID, state)
-	} else if s.CantIsStateStopped && s.T != nil {
-		s.T.Fatalf("Unexpectedly called IsStateStoppedF")
-	}
-	return false
 }
 
 func (s *SubnetStateTrackerTest) OnSyncCompleted() chan struct{} {

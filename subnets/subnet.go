@@ -36,9 +36,14 @@ type Subnet interface {
 type subnet struct {
 	lock sync.RWMutex
 
+	// currentState maps chainID to chain's latest started state
 	currentState map[ids.ID]snow.State
-	started      map[snow.State]set.Set[ids.ID]
-	stopped      map[snow.State]set.Set[ids.ID]
+
+	// started maps a vm state to the set of VMs that has started that state
+	started map[snow.State]set.Set[ids.ID]
+
+	// stopped maps a vm state to the set of VMs that has done with that state
+	stopped map[snow.State]set.Set[ids.ID]
 
 	once             sync.Once
 	bootstrappedSema chan struct{}
@@ -65,19 +70,32 @@ func (s *subnet) IsSubnetSynced() bool {
 }
 
 // isSynced assumes s.lock is held
-// Currently a subnet is declared synced if
-// all chains have completed bootstrap, even if chains VM
-// have not yet started normal operations
 func (s *subnet) isSynced() bool {
-	bootstrapped, found := s.stopped[snow.Bootstrapping]
-	if !found {
-		// no chain completed bootstrapping
+	bootstrapped, anyChainDoneBootstrap := s.stopped[snow.Bootstrapping]
+	if !anyChainDoneBootstrap {
+		return false
+	}
+
+	stateSyncedStarted, anyChainStartedStateSync := s.started[snow.StateSyncing]
+	stateSyncedDone, anyChainDoneStateSync := s.stopped[snow.StateSyncing]
+
+	if anyChainStartedStateSync && !anyChainDoneStateSync {
+		// some chains have started state sync but not chain finished it.
+		// Can't be fully synced
 		return false
 	}
 
 	synced := true
 	for chain := range s.currentState {
+		// full sync requires bootstrapping done
 		if !bootstrapped.Contains(chain) {
+			synced = false
+			break
+		}
+
+		// full sync requires state sync done, if ever started
+		if (stateSyncedStarted != nil && stateSyncedStarted.Contains(chain)) &&
+			(stateSyncedDone != nil && !stateSyncedDone.Contains(chain)) {
 			synced = false
 			break
 		}
@@ -90,16 +108,21 @@ func (s *subnet) StartState(chainID ids.ID, state snow.State) {
 	defer s.lock.Unlock()
 
 	s.currentState[chainID] = state
-	started, found := s.started[state]
-	if !found {
+	started, anyChainStarted := s.started[state]
+	if !anyChainStarted {
 		s.started[state] = set.NewSet[ids.ID](3)
 		started = s.started[state]
 	}
 	started.Add(chainID)
+
+	// if we are restarting a given state, make sure it is not marked as stopped
+	if stopped, anyChainStopped := s.stopped[state]; anyChainStopped {
+		stopped.Remove(chainID)
+	}
+
 	if !s.isSynced() {
 		return
 	}
-
 	s.once.Do(func() {
 		close(s.bootstrappedSema)
 	})
@@ -109,12 +132,19 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	stopped, found := s.stopped[state]
-	if !found {
+	stopped, anyChainDoneBootstrap := s.stopped[state]
+	if !anyChainDoneBootstrap {
 		s.stopped[state] = set.NewSet[ids.ID](3)
 		stopped = s.stopped[state]
 	}
 	stopped.Add(chainID)
+
+	if !s.isSynced() {
+		return
+	}
+	s.once.Do(func() {
+		close(s.bootstrappedSema)
+	})
 }
 
 func (s *subnet) GetState(chainID ids.ID) snow.State {
@@ -122,17 +152,6 @@ func (s *subnet) GetState(chainID ids.ID) snow.State {
 	defer s.lock.Unlock()
 
 	return s.currentState[chainID]
-}
-
-func (s *subnet) IsStateStopped(chainID ids.ID, state snow.State) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	chains, found := s.stopped[state]
-	if !found {
-		return false
-	}
-	return chains.Contains(chainID)
 }
 
 func (s *subnet) OnSyncCompleted() chan struct{} {
@@ -143,7 +162,7 @@ func (s *subnet) AddChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, found := s.currentState[chainID]; found {
+	if _, anyChainDoneBootstrap := s.currentState[chainID]; anyChainDoneBootstrap {
 		return false
 	}
 
