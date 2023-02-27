@@ -315,6 +315,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
+		proof.Value = closestNode.value
 		return proof, nil
 	}
 
