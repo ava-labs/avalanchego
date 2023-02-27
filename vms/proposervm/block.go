@@ -123,7 +123,7 @@ func (p *postForkCommonComponents) Verify(
 
 	// If the node is currently syncing - we don't assume that the P-chain has
 	// been synced up to this point yet.
-	if p.vm.consensusState == snow.NormalOp {
+	if p.vm.consensusState == snow.ExtendingFrontier {
 		childID := child.ID()
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {

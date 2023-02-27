@@ -377,7 +377,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		panic(err)
 	}
@@ -468,7 +468,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	)
 	require.NoError(err)
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	// Create a subnet and store it in testSubnet1
@@ -1454,7 +1454,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	err = blk.Accept(context.Background())
 	require.NoError(err)
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
@@ -2109,7 +2109,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(firstVM.SetState(context.Background(), snow.ExtendingFrontier))
 
 	// Fast forward clock to time for genesis validators to leave
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
@@ -2154,7 +2154,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(secondVM.SetState(context.Background(), snow.ExtendingFrontier))
 
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
@@ -2294,7 +2294,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -2396,7 +2396,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(t, vm.SetState(context.Background(), snow.ExtendingFrontier))
 
 	var (
 		oldVdrs       = vm.Validators

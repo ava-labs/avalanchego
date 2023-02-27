@@ -120,8 +120,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	b.Ctx.Start(snow.Bootstrapping)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}
 
 	// Set the starting height
@@ -280,7 +279,7 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
+func (b *bootstrapper) Notify(ctx context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
 		b.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
@@ -289,6 +288,13 @@ func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	}
 
 	b.Ctx.Done(snow.StateSyncing)
+	if b.Ctx.IsSubnetSynced() {
+		b.Ctx.Start(snow.SubnetSynced)
+		if err := b.VM.SetState(ctx, snow.SubnetSynced); err != nil {
+			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -572,9 +578,16 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 			b.Bootstrapped()
 		})
 	}
+	b.fetchETA.Set(0)
 
 	// Notify the subnet that this chain is synced
 	b.Config.Ctx.Done(snow.Bootstrapping)
-	b.fetchETA.Set(0)
+	if b.Ctx.IsSubnetSynced() {
+		b.Ctx.Start(snow.SubnetSynced)
+		if err := b.VM.SetState(ctx, snow.SubnetSynced); err != nil {
+			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
+		}
+	}
+
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

@@ -1070,7 +1070,7 @@ func (m *manager) IsFullySynced(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().GetChainState() == snow.NormalOp
+	return chain.Context().IsSubnetSynced()
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {

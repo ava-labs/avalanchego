@@ -153,7 +153,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	// create bootstrapper
 	dummyCallback := func(context.Context, uint32) error {
 		cfg.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-		cfg.Ctx.Start(snow.NormalOp)
+		cfg.Ctx.Start(snow.ExtendingFrontier)
 		return nil
 	}
 	bs, err := New(context.Background(), cfg, dummyCallback)
@@ -232,7 +232,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -273,7 +273,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -337,7 +337,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -424,7 +424,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -499,7 +499,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -588,7 +588,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -664,7 +664,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -772,7 +772,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -851,7 +851,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -933,7 +933,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -995,7 +995,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -1068,7 +1068,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1206,7 +1206,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -1272,7 +1272,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetChainState() == snow.NormalOp {
+	if config.Ctx.GetChainState() == snow.ExtendingFrontier {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
@@ -1281,7 +1281,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1347,7 +1347,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)
@@ -1387,7 +1387,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.NormalOp:
+	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Processing:
 		t.Fatalf("Block should be processing")
@@ -1435,7 +1435,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.NormalOp)
+			config.Ctx.Start(snow.ExtendingFrontier)
 			return nil
 		},
 	)

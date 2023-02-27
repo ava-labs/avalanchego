@@ -49,7 +49,7 @@ func (c *Config) Context() *snow.ConsensusContext {
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
 func (c *Config) IsBootstrapped() bool {
-	return c.Ctx.GetChainState() == snow.NormalOp
+	return c.Ctx.GetChainState() == snow.ExtendingFrontier
 }
 
 // Shared among common.bootstrapper and snowman/avalanche bootstrapper

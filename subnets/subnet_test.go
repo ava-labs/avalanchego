@@ -41,7 +41,7 @@ func TestSingleChainSubnetFullySyncedWithStateSync(t *testing.T) {
 	tracker.StopState(chainID, snow.StateSyncing)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chainID, snow.NormalOp)
+	tracker.StartState(chainID, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 }
 
@@ -67,7 +67,7 @@ func TestSingleChainSubnetFullySyncedWithoutStateSync(t *testing.T) {
 	tracker.StopState(chainID, snow.Bootstrapping)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chainID, snow.NormalOp)
+	tracker.StartState(chainID, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 }
 
@@ -120,13 +120,13 @@ func TestMultipleChainsSubnetNoRestart(t *testing.T) {
 	tracker.StopState(chain1, snow.Bootstrapping)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chain0, snow.NormalOp)
+	tracker.StartState(chain0, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chain2, snow.NormalOp)
+	tracker.StartState(chain2, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chain1, snow.NormalOp)
+	tracker.StartState(chain1, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 }
 
@@ -178,10 +178,10 @@ func TestMultipleChainsSubnetWithRestart(t *testing.T) {
 	tracker.StopState(chain0, snow.Bootstrapping)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chain0, snow.NormalOp)
+	tracker.StartState(chain0, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 
-	tracker.StartState(chain1, snow.NormalOp)
+	tracker.StartState(chain1, snow.ExtendingFrontier)
 	require.True(tracker.IsSubnetSynced())
 }
 

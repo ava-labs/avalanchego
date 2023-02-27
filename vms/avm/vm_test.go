@@ -121,8 +121,8 @@ func NewContext(tb testing.TB) *snow.Context {
 }
 
 // Returns:
-//   1) tx in genesis that creates asset
-//   2) the index of the output
+//  1. tx in genesis that creates asset
+//  2. the index of the output
 func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
@@ -344,7 +344,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		tb.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -667,7 +667,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -820,7 +820,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1529,7 +1529,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1698,7 +1698,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1801,7 +1801,7 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1935,7 +1935,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}

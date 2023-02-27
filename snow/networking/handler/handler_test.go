@@ -309,7 +309,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	}
 	handler.SetConsensus(engine)
 	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.NormalOp) // assumed bootstrap is done
+	ctx.Start(snow.ExtendingFrontier) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -374,7 +374,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	}
 	handler.SetConsensus(engine)
 	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.NormalOp) // assumed bootstrap is done
+	ctx.Start(snow.ExtendingFrontier) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil

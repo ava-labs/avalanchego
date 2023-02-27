@@ -13,7 +13,8 @@ const (
 	Initializing = iota
 	StateSyncing
 	Bootstrapping
-	NormalOp
+	ExtendingFrontier
+	SubnetSynced
 )
 
 var ErrUnknownState = errors.New("unknown state")
@@ -28,8 +29,10 @@ func (st State) String() string {
 		return "State syncing state"
 	case Bootstrapping:
 		return "Bootstrapping state"
-	case NormalOp:
-		return "Normal operations state"
+	case ExtendingFrontier:
+		return "Extending frontier state"
+	case SubnetSynced:
+		return "Subnet synced state"
 	default:
 		return "Unknown state"
 	}

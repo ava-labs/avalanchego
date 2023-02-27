@@ -282,7 +282,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
-	case snow.NormalOp:
+	case snow.ExtendingFrontier:
 		return vm.onNormalOperationsStarted()
 	default:
 		return snow.ErrUnknownState

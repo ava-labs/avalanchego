@@ -348,6 +348,13 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
 		t.Ctx.Done(snow.StateSyncing)
+		if t.Ctx.IsSubnetSynced() {
+			t.Ctx.Start(snow.SubnetSynced)
+			if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
+				return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
+			}
+		}
+
 		return nil
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
@@ -412,8 +419,8 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	t.metrics.bootstrapFinished.Set(1)
 
 	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	t.Ctx.Start(snow.NormalOp)
-	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
+	t.Ctx.Start(snow.ExtendingFrontier)
+	if err := t.VM.SetState(ctx, snow.ExtendingFrontier); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}

@@ -230,7 +230,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -649,7 +649,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -797,7 +797,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1358,7 +1358,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
 
