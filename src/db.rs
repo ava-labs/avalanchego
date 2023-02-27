@@ -1,4 +1,6 @@
 use std::collections::VecDeque;
+use std::error::Error;
+use std::fmt;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 use std::thread::JoinHandle;
@@ -11,6 +13,7 @@ use typed_builder::TypedBuilder;
 use crate::account::{Account, AccountRLP, Blob, BlobStash};
 use crate::file;
 use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
+use crate::proof::Proof;
 use crate::storage::{CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared};
 pub use crate::storage::{DiskBufferConfig, WALConfig};
 
@@ -30,7 +33,17 @@ pub enum DBError {
     System(nix::Error),
     KeyNotFound,
     CreateError,
+    InvalidRangeProof,
 }
+
+impl fmt::Display for DBError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: fix this
+        write!(f, "{:?}", &self)
+    }
+}
+
+impl Error for DBError {}
 
 /// DBParams contains the constants that are fixed upon the creation of the DB, this ensures the
 /// correct parameters are used when the DB is opened later (the parameters here will override the
@@ -311,6 +324,24 @@ impl DBRev {
         Ok(match &**b {
             Blob::Code(code) => code.clone(),
         })
+    }
+
+    /// Provides a proof that a key is in the MPT.
+    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, DBError> {
+        self.merkle
+            .prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
+            .map_err(DBError::Merkle)
+    }
+
+    /// Verifies a range proof is valid for a set of keys.
+    pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
+        &self, proof: Proof, first_key: K, last_key: K, keys: Vec<K>, values: Vec<V>,
+    ) -> Result<bool, DBError> {
+        let hash: [u8; 32] = *self.kv_root_hash()?;
+        let valid = proof
+            .verify_range_proof(hash, first_key, last_key, keys, values)
+            .map_err(|_e| DBError::InvalidRangeProof)?;
+        Ok(valid)
     }
 
     /// Get nonce of the account.

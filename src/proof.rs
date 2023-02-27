@@ -1,3 +1,4 @@
+use crate::db::DBError;
 use crate::merkle::*;
 use crate::merkle_util::*;
 
@@ -36,6 +37,14 @@ impl From<DataStoreError> for ProofError {
             DataStoreError::InsertionError => ProofError::NodesInsertionError,
             DataStoreError::RootHashError => ProofError::InvalidNode,
             DataStoreError::ProofEmptyKeyValuesError => ProofError::EmptyKeyValues,
+            _ => ProofError::InvalidProof,
+        }
+    }
+}
+
+impl From<DBError> for ProofError {
+    fn from(d: DBError) -> ProofError {
+        match d {
             _ => ProofError::InvalidProof,
         }
     }

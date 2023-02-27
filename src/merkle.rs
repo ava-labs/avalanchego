@@ -8,6 +8,7 @@ use shale::{MemStore, MummyItem, ObjPtr, ObjRef, ShaleError, ShaleStore};
 use std::cell::Cell;
 use std::cmp;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
 
@@ -20,6 +21,15 @@ pub enum MerkleError {
     NotBranchNode,
     Format(std::io::Error),
 }
+
+impl fmt::Display for MerkleError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: fix this
+        write!(f, "{:?}", &self)
+    }
+}
+
+impl Error for MerkleError {}
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct Hash(pub [u8; 32]);
