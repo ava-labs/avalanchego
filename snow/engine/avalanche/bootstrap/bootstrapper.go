@@ -312,8 +312,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 	b.Ctx.Start(snow.Bootstrapping)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}
 
 	b.Config.SharedCfg.RequestID = startReqID

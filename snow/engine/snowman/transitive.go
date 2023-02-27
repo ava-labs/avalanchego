@@ -347,7 +347,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
-		t.Ctx.Log.Warn("received an StateSyncDone message from the VM when VM is already fully synced")
+		t.Ctx.Done(snow.StateSyncing)
 		return nil
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
