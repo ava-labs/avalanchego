@@ -413,25 +413,34 @@ func (n *Node) Dispatch() error {
  ******************************************************************************
  */
 
-func (n *Node) initDatabase() error {
-	// start the db manager
+func NewDatabaseManager(dbConfig DatabaseConfig, logger logging.Logger, reg prometheus.Registerer) (manager.Manager, error) {
 	var (
 		dbManager manager.Manager
 		err       error
 	)
-	switch n.Config.DatabaseConfig.Name {
+	switch dbConfig.Name {
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
+		dbManager, err = manager.NewLevelDB(dbConfig.Path, dbConfig.Config, logger, version.CurrentDatabase, "db_internal", reg)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s}",
-			n.Config.DatabaseConfig.Name,
+			dbConfig.Name,
 			leveldb.Name,
 			memdb.Name,
 		)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	return dbManager, nil
+}
+
+func (n *Node) initDatabase() error {
+	// start the db manager
+	dbManager, err := NewDatabaseManager(n.Config.DatabaseConfig, n.Log, n.MetricsRegisterer)
 	if err != nil {
 		return err
 	}
