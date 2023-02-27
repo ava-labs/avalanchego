@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -31,9 +30,6 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
-
-	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	bootstrappingDelay = 10 * time.Second
 )
 
 var (
@@ -110,8 +106,6 @@ type bootstrapper struct {
 	processedCache *cache.LRU[ids.ID, struct{}]
 	// number of state transitions executed
 	executedStateTransitions int
-
-	awaitingTimeout bool
 }
 
 func (b *bootstrapper) Clear() error {
@@ -295,16 +289,8 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (b *bootstrapper) Timeout(ctx context.Context) error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.Ctx.IsSubnetSynced() {
-		return b.Restart(ctx, true)
-	}
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+func (*bootstrapper) Timeout(_ context.Context) error {
+	return errUnexpectedTimeout
 }
 
 func (*bootstrapper) Gossip(context.Context) error {
@@ -544,7 +530,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.IsBootstrapped() || len(pendingJobs) > 0 {
 		return nil
 	}
 
@@ -596,20 +582,5 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// Notify the subnet that this chain is synced
 	b.Config.Ctx.Done(snow.Bootstrapping)
 	b.processedCache.Flush()
-
-	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing.
-	if !b.Config.Ctx.IsSubnetSynced() {
-		if !b.Config.SharedCfg.Restarted {
-			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
-		} else {
-			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
-		}
-		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
-		// on the latest tip.
-		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
-		b.awaitingTimeout = true
-		return nil
-	}
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

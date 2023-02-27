@@ -22,7 +22,6 @@ type Config struct {
 	StartupTracker tracker.Startup
 	Sender         Sender
 	Bootstrapable  Bootstrapable
-	Timer          Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

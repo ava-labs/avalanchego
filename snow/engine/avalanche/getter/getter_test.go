@@ -38,7 +38,6 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

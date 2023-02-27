@@ -59,7 +59,6 @@ func testSetup(
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

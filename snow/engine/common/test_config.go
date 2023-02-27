@@ -26,7 +26,6 @@ func DefaultConfigTest(t *testing.T) Config {
 		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
-		Timer:                          &TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &SharedConfig{},

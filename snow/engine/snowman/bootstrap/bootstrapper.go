@@ -25,9 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// Parameters for delaying bootstrapping to avoid potential CPU burns
-const bootstrappingDelay = 10 * time.Second
-
 var (
 	_ common.BootstrapableEngine = (*bootstrapper)(nil)
 
@@ -64,8 +61,6 @@ type bootstrapper struct {
 	executedStateTransitions int
 
 	parser *parser
-
-	awaitingTimeout bool
 
 	// fetchFrom is the set of nodes that we can fetch the next container from.
 	// When a container is fetched, the nodeID is removed from [fetchFrom] to
@@ -272,17 +267,8 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return nil
 }
 
-func (b *bootstrapper) Timeout(ctx context.Context) error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.Ctx.IsSubnetSynced() {
-		return b.Restart(ctx, true)
-	}
-	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+func (*bootstrapper) Timeout(_ context.Context) error {
+	return errUnexpectedTimeout
 }
 
 func (*bootstrapper) Gossip(context.Context) error {
@@ -543,7 +529,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.IsBootstrapped() {
 		return nil
 	}
 
@@ -589,21 +575,6 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 
 	// Notify the subnet that this chain is synced
 	b.Config.Ctx.Done(snow.Bootstrapping)
-
-	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing.
-	if !b.Config.Ctx.IsSubnetSynced() {
-		if !b.Config.SharedCfg.Restarted {
-			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
-		} else {
-			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
-		}
-		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
-		// on the latest tip.
-		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
-		b.awaitingTimeout = true
-		return nil
-	}
 	b.fetchETA.Set(0)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

@@ -72,7 +72,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		Alpha:                          peers.Weight()/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
