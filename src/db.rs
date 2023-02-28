@@ -13,7 +13,7 @@ use typed_builder::TypedBuilder;
 use crate::account::{Account, AccountRLP, Blob, BlobStash};
 use crate::file;
 use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
-use crate::proof::Proof;
+use crate::proof::{Proof, ProofError};
 use crate::storage::{CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared};
 pub use crate::storage::{DiskBufferConfig, WALConfig};
 
@@ -33,13 +33,20 @@ pub enum DBError {
     System(nix::Error),
     KeyNotFound,
     CreateError,
-    InvalidRangeProof,
+    InvalidRangeProof(ProofError),
 }
 
 impl fmt::Display for DBError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: fix this
-        write!(f, "{:?}", &self)
+        match self {
+            DBError::InvalidParams => write!(f, "invalid parameters provided"),
+            DBError::Merkle(e) => write!(f, "merkle error: {e:?}"),
+            DBError::Blob(e) => write!(f, "storage error: {e:?}"),
+            DBError::System(e) => write!(f, "system error: {e:?}"),
+            DBError::KeyNotFound => write!(f, "not found"),
+            DBError::CreateError => write!(f, "database create error"),
+            DBError::InvalidRangeProof(e) => write!(f, "invalid range proof: {e:?}"),
+        }
     }
 }
 
@@ -340,7 +347,7 @@ impl DBRev {
         let hash: [u8; 32] = *self.kv_root_hash()?;
         let valid = proof
             .verify_range_proof(hash, first_key, last_key, keys, values)
-            .map_err(|_e| DBError::InvalidRangeProof)?;
+            .map_err(|e| DBError::InvalidRangeProof(e))?;
         Ok(valid)
     }
 
@@ -1053,4 +1060,10 @@ impl<'a> Drop for WriteBatch<'a> {
             self.m.staging.blob.meta.take_delta();
         }
     }
+}
+
+#[test]
+fn test_proof_error() {
+    let e = DBError::InvalidRangeProof(ProofError::InvalidNode).to_string();
+    assert_eq!(e, "invalid range proof: InvalidNode");
 }

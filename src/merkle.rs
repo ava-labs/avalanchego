@@ -24,8 +24,12 @@ pub enum MerkleError {
 
 impl fmt::Display for MerkleError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: fix this
-        write!(f, "{:?}", &self)
+        match self {
+            MerkleError::Shale(e) => write!(f, "merkle datastore error: {e:?}"),
+            MerkleError::ReadOnly => write!(f, "error: read only"),
+            MerkleError::NotBranchNode => write!(f, "error: node is not a branch node"),
+            MerkleError::Format(e) => write!(f, "format error: {e:?}"),
+        }
     }
 }
 

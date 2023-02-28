@@ -8,6 +8,7 @@ use shale::ObjPtr;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 
 /// Hash -> RLP encoding map
 #[derive(Serialize, Deserialize)]
@@ -45,7 +46,34 @@ impl From<DataStoreError> for ProofError {
 impl From<DBError> for ProofError {
     fn from(d: DBError) -> ProofError {
         match d {
-            _ => ProofError::InvalidProof,
+            DBError::InvalidParams => ProofError::InvalidProof,
+            DBError::Merkle(_e) => ProofError::InvalidNode,
+            DBError::Blob(_e) => ProofError::InvalidNode,
+            DBError::System(_e) => ProofError::InvalidNode,
+            DBError::KeyNotFound => ProofError::InvalidEdgeKeys,
+            DBError::CreateError => ProofError::NoSuchNode,
+            DBError::InvalidRangeProof(_e) => ProofError::InvalidProof,
+        }
+    }
+}
+
+impl fmt::Display for ProofError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ProofError::DecodeError => write!(f, "decoding"),
+            ProofError::NoSuchNode => write!(f, "no such node"),
+            ProofError::ProofNodeMissing => write!(f, "proof node missing"),
+            ProofError::InconsistentProofData => write!(f, "inconsistent proof data"),
+            ProofError::NonMonotonicIncreaseRange => write!(f, "nonmonotonic range increase"),
+            ProofError::RangeHasDeletion => write!(f, "range has deletion"),
+            ProofError::InvalidProof => write!(f, "invalid proof"),
+            ProofError::InvalidEdgeKeys => write!(f, "invalid edge keys"),
+            ProofError::InconsistentEdgeKeys => write!(f, "inconsistent edge keys"),
+            ProofError::NodesInsertionError => write!(f, "node insertion error"),
+            ProofError::NodeNotInTrie => write!(f, "node not in trie"),
+            ProofError::InvalidNode => write!(f, "invalid node"),
+            ProofError::EmptyRange => write!(f, "empty range"),
+            ProofError::EmptyKeyValues => write!(f, "empty keys or values provided"),
         }
     }
 }
