@@ -26,7 +26,6 @@ func TestNewOnEvictCache(t *testing.T) {
 	require.Equal(maxSize, cache.maxSize)
 	require.NotNil(cache.lru)
 	require.Equal(0, cache.lru.Len())
-	require.NotNil(cache.cache)
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
 	err := cache.onEviction(0)
