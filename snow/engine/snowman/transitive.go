@@ -348,7 +348,7 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		return t.buildBlocks(ctx)
 	case common.StateSyncDone:
 		t.Ctx.Done(snow.StateSyncing)
-		if t.Ctx.IsSubnetSynced() {
+		if t.Ctx.IsSynced() {
 			t.Ctx.Start(snow.SubnetSynced)
 			if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
 				return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)

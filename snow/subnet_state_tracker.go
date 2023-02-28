@@ -10,10 +10,10 @@ import (
 // SubnetStateTracker describes the standard interface for tracking the status of
 // a subnet syncing
 type SubnetStateTracker interface {
-	// IsSubnetSynced returns true iff all subnet chains have complete syncing.
+	// IsSynced returns true iff all subnet chains have complete syncing.
 	// A subnet is fully synced if all chains have completed bootstrap
 	// and state synced chains have completed state sync too-
-	IsSubnetSynced() bool
+	IsSynced() bool
 
 	StartState(chainID ids.ID, state State)
 	StopState(chainID ids.ID, state State)

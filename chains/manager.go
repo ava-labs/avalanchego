@@ -1072,7 +1072,7 @@ func (m *manager) IsFullySynced(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().IsSubnetSynced()
+	return chain.Context().IsSynced()
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
@@ -1081,7 +1081,7 @@ func (m *manager) subnetsNotBootstrapped() []ids.ID {
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
-		if !subnet.IsSubnetSynced() {
+		if !subnet.IsSynced() {
 			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
 		}
 	}

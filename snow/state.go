@@ -5,8 +5,6 @@ package snow
 
 import (
 	"errors"
-
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 const (
@@ -36,9 +34,4 @@ func (st State) String() string {
 	default:
 		return "Unknown state"
 	}
-}
-
-type EngineState struct {
-	Type  p2p.EngineType
-	State State
 }

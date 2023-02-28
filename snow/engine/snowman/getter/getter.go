@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
-// Get requests are always served, regardless node state (bootstrapping or normal operations).
+// Get requests are always served, whether node has fully synced or not.
 var _ common.AllGetsServer = (*getter)(nil)
 
 func New(

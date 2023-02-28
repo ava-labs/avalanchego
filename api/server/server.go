@@ -368,7 +368,7 @@ func lockMiddleware(
 // not fully synced, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
-		if !ctx.IsSubnetSynced() {
+		if !ctx.IsSynced() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
 			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
