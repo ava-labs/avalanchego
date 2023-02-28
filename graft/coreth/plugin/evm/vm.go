@@ -5,7 +5,6 @@ package evm
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -138,11 +137,10 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey        = []byte("last_accepted_key")
-	acceptedPrefix         = []byte("snowman_accepted")
-	metadataPrefix         = []byte("metadata")
-	ethDBPrefix            = []byte("ethdb")
-	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
+	lastAcceptedKey = []byte("last_accepted_key")
+	acceptedPrefix  = []byte("snowman_accepted")
+	metadataPrefix  = []byte("metadata")
+	ethDBPrefix     = []byte("ethdb")
 
 	// Prefixes for atomic trie
 	atomicTrieDBPrefix     = []byte("atomicTrieDB")
@@ -908,30 +906,6 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		}
 	}
 	return batchContribution, batchGasUsed, nil
-}
-
-func (vm *VM) pruneChain() error {
-	if !vm.config.Pruning {
-		return nil
-	}
-	pruned, err := vm.db.Has(pruneRejectedBlocksKey)
-	if err != nil {
-		return fmt.Errorf("failed to check if the VM has pruned rejected blocks: %w", err)
-	}
-	if pruned {
-		return nil
-	}
-
-	lastAcceptedHeight := vm.LastAcceptedBlock().Height()
-	if err := vm.blockChain.RemoveRejectedBlocks(0, lastAcceptedHeight); err != nil {
-		return err
-	}
-	heightBytes := make([]byte, 8)
-	binary.PutUvarint(heightBytes, lastAcceptedHeight)
-	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err != nil {
-		return err
-	}
-	return vm.db.Commit()
 }
 
 func (vm *VM) SetState(_ context.Context, state snow.State) error {

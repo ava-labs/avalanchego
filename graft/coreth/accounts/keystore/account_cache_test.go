@@ -61,7 +61,9 @@ var (
 )
 
 func TestWatchNewFile(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	t.Parallel()
 
 	dir, ks := tmpKeyStore(t, false)
@@ -326,7 +328,9 @@ func waitForAccounts(wantAccounts []accounts.Account, ks *KeyStore) error {
 // TestUpdatedKeyfileContents tests that updating the contents of a keystore file
 // is noticed by the watcher, and the account cache is updated accordingly
 func TestUpdatedKeyfileContents(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	t.Parallel()
 
 	// Create a temporary keystore to test with

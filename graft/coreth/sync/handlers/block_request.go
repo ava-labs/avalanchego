@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 
-	"github.com/ava-labs/coreth/peer"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,7 +25,6 @@ const parentLimit = uint16(64)
 // serving requested blocks starting at specified hash
 type BlockRequestHandler struct {
 	stats         stats.BlockRequestHandlerStats
-	network       peer.Network
 	blockProvider BlockProvider
 	codec         codec.Manager
 }

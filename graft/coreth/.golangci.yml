@@ -8,11 +8,11 @@ run:
   skip-dirs-use-default: true
   skip-files:
     - core/genesis_alloc.go
+    - precompile/
 
 linters:
   disable-all: true
   enable:
-    - deadcode
     - goconst
     - goimports
     - gosimple
@@ -20,7 +20,7 @@ linters:
     - ineffassign
     - misspell
     - unconvert
-    - varcheck
+    - unused
     - whitespace
 
 linters-settings:
@@ -29,21 +29,3 @@ linters-settings:
   goconst:
     min-len: 3 # minimum length of string constant
     min-occurrences: 6 # minimum number of occurrences
-
-issues:
-  exclude-rules:
-    - path: crypto/blake2b/
-      linters:
-        - deadcode
-    - path: crypto/bn256/cloudflare
-      linters:
-        - deadcode
-    - path: p2p/discv5/
-      linters:
-        - deadcode
-    - path: core/vm/instructions_test.go
-      linters:
-        - goconst
-    - path: cmd/faucet/
-      linters:
-        - deadcode
