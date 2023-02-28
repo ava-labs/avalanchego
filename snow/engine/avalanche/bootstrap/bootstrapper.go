@@ -579,15 +579,6 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
-
-	// Notify the subnet that this chain is synced
 	b.Config.Ctx.Done(snow.Bootstrapping)
-	if b.Ctx.IsSynced() {
-		b.Ctx.Start(snow.SubnetSynced)
-		if err := b.VM.SetState(ctx, snow.SubnetSynced); err != nil {
-			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
-		}
-	}
-
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

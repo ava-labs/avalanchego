@@ -424,6 +424,12 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
+	if t.Ctx.IsSynced() {
+		t.Ctx.Start(snow.SubnetSynced)
+		if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
+			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
+		}
+	}
 	return nil
 }
 
