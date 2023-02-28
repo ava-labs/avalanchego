@@ -10,6 +10,7 @@ use shale::ObjPtr;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
 
 /// Hash -> RLP encoding map
@@ -84,6 +85,8 @@ impl fmt::Display for ProofError {
         }
     }
 }
+
+impl Error for ProofError {}
 
 const EXT_NODE_SIZE: usize = 2;
 const BRANCH_NODE_SIZE: usize = 17;
