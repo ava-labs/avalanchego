@@ -179,18 +179,15 @@ func (u *unaryNode) DecidedPrefix() int {
 	return u.decidedPrefix
 }
 
-//nolint:gofmt,gofmpt,gofumpt,goimports // this comment is formatted as intended
-//
 // This is by far the most complicated function in this algorithm.
 // The intuition is that this instance represents a series of consecutive unary
 // snowball instances, and this function's purpose is convert one of these unary
 // snowball instances into a binary snowball instance.
 // There are 5 possible cases.
+// 1. None of these instances should be split, we should attempt to split a
+//    child
 //
-//  1. None of these instances should be split, we should attempt to split a
-//     child
-//
-//     For example, attempting to insert the value "00001" in this node:
+//        For example, attempting to insert the value "00001" in this node:
 //
 //                       +-------------------+ <-- This node will not be split
 //                       |                   |
@@ -200,7 +197,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                                 ^
 //                                 |
 //
-//     Results in:
+//        Results in:
 //
 //                       +-------------------+
 //                       |                   |
@@ -210,14 +207,13 @@ func (u *unaryNode) DecidedPrefix() int {
 //                                 ^
 //                                 |
 //
-//  2. This instance represents a series of only one unary instance and it must
-//     be split.
+// 2. This instance represents a series of only one unary instance and it must
+//    be split
+//       This will return a binary choice, with one child the same as my child,
+//       and another (possibly nil child) representing a new chain to the end of
+//       the hash
 //
-//     This will return a binary choice, with one child the same as my child,
-//     and another (possibly nil child) representing a new chain to the end of
-//     the hash
-//
-//     For example, attempting to insert the value "1" in this tree:
+//        For example, attempting to insert the value "1" in this tree:
 //
 //                       +-------------------+
 //                       |                   |
@@ -225,7 +221,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |                   |
 //                       +-------------------+
 //
-//     Results in:
+//        Results in:
 //
 //                       +-------------------+
 //                       |         |         |
@@ -233,13 +229,12 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |         |         |
 //                       +-------------------+
 //
-//  3. This instance must be split on the first bit
+// 3. This instance must be split on the first bit
+//       This will return a binary choice, with one child equal to this instance
+//       with decidedPrefix increased by one, and another representing a new
+//       chain to the end of the hash
 //
-//     This will return a binary choice, with one child equal to this instance
-//     with decidedPrefix increased by one, and another representing a new
-//     chain to the end of the hash
-//
-//     For example, attempting to insert the value "10" in this tree:
+//        For example, attempting to insert the value "10" in this tree:
 //
 //                       +-------------------+
 //                       |                   |
@@ -247,7 +242,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |                   |
 //                       +-------------------+
 //
-//     Results in:
+//        Results in:
 //
 //                       +-------------------+
 //                       |         |         |
@@ -262,14 +257,13 @@ func (u *unaryNode) DecidedPrefix() int {
 //            |                   | |                   |
 //            +-------------------+ +-------------------+
 //
-//  4. This instance must be split on the last bit
+// 4. This instance must be split on the last bit
+//       This will modify this unary choice. The commonPrefix is decreased by
+//       one. The child is set to a binary instance that has a child equal to
+//       the current child and another child equal to a new unary instance to
+//       the end of the hash
 //
-//     This will modify this unary choice. The commonPrefix is decreased by
-//     one. The child is set to a binary instance that has a child equal to
-//     the current child and another child equal to a new unary instance to
-//     the end of the hash
-//
-//     For example, attempting to insert the value "01" in this tree:
+//        For example, attempting to insert the value "01" in this tree:
 //
 //                       +-------------------+
 //                       |                   |
@@ -277,7 +271,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |                   |
 //                       +-------------------+
 //
-//     Results in:
+//        Results in:
 //
 //                       +-------------------+
 //                       |                   |
@@ -292,15 +286,14 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |         |         |
 //                       +-------------------+
 //
-//  5. This instance must be split on an interior bit
+// 5. This instance must be split on an interior bit
+//       This will modify this unary choice. The commonPrefix is set to the
+//       interior bit. The child is set to a binary instance that has a child
+//       equal to this unary choice with the decidedPrefix equal to the interior
+//       bit and another child equal to a new unary instance to the end of the
+//       hash
 //
-//     This will modify this unary choice. The commonPrefix is set to the
-//     interior bit. The child is set to a binary instance that has a child
-//     equal to this unary choice with the decidedPrefix equal to the interior
-//     bit and another child equal to a new unary instance to the end of the
-//     hash
-//
-//     For example, attempting to insert the value "010" in this tree:
+//        For example, attempting to insert the value "010" in this tree:
 //
 //                       +-------------------+
 //                       |                   |
@@ -308,7 +301,7 @@ func (u *unaryNode) DecidedPrefix() int {
 //                       |                   |
 //                       +-------------------+
 //
-//     Results in:
+//        Results in:
 //
 //                       +-------------------+
 //                       |                   |

@@ -88,7 +88,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db
 		}
 
 		if err := changeProof.Verify(ctx, db, req.Start, req.End, req.EndingRoot); err != nil {
-			return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
+			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
 		return changeProof, nil
 	}
@@ -116,7 +116,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *RangeProofRequest) (*me
 			req.End,
 			req.Root,
 		); err != nil {
-			return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
+			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
 		return rangeProof, nil
 	}
@@ -143,7 +143,7 @@ func getAndParse[T any](ctx context.Context, client *client, request Request, pa
 		// If the context has finished, return the context error early.
 		if err := ctx.Err(); err != nil {
 			if lastErr != nil {
-				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %w", attempt, lastErr, err)
+				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %s", attempt, lastErr, err)
 			}
 			return nil, err
 		}

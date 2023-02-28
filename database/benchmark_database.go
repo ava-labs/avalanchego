@@ -99,6 +99,7 @@ func BenchmarkPut(b *testing.B, db Database, name string, keys, values [][]byte)
 }
 
 // BenchmarkDelete measures the time it takes to delete a (k, v) from a database.
+//nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
 	if count == 0 {
@@ -126,6 +127,7 @@ func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]by
 }
 
 // BenchmarkBatchPut measures the time it takes to batch put.
+//nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkBatchPut(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
 	if count == 0 {
@@ -143,6 +145,7 @@ func BenchmarkBatchPut(b *testing.B, db Database, name string, keys, values [][]
 }
 
 // BenchmarkBatchDelete measures the time it takes to batch delete.
+//nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkBatchDelete(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
 	if count == 0 {
@@ -160,6 +163,7 @@ func BenchmarkBatchDelete(b *testing.B, db Database, name string, keys, values [
 }
 
 // BenchmarkBatchWrite measures the time it takes to batch write.
+//nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkBatchWrite(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
 	if count == 0 {
@@ -233,6 +237,7 @@ func BenchmarkParallelPut(b *testing.B, db Database, name string, keys, values [
 }
 
 // BenchmarkParallelDelete measures the time it takes to delete a (k, v) from the db.
+//nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkParallelDelete(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
 	if count == 0 {

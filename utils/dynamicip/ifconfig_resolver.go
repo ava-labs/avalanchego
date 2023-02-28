@@ -4,7 +4,6 @@
 package dynamicip
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -20,12 +19,7 @@ type ifConfigResolver struct {
 }
 
 func (r *ifConfigResolver) Resolve() (net.IP, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", r.url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Get(r.url)
 	if err != nil {
 		return nil, err
 	}

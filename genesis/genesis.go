@@ -187,7 +187,6 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 // loads the network genesis data from the config at [filepath].
 //
 // FromFile returns:
-//
 //  1. The byte representation of the genesis state of the platform chain
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
@@ -229,7 +228,6 @@ func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]b
 // loads the network genesis data from [genesisContent].
 //
 // FromFlag returns:
-//
 //  1. The byte representation of the genesis state of the platform chain
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
@@ -256,7 +254,6 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 }
 
 // FromConfig returns:
-//
 //  1. The byte representation of the genesis state of the platform chain
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
