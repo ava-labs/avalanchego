@@ -298,7 +298,7 @@ func {{decapitalise $contract.Type}}Fallback (accessibleState contract.Accessibl
 {{- end}}
 
 // create{{.Contract.Type}}Precompile returns a StatefulPrecompiledContract with getters and setters for the precompile.
-{{- if .Contract.AllowList}} // Access to the getters/setters is controlled by an allow list for ContractAddress.{{end}}
+{{if .Contract.AllowList}} // Access to the getters/setters is controlled by an allow list for ContractAddress.{{end}}
 func create{{.Contract.Type}}Precompile() contract.StatefulPrecompiledContract {
 	var functions []*contract.StatefulPrecompileFunction
 	{{- if .Contract.AllowList}}
