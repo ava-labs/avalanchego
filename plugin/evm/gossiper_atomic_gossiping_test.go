@@ -5,6 +5,7 @@ package evm
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -148,7 +149,9 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 // show that txs already marked as invalid are not re-requested on gossiping
 func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")

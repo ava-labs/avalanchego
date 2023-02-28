@@ -27,7 +27,6 @@
 package tests
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -43,8 +42,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // StateTest checks transaction processing without block context.
@@ -144,10 +141,6 @@ func (t *StateTest) Subtests() []StateSubtest {
 	return sub
 }
 
-func (t *StateTest) gasLimit(subtest StateSubtest) uint64 {
-	return t.json.Tx.GasLimit[t.json.Post[subtest.Fork][subtest.Index].Indexes.Gas]
-}
-
 func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter bool) (*snapshot.Tree, *state.StateDB) {
 	sdb := state.NewDatabase(db)
 	statedb, _ := state.New(common.Hash{}, sdb, nil)
@@ -168,89 +161,4 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 	}
 	statedb, _ = state.New(root, sdb, snaps)
 	return snaps, statedb
-}
-
-func (t *StateTest) genesis(config *params.ChainConfig) *core.Genesis {
-	return &core.Genesis{
-		Config:     config,
-		Coinbase:   t.json.Env.Coinbase,
-		Difficulty: t.json.Env.Difficulty,
-		GasLimit:   t.json.Env.GasLimit,
-		Number:     t.json.Env.Number,
-		Timestamp:  t.json.Env.Timestamp,
-		Alloc:      t.json.Pre,
-	}
-}
-
-func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Message, error) {
-	// Derive sender from private key if present.
-	var from common.Address
-	if len(tx.PrivateKey) > 0 {
-		key, err := crypto.ToECDSA(tx.PrivateKey)
-		if err != nil {
-			return nil, fmt.Errorf("invalid private key: %v", err)
-		}
-		from = crypto.PubkeyToAddress(key.PublicKey)
-	}
-	// Parse recipient if present.
-	var to *common.Address
-	if tx.To != "" {
-		to = new(common.Address)
-		if err := to.UnmarshalText([]byte(tx.To)); err != nil {
-			return nil, fmt.Errorf("invalid to address: %v", err)
-		}
-	}
-
-	// Get values specific to this post state.
-	if ps.Indexes.Data > len(tx.Data) {
-		return nil, fmt.Errorf("tx data index %d out of bounds", ps.Indexes.Data)
-	}
-	if ps.Indexes.Value > len(tx.Value) {
-		return nil, fmt.Errorf("tx value index %d out of bounds", ps.Indexes.Value)
-	}
-	if ps.Indexes.Gas > len(tx.GasLimit) {
-		return nil, fmt.Errorf("tx gas limit index %d out of bounds", ps.Indexes.Gas)
-	}
-	dataHex := tx.Data[ps.Indexes.Data]
-	valueHex := tx.Value[ps.Indexes.Value]
-	gasLimit := tx.GasLimit[ps.Indexes.Gas]
-	// Value, Data hex encoding is messy: https://github.com/ethereum/tests/issues/203
-	value := new(big.Int)
-	if valueHex != "0x" {
-		v, ok := math.ParseBig256(valueHex)
-		if !ok {
-			return nil, fmt.Errorf("invalid tx value %q", valueHex)
-		}
-		value = v
-	}
-	data, err := hex.DecodeString(strings.TrimPrefix(dataHex, "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid tx data %q", dataHex)
-	}
-	var accessList types.AccessList
-	if tx.AccessLists != nil && tx.AccessLists[ps.Indexes.Data] != nil {
-		accessList = *tx.AccessLists[ps.Indexes.Data]
-	}
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	gasPrice := tx.GasPrice
-	if baseFee != nil {
-		if tx.MaxFeePerGas == nil {
-			tx.MaxFeePerGas = gasPrice
-		}
-		if tx.MaxFeePerGas == nil {
-			tx.MaxFeePerGas = new(big.Int)
-		}
-		if tx.MaxPriorityFeePerGas == nil {
-			tx.MaxPriorityFeePerGas = tx.MaxFeePerGas
-		}
-		gasPrice = math.BigMin(new(big.Int).Add(tx.MaxPriorityFeePerGas, baseFee),
-			tx.MaxFeePerGas)
-	}
-	if gasPrice == nil {
-		return nil, fmt.Errorf("no gas price provided")
-	}
-
-	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, gasPrice,
-		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, false)
-	return msg, nil
 }

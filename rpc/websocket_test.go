@@ -35,6 +35,7 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -240,7 +241,9 @@ func TestClientWebsocketLargeMessage(t *testing.T) {
 }
 
 func TestClientWebsocketSevered(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	t.Parallel()
 
 	var (

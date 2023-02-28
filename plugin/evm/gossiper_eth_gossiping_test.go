@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -82,7 +83,9 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*type
 // to ease up UT, which target only VM behaviors in response to coreth mempool
 // signals
 func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -168,7 +171,9 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 
 // show that locally issued eth txs are chunked correctly
 func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -228,7 +233,9 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 // show that a geth tx discovered from gossip is requested to the same node that
 // gossiped it
 func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
