@@ -1554,13 +1554,11 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 // Ensure that Accepting a PostForkBlock (A) containing core block (X) causes
 // core block (Y) and (Z) to also be rejected.
 //
-//	  G
-//	/   \
-//
-// A(X)   B(Y)
-//
-//	 |
-//	C(Z)
+//	     G
+//	   /   \
+//	A(X)   B(Y)
+//	        |
+//	       C(Z)
 func TestTwoForks_OneIsAccepted(t *testing.T) {
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)

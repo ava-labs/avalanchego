@@ -347,8 +347,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 		tx.vm.ctx,
 		tx.vm.parser.Codec(),
 		tx.vm.feeAssetID,
-		tx.vm.TxFee,
-		tx.vm.CreateAssetTxFee,
+		&tx.vm.Config,
 		len(tx.vm.fxs),
 	)
 	return tx.validity

@@ -59,6 +59,7 @@ type Staker struct {
 }
 
 // A *Staker is considered to be less than another *Staker when:
+//
 //  1. If its NextTime is before the other's.
 //  2. If the NextTimes are the same, the *Staker with the lesser priority is the
 //     lesser one.

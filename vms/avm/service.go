@@ -440,8 +440,10 @@ type GetAllBalancesReply struct {
 }
 
 // GetAllBalances returns a map where:
-//   Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
-//   Value: The balance of the asset held by the address
+//
+// Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
+// Value: The balance of the asset held by the address
+//
 // If ![args.IncludePartial], returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.

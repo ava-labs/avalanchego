@@ -67,13 +67,16 @@ func (b Bits) Contains(i int) bool {
 	return b.bits.Bit(i) == 1
 }
 
-// Len returns the bit length of this bitset
-func (b Bits) Len() int {
+// BitLen returns the bit length of this bitset
+func (b Bits) BitLen() int {
 	return b.bits.BitLen()
 }
 
-// HammingWeight returns the amount of 1's in the bitset
-func (b Bits) HammingWeight() int {
+// Len returns the amount of 1's in the bitset
+//
+// This is typically referred to as the "Hamming Weight"
+// of a set of bits.
+func (b Bits) Len() int {
 	result := 0
 	for _, word := range b.bits.Bits() {
 		result += bits.OnesCount(uint(word))

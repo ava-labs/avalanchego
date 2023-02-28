@@ -82,12 +82,13 @@ func GetAncestors(
 		// Ensure response size isn't too large. Include wrappers.IntLen because
 		// the size of the message is included with each container, and the size
 		// is repr. by an int.
-		if newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen; newLen <= maxBlocksSize {
-			ancestorsBytes = append(ancestorsBytes, blkBytes)
-			ancestorsBytesLen = newLen
-		} else { // reached maximum response size
+		newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen
+		if newLen > maxBlocksSize {
+			// reached maximum response size
 			break
 		}
+		ancestorsBytes = append(ancestorsBytes, blkBytes)
+		ancestorsBytesLen = newLen
 	}
 
 	return ancestorsBytes, nil

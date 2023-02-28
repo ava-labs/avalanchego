@@ -299,6 +299,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 }
 
 // createChain creates and starts the chain
+//
 // Note: it is expected for the subnet to already have the chain registered as
 // bootstrapping before this function is called
 func (m *manager) createChain(chainParams ChainParameters) {
@@ -448,6 +449,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			SubnetID:  chainParams.SubnetID,
 			ChainID:   chainParams.ID,
 			NodeID:    m.NodeID,
+			PublicKey: bls.PublicFromSecretKey(m.StakingBLSKey),
 
 			XChainID:    m.XChainID,
 			CChainID:    m.CChainID,

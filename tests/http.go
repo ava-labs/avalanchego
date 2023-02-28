@@ -5,6 +5,7 @@ package tests
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -47,10 +48,16 @@ func GetMetricsValue(url string, metrics ...string) (map[string]float64, error) 
 }
 
 func getHTTPLines(url string) ([]string, error) {
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	rd := bufio.NewReader(resp.Body)
 	lines := []string{}
 	for {
@@ -59,6 +66,7 @@ func getHTTPLines(url string) ([]string, error) {
 			if err == io.EOF {
 				break
 			}
+			_ = resp.Body.Close()
 			return nil, err
 		}
 		lines = append(lines, strings.TrimSpace(line))

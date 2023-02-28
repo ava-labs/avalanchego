@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -35,6 +36,7 @@ type Context struct {
 	SubnetID  ids.ID
 	ChainID   ids.ID
 	NodeID    ids.NodeID
+	PublicKey *bls.PublicKey
 
 	XChainID    ids.ID
 	CChainID    ids.ID

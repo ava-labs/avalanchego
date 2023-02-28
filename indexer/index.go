@@ -293,9 +293,10 @@ func (i *index) GetLastAccepted() (Container, error) {
 
 // Assumes i.lock is held
 // Returns:
-// 1) The index of the most recently accepted transaction,
-//    or 0 if no transactions have been accepted
-// 2) Whether at least 1 transaction has been accepted
+//
+//  1. The index of the most recently accepted transaction, or 0 if no
+//     transactions have been accepted
+//  2. Whether at least 1 transaction has been accepted
 func (i *index) lastAcceptedIndex() (uint64, bool) {
 	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
 }
