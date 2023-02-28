@@ -219,7 +219,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 		}},
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -265,7 +265,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 		}},
 	}
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")
 	}
 }

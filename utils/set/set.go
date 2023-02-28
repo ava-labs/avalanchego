@@ -134,6 +134,8 @@ func (s Set[T]) CappedList(size int) []T {
 
 // Equals returns true if the sets contain the same elements
 func (s Set[T]) Equals(other Set[T]) bool {
+	// Using maps.Equals makes the build not work for some reason so do this
+	// manually.
 	if s.Len() != other.Len() {
 		return false
 	}

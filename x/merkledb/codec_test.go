@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // TODO add more codec tests
@@ -20,7 +21,7 @@ import (
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
-	val := make([]byte, r.Intn(32)) // #nosec G404
+	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404
 
 	children := map[byte]ids.ID{}
@@ -31,8 +32,10 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 			children[byte(j)] = childID
 		}
 	}
-
-	if len(val) == 0 {
+	// use the hash instead when length is greater than the hash length
+	if len(val) >= HashLength {
+		val = hashing.ComputeHash256(val)
+	} else if len(val) == 0 {
 		// We do this because when we encode a value of []byte{} we will later
 		// decode it as nil.
 		// Doing this prevents inconsistency when comparing the encoded and
@@ -41,10 +44,11 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 		// variable on the struct
 		val = nil
 	}
+
 	return ProofNode{
-		KeyPath:  newPath(key).Serialize(),
-		Value:    Some(val),
-		Children: children,
+		KeyPath:     newPath(key).Serialize(),
+		ValueOrHash: Some(val),
+		Children:    children,
 	}
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -26,7 +25,7 @@ type builderWithOptions struct {
 // given options by default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
-//     opterations.
+//     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
 func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
@@ -55,7 +54,7 @@ func (b *builderWithOptions) GetImportableBalance(
 }
 
 func (b *builderWithOptions) NewAddValidatorTx(
-	vdr *validator.Validator,
+	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -69,7 +68,7 @@ func (b *builderWithOptions) NewAddValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
@@ -91,7 +90,7 @@ func (b *builderWithOptions) RemoveSubnetValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddDelegatorTx(
-	vdr *validator.Validator,
+	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
@@ -191,7 +190,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 }
 
 func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
@@ -211,7 +210,7 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,

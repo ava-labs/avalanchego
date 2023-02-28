@@ -63,11 +63,11 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		t.Fatal(err)
 	}
 
-	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.Registerer)
+	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", ctx.Registerer)
+	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", ctx.AvalancheRegisterer)
 	if err != nil {
 		t.Fatal(err)
 	}

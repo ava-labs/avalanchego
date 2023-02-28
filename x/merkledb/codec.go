@@ -117,6 +117,9 @@ func (c *codecImpl) EncodeProof(version uint16, proof *Proof) ([]byte, error) {
 	if err := c.encodeByteSlice(buf, proof.Key); err != nil {
 		return nil, err
 	}
+	if err := c.encodeMaybeByteSlice(buf, proof.Value); err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }
 
@@ -275,6 +278,9 @@ func (c *codecImpl) DecodeProof(b []byte, proof *Proof) (uint16, error) {
 		return 0, err
 	}
 	if proof.Key, err = c.decodeByteSlice(src); err != nil {
+		return 0, err
+	}
+	if proof.Value, err = c.decodeMaybeByteSlice(src); err != nil {
 		return 0, err
 	}
 	if src.Len() != 0 {
@@ -690,7 +696,7 @@ func (c *codecImpl) decodeProofNode(src *bytes.Reader) (ProofNode, error) {
 	if result.KeyPath, err = c.decodeSerializedPath(src); err != nil {
 		return result, err
 	}
-	if result.Value, err = c.decodeMaybeByteSlice(src); err != nil {
+	if result.ValueOrHash, err = c.decodeMaybeByteSlice(src); err != nil {
 		return result, err
 	}
 	numChildren, err := c.decodeInt(src)
@@ -731,7 +737,7 @@ func (c *codecImpl) encodeProofNode(pn ProofNode, dst io.Writer) error {
 	if err := c.encodeSerializedPath(pn.KeyPath, dst); err != nil {
 		return err
 	}
-	if err := c.encodeMaybeByteSlice(dst, pn.Value); err != nil {
+	if err := c.encodeMaybeByteSlice(dst, pn.ValueOrHash); err != nil {
 		return err
 	}
 	if err := c.encodeInt(dst, len(pn.Children)); err != nil {

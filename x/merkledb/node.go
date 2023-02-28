@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const NodeBranchFactor = 16
+const (
+	NodeBranchFactor = 16
+	HashLength       = 32
+)
 
 // the values that go into the node's id
 type hashValues struct {
@@ -33,9 +36,10 @@ type child struct {
 // node holds additional information on top of the dbNode that makes calulcations easier to do
 type node struct {
 	dbNode
-	id        ids.ID
-	key       path
-	nodeBytes []byte
+	id          ids.ID
+	key         path
+	nodeBytes   []byte
+	valueDigest Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
@@ -59,11 +63,14 @@ func parseNode(key path, nodeBytes []byte) (*node, error) {
 	if _, err := Codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
-	return &node{
+	result := &node{
 		dbNode:    n,
 		key:       key,
 		nodeBytes: nodeBytes,
-	}, nil
+	}
+
+	result.setValueDigest()
+	return result, nil
 }
 
 // Returns true iff this node has a value.
@@ -100,9 +107,10 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 
 	hv := &hashValues{
 		Children: n.children,
-		Value:    n.value,
+		Value:    n.valueDigest,
 		Key:      n.key.Serialize(),
 	}
+
 	bytes, err := Codec.encodeHashValues(Version, hv)
 	if err != nil {
 		return err
@@ -117,6 +125,15 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 func (n *node) setValue(val Maybe[[]byte]) {
 	n.onNodeChanged()
 	n.value = val
+	n.setValueDigest()
+}
+
+func (n *node) setValueDigest() {
+	if n.value.IsNothing() || len(n.value.value) < HashLength {
+		n.valueDigest = n.value
+	} else {
+		n.valueDigest = Some(hashing.ComputeHash256(n.value.value))
+	}
 }
 
 // Adds [child] as a child of [n].
@@ -164,9 +181,9 @@ func (n *node) clone() *node {
 // Returns the ProofNode representation of this node.
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
-		KeyPath:  n.key.Serialize(),
-		Children: make(map[byte]ids.ID, len(n.children)),
-		Value:    n.value,
+		KeyPath:     n.key.Serialize(),
+		Children:    make(map[byte]ids.ID, len(n.children)),
+		ValueOrHash: n.valueDigest,
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

@@ -6,16 +6,16 @@ module github.com/ava-labs/avalanchego
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
-go 1.18
+go 1.20
 
 require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner-sdk v0.3.0
-	github.com/ava-labs/coreth v0.11.7-rc.2.0.20230216050717-1f6b2886185a
+	github.com/ava-labs/coreth v0.11.8-0.20230223235704-14175cdd347d
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/golang/mock v1.6.0
 	github.com/google/btree v1.1.2
@@ -70,7 +70,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dlclark/regexp2 v1.4.1-0.20201116162257-a2a8dda75c91 // indirect
 	github.com/dop251/goja v0.0.0-20220405120441-9037c2b61cbf // indirect
 	github.com/ethereum/go-ethereum v1.10.26 // indirect

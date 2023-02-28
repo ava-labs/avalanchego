@@ -8,8 +8,6 @@
   - [ ] Remove internal parent view commitments.
   - [ ] Consider allowing a child view to commit into a parent view without committing to the base DB.
 - [ ] Allow concurrent reads into the trieview.
-  - [ ] Remove `baseValuesCache` and `baseNodesCache` from the trieview.
-  - [ ] Remove `parents` from the trieview.
 - [ ] Remove special casing around the root node from the physical structure of the hashed tree.
 - [ ] Remove the implied prefix from the `dbNode`'s `child`
 - [ ] Fix intermediate node eviction panic when encountering errors

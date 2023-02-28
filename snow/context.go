@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -34,6 +35,7 @@ type Context struct {
 	SubnetID  ids.ID
 	ChainID   ids.ID
 	NodeID    ids.NodeID
+	PublicKey *bls.PublicKey
 
 	XChainID    ids.ID
 	CChainID    ids.ID
@@ -63,7 +65,15 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// Registers all common and snowman consensus metrics. Unlike the avalanche
+	// consensus engine metrics, we do not prefix the name with the engine name,
+	// as snowman is used for all chains by default.
 	Registerer Registerer
+	// Only used to register Avalanche consensus metrics. Previously, all
+	// metrics were prefixed with "avalanche_{chainID}_". Now we add avalanche
+	// to the prefix, "avalanche_{chainID}_avalanche_", to differentiate
+	// consensus operations after the DAG linearization.
+	AvalancheRegisterer Registerer
 
 	// DecisionAcceptor is the callback that will be fired whenever a VM is
 	// notified that their object, either a block in snowman or a transaction
@@ -86,11 +96,17 @@ type ConsensusContext struct {
 }
 
 func DefaultContextTest() *Context {
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		panic(err)
+	}
+	pk := bls.PublicFromSecretKey(sk)
 	return &Context{
 		NetworkID:    0,
 		SubnetID:     ids.Empty,
 		ChainID:      ids.Empty,
 		NodeID:       ids.EmptyNodeID,
+		PublicKey:    pk,
 		Log:          logging.NoLog{},
 		BCLookup:     ids.NewAliaser(),
 		Metrics:      metrics.NewOptionalGatherer(),
@@ -100,9 +116,10 @@ func DefaultContextTest() *Context {
 
 func DefaultConsensusContextTest() *ConsensusContext {
 	return &ConsensusContext{
-		Context:           DefaultContextTest(),
-		Registerer:        prometheus.NewRegistry(),
-		DecisionAcceptor:  noOpAcceptor{},
-		ConsensusAcceptor: noOpAcceptor{},
+		Context:             DefaultContextTest(),
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
+		DecisionAcceptor:    noOpAcceptor{},
+		ConsensusAcceptor:   noOpAcceptor{},
 	}
 }

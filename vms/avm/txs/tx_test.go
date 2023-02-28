@@ -73,7 +73,7 @@ func TestTxNil(t *testing.T) {
 	}
 
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, &TestConfig, 1); err == nil {
 		t.Fatalf("Should have erred due to nil tx")
 	}
 }
@@ -82,7 +82,7 @@ func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 1); err == nil {
 		t.Fatalf("Should have erred due to nil tx")
 	}
 }
@@ -115,7 +115,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	}
 	tx.SetBytes(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -168,7 +168,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	}
 	tx.SetBytes(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -212,7 +212,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	}
 	tx.SetBytes(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid number of credentials")
 	}
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -105,8 +106,6 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
-
-	ctx *snow.Context
 }
 
 // NewClient returns a VM connected to a remote VM
@@ -117,8 +116,7 @@ func NewClient(client vmpb.VMClient) *VMClient {
 }
 
 // SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(ctx *snow.Context, runtime runtime.Stopper, pid int, processTracker resource.ProcessTracker) {
-	vm.ctx = ctx
+func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker resource.ProcessTracker) {
 	vm.runtime = runtime
 	vm.processTracker = processTracker
 	vm.pid = pid
@@ -139,8 +137,6 @@ func (vm *VMClient) Initialize(
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
 	}
-
-	vm.ctx = chainCtx
 
 	// Register metrics
 	registerer := prometheus.NewRegistry()
@@ -169,7 +165,7 @@ func (vm *VMClient) Initialize(
 		serverAddr := serverListener.Addr().String()
 
 		go grpcutils.Serve(serverListener, vm.newDBServer(semDB.Database))
-		vm.ctx.Log.Info("grpc: serving database",
+		chainCtx.Log.Info("grpc: serving database",
 			zap.String("version", dbVersion),
 			zap.String("address", serverAddr),
 		)
@@ -195,7 +191,7 @@ func (vm *VMClient) Initialize(
 	serverAddr := serverListener.Addr().String()
 
 	go grpcutils.Serve(serverListener, vm.newInitServer())
-	vm.ctx.Log.Info("grpc: serving vm services",
+	chainCtx.Log.Info("grpc: serving vm services",
 		zap.String("address", serverAddr),
 	)
 
@@ -204,6 +200,7 @@ func (vm *VMClient) Initialize(
 		SubnetId:     chainCtx.SubnetID[:],
 		ChainId:      chainCtx.ChainID[:],
 		NodeId:       chainCtx.NodeID.Bytes(),
+		PublicKey:    bls.PublicKeyToBytes(chainCtx.PublicKey),
 		XChainId:     chainCtx.XChainID[:],
 		CChainId:     chainCtx.CChainID[:],
 		AvaxAssetId:  chainCtx.AVAXAssetID[:],
@@ -264,7 +261,7 @@ func (vm *VMClient) Initialize(
 	}
 	vm.State = chainState
 
-	return vm.ctx.Metrics.Register(multiGatherer)
+	return chainCtx.Metrics.Register(multiGatherer)
 }
 
 func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {

@@ -10,7 +10,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/ava-labs/avalanchego/app/runner"
+	"golang.org/x/term"
+
+	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -28,8 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	runnerConfig := config.GetRunnerConfig(v)
-	if runnerConfig.DisplayVersionAndExit {
+	if v.GetBool(config.VersionKey) {
 		fmt.Print(version.String)
 		os.Exit(0)
 	}
@@ -40,5 +41,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	runner.Run(nodeConfig)
+	nodeApp := app.New(nodeConfig) // Create node wrapper
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println(app.Header)
+	}
+
+	exitCode := app.Run(nodeApp)
+	os.Exit(exitCode)
 }

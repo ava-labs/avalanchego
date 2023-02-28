@@ -24,7 +24,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header"}
 
 function test_golangci_lint {
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
   golangci-lint run --config .golangci.yml
 }
 

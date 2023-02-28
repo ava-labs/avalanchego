@@ -39,20 +39,18 @@ const (
 )
 
 var (
-	errUnknownAssetID         = errors.New("unknown asset ID")
-	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
-	errNoMinters              = errors.New("no minters provided")
-	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
-	errZeroAmount             = errors.New("amount must be positive")
-	errNoOutputs              = errors.New("no outputs to send")
-	errSpendOverflow          = errors.New("spent amount overflows uint64")
-	errInvalidMintAmount      = errors.New("amount minted must be positive")
-	errAddressesCantMintAsset = errors.New("provided addresses don't have the authority to mint the provided asset")
-	errInvalidUTXO            = errors.New("invalid utxo")
-	errNilTxID                = errors.New("nil transaction ID")
-	errNoAddresses            = errors.New("no addresses provided")
-	errNoKeys                 = errors.New("from addresses have no keys or funds")
-	errMissingPrivateKey      = errors.New("argument 'privateKey' not given")
+	errUnknownAssetID     = errors.New("unknown asset ID")
+	errTxNotCreateAsset   = errors.New("transaction doesn't create an asset")
+	errNoMinters          = errors.New("no minters provided")
+	errNoHoldersOrMinters = errors.New("no minters or initialHolders provided")
+	errZeroAmount         = errors.New("amount must be positive")
+	errNoOutputs          = errors.New("no outputs to send")
+	errInvalidMintAmount  = errors.New("amount minted must be positive")
+	errInvalidUTXO        = errors.New("invalid utxo")
+	errNilTxID            = errors.New("nil transaction ID")
+	errNoAddresses        = errors.New("no addresses provided")
+	errNoKeys             = errors.New("from addresses have no keys or funds")
+	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
 )
 
 // Service defines the base service for the asset vm
@@ -442,8 +440,10 @@ type GetAllBalancesReply struct {
 }
 
 // GetAllBalances returns a map where:
-//   Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
-//   Value: The balance of the asset held by the address
+//
+// Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
+// Value: The balance of the asset held by the address
+//
 // If ![args.IncludePartial], returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.

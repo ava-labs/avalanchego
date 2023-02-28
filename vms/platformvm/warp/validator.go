@@ -59,7 +59,7 @@ func GetCanonicalValidatorSet(
 	for _, vdr := range vdrSet {
 		totalWeight, err = math.Add64(totalWeight, vdr.Weight)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%w: %s", ErrWeightOverflow, err)
+			return nil, 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
 
 		if vdr.PublicKey == nil {
@@ -95,11 +95,11 @@ func FilterValidators(
 	vdrs []*Validator,
 ) ([]*Validator, error) {
 	// Verify that all alleged signers exist
-	if indices.Len() > len(vdrs) {
+	if indices.BitLen() > len(vdrs) {
 		return nil, fmt.Errorf(
 			"%w: %d >= %d",
 			ErrUnknownValidator,
-			indices.Len()-1, // -1 to convert from length to index
+			indices.BitLen()-1, // -1 to convert from length to index
 			len(vdrs),
 		)
 	}
@@ -124,7 +124,7 @@ func SumWeight(vdrs []*Validator) (uint64, error) {
 	for _, vdr := range vdrs {
 		weight, err = math.Add64(weight, vdr.Weight)
 		if err != nil {
-			return 0, fmt.Errorf("%w: %s", ErrWeightOverflow, err)
+			return 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
 	}
 	return weight, nil

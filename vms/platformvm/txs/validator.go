@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validator
+package txs
 
 import (
 	"errors"
@@ -28,11 +28,6 @@ type Validator struct {
 
 	// Weight of this validator used when sampling
 	Wght uint64 `serialize:"true" json:"weight"`
-}
-
-// ID returns the node ID of the validator
-func (v *Validator) ID() ids.NodeID {
-	return v.NodeID
 }
 
 // StartTime is the time that this validator will enter the validator set

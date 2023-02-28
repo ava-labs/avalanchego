@@ -32,34 +32,8 @@ var (
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
 
-// Removes the UTXOs consumed by [ins] from the UTXO set
-func Consume(utxoDB state.UTXODeleter, ins []*avax.TransferableInput) {
-	for _, input := range ins {
-		utxoDB.DeleteUTXO(input.InputID())
-	}
-}
-
-// Adds the UTXOs created by [outs] to the UTXO set.
-// [txID] is the ID of the tx that created [outs].
-func Produce(
-	utxoDB state.UTXOAdder,
-	txID ids.ID,
-	outs []*avax.TransferableOutput,
-) {
-	for index, out := range outs {
-		utxoDB.AddUTXO(&avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(index),
-			},
-			Asset: out.Asset,
-			Out:   out.Output(),
-		})
-	}
-}
-
 // TODO: Stake and Authorize should be replaced by similar methods in the
-//       P-chain wallet
+// P-chain wallet
 type Spender interface {
 	// Spend the provided amount while deducting the provided fee.
 	// Arguments:
@@ -114,7 +88,7 @@ type Verifier interface {
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpend(
 		tx txs.UnsignedTx,
-		utxoDB state.UTXOGetter,
+		utxoDB avax.UTXOGetter,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
@@ -453,7 +427,7 @@ func (h *handler) Authorize(
 
 func (h *handler) VerifySpend(
 	tx txs.UnsignedTx,
-	utxoDB state.UTXOGetter,
+	utxoDB avax.UTXOGetter,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
