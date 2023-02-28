@@ -45,66 +45,66 @@ var (
 //
 // As an example, assume we have a ring that supports hashes from 1-12.
 //
-//                   12
-//             11          1
+//	           12
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3
+//	9                      3
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Add node 1 (n1). Let h(n1) = 12.
 // First, we compute the hash the node, and insert it into its corresponding
 // location on the ring.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3
+//	9                      3
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Now, to see which node a key (k1) should map to, we hash the key and search
 // for its closest clockwise neighbor.
 // Let h(k1) = 3. Here, we see that since n1 is the closest neighbor, as there
 // are no other nodes in the ring.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3 (k1)
+//	9                      3 (k1)
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Now, let's insert another node (n2), such that h(n2) = 6.
 // Here we observe that k1 has shuffled to n2, as n2 is the closest clockwise
 // neighbor to k1.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3 (k1)
+//	9                      3 (k1)
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6 (n2)
+//	     7           5
+//	           6 (n2)
 //
 // Other optimizations can be made to help reduce blast radius of failures and
 // the variance in keys (hot shards). One such optimization is introducing

@@ -584,12 +584,14 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 	}
 }
 
-// Sets up test tx IDs in DB in the following structure for the indexer to pick them up:
-// [address] prefix DB
-//		[assetID] prefix DB
-//			- "idx": 2
-//			- 0: txID1
-//			- 1: txID1
+// Sets up test tx IDs in DB in the following structure for the indexer to pick
+// them up:
+//
+//	[address] prefix DB
+//	  [assetID] prefix DB
+//	    - "idx": 2
+//	    - 0: txID1
+//	    - 1: txID1
 func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
 	var testTxs []ids.ID
 	for i := 0; i < txCount; i++ {

@@ -299,8 +299,9 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 }
 
 // createChain creates and starts the chain
+//
 // Note: it is expected for the subnet to already have the chain registered as
-//       bootstrapping before this function is called
+// bootstrapping before this function is called
 func (m *manager) createChain(chainParams ChainParameters) {
 	m.Log.Info("creating chain",
 		zap.Stringer("subnetID", chainParams.SubnetID),

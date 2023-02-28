@@ -121,8 +121,9 @@ func NewContext(tb testing.TB) *snow.Context {
 }
 
 // Returns:
-//   1) tx in genesis that creates asset
-//   2) the index of the output
+//
+//  1. tx in genesis that creates asset
+//  2. the index of the output
 func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},

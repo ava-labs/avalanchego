@@ -119,20 +119,23 @@ func NewInboundMsgThrottler(
 }
 
 // A sybil-safe inbound message throttler.
-// Rate-limits reading of inbound messages to prevent peers from
-// consuming excess resources.
+// Rate-limits reading of inbound messages to prevent peers from consuming
+// excess resources.
 // The three resources considered are:
-// 1. An inbound message buffer, where each message that we're currently
-//    processing takes up 1 unit of space on the buffer.
-// 2. An inbound message byte buffer, where a message of length n
-//    that we're currently processing takes up n units of space on the buffer.
-// 3. Bandwidth. The bandwidth rate-limiting is implemented using a token bucket,
-//    where each token is 1 byte. See BandwidthThrottler.
+//
+//  1. An inbound message buffer, where each message that we're currently
+//     processing takes up 1 unit of space on the buffer.
+//  2. An inbound message byte buffer, where a message of length n
+//     that we're currently processing takes up n units of space on the buffer.
+//  3. Bandwidth. The bandwidth rate-limiting is implemented using a token
+//     bucket, where each token is 1 byte. See BandwidthThrottler.
+//
 // A call to Acquire([msgSize], [nodeID]) blocks until we've secured
-// enough of both these resources to read a message of size [msgSize] from [nodeID].
+// enough of both these resources to read a message of size [msgSize] from
+// [nodeID].
 type inboundMsgThrottler struct {
-	// Rate-limits based on number of messages from a given
-	// node that we're currently processing.
+	// Rate-limits based on number of messages from a given node that we're
+	// currently processing.
 	bufferThrottler *inboundMsgBufferThrottler
 	// Rate-limits based on recent bandwidth usage
 	bandwidthThrottler bandwidthThrottler

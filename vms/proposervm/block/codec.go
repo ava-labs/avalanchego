@@ -17,7 +17,7 @@ const codecVersion = 0
 // See: [constants.DefaultMaxMessageSize]
 //
 // Invariant: This codec must never be used to unmarshal a slice unless it is a
-//            `[]byte`. Otherwise a malicious payload could cause an OOM.
+// `[]byte`. Otherwise a malicious payload could cause an OOM.
 var c codec.Manager
 
 func init() {

@@ -115,12 +115,13 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		vtxBytes := vtx.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
-		if newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes); newLen < constants.MaxContainersLen {
-			ancestorsBytes = append(ancestorsBytes, vtxBytes)
-			ancestorsBytesLen = newLen
-		} else { // reached maximum response size
+		newLen := wrappers.IntLen + ancestorsBytesLen + len(vtxBytes)
+		if newLen > constants.MaxContainersLen {
+			// reached maximum response size
 			break
 		}
+		ancestorsBytes = append(ancestorsBytes, vtxBytes)
+		ancestorsBytesLen = newLen
 		parents, err := vtx.Parents()
 		if err != nil {
 			return err

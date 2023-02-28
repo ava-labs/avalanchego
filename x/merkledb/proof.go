@@ -146,17 +146,17 @@ type RangeProof struct {
 //   - [start] <= [end].
 //   - [proof] is non-empty.
 //   - All keys in [proof.KeyValues] are in the range [start, end].
-//     - If [start] is empty, all keys are considered > [start].
-//     - If [end] is empty, all keys are considered < [end].
+//     If [start] is empty, all keys are considered > [start].
+//     If [end] is empty, all keys are considered < [end].
 //   - [proof.KeyValues] is sorted by increasing key.
 //   - [proof.StartProof] and [proof.EndProof] are well-formed.
 //   - One of the following holds:
-//     - [end] and [proof.EndProof] are empty.
-//     - [proof.StartProof], [start], [end], and [proof.KeyValues] are empty and
+//     [end] and [proof.EndProof] are empty.
+//     [proof.StartProof], [start], [end], and [proof.KeyValues] are empty and
 //     [proof.EndProof] is just the root.
-//     - [end] is non-empty and [proof.EndProof] is a valid proof of a key <= [end].
-//   - [expectedRootID] is the root of the trie containing the given key-value pairs
-//     and start/end proofs.
+//     [end] is non-empty and [proof.EndProof] is a valid proof of a key <= [end].
+//   - [expectedRootID] is the root of the trie containing the given key-value
+//     pairs and start/end proofs.
 func (proof *RangeProof) Verify(
 	ctx context.Context,
 	start []byte,
@@ -308,8 +308,8 @@ type ChangeProof struct {
 //   - [start] <= [end].
 //   - [proof] is non-empty iff [proof.HadRootsInHistory].
 //   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
-//     - If [start] is empty, all keys are considered > [start].
-//     - If [end] is empty, all keys are considered < [end].
+//     If [start] is empty, all keys are considered > [start].
+//     If [end] is empty, all keys are considered < [end].
 //   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 //   - [proof.StartProof] and [proof.EndProof] are well-formed.
 //   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
@@ -539,12 +539,12 @@ func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
 }
 
 // Returns nil iff all the following hold:
-// - Any node with an odd nibble length, should not have a value associated with it
-//   since all keys with values are written in bytes, so have even nibble length.
-// - Each key in [proof] is a strict prefix of the following key.
-// - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-// - If the last element in [proof] is [keyBytes], this is an inclusion proof.
-//   Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
+//   - Any node with an odd nibble length, should not have a value associated with it
+//     since all keys with values are written in bytes, so have even nibble length.
+//   - Each key in [proof] is a strict prefix of the following key.
+//   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
+//   - If the last element in [proof] is [keyBytes], this is an inclusion proof.
+//     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
 func verifyProofPath(proof []ProofNode, keyPath path) error {
 	provenKey := keyPath.Serialize()
 
