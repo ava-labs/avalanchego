@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -84,7 +85,7 @@ func verifyAddValidatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		return outs, nil
 	}
 
@@ -163,7 +164,7 @@ func verifyAddSubnetValidatorTx(
 		return errStakeTooLong
 	}
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		return nil
 	}
 
@@ -279,7 +280,7 @@ func removeSubnetValidatorValidation(
 		return nil, false, errRemovePermissionlessValidator
 	}
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		// Not bootstrapped yet -- don't need to do full verification.
 		return vdr, isCurrentValidator, nil
 	}
@@ -342,7 +343,7 @@ func verifyAddDelegatorTx(
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		return outs, nil
 	}
 
@@ -427,7 +428,7 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		return nil
 	}
 
@@ -606,7 +607,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	if !backend.Bootstrapped.Get() {
+	if !status.DoneBootstraping(backend.VMState.Get()) {
 		return nil
 	}
 

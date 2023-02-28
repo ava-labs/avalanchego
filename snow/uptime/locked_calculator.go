@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -21,12 +23,12 @@ var (
 type LockedCalculator interface {
 	Calculator
 
-	SetCalculator(isBootstrapped *utils.Atomic[bool], lock sync.Locker, newC Calculator)
+	SetCalculator(vmState *utils.Atomic[snow.State], lock sync.Locker, newC Calculator)
 }
 
 type lockedCalculator struct {
 	lock           sync.RWMutex
-	isBootstrapped *utils.Atomic[bool]
+	vmState        *utils.Atomic[snow.State]
 	calculatorLock sync.Locker
 	c              Calculator
 }
@@ -39,7 +41,7 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
+	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
 		return 0, time.Time{}, errNotReady
 	}
 
@@ -53,7 +55,7 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID, subnetID id
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
+	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
 		return 0, errNotReady
 	}
 
@@ -67,7 +69,7 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetI
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
+	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
 		return 0, errNotReady
 	}
 
@@ -77,11 +79,11 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetI
 	return c.c.CalculateUptimePercentFrom(nodeID, subnetID, startTime)
 }
 
-func (c *lockedCalculator) SetCalculator(isBootstrapped *utils.Atomic[bool], lock sync.Locker, newC Calculator) {
+func (c *lockedCalculator) SetCalculator(vmState *utils.Atomic[snow.State], lock sync.Locker, newC Calculator) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.isBootstrapped = isBootstrapped
+	c.vmState = vmState
 	c.calculatorLock = lock
 	c.c = newC
 }

@@ -9,12 +9,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var _ blocks.Visitor = (*acceptor)(nil)
@@ -26,7 +28,7 @@ type acceptor struct {
 	*backend
 	metrics          metrics.Metrics
 	recentlyAccepted window.Window[ids.ID]
-	bootstrapped     *utils.Atomic[bool]
+	vmState          *utils.Atomic[snow.State]
 }
 
 func (a *acceptor) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
@@ -180,7 +182,7 @@ func (a *acceptor) abortBlock(b blocks.Block) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if a.bootstrapped.Get() {
+	if status.DoneBootstraping(a.vmState.Get()) {
 		if parentState.initiallyPreferCommit {
 			a.metrics.MarkOptionVoteLost()
 		} else {
@@ -198,7 +200,7 @@ func (a *acceptor) commitBlock(b blocks.Block) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if a.bootstrapped.Get() {
+	if status.DoneBootstraping(a.vmState.Get()) {
 		if parentState.initiallyPreferCommit {
 			a.metrics.MarkOptionVoteWon()
 		} else {

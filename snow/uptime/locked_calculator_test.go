@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -36,11 +37,12 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
 	require.ErrorIs(err, errNotReady)
 
-	var isBootstrapped utils.Atomic[bool]
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.Bootstrapping)
 	mockCalc := NewMockCalculator(ctrl)
 
 	// Should still error because ctx is not bootstrapped
-	lc.SetCalculator(&isBootstrapped, &sync.Mutex{}, mockCalc)
+	lc.SetCalculator(vmState, &sync.Mutex{}, mockCalc)
 	_, _, err = lc.CalculateUptime(nodeID, subnetID)
 	require.ErrorIs(err, errNotReady)
 
@@ -50,7 +52,7 @@ func TestLockedCalculator(t *testing.T) {
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
 	require.EqualValues(errNotReady, err)
 
-	isBootstrapped.Set(true)
+	vmState.Set(snow.SubnetSynced)
 
 	// Should return the value from the mocked inner calculator
 	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)

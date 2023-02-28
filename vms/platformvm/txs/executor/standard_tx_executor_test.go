@@ -1083,6 +1083,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
@@ -1103,15 +1105,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				vmState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr: false,
@@ -1121,6 +1123,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
@@ -1128,15 +1132,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr: true,
@@ -1145,6 +1149,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "node isn't a validator of the subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
@@ -1153,15 +1159,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1176,21 +1182,23 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
 
 				// Set dependency expectations.
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1200,6 +1208,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "tx has no credentials",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
@@ -1209,15 +1220,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1227,6 +1238,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(nil, status.Unknown, database.ErrNotFound)
@@ -1235,15 +1248,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1253,6 +1266,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "no permission to remove validator",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1268,15 +1283,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1286,6 +1301,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1304,15 +1321,15 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
@@ -1460,6 +1477,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "tx fails syntactic verification",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
+
 				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
 				env.state = state.NewMockDiff(ctrl)
@@ -1468,15 +1488,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			err: txs.ErrNilTx,
@@ -1485,6 +1505,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "max stake duration too large",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
@@ -1492,15 +1514,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 						Config: &config.Config{
 							BanffTime: env.banffTime,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			err: errMaxStakeDurationTooLarge,
@@ -1509,6 +1531,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "fail subnet authorization",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
+
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
@@ -1518,15 +1543,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			err: errWrongNumberOfCredentials,
@@ -1535,6 +1560,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
+
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
@@ -1554,15 +1582,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			err: errFlowCheckFailed,
@@ -1571,6 +1599,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "valid tx",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 
 				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1595,15 +1625,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 							BanffTime:        env.banffTime,
 							MaxStakeDuration: math.MaxInt64,
 						},
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						VMState:     vmState,
+						Fx:          env.fx,
+						FlowChecker: env.flowChecker,
+						Ctx:         &snow.Context{},
 					},
 					Tx:    env.tx,
 					State: env.state,
 				}
-				e.Bootstrapped.Set(true)
+				e.VMState.Set(snow.SubnetSynced)
 				return env.unsignedTx, e
 			},
 			err: nil,

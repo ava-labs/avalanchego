@@ -84,20 +84,20 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	msm            *mutableSharedMemory
-	fx             fx.Fx
-	state          state.State
-	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
-	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
-	backend        Backend
+	vmState      *utils.Atomic[snow.State]
+	config       *config.Config
+	clk          *mockable.Clock
+	baseDB       *versiondb.Database
+	ctx          *snow.Context
+	msm          *mutableSharedMemory
+	fx           fx.Fx
+	state        state.State
+	states       map[ids.ID]state.Chain
+	atomicUTXOs  avax.AtomicUTXOManager
+	uptimes      uptime.Manager
+	utxosHandler utxo.Handler
+	txBuilder    builder.Builder
+	backend      Backend
 }
 
 func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
@@ -113,8 +113,8 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newEnvironment(postBanff bool) *environment {
-	var isBootstrapped utils.Atomic[bool]
-	isBootstrapped.Set(true)
+	var vmState utils.Atomic[snow.State]
+	vmState.Set(snow.SubnetSynced)
 
 	config := defaultConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -123,7 +123,7 @@ func newEnvironment(postBanff bool) *environment {
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
+	fx := defaultFx(&clk, ctx.Log, true /*isBootstrapped*/)
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultState(&config, ctx, baseDB, rewards)
@@ -143,31 +143,31 @@ func newEnvironment(postBanff bool) *environment {
 	)
 
 	backend := Backend{
-		Config:       &config,
-		Ctx:          ctx,
-		Clk:          &clk,
-		Bootstrapped: &isBootstrapped,
-		Fx:           fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      uptimes,
-		Rewards:      rewards,
+		Config:      &config,
+		Ctx:         ctx,
+		Clk:         &clk,
+		VMState:     &vmState,
+		Fx:          fx,
+		FlowChecker: utxoHandler,
+		Uptimes:     uptimes,
+		Rewards:     rewards,
 	}
 
 	env := &environment{
-		isBootstrapped: &isBootstrapped,
-		config:         &config,
-		clk:            &clk,
-		baseDB:         baseDB,
-		ctx:            ctx,
-		msm:            msm,
-		fx:             fx,
-		state:          baseState,
-		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
-		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
-		txBuilder:      txBuilder,
-		backend:        backend,
+		vmState:      &vmState,
+		config:       &config,
+		clk:          &clk,
+		baseDB:       baseDB,
+		ctx:          ctx,
+		msm:          msm,
+		fx:           fx,
+		state:        baseState,
+		states:       make(map[ids.ID]state.Chain),
+		atomicUTXOs:  atomicUTXOs,
+		uptimes:      uptimes,
+		utxosHandler: utxoHandler,
+		txBuilder:    txBuilder,
+		backend:      backend,
 	}
 
 	addSubnet(env, txBuilder)
@@ -426,7 +426,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.Get() {
+	if status.DoneBootstraping(env.vmState.Get()) {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errMissingPrimaryValidators

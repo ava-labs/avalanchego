@@ -264,6 +264,9 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.Bootstrapping)
+
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -284,7 +287,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
-		bootstrapped: &utils.Atomic[bool]{},
+		vmState: vmState,
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
@@ -354,6 +357,9 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.Bootstrapping)
+
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
@@ -374,7 +380,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
-		bootstrapped: &utils.Atomic[bool]{},
+		vmState: vmState,
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
