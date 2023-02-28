@@ -95,11 +95,11 @@ func FilterValidators(
 	vdrs []*Validator,
 ) ([]*Validator, error) {
 	// Verify that all alleged signers exist
-	if indices.Len() > len(vdrs) {
+	if indices.BitLen() > len(vdrs) {
 		return nil, fmt.Errorf(
 			"%w: %d >= %d",
 			ErrUnknownValidator,
-			indices.Len()-1, // -1 to convert from length to index
+			indices.BitLen()-1, // -1 to convert from length to index
 			len(vdrs),
 		)
 	}

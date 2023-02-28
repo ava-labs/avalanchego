@@ -61,7 +61,7 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 	if len(signerIndices.Bytes()) != len(s.Signers) {
 		return 0, ErrInvalidBitSet
 	}
-	return signerIndices.HammingWeight(), nil
+	return signerIndices.Len(), nil
 }
 
 func (s *BitSetSignature) Verify(
