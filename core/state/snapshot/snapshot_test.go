@@ -396,17 +396,19 @@ func TestPostFlattenBasicDataAccess(t *testing.T) {
 // different blocks inserted with an identical state root.
 // In this example, (B, C) and (D, E) share the identical state root, but were
 // inserted under different blocks.
-//    A
-//   /  \
-//  B    C
-//  |    |
-//  D    E
+//
+//	  A
+//	 /  \
+//	B    C
+//	|    |
+//	D    E
 //
 // `t.Flatten(C)` should result in:
 //
-//  B    C
-//  |    |
-//  D    E
+//	B    C
+//	|    |
+//	D    E
+//
 // With the branch D, E, hanging and relying on Discard to be called to
 // garbage collect the references.
 func TestTreeFlattenDoesNotDropPendingLayers(t *testing.T) {

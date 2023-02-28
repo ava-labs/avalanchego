@@ -31,7 +31,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v1
         with:
-          go-version: 1.18
+          go-version: "1.20"
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -43,7 +43,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.47
+          version: v1.51
           working-directory: .
           args: --timeout 3m
   test:
@@ -51,7 +51,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: ['1.18']
+        go: ['1.20']
         os: [macos-11.0, ubuntu-20.04, windows-latest]
     steps:
     - uses: actions/checkout@v2
@@ -84,7 +84,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: ['1.18']
+        go: ['1.20']
         os: [ubuntu-20.04]
     steps:
     - uses: actions/checkout@v2
@@ -115,7 +115,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: [ '1.18' ]
+        go: [ '1.20' ]
         os: [ ubuntu-20.04 ]
     steps:
     - uses: actions/checkout@v2
