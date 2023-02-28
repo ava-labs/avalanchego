@@ -1,7 +1,9 @@
+use crate::account::BlobError;
 use crate::db::DBError;
 use crate::merkle::*;
 use crate::merkle_util::*;
 
+use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
 use shale::ObjPtr;
@@ -27,16 +29,19 @@ pub enum ProofError {
     InconsistentEdgeKeys,
     NodesInsertionError,
     NodeNotInTrie,
-    InvalidNode,
+    InvalidNode(MerkleError),
     EmptyRange,
     EmptyKeyValues,
+    BlobStoreError(BlobError),
+    SystemError(Errno),
+    InvalidRootHash,
 }
 
 impl From<DataStoreError> for ProofError {
     fn from(d: DataStoreError) -> ProofError {
         match d {
             DataStoreError::InsertionError => ProofError::NodesInsertionError,
-            DataStoreError::RootHashError => ProofError::InvalidNode,
+            DataStoreError::RootHashError => ProofError::InvalidRootHash,
             DataStoreError::ProofEmptyKeyValuesError => ProofError::EmptyKeyValues,
             _ => ProofError::InvalidProof,
         }
@@ -47,12 +52,11 @@ impl From<DBError> for ProofError {
     fn from(d: DBError) -> ProofError {
         match d {
             DBError::InvalidParams => ProofError::InvalidProof,
-            DBError::Merkle(_e) => ProofError::InvalidNode,
-            DBError::Blob(_e) => ProofError::InvalidNode,
-            DBError::System(_e) => ProofError::InvalidNode,
+            DBError::Merkle(e) => ProofError::InvalidNode(e),
+            DBError::Blob(e) => ProofError::BlobStoreError(e),
+            DBError::System(e) => ProofError::SystemError(e),
             DBError::KeyNotFound => ProofError::InvalidEdgeKeys,
             DBError::CreateError => ProofError::NoSuchNode,
-            DBError::InvalidRangeProof(_e) => ProofError::InvalidProof,
         }
     }
 }
@@ -71,9 +75,12 @@ impl fmt::Display for ProofError {
             ProofError::InconsistentEdgeKeys => write!(f, "inconsistent edge keys"),
             ProofError::NodesInsertionError => write!(f, "node insertion error"),
             ProofError::NodeNotInTrie => write!(f, "node not in trie"),
-            ProofError::InvalidNode => write!(f, "invalid node"),
+            ProofError::InvalidNode(e) => write!(f, "invalid node: {e:?}"),
             ProofError::EmptyRange => write!(f, "empty range"),
             ProofError::EmptyKeyValues => write!(f, "empty keys or values provided"),
+            ProofError::BlobStoreError(e) => write!(f, "blob store error: {e:?}"),
+            ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
+            ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
         }
     }
 }
@@ -342,7 +349,7 @@ impl Proof {
                     }
                 }
                 // We should not hit a leaf node as a parent.
-                _ => return Err(ProofError::InvalidNode),
+                _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
 
             if chd_ptr.is_some() {
@@ -549,7 +556,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 index += cur_key.len();
             }
             // The fork point cannot be a leaf since it doesn't have any children.
-            _ => return Err(ProofError::InvalidNode),
+            _ => return Err(ProofError::InvalidNode(MerkleError::UnsetInternal)),
         }
     }
 
@@ -634,7 +641,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
             }
             Ok(false)
         }
-        _ => Err(ProofError::InvalidNode),
+        _ => Err(ProofError::InvalidNode(MerkleError::UnsetInternal)),
     }
 }
 

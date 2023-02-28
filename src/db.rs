@@ -33,7 +33,6 @@ pub enum DBError {
     System(nix::Error),
     KeyNotFound,
     CreateError,
-    InvalidRangeProof(ProofError),
 }
 
 impl fmt::Display for DBError {
@@ -45,7 +44,6 @@ impl fmt::Display for DBError {
             DBError::System(e) => write!(f, "system error: {e:?}"),
             DBError::KeyNotFound => write!(f, "not found"),
             DBError::CreateError => write!(f, "database create error"),
-            DBError::InvalidRangeProof(e) => write!(f, "invalid range proof: {e:?}"),
         }
     }
 }
@@ -334,20 +332,16 @@ impl DBRev {
     }
 
     /// Provides a proof that a key is in the MPT.
-    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, DBError> {
-        self.merkle
-            .prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
-            .map_err(DBError::Merkle)
+    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, MerkleError> {
+        self.merkle.prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
     }
 
     /// Verifies a range proof is valid for a set of keys.
     pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self, proof: Proof, first_key: K, last_key: K, keys: Vec<K>, values: Vec<V>,
-    ) -> Result<bool, DBError> {
+    ) -> Result<bool, ProofError> {
         let hash: [u8; 32] = *self.kv_root_hash()?;
-        let valid = proof
-            .verify_range_proof(hash, first_key, last_key, keys, values)
-            .map_err(|e| DBError::InvalidRangeProof(e))?;
+        let valid = proof.verify_range_proof(hash, first_key, last_key, keys, values)?;
         Ok(valid)
     }
 
@@ -1060,10 +1054,4 @@ impl<'a> Drop for WriteBatch<'a> {
             self.m.staging.blob.meta.take_delta();
         }
     }
-}
-
-#[test]
-fn test_proof_error() {
-    let e = DBError::InvalidRangeProof(ProofError::InvalidNode).to_string();
-    assert_eq!(e, "invalid range proof: InvalidNode");
 }

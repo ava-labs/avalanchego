@@ -20,6 +20,8 @@ pub enum MerkleError {
     ReadOnly,
     NotBranchNode,
     Format(std::io::Error),
+    ParentLeafBranch,
+    UnsetInternal,
 }
 
 impl fmt::Display for MerkleError {
@@ -29,6 +31,8 @@ impl fmt::Display for MerkleError {
             MerkleError::ReadOnly => write!(f, "error: read only"),
             MerkleError::NotBranchNode => write!(f, "error: node is not a branch node"),
             MerkleError::Format(e) => write!(f, "format error: {e:?}"),
+            MerkleError::ParentLeafBranch => write!(f, "parent should not be a leaf branch"),
+            MerkleError::UnsetInternal => write!(f, "removing internal node references failed"),
         }
     }
 }
