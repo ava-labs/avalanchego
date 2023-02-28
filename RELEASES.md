@@ -2,28 +2,39 @@
 
 ## [v1.9.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.10)
 
-This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `23`.
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
 
-- Removed support for the `--whitelisted-subnets` flag
-- Updated the `secp256k1` library to `v4.1.0`
-- Removed unnecessary abstractions from the `app` package
-- Renamed Avalanche consensus metrics to avalanche_{chainID}_avalanche
+### MerkleDB
+
 - Removed parent tracking from `merkledb.trieView`
 - Removed `base` caches from `merkledb.trieView`
 - Fixed error handling during `merkledb` intermediate node eviction
-- Migrated UTXO interfaces from the `platformvm` into the `components` for use in the `avm`
-- Removed `Factory` embedding from `platformvm.VM` and `avm.VM`
-- Replaced `snow.Context` in `Factory.New` with `logging.Logger`
-- Removed `validator` package from the `platformvm`
-- Refactored `avm` API tx creation into a standalone `Spender` implementation
-- Removed `timer.TimeoutManager`
 - Replaced values larger than `32` bytes with a hash in the `merkledb` hash representation
-- Added `warp.Signature#NumSigners` for better cost tracking support
-- Renamed `set.Bits#Len` to `BitLen` and `set.Bits#HammingWeight` to `Len` to align with `set.Bits64`
+
+### AVM
+
+- Refactored `avm` API tx creation into a standalone `Spender` implementation
+- Migrated UTXO interfaces from the `platformvm` into the `components` for use in the `avm`
 - Refactored `avm` `tx.SyntacticVerify` to expect the config rather than the fee fields
-- Added `snow.Context#PublicKey` to provide access to the local node's BLS public key inside the VM execution environment
+
+### Miscellaneous
+
 - Updated the minimum golang version to `v1.20.1`
+- Added `warp.Signature#NumSigners` for better cost tracking support
+- Added `snow.Context#PublicKey` to provide access to the local node's BLS public key inside the VM execution environment
+- Renamed Avalanche consensus metric prefix to `avalanche_{chainID}_avalanche`
 - Specified an explicit TCP `Linger` timeout of `15` seconds
+- Updated the `secp256k1` library to `v4.1.0`
+
+### Cleanup
+
+- Removed support for the `--whitelisted-subnets` flag
+- Removed unnecessary abstractions from the `app` package
+- Removed `Factory` embedding from `platformvm.VM` and `avm.VM`
+- Removed `validator` package from the `platformvm`
+- Removed `timer.TimeoutManager`
+- Replaced `snow.Context` in `Factory.New` with `logging.Logger`
+- Renamed `set.Bits#Len` to `BitLen` and `set.Bits#HammingWeight` to `Len` to align with `set.Bits64`
 
 ## [v1.9.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.9)
 
