@@ -260,6 +260,7 @@ func (g *gossipTracker) ResetValidator(validatorID ids.NodeID) bool {
 }
 
 // AddKnown invariants:
+//
 //  1. [peerID] SHOULD only be a nodeID that has been tracked with
 //     StartTrackingPeer().
 func (g *gossipTracker) AddKnown(

@@ -299,8 +299,9 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 }
 
 // createChain creates and starts the chain
+//
 // Note: it is expected for the subnet to already have the chain registered as
-//       bootstrapping before this function is called
+// bootstrapping before this function is called
 func (m *manager) createChain(chainParams ChainParameters) {
 	m.Log.Info("creating chain",
 		zap.Stringer("subnetID", chainParams.SubnetID),
@@ -427,6 +428,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
 
+	// This converts the prefix for all the Avalanche consensus metrics from
+	// `avalanche_{chainID}_` into `avalanche_{chainID}_avalanche_` so that
+	// there are no conflicts when registering the Snowman consensus metrics.
+	avalancheConsensusMetrics := prometheus.NewRegistry()
+	avalancheDAGNamespace := fmt.Sprintf("%s_avalanche", chainNamespace)
+	if err := m.Metrics.Register(avalancheDAGNamespace, avalancheConsensusMetrics); err != nil {
+		return nil, fmt.Errorf("error while registering DAG metrics %w", err)
+	}
+
 	vmMetrics := metrics.NewOptionalGatherer()
 	vmNamespace := fmt.Sprintf("%s_vm", chainNamespace)
 	if err := m.Metrics.Register(vmNamespace, vmMetrics); err != nil {
@@ -439,6 +449,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			SubnetID:  chainParams.SubnetID,
 			ChainID:   chainParams.ID,
 			NodeID:    m.NodeID,
+			PublicKey: bls.PublicFromSecretKey(m.StakingBLSKey),
 
 			XChainID:    m.XChainID,
 			CChainID:    m.CChainID,
@@ -455,9 +466,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		DecisionAcceptor:  m.DecisionAcceptorGroup,
-		ConsensusAcceptor: m.ConsensusAcceptorGroup,
-		Registerer:        consensusMetrics,
+		DecisionAcceptor:    m.DecisionAcceptorGroup,
+		ConsensusAcceptor:   m.ConsensusAcceptorGroup,
+		Registerer:          consensusMetrics,
+		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -467,7 +479,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(ctx.Context)
+	vm, err := vmFactory.New(chainLog)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -481,7 +493,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
 
-		fx, err := fxFactory.New(ctx.Context)
+		fx, err := fxFactory.New(chainLog)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating fx: %w", err)
 		}
@@ -583,11 +595,11 @@ func (m *manager) createAvalancheChain(
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
 
-	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.Registerer)
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.Registerer)
+	txBlocker, err := queue.New(txBootstrappingDB, "tx", ctx.AvalancheRegisterer)
 	if err != nil {
 		return nil, err
 	}

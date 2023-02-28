@@ -14,6 +14,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -288,10 +290,7 @@ utxoFor:
 		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
 
-	balances := map[ids.ID]uint64{}
-	for assetID, amount := range lockedStakeables {
-		balances[assetID] = amount
-	}
+	balances := maps.Clone(lockedStakeables)
 	for assetID, amount := range lockedNotStakeables {
 		newBalance, err := math.Add64(balances[assetID], amount)
 		if err != nil {

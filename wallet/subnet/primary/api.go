@@ -28,8 +28,8 @@ const (
 	fetchLimit = 1024
 )
 
-// TODO: refactor UTXOClient definition to allow the client implementations to
-//       perform their own assertions.
+// TODO: Refactor UTXOClient definition to allow the client implementations to
+// perform their own assertions.
 var (
 	_ UTXOClient = platformvm.Client(nil)
 	_ UTXOClient = avm.Client(nil)

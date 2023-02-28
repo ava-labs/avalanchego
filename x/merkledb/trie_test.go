@@ -22,11 +22,13 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		if err := asTrieView.CalculateIDs(context.Background()); err != nil {
 			return nil, err
 		}
-		closestNode, exact, err := asTrieView.getClosestNode(context.Background(), newPath([]byte(key)))
+		path := newPath([]byte(key))
+		nodePath, err := asTrieView.getPathTo(context.Background(), path)
 		if err != nil {
 			return nil, err
 		}
-		if !exact || closestNode == nil {
+		closestNode := nodePath[len(nodePath)-1]
+		if closestNode.key.Compare(path) != 0 || closestNode == nil {
 			return nil, database.ErrNotFound
 		}
 
@@ -37,17 +39,114 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		closestNode, exact, err := view.(*trieView).getClosestNode(context.Background(), newPath([]byte(key)))
+		path := newPath([]byte(key))
+		nodePath, err := view.(*trieView).getPathTo(context.Background(), path)
 		if err != nil {
 			return nil, err
 		}
-		if !exact || closestNode == nil {
+		closestNode := nodePath[len(nodePath)-1]
+		if closestNode.key.Compare(path) != 0 || closestNode == nil {
 			return nil, database.ErrNotFound
 		}
 
 		return closestNode.value.value, nil
 	}
 	return nil, nil
+}
+
+func TestTrieViewGetPathTo(t *testing.T) {
+	require := require.New(t)
+
+	db, err := newDatabase(
+		context.Background(),
+		memdb.New(),
+		Config{
+			Tracer:         newNoopTracer(),
+			ValueCacheSize: 1000,
+			HistoryLength:  1000,
+			NodeCacheSize:  1000,
+		},
+		&mockMetrics{},
+	)
+	require.NoError(err)
+
+	trieIntf, err := db.NewView(context.Background())
+	require.NoError(err)
+	trie, ok := trieIntf.(*trieView)
+	require.True(ok)
+
+	path, err := trie.getPathTo(context.Background(), newPath(nil))
+	require.NoError(err)
+
+	// Just the root
+	require.Len(path, 1)
+	require.Equal(trie.root, path[0])
+
+	// Insert a key
+	key1 := []byte{0}
+	err = trie.Insert(context.Background(), key1, []byte("value"))
+	require.NoError(err)
+	err = trie.CalculateIDs(context.Background())
+	require.NoError(err)
+
+	path, err = trie.getPathTo(context.Background(), newPath(key1))
+	require.NoError(err)
+
+	// Root and 1 value
+	require.Len(path, 2)
+	require.Equal(trie.root, path[0])
+	require.Equal(newPath(key1), path[1].key)
+
+	// Insert another key which is a child of the first
+	key2 := []byte{0, 1}
+	err = trie.Insert(context.Background(), key2, []byte("value"))
+	require.NoError(err)
+	err = trie.CalculateIDs(context.Background())
+	require.NoError(err)
+
+	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	require.NoError(err)
+	require.Len(path, 3)
+	require.Equal(trie.root, path[0])
+	require.Equal(newPath(key1), path[1].key)
+	require.Equal(newPath(key2), path[2].key)
+
+	// Insert a key which shares no prefix with the others
+	key3 := []byte{255}
+	err = trie.Insert(context.Background(), key3, []byte("value"))
+	require.NoError(err)
+	err = trie.CalculateIDs(context.Background())
+	require.NoError(err)
+
+	path, err = trie.getPathTo(context.Background(), newPath(key3))
+	require.NoError(err)
+	require.Len(path, 2)
+	require.Equal(trie.root, path[0])
+	require.Equal(newPath(key3), path[1].key)
+
+	// Other key paths not affected
+	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	require.NoError(err)
+	require.Len(path, 3)
+	require.Equal(trie.root, path[0])
+	require.Equal(newPath(key1), path[1].key)
+	require.Equal(newPath(key2), path[2].key)
+
+	// Gets closest node when key doesn't exist
+	key4 := []byte{0, 1, 2}
+	path, err = trie.getPathTo(context.Background(), newPath(key4))
+	require.NoError(err)
+	require.Len(path, 3)
+	require.Equal(trie.root, path[0])
+	require.Equal(newPath(key1), path[1].key)
+	require.Equal(newPath(key2), path[2].key)
+
+	// Gets just root when key doesn't exist and no key shares a prefix
+	key5 := []byte{128}
+	path, err = trie.getPathTo(context.Background(), newPath(key5))
+	require.NoError(err)
+	require.Len(path, 1)
+	require.Equal(trie.root, path[0])
 }
 
 func Test_Trie_Partial_Commit_Leaves_Valid_Tries(t *testing.T) {

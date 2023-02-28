@@ -110,17 +110,17 @@ func (dg *Directed) Initialize(
 	dg.params = params
 
 	var err error
-	dg.Polls, err = metrics.NewPolls("", ctx.Registerer)
+	dg.Polls, err = metrics.NewPolls("", ctx.AvalancheRegisterer)
 	if err != nil {
 		return fmt.Errorf("failed to create poll metrics: %w", err)
 	}
 
-	dg.Latency, err = metrics.NewLatency("txs", "transaction(s)", ctx.Log, "", ctx.Registerer)
+	dg.Latency, err = metrics.NewLatency("txs", "transaction(s)", ctx.Log, "", ctx.AvalancheRegisterer)
 	if err != nil {
 		return fmt.Errorf("failed to create latency metrics: %w", err)
 	}
 
-	dg.whitelistTxLatency, err = metrics.NewLatency("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.Registerer)
+	dg.whitelistTxLatency, err = metrics.NewLatency("whitelist_tx", "whitelist transaction(s)", ctx.Log, "", ctx.AvalancheRegisterer)
 	if err != nil {
 		return fmt.Errorf("failed to create whitelist tx metrics: %w", err)
 	}
@@ -129,7 +129,7 @@ func (dg *Directed) Initialize(
 		Name: "virtuous_tx_processing",
 		Help: "Number of currently processing virtuous transaction(s)",
 	})
-	err = ctx.Registerer.Register(dg.numVirtuousTxs)
+	err = ctx.AvalancheRegisterer.Register(dg.numVirtuousTxs)
 	if err != nil {
 		return fmt.Errorf("failed to create virtuous tx metrics: %w", err)
 	}
@@ -138,7 +138,7 @@ func (dg *Directed) Initialize(
 		Name: "rogue_tx_processing",
 		Help: "Number of currently processing rogue transaction(s)",
 	})
-	err = ctx.Registerer.Register(dg.numRogueTxs)
+	err = ctx.AvalancheRegisterer.Register(dg.numRogueTxs)
 	if err != nil {
 		return fmt.Errorf("failed to create rogue tx metrics: %w", err)
 	}

@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
@@ -325,7 +324,7 @@ func TestBuildBlock(t *testing.T) {
 					}},
 					Outs: []*avax.TransferableOutput{output},
 				}},
-				Validator: validator.Validator{
+				Validator: txs.Validator{
 					// Shouldn't be dropped
 					Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
 				},

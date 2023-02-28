@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -120,8 +121,9 @@ func NewContext(tb testing.TB) *snow.Context {
 }
 
 // Returns:
-//   1) tx in genesis that creates asset
-//   2) the index of the output
+//
+//  1. tx in genesis that creates asset
+//  2. the index of the output
 func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
@@ -303,7 +305,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{Factory: Factory{
+	vm := &VM{Config: config.Config{
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
 	}}

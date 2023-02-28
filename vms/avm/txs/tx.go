@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -41,8 +42,7 @@ type UnsignedTx interface {
 		ctx *snow.Context,
 		c codec.Manager,
 		txFeeAssetID ids.ID,
-		txFee uint64,
-		creationTxFee uint64,
+		config *config.Config,
 		numFxs int,
 	) error
 	// Visit calls [visitor] with this transaction's concrete type
@@ -108,15 +108,14 @@ func (t *Tx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
 	txFeeAssetID ids.ID,
-	txFee uint64,
-	creationTxFee uint64,
+	config *config.Config,
 	numFxs int,
 ) error {
 	if t == nil || t.Unsigned == nil {
 		return errNilTx
 	}
 
-	if err := t.Unsigned.SyntacticVerify(ctx, c, txFeeAssetID, txFee, creationTxFee, numFxs); err != nil {
+	if err := t.Unsigned.SyntacticVerify(ctx, c, txFeeAssetID, config, numFxs); err != nil {
 		return err
 	}
 

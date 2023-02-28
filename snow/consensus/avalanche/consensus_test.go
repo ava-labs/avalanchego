@@ -89,7 +89,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_processing",
 		}))
 		if err != nil {
@@ -113,7 +113,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_accepted",
 		}))
 		if err != nil {
@@ -137,7 +137,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_rejected",
 		}))
 		if err != nil {

@@ -19,7 +19,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -60,9 +59,7 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{
-		WhitelistedSubnetsKey: fmt.Sprintf("Use --%s instead", TrackSubnetsKey),
-	}
+	deprecatedKeys = map[string]string{}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -82,12 +79,6 @@ var (
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 )
-
-func GetRunnerConfig(v *viper.Viper) runner.Config {
-	return runner.Config{
-		DisplayVersionAndExit: v.GetBool(VersionKey),
-	}
-}
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
@@ -842,15 +833,10 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 }
 
 func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
-	var trackSubnets string
-	if v.IsSet(TrackSubnetsKey) {
-		trackSubnets = v.GetString(TrackSubnetsKey)
-	} else {
-		trackSubnets = v.GetString(WhitelistedSubnetsKey)
-	}
-
-	trackedSubnetIDs := set.Set[ids.ID]{}
-	for _, subnet := range strings.Split(trackSubnets, ",") {
+	trackSubnetsStr := v.GetString(TrackSubnetsKey)
+	trackSubnetsStrs := strings.Split(trackSubnetsStr, ",")
+	trackedSubnetIDs := set.NewSet[ids.ID](len(trackSubnetsStrs))
+	for _, subnet := range trackSubnetsStrs {
 		if subnet == "" {
 			continue
 		}

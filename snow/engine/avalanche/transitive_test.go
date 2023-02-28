@@ -3104,7 +3104,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bootCfg.Ctx.Registerer = prometheus.NewRegistry()
+	bootCfg.Ctx.AvalancheRegisterer = prometheus.NewRegistry()
 
 	// re-register the Transitive
 	bootstrapper2, err := bootstrap.New(

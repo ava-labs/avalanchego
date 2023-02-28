@@ -660,12 +660,12 @@ func midPoint(start, end []byte) []byte {
 			total -= 256
 			index := i - 1
 			for index >= 0 {
-				if midpoint[index] == 255 {
-					midpoint[index] = 0
-				} else {
+				if midpoint[index] != 255 {
 					midpoint[index]++
 					break
 				}
+
+				midpoint[index] = 0
 				index--
 			}
 		}

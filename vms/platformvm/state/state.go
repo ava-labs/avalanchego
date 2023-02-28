@@ -84,9 +84,9 @@ var (
 // execution.
 type Chain interface {
 	Stakers
-	UTXOAdder
-	UTXOGetter
-	UTXODeleter
+	avax.UTXOAdder
+	avax.UTXOGetter
+	avax.UTXODeleter
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -1333,7 +1333,7 @@ func (s *state) loadPendingValidators() error {
 }
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
-//            been called.
+// been called.
 func (s *state) initValidatorSets() error {
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {

@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -97,7 +97,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			validatorStartTimeDiff := 30 * time.Second
 			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
-			vdr := &validator.Validator{
+			vdr := &txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  uint64(vdrStartTime.Unix()),
 				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),

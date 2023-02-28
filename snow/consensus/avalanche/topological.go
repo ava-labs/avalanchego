@@ -11,6 +11,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -122,7 +124,7 @@ func (ta *Topological) Initialize(
 	ta.votes = bag.UniqueBag[ids.ID]{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
-	latencyMetrics, err := metrics.NewLatency("vtx", "vertex/vertices", chainCtx.Log, "", chainCtx.Registerer)
+	latencyMetrics, err := metrics.NewLatency("vtx", "vertex/vertices", chainCtx.Log, "", chainCtx.AvalancheRegisterer)
 	if err != nil {
 		return err
 	}
@@ -315,9 +317,7 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 // the non-transitively applied votes. Also returns the list of leaf nodes.
 func (ta *Topological) calculateInDegree(responses bag.UniqueBag[ids.ID]) error {
 	// Clear the kahn node set
-	for k := range ta.kahnNodes {
-		delete(ta.kahnNodes, k)
-	}
+	maps.Clear(ta.kahnNodes)
 	// Clear the leaf set
 	ta.leaves.Clear()
 

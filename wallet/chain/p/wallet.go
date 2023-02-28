@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -55,7 +54,7 @@ type Wallet interface {
 	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddValidatorTx(
-		vdr *validator.Validator,
+		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		shares uint32,
 		options ...common.Option,
@@ -67,7 +66,7 @@ type Wallet interface {
 	// - [vdr] specifies all the details of the validation period such as the
 	//   startTime, endTime, sampling weight, nodeID, and subnetID.
 	IssueAddSubnetValidatorTx(
-		vdr *validator.SubnetValidator,
+		vdr *txs.SubnetValidator,
 		options ...common.Option,
 	) (ids.ID, error)
 
@@ -89,7 +88,7 @@ type Wallet interface {
 	// - [rewardsOwner] specifies the owner of all the rewards this delegator
 	//   may accrue at the end of its delegation period.
 	IssueAddDelegatorTx(
-		vdr *validator.Validator,
+		vdr *txs.Validator,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (ids.ID, error)
@@ -208,7 +207,7 @@ type Wallet interface {
 	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
-		vdr *validator.SubnetValidator,
+		vdr *txs.SubnetValidator,
 		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
@@ -226,7 +225,7 @@ type Wallet interface {
 	// - [rewardsOwner] specifies the owner of all the rewards this delegator
 	//   earns during its delegation period.
 	IssueAddPermissionlessDelegatorTx(
-		vdr *validator.SubnetValidator,
+		vdr *txs.SubnetValidator,
 		assetID ids.ID,
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
@@ -286,7 +285,7 @@ func (w *wallet) IssueBaseTx(
 }
 
 func (w *wallet) IssueAddValidatorTx(
-	vdr *validator.Validator,
+	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
@@ -299,7 +298,7 @@ func (w *wallet) IssueAddValidatorTx(
 }
 
 func (w *wallet) IssueAddSubnetValidatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (ids.ID, error) {
 	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, options...)
@@ -322,7 +321,7 @@ func (w *wallet) IssueRemoveSubnetValidatorTx(
 }
 
 func (w *wallet) IssueAddDelegatorTx(
-	vdr *validator.Validator,
+	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (ids.ID, error) {
@@ -424,7 +423,7 @@ func (w *wallet) IssueTransformSubnetTx(
 }
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
@@ -448,7 +447,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 }
 
 func (w *wallet) IssueAddPermissionlessDelegatorTx(
-	vdr *validator.SubnetValidator,
+	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,

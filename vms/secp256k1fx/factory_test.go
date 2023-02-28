@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestFactory(t *testing.T) {
 	require := require.New(t)
 	factory := Factory{}
-	fx, err := factory.New(nil)
+	fx, err := factory.New(logging.NoLog{})
 	require.NoError(err)
 	require.NotNil(fx)
 }

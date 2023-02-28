@@ -1420,11 +1420,11 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 // Ensure that Accepting a PostForkBlock (A) containing core block (X) causes
 // core block (Y) and (Z) to also be rejected.
 //
-//      G
-//    /   \
-// A(X)   B(Y)
-//         |
-//        C(Z)
+//	     G
+//	   /   \
+//	A(X)   B(Y)
+//	        |
+//	       C(Z)
 func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
@@ -1602,11 +1602,11 @@ func TestTooFarAdvanced(t *testing.T) {
 // Ensure that Accepting a PostForkOption (B) causes both the other option and
 // the core block in the other option to be rejected.
 //
-//     G
-//     |
-//    A(X)
-//   /====\
-//  B(...) C(...)
+//	   G
+//	   |
+//	  A(X)
+//	 /====\
+//	B(...) C(...)
 //
 // B(...) is B(X.opts[0])
 // B(...) is C(X.opts[1])

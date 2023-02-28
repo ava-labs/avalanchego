@@ -83,6 +83,7 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 
 // Returns true iff the elements in [s] are unique.
 func IsUnique[T comparable](elts []T) bool {
+	// Can't use set.Set because it'd be a circular import.
 	asMap := make(map[T]struct{}, len(elts))
 	for _, elt := range elts {
 		if _, ok := asMap[elt]; ok {

@@ -595,8 +595,9 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 	ctx.SubnetID = subnetID
 	ctx.NodeID = myNodeID
 	snowCtx := &snow.ConsensusContext{
-		Context:    ctx,
-		Registerer: prometheus.NewRegistry(),
+		Context:             ctx,
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
 	}
 
 	type test struct {
@@ -882,8 +883,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 	ctx.SubnetID = subnetID
 	ctx.NodeID = myNodeID
 	snowCtx := &snow.ConsensusContext{
-		Context:    ctx,
-		Registerer: prometheus.NewRegistry(),
+		Context:             ctx,
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
 	}
 
 	type test struct {
@@ -1031,7 +1033,11 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
 			)
+
+			// Instantiate new registerers to avoid duplicate metrics
+			// registration
 			snowCtx.Registerer = prometheus.NewRegistry()
+			snowCtx.AvalancheRegisterer = prometheus.NewRegistry()
 
 			sender, err := New(
 				snowCtx,
@@ -1091,8 +1097,9 @@ func TestSender_Single_Request(t *testing.T) {
 	ctx.SubnetID = subnetID
 	ctx.NodeID = myNodeID
 	snowCtx := &snow.ConsensusContext{
-		Context:    ctx,
-		Registerer: prometheus.NewRegistry(),
+		Context:             ctx,
+		Registerer:          prometheus.NewRegistry(),
+		AvalancheRegisterer: prometheus.NewRegistry(),
 	}
 
 	type test struct {

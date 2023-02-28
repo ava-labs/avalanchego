@@ -5,11 +5,13 @@ package nftfx
 
 import (
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestFactory(t *testing.T) {
 	factory := Factory{}
-	if fx, err := factory.New(nil); err != nil {
+	if fx, err := factory.New(logging.NoLog{}); err != nil {
 		t.Fatal(err)
 	} else if fx == nil {
 		t.Fatalf("Factory.New returned nil")

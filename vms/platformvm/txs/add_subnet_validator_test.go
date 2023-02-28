@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -72,8 +71,8 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 			Outs:         outputs,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
-		Validator: validator.SubnetValidator{
-			Validator: validator.Validator{
+		SubnetValidator: SubnetValidator{
+			Validator: Validator{
 				NodeID: ctx.NodeID,
 				Start:  uint64(clk.Time().Unix()),
 				End:    uint64(clk.Time().Add(time.Hour).Unix()),
@@ -100,21 +99,21 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Missing Subnet ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
-	addSubnetValidatorTx.Validator.Subnet = ids.Empty
+	addSubnetValidatorTx.Subnet = ids.Empty
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
-	addSubnetValidatorTx.Validator.Subnet = subnetID
+	addSubnetValidatorTx.Subnet = subnetID
 
 	// Case: No weight
 	addSubnetValidatorTx.SyntacticallyVerified = false
-	addSubnetValidatorTx.Validator.Wght = 0
+	addSubnetValidatorTx.Wght = 0
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
-	addSubnetValidatorTx.Validator.Wght = validatorWeight
+	addSubnetValidatorTx.Wght = validatorWeight
 
 	// Case: Subnet auth indices not unique
 	addSubnetValidatorTx.SyntacticallyVerified = false
@@ -129,7 +128,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: adding to Primary Network
 	addSubnetValidatorTx.SyntacticallyVerified = false
-	addSubnetValidatorTx.Validator.Subnet = constants.PrimaryNetworkID
+	addSubnetValidatorTx.Subnet = constants.PrimaryNetworkID
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
@@ -183,8 +182,8 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 			Outs:         outputs,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
-		Validator: validator.SubnetValidator{
-			Validator: validator.Validator{
+		SubnetValidator: SubnetValidator{
+			Validator: Validator{
 				NodeID: ctx.NodeID,
 				Start:  uint64(clk.Time().Unix()),
 				End:    uint64(clk.Time().Add(time.Hour).Unix()),

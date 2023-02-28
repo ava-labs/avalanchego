@@ -100,12 +100,12 @@ func newTransitive(config Config) (*Transitive, error) {
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
-			config.Ctx.Registerer,
+			config.Ctx.AvalancheRegisterer,
 		),
 		uniformSampler: sampler.NewUniform(),
 	}
 
-	return t, t.metrics.Initialize("", config.Ctx.Registerer)
+	return t, t.metrics.Initialize("", config.Ctx.AvalancheRegisterer)
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
@@ -365,7 +365,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %s", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %w", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {

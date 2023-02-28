@@ -12,8 +12,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -24,19 +24,20 @@ var (
 
 // A Factory creates new instances of a VM
 type Factory interface {
-	New(*snow.Context) (interface{}, error)
+	New(logging.Logger) (interface{}, error)
 }
 
 // Manager tracks a collection of VM factories, their aliases, and their
 // versions.
 // It has the following functionality:
-//   1) Register a VM factory. To register a VM is to associate its ID with a
-//		VMFactory which, when New() is called upon it, creates a new instance of
-//      that VM.
-//	 2) Get a VM factory. Given the ID of a VM that has been registered, return
-//      the factory that the ID is associated with.
-//   3) Manage the aliases of VMs
-//   3) Manage the versions of VMs
+//
+//  1. Register a VM factory. To register a VM is to associate its ID with a
+//     VMFactory which, when New() is called upon it, creates a new instance of
+//     that VM.
+//  2. Get a VM factory. Given the ID of a VM that has been registered, return
+//     the factory that the ID is associated with.
+//  3. Manage the aliases of VMs
+//  4. Manage the versions of VMs
 type Manager interface {
 	ids.Aliaser
 
@@ -104,7 +105,8 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 
 	m.factories[vmID] = factory
 
-	vm, err := factory.New(nil)
+	// TODO: Pass in a VM specific logger
+	vm, err := factory.New(logging.NoLog{})
 	if err != nil {
 		return err
 	}

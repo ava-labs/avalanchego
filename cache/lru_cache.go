@@ -27,9 +27,6 @@ type LRU[K comparable, V any] struct {
 	entryMap  map[K]*list.Element
 	entryList *list.List
 	Size      int
-	// OnEviction is called with an internal lock held, and therefore should
-	// never call any methods on the cache internally.
-	OnEviction func(V)
 }
 
 func (c *LRU[K, V]) Put(key K, value V) {
@@ -79,9 +76,6 @@ func (c *LRU[K, V]) resize() {
 
 		val := e.Value.(*entry[K, V])
 		delete(c.entryMap, val.Key)
-		if c.OnEviction != nil {
-			c.OnEviction(val.Value)
-		}
 	}
 }
 
@@ -96,9 +90,6 @@ func (c *LRU[K, V]) put(key K, value V) {
 
 			val := e.Value.(*entry[K, V])
 			delete(c.entryMap, val.Key)
-			if c.OnEviction != nil {
-				c.OnEviction(val.Value)
-			}
 			val.Key = key
 			val.Value = value
 		} else {
@@ -136,23 +127,11 @@ func (c *LRU[K, V]) evict(key K) {
 	if e, ok := c.entryMap[key]; ok {
 		c.entryList.Remove(e)
 		delete(c.entryMap, key)
-
-		if c.OnEviction != nil {
-			val := e.Value.(*entry[K, V])
-			c.OnEviction(val.Value)
-		}
 	}
 }
 
 func (c *LRU[K, V]) flush() {
 	c.init()
-
-	if c.OnEviction != nil {
-		for _, v := range c.entryMap {
-			val := v.Value.(*entry[K, V])
-			c.OnEviction(val.Value)
-		}
-	}
 
 	c.entryMap = make(map[K]*list.Element, minCacheSize)
 	c.entryList = list.New()
