@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	ctx := snow.DefaultConsensusContextTest(t)
+	ctx.SubnetStateTracker = subnets.New(ctx.NodeID, subnets.Config{})
 
 	peers := validators.NewSet()
 	db := memdb.New()
@@ -181,7 +183,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -332,7 +334,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	switch {
 	case *requestID != oldReqID:
 		t.Fatal("should not have issued new request")
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -488,7 +490,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetChainState() != snow.ExtendingFrontier {
+	if !config.Ctx.IsChainBootstrapped() {
 		t.Fatalf("Should have finished bootstrapping")
 	}
 	if tx0.Status() != choices.Accepted {
@@ -622,7 +624,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetChainState() != snow.ExtendingFrontier {
+	if !config.Ctx.IsChainBootstrapped() {
 		t.Fatalf("Bootstrapping should have finished")
 	}
 	if tx0.Status() != choices.Unknown { // never saw this tx
@@ -752,17 +754,17 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
-	case bs.Context().GetChainState() == snow.ExtendingFrontier:
+	case bs.Context().IsChainBootstrapped():
 		t.Fatalf("should not have finished")
 	case requested != vtxID0:
-		t.Fatal("should hae requested vtx0")
+		t.Fatal("should have requested vtx0")
 	}
 
 	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
-	case bs.Context().GetChainState() != snow.ExtendingFrontier:
+	case !bs.Context().IsChainBootstrapped():
 		t.Fatal("should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatal("should be accepted")
@@ -884,7 +886,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1018,7 +1020,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")
@@ -1267,7 +1269,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case vtx0.Status() != choices.Accepted:
 		t.Fatalf("Vertex should be accepted")

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -35,6 +36,7 @@ var errUnknownBlock = errors.New("unknown block")
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
 	ctx := snow.DefaultConsensusContextTest(t)
+	ctx.SubnetStateTracker = subnets.New(ctx.NodeID, subnets.Config{})
 
 	peers := validators.NewSet()
 
@@ -273,7 +275,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -424,7 +426,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -588,7 +590,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -772,7 +774,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -933,7 +935,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1068,7 +1070,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1272,7 +1274,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.GetChainState() == snow.ExtendingFrontier {
+	if config.Ctx.IsChainBootstrapped() {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
@@ -1281,7 +1283,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1387,7 +1389,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.GetChainState() != snow.ExtendingFrontier:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Processing:
 		t.Fatalf("Block should be processing")

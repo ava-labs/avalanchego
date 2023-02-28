@@ -94,14 +94,20 @@ type ConsensusContext struct {
 	Executing utils.Atomic[bool]
 }
 
-func (cc *ConsensusContext) GetChainState() State {
-	return cc.SubnetStateTracker.GetState(cc.ChainID)
-}
-
+// Helpers section
 func (cc *ConsensusContext) Start(state State) {
 	cc.SubnetStateTracker.StartState(cc.ChainID, state)
 }
 
 func (cc *ConsensusContext) Done(state State) {
 	cc.SubnetStateTracker.StopState(cc.ChainID, state)
+}
+
+func (cc *ConsensusContext) IsChainBootstrapped() bool {
+	return cc.SubnetStateTracker.IsChainBootstrapped(cc.ChainID)
+}
+
+// TODO: consider dropping GetChainState
+func (cc *ConsensusContext) GetChainState() State {
+	return cc.SubnetStateTracker.GetState(cc.ChainID)
 }

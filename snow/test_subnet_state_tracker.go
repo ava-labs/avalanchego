@@ -16,13 +16,14 @@ type SubnetStateTrackerTest struct {
 	T *testing.T
 
 	CantIsSubnetSynced, CantStartState, CantStopState,
-	CantGetState, CantOnSyncCompleted bool
+	CantGetState, CantIsChainBootstrapped, CantOnSyncCompleted bool
 
-	IsSubnetSyncedF  func() bool
-	StartStateF      func(chainID ids.ID, state State)
-	StopStateF       func(chainID ids.ID, state State)
-	GetStateF        func(chainID ids.ID) State
-	OnSyncCompletedF func() chan struct{}
+	IsSubnetSyncedF      func() bool
+	StartStateF          func(chainID ids.ID, state State)
+	StopStateF           func(chainID ids.ID, state State)
+	GetStateF            func(chainID ids.ID) State
+	IsChainBootstrappedF func(chainID ids.ID) bool
+	OnSyncCompletedF     func() chan struct{}
 }
 
 // Default set the default callable value to [cant]
@@ -31,6 +32,7 @@ func (s *SubnetStateTrackerTest) Default(cant bool) {
 	s.CantStartState = cant
 	s.CantStopState = cant
 	s.CantGetState = cant
+	s.CantIsChainBootstrapped = cant
 	s.CantOnSyncCompleted = cant
 }
 
@@ -64,6 +66,15 @@ func (s *SubnetStateTrackerTest) StopState(chainID ids.ID, state State) {
 	} else if s.CantStopState && s.T != nil {
 		s.T.Fatalf("Unexpectedly called StopState")
 	}
+}
+
+func (s *SubnetStateTrackerTest) IsChainBootstrapped(chainID ids.ID) bool {
+	if s.IsChainBootstrappedF != nil {
+		return s.IsChainBootstrappedF(chainID)
+	} else if s.CantIsChainBootstrapped && s.T != nil {
+		s.T.Fatalf("Unexpectedly called IsChainBootstrapped")
+	}
+	return false
 }
 
 func (s *SubnetStateTrackerTest) GetState(chainID ids.ID) State {

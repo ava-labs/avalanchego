@@ -1542,8 +1542,7 @@ func (s *sender) SendGossip(_ context.Context, container []byte) {
 
 // Accept is called after every consensus decision
 func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) error {
-	if ctx.GetChainState() != snow.ExtendingFrontier &&
-		ctx.GetChainState() != snow.SubnetSynced {
+	if ctx.IsChainBootstrapped() {
 		// don't gossip during bootstrapping
 		return nil
 	}

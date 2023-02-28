@@ -268,7 +268,7 @@ func (vm *VM) onBootstrapStarted() error {
 	return nil
 }
 
-func (vm *VM) onNormalOperationsStarted() error {
+func (vm *VM) onExtendingFrontierStarted() error {
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -283,7 +283,10 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
 	case snow.ExtendingFrontier:
-		return vm.onNormalOperationsStarted()
+		return vm.onExtendingFrontierStarted()
+	case snow.SubnetSynced:
+		// TODO ABENEGIA: duly handle this
+		return nil
 	default:
 		return snow.ErrUnknownState
 	}

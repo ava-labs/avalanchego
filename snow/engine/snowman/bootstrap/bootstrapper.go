@@ -535,7 +535,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() {
+	if b.Ctx.IsChainBootstrapped() {
 		return nil
 	}
 

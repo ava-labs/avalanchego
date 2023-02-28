@@ -278,8 +278,8 @@ func (vm *VM) onBootstrapStarted() error {
 	return vm.fx.Bootstrapping()
 }
 
-// onNormalOperationsStarted marks this VM as bootstrapped
-func (vm *VM) onNormalOperationsStarted() error {
+// onExtendingFrontierStarted marks this VM as bootstrapped
+func (vm *VM) onExtendingFrontierStarted() error {
 	if vm.bootstrapped.Get() {
 		return nil
 	}
@@ -321,7 +321,10 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
 	case snow.ExtendingFrontier:
-		return vm.onNormalOperationsStarted()
+		return vm.onExtendingFrontierStarted()
+	case snow.SubnetSynced:
+		// TODO ABENEGIA: duly handle this
+		return nil
 	default:
 		return snow.ErrUnknownState
 	}

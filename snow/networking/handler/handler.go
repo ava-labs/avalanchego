@@ -450,9 +450,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit &&
-			(h.ctx.GetChainState() == snow.ExtendingFrontier ||
-				h.ctx.GetChainState() == snow.SubnetSynced) {
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.IsChainBootstrapped() {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),

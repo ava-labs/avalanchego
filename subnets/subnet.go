@@ -148,10 +148,32 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 }
 
 func (s *subnet) GetState(chainID ids.ID) snow.State {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.currentState[chainID]
+}
+
+func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	// chain must have completed bootstrap
+	doneBootstrap, found := s.stopped[snow.Bootstrapping]
+	if !found || !doneBootstrap.Contains(chainID) {
+		return false
+	}
+
+	// chain must have complete state sync only if it ever started
+	startedStateSync, found := s.started[snow.StateSyncing]
+	if !found || !startedStateSync.Contains(chainID) {
+		// bootstrap done, state sync never started
+		return true
+	}
+
+	// state sync started, must have finished
+	stoppedStateSync, found := s.stopped[snow.StateSyncing]
+	return found && stoppedStateSync.Contains(chainID)
 }
 
 func (s *subnet) OnSyncCompleted() chan struct{} {
