@@ -90,6 +90,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
+		case evm.chainRules.IsCortina:
+			cfg.JumpTable = &cortinaInstructionSet
 		case evm.chainRules.IsApricotPhase3:
 			cfg.JumpTable = &apricotPhase3InstructionSet
 		case evm.chainRules.IsApricotPhase2:
@@ -111,14 +113,17 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		default:
 			cfg.JumpTable = &frontierInstructionSet
 		}
+		// TODO: update this to the new go-ethereum code when the relevant code is merged.
+		if len(evm.Config.ExtraEips) > 0 {
+			// Deep-copy jumptable to prevent modification of opcodes in other tables
+			cfg.JumpTable = copyJumpTable(cfg.JumpTable)
+		}
 		for i, eip := range cfg.ExtraEips {
-			copy := *cfg.JumpTable
-			if err := EnableEIP(eip, &copy); err != nil {
+			if err := EnableEIP(eip, cfg.JumpTable); err != nil {
 				// Disable it, so caller can check if it's activated or not
 				cfg.ExtraEips = append(cfg.ExtraEips[:i], cfg.ExtraEips[i+1:]...)
 				log.Error("EIP activation failed", "eip", eip, "error", err)
 			}
-			cfg.JumpTable = &copy
 		}
 	}
 
