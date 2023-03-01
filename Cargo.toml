@@ -1,53 +1,8 @@
-[package]
-name = "firewood"
-version = "0.0.1"
-edition = "2021"
-autobins = false
-
-[lib]
-name = "firewood"
-path = "src/lib.rs"
-
-[[bin]]
-name = "fwdctl"
-path = "src/bin/fwdctl.rs"
-
-[dependencies]
-enum-as-inner = "0.5.1"
-parking_lot = "0.12.1"
-rlp = "0.5.2"
-sha3 = "0.10.2"
-once_cell = "1.13.1"
-hex = "0.4.3"
-lru = "0.9.0"
-libaio-futures = "0.2.2"
-nix = "0.26.1"
-typed-builder = "0.12.0"
-tokio = { version = "1.21.1", features = ["rt", "sync", "macros"] }
-shale = "0.1.7"
-growth-ring = "0.3.0"
-futures = "0.3.24"
-primitive-types = { version = "0.12.0", features = ["impl-rlp"] }
-serde = { version = "1.0", features = ["derive"] }
-bincode = "1.2.1"
-clap = { version = "4.0.29", features = ["cargo", "derive"] }
-anyhow = "1.0.66"
-env_logger = "0.10.0"
-log = "0.4.17"
-thiserror = "1.0.38"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-
-[dev-dependencies]
-clap = { version = "4.0.2", features = ["cargo", "derive"] }
-criterion = "0.4.0"
-keccak-hasher = "0.15.3"
-rand = "0.8.5"
-triehash = "0.8.4"
-assert_cmd = "2.0.7"
-predicates = "2.1.1"
-serial_test = "1.0.0"
+[workspace]
+members = [
+  "firewood",
+  "fwdctl",
+]
 
 [profile.release]
 debug = true
