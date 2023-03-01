@@ -467,6 +467,11 @@ func (n *network) Shutdown() {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	// clean up any pending requests
+	for requestID := range n.outstandingRequestHandlers {
+		delete(n.outstandingRequestHandlers, requestID)
+	}
+
 	// reset peers
 	n.peers = NewPeerTracker()
 }

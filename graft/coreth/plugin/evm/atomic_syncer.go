@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/trie"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -160,13 +161,13 @@ type atomicSyncerLeafTask struct {
 	atomicSyncer *atomicSyncer
 }
 
-func (a *atomicSyncerLeafTask) Start() []byte              { return addZeroes(a.atomicSyncer.nextHeight) }
-func (a *atomicSyncerLeafTask) End() []byte                { return nil }
-func (a *atomicSyncerLeafTask) NodeType() message.NodeType { return message.AtomicTrieNode }
-func (a *atomicSyncerLeafTask) OnFinish() error            { return a.atomicSyncer.onFinish() }
-func (a *atomicSyncerLeafTask) OnStart() (bool, error)     { return false, nil }
-func (a *atomicSyncerLeafTask) Root() common.Hash          { return a.atomicSyncer.targetRoot }
-func (a *atomicSyncerLeafTask) Account() common.Hash       { return common.Hash{} }
+func (a *atomicSyncerLeafTask) Start() []byte                  { return addZeroes(a.atomicSyncer.nextHeight) }
+func (a *atomicSyncerLeafTask) End() []byte                    { return nil }
+func (a *atomicSyncerLeafTask) NodeType() message.NodeType     { return message.AtomicTrieNode }
+func (a *atomicSyncerLeafTask) OnFinish(context.Context) error { return a.atomicSyncer.onFinish() }
+func (a *atomicSyncerLeafTask) OnStart() (bool, error)         { return false, nil }
+func (a *atomicSyncerLeafTask) Root() common.Hash              { return a.atomicSyncer.targetRoot }
+func (a *atomicSyncerLeafTask) Account() common.Hash           { return common.Hash{} }
 func (a *atomicSyncerLeafTask) OnLeafs(keys, vals [][]byte) error {
 	return a.atomicSyncer.onLeafs(keys, vals)
 }
