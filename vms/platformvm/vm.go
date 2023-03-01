@@ -317,6 +317,11 @@ func (vm *VM) onExtendingFrontierStarted() error {
 	return nil
 }
 
+func (vm *VM) onFullySynced() error {
+	vm.vmState.Set(snow.SubnetSynced)
+	return nil
+}
+
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
@@ -324,8 +329,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	case snow.ExtendingFrontier:
 		return vm.onExtendingFrontierStarted()
 	case snow.SubnetSynced:
-		// TODO ABENEGIA: duly handle this
-		return nil
+		return vm.onFullySynced()
 	default:
 		return snow.ErrUnknownState
 	}

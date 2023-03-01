@@ -126,7 +126,9 @@ func (b *builder) Preferred() (snowman.Block, error) {
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	if !status.DoneBootstraping(b.txExecutorBackend.VMState.Get()) {
+	if !status.FullySynced(b.txExecutorBackend.VMState.Get()) {
+		// do not produce blocks until this node is
+		// fully ready to verify them
 		return errChainNotSynced
 	}
 
@@ -279,7 +281,9 @@ func (b *builder) setNextBuildBlockTime() {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	if !status.DoneBootstraping(b.txExecutorBackend.VMState.Get()) {
+	if !status.FullySynced(b.txExecutorBackend.VMState.Get()) {
+		// do not produce blocks until this node is
+		// fully ready to verify them
 		ctx.Log.Verbo("skipping block timer reset",
 			zap.String("reason", "not bootstrapped"),
 		)

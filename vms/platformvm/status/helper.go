@@ -8,3 +8,7 @@ import "github.com/ava-labs/avalanchego/snow"
 func DoneBootstraping(state snow.State) bool {
 	return state == snow.ExtendingFrontier || state == snow.SubnetSynced
 }
+
+func FullySynced(state snow.State) bool {
+	return state == snow.SubnetSynced
+}
