@@ -21,7 +21,7 @@ jobs:
           cd goroot
           git checkout release-branch.go1.20
           rm VERSION
-          echo "1.20.2-rc" > VERSION
+          git rev-parse HEAD > VERSION
           cd src
           ./make.bash
           rm -rf /home/runner/go
