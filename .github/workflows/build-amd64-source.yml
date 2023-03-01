@@ -20,7 +20,6 @@ jobs:
           git clone https://go.googlesource.com/go goroot
           cd goroot
           git checkout release-branch.go1.20
-          echo "-" >> VERSION
           git rev-parse HEAD >> VERSION
           cd src
           ./make.bash
