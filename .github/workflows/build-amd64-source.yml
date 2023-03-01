@@ -4,8 +4,8 @@ on:
   push:
 
 jobs:
-  build-jammy-amd64-package:
-    runs-on: ubuntu-22.04
+  build-amd64-package-from-source:
+    runs-on: ubuntu-latest-16-cores
 
     steps:
       - uses: actions/checkout@v3
