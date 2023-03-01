@@ -26,8 +26,6 @@ jobs:
           cd ..
           cd ..
           mv goroot /home/runner/go
-          export GOROOT=/home/runner/go
-          export GOTOOLDIR=/home/runner/go/pkg/tool/linux_amd64
 
       - run: go version
       - run: go env
