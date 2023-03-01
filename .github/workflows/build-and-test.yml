@@ -16,6 +16,27 @@ jobs:
         with:
           go-version: '1.20'
           check-latest: true
+      - run: go version
+
+      - name: build golang from source
+        run: |
+          sudo apt update
+          sudo apt -y install git
+          git clone https://go.googlesource.com/go goroot
+          cd goroot
+          git checkout release-branch.go1.20
+          echo -n "-" >> VERSION
+          git rev-parse HEAD >> VERSION
+          cd src
+          ./make.bash
+          rm -rf /home/runner/go
+          cd ..
+          cd ..
+          mv goroot /home/runner/go
+
+      - run: go version
+      - run: go env
+
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
