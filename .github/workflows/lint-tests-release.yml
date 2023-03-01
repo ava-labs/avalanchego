@@ -24,17 +24,13 @@ jobs:
           args: --timeout 3m
 
   unit_test:
-    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        go: ["1.20"]
-        os: [ubuntu-20.04]
+    name: Golang Unit Tests
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
+          go-version: "1.19"
       - run: go mod download
         shell: bash
       - run: ./scripts/build.sh ./build/subnetevm
@@ -55,7 +51,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.20"
+          go-version: "1.19"
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -85,7 +81,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.20"
+          go-version: "1.19"
       - name: Set up arm64 cross compiler
         run: |
           sudo apt-get -y update
