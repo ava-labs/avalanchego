@@ -382,6 +382,12 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	}
 
+	// immediately promoting vm to fully synced to allow insertion of testSubnet
+	err = vm.SetState(context.Background(), snow.SubnetSynced)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead

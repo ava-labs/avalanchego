@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var _ txs.Visitor = (*txSemanticVerify)(nil)
@@ -47,7 +48,7 @@ func (t *txSemanticVerify) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	if !t.vm.bootstrapped {
+	if !status.DoneBootstraping(t.vm.vmState.Get()) {
 		return nil
 	}
 
@@ -85,7 +86,7 @@ func (t *txSemanticVerify) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
-	if t.vm.bootstrapped {
+	if status.FullySynced(t.vm.vmState.Get()) {
 		if err := verify.SameSubnet(context.TODO(), t.vm.ctx, tx.DestinationChain); err != nil {
 			return err
 		}

@@ -826,13 +826,15 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -918,13 +920,15 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1025,13 +1029,15 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1134,13 +1140,15 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1243,13 +1251,15 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1353,13 +1363,15 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1460,13 +1472,15 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 

@@ -93,7 +93,7 @@ type VM struct {
 	fx            fx.Fx
 	codecRegistry codec.Registry
 
-	// Bootstrapped remembers if this chain has finished bootstrapping or not
+	// vmState tracks vm status as set by the consensus engine
 	vmState utils.Atomic[snow.State]
 
 	// Maps caches for each subnet that is currently tracked.
