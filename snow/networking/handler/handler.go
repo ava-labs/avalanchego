@@ -41,7 +41,6 @@ const (
 var _ Handler = (*handler)(nil)
 
 type Handler interface {
-	common.Timer
 	health.Checker
 
 	Context() *snow.ConsensusContext
@@ -284,26 +283,6 @@ func (h *handler) Push(ctx context.Context, msg message.InboundMessage) {
 
 func (h *handler) Len() int {
 	return h.syncMessageQueue.Len() + h.asyncMessageQueue.Len()
-}
-
-func (h *handler) RegisterTimeout(d time.Duration) {
-	go func() {
-		timer := time.NewTimer(d)
-		defer timer.Stop()
-
-		select {
-		case <-timer.C:
-		case <-h.preemptTimeouts:
-		}
-
-		// If there is already a timeout ready to fire - just drop the
-		// additional timeout. This ensures that all goroutines that are spawned
-		// here are able to close if the chain is shutdown.
-		select {
-		case h.timeouts <- struct{}{}:
-		default:
-		}
-	}()
 }
 
 func (h *handler) Stop(ctx context.Context) {

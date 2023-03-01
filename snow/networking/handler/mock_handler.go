@@ -10,7 +10,6 @@ package handler
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	message "github.com/ava-labs/avalanchego/message"
@@ -123,18 +122,6 @@ func (m *MockHandler) Push(arg0 context.Context, arg1 message.InboundMessage) {
 func (mr *MockHandlerMockRecorder) Push(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Push", reflect.TypeOf((*MockHandler)(nil).Push), arg0, arg1)
-}
-
-// RegisterTimeout mocks base method.
-func (m *MockHandler) RegisterTimeout(arg0 time.Duration) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterTimeout", arg0)
-}
-
-// RegisterTimeout indicates an expected call of RegisterTimeout.
-func (mr *MockHandlerMockRecorder) RegisterTimeout(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterTimeout", reflect.TypeOf((*MockHandler)(nil).RegisterTimeout), arg0)
 }
 
 // SetBootstrapper mocks base method.
