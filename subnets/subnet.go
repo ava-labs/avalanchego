@@ -45,20 +45,20 @@ type subnet struct {
 	// stopped maps a vm state to the set of VMs that has done with that state
 	stopped map[snow.State]set.Set[ids.ID]
 
-	once             sync.Once
-	bootstrappedSema chan struct{}
-	config           Config
-	myNodeID         ids.NodeID
+	once       sync.Once
+	syncedSema chan struct{}
+	config     Config
+	myNodeID   ids.NodeID
 }
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
-		currentState:     make(map[ids.ID]snow.State),
-		started:          make(map[snow.State]set.Set[ids.ID]),
-		stopped:          make(map[snow.State]set.Set[ids.ID]),
-		bootstrappedSema: make(chan struct{}),
-		config:           config,
-		myNodeID:         myNodeID,
+		currentState: make(map[ids.ID]snow.State),
+		started:      make(map[snow.State]set.Set[ids.ID]),
+		stopped:      make(map[snow.State]set.Set[ids.ID]),
+		syncedSema:   make(chan struct{}),
+		config:       config,
+		myNodeID:     myNodeID,
 	}
 }
 
@@ -124,7 +124,7 @@ func (s *subnet) StartState(chainID ids.ID, state snow.State) {
 		return
 	}
 	s.once.Do(func() {
-		close(s.bootstrappedSema)
+		close(s.syncedSema)
 	})
 }
 
@@ -143,7 +143,7 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 		return
 	}
 	s.once.Do(func() {
-		close(s.bootstrappedSema)
+		close(s.syncedSema)
 	})
 }
 
@@ -177,7 +177,7 @@ func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
 }
 
 func (s *subnet) OnSyncCompleted() chan struct{} {
-	return s.bootstrappedSema
+	return s.syncedSema
 }
 
 func (s *subnet) AddChain(chainID ids.ID) bool {

@@ -78,7 +78,7 @@ type handler struct {
 	validators validators.Set
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
-	preemptTimeouts chan struct{}
+	syncedSubnet    chan struct{}
 	gossipFrequency time.Duration
 
 	stateSyncer  common.StateSyncer
@@ -99,7 +99,6 @@ type handler struct {
 	asyncMessageQueue MessageQueue
 	// Worker pool for handling asynchronous consensus messages
 	asyncMessagePool worker.Pool
-	timeouts         chan struct{}
 
 	closeOnce            sync.Once
 	closingChan          chan struct{}
@@ -127,10 +126,9 @@ func New(
 		ctx:              ctx,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
-		preemptTimeouts:  subnet.OnSyncCompleted(),
+		syncedSubnet:     subnet.OnSyncCompleted(),
 		gossipFrequency:  gossipFrequency,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
-		timeouts:         make(chan struct{}, 1),
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
@@ -381,8 +379,8 @@ func (h *handler) dispatchChans(ctx context.Context) {
 		case <-gossiper.C:
 			msg = message.InternalGossipRequest(h.ctx.NodeID)
 
-		case <-h.timeouts:
-			msg = message.InternalTimeout(h.ctx.NodeID)
+		case <-h.syncedSubnet:
+			msg = message.InternalVMMessage(h.ctx.NodeID, uint32(common.SubnetSynced))
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {

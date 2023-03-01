@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -80,6 +81,10 @@ type Transitive struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// subnetSyncedOnce ensures this engine notifies
+	// VM that subnet is synced only once
+	subnetSyncedOnce sync.Once
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
@@ -346,16 +351,18 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
+
 	case common.StateSyncDone:
 		t.Ctx.Done(snow.StateSyncing)
-		if t.Ctx.IsSynced() {
-			t.Ctx.Start(snow.SubnetSynced)
-			if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
-				return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
-			}
-		}
-
 		return nil
+
+	case common.SubnetSynced:
+		var err error
+		t.subnetSyncedOnce.Do(func() {
+			err = t.VM.SetState(ctx, snow.SubnetSynced)
+		})
+		return err
+
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
@@ -420,17 +427,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	t.Ctx.Start(snow.ExtendingFrontier)
-	if err := t.VM.SetState(ctx, snow.ExtendingFrontier); err != nil {
-		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
-			err)
-	}
-	if t.Ctx.IsSynced() {
-		t.Ctx.Start(snow.SubnetSynced)
-		if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
-			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
-		}
-	}
-	return nil
+	return t.VM.SetState(ctx, snow.ExtendingFrontier)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {

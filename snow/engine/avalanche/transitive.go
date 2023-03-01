@@ -6,6 +6,7 @@ package avalanche
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -75,6 +76,10 @@ type Transitive struct {
 
 	// A uniform sampler without replacement
 	uniformSampler sampler.Uniform
+
+	// subnetSyncedOnce ensures this engine notifies
+	// VM that subnet is synced only once
+	subnetSyncedOnce sync.Once
 
 	errs wrappers.Errs
 }
@@ -308,6 +313,13 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		// stop vertex doesn't have any txs, issue directly!
 		return t.issueStopVtx(ctx)
 
+	case common.SubnetSynced:
+		var err error
+		t.subnetSyncedOnce.Do(func() {
+			err = t.VM.SetState(ctx, snow.SubnetSynced)
+		})
+		return err
+
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
@@ -347,17 +359,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 
 	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 	t.Ctx.Start(snow.ExtendingFrontier)
-	if err := t.VM.SetState(ctx, snow.ExtendingFrontier); err != nil {
-		return fmt.Errorf("failed to notify VM that frontier extending has started: %w", err)
-	}
-	if t.Ctx.IsSynced() {
-		t.Ctx.Start(snow.SubnetSynced)
-		if err := t.VM.SetState(ctx, snow.SubnetSynced); err != nil {
-			return fmt.Errorf("failed to notify VM that subnet is fully synced: %w", err)
-		}
-	}
-
-	return nil
+	return t.VM.SetState(ctx, snow.ExtendingFrontier)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {

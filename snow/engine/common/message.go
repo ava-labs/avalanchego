@@ -24,6 +24,9 @@ const (
 
 	// StopVertex notifies a consensus that it has a pending stop vertex
 	StopVertex
+
+	// SubnetSynced notifies VMs that all other VMs in the same subnet have synced
+	SubnetSynced
 )
 
 func (msg Message) String() string {
@@ -34,6 +37,8 @@ func (msg Message) String() string {
 		return "State Sync Done"
 	case StopVertex:
 		return "Pending Stop Vertex"
+	case SubnetSynced:
+		return "Subnet Synced"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}

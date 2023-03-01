@@ -282,6 +282,10 @@ func (vm *VM) onExtendingFrontierStarted() error {
 }
 
 func (vm *VM) onFullySynced() error {
+	if status.FullySynced(vm.vmState.Get()) {
+		return nil
+	}
+
 	vm.vmState.Set(snow.SubnetSynced)
 	return nil
 }
