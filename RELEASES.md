@@ -19,7 +19,7 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 ### Miscellaneous
 
-- Updated the minimum golang version to `v1.20.1`
+- Updated the minimum golang version to `v1.19.6`
 - Added `warp.Signature#NumSigners` for better cost tracking support
 - Added `snow.Context#PublicKey` to provide access to the local node's BLS public key inside the VM execution environment
 - Renamed Avalanche consensus metric prefix to `avalanche_{chainID}_avalanche`

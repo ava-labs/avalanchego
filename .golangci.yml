@@ -19,7 +19,6 @@ linters:
     - bodyclose
     - depguard
     - errcheck
-    - errorlint
     - exportloopref
     - goconst
     - gocritic
@@ -44,6 +43,7 @@ linters:
     - unparam
     - unused
     - whitespace
+    # - errorlint (TODO: re-enable in go1.20 migration)
     # - goerr113
     # - gomnd
     # - lll
@@ -97,7 +97,7 @@ linters-settings:
       - name: useless-break
         disabled: false
   staticcheck:
-    go: "1.20"
+    go: "1.19"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"
