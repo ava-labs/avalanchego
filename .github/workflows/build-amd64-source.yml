@@ -21,7 +21,7 @@ jobs:
           cd goroot
           git checkout release-branch.go1.20
           cd src
-          ./all.bash
+          ./make.bash
 
       - run: go version
 
