@@ -45,6 +45,10 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -52,7 +56,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -126,6 +130,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -133,7 +141,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -206,6 +214,10 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -213,7 +225,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		1,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -276,6 +288,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -283,7 +299,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -345,6 +361,10 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -352,7 +372,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		connector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 

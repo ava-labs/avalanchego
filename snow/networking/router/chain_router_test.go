@@ -84,6 +84,10 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := handler.New(
 		ctx,
 		vdrs,
@@ -91,7 +95,7 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -207,6 +211,10 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := handler.New(
 		ctx,
 		vdrs,
@@ -214,7 +222,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -348,6 +356,9 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := handler.New(
 		ctx,
 		vdrs,
@@ -355,7 +366,7 @@ func TestRouterTimeout(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(err)
 
@@ -665,6 +676,10 @@ func TestRouterClearTimeouts(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := handler.New(
 		ctx,
 		vdrs,
@@ -672,7 +687,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -928,6 +943,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest(t)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
+	sb.AddChain(ctx.ChainID)
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
 	err = vdrs.Add(vID, nil, ids.Empty, 1)
@@ -1076,6 +1092,9 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	reqSb := subnets.New(requester.NodeID, subnets.Config{})
+	reqSb.AddChain(requester.ChainID)
+	requester.SubnetStateTracker = reqSb
 	requesterHandler, err := handler.New(
 		requester,
 		vdrs,
@@ -1083,7 +1102,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(requester.NodeID, subnets.Config{}),
+		reqSb,
 	)
 	require.NoError(t, err)
 
@@ -1093,6 +1112,9 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	responder.Metrics = metrics.NewOptionalGatherer()
 	responder.Executing.Set(false)
 
+	respSb := subnets.New(responder.NodeID, subnets.Config{})
+	respSb.AddChain(responder.ChainID)
+	responder.SubnetStateTracker = respSb
 	responderHandler, err := handler.New(
 		responder,
 		vdrs,
@@ -1100,7 +1122,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(responder.NodeID, subnets.Config{}),
+		respSb,
 	)
 	require.NoError(t, err)
 
@@ -1300,6 +1322,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	allowedSet := set.NewSet[ids.NodeID](1)
 	allowedSet.Add(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
+	sb.AddChain(ctx.ChainID)
 
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()

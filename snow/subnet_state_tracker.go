@@ -15,15 +15,18 @@ type SubnetStateTracker interface {
 	// and state synced chains have completed state sync too-
 	IsSynced() bool
 
-	StartState(chainID ids.ID, state State)
-	StopState(chainID ids.ID, state State)
-
 	// IsChainBootstrapped return true if chainID has currently completed
 	// state syncing and bootstrapping, even if the whole subnet is still to
 	// fully sync.
 	IsChainBootstrapped(chainID ids.ID) bool
 
+	// GetState returns latest started state for chainID
 	GetState(chainID ids.ID) State
 
-	OnSyncCompleted() chan struct{}
+	StartState(chainID ids.ID, state State)
+	StopState(chainID ids.ID, state State)
+
+	// one sync channel per chain, to make sure each chain gets notified
+	// when subnet completes sync
+	OnSyncCompleted(chainID ids.ID) (chan struct{}, error)
 }

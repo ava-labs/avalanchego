@@ -4,6 +4,7 @@
 package subnets
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,7 +47,7 @@ type subnet struct {
 	stopped map[snow.State]set.Set[ids.ID]
 
 	once       sync.Once
-	syncedSema chan struct{}
+	semaphores map[ids.ID]chan struct{}
 	config     Config
 	myNodeID   ids.NodeID
 }
@@ -56,7 +57,7 @@ func New(myNodeID ids.NodeID, config Config) Subnet {
 		currentState: make(map[ids.ID]snow.State),
 		started:      make(map[snow.State]set.Set[ids.ID]),
 		stopped:      make(map[snow.State]set.Set[ids.ID]),
-		syncedSema:   make(chan struct{}),
+		semaphores:   make(map[ids.ID]chan struct{}),
 		config:       config,
 		myNodeID:     myNodeID,
 	}
@@ -103,57 +104,6 @@ func (s *subnet) isSynced() bool {
 	return synced
 }
 
-func (s *subnet) StartState(chainID ids.ID, state snow.State) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.currentState[chainID] = state
-	started, anyChainStarted := s.started[state]
-	if !anyChainStarted {
-		s.started[state] = set.NewSet[ids.ID](3)
-		started = s.started[state]
-	}
-	started.Add(chainID)
-
-	// if we are restarting a given state, make sure it is not marked as stopped
-	if stopped, anyChainStopped := s.stopped[state]; anyChainStopped {
-		stopped.Remove(chainID)
-	}
-
-	if !s.isSynced() {
-		return
-	}
-	s.once.Do(func() {
-		close(s.syncedSema)
-	})
-}
-
-func (s *subnet) StopState(chainID ids.ID, state snow.State) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	stopped, anyChainDoneBootstrap := s.stopped[state]
-	if !anyChainDoneBootstrap {
-		s.stopped[state] = set.NewSet[ids.ID](3)
-		stopped = s.stopped[state]
-	}
-	stopped.Add(chainID)
-
-	if !s.isSynced() {
-		return
-	}
-	s.once.Do(func() {
-		close(s.syncedSema)
-	})
-}
-
-func (s *subnet) GetState(chainID ids.ID) snow.State {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.currentState[chainID]
-}
-
 func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -176,8 +126,69 @@ func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
 	return found && stoppedStateSync.Contains(chainID)
 }
 
-func (s *subnet) OnSyncCompleted() chan struct{} {
-	return s.syncedSema
+func (s *subnet) GetState(chainID ids.ID) snow.State {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.currentState[chainID]
+}
+
+func (s *subnet) StartState(chainID ids.ID, state snow.State) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.currentState[chainID] = state
+	started, anyChainStarted := s.started[state]
+	if !anyChainStarted {
+		s.started[state] = set.NewSet[ids.ID](3)
+		started = s.started[state]
+	}
+	started.Add(chainID)
+
+	// if we are restarting a given state, make sure it is not marked as stopped
+	if stopped, anyChainStopped := s.stopped[state]; anyChainStopped {
+		stopped.Remove(chainID)
+	}
+
+	if !s.isSynced() {
+		return
+	}
+	s.once.Do(func() {
+		for _, ch := range s.semaphores {
+			close(ch)
+		}
+	})
+}
+
+func (s *subnet) StopState(chainID ids.ID, state snow.State) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	stopped, anyChainDoneBootstrap := s.stopped[state]
+	if !anyChainDoneBootstrap {
+		s.stopped[state] = set.NewSet[ids.ID](3)
+		stopped = s.stopped[state]
+	}
+	stopped.Add(chainID)
+
+	if !s.isSynced() {
+		return
+	}
+	s.once.Do(func() {
+		for _, ch := range s.semaphores {
+			close(ch)
+		}
+	})
+}
+
+func (s *subnet) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
+	if _, found := s.currentState[chainID]; !found {
+		return nil, errors.New("unknown chain")
+	}
+
+	ch := make(chan struct{})
+	s.semaphores[chainID] = ch
+	return ch, nil
 }
 
 func (s *subnet) AddChain(chainID ids.ID) bool {

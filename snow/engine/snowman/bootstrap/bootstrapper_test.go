@@ -36,7 +36,9 @@ var errUnknownBlock = errors.New("unknown block")
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
 	ctx := snow.DefaultConsensusContextTest(t)
-	ctx.SubnetStateTracker = subnets.New(ctx.NodeID, subnets.Config{})
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 
 	peers := validators.NewSet()
 

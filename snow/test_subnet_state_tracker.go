@@ -23,7 +23,7 @@ type SubnetStateTrackerTest struct {
 	StopStateF           func(chainID ids.ID, state State)
 	GetStateF            func(chainID ids.ID) State
 	IsChainBootstrappedF func(chainID ids.ID) bool
-	OnSyncCompletedF     func() chan struct{}
+	OnSyncCompletedF     func(ids.ID) (chan struct{}, error)
 }
 
 // Default set the default callable value to [cant]
@@ -86,11 +86,11 @@ func (s *SubnetStateTrackerTest) GetState(chainID ids.ID) State {
 	return Initializing
 }
 
-func (s *SubnetStateTrackerTest) OnSyncCompleted() chan struct{} {
+func (s *SubnetStateTrackerTest) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
 	if s.OnSyncCompletedF != nil {
-		return s.OnSyncCompletedF()
+		return s.OnSyncCompletedF(chainID)
 	} else if s.CantOnSyncCompleted && s.T != nil {
 		s.T.Fatalf("Unexpectedly called OnSyncCompleted")
 	}
-	return nil
+	return nil, nil
 }

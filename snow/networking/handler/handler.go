@@ -122,11 +122,15 @@ func New(
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 ) (Handler, error) {
+	syncedSubnetCh, err := subnet.OnSyncCompleted(ctx.ChainID)
+	if err != nil {
+		return nil, err
+	}
 	h := &handler{
 		ctx:              ctx,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
-		syncedSubnet:     subnet.OnSyncCompleted(),
+		syncedSubnet:     syncedSubnetCh,
 		gossipFrequency:  gossipFrequency,
 		asyncMessagePool: worker.NewPool(threadPoolSize),
 		closingChan:      make(chan struct{}),
@@ -135,8 +139,6 @@ func New(
 		subnetConnector:  subnetConnector,
 		subnetAllower:    subnet,
 	}
-
-	var err error
 
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {
@@ -379,7 +381,13 @@ func (h *handler) dispatchChans(ctx context.Context) {
 		case <-gossiper.C:
 			msg = message.InternalGossipRequest(h.ctx.NodeID)
 
-		case <-h.syncedSubnet:
+		case _, ok := <-h.syncedSubnet:
+			// h.syncedSubnet is closed immediately, which makes it
+			// immediately available and would cause and endless loop.
+			// We nil h.syncedSubnet to ensure it is never selected again.
+			if !ok {
+				h.syncedSubnet = nil
+			}
 			msg = message.InternalVMMessage(h.ctx.NodeID, uint32(common.SubnetSynced))
 		}
 

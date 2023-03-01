@@ -1755,6 +1755,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AppGossipValidatorSize:    1,
 		AppGossipNonValidatorSize: 1,
 	}
+
+	sb := subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig})
+	sb.AddChain(consensusCtx.ChainID)
+	consensusCtx.SubnetStateTracker = sb
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
@@ -1762,7 +1766,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
+		sb,
 	)
 	require.NoError(err)
 
@@ -1816,6 +1820,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	sb2 := subnets.New(bootstrapConfig.Ctx.NodeID, subnets.Config{})
+	sb2.AddChain(bootstrapConfig.Ctx.ChainID)
+	bootstrapConfig.Ctx.SubnetStateTracker = sb2
 	handler, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1823,7 +1830,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		time.Hour,
 		cpuTracker,
 		vm,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb2,
 	)
 	require.NoError(err)
 
