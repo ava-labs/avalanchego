@@ -23,7 +23,7 @@ import (
 
 func NewCmd(path string, args ...string) *exec.Cmd {
 	cmd := exec.Command(path, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGINT}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
 	return cmd
 }
 
@@ -32,7 +32,7 @@ func stop(ctx context.Context, log logging.Logger, cmd *exec.Cmd) {
 	go func() {
 		// attempt graceful shutdown
 		errs := wrappers.Errs{}
-		err := cmd.Process.Signal(syscall.SIGINT)
+		err := cmd.Process.Signal(syscall.SIGTERM)
 		errs.Add(err)
 		_, err = cmd.Process.Wait()
 		errs.Add(err)
