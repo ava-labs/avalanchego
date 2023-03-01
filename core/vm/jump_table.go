@@ -65,6 +65,7 @@ var (
 	apricotPhase1InstructionSet    = newApricotPhase1InstructionSet()
 	apricotPhase2InstructionSet    = newApricotPhase2InstructionSet()
 	apricotPhase3InstructionSet    = newApricotPhase3InstructionSet()
+	cortinaInstructionSet          = newCortinaInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -86,6 +87,13 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
+}
+
+func newCortinaInstructionSet() JumpTable {
+	instructionSet := newApricotPhase3InstructionSet()
+	enable3855(&instructionSet) // PUSH0 instruction
+	enable3860(&instructionSet) // Limit and meter initcode
+	return validate(instructionSet)
 }
 
 // newApricotPhase3InstructionSet returns the frontier, homestead, byzantium,
@@ -1070,4 +1078,15 @@ func newFrontierInstructionSet() JumpTable {
 	}
 
 	return validate(tbl)
+}
+
+func copyJumpTable(source *JumpTable) *JumpTable {
+	dest := *source
+	for i, op := range source {
+		if op != nil {
+			opCopy := *op
+			dest[i] = &opCopy
+		}
+	}
+	return &dest
 }

@@ -70,12 +70,11 @@ type testBackend struct {
 
 func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {
 	backend := &testBackend{
-		chainConfig: params.TestChainConfig,
+		chainConfig: gspec.Config,
 		engine:      dummy.NewETHFaker(),
 		chaindb:     rawdb.NewMemoryDatabase(),
 	}
 	// Generate blocks for testing
-	gspec.Config = backend.chainConfig
 	var (
 		gendb   = rawdb.NewMemoryDatabase()
 		genesis = gspec.MustCommit(gendb)
@@ -201,11 +200,13 @@ func TestTraceCall(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	genesis := &core.Genesis{Alloc: core.GenesisAlloc{
-		accounts[0].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[1].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[2].addr: {Balance: big.NewInt(params.Ether)},
-	}}
+	genesis := &core.Genesis{
+		Config: params.TestBanffChainConfig, // TODO: go-ethereum has not enabled Shanghai yet, so we use Banff here so tests pass.
+		Alloc: core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
+		}}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
@@ -331,10 +332,12 @@ func TestTraceTransaction(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(2)
-	genesis := &core.Genesis{Alloc: core.GenesisAlloc{
-		accounts[0].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[1].addr: {Balance: big.NewInt(params.Ether)},
-	}}
+	genesis := &core.Genesis{
+		Config: params.TestChainConfig,
+		Alloc: core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+		}}
 	target := common.Hash{}
 	signer := types.HomesteadSigner{}
 	api := NewAPI(newTestBackend(t, 1, genesis, func(i int, b *core.BlockGen) {
@@ -369,11 +372,13 @@ func TestTraceBlock(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	genesis := &core.Genesis{Alloc: core.GenesisAlloc{
-		accounts[0].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[1].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[2].addr: {Balance: big.NewInt(params.Ether)},
-	}}
+	genesis := &core.Genesis{
+		Config: params.TestChainConfig,
+		Alloc: core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
+		}}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
@@ -444,11 +449,13 @@ func TestTracingWithOverrides(t *testing.T) {
 	t.Parallel()
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	genesis := &core.Genesis{Alloc: core.GenesisAlloc{
-		accounts[0].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[1].addr: {Balance: big.NewInt(params.Ether)},
-		accounts[2].addr: {Balance: big.NewInt(params.Ether)},
-	}}
+	genesis := &core.Genesis{
+		Config: params.TestBanffChainConfig, // TODO: go-ethereum has not enabled Shanghai yet, so we use Banff here so tests pass.
+		Alloc: core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
+		}}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {

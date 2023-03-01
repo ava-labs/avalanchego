@@ -50,6 +50,7 @@ const (
 
 	Keccak256Gas     uint64 = 30 // Once per KECCAK256 operation.
 	Keccak256WordGas uint64 = 6  // Once per word of the KECCAK256 operation's data.
+	InitCodeWordGas  uint64 = 2  // Once per word of the init code when creating a contract.
 
 	SstoreSetGas    uint64 = 20000 // Once per SSTORE operation.
 	SstoreResetGas  uint64 = 5000  // Once per SSTORE operation if the zeroness changes from zero.
@@ -131,7 +132,8 @@ const (
 	// Introduced in Tangerine Whistle (Eip 150)
 	CreateBySelfdestructGas uint64 = 25000
 
-	MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
+	MaxCodeSize     = 24576           // Maximum bytecode to permit for a contract
+	MaxInitCodeSize = 2 * MaxCodeSize // Maximum initcode to permit in a creation transaction and create instructions
 
 	// Precompiled contract gas prices
 
