@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-amd64-package-from-source:
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -22,8 +22,15 @@ jobs:
           git checkout release-branch.go1.20
           cd src
           ./make.bash
+          rm -rf /home/runner/go
+          cd ..
+          cd ..
+          mv goroot /home/runner/go
+          export GOROOT=/home/runner/go
+          export GOTOOLDIR=/home/runner/go/pkg/tool/linux_amd64
 
       - run: go version
+      - run: go env
 
       - name: Build the avalanchego binaries
         run: ./scripts/build.sh
