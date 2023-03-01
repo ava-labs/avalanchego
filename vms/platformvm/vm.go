@@ -312,13 +312,14 @@ func (vm *VM) onExtendingFrontierStarted() error {
 		return err
 	}
 
-	// Start the block builder
-	vm.Builder.ResetBlockTimer()
 	return nil
 }
 
 func (vm *VM) onFullySynced() error {
 	vm.vmState.Set(snow.SubnetSynced)
+
+	// Start the block builder
+	vm.Builder.ResetBlockTimer()
 	return nil
 }
 

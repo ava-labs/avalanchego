@@ -184,7 +184,7 @@ func (s *subnet) AddChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, anyChainDoneBootstrap := s.currentState[chainID]; anyChainDoneBootstrap {
+	if _, alreadyAdded := s.currentState[chainID]; alreadyAdded {
 		return false
 	}
 
