@@ -20,8 +20,6 @@ jobs:
 
       - name: build golang from source
         run: |
-          sudo apt update
-          sudo apt -y install git
           git clone https://go.googlesource.com/go goroot
           cd goroot
           git checkout release-branch.go1.20
