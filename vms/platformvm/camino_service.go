@@ -639,6 +639,50 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 	return nil
 }
 
+type APIDeposit struct {
+	DepositTxID         ids.ID `json:"depositTxID"`
+	DepositOfferID      ids.ID `json:"depositOfferID"`
+	UnlockedAmount      uint64 `json:"unlockedAmount"`
+	ClaimedRewardAmount uint64 `json:"claimedRewardAmount"`
+	Start               uint64 `json:"start"`
+	Duration            uint32 `json:"duration"`
+	Amount              uint64 `json:"amount"`
+}
+
+func APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) *APIDeposit {
+	return &APIDeposit{
+		DepositTxID:         depositTxID,
+		DepositOfferID:      deposit.DepositOfferID,
+		UnlockedAmount:      deposit.UnlockedAmount,
+		ClaimedRewardAmount: deposit.ClaimedRewardAmount,
+		Start:               deposit.Start,
+		Duration:            deposit.Duration,
+		Amount:              deposit.Amount,
+	}
+}
+
+type GetDepositsArgs struct {
+	DepositTxIDs []ids.ID `json:"depositTxIDs"`
+}
+
+type GetDepositsReply struct {
+	Deposits []*APIDeposit `json:"deposits"`
+}
+
+// GetDeposits returns deposits by IDs
+func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, reply *GetDepositsReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetDeposits called")
+	reply.Deposits = make([]*APIDeposit, len(args.DepositTxIDs))
+	for i := range args.DepositTxIDs {
+		deposit, err := s.vm.state.GetDeposit(args.DepositTxIDs[i])
+		if err != nil {
+			return fmt.Errorf("could't get deposit from state: %w", err)
+		}
+		reply.Deposits[i] = APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
+	}
+	return nil
+}
+
 // GetHeight returns the height of the last accepted block
 func (s *Service) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetLastAcceptedBlock called")
