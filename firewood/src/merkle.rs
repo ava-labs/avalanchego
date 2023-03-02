@@ -55,7 +55,9 @@ impl std::ops::Deref for Hash {
 
 impl MummyItem for Hash {
     fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
-        let raw = mem.get_view(addr, Self::MSIZE).ok_or(ShaleError::LinearMemStoreError)?;
+        let raw = mem
+            .get_view(addr, Self::MSIZE)
+            .ok_or(ShaleError::LinearMemStoreError)?;
         Ok(Self(raw[..Self::MSIZE as usize].try_into().unwrap()))
     }
 
@@ -96,7 +98,11 @@ impl PartialPath {
     fn encode(&self, term: bool) -> Vec<u8> {
         let odd_len = (self.0.len() & 1) as u8;
         let flags = if term { 2 } else { 0 } + odd_len;
-        let mut res = if odd_len == 1 { vec![flags] } else { vec![flags, 0x0] };
+        let mut res = if odd_len == 1 {
+            vec![flags]
+        } else {
+            vec![flags, 0x0]
+        };
         res.extend(&self.0);
         res
     }
@@ -190,7 +196,7 @@ impl BranchNode {
                 has_chd = true;
                 if only_chd.is_some() {
                     only_chd = None;
-                    break
+                    break;
                 }
                 only_chd = (*c).map(|e| (e, i as u8))
             }
@@ -235,7 +241,9 @@ impl BranchNode {
     }
 
     pub fn new(
-        chd: [Option<ObjPtr<Node>>; NBRANCH], value: Option<Vec<u8>>, chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
+        chd: [Option<ObjPtr<Node>>; NBRANCH],
+        value: Option<Vec<u8>>,
+        chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
     ) -> Self {
         BranchNode {
             chd,
@@ -272,7 +280,11 @@ impl Debug for LeafNode {
 
 impl LeafNode {
     fn calc_eth_rlp<T: ValueTransformer>(&self) -> Vec<u8> {
-        rlp::encode_list::<Vec<u8>, _>(&[from_nibbles(&self.0.encode(true)).collect(), T::transform(&self.1)]).into()
+        rlp::encode_list::<Vec<u8>, _>(&[
+            from_nibbles(&self.0.encode(true)).collect(),
+            T::transform(&self.1),
+        ])
+        .into()
     }
 
     pub fn new(path: Vec<u8>, data: Vec<u8>) -> Self {
@@ -383,7 +395,8 @@ impl Node {
     }
 
     fn get_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &[u8] {
-        self.eth_rlp.get_or_init(|| self.inner.calc_eth_rlp::<T>(store))
+        self.eth_rlp
+            .get_or_init(|| self.inner.calc_eth_rlp::<T>(store))
     }
 
     fn get_root_hash<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &Hash {
@@ -451,7 +464,9 @@ impl MummyItem for Node {
     fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
         let dec_err = |_| ShaleError::DecodeError;
         const META_SIZE: u64 = 32 + 1 + 1;
-        let meta_raw = mem.get_view(addr, META_SIZE).ok_or(ShaleError::LinearMemStoreError)?;
+        let meta_raw = mem
+            .get_view(addr, META_SIZE)
+            .ok_or(ShaleError::LinearMemStoreError)?;
         let attrs = meta_raw[32];
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
@@ -473,13 +488,15 @@ impl MummyItem for Node {
                 let mut chd = [None; NBRANCH];
                 let mut buff = [0; 8];
                 for chd in chd.iter_mut() {
-                    cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                    cur.read_exact(&mut buff)
+                        .map_err(|_| ShaleError::DecodeError)?;
                     let addr = u64::from_le_bytes(buff);
                     if addr != 0 {
                         *chd = Some(unsafe { ObjPtr::new_from_addr(addr) })
                     }
                 }
-                cur.read_exact(&mut buff[..4]).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff[..4])
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let raw_len = u32::from_le_bytes(buff[..4].try_into().map_err(dec_err)?) as u64;
                 let value = if raw_len == u32::MAX as u64 {
                     None
@@ -503,7 +520,8 @@ impl MummyItem for Node {
                         .get_view(offset + cur_rlp_len, 1)
                         .ok_or(ShaleError::LinearMemStoreError)?;
                     cur = Cursor::new(rlp_len_raw.deref());
-                    cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                    cur.read_exact(&mut buff)
+                        .map_err(|_| ShaleError::DecodeError)?;
                     let rlp_len = buff[0] as u64;
                     cur_rlp_len += 1;
                     if rlp_len != 0 {
@@ -533,9 +551,11 @@ impl MummyItem for Node {
                     .ok_or(ShaleError::LinearMemStoreError)?;
                 let mut cur = Cursor::new(node_raw.deref());
                 let mut buff = [0; 8];
-                cur.read_exact(&mut buff[..1]).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff[..1])
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let path_len = buff[0] as u64;
-                cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff)
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let ptr = u64::from_le_bytes(buff);
                 let nibbles: Vec<_> = to_nibbles(
                     &mem.get_view(addr + META_SIZE + ext_header_size, path_len)
@@ -549,7 +569,8 @@ impl MummyItem for Node {
                     .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
                     .ok_or(ShaleError::LinearMemStoreError)?;
                 cur = Cursor::new(rlp_len_raw.deref());
-                cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff)
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let rlp_len = buff[0] as u64;
                 let rlp: Option<Vec<u8>> = if rlp_len != 0 {
                     let rlp_raw = mem
@@ -573,9 +594,11 @@ impl MummyItem for Node {
                     .ok_or(ShaleError::LinearMemStoreError)?;
                 let mut cur = Cursor::new(node_raw.deref());
                 let mut buff = [0; 4];
-                cur.read_exact(&mut buff[..1]).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff[..1])
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let path_len = buff[0] as u64;
-                cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                cur.read_exact(&mut buff)
+                    .map_err(|_| ShaleError::DecodeError)?;
                 let data_len = u32::from_le_bytes(buff) as u64;
                 let remainder = mem
                     .get_view(addr + META_SIZE + leaf_header_size, path_len + data_len)
@@ -594,9 +617,9 @@ impl MummyItem for Node {
     }
 
     fn dehydrated_len(&self) -> u64 {
-        32 + 1 +
-            1 +
-            match &self.inner {
+        32 + 1
+            + 1
+            + match &self.inner {
                 NodeType::Branch(n) => {
                     let mut rlp_len = 0;
                     for rlp in n.chd_eth_rlp.iter() {
@@ -605,18 +628,18 @@ impl MummyItem for Node {
                             None => 1,
                         }
                     }
-                    NBRANCH as u64 * 8 +
-                        4 +
-                        match &n.value {
+                    NBRANCH as u64 * 8
+                        + 4
+                        + match &n.value {
                             Some(val) => val.len() as u64,
                             None => 0,
-                        } +
-                        rlp_len
+                        }
+                        + rlp_len
                 }
                 NodeType::Extension(n) => {
-                    1 + 8 +
-                        n.0.dehydrated_len() +
-                        match &n.2 {
+                    1 + 8
+                        + n.0.dehydrated_len()
+                        + match &n.2 {
                             Some(v) => 1 + v.len() as u64,
                             None => 1,
                         }
@@ -728,7 +751,10 @@ fn test_merkle_node_encoding() {
         Node::new_from_hash(
             None,
             None,
-            NodeType::Leaf(LeafNode(PartialPath(vec![0x1, 0x2, 0x3]), Data(vec![0x4, 0x5]))),
+            NodeType::Leaf(LeafNode(
+                PartialPath(vec![0x1, 0x2, 0x3]),
+                Data(vec![0x4, 0x5]),
+            )),
         ),
         Node::new_from_hash(
             None,
@@ -805,7 +831,10 @@ impl Merkle {
         Self { store }
     }
 
-    pub fn init_root(root: &mut ObjPtr<Node>, store: &dyn ShaleStore<Node>) -> Result<(), MerkleError> {
+    pub fn init_root(
+        root: &mut ObjPtr<Node>,
+        store: &dyn ShaleStore<Node>,
+    ) -> Result<(), MerkleError> {
         *root = store
             .put_item(
                 Node::new(NodeType::Branch(BranchNode {
@@ -910,8 +939,14 @@ impl Merkle {
 
     #[allow(clippy::too_many_arguments)]
     fn split<'b>(
-        &self, mut u_ref: ObjRef<'b, Node>, parents: &mut [(ObjRef<'b, Node>, u8)], rem_path: &[u8], n_path: Vec<u8>,
-        n_value: Option<Data>, val: Vec<u8>, deleted: &mut Vec<ObjPtr<Node>>,
+        &self,
+        mut u_ref: ObjRef<'b, Node>,
+        parents: &mut [(ObjRef<'b, Node>, u8)],
+        rem_path: &[u8],
+        n_path: Vec<u8>,
+        n_value: Option<Data>,
+        val: Vec<u8>,
+        deleted: &mut Vec<ObjPtr<Node>>,
     ) -> Result<Option<Vec<u8>>, MerkleError> {
         let u_ptr = u_ref.as_ptr();
         let new_chd = match rem_path.iter().zip(n_path.iter()).position(|(a, b)| a != b) {
@@ -982,7 +1017,8 @@ impl Merkle {
                                         let mut b_ref = self.get_node(u.1)?;
                                         if b_ref
                                             .write(|b| {
-                                                b.inner.as_branch_mut().unwrap().value = Some(Data(val));
+                                                b.inner.as_branch_mut().unwrap().value =
+                                                    Some(Data(val));
                                                 b.rehash()
                                             })
                                             .is_none()
@@ -1002,7 +1038,7 @@ impl Merkle {
                         parents,
                         deleted
                     );
-                    return err.unwrap_or_else(|| Ok(None))
+                    return err.unwrap_or_else(|| Ok(None));
                 }
                 let (leaf_ptr, prefix, idx, v) = if rem_path.len() < n_path.len() {
                     // key path is a prefix of the path to u
@@ -1036,7 +1072,7 @@ impl Merkle {
                     // key path extends the path to u
                     if n_value.is_none() {
                         // this case does not apply to an extension node, resume the tree walk
-                        return Ok(Some(val))
+                        return Ok(Some(val));
                     }
                     let leaf = self.new_node(Node::new(NodeType::Leaf(LeafNode(
                         PartialPath(rem_path[n_path.len() + 1..].to_vec()),
@@ -1075,7 +1111,12 @@ impl Merkle {
         Ok(None)
     }
 
-    pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, val: Vec<u8>, root: ObjPtr<Node>) -> Result<(), MerkleError> {
+    pub fn insert<K: AsRef<[u8]>>(
+        &mut self,
+        key: K,
+        val: Vec<u8>,
+        root: ObjPtr<Node>,
+    ) -> Result<(), MerkleError> {
         let mut deleted = Vec::new();
         let mut chunks = vec![0];
         chunks.extend(to_nibbles(key.as_ref()));
@@ -1086,7 +1127,7 @@ impl Merkle {
         for (i, nib) in chunks.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
-                continue
+                continue;
             }
             let mut u = u_ref.take().unwrap();
             let u_ptr = u.as_ptr();
@@ -1107,7 +1148,7 @@ impl Merkle {
                             u.rehash();
                         })
                         .unwrap();
-                        break
+                        break;
                     }
                 },
                 NodeType::Leaf(n) => {
@@ -1122,7 +1163,7 @@ impl Merkle {
                         val.take().unwrap(),
                         &mut deleted,
                     )?;
-                    break
+                    break;
                 }
                 NodeType::Extension(n) => {
                     let n_path = n.0.to_vec();
@@ -1141,7 +1182,7 @@ impl Merkle {
                         u = self.get_node(u_ptr)?;
                         n_ptr
                     } else {
-                        break
+                        break;
                     }
                 }
             };
@@ -1225,7 +1266,9 @@ impl Merkle {
     }
 
     fn after_remove_leaf<'b>(
-        &self, parents: &mut Vec<(ObjRef<'b, Node>, u8)>, deleted: &mut Vec<ObjPtr<Node>>,
+        &self,
+        parents: &mut Vec<(ObjRef<'b, Node>, u8)>,
+        deleted: &mut Vec<ObjPtr<Node>>,
     ) -> Result<(), MerkleError> {
         let (b_chd, val) = {
             let (mut b_ref, b_idx) = parents.pop().unwrap();
@@ -1239,7 +1282,7 @@ impl Merkle {
             let b_inner = b_ref.inner.as_branch().unwrap();
             let (b_chd, has_chd) = b_inner.single_child();
             if (has_chd && (b_chd.is_none() || b_inner.value.is_some())) || parents.is_empty() {
-                return Ok(())
+                return Ok(());
             }
             deleted.push(b_ref.as_ptr());
             (b_chd, b_inner.value.clone())
@@ -1252,7 +1295,10 @@ impl Merkle {
                     // from: [p: Branch] -> [b (v)]x -> [Leaf]x
                     // to: [p: Branch] -> [Leaf (v)]
                     let leaf = self
-                        .new_node(Node::new(NodeType::Leaf(LeafNode(PartialPath(Vec::new()), val))))?
+                        .new_node(Node::new(NodeType::Leaf(LeafNode(
+                            PartialPath(Vec::new()),
+                            val,
+                        ))))?
                         .as_ptr();
                     p_ref
                         .write(|p| {
@@ -1349,7 +1395,8 @@ impl Merkle {
                             drop(c_ref);
                             p_ref
                                 .write(|p| {
-                                    p.inner.as_branch_mut().unwrap().chd[p_idx as usize] = Some(c_ptr);
+                                    p.inner.as_branch_mut().unwrap().chd[p_idx as usize] =
+                                        Some(c_ptr);
                                     p.rehash()
                                 })
                                 .unwrap();
@@ -1392,7 +1439,9 @@ impl Merkle {
     }
 
     fn after_remove_branch<'b>(
-        &self, (c_ptr, idx): (ObjPtr<Node>, u8), parents: &mut Vec<(ObjRef<'b, Node>, u8)>,
+        &self,
+        (c_ptr, idx): (ObjPtr<Node>, u8),
+        parents: &mut Vec<(ObjRef<'b, Node>, u8)>,
         deleted: &mut Vec<ObjPtr<Node>>,
     ) -> Result<(), MerkleError> {
         // [b] -> [u] -> [c]
@@ -1411,14 +1460,13 @@ impl Merkle {
                                 NodeType::Branch(n) => {
                                     // from: [Branch] -> [Branch]x -> [Branch]
                                     // to: [Branch] -> [Ext] -> [Branch]
-                                    n.chd[b_idx as usize] = Some(
-                                        self.new_node(Node::new(NodeType::Extension(ExtNode(
-                                            PartialPath(vec![idx]),
-                                            c_ptr,
-                                            None,
-                                        ))))?
-                                        .as_ptr(),
-                                    );
+                                    n.chd[b_idx as usize] =
+                                        Some(
+                                            self.new_node(Node::new(NodeType::Extension(
+                                                ExtNode(PartialPath(vec![idx]), c_ptr, None),
+                                            )))?
+                                            .as_ptr(),
+                                        );
                                 }
                                 NodeType::Extension(n) => {
                                     // from: [Ext] -> [Branch]x -> [Branch]
@@ -1438,7 +1486,7 @@ impl Merkle {
                     deleted
                 );
                 if let Some(e) = err {
-                    return e
+                    return e;
                 }
             }
             NodeType::Leaf(_) | NodeType::Extension(_) => match &b_ref.inner {
@@ -1506,12 +1554,16 @@ impl Merkle {
         Ok(())
     }
 
-    pub fn remove<K: AsRef<[u8]>>(&mut self, key: K, root: ObjPtr<Node>) -> Result<Option<Vec<u8>>, MerkleError> {
+    pub fn remove<K: AsRef<[u8]>>(
+        &mut self,
+        key: K,
+        root: ObjPtr<Node>,
+    ) -> Result<Option<Vec<u8>>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(to_nibbles(key.as_ref()));
 
         if root.is_null() {
-            return Ok(None)
+            return Ok(None);
         }
 
         let mut deleted = Vec::new();
@@ -1523,7 +1575,7 @@ impl Merkle {
         for (i, nib) in chunks.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
-                continue
+                continue;
             }
             let next_ptr = match &u_ref.inner {
                 NodeType::Branch(n) => match n.chd[*nib as usize] {
@@ -1532,18 +1584,18 @@ impl Merkle {
                 },
                 NodeType::Leaf(n) => {
                     if chunks[i..] != *n.0 {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     found = Some(n.1.clone());
                     deleted.push(u_ref.as_ptr());
                     self.after_remove_leaf(&mut parents, &mut deleted)?;
-                    break
+                    break;
                 }
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
                     let rem_path = &chunks[i..];
                     if rem_path < n_path || &rem_path[..n_path.len()] != n_path {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     nskip = n_path.len() - 1;
                     n.1
@@ -1557,7 +1609,7 @@ impl Merkle {
             match &u_ref.inner {
                 NodeType::Branch(n) => {
                     if n.value.is_none() {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     let (c_chd, _) = n.single_child();
                     u_ref
@@ -1573,7 +1625,7 @@ impl Merkle {
                 }
                 NodeType::Leaf(n) => {
                     if n.0.len() > 0 {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     found = Some(n.1.clone());
                     deleted.push(u_ref.as_ptr());
@@ -1595,7 +1647,11 @@ impl Merkle {
         Ok(found.map(|e| e.0))
     }
 
-    fn remove_tree_(&self, u: ObjPtr<Node>, deleted: &mut Vec<ObjPtr<Node>>) -> Result<(), MerkleError> {
+    fn remove_tree_(
+        &self,
+        u: ObjPtr<Node>,
+        deleted: &mut Vec<ObjPtr<Node>>,
+    ) -> Result<(), MerkleError> {
         let u_ref = self.get_node(u)?;
         match &u_ref.inner {
             NodeType::Branch(n) => {
@@ -1613,7 +1669,7 @@ impl Merkle {
     pub fn remove_tree(&mut self, root: ObjPtr<Node>) -> Result<(), MerkleError> {
         let mut deleted = Vec::new();
         if root.is_null() {
-            return Ok(())
+            return Ok(());
         }
         self.remove_tree_(root, &mut deleted)?;
         for ptr in deleted.into_iter() {
@@ -1622,13 +1678,17 @@ impl Merkle {
         Ok(())
     }
 
-    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K, root: ObjPtr<Node>) -> Result<Option<RefMut>, MerkleError> {
+    pub fn get_mut<K: AsRef<[u8]>>(
+        &mut self,
+        key: K,
+        root: ObjPtr<Node>,
+    ) -> Result<Option<RefMut>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(to_nibbles(key.as_ref()));
         let mut parents = Vec::new();
 
         if root.is_null() {
-            return Ok(None)
+            return Ok(None);
         }
 
         let mut u_ref = self.get_node(root)?;
@@ -1638,7 +1698,7 @@ impl Merkle {
             let u_ptr = u_ref.as_ptr();
             if nskip > 0 {
                 nskip -= 1;
-                continue
+                continue;
             }
             let next_ptr = match &u_ref.inner {
                 NodeType::Branch(n) => match n.chd[*nib as usize] {
@@ -1647,16 +1707,16 @@ impl Merkle {
                 },
                 NodeType::Leaf(n) => {
                     if chunks[i..] != *n.0 {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     drop(u_ref);
-                    return Ok(Some(RefMut::new(u_ptr, parents, self)))
+                    return Ok(Some(RefMut::new(u_ptr, parents, self)));
                 }
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
                     let rem_path = &chunks[i..];
                     if rem_path.len() < n_path.len() || &rem_path[..n_path.len()] != n_path {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     nskip = n_path.len() - 1;
                     n.1
@@ -1671,13 +1731,13 @@ impl Merkle {
             NodeType::Branch(n) => {
                 if n.value.as_ref().is_some() {
                     drop(u_ref);
-                    return Ok(Some(RefMut::new(u_ptr, parents, self)))
+                    return Ok(Some(RefMut::new(u_ptr, parents, self)));
                 }
             }
             NodeType::Leaf(n) => {
                 if n.0.len() == 0 {
                     drop(u_ref);
-                    return Ok(Some(RefMut::new(u_ptr, parents, self)))
+                    return Ok(Some(RefMut::new(u_ptr, parents, self)));
                 }
             }
             _ => (),
@@ -1703,7 +1763,7 @@ impl Merkle {
 
         let mut proofs: HashMap<[u8; 32], Vec<u8>> = HashMap::new();
         if root.is_null() {
-            return Ok(Proof(proofs))
+            return Ok(Proof(proofs));
         }
 
         // Skip the sentinel root
@@ -1723,7 +1783,7 @@ impl Merkle {
         for (i, nib) in chunks.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
-                continue
+                continue;
             }
             nodes.push(u_ref.as_ptr());
             let next_ptr: ObjPtr<Node> = match &u_ref.inner {
@@ -1735,8 +1795,10 @@ impl Merkle {
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
                     let remaining_path = &chunks[i..];
-                    if remaining_path.len() < n_path.len() || &remaining_path[..n_path.len()] != n_path {
-                        break
+                    if remaining_path.len() < n_path.len()
+                        || &remaining_path[..n_path.len()] != n_path
+                    {
+                        break;
                     } else {
                         nskip = n_path.len() - 1;
                         n.1
@@ -1771,12 +1833,16 @@ impl Merkle {
         Ok(Proof(proofs))
     }
 
-    pub fn get<K: AsRef<[u8]>>(&self, key: K, root: ObjPtr<Node>) -> Result<Option<Ref>, MerkleError> {
+    pub fn get<K: AsRef<[u8]>>(
+        &self,
+        key: K,
+        root: ObjPtr<Node>,
+    ) -> Result<Option<Ref>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(to_nibbles(key.as_ref()));
 
         if root.is_null() {
-            return Ok(None)
+            return Ok(None);
         }
 
         let mut u_ref = self.get_node(root)?;
@@ -1785,7 +1851,7 @@ impl Merkle {
         for (i, nib) in chunks.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
-                continue
+                continue;
             }
             let next_ptr = match &u_ref.inner {
                 NodeType::Branch(n) => match n.chd[*nib as usize] {
@@ -1794,15 +1860,15 @@ impl Merkle {
                 },
                 NodeType::Leaf(n) => {
                     if chunks[i..] != *n.0 {
-                        return Ok(None)
+                        return Ok(None);
                     }
-                    return Ok(Some(Ref(u_ref)))
+                    return Ok(Some(Ref(u_ref)));
                 }
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
                     let rem_path = &chunks[i..];
                     if rem_path.len() < n_path.len() || &rem_path[..n_path.len()] != n_path {
-                        return Ok(None)
+                        return Ok(None);
                     }
                     nskip = n_path.len() - 1;
                     n.1
@@ -1814,12 +1880,12 @@ impl Merkle {
         match &u_ref.inner {
             NodeType::Branch(n) => {
                 if n.value.as_ref().is_some() {
-                    return Ok(Some(Ref(u_ref)))
+                    return Ok(Some(Ref(u_ref)));
                 }
             }
             NodeType::Leaf(n) => {
                 if n.0.len() == 0 {
-                    return Ok(Some(Ref(u_ref)))
+                    return Ok(Some(Ref(u_ref)));
                 }
             }
             _ => (),
@@ -1854,7 +1920,11 @@ impl<'a> std::ops::Deref for Ref<'a> {
 
 impl<'a> RefMut<'a> {
     fn new(ptr: ObjPtr<Node>, parents: Vec<(ObjPtr<Node>, u8)>, merkle: &'a mut Merkle) -> Self {
-        Self { ptr, parents, merkle }
+        Self {
+            ptr,
+            parents,
+            merkle,
+        }
     }
 
     pub fn get(&self) -> Ref {
@@ -1905,7 +1975,9 @@ impl ValueTransformer for IdTrans {
 }
 
 pub fn to_nibbles(bytes: &[u8]) -> impl Iterator<Item = u8> + '_ {
-    bytes.iter().flat_map(|b| [(b >> 4) & 0xf, b & 0xf].into_iter())
+    bytes
+        .iter()
+        .flat_map(|b| [(b >> 4) & 0xf, b & 0xf].into_iter())
 }
 
 pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {

@@ -19,7 +19,11 @@ impl File {
         openat(
             rootfd,
             fname,
-            (if truncate { OFlag::O_TRUNC } else { OFlag::empty() }) | OFlag::O_RDWR,
+            (if truncate {
+                OFlag::O_TRUNC
+            } else {
+                OFlag::empty()
+            }) | OFlag::O_RDWR,
             Mode::S_IRUSR | Mode::S_IWUSR,
         )
     }
@@ -77,13 +81,24 @@ impl Drop for File {
 
 pub fn touch_dir(dirname: &str, rootfd: Fd) -> Result<Fd, Errno> {
     use nix::sys::stat::mkdirat;
-    if mkdirat(rootfd, dirname, Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR).is_err() {
+    if mkdirat(
+        rootfd,
+        dirname,
+        Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR,
+    )
+    .is_err()
+    {
         let errno = nix::errno::from_i32(nix::errno::errno());
         if errno != nix::errno::Errno::EEXIST {
-            return Err(errno)
+            return Err(errno);
         }
     }
-    openat(rootfd, dirname, OFlag::O_DIRECTORY | OFlag::O_PATH, Mode::empty())
+    openat(
+        rootfd,
+        dirname,
+        OFlag::O_DIRECTORY | OFlag::O_PATH,
+        Mode::empty(),
+    )
 }
 
 pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
@@ -94,7 +109,7 @@ pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
     match mkdir(path, Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR) {
         Err(e) => {
             if truncate {
-                return Err(e)
+                return Err(e);
             }
         }
         Ok(_) => {

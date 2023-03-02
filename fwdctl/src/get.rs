@@ -40,9 +40,9 @@ pub fn run(opts: &Options) -> Result<()> {
             };
             println!("{:?}", s);
             if val.is_empty() {
-                return Err(anyhow!("no value found for key"))
+                return Err(anyhow!("no value found for key"));
             }
-            return Ok(())
+            return Ok(());
         }
         Err(_) => return Err(anyhow!("key not found")),
     }

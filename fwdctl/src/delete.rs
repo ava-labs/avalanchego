@@ -32,7 +32,10 @@ pub fn run(opts: &Options) -> Result<()> {
     };
 
     let mut account: Option<Vec<u8>> = None;
-    let x = match db.new_writebatch().kv_remove(opts.key.clone(), &mut account) {
+    let x = match db
+        .new_writebatch()
+        .kv_remove(opts.key.clone(), &mut account)
+    {
         Ok(wb) => {
             wb.commit();
             println!("{}", opts.key);

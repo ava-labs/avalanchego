@@ -146,10 +146,12 @@ impl Deref for StoreDelta {
 impl StoreDelta {
     pub fn new(src: &dyn MemStoreR, writes: &[SpaceWrite]) -> Self {
         let mut deltas = Vec::new();
-        let mut widx: Vec<_> = (0..writes.len()).filter(|i| writes[*i].data.len() > 0).collect();
+        let mut widx: Vec<_> = (0..writes.len())
+            .filter(|i| writes[*i].data.len() > 0)
+            .collect();
         if widx.is_empty() {
             // the writes are all empty
-            return Self(deltas)
+            return Self(deltas);
         }
 
         // sort by the starting point
@@ -245,18 +247,22 @@ impl MemStoreR for StoreRev {
         let mut r = delta.len();
         // no dirty page, before or after all dirty pages
         if r == 0 {
-            return prev.get_slice(start, end - start)
+            return prev.get_slice(start, end - start);
         }
         // otherwise, some dirty pages are covered by the range
         while r - l > 1 {
             let mid = (l + r) >> 1;
-            (*if start < delta[mid].offset() { &mut r } else { &mut l }) = mid;
+            (*if start < delta[mid].offset() {
+                &mut r
+            } else {
+                &mut l
+            }) = mid;
         }
         if start >= delta[l].offset() + PAGE_SIZE {
             l += 1
         }
         if l >= delta.len() || end < delta[l].offset() {
-            return prev.get_slice(start, end - start)
+            return prev.get_slice(start, end - start);
         }
         let mut data = Vec::new();
         let p_off = std::cmp::min(end - delta[l].offset(), PAGE_SIZE);
@@ -271,14 +277,14 @@ impl MemStoreR for StoreRev {
             l += 1;
             if l >= delta.len() || end < delta[l].offset() {
                 data.extend(prev.get_slice(start, end - start)?);
-                break
+                break;
             }
             if delta[l].offset() > start {
                 data.extend(prev.get_slice(start, delta[l].offset() - start)?);
             }
             if end < delta[l].offset() + PAGE_SIZE {
                 data.extend(&delta[l].data()[..(end - delta[l].offset()) as usize]);
-                break
+                break;
             }
             data.extend(delta[l].data());
             start = delta[l].offset() + PAGE_SIZE;
@@ -441,7 +447,10 @@ impl MemStore for StoreRevMut {
                 }
                 match deltas.get(&e_pid) {
                     Some(p) => data.extend(&p[..e_off + 1]),
-                    None => data.extend(self.prev.get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?),
+                    None => data.extend(
+                        self.prev
+                            .get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?,
+                    ),
                 }
                 data
             }
@@ -585,7 +594,9 @@ impl CachedSpace {
         let files = Arc::new(FilePool::new(cfg)?);
         Ok(Self {
             inner: Rc::new(RefCell::new(CachedSpaceInner {
-                cached_pages: lru::LruCache::new(NonZeroUsize::new(cfg.ncached_pages).expect("non-zero cache size")),
+                cached_pages: lru::LruCache::new(
+                    NonZeroUsize::new(cfg.ncached_pages).expect("non-zero cache size"),
+                ),
                 pinned_pages: HashMap::new(),
                 files,
                 disk_buffer: DiskBufferRequester::default(),
@@ -611,15 +622,19 @@ impl CachedSpace {
 impl CachedSpaceInner {
     fn fetch_page(&mut self, space_id: SpaceID, pid: u64) -> Result<Box<Page>, StoreError> {
         if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
-            return Ok(Box::new(*p))
+            return Ok(Box::new(*p));
         }
         let file_nbit = self.files.get_file_nbit();
         let file_size = 1 << file_nbit;
         let poff = pid << PAGE_SIZE_NBIT;
         let file = self.files.get_file(poff >> file_nbit)?;
         let mut page: Page = [0; PAGE_SIZE as usize];
-        nix::sys::uio::pread(file.get_fd(), &mut page, (poff & (file_size - 1)) as nix::libc::off_t)
-            .map_err(StoreError::System)?;
+        nix::sys::uio::pread(
+            file.get_fd(),
+            &mut page,
+            (poff & (file_size - 1)) as nix::libc::off_t,
+        )
+        .map_err(StoreError::System)?;
         Ok(Box::new(page))
     }
 
@@ -652,7 +667,7 @@ impl CachedSpaceInner {
                 if *cnt == 0 {
                     e.remove().1
                 } else {
-                    return
+                    return;
                 }
             }
             _ => unreachable!(),
@@ -684,7 +699,11 @@ impl PageRef {
     fn new(pid: u64, store: &CachedSpace) -> Option<Self> {
         Some(Self {
             pid,
-            data: store.inner.borrow_mut().pin_page(store.space_id, pid).ok()?,
+            data: store
+                .inner
+                .borrow_mut()
+                .pin_page(store.space_id, pid)
+                .ok()?,
             store: store.clone(),
         })
     }
@@ -699,7 +718,7 @@ impl Drop for PageRef {
 impl MemStoreR for CachedSpace {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>> {
         if length == 0 {
-            return Some(Default::default())
+            return Some(Default::default());
         }
         let end = offset + length - 1;
         let s_pid = offset >> PAGE_SIZE_NBIT;
@@ -707,7 +726,7 @@ impl MemStoreR for CachedSpace {
         let e_pid = end >> PAGE_SIZE_NBIT;
         let e_off = (end & PAGE_MASK) as usize;
         if s_pid == e_pid {
-            return PageRef::new(s_pid, self).map(|e| e[s_off..e_off + 1].to_vec())
+            return PageRef::new(s_pid, self).map(|e| e[s_off..e_off + 1].to_vec());
         }
         let mut data: Vec<u8> = Vec::new();
         {
@@ -744,7 +763,7 @@ impl FilePool {
         };
         let f0 = s.get_file(0)?;
         if flock(f0.get_fd(), FlockArg::LockExclusiveNonblock).is_err() {
-            return Err(StoreError::InitError("the store is busy".into()))
+            return Err(StoreError::InitError("the store is busy".into()));
         }
         Ok(s)
     }
@@ -854,7 +873,11 @@ pub struct DiskBuffer {
 }
 
 impl DiskBuffer {
-    pub fn new(inbound: mpsc::Receiver<BufferCmd>, cfg: &DiskBufferConfig, wal: &WALConfig) -> Option<Self> {
+    pub fn new(
+        inbound: mpsc::Receiver<BufferCmd>,
+        cfg: &DiskBufferConfig,
+        wal: &WALConfig,
+    ) -> Option<Self> {
         const INIT: Option<Arc<FilePool>> = None;
         let aiomgr = AIOBuilder::default()
             .max_events(cfg.max_aio_requests)
@@ -893,9 +916,12 @@ impl DiskBuffer {
             .unwrap()
             .get_file(fid)
             .unwrap();
-        let fut = self
-            .aiomgr
-            .write(file.get_fd(), offset & fmask, Box::new(*p.staging_data), None);
+        let fut = self.aiomgr.write(
+            file.get_fd(),
+            offset & fmask,
+            Box::new(*p.staging_data),
+            None,
+        );
         let s = unsafe { self.get_longlive_self() };
         self.start_task(async move {
             let (res, _) = fut.await;
@@ -942,7 +968,7 @@ impl DiskBuffer {
             .recover_policy(RecoverPolicy::Strict);
         if self.wal.is_some() {
             // already initialized
-            return Ok(())
+            return Ok(());
         }
         let wal = loader
             .load(
@@ -983,21 +1009,22 @@ impl DiskBuffer {
                 records.push(ac);
                 bwrites.extend(bw);
             } else {
-                break
+                break;
             }
             while let Ok((bw, ac)) = writes.try_recv() {
                 records.push(ac);
                 bwrites.extend(bw);
                 if records.len() >= self.cfg.wal_max_batch {
-                    break
+                    break;
                 }
             }
             // first write to WAL
-            let ring_ids: Vec<_> = futures::future::join_all(self.wal.as_ref().unwrap().lock().await.grow(records))
-                .await
-                .into_iter()
-                .map(|ring| ring.map_err(|_| "WAL Error while writing").unwrap().1)
-                .collect();
+            let ring_ids: Vec<_> =
+                futures::future::join_all(self.wal.as_ref().unwrap().lock().await.grow(records))
+                    .await
+                    .into_iter()
+                    .map(|ring| ring.map_err(|_| "WAL Error while writing").unwrap().1)
+                    .collect();
             let sem = Rc::new(tokio::sync::Semaphore::new(0));
             let mut npermit = 0;
             for BufferWrite { space_id, delta } in bwrites {
@@ -1011,7 +1038,10 @@ impl DiskBuffer {
                             npermit += 1;
                         }
                         Vacant(e) => {
-                            let file_nbit = self.file_pools[page_key.0 as usize].as_ref().unwrap().file_nbit;
+                            let file_nbit = self.file_pools[page_key.0 as usize]
+                                .as_ref()
+                                .unwrap()
+                                .file_nbit;
                             e.insert(PendingPage {
                                 staging_data: w.1.into(),
                                 file_nbit,
@@ -1043,7 +1073,11 @@ impl DiskBuffer {
         }
     }
 
-    async fn process(&mut self, req: BufferCmd, wal_in: &mpsc::Sender<(Vec<BufferWrite>, AshRecord)>) -> bool {
+    async fn process(
+        &mut self,
+        req: BufferCmd,
+        wal_in: &mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
+    ) -> bool {
         match req {
             BufferCmd::Shutdown => return false,
             BufferCmd::InitWAL(rootfd, waldir) => {
@@ -1074,7 +1108,9 @@ impl DiskBuffer {
                     .collect();
                 tx.send(ash).unwrap();
             }
-            BufferCmd::RegCachedSpace(space_id, files) => self.file_pools[space_id as usize] = Some(files),
+            BufferCmd::RegCachedSpace(space_id, files) => {
+                self.file_pools[space_id as usize] = Some(files)
+            }
         }
         true
     }
@@ -1110,7 +1146,7 @@ impl DiskBuffer {
                     }
                     let req = self.inbound.recv().await.unwrap();
                     if !self.process(req, &wal_in).await {
-                        break
+                        break;
                     }
                 }
                 drop(wal_in);

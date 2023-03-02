@@ -47,7 +47,9 @@ impl MerkleSetup {
     }
 
     pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Result<Option<Ref>, DataStoreError> {
-        self.merkle.get(key, self.root).map_err(|_err| DataStoreError::GetError)
+        self.merkle
+            .get(key, self.root)
+            .map_err(|_err| DataStoreError::GetError)
     }
 
     pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Result<Option<RefMut>, DataStoreError> {
@@ -84,7 +86,11 @@ impl MerkleSetup {
             .map_err(|_err| DataStoreError::ProofError)
     }
 
-    pub fn verify_proof<K: AsRef<[u8]>>(&self, key: K, proof: &Proof) -> Result<Option<Vec<u8>>, DataStoreError> {
+    pub fn verify_proof<K: AsRef<[u8]>>(
+        &self,
+        key: K,
+        proof: &Proof,
+    ) -> Result<Option<Vec<u8>>, DataStoreError> {
         let hash: [u8; 32] = *self.root_hash()?;
         proof
             .verify_proof(key, hash)
@@ -92,7 +98,12 @@ impl MerkleSetup {
     }
 
     pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
-        &self, proof: &Proof, first_key: K, last_key: K, keys: Vec<K>, vals: Vec<V>,
+        &self,
+        proof: &Proof,
+        first_key: K,
+        last_key: K,
+        keys: Vec<K>,
+        vals: Vec<V>,
     ) -> Result<bool, DataStoreError> {
         let hash: [u8; 32] = *self.root_hash()?;
         proof
@@ -115,12 +126,18 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
     );
 
     let compact_header = unsafe {
-        MummyObj::ptr_to_obj(mem_meta.as_ref(), compact_header, shale::compact::CompactHeader::MSIZE).unwrap()
+        MummyObj::ptr_to_obj(
+            mem_meta.as_ref(),
+            compact_header,
+            shale::compact::CompactHeader::MSIZE,
+        )
+        .unwrap()
     };
 
     let cache = shale::ObjCache::new(1);
-    let space = shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
-        .expect("CompactSpace init fail");
+    let space =
+        shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
+            .expect("CompactSpace init fail");
     let mut root = ObjPtr::null();
     Merkle::init_root(&mut root, &space).unwrap();
     MerkleSetup {

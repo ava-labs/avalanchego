@@ -4,10 +4,19 @@ use firewood::db::{DBConfig, DBError, WALConfig, DB};
 /// cargo run --example dump benchmark_db/
 fn main() {
     let matches = command!()
-        .arg(Arg::new("INPUT").help("db path name").required(false).index(1))
+        .arg(
+            Arg::new("INPUT")
+                .help("db path name")
+                .required(false)
+                .index(1),
+        )
         .get_matches();
     let path = get_db_path(matches);
-    let db = DB::new(path.unwrap().as_str(), &DBConfig::builder().truncate(false).build()).unwrap();
+    let db = DB::new(
+        path.unwrap().as_str(),
+        &DBConfig::builder().truncate(false).build(),
+    )
+    .unwrap();
     let mut stdout = std::io::stdout();
     println!("== Account Model ==");
     db.dump(&mut stdout).unwrap();
@@ -19,7 +28,7 @@ fn main() {
 /// Otherwise, instantiate a DB called simple_db and return the path.
 fn get_db_path(matches: ArgMatches) -> Result<String, DBError> {
     if let Some(m) = matches.get_one::<String>("INPUT") {
-        return Ok(m.to_string())
+        return Ok(m.to_string());
     }
 
     // Build and provide a new db path

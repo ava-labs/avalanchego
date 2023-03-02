@@ -48,7 +48,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, cli.log_level.to_string()),
+        env_logger::Env::default()
+            .filter_or(env_logger::DEFAULT_FILTER_ENV, cli.log_level.to_string()),
     );
 
     match &cli.command {

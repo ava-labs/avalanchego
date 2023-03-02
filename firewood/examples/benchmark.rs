@@ -38,7 +38,9 @@ fn main() {
             workload.push(batch);
         }
         println!("workload prepared");
-        group.sampling_mode(criterion::SamplingMode::Flat).sample_size(10);
+        group
+            .sampling_mode(criterion::SamplingMode::Flat)
+            .sample_size(10);
         group.throughput(criterion::Throughput::Elements(total as u64));
         group.bench_with_input(
             format!("nbatch={nbatch} batch_size={batch_size}"),

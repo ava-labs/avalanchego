@@ -14,7 +14,9 @@ use crate::account::{Account, AccountRLP, Blob, BlobStash};
 use crate::file;
 use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
 use crate::proof::{Proof, ProofError};
-use crate::storage::{CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared};
+use crate::storage::{
+    CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared,
+};
 pub use crate::storage::{DiskBufferConfig, WALConfig};
 
 const MERKLE_META_SPACE: SpaceID = 0x0;
@@ -142,7 +144,11 @@ impl SubUniverse<StoreRevShared> {
 }
 
 impl SubUniverse<Rc<dyn MemStoreR>> {
-    fn rewind(&self, meta_writes: &[SpaceWrite], payload_writes: &[SpaceWrite]) -> SubUniverse<StoreRevShared> {
+    fn rewind(
+        &self,
+        meta_writes: &[SpaceWrite],
+        payload_writes: &[SpaceWrite],
+    ) -> SubUniverse<StoreRevShared> {
         SubUniverse::new(
             StoreRevShared::from_ash(self.meta.clone(), meta_writes),
             StoreRevShared::from_ash(self.payload.clone(), payload_writes),
@@ -231,11 +237,16 @@ impl Universe<Rc<CachedSpace>> {
 
 impl Universe<Rc<dyn MemStoreR>> {
     fn rewind(
-        &self, merkle_meta_writes: &[SpaceWrite], merkle_payload_writes: &[SpaceWrite],
-        blob_meta_writes: &[SpaceWrite], blob_payload_writes: &[SpaceWrite],
+        &self,
+        merkle_meta_writes: &[SpaceWrite],
+        merkle_payload_writes: &[SpaceWrite],
+        blob_meta_writes: &[SpaceWrite],
+        blob_payload_writes: &[SpaceWrite],
     ) -> Universe<StoreRevShared> {
         Universe {
-            merkle: self.merkle.rewind(merkle_meta_writes, merkle_payload_writes),
+            merkle: self
+                .merkle
+                .rewind(merkle_meta_writes, merkle_payload_writes),
             blob: self.blob.rewind(blob_meta_writes, blob_payload_writes),
         }
     }
@@ -277,7 +288,9 @@ impl DBRev {
 
     /// Dump the MPT of the generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
-        self.merkle.dump(self.header.kv_root, w).map_err(DBError::Merkle)
+        self.merkle
+            .dump(self.header.kv_root, w)
+            .map_err(DBError::Merkle)
     }
 
     /// Get root hash of the world state of all accounts.
@@ -289,7 +302,9 @@ impl DBRev {
 
     /// Dump the MPT of the entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
-        self.merkle.dump(self.header.acc_root, w).map_err(DBError::Merkle)
+        self.merkle
+            .dump(self.header.acc_root, w)
+            .map_err(DBError::Merkle)
     }
 
     fn get_account(&self, key: &[u8]) -> Result<Account, DBError> {
@@ -323,7 +338,7 @@ impl DBRev {
     pub fn get_code(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
         let code = self.get_account(key)?.code;
         if code.is_null() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
         let b = self.blob.get_blob(code).map_err(DBError::Blob)?;
         Ok(match &**b {
@@ -333,12 +348,18 @@ impl DBRev {
 
     /// Provides a proof that a key is in the MPT.
     pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, MerkleError> {
-        self.merkle.prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
+        self.merkle
+            .prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
     }
 
     /// Verifies a range proof is valid for a set of keys.
     pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
-        &self, proof: Proof, first_key: K, last_key: K, keys: Vec<K>, values: Vec<V>,
+        &self,
+        proof: Proof,
+        first_key: K,
+        last_key: K,
+        keys: Vec<K>,
+        values: Vec<V>,
     ) -> Result<bool, ProofError> {
         let hash: [u8; 32] = *self.kv_root_hash()?;
         let valid = proof.verify_range_proof(hash, first_key, last_key, keys, values)?;
@@ -354,7 +375,7 @@ impl DBRev {
     pub fn get_state(&self, key: &[u8], sub_key: &[u8]) -> Result<Vec<u8>, DBError> {
         let root = self.get_account(key)?.root;
         if root.is_null() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
         Ok(match self.merkle.get(sub_key, root) {
             Ok(Some(v)) => v.to_vec(),
@@ -413,13 +434,16 @@ impl DB {
         let blob_meta_fd = file::touch_dir("meta", blob_fd).map_err(DBError::System)?;
         let blob_payload_fd = file::touch_dir("compact", blob_fd).map_err(DBError::System)?;
 
-        let file0 = crate::file::File::new(0, SPACE_RESERVED, merkle_meta_fd).map_err(DBError::System)?;
+        let file0 =
+            crate::file::File::new(0, SPACE_RESERVED, merkle_meta_fd).map_err(DBError::System)?;
         let fd0 = file0.get_fd();
 
         if reset {
             // initialize DBParams
-            if cfg.payload_file_nbit < cfg.payload_regn_nbit || cfg.payload_regn_nbit < crate::storage::PAGE_SIZE_NBIT {
-                return Err(DBError::InvalidParams)
+            if cfg.payload_file_nbit < cfg.payload_regn_nbit
+                || cfg.payload_regn_nbit < crate::storage::PAGE_SIZE_NBIT
+            {
+                return Err(DBError::InvalidParams);
             }
             nix::unistd::ftruncate(fd0, 0).map_err(DBError::System)?;
             nix::unistd::ftruncate(fd0, 1 << cfg.meta_file_nbit).map_err(DBError::System)?;
@@ -433,7 +457,8 @@ impl DB {
                 wal_file_nbit: cfg.wal.file_nbit,
                 wal_block_nbit: cfg.wal.block_nbit,
             };
-            nix::sys::uio::pwrite(fd0, &shale::util::get_raw_bytes(&header), 0).map_err(DBError::System)?;
+            nix::sys::uio::pwrite(fd0, &shale::util::get_raw_bytes(&header), 0)
+                .map_err(DBError::System)?;
         }
 
         // read DBParams
@@ -519,12 +544,20 @@ impl DB {
 
         let staging = Universe {
             merkle: SubUniverse::new(
-                Rc::new(StoreRevMut::new(cached.merkle.meta.clone() as Rc<dyn MemStoreR>)),
-                Rc::new(StoreRevMut::new(cached.merkle.payload.clone() as Rc<dyn MemStoreR>)),
+                Rc::new(StoreRevMut::new(
+                    cached.merkle.meta.clone() as Rc<dyn MemStoreR>
+                )),
+                Rc::new(StoreRevMut::new(
+                    cached.merkle.payload.clone() as Rc<dyn MemStoreR>
+                )),
             ),
             blob: SubUniverse::new(
-                Rc::new(StoreRevMut::new(cached.blob.meta.clone() as Rc<dyn MemStoreR>)),
-                Rc::new(StoreRevMut::new(cached.blob.payload.clone() as Rc<dyn MemStoreR>)),
+                Rc::new(StoreRevMut::new(
+                    cached.blob.meta.clone() as Rc<dyn MemStoreR>
+                )),
+                Rc::new(StoreRevMut::new(
+                    cached.blob.payload.clone() as Rc<dyn MemStoreR>
+                )),
             ),
         };
 
@@ -548,15 +581,21 @@ impl DB {
             // initialize space headers
             staging.merkle.meta.write(
                 merkle_payload_header.addr(),
-                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(SPACE_RESERVED, SPACE_RESERVED)),
+                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+                    SPACE_RESERVED,
+                    SPACE_RESERVED,
+                )),
             );
-            staging
-                .merkle
-                .meta
-                .write(db_header.addr(), &shale::to_dehydrated(&DBHeader::new_empty()));
+            staging.merkle.meta.write(
+                db_header.addr(),
+                &shale::to_dehydrated(&DBHeader::new_empty()),
+            );
             staging.blob.meta.write(
                 blob_payload_header.addr(),
-                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(SPACE_RESERVED, SPACE_RESERVED)),
+                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+                    SPACE_RESERVED,
+                    SPACE_RESERVED,
+                )),
             );
         }
 
@@ -572,7 +611,12 @@ impl DB {
                     shale::compact::CompactHeader::MSIZE,
                 )
                 .unwrap(),
-                MummyObj::ptr_to_obj(blob_meta_ref, blob_payload_header, shale::compact::CompactHeader::MSIZE).unwrap(),
+                MummyObj::ptr_to_obj(
+                    blob_meta_ref,
+                    blob_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
             )
         };
 
@@ -663,7 +707,11 @@ impl DB {
 
     /// Get a value in the kv store associated with a particular key.
     pub fn kv_get(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
-        self.inner.lock().latest.kv_get(key).ok_or(DBError::KeyNotFound)
+        self.inner
+            .lock()
+            .latest
+            .kv_get(key)
+            .ok_or(DBError::KeyNotFound)
     }
 
     /// Get root hash of the latest world state of all accounts.
@@ -702,7 +750,7 @@ impl DB {
 
         let rlen = inner.revisions.len();
         if nback == 0 || nback > inner.max_revisions {
-            return None
+            return None;
         }
         if rlen < nback {
             let ashes = inner.disk_requester.collect_ash(nback);
@@ -724,7 +772,7 @@ impl DB {
             }
         }
         if inner.revisions.len() < nback {
-            return None
+            return None;
         }
         // set up the storage layout
         let db_header: ObjPtr<DBHeader>;
@@ -757,7 +805,12 @@ impl DB {
                     shale::compact::CompactHeader::MSIZE,
                 )
                 .unwrap(),
-                MummyObj::ptr_to_obj(blob_meta_ref, blob_payload_header, shale::compact::CompactHeader::MSIZE).unwrap(),
+                MummyObj::ptr_to_obj(
+                    blob_meta_ref,
+                    blob_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
             )
         };
 
@@ -818,20 +871,30 @@ impl<'a> WriteBatch<'a> {
     /// Insert an item to the generic key-value storage.
     pub fn kv_insert<K: AsRef<[u8]>>(mut self, key: K, val: Vec<u8>) -> Result<Self, DBError> {
         let (header, merkle, _) = self.m.latest.borrow_split();
-        merkle.insert(key, val, header.kv_root).map_err(DBError::Merkle)?;
+        merkle
+            .insert(key, val, header.kv_root)
+            .map_err(DBError::Merkle)?;
         Ok(self)
     }
 
     /// Remove an item from the generic key-value storage. `val` will be set to the value that is
     /// removed from the storage if it exists.
-    pub fn kv_remove<K: AsRef<[u8]>>(mut self, key: K, val: &mut Option<Vec<u8>>) -> Result<Self, DBError> {
+    pub fn kv_remove<K: AsRef<[u8]>>(
+        mut self,
+        key: K,
+        val: &mut Option<Vec<u8>>,
+    ) -> Result<Self, DBError> {
         let (header, merkle, _) = self.m.latest.borrow_split();
-        *val = merkle.remove(key, header.kv_root).map_err(DBError::Merkle)?;
+        *val = merkle
+            .remove(key, header.kv_root)
+            .map_err(DBError::Merkle)?;
         Ok(self)
     }
 
     fn change_account(
-        &mut self, key: &[u8], modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DBError>,
+        &mut self,
+        key: &[u8],
+        modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DBError>,
     ) -> Result<(), DBError> {
         let (header, merkle, blob) = self.m.latest.borrow_split();
         match merkle.get_mut(key, header.acc_root) {
@@ -842,7 +905,7 @@ impl<'a> WriteBatch<'a> {
                         let mut acc = Account::deserialize(b);
                         ret = modify(&mut acc, blob);
                         if ret.is_err() {
-                            return
+                            return;
                         }
                         *b = acc.serialize();
                     })
@@ -909,8 +972,12 @@ impl<'a> WriteBatch<'a> {
         if acc.root.is_null() {
             Merkle::init_root(&mut acc.root, merkle.get_store()).map_err(DBError::Merkle)?;
         }
-        merkle.insert(sub_key, val, acc.root).map_err(DBError::Merkle)?;
-        acc.root_hash = merkle.root_hash::<IdTrans>(acc.root).map_err(DBError::Merkle)?;
+        merkle
+            .insert(sub_key, val, acc.root)
+            .map_err(DBError::Merkle)?;
+        acc.root_hash = merkle
+            .root_hash::<IdTrans>(acc.root)
+            .map_err(DBError::Merkle)?;
         merkle
             .insert(key, acc.serialize(), header.acc_root)
             .map_err(DBError::Merkle)?;
@@ -936,13 +1003,17 @@ impl<'a> WriteBatch<'a> {
     }
 
     /// Delete an account.
-    pub fn delete_account(mut self, key: &[u8], acc: &mut Option<Account>) -> Result<Self, DBError> {
+    pub fn delete_account(
+        mut self,
+        key: &[u8],
+        acc: &mut Option<Account>,
+    ) -> Result<Self, DBError> {
         let (header, merkle, blob_stash) = self.m.latest.borrow_split();
         let mut a = match merkle.remove(key, header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => {
                 *acc = None;
-                return Ok(self)
+                return Ok(self);
             }
             Err(e) => return Err(DBError::Merkle(e)),
         };
@@ -976,33 +1047,56 @@ impl<'a> WriteBatch<'a> {
         }
         // clear the staging layer and apply changes to the CachedSpace
         inner.latest.flush_dirty().unwrap();
-        let (merkle_payload_pages, merkle_payload_plain) = inner.staging.merkle.payload.take_delta();
+        let (merkle_payload_pages, merkle_payload_plain) =
+            inner.staging.merkle.payload.take_delta();
         let (merkle_meta_pages, merkle_meta_plain) = inner.staging.merkle.meta.take_delta();
         let (blob_payload_pages, blob_payload_plain) = inner.staging.blob.payload.take_delta();
         let (blob_meta_pages, blob_meta_plain) = inner.staging.blob.meta.take_delta();
 
         let old_merkle_meta_delta = inner.cached.merkle.meta.update(&merkle_meta_pages).unwrap();
-        let old_merkle_payload_delta = inner.cached.merkle.payload.update(&merkle_payload_pages).unwrap();
+        let old_merkle_payload_delta = inner
+            .cached
+            .merkle
+            .payload
+            .update(&merkle_payload_pages)
+            .unwrap();
         let old_blob_meta_delta = inner.cached.blob.meta.update(&blob_meta_pages).unwrap();
-        let old_blob_payload_delta = inner.cached.blob.payload.update(&blob_payload_pages).unwrap();
+        let old_blob_payload_delta = inner
+            .cached
+            .blob
+            .payload
+            .update(&blob_payload_pages)
+            .unwrap();
 
         // update the rolling window of past revisions
         let new_base = Universe {
             merkle: SubUniverse::new(
                 StoreRevShared::from_delta(inner.cached.merkle.meta.clone(), old_merkle_meta_delta),
-                StoreRevShared::from_delta(inner.cached.merkle.payload.clone(), old_merkle_payload_delta),
+                StoreRevShared::from_delta(
+                    inner.cached.merkle.payload.clone(),
+                    old_merkle_payload_delta,
+                ),
             ),
             blob: SubUniverse::new(
                 StoreRevShared::from_delta(inner.cached.blob.meta.clone(), old_blob_meta_delta),
-                StoreRevShared::from_delta(inner.cached.blob.payload.clone(), old_blob_payload_delta),
+                StoreRevShared::from_delta(
+                    inner.cached.blob.payload.clone(),
+                    old_blob_payload_delta,
+                ),
             ),
         };
 
         if let Some(rev) = inner.revisions.front_mut() {
-            rev.merkle.meta.set_prev(new_base.merkle.meta.inner().clone());
-            rev.merkle.payload.set_prev(new_base.merkle.payload.inner().clone());
+            rev.merkle
+                .meta
+                .set_prev(new_base.merkle.meta.inner().clone());
+            rev.merkle
+                .payload
+                .set_prev(new_base.merkle.payload.inner().clone());
             rev.blob.meta.set_prev(new_base.blob.meta.inner().clone());
-            rev.blob.payload.set_prev(new_base.blob.payload.inner().clone());
+            rev.blob
+                .payload
+                .set_prev(new_base.blob.payload.inner().clone());
         }
         inner.revisions.push_front(new_base);
         while inner.revisions.len() > inner.max_revisions {

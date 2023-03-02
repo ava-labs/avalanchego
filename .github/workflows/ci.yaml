@@ -20,7 +20,7 @@ jobs:
           override: true
           components: rustfmt, clippy
       - name: Lint
-        run: cargo fmt && git diff --exit-code
+        run: cargo fmt -- --check
       - name: Clippy
         run: cargo clippy --fix -- -Dwarnings
 

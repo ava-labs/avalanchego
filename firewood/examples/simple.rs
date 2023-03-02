@@ -56,11 +56,15 @@ fn main() {
         let mut acc = None;
         db.dump(&mut stdout).unwrap();
         db.dump_account(b"ted", &mut stdout).unwrap();
-        db.new_writebatch().delete_account(b"ted", &mut acc).unwrap();
+        db.new_writebatch()
+            .delete_account(b"ted", &mut acc)
+            .unwrap();
         assert!(acc.is_some());
         print_states(&db);
         db.dump_account(b"ted", &mut stdout).unwrap();
-        db.new_writebatch().delete_account(b"nobody", &mut acc).unwrap();
+        db.new_writebatch()
+            .delete_account(b"nobody", &mut acc)
+            .unwrap();
         assert!(acc.is_none());
     }
 }
