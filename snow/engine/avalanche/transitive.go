@@ -318,6 +318,11 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		t.subnetSyncedOnce.Do(func() {
 			err = t.VM.SetState(ctx, snow.SubnetSynced)
 		})
+		if err == nil {
+			t.Ctx.Log.Info("Subnet fully synced",
+				zap.Stringer("SubnetID", t.Ctx.SubnetID),
+			)
+		}
 		return err
 
 	default:
