@@ -218,7 +218,7 @@ type state struct {
 	cfg              *config.Config
 	ctx              *snow.Context
 	metrics          metrics.Metrics
-	nodeStakeLoggers []validators.NodeStakeTracker
+	nodeStakeLoggers []validators.NodeStakeLogger
 	rewards          reward.Calculator
 
 	baseDB *versiondb.Database
@@ -487,7 +487,7 @@ func new(
 		cfg:              cfg,
 		ctx:              ctx,
 		metrics:          metrics,
-		nodeStakeLoggers: make([]validators.NodeStakeTracker, 0),
+		nodeStakeLoggers: make([]validators.NodeStakeLogger, 0),
 		rewards:          rewards,
 		baseDB:           baseDB,
 
@@ -917,11 +917,6 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 		}
 		delegatorIterator.Release()
 	}
-
-	tr := validators.NewLogger(subnetID, s.ctx.NodeID, s.ctx.Log)
-	vdrs.RegisterCallbackListener(tr)
-	s.nodeStakeLoggers = append(s.nodeStakeLoggers, tr)
-
 	return nil
 }
 
@@ -1355,6 +1350,10 @@ func (s *state) initValidatorSets() error {
 		return err
 	}
 
+	vl := validators.NewLogger(constants.PrimaryNetworkID, s.ctx.NodeID, s.ctx.Log)
+	primaryValidators.RegisterCallbackListener(vl)
+	s.nodeStakeLoggers = append(s.nodeStakeLoggers, vl)
+
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
@@ -1368,6 +1367,10 @@ func (s *state) initValidatorSets() error {
 		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
+
+		vl := validators.NewLogger(subnetID, s.ctx.NodeID, s.ctx.Log)
+		subnetValidators.RegisterCallbackListener(vl)
+		s.nodeStakeLoggers = append(s.nodeStakeLoggers, vl)
 	}
 	return nil
 }

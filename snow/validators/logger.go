@@ -10,18 +10,18 @@ import (
 	"go.uber.org/zap"
 )
 
-var _ NodeStakeTracker = (*logger)(nil)
+var _ NodeStakeLogger = (*logger)(nil)
 
-type NodeStakeTracker SetCallbackListener
+// NodeStakeLogger allows logging stake changes of a specified validator
+type NodeStakeLogger SetCallbackListener
 
-// logger allows tracking changes related to a specified validator
 type logger struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID
 	log      logging.Logger
 }
 
-func NewLogger(subnetID ids.ID, targetNode ids.NodeID, log logging.Logger) NodeStakeTracker {
+func NewLogger(subnetID ids.ID, targetNode ids.NodeID, log logging.Logger) NodeStakeLogger {
 	return &logger{
 		subnetID: subnetID,
 		nodeID:   targetNode,
