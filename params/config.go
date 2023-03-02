@@ -40,6 +40,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const maxJSONLen = 64 * 1024 * 1024 // 64MB
+
 var (
 	errNonGenesisForkByHeight = errors.New("subnet-evm only supports forking by height at the genesis block")
 
@@ -209,6 +211,53 @@ func (c ChainConfig) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(raw)
+}
+
+type ChainConfigWithUpgradesMarshalled struct {
+	*ChainConfig
+	UpgradeConfig UpgradeConfig `json:"upgrades,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler. This is a workaround for the fact that
+// the embedded ChainConfig struct has a MarshalJSON method, which prevents
+// the default JSON marshalling from working for UpgradeConfig.
+// TODO: consider removing this method by allowing external tag for the embedded
+// ChainConfig struct.
+func (s *ChainConfigWithUpgradesMarshalled) MarshalJSON() ([]byte, error) {
+	// embed the ChainConfig struct into the response
+	chainConfigJSON, err := json.Marshal(s.ChainConfig)
+	if err != nil {
+		return nil, err
+	}
+	if len(chainConfigJSON) > maxJSONLen {
+		return nil, errors.New("value too large")
+	}
+
+	type upgrades struct {
+		UpgradeConfig UpgradeConfig `json:"upgrades"`
+	}
+
+	upgradeJSON, err := json.Marshal(upgrades{s.UpgradeConfig})
+	if err != nil {
+		return nil, err
+	}
+	if len(upgradeJSON) > maxJSONLen {
+		return nil, errors.New("value too large")
+	}
+
+	// merge the two JSON objects
+	mergedJSON := make([]byte, 0, len(chainConfigJSON)+len(upgradeJSON)+1)
+	mergedJSON = append(mergedJSON, chainConfigJSON[:len(chainConfigJSON)-1]...)
+	mergedJSON = append(mergedJSON, ',')
+	mergedJSON = append(mergedJSON, upgradeJSON[1:]...)
+	return mergedJSON, nil
+}
+
+func (c *ChainConfig) ToWithUpgradesMarshalled() *ChainConfigWithUpgradesMarshalled {
+	return &ChainConfigWithUpgradesMarshalled{
+		ChainConfig:   c,
+		UpgradeConfig: c.UpgradeConfig,
+	}
 }
 
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:

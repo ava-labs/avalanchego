@@ -34,6 +34,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -226,4 +227,21 @@ func TestActivePrecompiles(t *testing.T) {
 
 	rules1 := config.AvalancheRules(common.Big0, common.Big1)
 	require.False(t, rules1.IsPrecompileEnabled(nativeminter.Module.Address))
+}
+
+func TestChainConfigMarshalWithUpgrades(t *testing.T) {
+	config := ChainConfigWithUpgradesMarshalled{
+		ChainConfig: TestChainConfig,
+		UpgradeConfig: UpgradeConfig{
+			PrecompileUpgrades: []PrecompileUpgrade{
+				{
+					Config: txallowlist.NewConfig(big.NewInt(100), nil, nil),
+				},
+			},
+		},
+	}
+	result, err := json.Marshal(&config)
+	require.NoError(t, err)
+	expectedJSON := `{"chainId":1,"feeConfig":{"gasLimit":8000000,"targetBlockRate":2,"minBaseFee":25000000000,"targetGas":15000000,"baseFeeChangeDenominator":36,"minBlockGasCost":0,"maxBlockGasCost":1000000,"blockGasCostStep":200000},"homesteadBlock":0,"eip150Block":0,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000","eip155Block":0,"eip158Block":0,"byzantiumBlock":0,"constantinopleBlock":0,"petersburgBlock":0,"istanbulBlock":0,"muirGlacierBlock":0,"subnetEVMTimestamp":0,"upgrades":{"precompileUpgrades":[{"txAllowListConfig":{"blockTimestamp":100}}]}}`
+	require.JSONEq(t, expectedJSON, string(result))
 }
