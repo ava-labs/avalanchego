@@ -2,6 +2,9 @@
 
 ## [v0.11.8](https://github.com/ava-labs/coreth/releases/tag/v0.11.8)
 
+- Fix shutdown hanging during state sync
+- Add pre-check for imported UTXOs
+- Fix bug in `BadBlockReason` output to display error string correctly
 - Update golangci-lint version to v1.51.2
 
 ## [v0.11.7](https://github.com/ava-labs/coreth/releases/tag/v0.11.7)
