@@ -1279,7 +1279,6 @@ func (n *Node) Initialize(
 	n.msgCreator, err = message.NewCreator(
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		// n.Config.NetworkConfig.CompressionEnabled, TODO add config for this
 		compression.GzipCompression,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)

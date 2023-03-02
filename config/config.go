@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
@@ -59,7 +60,9 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
+	}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -295,6 +298,10 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
+	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
+	if err != nil {
+		return network.Config{}, err
+	}
 	config := network.Config{
 		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
@@ -369,7 +376,7 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 		},
 
 		MaxClockDifference:           v.GetDuration(NetworkMaxClockDifferenceKey),
-		CompressionEnabled:           v.GetBool(NetworkCompressionEnabledKey),
+		CompressionType:              compressionType,
 		PingFrequency:                v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:              v.GetBool(NetworkAllowPrivateIPsKey),
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),

@@ -55,7 +55,7 @@ const (
 	DefaultNetworkTimeoutCoefficient    = 2
 	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
 
-	DefaultNetworkCompressionEnabled        = true // TODO remove
+	DefaultNetworkCompressionEnabled        = true // TODO remove when NetworkCompressionEnabledKey is removed
 	DefaultNetworkCompressionType           = compression.GzipCompression
 	DefaultNetworkMaxClockDifference        = time.Minute
 	DefaultNetworkAllowPrivateIPs           = true

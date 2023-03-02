@@ -111,7 +111,7 @@ var (
 		PingFrequency:      constants.DefaultPingFrequency,
 		AllowPrivateIPs:    true,
 
-		CompressionEnabled: true,
+		CompressionType: constants.DefaultNetworkCompressionType,
 
 		UptimeCalculator:  uptime.NewManager(uptime.NewTestState()),
 		UptimeMetricFreq:  30 * time.Second,
