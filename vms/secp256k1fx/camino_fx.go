@@ -17,10 +17,12 @@ import (
 )
 
 var (
-	errNotSecp256Cred  = errors.New("expected secp256k1 credentials")
-	errWrongOutputType = errors.New("wrong output type")
-	errMsigCombination = errors.New("msig combinations not supported")
-	errNotAliasGetter  = errors.New("state isn't msig alias getter")
+	errNotSecp256Cred    = errors.New("expected secp256k1 credentials")
+	errWrongOutputType   = errors.New("wrong output type")
+	errMsigCombination   = errors.New("msig combinations not supported")
+	errNotAliasGetter    = errors.New("state isn't msig alias getter")
+	errTooFewSigIndices  = errors.New("too few signature indices")
+	errTooManySigIndices = errors.New("too many signature indices")
 )
 
 type Owned interface {
@@ -171,10 +173,10 @@ func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msi
 }
 
 func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credential, owners *OutputOwners, msig AliasGetter) error {
-	if len(in.SigIndices) > len(cred.Sigs) {
-		return errTooManySigners
-	} else if len(in.SigIndices) < len(cred.Sigs) {
-		return errTooFewSigners
+	if len(in.SigIndices) > int(owners.Threshold) {
+		return errTooManySigIndices
+	} else if len(in.SigIndices) < int(owners.Threshold) {
+		return errTooFewSigIndices
 	}
 
 	resolved, err := fx.RecoverAddresses(tx, []verify.Verifiable{cred})
@@ -182,22 +184,34 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credenti
 		return err
 	}
 
-	tf := func(addr ids.ShortID, visited, verified uint32) (bool, error) {
+	tf := func(
+		addr ids.ShortID,
+		depth int,
+		visited,
+		verified,
+		totalVisited uint32,
+	) (bool, error) {
 		// check that input sig index matches
-		if verified >= uint32(len(in.SigIndices)) {
-			return false, errInputOutputIndexOutOfBounds
+		if totalVisited >= uint32(len(cred.Sigs)) {
+			return false, errTooFewSigIndices
 		}
+
 		if sig, exists := resolved[addr]; exists &&
-			sig == cred.Sigs[verified] &&
-			(in.SigIndices[verified] == math.MaxUint32 ||
-				in.SigIndices[verified] == visited) {
+			sig == cred.Sigs[totalVisited] &&
+			(depth > 1 || (in.SigIndices[verified] == math.MaxUint32 ||
+				in.SigIndices[verified] == visited)) {
 			return true, nil
 		}
 		return false, nil
 	}
 
-	if err = TraverseOwners(owners, msig, tf); err != nil {
+	var sigsVerified uint32
+	if sigsVerified, err = TraverseOwners(owners, msig, tf); err != nil {
 		return err
+	}
+
+	if sigsVerified < uint32(len(cred.Sigs)) {
+		return errTooManySigners
 	}
 
 	return nil
@@ -209,14 +223,14 @@ func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, cred *Credential
 		return err
 	}
 
-	tf := func(addr ids.ShortID, visited, verified uint32) (bool, error) {
+	tf := func(addr ids.ShortID, _ int, _, _, _ uint32) (bool, error) {
 		if _, exists := resolved[addr]; exists {
 			return true, nil
 		}
 		return false, nil
 	}
 
-	if err = TraverseOwners(owners, msig, tf); err != nil {
+	if _, err = TraverseOwners(owners, msig, tf); err != nil {
 		return err
 	}
 

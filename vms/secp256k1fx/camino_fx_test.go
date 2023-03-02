@@ -59,7 +59,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				Addrs:     []ids.ShortID{addr1, addr2},
 			},
 			msig:          noAliasesMsigGetter,
-			expectedError: errTooFewSigners,
+			expectedError: errTooFewSigIndices,
 		},
 		"Fail: To many signature indices": {
 			in:      &Input{SigIndices: []uint32{0, 1, 2}},
@@ -69,7 +69,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				Addrs:     []ids.ShortID{addr1, addr2},
 			},
 			msig:          noAliasesMsigGetter,
-			expectedError: errTooManySigners,
+			expectedError: errTooManySigIndices,
 		},
 		"Fail: To many signers": {
 			in:      &Input{SigIndices: []uint32{0, 1}},
@@ -79,7 +79,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				Addrs:     []ids.ShortID{addr1, addr2},
 			},
 			msig:          noAliasesMsigGetter,
-			expectedError: errTooFewSigners,
+			expectedError: errTooManySigners,
 		},
 		"Fail: Not enough sigs to reach treshold": {
 			in:      &Input{SigIndices: []uint32{0}},
@@ -89,7 +89,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				Addrs:     []ids.ShortID{addr1, addr2},
 			},
 			msig:          noAliasesMsigGetter,
-			expectedError: errInputOutputIndexOutOfBounds,
+			expectedError: errTooFewSigIndices,
 		},
 		"Fail: Wrong signature": {
 			in:      &Input{SigIndices: []uint32{0, 1}},
@@ -112,7 +112,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			expectedError: errCantSpend,
 		},
 		"OK msig: addr1, alias1{addr2, addr3, thresh: 1}": {
-			in:      &Input{SigIndices: []uint32{0, 1}},
+			in:      &Input{SigIndices: []uint32{0, math.MaxUint32}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -131,7 +131,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"OK msig: addr1, alias1{addr2, addr3, thresh: 2}": {
-			in:      &Input{SigIndices: []uint32{0, 1, 2}},
+			in:      &Input{SigIndices: []uint32{0, math.MaxUint32}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -150,7 +150,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"OK msig: alias1{ alias2{addr1, addr2, thresh: 2}, addr3, thresh: 2 }, addr4": {
-			in:      &Input{SigIndices: []uint32{0, 1, 2, 3}},
+			in:      &Input{SigIndices: []uint32{math.MaxUint32, 1}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -178,7 +178,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"OK msig: alias1{ alias2{addr1, addr2 (wildcard), thresh: 2}, addr3, thresh: 2 }, addr4": {
-			in:      &Input{SigIndices: []uint32{0, math.MaxUint32, 2, 3}},
+			in:      &Input{SigIndices: []uint32{math.MaxUint32, 1}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -206,7 +206,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"OK msig: alias1{ alias2{addr1, addr2, thresh: 2}, addr3, thresh: 2 }, addr4, all wildcards": {
-			in:      &Input{SigIndices: []uint32{math.MaxUint32, math.MaxUint32, math.MaxUint32, math.MaxUint32}},
+			in:      &Input{SigIndices: []uint32{math.MaxUint32, math.MaxUint32}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -234,7 +234,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"Fail msig: alias1{ alias2{addr1, addr2 (bad sig), thresh: 2}, addr3, thresh: 2 }, addr4": {
-			in:      &Input{SigIndices: []uint32{0, 1, 2, 3}},
+			in:      &Input{SigIndices: []uint32{math.MaxUint32, 1}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key4, key3, key4},
 			owners: &OutputOwners{
 				Threshold: 2,

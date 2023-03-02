@@ -5,7 +5,7 @@ package secp256k1fx
 
 import (
 	"errors"
-	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,7 +22,9 @@ var (
 )
 
 // Spend attempts to create an input from outputowners which can contain multisig aliases
-func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf interface{}) (verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error) {
+func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf interface{}) (
+	verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error,
+) {
 	if len(kc.Keys) == 0 {
 		return nil, nil, errCantSpend
 	}
@@ -44,23 +46,28 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	case *TransferOutput:
 		owners = &out.OutputOwners
 	default:
-		return nil, nil, fmt.Errorf("can't spend UTXO because it is unexpected type %T", out)
+		return nil, nil, errWrongOutputType
 	}
 
 	// assume non-multisigs for reserving memory
 	sigs := make([]uint32, 0, owners.Threshold)
 	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 
-	tf := func(addr ids.ShortID, visited, verified uint32) (bool, error) {
+	tf := func(addr ids.ShortID, depth int, visited, _, _ uint32) (bool, error) {
 		if key, exists := kc.get(addr); exists {
-			sigs = append(sigs, visited)
+			if depth == 1 {
+				for len(sigs) < int(visited) {
+					sigs = append(sigs, math.MaxUint32)
+				}
+				sigs = append(sigs, visited)
+			}
 			keys = append(keys, key)
 			return true, nil
 		}
 		return false, nil
 	}
 
-	if err := TraverseOwners(owners, msig, tf); err != nil {
+	if _, err := TraverseOwners(owners, msig, tf); err != nil {
 		return nil, nil, err
 	}
 
@@ -79,21 +86,23 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	}
 }
 
-type TraverserOwnerFunc func(addr ids.ShortID, visited, verified uint32) (bool, error)
+type TraverserOwnerFunc func(
+	addr ids.ShortID,
+	depth int,
+	visited,
+	verified,
+	totalVisited uint32,
+) (bool, error)
 
 // TraverseOwners traverses through owners, visits every address and callbacks in case a
-// non-multisig address is visited. Nested multisig alias are flattened so sigindices point
-// to the global flattened position
-// Examle O1 - M - O2
-//             | - M1 - M2
-// will be handled as O1 - M1 - M2 - O2 whereby O2 has sigIndex 3
-func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwnerFunc) error {
+// non-multisig address is visited. Nested multisig alias are excluded from sigIndex concept.
+// The sigIndex(es) on base level must be set as MaxUint32
+func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwnerFunc) (uint32, error) {
 	var visited, verified uint32
 
 	type stackItem struct {
-		index    int
-		verified uint32
-		owners   *OutputOwners
+		index, verified uint32
+		owners          *OutputOwners
 	}
 
 	cycleCheck := set.Set[ids.ShortID]{}
@@ -102,7 +111,7 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 	Stack:
 		// get head
 		currentStack := stack[len(stack)-1]
-		for currentStack.index < len(currentStack.owners.Addrs) &&
+		for int(currentStack.index) < len(currentStack.owners.Addrs) &&
 			currentStack.verified < currentStack.owners.Threshold {
 			// get the next address to check
 			addr := currentStack.owners.Addrs[currentStack.index]
@@ -112,25 +121,31 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 			switch err {
 			case nil: // multi-sig
 				if len(stack) > MaxSignatures {
-					return errTooManySignatures
+					return 0, errTooManySignatures
 				}
 				if cycleCheck.Contains(addr) {
-					return errCyclicAliases
+					return 0, errCyclicAliases
 				}
 				cycleCheck.Add(addr)
 				owners, ok := alias.Owners.(*OutputOwners)
 				if !ok {
-					return errWrongOwnerType
+					return 0, errWrongOwnerType
 				}
 				stack = append(stack, &stackItem{owners: owners})
 				goto Stack
 			case database.ErrNotFound: // non-multi-sig
 				if visited > MaxSignatures {
-					return errTooManySignatures
+					return 0, errTooManySignatures
 				}
-				success, err := callback(addr, visited, verified)
+				success, err := callback(
+					addr,
+					len(stack),
+					currentStack.index-1,
+					currentStack.verified,
+					visited,
+				)
 				if err != nil {
-					return err
+					return 0, err
 				}
 				if success {
 					currentStack.verified++
@@ -138,12 +153,12 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				}
 				visited++
 			default:
-				return err
+				return 0, err
 			}
 		}
 		// verify current level
 		if currentStack.verified < currentStack.owners.Threshold {
-			return errCantSpend
+			return 0, errCantSpend
 		}
 		// remove head
 		stack = stack[:len(stack)-1]
@@ -152,5 +167,5 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 			stack[len(stack)-1].verified++
 		}
 	}
-	return nil
+	return verified, nil
 }
