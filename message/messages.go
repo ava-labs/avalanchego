@@ -182,7 +182,7 @@ func (mb *msgBuilder) marshal(
 		return nil, 0, 0, err
 	}
 
-	if compressionType == compression.NoCompression {
+	if compressionType == compression.TypeNone {
 		return uncompressedMsgBytes, 0, 0, nil
 	}
 
@@ -197,7 +197,7 @@ func (mb *msgBuilder) marshal(
 	var compressedMsg p2p.Message
 
 	switch compressionType {
-	case compression.GzipCompression:
+	case compression.TypeGzip:
 		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
 			return nil, 0, 0, err
@@ -208,7 +208,7 @@ func (mb *msgBuilder) marshal(
 			},
 		}
 
-	case compression.ZstdCompression:
+	case compression.TypeZstd:
 		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
 			return nil, 0, 0, err
@@ -289,7 +289,7 @@ func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression
 		return nil, err
 	}
 
-	if compressionType != compression.NoCompression {
+	if compressionType != compression.TypeNone {
 		mb.compressTimeMetrics[op].Observe(float64(compressTook))
 	}
 

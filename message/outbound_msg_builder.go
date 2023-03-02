@@ -193,7 +193,7 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 				Ping: &p2p.Ping{},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -211,7 +211,7 @@ func (b *outMsgBuilder) Pong(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -242,7 +242,7 @@ func (b *outMsgBuilder) Version(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		true,
 	)
 }
@@ -281,7 +281,7 @@ func (b *outMsgBuilder) PeerListAck(peerAcks []*p2p.PeerAck) (OutboundMessage, e
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -301,7 +301,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -387,7 +387,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -411,7 +411,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -437,7 +437,7 @@ func (b *outMsgBuilder) GetAccepted(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -461,7 +461,7 @@ func (b *outMsgBuilder) Accepted(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -485,7 +485,7 @@ func (b *outMsgBuilder) GetAncestors(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -531,7 +531,7 @@ func (b *outMsgBuilder) Get(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -601,7 +601,7 @@ func (b *outMsgBuilder) PullQuery(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }
@@ -629,7 +629,7 @@ func (b *outMsgBuilder) Chits(
 				},
 			},
 		},
-		compression.NoCompression,
+		compression.TypeNone,
 		false,
 	)
 }

@@ -72,7 +72,7 @@ func StartTestPeer(
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		"",
-		compression.GzipCompression, // TODO support zstd
+		compression.TypeGzip, // TODO support zstd
 		10*time.Second,
 	)
 	if err != nil {

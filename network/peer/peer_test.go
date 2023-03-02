@@ -52,7 +52,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		"",
-		compression.GzipCompression, // TODO support zstd
+		compression.TypeGzip, // TODO support zstd
 		10*time.Second,
 	)
 	require.NoError(t, err)

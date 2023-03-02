@@ -13,18 +13,18 @@ var errUnknownCompressionType = errors.New("unknown compression type")
 type Type byte
 
 const (
-	NoCompression Type = iota + 1
-	GzipCompression
-	ZstdCompression
+	TypeNone Type = iota + 1
+	TypeGzip
+	TypeZstd
 )
 
 func (t Type) String() string {
 	switch t {
-	case NoCompression:
+	case TypeNone:
 		return "none"
-	case GzipCompression:
+	case TypeGzip:
 		return "gzip"
-	case ZstdCompression:
+	case TypeZstd:
 		return "zstd"
 	default:
 		return "unknown"
@@ -33,14 +33,14 @@ func (t Type) String() string {
 
 func TypeFromString(s string) (Type, error) {
 	switch s {
-	case NoCompression.String():
-		return NoCompression, nil
-	case GzipCompression.String():
-		return GzipCompression, nil
-	case ZstdCompression.String():
-		return ZstdCompression, nil
+	case TypeNone.String():
+		return TypeNone, nil
+	case TypeGzip.String():
+		return TypeGzip, nil
+	case TypeZstd.String():
+		return TypeZstd, nil
 	default:
-		return NoCompression, errUnknownCompressionType
+		return TypeNone, errUnknownCompressionType
 	}
 }
 
@@ -51,7 +51,7 @@ func (t Type) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	switch t {
-	case NoCompression, GzipCompression, ZstdCompression:
+	case TypeNone, TypeGzip, TypeZstd:
 		_, err = b.WriteString(t.String())
 	default:
 		err = errUnknownCompressionType

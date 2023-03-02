@@ -73,7 +73,7 @@ func TestTimeout(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		compression.GzipCompression, // TODO support zstd
+		compression.TypeGzip, // TODO support zstd
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -333,7 +333,7 @@ func TestReliableMessages(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		compression.GzipCompression, // TODO support zstd
+		compression.TypeGzip, // TODO support zstd
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -469,7 +469,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		compression.GzipCompression,
+		compression.TypeGzip,
 		10*time.Second,
 	)
 	require.NoError(t, err)

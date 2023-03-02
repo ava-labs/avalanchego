@@ -71,7 +71,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if useBuilder {
-			_, err = codec.createOutbound(&msg, compression.NoCompression, false)
+			_, err = codec.createOutbound(&msg, compression.TypeNone, false)
 		} else {
 			_, err = proto.Marshal(&msg)
 		}
