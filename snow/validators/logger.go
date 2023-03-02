@@ -10,17 +10,29 @@ import (
 	"go.uber.org/zap"
 )
 
-var _ SetCallbackListener = (*Logger)(nil)
+var _ NodeStakeTracker = (*logger)(nil)
 
-// Logger allows tracking changes related to a specified validator
-type Logger struct {
-	TargetNode ids.NodeID
-	Log        logging.Logger
+type NodeStakeTracker SetCallbackListener
+
+// logger allows tracking changes related to a specified validator
+type logger struct {
+	subnetID ids.ID
+	nodeID   ids.NodeID
+	log      logging.Logger
 }
 
-func (l *Logger) OnValidatorAdded(valID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
-	if valID == l.TargetNode {
-		l.Log.Info("tracking validator: validator added to validators set",
+func NewLogger(subnetID ids.ID, targetNode ids.NodeID, log logging.Logger) NodeStakeTracker {
+	return &logger{
+		subnetID: subnetID,
+		nodeID:   targetNode,
+		log:      log,
+	}
+}
+
+func (l *logger) OnValidatorAdded(valID ids.NodeID, _ *bls.PublicKey, txID ids.ID, weight uint64) {
+	if valID == l.nodeID {
+		l.log.Info("tracking validator: validator added to validators set",
+			zap.Stringer("subnetID ", l.subnetID),
 			zap.Stringer("nodeID ", valID),
 			zap.Uint64("weight ", weight),
 			zap.Stringer("txID", txID),
@@ -28,18 +40,20 @@ func (l *Logger) OnValidatorAdded(valID ids.NodeID, pk *bls.PublicKey, txID ids.
 	}
 }
 
-func (l *Logger) OnValidatorRemoved(valID ids.NodeID, weight uint64) {
-	if valID == l.TargetNode {
-		l.Log.Info("tracking validator: validator dropped from validators set",
+func (l *logger) OnValidatorRemoved(valID ids.NodeID, weight uint64) {
+	if valID == l.nodeID {
+		l.log.Info("tracking validator: validator dropped from validators set",
+			zap.Stringer("subnetID ", l.subnetID),
 			zap.Stringer("nodeID ", valID),
 			zap.Uint64("weight ", weight),
 		)
 	}
 }
 
-func (l *Logger) OnValidatorWeightChanged(valID ids.NodeID, oldWeight, newWeight uint64) {
-	if valID == l.TargetNode {
-		l.Log.Info("tracking validator: validator weight change",
+func (l *logger) OnValidatorWeightChanged(valID ids.NodeID, oldWeight, newWeight uint64) {
+	if valID == l.nodeID {
+		l.log.Info("tracking validator: validator weight change",
+			zap.Stringer("subnetID ", l.subnetID),
 			zap.Stringer("nodeID ", valID),
 			zap.Uint64("previous weight ", oldWeight),
 			zap.Uint64("current weight ", newWeight),

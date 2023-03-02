@@ -215,10 +215,11 @@ type stateBlk struct {
 type state struct {
 	validatorUptimes
 
-	cfg     *config.Config
-	ctx     *snow.Context
-	metrics metrics.Metrics
-	rewards reward.Calculator
+	cfg              *config.Config
+	ctx              *snow.Context
+	metrics          metrics.Metrics
+	nodeStakeLoggers []validators.NodeStakeTracker
+	rewards          reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -483,11 +484,12 @@ func new(
 	return &state{
 		validatorUptimes: newValidatorUptimes(),
 
-		cfg:     cfg,
-		ctx:     ctx,
-		metrics: metrics,
-		rewards: rewards,
-		baseDB:  baseDB,
+		cfg:              cfg,
+		ctx:              ctx,
+		metrics:          metrics,
+		nodeStakeLoggers: make([]validators.NodeStakeTracker, 0),
+		rewards:          rewards,
+		baseDB:           baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -915,6 +917,11 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 		}
 		delegatorIterator.Release()
 	}
+
+	tr := validators.NewLogger(subnetID, s.ctx.NodeID, s.ctx.Log)
+	vdrs.RegisterCallbackListener(tr)
+	s.nodeStakeLoggers = append(s.nodeStakeLoggers, tr)
+
 	return nil
 }
 
