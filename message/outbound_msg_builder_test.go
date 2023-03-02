@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func Test_newOutboundBuilder(t *testing.T) {
@@ -25,7 +26,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 	)
 	require.NoError(err)
 
-	builder := newOutboundBuilder(true /*compress*/, mb)
+	builder := newOutboundBuilder(compression.GzipCompression /*compress*/, mb) // TODO support zstd
 
 	outMsg, err := builder.GetAcceptedStateSummary(
 		ids.GenerateTestID(),

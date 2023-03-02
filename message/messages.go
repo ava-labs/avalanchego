@@ -4,6 +4,7 @@
 package message
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 var (
 	_ InboundMessage  = (*inboundMessage)(nil)
 	_ OutboundMessage = (*outboundMessage)(nil)
+
+	errTwoCompressionTypes = errors.New("message is compressed with both gzip and zstd")
 )
 
 // InboundMessage represents a set of fields for an inbound message
@@ -121,6 +124,7 @@ func (m *outboundMessage) BytesSavedCompression() int {
 // TODO: add other compression algorithms with extended interface
 type msgBuilder struct {
 	gzipCompressor compression.Compressor
+	zstdCompressor compression.Compressor
 
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
@@ -140,6 +144,7 @@ func newMsgBuilder(
 
 	mb := &msgBuilder{
 		gzipCompressor: cpr,
+		zstdCompressor: compression.NewZstdCompressor(),
 
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
@@ -169,14 +174,14 @@ func newMsgBuilder(
 
 func (mb *msgBuilder) marshal(
 	uncompressedMsg *p2p.Message,
-	gzipCompress bool,
+	compressionType compression.CompressionType,
 ) ([]byte, int, time.Duration, error) {
 	uncompressedMsgBytes, err := proto.Marshal(uncompressedMsg)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
-	if !gzipCompress {
+	if compressionType == compression.NoCompression {
 		return uncompressedMsgBytes, 0, 0, nil
 	}
 
@@ -187,16 +192,33 @@ func (mb *msgBuilder) marshal(
 	// This recursive packing allows us to avoid an extra compression on/off
 	// field in the message.
 	startTime := time.Now()
-	compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
-	if err != nil {
-		return nil, 0, 0, err
+
+	var compressedMsg p2p.Message
+
+	switch compressionType {
+	case compression.GzipCompression:
+		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		compressedMsg = p2p.Message{
+			Message: &p2p.Message_CompressedGzip{
+				CompressedGzip: compressedBytes,
+			},
+		}
+
+	case compression.ZstdCompression:
+		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		compressedMsg = p2p.Message{
+			Message: &p2p.Message_CompressedZstd{
+				CompressedZstd: compressedBytes,
+			},
+		}
 	}
 
-	compressedMsg := p2p.Message{
-		Message: &p2p.Message_CompressedGzip{
-			CompressedGzip: compressedBytes,
-		},
-	}
 	compressedMsgBytes, err := proto.Marshal(&compressedMsg)
 	if err != nil {
 		return nil, 0, 0, err
@@ -213,16 +235,33 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, bool, int, time.Duratio
 		return nil, false, 0, 0, err
 	}
 
-	compressed := m.GetCompressedGzip()
-	if len(compressed) == 0 {
+	gzipCompressed := m.GetCompressedGzip()
+	zstdCompressed := m.GetCompressedZstd()
+	if len(gzipCompressed) == 0 && len(zstdCompressed) == 0 {
 		// The message wasn't compressed
 		return m, false, 0, 0, nil
 	}
+	if len(gzipCompressed) > 0 && len(zstdCompressed) > 0 {
+		return nil, true, 0, 0, errTwoCompressionTypes
+	}
 
 	startTime := time.Now()
-	decompressed, err := mb.gzipCompressor.Decompress(compressed)
-	if err != nil {
-		return nil, true, 0, 0, err
+
+	var (
+		decompressed []byte
+		err          error
+	)
+	if len(gzipCompressed) > 0 {
+		decompressed, err = mb.gzipCompressor.Decompress(gzipCompressed)
+		if err != nil {
+			return nil, true, 0, 0, err
+		}
+	}
+	if len(zstdCompressed) > 0 {
+		decompressed, err = mb.zstdCompressor.Decompress(zstdCompressed)
+		if err != nil {
+			return nil, true, 0, 0, err
+		}
 	}
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
@@ -230,12 +269,12 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, bool, int, time.Duratio
 	}
 	decompressTook := time.Since(startTime)
 
-	bytesSavedCompression := len(decompressed) - len(compressed)
+	bytesSavedCompression := len(decompressed) - len(gzipCompressed)
 	return m, true, bytesSavedCompression, decompressTook, nil
 }
 
-func (mb *msgBuilder) createOutbound(m *p2p.Message, gzipCompress bool, bypassThrottling bool) (*outboundMessage, error) {
-	b, saved, compressTook, err := mb.marshal(m, gzipCompress)
+func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.CompressionType, bypassThrottling bool) (*outboundMessage, error) {
+	b, saved, compressTook, err := mb.marshal(m, compressionType)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +284,7 @@ func (mb *msgBuilder) createOutbound(m *p2p.Message, gzipCompress bool, bypassTh
 		return nil, err
 	}
 
-	if gzipCompress {
+	if compressionType != compression.NoCompression {
 		mb.compressTimeMetrics[op].Observe(float64(compressTook))
 	}
 

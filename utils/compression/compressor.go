@@ -3,6 +3,14 @@
 
 package compression
 
+type CompressionType byte
+
+const (
+	NoCompression CompressionType = iota + 1
+	GzipCompression
+	ZstdCompression
+)
+
 // Compressor compresss and decompresses messages.
 // Decompress is the inverse of Compress.
 // Decompress(Compress(msg)) == msg.

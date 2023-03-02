@@ -13,13 +13,12 @@ func NewZstdCompressor() Compressor {
 	return &zstdCompressor{}
 }
 
-type zstdCompressor struct {
-}
+type zstdCompressor struct{}
 
-func (c *zstdCompressor) Compress(msg []byte) ([]byte, error) {
+func (*zstdCompressor) Compress(msg []byte) ([]byte, error) {
 	return zstd.Compress(nil, msg)
 }
 
-func (c *zstdCompressor) Decompress(msg []byte) ([]byte, error) {
+func (*zstdCompressor) Decompress(msg []byte) ([]byte, error) {
 	return zstd.Decompress(nil, msg)
 }

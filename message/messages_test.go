@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func TestMessage(t *testing.T) {
@@ -51,7 +52,7 @@ func TestMessage(t *testing.T) {
 		desc             string
 		op               Op
 		msg              *p2p.Message
-		gzipCompress     bool
+		compressionType  compression.CompressionType
 		bypassThrottling bool
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
@@ -63,7 +64,7 @@ func TestMessage(t *testing.T) {
 					Ping: &p2p.Ping{},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -77,7 +78,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -97,7 +98,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -118,7 +119,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -140,7 +141,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -162,7 +163,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -181,7 +182,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: false,
 			bytesSaved:       false,
 		},
@@ -197,7 +198,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -213,7 +214,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -229,7 +230,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -246,7 +247,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -263,7 +264,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -279,7 +280,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -295,7 +296,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -312,7 +313,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -329,7 +330,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -347,7 +348,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -364,7 +365,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -382,7 +383,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -399,7 +400,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -416,7 +417,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -434,7 +435,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -451,7 +452,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -468,7 +469,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -486,7 +487,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -504,7 +505,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -522,7 +523,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -539,7 +540,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -556,7 +557,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -573,7 +574,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -589,7 +590,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -605,7 +606,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -620,7 +621,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.NoCompression,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -635,7 +636,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.GzipCompression, // TODO support zstd
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -643,7 +644,7 @@ func TestMessage(t *testing.T) {
 
 	for _, tv := range tests {
 		require.True(t.Run(tv.desc, func(t2 *testing.T) {
-			encodedMsg, err := mb.createOutbound(tv.msg, tv.gzipCompress, tv.bypassThrottling)
+			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
 			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())

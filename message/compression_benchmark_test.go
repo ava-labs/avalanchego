@@ -26,7 +26,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	builder := newOutboundBuilder(false, innerBuilder) // Note compression disabled
+	builder := newOutboundBuilder(compression.NoCompression, innerBuilder) // Note compression disabled
 
 	pingMsg, err := builder.Ping()
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -171,17 +172,17 @@ type OutboundMsgBuilder interface {
 }
 
 type outMsgBuilder struct {
-	compress bool // set to "true" if compression is enabled
+	compressionType compression.CompressionType
 
 	builder *msgBuilder
 }
 
 // Use "message.NewCreator" to import this function
 // since we do not expose "msgBuilder" yet
-func newOutboundBuilder(enableCompression bool, builder *msgBuilder) OutboundMsgBuilder {
+func newOutboundBuilder(compressionType compression.CompressionType, builder *msgBuilder) OutboundMsgBuilder {
 	return &outMsgBuilder{
-		compress: enableCompression,
-		builder:  builder,
+		compressionType: compressionType,
+		builder:         builder,
 	}
 }
 
@@ -192,7 +193,7 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 				Ping: &p2p.Ping{},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -210,7 +211,7 @@ func (b *outMsgBuilder) Pong(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -241,7 +242,7 @@ func (b *outMsgBuilder) Version(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		true,
 	)
 }
@@ -266,7 +267,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		bypassThrottling,
 	)
 }
@@ -280,7 +281,7 @@ func (b *outMsgBuilder) PeerListAck(peerAcks []*p2p.PeerAck) (OutboundMessage, e
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -300,7 +301,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -320,7 +321,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -342,7 +343,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -364,7 +365,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -386,7 +387,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -410,7 +411,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -436,7 +437,7 @@ func (b *outMsgBuilder) GetAccepted(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -460,7 +461,7 @@ func (b *outMsgBuilder) Accepted(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -484,7 +485,7 @@ func (b *outMsgBuilder) GetAncestors(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -506,7 +507,7 @@ func (b *outMsgBuilder) Ancestors(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -530,7 +531,7 @@ func (b *outMsgBuilder) Get(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -552,7 +553,7 @@ func (b *outMsgBuilder) Put(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -576,7 +577,7 @@ func (b *outMsgBuilder) PushQuery(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -600,7 +601,7 @@ func (b *outMsgBuilder) PullQuery(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -628,7 +629,7 @@ func (b *outMsgBuilder) Chits(
 				},
 			},
 		},
-		false,
+		compression.NoCompression,
 		false,
 	)
 }
@@ -650,7 +651,7 @@ func (b *outMsgBuilder) AppRequest(
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -666,7 +667,7 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }
@@ -681,7 +682,7 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 				},
 			},
 		},
-		b.compress,
+		b.compressionType,
 		false,
 	)
 }

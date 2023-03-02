@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -72,7 +73,7 @@ func TestTimeout(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		true,
+		compression.GzipCompression, // TODO support zstd
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -332,7 +333,7 @@ func TestReliableMessages(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		true,
+		compression.GzipCompression, // TODO support zstd
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -468,7 +469,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		true,
+		compression.GzipCompression,
 		10*time.Second,
 	)
 	require.NoError(t, err)

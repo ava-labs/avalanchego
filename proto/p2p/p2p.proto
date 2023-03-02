@@ -17,8 +17,12 @@ message Message {
     // This field is only set if the message type supports compression.
     bytes compressed_gzip = 1;
 
+    // zstd-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
+    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
+    // This field is only set if the message type supports compression.
+    bytes compressed_zstd = 2;
+
     // Fields lower than 10 are reserved for other compression algorithms.
-    // TODO: support COMPRESS_ZSTD
     // TODO: support COMPRESS_SNAPPY
 
     // Network messages:

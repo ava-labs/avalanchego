@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
@@ -1278,7 +1279,8 @@ func (n *Node) Initialize(
 	n.msgCreator, err = message.NewCreator(
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionEnabled,
+		// n.Config.NetworkConfig.CompressionEnabled, TODO add config for this
+		compression.GzipCompression,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
