@@ -29,8 +29,8 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-	github.com/onsi/ginkgo/v2 v2.4.0
-	github.com/onsi/gomega v1.24.0
+	github.com/onsi/ginkgo/v2 v2.8.4
+	github.com/onsi/gomega v1.27.2
 	github.com/pires/go-proxyproto v0.6.2
 	github.com/prometheus/client_golang v1.13.0
 	github.com/prometheus/client_model v0.2.0
@@ -81,9 +81,11 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.12.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
@@ -124,6 +126,7 @@ require (
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
