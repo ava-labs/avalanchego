@@ -1286,6 +1286,13 @@ func (n *Node) Initialize(
 	}
 
 	primaryNetVdrs := n.initVdrs()
+
+	// register logger to track this node life cycle in validators' set
+	primaryNetVdrs.RegisterCallbackListener(&validators.Logger{
+		TargetNode: n.ID,
+		Log:        n.Log,
+	})
+
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
