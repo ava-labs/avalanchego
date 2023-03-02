@@ -1,5 +1,8 @@
 [workspace]
 members = [
+  "growth-ring",
+  "libaio-futures",
+  "shale",
   "firewood",
   "fwdctl",
 ]

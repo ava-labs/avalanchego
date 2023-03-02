@@ -1,0 +1,25 @@
+[package]
+name = "libaio-futures"
+version = "0.2.3"
+authors = ["Determinant <tederminant@gmail.com>"]
+edition = "2018"
+homepage = "https://github.com/Determinant/libaio-futures"
+keywords = ["libaio", "aio", "async", "futures"]
+license = "MIT"
+description = "Straightforward Linux AIO using Futures/async/await."
+
+[features]
+emulated-failure = []
+
+[dependencies]
+libc = "0.2.133"
+parking_lot = "0.12.1"
+crossbeam-channel = "0.5.6"
+
+[dev-dependencies]
+futures = "0.3.24"
+
+[lib]
+name = "aiofut"
+path = "src/lib.rs"
+crate-type = ["dylib", "rlib", "staticlib"]

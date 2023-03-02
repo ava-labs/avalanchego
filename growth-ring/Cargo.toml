@@ -1,0 +1,32 @@
+[package]
+name = "growth-ring"
+version = "0.3.0"
+authors = ["Determinant <tederminant@gmail.com>"]
+edition = "2018"
+homepage = "https://github.com/Determinant/growth-ring"
+keywords = ["wal", "db", "futures"]
+license = "MIT"
+description = "Simple and modular write-ahead-logging implementation."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libaio-futures = { version = "0.2.3", path = "../libaio-futures" }
+crc = "3.0.0"
+lru = "0.8.0"
+scan_fmt = "0.2.6"
+regex = "1.6.0"
+async-trait = "0.1.57"
+futures = "0.3.24"
+nix = "0.25.0"
+libc = "0.2.133"
+
+[dev-dependencies]
+hex = "0.4.3"
+rand = "0.8.5"
+indexmap = "1.9.1"
+
+[lib]
+name = "growthring"
+path = "src/lib.rs"
+crate-type = ["dylib", "rlib", "staticlib"]
