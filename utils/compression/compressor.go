@@ -3,10 +3,10 @@
 
 package compression
 
-type CompressionType byte
+type Type byte
 
 const (
-	NoCompression CompressionType = iota + 1
+	NoCompression Type = iota + 1
 	GzipCompression
 	ZstdCompression
 )

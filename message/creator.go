@@ -26,7 +26,7 @@ type creator struct {
 func NewCreator(
 	metrics prometheus.Registerer,
 	parentNamespace string,
-	compressionType compression.CompressionType,
+	compressionType compression.Type,
 	maxMessageTimeout time.Duration,
 ) (Creator, error) {
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)

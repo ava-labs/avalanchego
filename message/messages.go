@@ -174,7 +174,7 @@ func newMsgBuilder(
 
 func (mb *msgBuilder) marshal(
 	uncompressedMsg *p2p.Message,
-	compressionType compression.CompressionType,
+	compressionType compression.Type,
 ) ([]byte, int, time.Duration, error) {
 	uncompressedMsgBytes, err := proto.Marshal(uncompressedMsg)
 	if err != nil {
@@ -273,7 +273,7 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, bool, int, time.Duratio
 	return m, true, bytesSavedCompression, decompressTook, nil
 }
 
-func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.CompressionType, bypassThrottling bool) (*outboundMessage, error) {
+func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*outboundMessage, error) {
 	b, saved, compressTook, err := mb.marshal(m, compressionType)
 	if err != nil {
 		return nil, err

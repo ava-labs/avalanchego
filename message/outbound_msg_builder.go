@@ -172,14 +172,14 @@ type OutboundMsgBuilder interface {
 }
 
 type outMsgBuilder struct {
-	compressionType compression.CompressionType
+	compressionType compression.Type
 
 	builder *msgBuilder
 }
 
 // Use "message.NewCreator" to import this function
 // since we do not expose "msgBuilder" yet
-func newOutboundBuilder(compressionType compression.CompressionType, builder *msgBuilder) OutboundMsgBuilder {
+func newOutboundBuilder(compressionType compression.Type, builder *msgBuilder) OutboundMsgBuilder {
 	return &outMsgBuilder{
 		compressionType: compressionType,
 		builder:         builder,

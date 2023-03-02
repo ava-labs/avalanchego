@@ -52,7 +52,7 @@ func TestMessage(t *testing.T) {
 		desc             string
 		op               Op
 		msg              *p2p.Message
-		compressionType  compression.CompressionType
+		compressionType  compression.Type
 		bypassThrottling bool
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
