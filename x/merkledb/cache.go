@@ -6,7 +6,6 @@ package merkledb
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -17,7 +16,6 @@ type onEvictCache[K comparable, V any] struct {
 	maxSize int
 	// LRU --> MRU from left to right.
 	lru        linkedhashmap.LinkedHashmap[K, V]
-	cache      cache.Cacher[K, V]
 	onEviction func(V) error
 }
 
@@ -25,7 +23,6 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
 		lru:        linkedhashmap.New[K, V](),
-		cache:      &cache.LRU[K, V]{Size: maxSize},
 		onEviction: onEviction,
 	}
 }
@@ -35,7 +32,7 @@ func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	val, ok := c.cache.Get(key)
+	val, ok := c.lru.Get(key)
 	if ok {
 		// This key was touched; move it to the MRU position.
 		c.lru.Put(key, val)
@@ -50,7 +47,6 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.cache.Put(key, value)
 	c.lru.Put(key, value) // Mark as MRU
 
 	if c.lru.Len() > c.maxSize {
@@ -70,7 +66,6 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 func (c *onEvictCache[K, V]) Flush() error {
 	c.lock.Lock()
 	defer func() {
-		c.cache.Flush()
 		c.lru = linkedhashmap.New[K, V]()
 		c.lock.Unlock()
 	}()
