@@ -28,13 +28,13 @@ const defaultLeafRequestLimit = 1024
 // the same value for Root, Account, Start, and NodeType throughout the sync.
 // The value returned by End can change between calls to OnLeafs.
 type LeafSyncTask interface {
-	Root() common.Hash                 // Root of the trie to sync
-	Account() common.Hash              // Account hash of the trie to sync (only applicable to storage tries)
-	Start() []byte                     // Starting key to request new leaves
-	End() []byte                       // End key to request new leaves
-	OnStart() (bool, error)            // Callback when tasks begins, returns true if work can be skipped
-	OnLeafs(keys, vals [][]byte) error // Callback when new leaves are received from the network
-	OnFinish() error                   // Callback when there are no more leaves in the trie to sync or when we reach End()
+	Root() common.Hash                  // Root of the trie to sync
+	Account() common.Hash               // Account hash of the trie to sync (only applicable to storage tries)
+	Start() []byte                      // Starting key to request new leaves
+	End() []byte                        // End key to request new leaves
+	OnStart() (bool, error)             // Callback when tasks begins, returns true if work can be skipped
+	OnLeafs(keys, vals [][]byte) error  // Callback when new leaves are received from the network
+	OnFinish(ctx context.Context) error // Callback when there are no more leaves in the trie to sync or when we reach End()
 }
 
 type CallbackLeafSyncer struct {
@@ -131,7 +131,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 		// If we have completed syncing this task, invoke [OnFinish] and mark the task
 		// as complete.
 		if done || !leafsResponse.More {
-			return task.OnFinish()
+			return task.OnFinish(ctx)
 		}
 
 		if len(leafsResponse.Keys) == 0 {
