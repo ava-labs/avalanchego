@@ -298,10 +298,28 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
-	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
-	if err != nil {
-		return network.Config{}, err
+
+	var (
+		compressionType compression.Type
+		err             error
+	)
+	if v.IsSet(NetworkCompressionTypeKey) {
+		if v.IsSet(NetworkCompressionEnabledKey) {
+			return network.Config{}, fmt.Errorf("cannot set both %q and %q", NetworkCompressionTypeKey, NetworkCompressionEnabledKey)
+		}
+
+		compressionType, err = compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
+		if err != nil {
+			return network.Config{}, err
+		}
+	} else {
+		if v.GetBool(NetworkCompressionEnabledKey) {
+			compressionType = constants.DefaultNetworkCompressionType
+		} else {
+			compressionType = compression.TypeNone
+		}
 	}
+
 	config := network.Config{
 		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
