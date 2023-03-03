@@ -124,11 +124,13 @@ func (m *outboundMessage) BytesSavedCompression() int {
 
 // TODO: add other compression algorithms with extended interface
 type msgBuilder struct {
-	gzipCompressor compression.Compressor
-	zstdCompressor compression.Compressor
+	gzipCompressor            compression.Compressor
+	gzipCompressTimeMetrics   map[Op]metric.Averager
+	gzipDecompressTimeMetrics map[Op]metric.Averager
 
-	compressTimeMetrics   map[Op]metric.Averager
-	decompressTimeMetrics map[Op]metric.Averager
+	zstdCompressor            compression.Compressor
+	zstdCompressTimeMetrics   map[Op]metric.Averager
+	zstdDecompressTimeMetrics map[Op]metric.Averager
 
 	maxMessageTimeout time.Duration
 }
@@ -144,28 +146,44 @@ func newMsgBuilder(
 	}
 
 	mb := &msgBuilder{
-		gzipCompressor: cpr,
-		zstdCompressor: compression.NewZstdCompressor(),
+		gzipCompressor:            cpr,
+		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
+		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
-		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
-		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
+		zstdCompressor:            compression.NewZstdCompressor(),
+		zstdCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
+		zstdDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
 		maxMessageTimeout: maxMessageTimeout,
 	}
 
 	errs := wrappers.Errs{}
 	for _, op := range ExternalOps {
-		mb.compressTimeMetrics[op] = metric.NewAveragerWithErrs(
+		mb.gzipCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
-			fmt.Sprintf("%s_compress_time", op),
-			fmt.Sprintf("time (in ns) to compress %s messages", op),
+			fmt.Sprintf("gzip_%s_compress_time", op),
+			fmt.Sprintf("time (in ns) to compress %s messages with gzip", op),
 			metrics,
 			&errs,
 		)
-		mb.decompressTimeMetrics[op] = metric.NewAveragerWithErrs(
+		mb.gzipDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
-			fmt.Sprintf("%s_decompress_time", op),
-			fmt.Sprintf("time (in ns) to decompress %s messages", op),
+			fmt.Sprintf("gzip_%s_decompress_time", op),
+			fmt.Sprintf("time (in ns) to decompress %s messages with gzip", op),
+			metrics,
+			&errs,
+		)
+		mb.zstdCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("zstd_%s_compress_time", op),
+			fmt.Sprintf("time (in ns) to compress %s messages with zstd", op),
+			metrics,
+			&errs,
+		)
+		mb.zstdDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("zstd_%s_decompress_time", op),
+			fmt.Sprintf("time (in ns) to decompress %s messages with zstd", op),
 			metrics,
 			&errs,
 		)
@@ -232,50 +250,53 @@ func (mb *msgBuilder) marshal(
 	return compressedMsgBytes, bytesSaved, compressTook, nil
 }
 
-func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, bool, int, time.Duration, error) {
+func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, compression.Type, int, time.Duration, error) {
 	m := new(p2p.Message)
 	if err := proto.Unmarshal(b, m); err != nil {
-		return nil, false, 0, 0, err
+		return nil, compression.TypeNone, 0, 0, err
 	}
 
 	gzipCompressed := m.GetCompressedGzip()
 	zstdCompressed := m.GetCompressedZstd()
 	if len(gzipCompressed) == 0 && len(zstdCompressed) == 0 {
 		// The message wasn't compressed
-		return m, false, 0, 0, nil
+		return m, compression.TypeNone, 0, 0, nil
 	}
 	if len(gzipCompressed) > 0 && len(zstdCompressed) > 0 {
-		return nil, true, 0, 0, errMultipleCompressionTypes
+		return nil, compression.TypeNone, 0, 0, errMultipleCompressionTypes
 	}
 
 	startTime := time.Now()
 
 	var (
 		bytesSavedCompression int
+		compressionType       compression.Type
 		decompressed          []byte
 		err                   error
 	)
 	if len(gzipCompressed) > 0 {
+		compressionType = compression.TypeGzip
 		decompressed, err = mb.gzipCompressor.Decompress(gzipCompressed)
 		if err != nil {
-			return nil, true, 0, 0, err
+			return nil, compression.TypeGzip, 0, 0, err
 		}
 		bytesSavedCompression = len(decompressed) - len(gzipCompressed)
 	}
 	if len(zstdCompressed) > 0 {
+		compressionType = compression.TypeZstd
 		decompressed, err = mb.zstdCompressor.Decompress(zstdCompressed)
 		if err != nil {
-			return nil, true, 0, 0, err
+			return nil, compression.TypeZstd, 0, 0, err
 		}
 		bytesSavedCompression = len(decompressed) - len(zstdCompressed)
 	}
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
-		return nil, true, 0, 0, err
+		return nil, compression.TypeNone, 0, 0, err
 	}
 	decompressTook := time.Since(startTime)
 
-	return m, true, bytesSavedCompression, decompressTook, nil
+	return m, compressionType, bytesSavedCompression, decompressTook, nil
 }
 
 func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*outboundMessage, error) {
@@ -289,8 +310,11 @@ func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression
 		return nil, err
 	}
 
-	if compressionType != compression.TypeNone {
-		mb.compressTimeMetrics[op].Observe(float64(compressTook))
+	switch compressionType {
+	case compression.TypeGzip:
+		mb.gzipCompressTimeMetrics[op].Observe(float64(compressTook))
+	case compression.TypeZstd:
+		mb.zstdCompressTimeMetrics[op].Observe(float64(compressTook))
 	}
 
 	return &outboundMessage{
@@ -306,7 +330,7 @@ func (mb *msgBuilder) parseInbound(
 	nodeID ids.NodeID,
 	onFinishedHandling func(),
 ) (*inboundMessage, error) {
-	m, wasCompressed, bytesSavedCompression, decompressTook, err := mb.unmarshal(bytes)
+	m, compressionType, bytesSavedCompression, decompressTook, err := mb.unmarshal(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -321,8 +345,11 @@ func (mb *msgBuilder) parseInbound(
 		return nil, err
 	}
 
-	if wasCompressed {
-		mb.decompressTimeMetrics[op].Observe(float64(decompressTook))
+	switch compressionType {
+	case compression.TypeGzip:
+		mb.gzipDecompressTimeMetrics[op].Observe(float64(decompressTook))
+	case compression.TypeZstd:
+		mb.zstdDecompressTimeMetrics[op].Observe(float64(decompressTook))
 	}
 
 	expiration := mockable.MaxTime
