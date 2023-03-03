@@ -256,6 +256,7 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, compression.Type, int, 
 		return nil, compression.TypeNone, 0, 0, err
 	}
 
+	// Figure out what compression type, if any, was used to compress the message.
 	gzipCompressed := m.GetCompressedGzip()
 	zstdCompressed := m.GetCompressedZstd()
 	if len(gzipCompressed) == 0 && len(zstdCompressed) == 0 {
@@ -266,30 +267,25 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, compression.Type, int, 
 		return nil, compression.TypeNone, 0, 0, errMultipleCompressionTypes
 	}
 
-	startTime := time.Now()
-
 	var (
-		bytesSavedCompression int
-		compressionType       compression.Type
-		decompressed          []byte
-		err                   error
+		compressionType compression.Type
+		compressor      compression.Compressor
 	)
 	if len(gzipCompressed) > 0 {
 		compressionType = compression.TypeGzip
-		decompressed, err = mb.gzipCompressor.Decompress(gzipCompressed)
-		if err != nil {
-			return nil, compression.TypeGzip, 0, 0, err
-		}
-		bytesSavedCompression = len(decompressed) - len(gzipCompressed)
-	}
-	if len(zstdCompressed) > 0 {
+		compressor = mb.gzipCompressor
+	} else {
 		compressionType = compression.TypeZstd
-		decompressed, err = mb.zstdCompressor.Decompress(zstdCompressed)
-		if err != nil {
-			return nil, compression.TypeZstd, 0, 0, err
-		}
-		bytesSavedCompression = len(decompressed) - len(zstdCompressed)
+		compressor = mb.zstdCompressor
 	}
+
+	startTime := time.Now()
+
+	decompressed, err := compressor.Decompress(gzipCompressed)
+	if err != nil {
+		return nil, compression.TypeGzip, 0, 0, err
+	}
+	bytesSavedCompression := len(decompressed) - len(gzipCompressed)
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
 		return nil, compression.TypeNone, 0, 0, err
