@@ -19,7 +19,7 @@ import (
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	if asTrieView, ok := t.(*trieView); ok {
-		if err := asTrieView.calculateIDs(context.Background()); err != nil {
+		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
 			return nil, err
 		}
 		path := newPath([]byte(key))
@@ -76,7 +76,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key1 := []byte{0}
 	err = trie.Insert(context.Background(), key1, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
 	path, err = trie.getPathTo(context.Background(), newPath(key1))
@@ -91,7 +91,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key2 := []byte{0, 1}
 	err = trie.Insert(context.Background(), key2, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
 	path, err = trie.getPathTo(context.Background(), newPath(key2))
@@ -105,7 +105,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key3 := []byte{255}
 	err = trie.Insert(context.Background(), key3, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
 	path, err = trie.getPathTo(context.Background(), newPath(key3))
@@ -633,7 +633,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value3"))
 	require.NoError(t, err)
-	err = newTrie.(*trieView).calculateIDs(context.Background())
+	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 	root, err := newTrie.getNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
@@ -647,7 +647,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.Remove(context.Background(), []byte("key1"))
 	require.NoError(t, err)
-	err = newTrie.(*trieView).calculateIDs(context.Background())
+	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 	root, err = newTrie.getNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
@@ -727,7 +727,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	err = trie.Insert(context.Background(), []byte("key2"), []byte("value4"))
 	require.NoError(t, err)
 
-	err = trie.(*trieView).calculateIDs(context.Background())
+	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 	root, err := trie.getNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
@@ -749,7 +749,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	err = trie.Remove(context.Background(), []byte("key"))
 	require.NoError(t, err)
 
-	err = trie.(*trieView).calculateIDs(context.Background())
+	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 
 	root, err = trie.getNode(context.Background(), EmptyPath)
