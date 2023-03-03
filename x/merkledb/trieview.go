@@ -55,7 +55,7 @@ type trieView struct {
 	// Controls the trie's invalidation related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
 	// Must not grab the [lock] of this trie or any ancestor while this is held.
-	invalidationLock sync.RWMutex
+	validityTrackingLock sync.RWMutex
 
 	// If true, this view has been invalidated and can't be used.
 	//
@@ -67,25 +67,25 @@ type trieView struct {
 	//
 	// *Code Accessing Ancestor State*
 	//
-	// t.invalidationLock.Lock()
+	// t.validityTrackingLock.Lock()
 	// if t.invalidated {
-	//     t.invalidationLock.Unlock()
+	//     t.validityTrackingLock.Unlock()
 	//     return ErrInvalid
 	//  }
-	//  t.invalidationLock.Unlock()
+	//  t.validityTrackingLock.Unlock()
 	//
 	// If the invalidated check passes, then we're guaranteed that no ancestor changes occurred
 	// during the code that accessed ancestor state and the result of that work is still valid
 	//
-	// [invalidationLock] must be held when reading/writing this field.
+	// [validityTrackingLock] must be held when reading/writing this field.
 	invalidated bool
 
 	// the uncommitted parent trie of this view
-	// [invalidationLock] must be held when reading/writing this field.
+	// [validityTrackingLock] must be held when reading/writing this field.
 	parentTrie Trie
 
 	// The valid children of this trie.
-	// [invalidationLock] must be held when reading/writing this field.
+	// [validityTrackingLock] must be held when reading/writing this field.
 	childViews []*trieView
 
 	// Changes made to this view.
@@ -147,8 +147,8 @@ func (t *trieView) NewPreallocatedView(
 		return nil, err
 	}
 
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	if t.invalidated {
 		return nil, ErrInvalid
@@ -612,19 +612,19 @@ func (t *trieView) commitToDB(ctx context.Context, trieToCommit *trieView) error
 	return nil
 }
 
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) isInvalid() bool {
-	t.invalidationLock.RLock()
-	defer t.invalidationLock.RUnlock()
+	t.validityTrackingLock.RLock()
+	defer t.validityTrackingLock.RUnlock()
 
 	return t.invalidated
 }
 
 // Invalidates this view and all descendants.
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidate() {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	t.invalidated = true
 
@@ -637,15 +637,15 @@ func (t *trieView) invalidate() {
 }
 
 // Invalidates all children of this view.
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidateChildren() {
 	t.invalidateChildrenExcept(nil)
 }
 
 // move any child views from the trieToCommit to the current trie view
 func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	for _, childView := range trieToCommit.childViews {
 		childView.updateParent(t)
@@ -654,27 +654,27 @@ func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
 }
 
 func (t *trieView) updateParent(newParent Trie) {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	t.parentTrie = newParent
 }
 
 // Removes all tracked child views from [childViews]
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) clearChildView() {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
 }
 
 // Invalidates all children of this view except [exception].
 // [t.childViews] will only contain the exception after invalidation is complete.
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidateChildrenExcept(exception *trieView) {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 
 	for _, childView := range t.childViews {
 		if childView != exception {
@@ -900,7 +900,7 @@ func (t *trieView) Insert(ctx context.Context, key []byte, value []byte) error {
 }
 
 // Assumes [t.lock] is held.
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) insert(ctx context.Context, key []byte, value []byte) error {
 	if t.committed {
 		return ErrCommitted
@@ -935,7 +935,7 @@ func (t *trieView) Remove(ctx context.Context, key []byte) error {
 }
 
 // Assumes [t.lock] is held.
-// Assumes [t.invalidationLock] isn't held.
+// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) remove(ctx context.Context, key []byte) error {
 	if t.committed {
 		return ErrCommitted
@@ -1103,7 +1103,7 @@ func getLengthOfCommonPrefix(first, second path) int {
 func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	
+
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -1387,7 +1387,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 
 // Get the parent trie of the view
 func (t *trieView) getParentTrie() Trie {
-	t.invalidationLock.Lock()
-	defer t.invalidationLock.Unlock()
+	t.validityTrackingLock.Lock()
+	defer t.validityTrackingLock.Unlock()
 	return t.parentTrie
 }
