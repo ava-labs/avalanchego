@@ -74,6 +74,16 @@ type Trie interface {
 
 	// Insert a key/value pair into the Trie
 	Insert(ctx context.Context, key, value []byte) error
+
+	// ensures that all changed nodes have their new ids calculated
+	calculateIDs(ctx context.Context) error
+
+	// commits changes in the trieToCommit into the current trie
+	commitChanges(ctx context.Context, trieToCommit *trieView) error
+
+	// commits changes in the trieToCommit into the current trie
+	// then commits the combined changes down the stack until all changes in the stack commit to the database
+	commitToDB(ctx context.Context, trieToCommit *trieView) error
 }
 
 // Invariant: unexported methods (except lockStack) are only called when the
@@ -84,16 +94,5 @@ type TrieView interface {
 	// Commit the changes from this Trie into the database.
 	// Any views that this Trie is built on will also be committed, starting at
 	// the oldest.
-	Commit(ctx context.Context) error
-
-	// Insert key/value into the trie and get back the node associated with the
-	// key.
-	// Updates nodes in the trie, whereas Trie.Insert records the key/value
-	// without updating any trie nodes.
-	insertIntoTrie(ctx context.Context, keyPath path, value Maybe[[]byte]) (*node, error)
-
-	// Remove the key's value from the trie.
-	// Updates nodes in the trie, whereas Trie.Remove records the key without
-	// updating any trie nodes.
-	removeFromTrie(ctx context.Context, keyPath path) error
+	CommitToDB(ctx context.Context) error
 }
