@@ -18,7 +18,7 @@ scan_fmt = "0.2.6"
 regex = "1.6.0"
 async-trait = "0.1.57"
 futures = "0.3.24"
-nix = "0.25.0"
+nix = "0.26.2"
 libc = "0.2.133"
 
 [dev-dependencies]
