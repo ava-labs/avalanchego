@@ -424,8 +424,8 @@ func (proof *ChangeProof) Verify(
 		return err
 	}
 
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
 
 	// Don't need to lock [view] because nobody else has a reference to it.
 	view, err := db.newUntrackedView(ctx)
@@ -607,7 +607,7 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 // For each proof node, adds the children that are < [start] or > [end].
 // If [start] is empty, no children are < [start].
 // If [end] is empty, no children are > [end].
-// Assumes [t]'s view stack is locked.
+// Assumes [t.lock] is held.
 func addPathInfo(
 	ctx context.Context,
 	t *trieView,
