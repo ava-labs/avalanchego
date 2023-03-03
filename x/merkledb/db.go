@@ -69,8 +69,14 @@ type Config struct {
 
 // Can only be edited by committing changes from a trieView.
 type Database struct {
+
 	// Must be held when reading/writing fields.
 	lock sync.RWMutex
+
+	// Must be held when preparing work to be committed to the DB
+	// Used to prevent editing of the trie without restricting read access
+	// until the full set of changes is ready to be written
+	commitLock sync.Mutex
 
 	// versiondb that the other dbs are built on.
 	// Allows the changes made to the snapshot and [nodeDB] to be atomic.
@@ -103,7 +109,7 @@ type Database struct {
 	childViews []*trieView
 }
 
-func (*Database) calculateIDs(context.Context) error {
+func (*Database) CalculateNodeIDs(context.Context) error {
 	// no-op as the db is always up to date with all ids
 	return nil
 }
@@ -158,17 +164,6 @@ func newDatabase(
 	// mark that the db has not yet been cleanly closed
 	err = trieDB.metadataDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
 	return trieDB, err
-}
-
-// Only grabs a read lock because views built atop this database can't mutate it.
-// The database is only mutated by a view when the view is committed, and
-// trieView grabs a write lock when committing.
-func (db *Database) lockStack() {
-	db.lock.RLock()
-}
-
-func (db *Database) unlockStack() {
-	db.lock.RUnlock()
 }
 
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
@@ -240,8 +235,8 @@ func New(ctx context.Context, db database.Database, config Config) (*Database, e
 
 // Commits the key/value pairs within the [proof] to the db.
 func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.commitLock.Lock()
+	db.commitLock.Unlock()
 
 	view, err := db.prepareChangeProofView(ctx, proof)
 	if err != nil {
@@ -253,8 +248,8 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 // Commits the key/value pairs within the [proof] to the db.
 // [start] is the smallest key in the range this [proof] covers.
 func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.commitLock.Lock()
+	db.commitLock.Unlock()
 
 	view, err := db.prepareRangeProofView(ctx, start, proof)
 	if err != nil {
@@ -590,7 +585,7 @@ func (db *Database) NewPreallocatedView(ctx context.Context, estimatedSize int) 
 // Assumes [db.lock] is read locked.
 // Assumes that this view is temporary and doesn't require validity tracking
 func (db *Database) newPreallocatedView(ctx context.Context, estimatedSize int) (*trieView, error) {
-	return newTrieView(ctx, db, db, nil, estimatedSize)
+	return newTrieView(ctx, db, db, db.root.clone(), estimatedSize)
 }
 
 func (db *Database) Has(k []byte) (bool, error) {
@@ -613,8 +608,8 @@ func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 }
 
 func (db *Database) Insert(ctx context.Context, k, v []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
 
 	view, err := db.newUntrackedView(ctx)
 	if err != nil {
@@ -699,8 +694,8 @@ func (db *Database) Put(k, v []byte) error {
 }
 
 func (db *Database) Remove(ctx context.Context, key []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
 
 	view, err := db.newUntrackedView(ctx)
 	if err != nil {
@@ -713,8 +708,10 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 	return view.commitToDB(ctx, nil)
 }
 
-// Assumes [db.lock] is held.
 func (db *Database) commitBatch(ops []database.BatchOp) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
 	view, err := db.prepareBatchView(context.Background(), ops)
 	if err != nil {
 		return err
@@ -722,8 +719,10 @@ func (db *Database) commitBatch(ops []database.BatchOp) error {
 	return view.commitToDB(context.Background(), nil)
 }
 
-// Assumes [db.lock] is held.
 func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	if trieToCommit == nil {
 		return nil
 	}
@@ -903,14 +902,14 @@ func (db *Database) getHistoricalViewForRangeProof(
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(ctx, db, db, nil, 100)
+		return newTrieView(ctx, db, db, db.root.clone(), 100)
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return newTrieView(ctx, db, db, changeHistory, len(changeHistory.nodes))
+	return newTrieViewWithChanges(ctx, db, db, changeHistory, len(changeHistory.nodes))
 }
 
 // Returns all of the keys in range [start, end] that aren't in [keySet].
@@ -938,6 +937,9 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
 func (db *Database) getNode(_ context.Context, key path) (*node, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
 	if key == RootPath {
 		return db.root.clone(), nil
 	}
@@ -979,7 +981,13 @@ func (db *Database) getKeyValues(
 	end []byte,
 	maxLength int,
 	keysToIgnore set.Set[string],
+	lock bool,
 ) ([]KeyValue, error) {
+
+	if lock {
+		db.lock.RLock()
+		defer db.lock.RUnlock()
+	}
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
