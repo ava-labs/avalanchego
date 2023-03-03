@@ -61,8 +61,11 @@ To prevent this, we need to use locking.
 It also has a `RWMutex` named `invalidationLock` that is held during methods that change the view's validity or tracking of child views' validity.
 The `Commit` function also grabs the `Database`'s `commitLock` lock. This is the only `trieView` method that modifies the underlying `Database`.  If an ancestor is modified during this time, the commit will error with ErrInvalid.
 
-To prevent deadlocks, `trieView` and `Database` never lock a view that is built atop itself.
+To prevent deadlocks, `trieView` and `Database` never trigger the `lock` of a view that is built atop itself.
 That is, locking is always done from a view down to the underlying `Database`, never the other way around.
+
+The `invalidationLock` goes the opposite way.  Views can invalidationLock their children, but not their ancestors. Because of this, any function that takes the `invalidationLock` should avoid taking the `trieView.lock` as this will likely trigger a deadlock.
+
 In some of `Database`'s methods, we create a `trieView` and call unexported methods on it without locking it.
 We do so because the exported counterpart of the method read locks the `Database`, which is already locked.
-This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.  Additionally, any function that takes the `invalidationLock` should avoid taking the `trieView.lock` as this will likely trigger a deadlock as well.
+This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.  
