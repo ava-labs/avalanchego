@@ -1,7 +1,9 @@
 use firewood::{merkle_util::*, proof::Proof};
 
 fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
-    items: Vec<(K, V)>, meta_size: u64, compact_size: u64,
+    items: Vec<(K, V)>,
+    meta_size: u64,
+    compact_size: u64,
 ) -> Result<MerkleSetup, DataStoreError> {
     let mut merkle = new_merkle(meta_size, compact_size);
     for (k, v) in items.iter() {
@@ -50,7 +52,10 @@ fn test_root_hash_fuzz_insertions() {
     let keygen = || {
         let (len0, len1): (usize, usize) = {
             let mut rng = rng.borrow_mut();
-            (rng.gen_range(1..max_len0 + 1), rng.gen_range(1..max_len1 + 1))
+            (
+                rng.gen_range(1..max_len0 + 1),
+                rng.gen_range(1..max_len1 + 1),
+            )
         };
         let key: Vec<u8> = (0..len0)
             .map(|_| rng.borrow_mut().gen_range(0..2))
@@ -77,7 +82,10 @@ fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
     let keygen = || {
         let (len0, len1): (usize, usize) = {
             let mut rng = rng.borrow_mut();
-            (rng.gen_range(1..max_len0 + 1), rng.gen_range(1..max_len1 + 1))
+            (
+                rng.gen_range(1..max_len0 + 1),
+                rng.gen_range(1..max_len1 + 1),
+            )
         };
         let key: Vec<u8> = (0..len0)
             .map(|_| rng.borrow_mut().gen_range(0..2))
@@ -104,14 +112,23 @@ fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
         hashes.pop();
         println!("----");
         let mut prev_dump = merkle.dump()?;
-        for (((k, _), h), d) in items.iter().rev().zip(hashes.iter().rev()).zip(dumps.iter().rev()) {
+        for (((k, _), h), d) in items
+            .iter()
+            .rev()
+            .zip(hashes.iter().rev())
+            .zip(dumps.iter().rev())
+        {
             merkle.remove(k)?;
             let h0 = merkle.root_hash()?.0;
             if h.as_ref().unwrap().0 != h0 {
                 for (k, _) in items.iter() {
                     println!("{}", hex::encode(k));
                 }
-                println!("{} != {}", hex::encode(**h.as_ref().unwrap()), hex::encode(h0));
+                println!(
+                    "{} != {}",
+                    hex::encode(**h.as_ref().unwrap()),
+                    hex::encode(h0)
+                );
                 println!("== before {} ===", hex::encode(k));
                 print!("{prev_dump}");
                 println!("== after {} ===", hex::encode(k));
@@ -136,7 +153,10 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
     let keygen = || {
         let (len0, len1): (usize, usize) = {
             let mut rng = rng.borrow_mut();
-            (rng.gen_range(1..max_len0 + 1), rng.gen_range(1..max_len1 + 1))
+            (
+                rng.gen_range(1..max_len0 + 1),
+                rng.gen_range(1..max_len1 + 1),
+            )
         };
         let key: Vec<u8> = (0..len0)
             .map(|_| rng.borrow_mut().gen_range(0..2))
@@ -168,7 +188,9 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
                 assert_eq!(&*merkle.get(k)?.unwrap(), &v[..]);
                 assert_eq!(&*merkle.get_mut(k)?.unwrap().get(), &v[..]);
             }
-            let h = triehash::trie_root::<keccak_hasher::KeccakHasher, Vec<_>, _, _>(items.iter().collect());
+            let h = triehash::trie_root::<keccak_hasher::KeccakHasher, Vec<_>, _, _>(
+                items.iter().collect(),
+            );
             let h0 = merkle.root_hash()?;
             if h[..] != *h0 {
                 println!("{} != {}", hex::encode(h), hex::encode(*h0));
@@ -220,7 +242,12 @@ fn test_proof_end_with_leaf() -> Result<(), DataStoreError> {
 #[test]
 /// Verify the proofs that end with branch node with the given key.
 fn test_proof_end_with_branch() -> Result<(), DataStoreError> {
-    let items = vec![("d", "verb"), ("do", "verb"), ("doe", "reindeer"), ("e", "coin")];
+    let items = vec![
+        ("d", "verb"),
+        ("do", "verb"),
+        ("doe", "reindeer"),
+        ("e", "coin"),
+    ];
     let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
     let key = "d";
 
@@ -284,7 +311,12 @@ fn test_empty_tree_proof() -> Result<(), DataStoreError> {
 
 #[test]
 fn test_range_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![("doa", "verb"), ("doe", "reindeer"), ("dog", "puppy"), ("ddd", "ok")];
+    let mut items = vec![
+        ("doa", "verb"),
+        ("doe", "reindeer"),
+        ("dog", "puppy"),
+        ("ddd", "ok"),
+    ];
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
@@ -359,9 +391,15 @@ fn test_range_proof_with_invalid_non_existent_proof() {
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.as_ref().unwrap().prove(std::str::from_utf8(&[0x3]).unwrap());
+    let mut proof = merkle
+        .as_ref()
+        .unwrap()
+        .prove(std::str::from_utf8(&[0x3]).unwrap());
     assert!(!proof.as_ref().unwrap().0.is_empty());
-    let end_proof = merkle.as_ref().unwrap().prove(std::str::from_utf8(&[0x7]).unwrap());
+    let end_proof = merkle
+        .as_ref()
+        .unwrap()
+        .prove(std::str::from_utf8(&[0x7]).unwrap());
     assert!(!end_proof.as_ref().unwrap().0.is_empty());
 
     proof.as_mut().unwrap().concat_proofs(end_proof.unwrap());
@@ -376,7 +414,13 @@ fn test_range_proof_with_invalid_non_existent_proof() {
 
     merkle
         .unwrap()
-        .verify_range_proof(proof.as_ref().unwrap(), &items[start].0, &items[end].0, keys, vals)
+        .verify_range_proof(
+            proof.as_ref().unwrap(),
+            &items[start].0,
+            &items[end].0,
+            keys,
+            vals,
+        )
         .is_err();
 }
 

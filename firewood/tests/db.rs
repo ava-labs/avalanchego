@@ -33,7 +33,10 @@ fn test_revisions() {
     let keygen = || {
         let (len0, len1): (usize, usize) = {
             let mut rng = rng.borrow_mut();
-            (rng.gen_range(1..max_len0 + 1), rng.gen_range(1..max_len1 + 1))
+            (
+                rng.gen_range(1..max_len0 + 1),
+                rng.gen_range(1..max_len1 + 1),
+            )
         };
         let key: Vec<u8> = (0..len0)
             .map(|_| rng.borrow_mut().gen_range(0..2))

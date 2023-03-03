@@ -6,14 +6,13 @@ use std::fs::remove_dir_all;
 
 const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const FIREWOOD: &str = "firewood";
 const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
 
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
     if let Err(e) = remove_dir_all(FIREWOOD_TEST_DB_NAME) {
         eprintln!("failed to delete testing dir: {e}");
-        return Err(anyhow!(e))
+        return Err(anyhow!(e));
     }
 
     Ok(())
@@ -22,7 +21,7 @@ fn fwdctl_delete_db() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_prints_version() -> Result<()> {
-    let expected_version_output: String = format!("{FIREWOOD} {VERSION}\n");
+    let expected_version_output: String = format!("{PRG} {VERSION}\n");
 
     // version is defined and succeeds with the desired output
     Command::cargo_bin(PRG)?
@@ -43,9 +42,7 @@ fn fwdctl_creates_database() -> Result<()> {
         .assert()
         .success();
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
@@ -70,9 +67,7 @@ fn fwdctl_insert_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("year"));
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
@@ -105,9 +100,7 @@ fn fwdctl_get_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("2023"));
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
@@ -139,9 +132,7 @@ fn fwdctl_delete_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("year"));
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
@@ -172,9 +163,7 @@ fn fwdctl_root_hash() -> Result<()> {
         .success()
         .stdout(predicate::str::is_empty().not());
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
@@ -205,9 +194,7 @@ fn fwdctl_dump() -> Result<()> {
         .success()
         .stdout(predicate::str::is_empty().not());
 
-    if let Err(e) = fwdctl_delete_db() {
-        return Err(anyhow!(e))
-    }
+    fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
