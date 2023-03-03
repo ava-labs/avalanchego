@@ -69,7 +69,6 @@ type Config struct {
 
 // Can only be edited by committing changes from a trieView.
 type Database struct {
-
 	// Must be held when reading/writing fields.
 	lock sync.RWMutex
 
@@ -983,7 +982,6 @@ func (db *Database) getKeyValues(
 	keysToIgnore set.Set[string],
 	lock bool,
 ) ([]KeyValue, error) {
-
 	if lock {
 		db.lock.RLock()
 		defer db.lock.RUnlock()

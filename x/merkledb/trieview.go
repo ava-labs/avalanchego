@@ -1099,18 +1099,13 @@ func getLengthOfCommonPrefix(first, second path) int {
 
 // Get a copy of the node matching the passed key from the trie
 // Used by views to get nodes from their ancestors
+// assumes that [t.needsRecalculation] is false
 func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
-	// need a write lock because we might need to recalculate node ids
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	
 	if t.isInvalid() {
 		return nil, ErrInvalid
-	}
-
-	// trigger a recalculation of the node ids if there have been any changes
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return nil, err
 	}
 
 	// grab the node in question
