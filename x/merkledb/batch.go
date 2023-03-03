@@ -19,9 +19,6 @@ type batch struct {
 
 // apply all operations in order to the database and write the result to disk
 func (b *batch) Write() error {
-	b.db.lock.Lock()
-	defer b.db.lock.Unlock()
-
 	return b.db.commitBatch(b.Ops)
 }
 
