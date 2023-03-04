@@ -85,12 +85,12 @@ func TestSpendMultiSigFakeKeys(t *testing.T) {
 type TestGetter struct{}
 
 func (*TestGetter) GetMultisigAlias(addr ids.ShortID) (*multisig.Alias, error) {
-	if addr.String() == addrs[2] {
+	if addr == msigAddress {
 		return &multisig.Alias{
 			Owners: &OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					addr,
+					msigAddress,
 				},
 			},
 		}, nil
@@ -123,7 +123,7 @@ func TestSpendMultiSigCycle(t *testing.T) {
 			Threshold: 2,
 			Addrs: []ids.ShortID{
 				addresses[1],
-				addresses[2],
+				msigAddress,
 			},
 		},
 	}

@@ -185,12 +185,16 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credenti
 	}
 
 	tf := func(
+		alias bool,
 		addr ids.ShortID,
 		depth int,
 		visited,
 		verified,
 		totalVisited uint32,
 	) (bool, error) {
+		if alias {
+			return false, nil
+		}
 		// check that input sig index matches
 		if totalVisited >= uint32(len(cred.Sigs)) {
 			return false, errTooFewSigIndices
@@ -223,7 +227,10 @@ func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, cred *Credential
 		return err
 	}
 
-	tf := func(addr ids.ShortID, _ int, _, _, _ uint32) (bool, error) {
+	tf := func(alias bool, addr ids.ShortID, _ int, _, _, _ uint32) (bool, error) {
+		if alias {
+			return false, nil
+		}
 		if _, exists := resolved[addr]; exists {
 			return true, nil
 		}

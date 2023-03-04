@@ -324,7 +324,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}})
 				// deposits
 				depositTx := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
 				s.EXPECT().GetTx(depositTxID1).Return(depositTx, status.Committed, nil)
@@ -354,7 +354,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
 				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
 				depositTx2 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner2}}
@@ -387,7 +387,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
 				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{
 					RewardsOwner: &secp256k1fx.OutputOwners{
@@ -428,11 +428,11 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}})
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, DepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}}, true)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}})
 				return s
 			},
 			args: args{
@@ -468,7 +468,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
 				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{
 					RewardsOwner: &secp256k1fx.OutputOwners{
@@ -480,7 +480,7 @@ func TestNewClaimTx(t *testing.T) {
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, DepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}}, true)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}})
 				return s
 			},
 			args: args{
@@ -519,7 +519,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
 				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, database.ErrNotFound)
 				return s
@@ -536,7 +536,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
 				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, nil)
 				return s
@@ -553,7 +553,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
 				s.EXPECT().GetTx(depositTxID1).Return(
 					&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{}},
@@ -574,7 +574,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
 				s.EXPECT().GetTx(depositTxID1).Return(
 					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &avax.TransferableOutput{}}},
@@ -595,7 +595,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
 				s.EXPECT().GetTx(depositTxID1).Return(
 					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}},
@@ -616,7 +616,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// claimables
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(nil, database.ErrNotFound)
 				return s
@@ -634,7 +634,7 @@ func TestNewClaimTx(t *testing.T) {
 				s := state.NewMockState(ctrl)
 				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
 				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}}, false)
+				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)

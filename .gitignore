@@ -23,6 +23,7 @@ tmp/
 .idea/
 
 *logs/
+*.diff
 
 .vscode*
 

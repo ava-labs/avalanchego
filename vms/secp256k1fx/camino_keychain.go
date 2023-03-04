@@ -5,7 +5,6 @@ package secp256k1fx
 
 import (
 	"errors"
-	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,10 +27,6 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	if len(kc.Keys) == 0 {
 		return nil, nil, errCantSpend
 	}
-	// If we work with fake keys, don't expode
-	if kc.Keys[0].IsZero() {
-		return kc.Spend(out, time)
-	}
 
 	// get the multisig alias getter
 	msig, ok := msigIntf.(AliasGetter)
@@ -53,15 +48,13 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	sigs := make([]uint32, 0, owners.Threshold)
 	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 
-	tf := func(addr ids.ShortID, depth int, visited, _, _ uint32) (bool, error) {
+	tf := func(_ bool, addr ids.ShortID, depth int, visited, _, _ uint32) (bool, error) {
 		if key, exists := kc.get(addr); exists {
 			if depth == 1 {
-				for len(sigs) < int(visited) {
-					sigs = append(sigs, math.MaxUint32)
-				}
 				sigs = append(sigs, visited)
 			}
 			keys = append(keys, key)
+			// if alias is true, this prevents next level
 			return true, nil
 		}
 		return false, nil
@@ -87,6 +80,7 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 }
 
 type TraverserOwnerFunc func(
+	alias bool,
 	addr ids.ShortID,
 	depth int,
 	visited,
@@ -131,13 +125,31 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				if !ok {
 					return 0, errWrongOwnerType
 				}
-				stack = append(stack, &stackItem{owners: owners})
-				goto Stack
+				success, err := callback(
+					true,
+					addr,
+					len(stack),
+					currentStack.index-1,
+					currentStack.verified,
+					visited,
+				)
+				if err != nil {
+					return 0, err
+				}
+
+				if success {
+					currentStack.verified++
+					verified++
+				} else {
+					stack = append(stack, &stackItem{owners: owners})
+					goto Stack
+				}
 			case database.ErrNotFound: // non-multi-sig
 				if visited > MaxSignatures {
 					return 0, errTooManySignatures
 				}
 				success, err := callback(
+					false,
 					addr,
 					len(stack),
 					currentStack.index-1,
