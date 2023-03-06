@@ -28,7 +28,7 @@ impl MummyItem for CompactHeader {
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
         let payload_size = u64::from_le_bytes(raw[..8].try_into().unwrap());
-        let is_freed = if raw[8] == 0 { false } else { true };
+        let is_freed = raw[8] != 0;
         let desc_addr = u64::from_le_bytes(raw[9..17].try_into().unwrap());
         Ok(Self {
             payload_size,
@@ -549,7 +549,7 @@ impl<T: MummyItem> CompactSpace<T> {
 }
 
 impl<T: MummyItem + 'static> ShaleStore<T> for CompactSpace<T> {
-    fn put_item<'a>(&'a self, item: T, extra: u64) -> Result<ObjRef<'a, T>, ShaleError> {
+    fn put_item(&'_ self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
         let inner = unsafe { &mut *self.inner.get() };
         let ptr: ObjPtr<T> = unsafe {
@@ -572,7 +572,7 @@ impl<T: MummyItem + 'static> ShaleStore<T> for CompactSpace<T> {
         inner.free(ptr.addr())
     }
 
-    fn get_item<'a>(&'a self, ptr: ObjPtr<T>) -> Result<ObjRef<'a, T>, ShaleError> {
+    fn get_item(&'_ self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError> {
         let inner = unsafe { &*self.inner.get() };
         if let Some(r) = inner.obj_cache.get(ptr)? {
             return Ok(r);

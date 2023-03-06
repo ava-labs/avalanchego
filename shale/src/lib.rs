@@ -159,11 +159,11 @@ impl<T: ?Sized> Obj<T> {
 impl<T: ?Sized> Obj<T> {
     /// Write to the underlying object. Returns `Some(())` on success.
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T) -> ()) -> Option<()> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Option<()> {
         modify(self.value.write());
         // if `estimate_mem_image` gives overflow, the object will not be written
-        self.dirty = None;
-        Some(self.dirty = Some(self.value.estimate_mem_image()?))
+        self.dirty = Some(self.value.estimate_mem_image()?);
+        Some(())
     }
 
     #[inline(always)]
@@ -198,7 +198,7 @@ impl<T: ?Sized> Drop for Obj<T> {
 impl<T> Deref for Obj<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        &*self.value
+        &self.value
     }
 }
 
@@ -219,7 +219,7 @@ impl<'a, T> ObjRef<'a, T> {
     }
 
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T) -> ()) -> Option<()> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Option<()> {
         let inner = self.inner.as_mut().unwrap();
         inner.write(modify)?;
         self.cache.get_inner_mut().dirty.insert(inner.as_ptr());
@@ -251,9 +251,9 @@ impl<'a, T> Drop for ObjRef<'a, T> {
 /// items could be retrieved or dropped.
 pub trait ShaleStore<T> {
     /// Dereference [ObjPtr] to a unique handle that allows direct access to the item in memory.
-    fn get_item<'a>(&'a self, ptr: ObjPtr<T>) -> Result<ObjRef<'a, T>, ShaleError>;
+    fn get_item(&'_ self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
-    fn put_item<'a>(&'a self, item: T, extra: u64) -> Result<ObjRef<'a, T>, ShaleError>;
+    fn put_item(&'_ self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Free an item and recycle its space when applicable.
     fn free_item(&mut self, item: ObjPtr<T>) -> Result<(), ShaleError>;
     /// Flush all dirty writes.
@@ -307,7 +307,7 @@ impl<T: MummyItem> TypedView<T> for MummyObj<T> {
 
     fn estimate_mem_image(&self) -> Option<u64> {
         let len = self.decoded.dehydrated_len();
-        if len as u64 > self.len_limit {
+        if len > self.len_limit {
             None
         } else {
             Some(len)
@@ -550,7 +550,7 @@ impl<T> ObjCache<T> {
     }
 
     #[inline(always)]
-    pub fn get<'a>(&'a self, ptr: ObjPtr<T>) -> Result<Option<ObjRef<'a, T>>, ShaleError> {
+    pub fn get(&'_ self, ptr: ObjPtr<T>) -> Result<Option<ObjRef<'_, T>>, ShaleError> {
         let inner = &mut self.get_inner_mut();
         if let Some(r) = inner.cached.pop(&ptr) {
             if inner.pinned.insert(ptr, false).is_some() {
@@ -566,7 +566,7 @@ impl<T> ObjCache<T> {
     }
 
     #[inline(always)]
-    pub fn put<'a>(&'a self, inner: Obj<T>) -> ObjRef<'a, T> {
+    pub fn put(&'_ self, inner: Obj<T>) -> ObjRef<'_, T> {
         let ptr = inner.as_ptr();
         self.get_inner_mut().pinned.insert(ptr, false);
         ObjRef {
@@ -593,7 +593,7 @@ impl<T> ObjCache<T> {
         if !inner.pinned.is_empty() {
             return None;
         }
-        for ptr in std::mem::replace(&mut inner.dirty, HashSet::new()) {
+        for ptr in std::mem::take(&mut inner.dirty) {
             if let Some(r) = inner.cached.peek_mut(&ptr) {
                 r.flush_dirty()
             }
