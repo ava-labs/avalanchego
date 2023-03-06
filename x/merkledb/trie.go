@@ -64,9 +64,6 @@ type Trie interface {
 	// Insert a key/value pair into the Trie
 	Insert(ctx context.Context, key, value []byte) error
 
-	// ensures that all changed nodes have their new ids calculated
-	CalculateNodeIDs(ctx context.Context) error
-
 	// commits changes in the trieToCommit into the current trie
 	// then commits the combined changes down the stack until all changes in the stack commit to the database
 	commitToDB(ctx context.Context, trieToCommit *trieView) error

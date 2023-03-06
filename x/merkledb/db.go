@@ -108,11 +108,6 @@ type Database struct {
 	childViews []*trieView
 }
 
-func (*Database) CalculateNodeIDs(context.Context) error {
-	// no-op as the db is always up to date with all ids
-	return nil
-}
-
 func newDatabase(
 	ctx context.Context,
 	db database.Database,

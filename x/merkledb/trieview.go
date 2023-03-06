@@ -214,13 +214,6 @@ func newTrieViewWithChanges(
 	}, nil
 }
 
-// Recalculates the node IDs for all changed nodes in the trie.
-func (t *trieView) CalculateNodeIDs(ctx context.Context) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.calculateNodeIDs(ctx)
-}
 
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
@@ -244,8 +237,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	defer span.End()
 
 	// ensure that the view under this one is up to date before potentially pulling in nodes from it
+	// getting the Merkle root forces any unupdated nodes to recalculate their ids
 	if t.parentTrie != nil {
-		if err := t.getParentTrie().CalculateNodeIDs(ctx); err != nil {
+		if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
 			return err
 		}
 	}
