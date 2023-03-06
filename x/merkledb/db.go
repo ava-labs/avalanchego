@@ -824,7 +824,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 // CommitToDB is a No Op for db since it is already in sync with itself
 // here to satify TrieView interface
-func (db *Database) CommitToDB() error {
+func (db *Database) CommitToDB(_ context.Context) error {
 	return nil
 }
 
