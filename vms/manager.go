@@ -62,6 +62,8 @@ type manager struct {
 	// alias of the VM. That is, [vmID].String() is an alias for [vmID].
 	ids.Aliaser
 
+	log logging.Logger
+
 	lock sync.RWMutex
 
 	// Key: A VM's ID
@@ -74,9 +76,10 @@ type manager struct {
 }
 
 // NewManager returns an instance of a VM manager
-func NewManager() Manager {
+func NewManager(log logging.Logger, aliaser ids.Aliaser) Manager {
 	return &manager{
-		Aliaser:   ids.NewAliaser(),
+		Aliaser:   aliaser,
+		log:       log,
 		factories: make(map[ids.ID]Factory),
 		versions:  make(map[ids.ID]string),
 	}
@@ -105,8 +108,7 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 
 	m.factories[vmID] = factory
 
-	// TODO: Pass in a VM specific logger
-	vm, err := factory.New(logging.NoLog{})
+	vm, err := factory.New(m.log)
 	if err != nil {
 		return err
 	}

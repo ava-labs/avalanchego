@@ -36,9 +36,10 @@ type registerer interface {
 
 // VMRegistererConfig configures settings for VMRegisterer.
 type VMRegistererConfig struct {
-	APIServer server.Server
-	Log       logging.Logger
-	VMManager vms.Manager
+	APIServer    server.Server
+	Log          logging.Logger
+	VMFactoryLog logging.Logger
+	VMManager    vms.Manager
 }
 
 type vmRegisterer struct {
@@ -89,8 +90,7 @@ func (r *vmRegisterer) createStaticHandlers(
 	vmID ids.ID,
 	factory vms.Factory,
 ) (map[string]*common.HTTPHandler, error) {
-	// TODO: Pass in a VM specific logger
-	vm, err := factory.New(logging.NoLog{})
+	vm, err := factory.New(r.config.VMFactoryLog)
 	if err != nil {
 		return nil, err
 	}
