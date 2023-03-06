@@ -1,17 +1,15 @@
 // Copied from CedrusDB
 
-#![allow(dead_code)]
-
 pub(crate) use std::os::unix::io::RawFd as Fd;
 
+use growthring::oflags;
 use nix::errno::Errno;
 use nix::fcntl::{open, openat, OFlag};
 use nix::sys::stat::Mode;
-use nix::unistd::{close, fsync, mkdir};
+use nix::unistd::{close, mkdir};
 
 pub struct File {
     fd: Fd,
-    fid: u64,
 }
 
 impl File {
@@ -55,21 +53,11 @@ impl File {
                 e => return Err(e),
             },
         };
-        Ok(File { fd, fid })
+        Ok(File { fd })
     }
 
     pub fn get_fd(&self) -> Fd {
         self.fd
-    }
-    pub fn get_fid(&self) -> u64 {
-        self.fid
-    }
-    pub fn get_fname(&self) -> String {
-        Self::_get_fname(self.fid)
-    }
-
-    pub fn sync(&self) {
-        fsync(self.fd).unwrap();
     }
 }
 
@@ -93,12 +81,7 @@ pub fn touch_dir(dirname: &str, rootfd: Fd) -> Result<Fd, Errno> {
             return Err(errno);
         }
     }
-    openat(
-        rootfd,
-        dirname,
-        OFlag::O_DIRECTORY | OFlag::O_PATH,
-        Mode::empty(),
-    )
+    openat(rootfd, dirname, oflags(), Mode::empty())
 }
 
 pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
@@ -118,7 +101,7 @@ pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
         }
     }
     Ok((
-        match open(path, OFlag::O_DIRECTORY | OFlag::O_PATH, Mode::empty()) {
+        match open(path, oflags(), Mode::empty()) {
             Ok(fd) => fd,
             Err(e) => return Err(e),
         },

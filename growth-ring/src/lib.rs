@@ -52,7 +52,10 @@ pub mod wal;
 use aiofut::{AIOBuilder, AIOManager};
 use async_trait::async_trait;
 use libc::off_t;
+#[cfg(target_os = "linux")]
 use nix::fcntl::{fallocate, open, openat, FallocateFlags, OFlag};
+#[cfg(not(target_os = "linux"))]
+use nix::fcntl::{open, openat, OFlag};
 use nix::sys::stat::Mode;
 use nix::unistd::{close, ftruncate, mkdir, unlinkat, UnlinkatFlags};
 use std::os::unix::io::RawFd;
@@ -85,16 +88,22 @@ impl Drop for WALFileAIO {
 
 #[async_trait(?Send)]
 impl WALFile for WALFileAIO {
+    #[cfg(target_os = "linux")]
     async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), ()> {
         // TODO: is there any async version of fallocate?
-        fallocate(
+        return fallocate(
             self.fd,
             FallocateFlags::FALLOC_FL_ZERO_RANGE,
             offset as off_t,
             length as off_t,
         )
         .and_then(|_| Ok(()))
-        .or_else(|_| Err(()))
+        .or_else(|_| Err(()));
+    }
+    #[cfg(not(target_os = "linux"))]
+    // TODO: macos support is possible here, but possibly unnecessary
+    async fn allocate(&self, _offset: WALPos, _length: usize) -> Result<(), ()> {
+        Ok(())
     }
 
     fn truncate(&self, length: usize) -> Result<(), ()> {
@@ -153,7 +162,7 @@ impl WALStoreAIO {
                     }
                     Ok(_) => (),
                 }
-                walfd = match open(wal_dir, OFlag::O_DIRECTORY | OFlag::O_PATH, Mode::empty()) {
+                walfd = match open(wal_dir, oflags(), Mode::empty()) {
                     Ok(fd) => fd,
                     Err(_) => panic!("error while opening the WAL directory"),
                 }
@@ -172,12 +181,7 @@ impl WALStoreAIO {
                         panic!("error while creating directory")
                     }
                 }
-                walfd = match nix::fcntl::openat(
-                    fd,
-                    wal_dir,
-                    OFlag::O_DIRECTORY | OFlag::O_PATH,
-                    Mode::empty(),
-                ) {
+                walfd = match nix::fcntl::openat(fd, wal_dir, oflags(), Mode::empty()) {
                     Ok(fd) => fd,
                     Err(_) => panic!("error while opening the WAL directory"),
                 }
@@ -188,6 +192,16 @@ impl WALStoreAIO {
             aiomgr,
         })
     }
+}
+
+/// Return OS specific open flags for opening files
+/// TODO: Switch to a rust idiomatic directory scanning approach
+/// TODO: This shouldn't need to escape growth-ring (no pub)
+pub fn oflags() -> OFlag {
+    #[cfg(target_os = "linux")]
+    return OFlag::O_DIRECTORY | OFlag::O_PATH;
+    #[cfg(not(target_os = "linux"))]
+    return OFlag::O_DIRECTORY;
 }
 
 #[async_trait(?Send)]
