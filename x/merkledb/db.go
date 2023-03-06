@@ -255,7 +255,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 func (db *Database) Close() error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
-	
+
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
