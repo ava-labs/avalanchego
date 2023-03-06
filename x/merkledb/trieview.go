@@ -528,11 +528,6 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		return err
 	}
 
-	// no changes in the trie, so there isn't anything to do
-	if len(t.changes.nodes) == 0 {
-		return nil
-	}
-
 	for key, nodeChange := range trieToCommit.changes.nodes {
 		if existing, ok := t.changes.nodes[key]; ok {
 			existing.after = nodeChange.after
@@ -555,13 +550,9 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		}
 	}
 	// update this view's root info to match the newly committed root
-	t.root = trieToCommit.changes.nodes[RootPath].after
+	t.root = trieToCommit.root
 	t.changes.rootID = trieToCommit.changes.rootID
 
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
 	// move the children from the incoming trieview to the current trieview
 	// do this after the current view has been updated
 	// this allows child views calls to their parent to remain consistent during the move
