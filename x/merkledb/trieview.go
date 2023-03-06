@@ -195,21 +195,23 @@ func newTrieViewWithChanges(
 		return nil, ErrNoValidRoot
 	}
 
-	passedRoot, ok := changes.nodes[RootPath]
+	var (
+		passedRootChange *change[*node]
+		ok               bool
+	)
 
-	if !ok {
+	if passedRootChange, ok = changes.nodes[RootPath]; !ok {
 		return nil, ErrNoValidRoot
 	}
 
-	result := &trieView{
-		root:                  passedRoot.after,
+	return &trieView{
+		root:                  passedRootChange.after,
 		db:                    db,
 		parentTrie:            parentTrie,
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
-	}
-	return result, nil
+	}, nil
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
