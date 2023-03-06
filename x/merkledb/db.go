@@ -822,6 +822,12 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	return nil
 }
 
+// CommitToDB is a No Op for db since it is already in sync with itself
+// here to satify TrieView interface
+func (*Database) CommitToDB(_ context.Context) error {
+	return nil
+}
+
 // Applies unwritten changes into the db.
 // Assumes [db.lock] is held.
 func (db *Database) commitToDB(ctx context.Context, trieToCommit *trieView) error {

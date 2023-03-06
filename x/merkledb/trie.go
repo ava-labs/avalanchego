@@ -63,17 +63,17 @@ type Trie interface {
 
 	// Insert a key/value pair into the Trie
 	Insert(ctx context.Context, key, value []byte) error
-
-	// commits changes in the trieToCommit into the current trie
-	// then commits the combined changes down the stack until all changes in the stack commit to the database
-	commitToDB(ctx context.Context, trieToCommit *trieView) error
 }
 
 type TrieView interface {
 	Trie
 
-	// Commit the changes from this Trie into the database.
-	// Any views that this Trie is built on will also be committed, starting at
-	// the oldest.
+	// Commits changes in the trieToCommit into the current trie
+	// then commits the combined changes down the stack until all changes in the stack commit to the database
+	// Takes the DB commit lock
 	CommitToDB(ctx context.Context) error
+
+	// commits changes in the trieToCommit into the current trie
+	// then commits the combined changes down the stack until all changes in the stack commit to the database
+	commitToDB(ctx context.Context, trieToCommit *trieView) error
 }

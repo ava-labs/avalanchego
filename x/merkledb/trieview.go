@@ -84,7 +84,7 @@ type trieView struct {
 
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
-	parentTrie Trie
+	parentTrie TrieView
 
 	// The valid children of this trie.
 	// [validityTrackingLock] must be held when reading/writing this field.
@@ -164,7 +164,7 @@ func (t *trieView) NewPreallocatedView(
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieView(
 	db *Database,
-	parentTrie Trie,
+	parentTrie TrieView,
 	root *node,
 	estimatedSize int,
 ) (*trieView, error) {
@@ -187,7 +187,7 @@ func newTrieView(
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieViewWithChanges(
 	db *Database,
-	parentTrie Trie,
+	parentTrie TrieView,
 	changes *changeSummary,
 	estimatedSize int,
 ) (*trieView, error) {
@@ -213,7 +213,6 @@ func newTrieViewWithChanges(
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
 	}, nil
 }
-
 
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
@@ -528,11 +527,6 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		return err
 	}
 
-	// no changes in the trie, so there isn't anything to do
-	if len(t.changes.nodes) == 0 {
-		return nil
-	}
-
 	for key, nodeChange := range trieToCommit.changes.nodes {
 		if existing, ok := t.changes.nodes[key]; ok {
 			existing.after = nodeChange.after
@@ -555,13 +549,9 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		}
 	}
 	// update this view's root info to match the newly committed root
-	t.root = trieToCommit.changes.nodes[RootPath].after
+	t.root = trieToCommit.root
 	t.changes.rootID = trieToCommit.changes.rootID
 
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
 	// move the children from the incoming trieview to the current trieview
 	// do this after the current view has been updated
 	// this allows child views calls to their parent to remain consistent during the move
@@ -648,7 +638,7 @@ func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
 	}
 }
 
-func (t *trieView) updateParent(newParent Trie) {
+func (t *trieView) updateParent(newParent TrieView) {
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 
@@ -1381,7 +1371,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 }
 
 // Get the parent trie of the view
-func (t *trieView) getParentTrie() Trie {
+func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 	return t.parentTrie

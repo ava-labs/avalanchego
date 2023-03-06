@@ -25,6 +25,7 @@ var (
 // to sign a hash
 type Signer interface {
 	SignHash([]byte) ([]byte, error)
+	Sign([]byte) ([]byte, error)
 	Address() ids.ShortID
 }
 
@@ -120,10 +121,31 @@ func (l *ledgerKeychain) Get(addr ids.ShortID) (Signer, bool) {
 	}, true
 }
 
+// expects to receive a hash of the unsigned tx bytes
 func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 	// Sign using the address with index l.idx on the ledger device. The number
 	// of returned signatures should be the same length as the provided indices.
 	sigs, err := l.ledger.SignHash(b, []uint32{l.idx})
+	if err != nil {
+		return nil, err
+	}
+
+	if sigsLen := len(sigs); sigsLen != 1 {
+		return nil, fmt.Errorf(
+			"%w. expected 1, got %d",
+			ErrInvalidNumSignatures,
+			sigsLen,
+		)
+	}
+
+	return sigs[0], err
+}
+
+// expects to receive the unsigned tx bytes
+func (l *ledgerSigner) Sign(b []byte) ([]byte, error) {
+	// Sign using the address with index l.idx on the ledger device. The number
+	// of returned signatures should be the same length as the provided indices.
+	sigs, err := l.ledger.Sign(b, []uint32{l.idx})
 	if err != nil {
 		return nil, err
 	}
