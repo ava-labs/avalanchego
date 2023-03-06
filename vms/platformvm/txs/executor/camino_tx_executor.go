@@ -65,6 +65,7 @@ var (
 	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
 	errClaimingNonTreasuryUTXO      = errors.New("claiming utxo owned by other owner, than treasury owner")
 	errWrongClaimedAmount           = errors.New("claiming more than was available to claim")
+	errMsigAlias                    = errors.New("can't use msig alias here")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -350,6 +351,21 @@ func (e *CaminoStandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	if err := locked.VerifyNoLocks(nil, tx.ExportedOutputs); err != nil {
 		return err
+	}
+
+	for _, output := range tx.ExportedOutputs {
+		out, ok := output.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return locked.ErrWrongOutType
+		}
+		for _, addr := range out.Addrs {
+			_, err := e.State.GetMultisigAlias(addr)
+			if err != nil && err != database.ErrNotFound {
+				return err
+			} else if err == nil {
+				return errMsigAlias
+			}
+		}
 	}
 
 	return e.StandardTxExecutor.ExportTx(tx)
