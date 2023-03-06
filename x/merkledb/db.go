@@ -19,7 +19,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -88,8 +87,6 @@ type Database struct {
 	nodeCache     onEvictCache[path, *node]
 	onEvictionErr utils.Atomic[error]
 
-	valueCache cache.LRU[string, Maybe[[]byte]]
-
 	// Stores change lists. Used to serve change proofs and construct
 	// historical views of the trie.
 	history *trieHistory
@@ -120,7 +117,6 @@ func newDatabase(
 		metadataDB: prefixdb.New(metadataPrefix, db),
 		history:    newTrieHistory(config.HistoryLength),
 		tracer:     config.Tracer,
-		valueCache: cache.LRU[string, Maybe[[]byte]]{Size: config.ValueCacheSize},
 		childViews: make([]*trieView, 0, defaultPreallocationSize),
 	}
 
@@ -332,22 +328,10 @@ func (db *Database) getValue(ctx context.Context, key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
-	keyStr := string(key.Serialize().Value)
-	if val, ok := db.getValueInCache(keyStr); ok {
-		if val.IsNothing() {
-			return nil, database.ErrNotFound
-		}
-		return val.value, nil
-	}
-	n, err := db.getNode(ctx, key)
-	if err == database.ErrNotFound {
-		db.putValueInCache(keyStr, Nothing[[]byte]())
-		return nil, database.ErrNotFound
-	}
+	n, err := db.getNode(key)
 	if err != nil {
 		return nil, err
 	}
-	db.putValueInCache(keyStr, n.value)
 	if n.value.IsNothing() {
 		return nil, database.ErrNotFound
 	}
@@ -811,13 +795,6 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		}
 	}
 
-	_, valuesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeValues")
-	for key, valueChange := range changes.values {
-		serializedKey := key.Serialize()
-		db.putValueInCache(string(serializedKey.Value), valueChange.after)
-	}
-	valuesSpan.End()
-
 	db.history.record(changes)
 	return nil
 }
@@ -934,13 +911,23 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 
 // Returns the node with the given [key].
 // Returns database.ErrNotFound if the node doesn't exist.
-// Assumes [db.lock] is read locked.
-func (db *Database) getNode(_ context.Context, key path) (*node, error) {
+func (db *Database) getEditableNode(_ context.Context, key path) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
+	n, err := db.getNode(key)
+	if err != nil {
+		return nil, err
+	}
+	return n.clone(), nil
+}
+
+// Returns the node with the given [key].
+// Returns database.ErrNotFound if the node doesn't exist.
+// Assumes [db.lock] is read locked.
+func (db *Database) getNode(key path) (*node, error) {
 	if key == RootPath {
-		return db.root.clone(), nil
+		return db.root, nil
 	}
 
 	if n, isCached := db.getNodeInCache(key); isCached {
@@ -948,7 +935,7 @@ func (db *Database) getNode(_ context.Context, key path) (*node, error) {
 		if n == nil {
 			return nil, database.ErrNotFound
 		}
-		return n.clone(), nil
+		return n, nil
 	}
 
 	db.metrics.DBNodeCacheMiss()
@@ -970,7 +957,7 @@ func (db *Database) getNode(_ context.Context, key path) (*node, error) {
 	}
 
 	err = db.putNodeInCache(key, node)
-	return node.clone(), err
+	return node, err
 }
 
 // Assumes [db.lock] is read locked.
@@ -1120,16 +1107,4 @@ func (db *Database) getNodeInCache(key path) (*node, bool) {
 		return node, true
 	}
 	return nil, false
-}
-
-func (db *Database) putValueInCache(key string, value Maybe[[]byte]) {
-	// TODO Cache metrics
-	db.valueCache.Put(key, value)
-}
-
-func (db *Database) getValueInCache(key string) (Maybe[[]byte], bool) {
-	if value, ok := db.valueCache.Get(key); ok {
-		return value, true
-	}
-	return Nothing[[]byte](), false
 }

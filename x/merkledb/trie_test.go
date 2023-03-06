@@ -635,7 +635,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err := newTrie.getNode(context.Background(), EmptyPath)
+	root, err := newTrie.getEditableNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
@@ -649,7 +649,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err = newTrie.getNode(context.Background(), EmptyPath)
+	root, err = newTrie.getEditableNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Equal(t, 0, len(root.children))
@@ -729,15 +729,15 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 
 	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err := trie.getNode(context.Background(), EmptyPath)
+	root, err := trie.getEditableNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
-	root, err = trie.getNode(context.Background(), EmptyPath)
+	root, err = trie.getEditableNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
-	firstNode, err := trie.getNode(context.Background(), root.getSingleChildPath())
+	firstNode, err := trie.getEditableNode(context.Background(), root.getSingleChildPath())
 	require.NoError(t, err)
 	require.Equal(t, 1, len(firstNode.children))
 
@@ -752,11 +752,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 
-	root, err = trie.getNode(context.Background(), EmptyPath)
+	root, err = trie.getEditableNode(context.Background(), EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
-	firstNode, err = trie.getNode(context.Background(), root.getSingleChildPath())
+	firstNode, err = trie.getEditableNode(context.Background(), root.getSingleChildPath())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(firstNode.children))
 }

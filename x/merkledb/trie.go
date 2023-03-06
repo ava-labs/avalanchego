@@ -30,7 +30,7 @@ type ReadOnlyTrie interface {
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 
 	// get an editable copy of the node with the given key path
-	getNode(ctx context.Context, key path) (*node, error)
+	getEditableNode(ctx context.Context, key path) (*node, error)
 
 	// generate a proof of the value associated with a particular key, or a proof of its absence from the trie
 	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)

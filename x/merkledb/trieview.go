@@ -1085,7 +1085,7 @@ func getLengthOfCommonPrefix(first, second path) int {
 // Get a copy of the node matching the passed key from the trie
 // Used by views to get nodes from their ancestors
 // assumes that [t.needsRecalculation] is false
-func (t *trieView) getNode(ctx context.Context, key path) (*node, error) {
+func (t *trieView) getEditableNode(ctx context.Context, key path) (*node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -1232,7 +1232,7 @@ func (t *trieView) recordKeyChange(ctx context.Context, key path, after *node) e
 		return nil
 	}
 
-	before, err := t.getParentTrie().getNode(ctx, key)
+	before, err := t.getParentTrie().getEditableNode(ctx, key)
 	if err != nil {
 		if err != database.ErrNotFound {
 			return err
@@ -1354,7 +1354,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 	}
 
 	// get the node from the parent trie and store a localy copy
-	parentTrieNode, err := t.getParentTrie().getNode(ctx, key)
+	parentTrieNode, err := t.getParentTrie().getEditableNode(ctx, key)
 	if err != nil {
 		return nil, err
 	}
