@@ -50,11 +50,13 @@ var (
 type trieView struct {
 	// Must be held when reading/writing fields except validity tracking fields:
 	// [childViews], [parentTrie], and [invalidated].
+	// Only use to lock current trieView or ancestors of the current trieView
 	lock sync.RWMutex
 
-	// Controls the trie's invalidation related fields.
+	// Controls the trie's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
-	// Must not grab the [lock] of this trie or any ancestor while this is held.
+	// Only use to lock current trieView or descendants of the current trieView
+	// AVOID grabbing the [lock] or [validityTrackingLock] of this trie or any ancestor trie while this is held.
 	validityTrackingLock sync.RWMutex
 
 	// If true, this view has been invalidated and can't be used.
