@@ -84,7 +84,7 @@ type trieView struct {
 
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
-	parentTrie Trie
+	parentTrie TrieView
 
 	// The valid children of this trie.
 	// [validityTrackingLock] must be held when reading/writing this field.
@@ -164,7 +164,7 @@ func (t *trieView) NewPreallocatedView(
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieView(
 	db *Database,
-	parentTrie Trie,
+	parentTrie TrieView,
 	root *node,
 	estimatedSize int,
 ) (*trieView, error) {
@@ -187,7 +187,7 @@ func newTrieView(
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieViewWithChanges(
 	db *Database,
-	parentTrie Trie,
+	parentTrie TrieView,
 	changes *changeSummary,
 	estimatedSize int,
 ) (*trieView, error) {
@@ -648,7 +648,7 @@ func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
 	}
 }
 
-func (t *trieView) updateParent(newParent Trie) {
+func (t *trieView) updateParent(newParent TrieView) {
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 
@@ -1381,7 +1381,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 }
 
 // Get the parent trie of the view
-func (t *trieView) getParentTrie() Trie {
+func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 	return t.parentTrie
