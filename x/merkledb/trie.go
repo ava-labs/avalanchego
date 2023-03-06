@@ -56,10 +56,10 @@ type Trie interface {
 	Remove(ctx context.Context, key []byte) error
 
 	// Get a new view on top of this Trie
-	NewPreallocatedView(ctx context.Context, estimatedChanges int) (TrieView, error)
+	NewPreallocatedView(estimatedChanges int) (TrieView, error)
 
 	// Get a new view on top of this Trie
-	NewView(ctx context.Context) (TrieView, error)
+	NewView() (TrieView, error)
 
 	// Insert a key/value pair into the Trie
 	Insert(ctx context.Context, key, value []byte) error

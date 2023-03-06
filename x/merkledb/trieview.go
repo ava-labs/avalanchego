@@ -56,7 +56,7 @@ type trieView struct {
 	// Controls the trie's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
 	// Only use to lock current trieView or descendants of the current trieView
-	// AVOID grabbing the [lock] or [validityTrackingLock] of this trie or any ancestor trie while this is held.
+	// DO NOT grab the [lock] or [validityTrackingLock] of this trie or any ancestor trie while this is held.
 	validityTrackingLock sync.RWMutex
 
 	// If true, this view has been invalidated and can't be used.
@@ -119,8 +119,8 @@ type trieView struct {
 // Returns a new view on top of this one.
 // Adds the new view to [t.childViews].
 // Assumes this [t.lock] is unlocked.
-func (t *trieView) NewView(ctx context.Context) (TrieView, error) {
-	return t.NewPreallocatedView(ctx, defaultPreallocationSize)
+func (t *trieView) NewView() (TrieView, error) {
+	return t.NewPreallocatedView(defaultPreallocationSize)
 }
 
 // Returns a new view on top of this one with memory allocated to store the
@@ -130,7 +130,6 @@ func (t *trieView) NewView(ctx context.Context) (TrieView, error) {
 // Otherwise adds the new view to [t.childViews].
 // Assumes this [t.lock] is unlocked.
 func (t *trieView) NewPreallocatedView(
-	ctx context.Context,
 	estimatedChanges int,
 ) (TrieView, error) {
 	t.lock.RLock()
@@ -141,10 +140,10 @@ func (t *trieView) NewPreallocatedView(
 	}
 
 	if t.committed {
-		return t.getParentTrie().NewPreallocatedView(ctx, estimatedChanges)
+		return t.getParentTrie().NewPreallocatedView(estimatedChanges)
 	}
 
-	newView, err := newTrieView(ctx, t.db, t, t.root.clone(), estimatedChanges)
+	newView, err := newTrieView(t.db, t, t.root.clone(), estimatedChanges)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +163,6 @@ func (t *trieView) NewPreallocatedView(
 // If [changes] is nil, a new changeSummary is created.
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieView(
-	ctx context.Context,
 	db *Database,
 	parentTrie Trie,
 	root *node,
@@ -188,7 +186,6 @@ func newTrieView(
 // If [changes] is nil, a new changeSummary is created.
 // Assumes [parentTrie] and its ancestors are read locked.
 func newTrieViewWithChanges(
-	ctx context.Context,
 	db *Database,
 	parentTrie Trie,
 	changes *changeSummary,

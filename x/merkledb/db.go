@@ -175,7 +175,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 	it := db.nodeDB.NewIterator()
 	defer it.Release()
 
-	currentView, err := db.newUntrackedView(ctx)
+	currentView, err := db.newUntrackedView()
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 			if err := currentView.commitToDB(ctx, nil); err != nil {
 				return err
 			}
-			currentView, err = db.newUntrackedView(ctx)
+			currentView, err = db.newUntrackedView()
 			if err != nil {
 				return err
 			}
@@ -235,7 +235,7 @@ func New(ctx context.Context, db database.Database, config Config) (*Database, e
 // Commits the key/value pairs within the [proof] to the db.
 func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
-	db.commitLock.Unlock()
+	defer db.commitLock.Unlock()
 
 	view, err := db.prepareChangeProofView(ctx, proof)
 	if err != nil {
@@ -248,7 +248,7 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 // [start] is the smallest key in the range this [proof] covers.
 func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
 	db.commitLock.Lock()
-	db.commitLock.Unlock()
+	defer db.commitLock.Unlock()
 
 	view, err := db.prepareRangeProofView(ctx, start, proof)
 	if err != nil {
@@ -360,11 +360,11 @@ func (db *Database) getValue(ctx context.Context, key path) ([]byte, error) {
 }
 
 // Returns a view of the trie as it was when the merkle root was [rootID].
-func (db *Database) GetHistoricalView(ctx context.Context, rootID ids.ID) (ReadOnlyTrie, error) {
+func (db *Database) GetHistoricalView(rootID ids.ID) (ReadOnlyTrie, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getHistoricalViewForRangeProof(ctx, rootID, nil, nil)
+	return db.getHistoricalViewForRangeProof(rootID, nil, nil)
 }
 
 // Returns the ID of the root node of the merkle trie.
@@ -392,7 +392,7 @@ func (db *Database) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 // Returns a proof of the existence/non-existence of [key] in this trie.
 // Assumes [db.lock] is read locked.
 func (db *Database) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	view, err := db.newUntrackedView(ctx)
+	view, err := db.newUntrackedView()
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +441,7 @@ func (db *Database) getRangeProofAtRoot(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	historicalView, err := db.getHistoricalViewForRangeProof(ctx, rootID, start, end)
+	historicalView, err := db.getHistoricalViewForRangeProof(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func (db *Database) GetChangeProof(
 
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRangeProof(ctx, endRootID, start, end)
+	historicalView, err := db.getHistoricalViewForRangeProof(endRootID, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -554,26 +554,26 @@ func (db *Database) GetChangeProof(
 // Returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.lock] isn't held.
-func (db *Database) NewView(ctx context.Context) (TrieView, error) {
-	return db.NewPreallocatedView(ctx, defaultPreallocationSize)
+func (db *Database) NewView() (TrieView, error) {
+	return db.NewPreallocatedView(defaultPreallocationSize)
 }
 
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
 // Assumes [db.lock] is read locked.
-func (db *Database) newUntrackedView(ctx context.Context) (*trieView, error) {
-	return db.newPreallocatedView(ctx, defaultPreallocationSize)
+func (db *Database) newUntrackedView() (*trieView, error) {
+	return db.newPreallocatedView(defaultPreallocationSize)
 }
 
 // Returns a new view preallocated to hold at least [estimatedSize] value changes at a time.
 // If more changes are made, additional memory will be allocated.
 // The returned view is added to [db.childViews].
 // Assumes [db.lock] isn't held.
-func (db *Database) NewPreallocatedView(ctx context.Context, estimatedSize int) (TrieView, error) {
+func (db *Database) NewPreallocatedView(estimatedSize int) (TrieView, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	newView, err := db.newPreallocatedView(ctx, estimatedSize)
+	newView, err := db.newPreallocatedView(estimatedSize)
 	if err != nil {
 		return nil, err
 	}
@@ -583,8 +583,8 @@ func (db *Database) NewPreallocatedView(ctx context.Context, estimatedSize int) 
 
 // Assumes [db.lock] is read locked.
 // Assumes that this view is temporary and doesn't require validity tracking
-func (db *Database) newPreallocatedView(ctx context.Context, estimatedSize int) (*trieView, error) {
-	return newTrieView(ctx, db, db, db.root.clone(), estimatedSize)
+func (db *Database) newPreallocatedView(estimatedSize int) (*trieView, error) {
+	return newTrieView(db, db, db.root.clone(), estimatedSize)
 }
 
 func (db *Database) Has(k []byte) (bool, error) {
@@ -610,7 +610,7 @@ func (db *Database) Insert(ctx context.Context, k, v []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	view, err := db.newUntrackedView(ctx)
+	view, err := db.newUntrackedView()
 	if err != nil {
 		return err
 	}
@@ -696,7 +696,7 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	view, err := db.newUntrackedView(ctx)
+	view, err := db.newUntrackedView()
 	if err != nil {
 		return err
 	}
@@ -892,7 +892,6 @@ func (db *Database) initializeRootIfNeeded(_ context.Context) (ids.ID, error) {
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
 // Assumes [db.lock] is read locked.
 func (db *Database) getHistoricalViewForRangeProof(
-	ctx context.Context,
 	rootID ids.ID,
 	start []byte,
 	end []byte,
@@ -901,14 +900,14 @@ func (db *Database) getHistoricalViewForRangeProof(
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(ctx, db, db, db.root.clone(), 100)
+		return newTrieView(db, db, db.root.clone(), 100)
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return newTrieViewWithChanges(ctx, db, db, changeHistory, len(changeHistory.nodes))
+	return newTrieViewWithChanges(db, db, changeHistory, len(changeHistory.nodes))
 }
 
 // Returns all of the keys in range [start, end] that aren't in [keySet].
@@ -1023,7 +1022,7 @@ func (db *Database) prepareBatchView(
 	ctx context.Context,
 	ops []database.BatchOp,
 ) (*trieView, error) {
-	view, err := db.newPreallocatedView(ctx, len(ops))
+	view, err := db.newPreallocatedView(len(ops))
 	if err != nil {
 		return nil, err
 	}
@@ -1047,7 +1046,7 @@ func (db *Database) prepareBatchView(
 // inserted and the key/value pairs in [proof.DeletedKeys] removed.
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareChangeProofView(ctx context.Context, proof *ChangeProof) (*trieView, error) {
-	view, err := db.newPreallocatedView(ctx, len(proof.KeyValues))
+	view, err := db.newPreallocatedView(len(proof.KeyValues))
 	if err != nil {
 		return nil, err
 	}
@@ -1071,7 +1070,7 @@ func (db *Database) prepareChangeProofView(ctx context.Context, proof *ChangePro
 // any existing key-value pairs in the proof's range but not in the proof removed.
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareRangeProofView(ctx context.Context, start []byte, proof *RangeProof) (*trieView, error) {
-	view, err := db.newPreallocatedView(ctx, len(proof.KeyValues))
+	view, err := db.newPreallocatedView(len(proof.KeyValues))
 	if err != nil {
 		return nil, err
 	}

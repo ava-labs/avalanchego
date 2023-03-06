@@ -63,7 +63,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	require.NoError(err)
 
 	// Populate initial set of keys
-	view, err := db.NewView(context.Background())
+	view, err := db.NewView()
 	require.NoError(err)
 	for i := 0; i < 100; i++ {
 		k := []byte(strconv.Itoa(i))
@@ -114,7 +114,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require.NoError(err)
 
 	// Populate initial set of keys
-	view, err := db.NewView(context.Background())
+	view, err := db.NewView()
 	require.NoError(err)
 	for i := 0; i < initialSize; i++ {
 		k := []byte(strconv.Itoa(i))
@@ -208,12 +208,12 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
 
-	viewToCommit, err := dbTrie.NewView(context.Background())
+	viewToCommit, err := dbTrie.NewView()
 	require.NoError(t, err)
 
-	sibling1, err := dbTrie.NewView(context.Background())
+	sibling1, err := dbTrie.NewView()
 	require.NoError(t, err)
-	sibling2, err := dbTrie.NewView(context.Background())
+	sibling2, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	require.False(t, sibling1.(*trieView).isInvalid())
@@ -425,7 +425,7 @@ func TestDatabaseNewUntrackedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new untracked view.
-	view, err := db.newUntrackedView(context.Background())
+	view, err := db.newUntrackedView()
 	require.NoError(err)
 	require.Empty(db.childViews)
 
@@ -449,7 +449,7 @@ func TestDatabaseNewPreallocatedViewTracked(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new tracked view.
-	view, err := db.NewPreallocatedView(context.Background(), 10)
+	view, err := db.NewPreallocatedView(10)
 	require.NoError(err)
 	require.Len(db.childViews, 1)
 
@@ -492,7 +492,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 
 	// Make a view and inser/delete a key-value pair.
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
@@ -504,13 +504,13 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 
 	// Make a second view
-	view2Intf, err := db.NewView(context.Background())
+	view2Intf, err := db.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
 	// Make a view atop a view
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -561,17 +561,17 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	require.NoError(err)
 
 	// Create children
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
-	view2Intf, err := db.NewView(context.Background())
+	view2Intf, err := db.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
-	view3Intf, err := db.NewView(context.Background())
+	view3Intf, err := db.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -672,7 +672,7 @@ type testOperation struct {
 }
 
 func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
-	view, err := t.NewView(context.Background())
+	view, err := t.NewView()
 	if err != nil {
 		return nil, err
 	}

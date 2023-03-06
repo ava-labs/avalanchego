@@ -428,7 +428,7 @@ func (proof *ChangeProof) Verify(
 	defer db.commitLock.Unlock()
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ctx)
+	view, err := db.newUntrackedView()
 	if err != nil {
 		return err
 	}
@@ -681,5 +681,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(ctx)
+	return db.newUntrackedView()
 }
