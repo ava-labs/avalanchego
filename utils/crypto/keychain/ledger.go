@@ -14,6 +14,6 @@ type Ledger interface {
 	Address(displayHRP string, addressIndex uint32) (ids.ShortID, error)
 	Addresses(addressIndices []uint32) ([]ids.ShortID, error)
 	SignHash(hash []byte, addressIndices []uint32) ([][]byte, error)
-	// TODO: add SignTransaction
+	Sign(unsignedTxBytes []byte, addressIndices []uint32) ([][]byte, error)
 	Disconnect() error
 }

@@ -70,6 +70,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -94,8 +95,9 @@ var (
 
 // Node is an instance of an Avalanche node.
 type Node struct {
-	Log        logging.Logger
-	LogFactory logging.Factory
+	Log          logging.Logger
+	VMFactoryLog logging.Logger
+	LogFactory   logging.Factory
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -175,6 +177,8 @@ type Node struct {
 	// Metrics Registerer
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
+
+	VMManager vms.Manager
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
@@ -627,7 +631,7 @@ func (n *Node) addDefaultVMAliases() error {
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
-			if err := n.Config.VMManager.Alias(vmID, alias); err != nil {
+			if err := n.Config.VMAliaser.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
@@ -695,7 +699,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
-		VMManager:                               n.Config.VMManager,
+		VMManager:                               n.VMManager,
 		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
 		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
@@ -755,9 +759,10 @@ func (n *Node) initVMs() error {
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
-		APIServer: n.APIServer,
-		Log:       n.Log,
-		VMManager: n.Config.VMManager,
+		APIServer:    n.APIServer,
+		Log:          n.Log,
+		VMFactoryLog: n.VMFactoryLog,
+		VMManager:    n.VMManager,
 	})
 
 	// Register the VMs that Avalanche supports
@@ -801,9 +806,9 @@ func (n *Node) initVMs() error {
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -816,7 +821,7 @@ func (n *Node) initVMs() error {
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
 			FileReader:      filesystem.NewReader(),
-			Manager:         n.Config.VMManager,
+			Manager:         n.VMManager,
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
@@ -920,7 +925,7 @@ func (n *Node) initAdminAPI() error {
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
 			LogFactory:   n.LogFactory,
 			NodeConfig:   n.Config,
-			VMManager:    n.Config.VMManager,
+			VMManager:    n.VMManager,
 			VMRegistry:   n.VMRegistry,
 		},
 	)
@@ -978,11 +983,11 @@ func (n *Node) initInfoAPI() error {
 			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
 			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
 			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-			VMManager:                     n.Config.VMManager,
+			VMManager:                     n.VMManager,
 		},
 		n.Log,
 		n.chainManager,
-		n.Config.VMManager,
+		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
 		primaryValidators,
@@ -1235,12 +1240,19 @@ func (n *Node) Initialize(
 		zap.Reflect("config", n.Config),
 	)
 
+	var err error
+	n.VMFactoryLog, err = logFactory.Make("vm-factory")
+	if err != nil {
+		return fmt.Errorf("problem creating vm logger: %w", err)
+	}
+
+	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+
 	if err := n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
 	// Set up tracer
-	var err error
 	n.tracer, err = trace.New(n.Config.TraceConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize tracer: %w", err)
