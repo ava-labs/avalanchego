@@ -1,3 +1,8 @@
+# Ignore VSCode directory
+.vscode
+
+#### Below sections are auto-generated ####
+
 # ignore test databases
 *_db
 # Created by https://www.toptal.com/developers/gitignore/api/rust,visualstudiocode,vim
