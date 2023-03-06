@@ -327,7 +327,7 @@ func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 // Assumes [db.lock] is read locked.
-func (db *Database) getValue(ctx context.Context, key path) ([]byte, error) {
+func (db *Database) getValue(_ context.Context, key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
