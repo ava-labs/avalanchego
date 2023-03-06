@@ -214,7 +214,6 @@ func newTrieViewWithChanges(
 	}, nil
 }
 
-
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
