@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/golang/mock/gomock"
 
@@ -1840,7 +1840,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 	currentTime := time.Now()
 
-	testDepositOffer := &deposits.Offer{
+	testDepositOffer := &deposit.Offer{
 		InterestRateNominator:   0,
 		Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 		End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -1883,7 +1883,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos:          []*avax.UTXO{},
 			generateIns:    noInputs,
@@ -1895,7 +1895,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1921,7 +1921,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1946,7 +1946,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1973,7 +1973,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -1999,7 +1999,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2023,7 +2023,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   0,
 					Start:                   uint64(currentTime.Add(+60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -2058,7 +2058,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   0,
 					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(-60 * time.Hour).Unix()),
@@ -2093,7 +2093,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   0,
 					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -2128,7 +2128,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   0,
 					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -2163,7 +2163,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   0,
 					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -2198,7 +2198,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, existingTxID),
@@ -2223,7 +2223,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
@@ -2250,7 +2250,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, dummyOutputOwners, ids.Empty, ids.Empty),
@@ -2276,7 +2276,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
@@ -2302,7 +2302,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers: []*deposits.Offer{{
+				DepositOffers: []*deposit.Offer{{
 					InterestRateNominator:   1000 * units.MegaAvax,
 					Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
 					End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
@@ -2337,7 +2337,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2363,7 +2363,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance+10, outputOwners, ids.Empty, ids.Empty),
@@ -2390,7 +2390,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
@@ -2417,7 +2417,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee+defaultCaminoValidatorWeight/2, outputOwners, ids.Empty, ids.Empty),
@@ -2445,7 +2445,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				DepositOffers:       []*deposits.Offer{testDepositOffer},
+				DepositOffers:       []*deposit.Offer{testDepositOffer},
 			},
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
@@ -2529,597 +2529,926 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
-	testKey, err := testKeyfactory.NewPrivateKey()
-	require.NoError(t, err)
-	dummyKey, err := testKeyfactory.NewPrivateKey()
-	require.NoError(t, err)
+	ctx, _ := defaultCtx(nil)
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
 
-	outputOwners := secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{testKey.PublicKey().Address()},
-	}
-	dummyOutputOwners := secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{dummyKey.PublicKey().Address()},
-	}
-	sigIndices := []uint32{0}
-	inputSigners := []*crypto.PrivateKeySECP256K1R{testKey.(*crypto.PrivateKeySECP256K1R)}
-	existingTxID := ids.GenerateTestID()
-	depositTxID := ids.GenerateTestID()
+	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
+	owner1Key, owner1Addr, owner1 := generateKeyAndOwner(t)
+	_, _, owner2 := generateKeyAndOwner(t)
+	_, _, deposit1RewardsOwner := generateKeyAndOwner(t)
+	bondTxID := ids.GenerateTestID()
+	depositTxID1 := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
+	deposit1RewardOwnerID, err := txs.GetOwnerID(deposit1RewardsOwner)
+	require.NoError(t, err)
 
-	depositOffer := &deposits.Offer{
+	depositOffer := &deposit.Offer{
 		MinAmount:            1,
 		MinDuration:          60,
 		MaxDuration:          100,
 		UnlockPeriodDuration: 50,
 	}
 	require.NoError(t, depositOffer.SetID())
-
-	caminoGenesisConf := api.Camino{
-		VerifyNodeSignature: true,
-		LockModeBondDeposit: true,
-		DepositOffers:       []*deposits.Offer{depositOffer},
-	}
-
-	deposit := &deposits.Deposit{
+	deposit1 := &deposit.Deposit{
 		Duration:       depositOffer.MinDuration,
 		Amount:         defaultCaminoValidatorWeight,
 		DepositOfferID: depositOffer.ID,
 	}
-
-	depositExpired := deposit.StartTime().
-		Add(time.Duration(deposit.Duration) * time.Second)
-	depositStartUnlockTime := deposit.StartTime().
-		Add(time.Duration(deposit.Duration) * time.Second).
-		Add(-time.Duration(depositOffer.UnlockPeriodDuration) * time.Second)
-	depositHalfUnlockTime := deposit.StartTime().
-		Add(time.Duration(deposit.Duration) * time.Second).
-		Add(-time.Duration(depositOffer.UnlockPeriodDuration/2) * time.Second)
-
-	secondDeposit := &deposits.Deposit{
-		Start:          deposit.Start,
+	deposit2 := &deposit.Deposit{
+		Start:          deposit1.Start,
 		Duration:       depositOffer.MaxDuration,
 		Amount:         defaultCaminoValidatorWeight,
 		DepositOfferID: depositOffer.ID,
 	}
 
-	generateInsFromUTXOs := func(utxos []*avax.UTXO) []*avax.TransferableInput {
-		ins := make([]*avax.TransferableInput, len(utxos))
-		for i := range utxos {
-			ins[i] = generateTestInFromUTXO(utxos[i], sigIndices)
-		}
-		return ins
+	deposit1StartUnlockTime := deposit1.StartTime().
+		Add(time.Duration(deposit1.Duration) * time.Second).
+		Add(-time.Duration(depositOffer.UnlockPeriodDuration) * time.Second)
+	deposit1HalfUnlockTime := deposit1.StartTime().
+		Add(time.Duration(deposit1.Duration) * time.Second).
+		Add(-time.Duration(depositOffer.UnlockPeriodDuration/2) * time.Second)
+	deposit1Expired := deposit1.StartTime().
+		Add(time.Duration(deposit1.Duration) * time.Second)
+
+	depositTx1, err := txs.NewSigned(&txs.DepositTx{
+		BaseTx:       txs.BaseTx{BaseTx: avax.BaseTx{}},
+		RewardsOwner: &deposit1RewardsOwner,
+	}, txs.Codec, nil)
+	require.NoError(t, err)
+
+	baseState := func(c *gomock.Controller) *state.MockState {
+		s := state.NewMockState(c)
+		// shutdown
+		s.EXPECT().SetHeight(uint64(math.MaxUint64))
+		s.EXPECT().Commit()
+		s.EXPECT().Close()
+		return s
 	}
 
 	tests := map[string]struct {
-		utxos       []*avax.UTXO
-		generateIns func([]*avax.UTXO) []*avax.TransferableInput
+		baseState   func(c *gomock.Controller) *state.MockState
+		state       func(*gomock.Controller, *txs.UnlockDepositTx, ids.ID, []*avax.UTXO) *state.MockDiff
+		utx         func([]*avax.UTXO) *txs.UnlockDepositTx
 		signers     [][]*crypto.PrivateKeySECP256K1R
-		outs        []*avax.TransferableOutput
-		preExecute  func(env *caminoEnvironment)
+		utxos       []*avax.UTXO
 		expectedErr error
 	}{
 		"Stakeable ins": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
 			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				return []*avax.TransferableInput{
-					generateTestStakeableIn(avaxAssetID, 1, uint64(defaultMinStakingDuration), sigIndices),
-				}
+			utx: func(u []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{
+						generateTestStakeableIn(ctx.AVAXAssetID, 1, 0, []uint32{0}),
+					},
+				}}}
 			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
-			outs:    []*avax.TransferableOutput{},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(deposit.StartTime())
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{},
 			expectedErr: locked.ErrWrongInType,
 		},
 		"Stakeable outs": {
-			utxos:       []*avax.UTXO{},
-			generateIns: noInputs,
-			outs: []*avax.TransferableOutput{
-				generateTestStakeableOut(avaxAssetID, 1, uint64(defaultMinStakingDuration), outputOwners),
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				return s
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(deposit.StartTime())
+			utx: func(u []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Outs: []*avax.TransferableOutput{
+						generateTestStakeableOut(ctx.AVAXAssetID, 1, 0, feeOwner),
+					},
+				}}}
 			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{},
 			expectedErr: locked.ErrWrongOutType,
 		},
-		"Inputs and utxos length mismatch": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				return []*avax.TransferableInput{
-					generateTestInFromUTXO(utxos[0], sigIndices),
-					generateTestInFromUTXO(utxos[1], sigIndices),
-					generateTestIn(avaxAssetID, 10, ids.Empty, ids.Empty, sigIndices),
-				}
-			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
-			expectedErr: errFlowCheckFailed,
-		},
 		"Unlock bonded UTXOs": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1.StartTime())
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, ids.Empty, existingTxID),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, bondTxID),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(deposit.StartTime())
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{owner1Key}, {owner1Key}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock deposited UTXOs but with unlocked ins": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1.StartTime())
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				in := generateTestInFromUTXO(utxos[0], sigIndices)
-				innerIn := &secp256k1fx.TransferInput{
-					Amt:   in.In.Amount(),
-					Input: secp256k1fx.Input{SigIndices: sigIndices},
-				}
-				in.In = innerIn
-				return []*avax.TransferableInput{in, generateTestInFromUTXO(utxos[1], sigIndices)}
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{
+						{
+							UTXOID: utxos[0].UTXOID,
+							Asset:  utxos[0].Asset,
+							In: &secp256k1fx.TransferInput{
+								Amt:   utxos[0].Out.(avax.Amounter).Amount(),
+								Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+							},
+						},
+						generateTestInFromUTXO(utxos[1], []uint32{0}),
+					},
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(deposit.StartTime())
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {owner1Key}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock deposited UTXOs but with bonded ins": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1.StartTime())
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				in := generateTestInFromUTXO(utxos[0], sigIndices)
-				out := utxos[0].Out.(*locked.Out)
-				innerIn := &locked.In{
-					IDs: locked.IDs{BondTxID: existingTxID},
-					TransferableIn: &secp256k1fx.TransferInput{
-						Amt:   out.Amount(),
-						Input: secp256k1fx.Input{SigIndices: sigIndices},
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{
+						{
+							UTXOID: utxos[0].UTXOID,
+							Asset:  utxos[0].Asset,
+							In: &locked.In{
+								IDs: locked.IDs{BondTxID: bondTxID},
+								TransferableIn: &secp256k1fx.TransferInput{
+									Amt:   utxos[0].Out.(avax.Amounter).Amount(),
+									Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+								},
+							},
+						},
+						generateTestInFromUTXO(utxos[1], []uint32{0}),
 					},
-				}
-				in.In = innerIn
-				return []*avax.TransferableInput{in, generateTestInFromUTXO(utxos[1], sigIndices)}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(deposit.StartTime())
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {owner1Key}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock some amount, before deposit's unlock period": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1StartUnlockTime.Add(-1 * time.Second))
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount-1, outputOwners, depositTxID, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositStartUnlockTime.Add(-1 * time.Second))
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {owner1Key}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock some amount, deposit expired": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
+			},
 			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount-1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, 1, outputOwners, depositTxID, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
 			expectedErr: errFlowCheckFailed,
 		},
-		"Unlock some amount of not owned utxos, deposit is still unlocking": {
+		"Unlock some amount of not owned utxos as owned, deposit is still unlocking": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, dummyOutputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount-1, outputOwners, depositTxID, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock some amount, utxos and input amount mismatch, deposit is still unlocking": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				in := generateTestInFromUTXO(utxos[0], sigIndices)
-				out := utxos[0].Out.(*locked.Out)
-				innerIn := &locked.In{
-					IDs: utxos[0].Out.(*locked.Out).IDs,
-					TransferableIn: &secp256k1fx.TransferInput{
-						Amt:   out.Amount() + 1,
-						Input: secp256k1fx.Input{SigIndices: sigIndices},
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{
+						{
+							UTXOID: utxos[0].UTXOID,
+							Asset:  utxos[0].Asset,
+							In: &locked.In{
+								IDs: utxos[0].Out.(*locked.Out).IDs,
+								TransferableIn: &secp256k1fx.TransferInput{
+									Amt:   utxos[0].Out.(avax.Amounter).Amount() + 1,
+									Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+								},
+							},
+						},
 					},
-				}
-				in.In = innerIn
-				return []*avax.TransferableInput{in}
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
 			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount-1, outputOwners, depositTxID, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock some amount, deposit is still unlocking": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: func() []*avax.TransferableOutput {
-				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositHalfUnlockTime.Unix()))
-				return []*avax.TransferableOutput{
-					generateTestOut(avaxAssetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
-					generateTestOut(avaxAssetID, deposit.Amount-unlockableAmount-1, outputOwners, depositTxID, ids.Empty),
-				}
-			}(),
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, unlockableAmount+1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-unlockableAmount-1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
 			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
-		"deposit is still unlocking, 2 utxos with diff owners, consumed 1.5 utxo < unlockable, all produced as owner1": {
+		"Deposit is still unlocking, 2 utxos with diff owners, consumed 1.5 utxo < unlockable, all produced as owner1": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired.Add(-time.Second))
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount/2, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, deposit.Amount/2, dummyOutputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount/2, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, deposit1.Amount/2, owner2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
-			outs: func() []*avax.TransferableOutput {
-				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositHalfUnlockTime.Unix()))
-				return []*avax.TransferableOutput{
-					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
-					generateTestOut(avaxAssetID, secondDeposit.Amount-(unlockableAmount-10000), dummyOutputOwners, depositTxID2, ids.Empty),
-				}
-			}(),
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount*3/4, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-deposit1.Amount*3/4, owner2, depositTxID1, ids.Empty),
+					},
+				}}}
 			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock all amount of not owned utxos, deposit expired": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, dummyOutputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner2, depositTxID1, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock all amount, utxos and input amount mismatch, deposit expired": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 			},
-			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
-				in := generateTestInFromUTXO(utxos[0], sigIndices)
-				out := utxos[0].Out.(*locked.Out)
-				innerIn := &locked.In{
-					IDs: utxos[0].Out.(*locked.Out).IDs,
-					TransferableIn: &secp256k1fx.TransferInput{
-						Amt:   out.Amount() + 1,
-						Input: secp256k1fx.Input{SigIndices: sigIndices},
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{{
+						UTXOID: utxos[0].UTXOID,
+						Asset:  utxos[0].Asset,
+						In: &locked.In{
+							IDs: utxos[0].Out.(*locked.Out).IDs,
+							TransferableIn: &secp256k1fx.TransferInput{
+								Amt:   utxos[0].Out.(avax.Amounter).Amount() + 1,
+								Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+							},
+						},
+					}},
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
 					},
-				}
-				in.In = innerIn
-				return []*avax.TransferableInput{in}
+				}}}
 			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock all amount but also consume bonded utxo, deposit expired": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{0}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{1}, avaxAssetID, 10, outputOwners, ids.Empty, existingTxID),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, 10, owner1, ids.Empty, bondTxID),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, 10, outputOwners, ids.Empty, existingTxID),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 10, owner1, ids.Empty, bondTxID),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock deposit, one expired-not-owned and one active deposit": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, dummyOutputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, secondDeposit.Amount, outputOwners, depositTxID2, ids.Empty),
-				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, deposit2.Amount, owner1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, secondDeposit.Amount-1, outputOwners, depositTxID2, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit2.Amount-1, owner1, depositTxID2, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-				env.state.UpdateDeposit(depositTxID2, secondDeposit)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock deposit, one expired and one active-not-owned deposit": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, secondDeposit.Amount, dummyOutputOwners, depositTxID2, ids.Empty),
-				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, deposit2.Amount, owner2, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, secondDeposit.Amount-1, outputOwners, depositTxID2, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit2.Amount-1, owner1, depositTxID2, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-				env.state.UpdateDeposit(depositTxID2, secondDeposit)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"Producing more than consumed": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, 1, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: func() []*avax.TransferableOutput {
-				return []*avax.TransferableOutput{
-					generateTestOut(avaxAssetID, 1+1, outputOwners, ids.Empty, ids.Empty),
-				}
-			}(),
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 2, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {feeOwnerKey}},
 			expectedErr: errFlowCheckFailed,
 		},
-		"No fee burning inputs are unlocked": {
+		"No fee burning, inputs are unlocked": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(owner1Addr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
-			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{{owner1Key}},
 			expectedErr: errFlowCheckFailed,
 		},
 		"No fee burning inputs are deposited": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
+			},
 			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount-1, outputOwners, depositTxID, ids.Empty),
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
-			},
 			expectedErr: errFlowCheckFailed,
 		},
-		"Happy path burn only fees": {
+		"OK: only burn fees": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				s.EXPECT().GetMultisigAlias(owner1Addr).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				// state update: ins/outs/utxos
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
-			},
-			expectedErr: nil,
+			signers: [][]*crypto.PrivateKeySECP256K1R{{owner1Key}, {feeOwnerKey}},
 		},
-		"Happy path unlock all amount with creds provided, deposit expired": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
-			expectedErr: nil,
-		},
-		"Happy path unlock all amount, deposit expired": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-			},
-			expectedErr: nil,
-		},
-		"Happy path unlock some amount, deposit is still unlocking": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: func() []*avax.TransferableOutput {
-				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositHalfUnlockTime.Unix()))
-				return []*avax.TransferableOutput{
-					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
-					generateTestOut(avaxAssetID, deposit.Amount-unlockableAmount, outputOwners, depositTxID, ids.Empty),
+		"OK: unlock all amount, deposit expired": {
+			baseState: baseState,
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				// state update: deposit1
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
+				s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
+				s.EXPECT().UpdateDeposit(depositTxID1, nil)
+				rewardUTXO := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(utx.Outs)),
+					},
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
+						OutputOwners: deposit1RewardsOwner,
+					},
 				}
-			}(),
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
+				s.EXPECT().AddUTXO(rewardUTXO)
+				s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
+				// state update: ins/outs/utxos
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
 			},
-			expectedErr: nil,
-		},
-		"Happy path unlock some amount, deposit is still unlocking, fee change to new address": {
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee+10, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
-			outs: func() []*avax.TransferableOutput {
-				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositHalfUnlockTime.Unix()))
-				return []*avax.TransferableOutput{
-					generateTestOut(avaxAssetID, 10, dummyOutputOwners, ids.Empty, ids.Empty),
-					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
-					generateTestOut(avaxAssetID, deposit.Amount-unlockableAmount, outputOwners, depositTxID, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+					},
+				}}}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}},
+		},
+		"OK: unlock some amount, deposit is still unlocking": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				// state update: deposit1
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
+				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+					DepositOfferID:      deposit1.DepositOfferID,
+					UnlockedAmount:      deposit1.UnlockedAmount + unlockableAmount,
+					ClaimedRewardAmount: deposit1.ClaimedRewardAmount,
+					Start:               deposit1.Start,
+					Duration:            deposit1.Duration,
+					Amount:              deposit1.Amount,
+				})
+				// state update: ins/outs/utxos
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
+			},
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, unlockableAmount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-unlockableAmount, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {feeOwnerKey}},
+		},
+		"OK: unlock some amount, deposit is still unlocking, fee change to new address": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				// state update: deposit1
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
+				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+					DepositOfferID:      deposit1.DepositOfferID,
+					UnlockedAmount:      deposit1.UnlockedAmount + unlockableAmount,
+					ClaimedRewardAmount: deposit1.ClaimedRewardAmount,
+					Start:               deposit1.Start,
+					Duration:            deposit1.Duration,
+					Amount:              deposit1.Amount,
+				})
+				// state update: ins/outs/utxos
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee+10, feeOwner, ids.Empty, ids.Empty),
+			},
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 10, owner2, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, unlockableAmount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount-unlockableAmount, owner1, depositTxID1, ids.Empty),
+					},
+				}}}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {feeOwnerKey}},
+		},
+		"OK: unlock deposit, one expired deposit and one active": {
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := baseState(c)
+				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				return s
+			},
+			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				// common checks
+				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
+				// verify unlock deposit flowcheck
+				expectGetUTXOsFromInputs(s, utx.Ins, utxos)
+				s.EXPECT().GetTimestamp().Return(deposit1Expired)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
+				s.EXPECT().GetDepositOffer(deposit2.DepositOfferID).Return(depositOffer, nil)
+				// state update: deposit1
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
+				s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
+				s.EXPECT().UpdateDeposit(depositTxID1, nil)
+				rewardUTXO := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(utx.Outs)),
+					},
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
+						OutputOwners: deposit1RewardsOwner,
+					},
 				}
-			}(),
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositHalfUnlockTime)
+				s.EXPECT().AddUTXO(rewardUTXO)
+				s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
+				// state update: deposit2
+				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
+				s.EXPECT().UpdateDeposit(depositTxID2, &deposit.Deposit{
+					DepositOfferID:      deposit2.DepositOfferID,
+					UnlockedAmount:      deposit2.UnlockedAmount + 1,
+					ClaimedRewardAmount: deposit2.ClaimedRewardAmount,
+					Start:               deposit2.Start,
+					Duration:            deposit2.Duration,
+					Amount:              deposit2.Amount,
+				})
+				// state update: ins/outs/utxos
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
 			},
-			expectedErr: nil,
-		},
-		"Happy path unlock deposit, one expired deposit and one active": {
 			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, avaxAssetID, deposit.Amount, outputOwners, depositTxID, ids.Empty),
-				generateTestUTXO(ids.ID{2}, avaxAssetID, secondDeposit.Amount, outputOwners, depositTxID2, ids.Empty),
-				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, deposit2.Amount, owner1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty),
 			},
-			generateIns: generateInsFromUTXOs,
-			signers:     [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, deposit.Amount, outputOwners, ids.Empty, ids.Empty),
-				generateTestOut(avaxAssetID, secondDeposit.Amount-1, outputOwners, depositTxID2, ids.Empty),
+			utx: func(utxos []*avax.UTXO) *txs.UnlockDepositTx {
+				return &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: generateInsFromUTXOs(utxos),
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit1.Amount, owner1, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, deposit2.Amount-1, owner1, depositTxID2, ids.Empty),
+					},
+				}}}
 			},
-			preExecute: func(env *caminoEnvironment) {
-				env.state.SetTimestamp(depositExpired)
-				env.state.UpdateDeposit(depositTxID2, secondDeposit)
-			},
-			expectedErr: nil,
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {}, {feeOwnerKey}},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			env := newCaminoEnvironmentWithMocks(true, false, nil, caminoGenesisConf, tt.baseState(ctrl), nil)
+			defer require.NoError(shutdownCaminoEnvironment(env))
 			env.ctx.Lock.Lock()
-			defer func() {
-				if err = shutdownCaminoEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
-			}()
 
-			// setting up state
-			env.config.BanffTime = env.state.GetTimestamp()
-			env.state.UpdateDeposit(depositTxID, deposit)
-			for _, utxo := range tt.utxos {
-				env.state.AddUTXO(utxo)
-			}
-			tt.preExecute(env)
-			require.NoError(t, env.state.Commit())
-
-			// generating tx
-			ins := tt.generateIns(tt.utxos)
-			avax.SortTransferableInputsWithSigners(ins, tt.signers)
-			avax.SortTransferableOutputs(tt.outs, txs.Codec)
-
-			utx := &txs.UnlockDepositTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         tt.outs,
-				}},
-			}
-
+			utx := tt.utx(tt.utxos)
+			utx.BlockchainID = env.ctx.ChainID
+			utx.NetworkID = env.ctx.NetworkID
 			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
-			require.NoError(t, err)
+			require.NoError(err)
 
-			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
-			require.NoError(t, err)
-
-			executor := CaminoStandardTxExecutor{
+			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   onAcceptState,
+					State:   tt.state(ctrl, utx, tx.ID(), tt.utxos),
 					Tx:      tx,
 				},
-			}
-
-			err = tx.Unsigned.Visit(&executor)
-			require.ErrorIs(t, err, tt.expectedErr)
+			})
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -3133,7 +3462,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	claimableOwnerKey2, _, claimableOwner2 := generateKeyAndOwner(t)
 
 	feeUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
-	feeInput := generateTestInFromUTXO(feeUTXO, []uint32{0})
 
 	depositOfferID := ids.GenerateTestID()
 	depositTxID1 := ids.GenerateTestID()
@@ -3149,6 +3477,8 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 	baseState := func(c *gomock.Controller) *state.MockState {
 		s := state.NewMockState(c)
+		// utxo handler, used in fx VerifyMultisigTransfer method for baseTx ins verification
+		s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
 		// shutdown
 		s.EXPECT().SetHeight(uint64(math.MaxUint64))
 		s.EXPECT().Commit()
@@ -3156,22 +3486,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 		return s
 	}
 
-	baseStateWithFeeSpendVerify := func(c *gomock.Controller) *state.MockState {
-		s := baseState(c)
-		// utxo handler, used in fx VerifyMultisigTransfer method,
-		s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
-		return s
-	}
-
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
-		Ins:          []*avax.TransferableInput{feeInput},
+		Ins:          []*avax.TransferableInput{generateTestInFromUTXO(feeUTXO, []uint32{0})},
 	}}
 
 	tests := map[string]struct {
 		state         func(*gomock.Controller, *txs.ClaimTx, ids.ID, []*avax.UTXO, []*state.Claimable) *state.MockDiff
-		baseState     func(*gomock.Controller) *state.MockState
 		utx           func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx
 		signers       [][]*crypto.PrivateKeySECP256K1R
 		treasuryUTXOs []*avax.UTXO
@@ -3179,7 +3501,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 		expectedErr   error
 	}{
 		"Deposit not found": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3201,7 +3522,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errDepositNotFound,
 		},
 		"Bad deposit credential": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3228,7 +3548,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errDepositCredentialMissmatch,
 		},
 		"Bad claimable credential": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3260,7 +3579,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errClaimableCredentialMissmatch,
 		},
 		"Claimable ins not owned by treasury": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3304,7 +3622,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errClaimingNonTreasuryUTXO,
 		},
 		"Claimed more than available": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3359,7 +3676,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"OK, claimable and 2 deposits": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3375,14 +3691,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					nil,
 				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
-				deposit1 := &deposits.Deposit{
+				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
-				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposits.Offer{
+				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
 					InterestRateNominator: 1_000_000, // 100%
 				}, nil)
 				claimedRewardAmount := uint64(5) // expected claimable reward amount
@@ -3399,7 +3715,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO1)
 				s.EXPECT().AddRewardUTXO(depositTxID1, depositRewardUTXO1)
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposits.Deposit{
+				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
 					DepositOfferID:      deposit1.DepositOfferID,
 					UnlockedAmount:      deposit1.UnlockedAmount,
 					ClaimedRewardAmount: deposit1.ClaimedRewardAmount + claimedRewardAmount,
@@ -3415,14 +3731,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					nil,
 				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
-				deposit2 := &deposits.Deposit{
+				deposit2 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
 				}
 				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
-				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposits.Offer{
+				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
 					InterestRateNominator: 1_000_000, // 100%
 				}, nil)
 				claimedRewardAmount = 5 // expected claimable reward amount
@@ -3439,7 +3755,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO2)
 				s.EXPECT().AddRewardUTXO(depositTxID2, depositRewardUTXO2)
-				s.EXPECT().UpdateDeposit(depositTxID2, &deposits.Deposit{
+				s.EXPECT().UpdateDeposit(depositTxID2, &deposit.Deposit{
 					DepositOfferID:      deposit2.DepositOfferID,
 					UnlockedAmount:      deposit2.UnlockedAmount,
 					ClaimedRewardAmount: deposit2.ClaimedRewardAmount + claimedRewardAmount,
@@ -3490,7 +3806,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			}},
 		},
 		"OK, deposit with new DepositRewardsOwner, non-zero already claimed reward and no rewards period": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3506,15 +3821,15 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					nil,
 				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
-				deposit := &deposits.Deposit{
+				deposit1 := &deposit.Deposit{
 					DepositOfferID:      depositOfferID,
 					Start:               uint64(timestamp.Unix()) - 365*24*60*60/12*6, // 6 month
 					Duration:            365 * 24 * 60 * 60 / 12 * 14,                 // 14 month
 					Amount:              10,
 					ClaimedRewardAmount: 1,
 				}
-				s.EXPECT().GetDeposit(depositTxID1).Return(deposit, nil)
-				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposits.Offer{
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
 					NoRewardsPeriodDuration: 365 * 24 * 60 * 60 / 12 * 2, // 2 month
 					InterestRateNominator:   1_000_000,                   // 100%
 				}, nil)
@@ -3532,13 +3847,13 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO)
 				s.EXPECT().AddRewardUTXO(depositTxID1, depositRewardUTXO)
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposits.Deposit{
-					DepositOfferID:      deposit.DepositOfferID,
-					UnlockedAmount:      deposit.UnlockedAmount,
-					ClaimedRewardAmount: deposit.ClaimedRewardAmount + claimedRewardAmount,
-					Start:               deposit.Start,
-					Duration:            deposit.Duration,
-					Amount:              deposit.Amount,
+				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+					DepositOfferID:      deposit1.DepositOfferID,
+					UnlockedAmount:      deposit1.UnlockedAmount,
+					ClaimedRewardAmount: deposit1.ClaimedRewardAmount + claimedRewardAmount,
+					Start:               deposit1.Start,
+					Duration:            deposit1.Duration,
+					Amount:              deposit1.Amount,
 				})
 				return s
 			},
@@ -3552,7 +3867,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {depositRewardOwnerKey}},
 		},
 		"OK, partial claim": {
-			baseState: baseStateWithFeeSpendVerify,
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3610,7 +3924,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			env := newCaminoEnvironmentWithMocks( /*postBanff*/ true, false, nil, caminoGenesisConf, tt.baseState(ctrl), nil)
+			env := newCaminoEnvironmentWithMocks( /*postBanff*/ true, false, nil, caminoGenesisConf, baseState(ctrl), nil)
 			defer require.NoError(shutdownCaminoEnvironment(env))
 			env.ctx.Lock.Lock()
 

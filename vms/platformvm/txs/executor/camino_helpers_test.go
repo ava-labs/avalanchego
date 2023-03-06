@@ -466,6 +466,14 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 	}
 }
 
+func generateInsFromUTXOs(utxos []*avax.UTXO) []*avax.TransferableInput {
+	ins := make([]*avax.TransferableInput, len(utxos))
+	for i := range utxos {
+		ins[i] = generateTestInFromUTXO(utxos[i], []uint32{0})
+	}
+	return ins
+}
+
 func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
 	key, err := testKeyfactory.NewPrivateKey()
 	require.NoError(t, err)
@@ -630,6 +638,12 @@ func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, 
 	}
 }
 
+func expectConsumeUTXOs(s *state.MockDiff, ins []*avax.TransferableInput) {
+	for _, in := range ins {
+		s.EXPECT().DeleteUTXO(in.InputID())
+	}
+}
+
 func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) {
 	for i := range outs {
 		s.EXPECT().AddUTXO(&avax.UTXO{
@@ -638,10 +652,7 @@ func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID
 				OutputIndex: uint32(baseOutIndex + i),
 			},
 			Asset: outs[i].Asset,
-			Out: &secp256k1fx.TransferOutput{
-				Amt:          outs[i].Out.Amount(),
-				OutputOwners: outs[i].Out.(*secp256k1fx.TransferOutput).OutputOwners,
-			},
+			Out:   outs[i].Out,
 		})
 	}
 }

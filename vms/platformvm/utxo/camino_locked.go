@@ -540,6 +540,7 @@ func (h *handler) Unlock(
 	return h.unlockUTXOs(utxos, removedLockState)
 }
 
+// utxos that are not locked with [removedLockState] will be ignored
 func (h *handler) unlockUTXOs(
 	utxos []*avax.UTXO,
 	removedLockState locked.State,
@@ -1257,11 +1258,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			return nil, err
 		}
 
-		unlockableAmount := deposit.UnlockableAmount(
-
-			depositOffer,
-			currentTimestamp,
-		)
+		unlockableAmount := deposit.UnlockableAmount(depositOffer, currentTimestamp)
 
 		// if we don't need keys, than deposit is expired and must be fully unlocked
 		// that means that tx must fully consume remaining deposited tokens and
