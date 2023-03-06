@@ -137,7 +137,7 @@ func Bootstrap(
 
 	if intitializer.err != nil {
 		stopper.Stop(ctx)
-		return nil, nil, fmt.Errorf("%w: %v", runtime.ErrHandshakeFailed, err)
+		return nil, nil, fmt.Errorf("%w: %v", runtime.ErrHandshakeFailed, intitializer.err)
 	}
 
 	log.Info("plugin handshake succeeded",

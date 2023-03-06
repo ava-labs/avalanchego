@@ -433,9 +433,10 @@ func initRegistererTest(t *testing.T) *vmRegistererTestResources {
 	mockLog := logging.NewMockLogger(ctrl)
 
 	registerer := NewVMRegisterer(VMRegistererConfig{
-		APIServer: mockServer,
-		Log:       mockLog,
-		VMManager: mockManager,
+		APIServer:    mockServer,
+		Log:          mockLog,
+		VMFactoryLog: logging.NoLog{},
+		VMManager:    mockManager,
 	})
 
 	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
