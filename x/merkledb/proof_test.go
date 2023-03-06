@@ -315,11 +315,8 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	trie, err := dbTrie.NewView(context.Background())
 	require.NoError(t, err)
 
-	_, err = trie.GetRangeProof(context.Background(), nil, nil, -1)
-	require.ErrorIs(t, err, ErrInvalidMaxLength)
-
 	_, err = trie.GetRangeProof(context.Background(), nil, nil, 0)
-	require.ErrorIs(t, err, ErrInvalidMaxLength)
+	require.ErrorIs(t, err, ErrInvalidMaxSize)
 }
 
 func Test_Proof(t *testing.T) {

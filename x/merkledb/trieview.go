@@ -372,7 +372,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 func (t *trieView) GetRangeProof(
 	ctx context.Context,
 	start, end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
@@ -380,7 +380,7 @@ func (t *trieView) GetRangeProof(
 	t.lockStack()
 	defer t.unlockStack()
 
-	return t.getRangeProof(ctx, start, end, maxLength)
+	return t.getRangeProof(ctx, start, end, maxSize)
 }
 
 // Returns a range proof for (at least part of) the key range [start, end].
@@ -390,7 +390,7 @@ func (t *trieView) GetRangeProof(
 func (t *trieView) getRangeProof(
 	ctx context.Context,
 	start, end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getRangeProof")
 	defer span.End()
@@ -399,8 +399,8 @@ func (t *trieView) getRangeProof(
 		return nil, ErrStartAfterEnd
 	}
 
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	if err := t.calculateIDs(ctx); err != nil {
@@ -412,7 +412,7 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
-	result.KeyValues, err = t.getKeyValues(ctx, start, end, maxLength, set.Set[string]{})
+	result.KeyValues, err = t.getKeyValues(ctx, start, end, maxSize, set.Set[string]{})
 	if err != nil {
 		return nil, err
 	}
@@ -694,14 +694,14 @@ func (t *trieView) getKeyValues(
 	ctx context.Context,
 	start []byte,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 	keysToIgnore set.Set[string],
 ) ([]KeyValue, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieView.getKeyValues")
 	defer span.End()
 
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	if t.isInvalid() {
@@ -726,7 +726,7 @@ func (t *trieView) getKeyValues(
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
 
-	baseKeyValues, err := t.getParentTrie().getKeyValues(ctx, start, end, maxLength, keysToIgnore)
+	baseKeyValues, err := t.getParentTrie().getKeyValues(ctx, start, end, maxSize, keysToIgnore)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +740,7 @@ func (t *trieView) getKeyValues(
 		baseKeyValuesIndex = 0
 		// The index of the next key/value pair to add from [changes].
 		changesIndex    = 0
-		remainingLength = maxLength
+		remainingLength = maxSize
 		hasUpperBound   = len(end) > 0
 		result          = make([]KeyValue, 0, len(baseKeyValues))
 	)
@@ -763,25 +763,37 @@ func (t *trieView) getKeyValues(
 			return result, nil
 		}
 
-		// one or both iterators still have values, so one will be added to the result
-		remainingLength--
 
 		// both still have key/values available, so add the smallest key
 		if !changesFinished && !baseKeyValuesFinished {
 			currentChangeState := changes[changesIndex]
 			currentKeyValues := baseKeyValues[baseKeyValuesIndex]
 
+			currentChangeSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
+			currentKeyValuesSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
+
 			switch bytes.Compare(currentChangeState.Key, currentKeyValues.Key) {
 			case -1:
+				if currentChangeSize>uint(remainingLength) {
+					return result, nil
+				}
 				result = append(result, currentChangeState)
 				changesIndex++
 			case 0:
 				// the keys are the same, so override the base value with the changed value
+				if currentChangeSize>uint(remainingLength) {
+					return result, nil
+				}
 				result = append(result, currentChangeState)
+				remainingLength -=currentChangeSize
 				changesIndex++
 				baseKeyValuesIndex++
 			case 1:
+				if currentKeyValuesSize>uint(remainingLength) {
+					return result, nil
+				}
 				result = append(result, currentKeyValues)
+				remainingLength -=currentKeyValuesSize
 				baseKeyValuesIndex++
 			}
 			continue
@@ -791,7 +803,13 @@ func (t *trieView) getKeyValues(
 		// add the next base state value.
 		if !baseKeyValuesFinished {
 			currentBaseState := baseKeyValues[baseKeyValuesIndex]
+			currentSize := uint(len(currentBaseState.Key) + len(currentBaseState.Value))
+			if currentSize>uint(remainingLength) {
+				return result, nil
+			}
+			
 			result = append(result, currentBaseState)
+			remainingLength -= currentSize
 			baseKeyValuesIndex++
 			continue
 		}
@@ -799,7 +817,12 @@ func (t *trieView) getKeyValues(
 		// the base state is finished, but the changes is not finished.
 		// add the next changes value.
 		currentChangeState := changes[changesIndex]
+		currentSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
+		if currentSize>uint(remainingLength) {
+			return result, nil
+		}
 		result = append(result, currentChangeState)
+		remainingLength -= currentSize
 		changesIndex++
 	}
 

@@ -141,7 +141,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		limit = maxKeyValuesLimit
 	}
 
-	changeProof, err := s.db.GetChangeProof(ctx, req.StartingRoot, req.EndingRoot, req.Start, req.End, int(limit))
+	changeProof, err := s.db.GetChangeProof(ctx, req.StartingRoot, req.EndingRoot, req.Start, req.End, uint(limit))
 	if err != nil {
 		// handle expected errors so clients cannot cause servers to spam warning logs.
 		if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
@@ -188,7 +188,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		limit = maxKeyValuesLimit
 	}
 
-	rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, int(limit))
+	rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, limit)
 	if err != nil {
 		// handle expected errors so clients cannot cause servers to spam warning logs.
 		if errors.Is(err, merkledb.ErrRootIDNotPresent) {

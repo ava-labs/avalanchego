@@ -225,9 +225,6 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	_, err = db.history.getValueChanges(startRoot, endRoot, nil, nil, 1)
 	require.NoError(err)
 
-	_, err = db.history.getValueChanges(startRoot, endRoot, nil, nil, -1)
-	require.Error(err, ErrInvalidMaxLength)
-
 	_, err = db.history.getValueChanges(endRoot, startRoot, nil, nil, 1)
 	require.Error(err, ErrStartRootNotFound)
 

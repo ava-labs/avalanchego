@@ -79,13 +79,13 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
-func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxLength int) (*changeSummary, error) {
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxSize uint) (*changeSummary, error) {
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	if startRoot == endRoot {
-		return newChangeSummary(maxLength), nil
+		return newChangeSummary(int(maxSize/minKeyValueLen)), nil
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -133,7 +133,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	combinedChanges := newChangeSummary(maxLength)
+	combinedChanges := newChangeSummary(int(maxSize/minKeyValueLen))
 
 	// For each change after [lastStartRootChange] up to and including
 	// [lastEndRootChange], record the change in [combinedChanges].

@@ -53,7 +53,7 @@ type RangeProofRequest struct {
 	Root  ids.ID `serialize:"true"`
 	Start []byte `serialize:"true"`
 	End   []byte `serialize:"true"`
-	Limit uint16 `serialize:"true"`
+	Limit uint   `serialize:"true"`
 }
 
 func (r *RangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, h Handler) error {
@@ -77,7 +77,7 @@ type ChangeProofRequest struct {
 	EndingRoot   ids.ID `serialize:"true"`
 	Start        []byte `serialize:"true"`
 	End          []byte `serialize:"true"`
-	Limit        uint16 `serialize:"true"`
+	Limit        uint   `serialize:"true"`
 }
 
 func (r *ChangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, h Handler) error {

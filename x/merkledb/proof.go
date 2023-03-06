@@ -20,7 +20,7 @@ const verificationCacheSize = 2_000
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
-	ErrInvalidMaxLength            = errors.New("expected max length to be > 0")
+	ErrInvalidMaxSize              = errors.New("expected max size to be > 0 KB")
 	ErrNonIncreasingValues         = errors.New("keys sent are not in increasing order")
 	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")

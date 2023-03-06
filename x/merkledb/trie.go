@@ -48,14 +48,14 @@ type ReadOnlyTrie interface {
 	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
 
 	// generate a proof of up to maxLength smallest key/values with keys between start and end
-	GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error)
+	GetRangeProof(ctx context.Context, start, end []byte, maxSize uint) (*RangeProof, error)
 
 	// GetKeyValues but doesn't grab any locks.
 	getKeyValues(
 		ctx context.Context,
 		start []byte,
 		end []byte,
-		maxLength int,
+		maxSize uint,
 		keysToIgnore set.Set[string],
 	) ([]KeyValue, error)
 }

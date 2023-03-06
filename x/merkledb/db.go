@@ -412,12 +412,12 @@ func (db *Database) GetRangeProof(
 	ctx context.Context,
 	start,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*RangeProof, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
+	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxSize)
 }
 
 // Returns a proof for the key/value pairs in this trie within the range
@@ -427,12 +427,12 @@ func (db *Database) GetRangeProofAtRoot(
 	rootID ids.ID,
 	start,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*RangeProof, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getRangeProofAtRoot(ctx, rootID, start, end, maxLength)
+	return db.getRangeProofAtRoot(ctx, rootID, start, end, maxSize)
 }
 
 // Assumes [db.lock] is read locked.
@@ -441,29 +441,29 @@ func (db *Database) getRangeProofAtRoot(
 	rootID ids.ID,
 	start,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*RangeProof, error) {
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	historicalView, err := db.getHistoricalViewForRangeProof(ctx, rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return historicalView.getRangeProof(ctx, start, end, maxLength)
+	return historicalView.getRangeProof(ctx, start, end, maxSize)
 }
 
 // Returns a proof for a subset of the key/value changes in key range
 // [start, end] that occurred between [startRootID] and [endRootID].
-// Returns at most [maxLength] key/value pairs.
+// Returns a proof of at most [maxSize] KB
 func (db *Database) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
 	start []byte,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 ) (*ChangeProof, error) {
 	if len(end) > 0 && bytes.Compare(start, end) == 1 {
 		return nil, ErrStartAfterEnd
@@ -478,7 +478,7 @@ func (db *Database) GetChangeProof(
 	result := &ChangeProof{
 		HadRootsInHistory: true,
 	}
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
+	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxSize)
 	if err == ErrRootIDNotPresent {
 		result.HadRootsInHistory = false
 		return result, nil
@@ -977,21 +977,21 @@ func (db *Database) getKeyValues(
 	_ context.Context,
 	start []byte,
 	end []byte,
-	maxLength int,
+	maxSize uint,
 	keysToIgnore set.Set[string],
 ) ([]KeyValue, error) {
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	if maxSize <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
-	remainingLength := maxLength
-	result := make([]KeyValue, 0, maxLength)
+	remainingLength := maxSize
+	result := make([]KeyValue, 0, maxSize)
 	// Keep adding key/value pairs until one of the following:
 	// * We hit a key that is lexicographically larger than the end key.
-	// * [maxLength] elements are in [result].
+	// * [maxSize] bytes worth of key/values are in the list
 	// * There are no more values to add.
 	for remainingLength > 0 && it.Next() {
 		key := it.Key()
@@ -1005,7 +1005,7 @@ func (db *Database) getKeyValues(
 			Key:   key,
 			Value: it.Value(),
 		})
-		remainingLength--
+		remainingLength-= uint(len(key) + len(it.Value()))
 	}
 
 	return result, it.Error()

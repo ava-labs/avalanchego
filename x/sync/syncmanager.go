@@ -15,11 +15,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const (
-	defaultLeafRequestLimit = 1024
+	defaultProofBytesLimit = 2 * uint(units.MiB)
 	maxTokenWaitTime        = 5 * time.Second
 )
 
@@ -115,6 +116,7 @@ type StateSyncConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
+	MaxProofSizeKB        uint
 }
 
 func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
@@ -276,7 +278,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			EndingRoot:   rootID,
 			Start:        workItem.start,
 			End:          workItem.end,
-			Limit:        defaultLeafRequestLimit,
+			Limit:        uint16(m.config.MaxProofSizeKB),
 		},
 		m.config.SyncDB,
 	)
@@ -335,7 +337,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 			Root:  rootID,
 			Start: workItem.start,
 			End:   workItem.end,
-			Limit: defaultLeafRequestLimit,
+			Limit: uint16(m.config.MaxProofSizeKB),
 		},
 	)
 	if err != nil {

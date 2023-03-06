@@ -110,7 +110,7 @@ func sendRequest(
 func TestGetRangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
-	smallTrieKeyCount := defaultLeafRequestLimit
+	smallTrieKeyCount := defaultProofBytesLimit
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
@@ -133,15 +133,15 @@ func TestGetRangeProof(t *testing.T) {
 			db: smallTrieDB,
 			request: &RangeProofRequest{
 				Root:  smallTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
-			expectedResponseLen: defaultLeafRequestLimit,
+			expectedResponseLen: defaultProofBytesLimit,
 		},
 		"too many leaves in response": {
 			db: smallTrieDB,
 			request: &RangeProofRequest{
 				Root:  smallTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
@@ -152,16 +152,16 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
-			expectedResponseLen: defaultLeafRequestLimit,
+			expectedResponseLen: defaultProofBytesLimit,
 		},
 		"full response from near end of trie to end of trie (less than leaf limit)": {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
 				Start: largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			expectedResponseLen: 30,
 		},
@@ -171,7 +171,7 @@ func TestGetRangeProof(t *testing.T) {
 				Root:  largeTrieRoot,
 				Start: largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
 				End:   largeTrieKeys[1099], // (inclusive range)
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			expectedResponseLen: 100,
 		},
@@ -179,7 +179,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[1:]
@@ -190,11 +190,11 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				start := response.KeyValues[1].Key
-				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultLeafRequestLimit)
+				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultProofBytesLimit)
 				if err != nil {
 					panic(err)
 				}
@@ -208,7 +208,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
@@ -219,7 +219,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
@@ -230,7 +230,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultLeafRequestLimit,
+				Limit: defaultProofBytesLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.StartProof = nil
@@ -258,7 +258,7 @@ func TestRetries(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 	require := require.New(t)
 
-	keyCount := defaultLeafRequestLimit
+	keyCount := 1000
 	db, _, err := generateTrieWithMinKeyLen(t, r, keyCount, 1)
 	require.NoError(err)
 	root, err := db.GetMerkleRoot(context.Background())
@@ -267,7 +267,7 @@ func TestRetries(t *testing.T) {
 	maxRequests := 4
 	request := &RangeProofRequest{
 		Root:  root,
-		Limit: uint16(keyCount),
+		Limit: uint(20*keyCount),
 	}
 
 	responseCount := 0
