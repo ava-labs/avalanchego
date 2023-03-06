@@ -428,7 +428,7 @@ func (proof *ChangeProof) Verify(
 	defer db.lock.RUnlock()
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newView(ctx)
+	view, err := db.newUntrackedView(ctx)
 	if err != nil {
 		return err
 	}
@@ -610,7 +610,7 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 // Assumes [t]'s view stack is locked.
 func addPathInfo(
 	ctx context.Context,
-	t TrieView,
+	t *trieView,
 	proofPath []ProofNode,
 	startPath path,
 	endPath path,
@@ -662,7 +662,7 @@ func addPathInfo(
 	return nil
 }
 
-func getEmptyTrieView(ctx context.Context) (TrieView, error) {
+func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 	tracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, err
@@ -681,5 +681,5 @@ func getEmptyTrieView(ctx context.Context) (TrieView, error) {
 		return nil, err
 	}
 
-	return db.NewView(ctx)
+	return db.newUntrackedView(ctx)
 }
