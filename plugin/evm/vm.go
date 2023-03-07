@@ -122,8 +122,6 @@ var (
 	errSubnetEVMUpgradeNotEnabled = errors.New("SubnetEVM upgrade is not enabled in genesis")
 )
 
-var originalStderr *os.File
-
 // legacyApiNames maps pre geth v1.10.20 api names to their updated counterparts.
 // used in attachEthService for backward configuration compatibility.
 var legacyApiNames = map[string]string{
@@ -141,13 +139,6 @@ var legacyApiNames = map[string]string{
 	"private-admin":     "admin",
 	"public-debug":      "debug",
 	"private-debug":     "debug",
-}
-
-func init() {
-	// Preserve [os.Stderr] prior to the call in plugin/main.go to plugin.Serve(...).
-	// Preserving the log level allows us to update the root handler while writing to the original
-	// [os.Stderr] that is being piped through to the logger via the rpcchainvm.
-	originalStderr = os.Stderr
 }
 
 // VM implements the snowman.ChainVM interface
@@ -253,7 +244,7 @@ func (vm *VM) Initialize(
 		alias = vm.ctx.ChainID.String()
 	}
 
-	subnetEVMLogger, err := InitLogger(alias, vm.config.LogLevel, vm.config.LogJSONFormat, originalStderr)
+	subnetEVMLogger, err := InitLogger(alias, vm.config.LogLevel, vm.config.LogJSONFormat, vm.ctx.Log)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
