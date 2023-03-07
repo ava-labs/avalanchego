@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	errNotReady = errors.New("should not be called")
+	errStillBootstrapping = errors.New("still bootstrapping")
 
 	_ LockedCalculator = (*lockedCalculator)(nil)
 )
@@ -42,7 +42,7 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (
 	defer c.lock.RUnlock()
 
 	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
-		return 0, time.Time{}, errNotReady
+		return 0, time.Time{}, errStillBootstrapping
 	}
 
 	c.calculatorLock.Lock()
@@ -56,7 +56,7 @@ func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID, subnetID id
 	defer c.lock.RUnlock()
 
 	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
-		return 0, errNotReady
+		return 0, errStillBootstrapping
 	}
 
 	c.calculatorLock.Lock()
@@ -70,7 +70,7 @@ func (c *lockedCalculator) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetI
 	defer c.lock.RUnlock()
 
 	if c.vmState == nil || !status.DoneBootstraping(c.vmState.Get()) {
-		return 0, errNotReady
+		return 0, errStillBootstrapping
 	}
 
 	c.calculatorLock.Lock()
