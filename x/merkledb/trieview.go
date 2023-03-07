@@ -912,7 +912,7 @@ func (t *trieView) Remove(_ context.Context, key []byte) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.remove( key)
+	return t.remove(key)
 }
 
 // Assumes [t.lock] is held.
