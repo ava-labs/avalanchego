@@ -48,15 +48,13 @@ impl Account {
         let root_hash = Hash(raw[56..88].try_into().unwrap());
         let code_hash = Hash(raw[88..].try_into().unwrap());
 
-        unsafe {
-            Self {
-                nonce,
-                balance,
-                root: ObjPtr::new_from_addr(root),
-                code: ObjPtr::new_from_addr(code),
-                root_hash,
-                code_hash,
-            }
+        Self {
+            nonce,
+            balance,
+            root: ObjPtr::new_from_addr(root),
+            code: ObjPtr::new_from_addr(code),
+            root_hash,
+            code_hash,
         }
     }
 

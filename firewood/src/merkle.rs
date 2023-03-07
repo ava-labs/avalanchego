@@ -492,7 +492,7 @@ impl MummyItem for Node {
                         .map_err(|_| ShaleError::DecodeError)?;
                     let addr = u64::from_le_bytes(buff);
                     if addr != 0 {
-                        *chd = Some(unsafe { ObjPtr::new_from_addr(addr) })
+                        *chd = Some(ObjPtr::new_from_addr(addr))
                     }
                 }
                 cur.read_exact(&mut buff[..4])
@@ -584,7 +584,7 @@ impl MummyItem for Node {
                 Ok(Self::new_from_hash(
                     root_hash,
                     eth_rlp_long,
-                    NodeType::Extension(ExtNode(path, unsafe { ObjPtr::new_from_addr(ptr) }, rlp)),
+                    NodeType::Extension(ExtNode(path, ObjPtr::new_from_addr(ptr), rlp)),
                 ))
             }
             Self::LEAF_NODE => {
@@ -741,7 +741,7 @@ fn test_merkle_node_encoding() {
     let chd0 = [None; NBRANCH];
     let mut chd1 = chd0;
     for node in chd1.iter_mut().take(NBRANCH / 2) {
-        *node = Some(unsafe { ObjPtr::new_from_addr(0xa) });
+        *node = Some(ObjPtr::new_from_addr(0xa));
     }
     let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
     for rlp in chd_eth_rlp.iter_mut().take(NBRANCH / 2) {
@@ -761,7 +761,7 @@ fn test_merkle_node_encoding() {
             None,
             NodeType::Extension(ExtNode(
                 PartialPath(vec![0x1, 0x2, 0x3]),
-                unsafe { ObjPtr::new_from_addr(0x42) },
+                ObjPtr::new_from_addr(0x42),
                 None,
             )),
         ),

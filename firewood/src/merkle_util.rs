@@ -118,22 +118,19 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
     assert!(compact_size > RESERVED);
     let mem_meta = Rc::new(DynamicMem::new(meta_size, 0x0)) as Rc<dyn MemStore>;
     let mem_payload = Rc::new(DynamicMem::new(compact_size, 0x1));
-    let compact_header: ObjPtr<CompactSpaceHeader> = unsafe { ObjPtr::new_from_addr(0x0) };
+    let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x0);
 
     mem_meta.write(
         compact_header.addr(),
         &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED)),
     );
 
-    let compact_header = unsafe {
-        MummyObj::ptr_to_obj(
-            mem_meta.as_ref(),
-            compact_header,
-            shale::compact::CompactHeader::MSIZE,
-        )
-        .unwrap()
-    };
-
+    let compact_header = MummyObj::ptr_to_obj(
+        mem_meta.as_ref(),
+        compact_header,
+        shale::compact::CompactHeader::MSIZE,
+    )
+    .unwrap();
     let cache = shale::ObjCache::new(1);
     let space =
         shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)

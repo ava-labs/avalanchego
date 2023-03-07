@@ -112,7 +112,7 @@ impl<T: ?Sized> ObjPtr<T> {
     }
 
     #[inline(always)]
-    pub unsafe fn new_from_addr(addr: u64) -> Self {
+    pub fn new_from_addr(addr: u64) -> Self {
         Self::new(addr)
     }
 }
@@ -209,7 +209,7 @@ pub struct ObjRef<'a, T> {
 }
 
 impl<'a, T> ObjRef<'a, T> {
-    pub unsafe fn to_longlive(mut self) -> ObjRef<'static, T> {
+    pub fn to_longlive(mut self) -> ObjRef<'static, T> {
         ObjRef {
             inner: self.inner.take(),
             cache: ObjCache(self.cache.0.clone()),
@@ -353,7 +353,7 @@ impl<T: MummyItem + 'static> MummyObj<T> {
     }
 
     #[inline(always)]
-    pub unsafe fn ptr_to_obj(
+    pub fn ptr_to_obj(
         store: &dyn MemStore,
         ptr: ObjPtr<T>,
         len_limit: u64,
@@ -366,7 +366,7 @@ impl<T: MummyItem + 'static> MummyObj<T> {
     }
 
     #[inline(always)]
-    pub unsafe fn item_to_obj(
+    pub fn item_to_obj(
         store: &dyn MemStore,
         addr: u64,
         len_limit: u64,
@@ -379,7 +379,7 @@ impl<T: MummyItem + 'static> MummyObj<T> {
 }
 
 impl<T> MummyObj<T> {
-    unsafe fn new_from_slice(
+    fn new_from_slice(
         offset: u64,
         len_limit: u64,
         decoded: T,
@@ -393,7 +393,7 @@ impl<T> MummyObj<T> {
         })
     }
 
-    pub unsafe fn slice<U: MummyItem + 'static>(
+    pub fn slice<U: MummyItem + 'static>(
         s: &Obj<T>,
         offset: u64,
         length: u64,
@@ -436,11 +436,9 @@ impl<T> MummyItem for ObjPtr<T> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        unsafe {
-            Ok(Self::new_from_addr(u64::from_le_bytes(
-                (**raw).try_into().unwrap(),
-            )))
-        }
+        Ok(Self::new_from_addr(u64::from_le_bytes(
+            (**raw).try_into().unwrap(),
+        )))
     }
 }
 
