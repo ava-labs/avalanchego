@@ -138,8 +138,8 @@ func (s *EthereumAPI) Syncing() (interface{}, error) {
 	return false, nil
 }
 
-func (s *BlockChainAPI) GetChainConfig(ctx context.Context) *params.ChainConfigWithUpgradesMarshalled {
-	return s.b.ChainConfig().ToWithUpgradesMarshalled()
+func (s *BlockChainAPI) GetChainConfig(ctx context.Context) *params.ChainConfigWithUpgradesJSON {
+	return s.b.ChainConfig().ToWithUpgradesJSON()
 }
 
 // TxPoolAPI offers and API for the transaction pool. It only operates on data that is non confidential.

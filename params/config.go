@@ -133,6 +133,24 @@ var (
 	}
 )
 
+// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
+// - Timestamps that enable avalanche network upgrades,
+// - Enabling or disabling precompiles as network upgrades.
+type UpgradeConfig struct {
+	// Config for blocks/timestamps that enable network upgrades.
+	// Note: if NetworkUpgrades is specified in the JSON all previously activated
+	// forks must be present or upgradeBytes will be rejected.
+	NetworkUpgrades *NetworkUpgrades `json:"networkUpgrades,omitempty"`
+
+	// Config for enabling and disabling precompiles as network upgrades.
+	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
+}
+
+// AvalancheContext provides Avalanche specific context directly into the EVM.
+type AvalancheContext struct {
+	SnowCtx *snow.Context
+}
+
 // ChainConfig is the core config which determines the blockchain settings.
 //
 // ChainConfig is stored in the database on a per block basis. This means
@@ -211,71 +229,6 @@ func (c ChainConfig) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(raw)
-}
-
-type ChainConfigWithUpgradesMarshalled struct {
-	*ChainConfig
-	UpgradeConfig UpgradeConfig `json:"upgrades,omitempty"`
-}
-
-// MarshalJSON implements json.Marshaler. This is a workaround for the fact that
-// the embedded ChainConfig struct has a MarshalJSON method, which prevents
-// the default JSON marshalling from working for UpgradeConfig.
-// TODO: consider removing this method by allowing external tag for the embedded
-// ChainConfig struct.
-func (s *ChainConfigWithUpgradesMarshalled) MarshalJSON() ([]byte, error) {
-	// embed the ChainConfig struct into the response
-	chainConfigJSON, err := json.Marshal(s.ChainConfig)
-	if err != nil {
-		return nil, err
-	}
-	if len(chainConfigJSON) > maxJSONLen {
-		return nil, errors.New("value too large")
-	}
-
-	type upgrades struct {
-		UpgradeConfig UpgradeConfig `json:"upgrades"`
-	}
-
-	upgradeJSON, err := json.Marshal(upgrades{s.UpgradeConfig})
-	if err != nil {
-		return nil, err
-	}
-	if len(upgradeJSON) > maxJSONLen {
-		return nil, errors.New("value too large")
-	}
-
-	// merge the two JSON objects
-	mergedJSON := make([]byte, 0, len(chainConfigJSON)+len(upgradeJSON)+1)
-	mergedJSON = append(mergedJSON, chainConfigJSON[:len(chainConfigJSON)-1]...)
-	mergedJSON = append(mergedJSON, ',')
-	mergedJSON = append(mergedJSON, upgradeJSON[1:]...)
-	return mergedJSON, nil
-}
-
-func (c *ChainConfig) ToWithUpgradesMarshalled() *ChainConfigWithUpgradesMarshalled {
-	return &ChainConfigWithUpgradesMarshalled{
-		ChainConfig:   c,
-		UpgradeConfig: c.UpgradeConfig,
-	}
-}
-
-// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
-// - Timestamps that enable avalanche network upgrades,
-// - Enabling or disabling precompiles as network upgrades.
-type UpgradeConfig struct {
-	// Config for blocks/timestamps that enable network upgrades.
-	// Note: if NetworkUpgrades is specified in the JSON all previously activated
-	// forks must be present or upgradeBytes will be rejected.
-	NetworkUpgrades *NetworkUpgrades `json:"networkUpgrades,omitempty"`
-
-	// Config for enabling and disabling precompiles as network upgrades.
-	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
-}
-
-// AvalancheContext provides Avalanche specific context directly into the EVM.
-type AvalancheContext struct {
-	SnowCtx *snow.Context
 }
 
 // String implements the fmt.Stringer interface.
@@ -663,4 +616,73 @@ func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
 // Implements precompile.ChainConfig interface.
 func (c *ChainConfig) AllowedFeeRecipients() bool {
 	return c.AllowFeeRecipients
+}
+
+type ChainConfigWithUpgradesJSON struct {
+	ChainConfig
+	UpgradeConfig UpgradeConfig `json:"upgrades,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler. This is a workaround for the fact that
+// the embedded ChainConfig struct has a MarshalJSON method, which prevents
+// the default JSON marshalling from working for UpgradeConfig.
+// TODO: consider removing this method by allowing external tag for the embedded
+// ChainConfig struct.
+func (cu ChainConfigWithUpgradesJSON) MarshalJSON() ([]byte, error) {
+	// embed the ChainConfig struct into the response
+	chainConfigJSON, err := json.Marshal(cu.ChainConfig)
+	if err != nil {
+		return nil, err
+	}
+	if len(chainConfigJSON) > maxJSONLen {
+		return nil, errors.New("value too large")
+	}
+
+	type upgrades struct {
+		UpgradeConfig UpgradeConfig `json:"upgrades"`
+	}
+
+	upgradeJSON, err := json.Marshal(upgrades{cu.UpgradeConfig})
+	if err != nil {
+		return nil, err
+	}
+	if len(upgradeJSON) > maxJSONLen {
+		return nil, errors.New("value too large")
+	}
+
+	// merge the two JSON objects
+	mergedJSON := make([]byte, 0, len(chainConfigJSON)+len(upgradeJSON)+1)
+	mergedJSON = append(mergedJSON, chainConfigJSON[:len(chainConfigJSON)-1]...)
+	mergedJSON = append(mergedJSON, ',')
+	mergedJSON = append(mergedJSON, upgradeJSON[1:]...)
+	return mergedJSON, nil
+}
+
+func (cu *ChainConfigWithUpgradesJSON) UnmarshalJSON(input []byte) error {
+	var cc ChainConfig
+	if err := json.Unmarshal(input, &cc); err != nil {
+		return err
+	}
+
+	type upgrades struct {
+		UpgradeConfig UpgradeConfig `json:"upgrades"`
+	}
+
+	var u upgrades
+	if err := json.Unmarshal(input, &u); err != nil {
+		return err
+	}
+	cu.ChainConfig = cc
+	cu.UpgradeConfig = u.UpgradeConfig
+	return nil
+}
+
+// ToWithUpgradesJSON converts the ChainConfig to ChainConfigWithUpgradesJSON with upgrades explicitly displayed.
+// ChainConfig does not include upgrades in its JSON output.
+// This is a workaround for showing upgrades in the JSON output.
+func (c *ChainConfig) ToWithUpgradesJSON() *ChainConfigWithUpgradesJSON {
+	return &ChainConfigWithUpgradesJSON{
+		ChainConfig:   *c,
+		UpgradeConfig: c.UpgradeConfig,
+	}
 }
