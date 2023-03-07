@@ -755,7 +755,7 @@ func runRandDBTest(require *require.Assertions, db *Database, r *rand.Rand, rt r
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 1000)
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 5000)
 			require.NoError(err)
 			err = rangeProof.Verify(
 				context.Background(),

@@ -35,10 +35,10 @@ var (
 	ErrOddLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
 	)
-	ErrGetPathToFailure = errors.New("GetPathTo failed to return the closest node")
-	ErrStartAfterEnd    = errors.New("start key > end key")
-	ErrViewIsNotAChild  = errors.New("passed in view is required to be a child of the current view")
-	ErrMinProofIsLargerThanMaxSize  = errors.New("no proof is constructable because the minimum proof is larger than the passed maximum proof size")
+	ErrGetPathToFailure            = errors.New("GetPathTo failed to return the closest node")
+	ErrStartAfterEnd               = errors.New("start key > end key")
+	ErrViewIsNotAChild             = errors.New("passed in view is required to be a child of the current view")
+	ErrMinProofIsLargerThanMaxSize = errors.New("no proof is constructable because the minimum proof is larger than the passed maximum proof size")
 
 	_ TrieView = &trieView{}
 
@@ -403,7 +403,8 @@ func (t *trieView) getRangeProof(
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
-	remainingSize := maxSize
+
+	totalSize := uint(0)
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -414,15 +415,16 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
+	greatestReturnedKey := end
 	startProofSize := uint(0)
-	
-	if len(result.StartProof) > 0 {
+
+	if len(start) > 0 {
 		startProof, err := t.getProof(ctx, start)
 		if err != nil {
 			return nil, err
 		}
 		result.StartProof = startProof.Path
-		
+
 		for _, proofNode := range startProof.Path {
 			startProofSize += proofNode.size()
 		}
@@ -431,26 +433,70 @@ func (t *trieView) getRangeProof(
 	if startProofSize > maxSize {
 		return nil, ErrMinProofIsLargerThanMaxSize
 	}
-	maxSize -= startProofSize
+	totalSize += startProofSize
 
-	result.KeyValues, err = t.getKeyValues(ctx, start, end, maxSize, set.Set[string]{})
+	var keyValeusSize uint
+	result.KeyValues, keyValeusSize, err = t.getKeyValues(ctx, start, end, maxSize-startProofSize, set.Set[string]{})
 	if err != nil {
 		return nil, err
 	}
+
+	totalSize += keyValeusSize
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
 	// The end proof we provide should be for the last key-value pair in the proof, not for
 	// the last key-value pair requested, which may not be in this proof.
 	if len(result.KeyValues) > 0 {
-		end = result.KeyValues[len(result.KeyValues)-1].Key
+		greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
 	}
 
-	if len(end) > 0 {
-		endProof, err := t.getProof(ctx, end)
+	getLargestKeyProof := func() (*Proof, uint, error) {
+		proofSize := uint(0)
+		proof, err := t.getProof(ctx, greatestReturnedKey)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, proofNode := range proof.Path {
+			proofSize += proofNode.size()
+		}
+		return proof, proofSize, nil
+	}
+	if len(greatestReturnedKey) > 0 {
+		endProof, size, err := getLargestKeyProof()
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = endProof.Path
+
+		// shrink the number of key/values returned until we are under the size limit
+		for totalSize + size > maxSize {
+			if len(result.KeyValues) == 0 {
+				// no more keys to remove, so we cannot construct the proof
+				return nil, ErrMinProofIsLargerThanMaxSize
+			}
+
+			//remove the last key/value
+			lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
+			totalSize -= uint(len(lastKeyValue.Key) + len(lastKeyValue.Value))
+			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
+
+			// update the greatestReturnedKey
+			if len(result.KeyValues) > 0 {
+				greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
+			} else {
+				// there are no more keys
+				// the last key is now also the first key so the proof will be the same
+				result.EndProof = result.StartProof
+				break;
+			}
+
+			// grab proof for new greatestReturnedKey
+			endProof, size, err = getLargestKeyProof()
+			if err != nil {
+				return nil, err
+			}
+			result.EndProof = endProof.Path
+		}
 	}
 
 	// strip out any common nodes to reduce proof size
@@ -709,16 +755,16 @@ func (t *trieView) getKeyValues(
 	end []byte,
 	maxSize uint,
 	keysToIgnore set.Set[string],
-) ([]KeyValue, error) {
+) ([]KeyValue, uint, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieView.getKeyValues")
 	defer span.End()
 
 	if maxSize <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
+		return nil, 0, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	if t.isInvalid() {
-		return nil, ErrInvalid
+		return nil, 0, ErrInvalid
 	}
 
 	// collect all values that have changed or been deleted
@@ -738,10 +784,9 @@ func (t *trieView) getKeyValues(
 	slices.SortFunc(changes, func(a, b KeyValue) bool {
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
-
-	baseKeyValues, err := t.getParentTrie().getKeyValues(ctx, start, end, maxSize, keysToIgnore)
+	baseKeyValues, _, err := t.getParentTrie().getKeyValues(ctx, start, end, maxSize, keysToIgnore)
 	if err != nil {
-		return nil, err
+		return nil, 0,err
 	}
 
 	var (
@@ -753,7 +798,7 @@ func (t *trieView) getKeyValues(
 		baseKeyValuesIndex = 0
 		// The index of the next key/value pair to add from [changes].
 		changesIndex    = 0
-		remainingLength = maxSize
+		totalSize = uint(0)
 		hasUpperBound   = len(end) > 0
 		result          = make([]KeyValue, 0, len(baseKeyValues))
 	)
@@ -762,7 +807,7 @@ func (t *trieView) getKeyValues(
 	// * a key that is lexicographically larger than the end key is hit
 	// * the maxLength is hit
 	// * no more values are available to add
-	for remainingLength > 0 {
+	for totalSize < maxSize {
 		// the baseKeyValues iterator is finished when we have run out of keys or hit a key greater than the end key
 		baseKeyValuesFinished = baseKeyValuesFinished ||
 			(baseKeyValuesIndex >= len(baseKeyValues) || (hasUpperBound && bytes.Compare(baseKeyValues[baseKeyValuesIndex].Key, end) == 1))
@@ -773,9 +818,8 @@ func (t *trieView) getKeyValues(
 
 		// if both the base state and changes are finished, return the result of the merge
 		if baseKeyValuesFinished && changesFinished {
-			return result, nil
+			return result, totalSize, nil
 		}
-
 
 		// both still have key/values available, so add the smallest key
 		if !changesFinished && !baseKeyValuesFinished {
@@ -787,26 +831,26 @@ func (t *trieView) getKeyValues(
 
 			switch bytes.Compare(currentChangeState.Key, currentKeyValues.Key) {
 			case -1:
-				if currentChangeSize>uint(remainingLength) {
-					return result, nil
+				if totalSize+currentChangeSize > maxSize {
+					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
 				changesIndex++
 			case 0:
 				// the keys are the same, so override the base value with the changed value
-				if currentChangeSize>uint(remainingLength) {
-					return result, nil
+				if totalSize+currentChangeSize > maxSize  {
+					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
-				remainingLength -=currentChangeSize
+				totalSize += currentChangeSize
 				changesIndex++
 				baseKeyValuesIndex++
 			case 1:
-				if currentKeyValuesSize>uint(remainingLength) {
-					return result, nil
+				if totalSize+currentKeyValuesSize > maxSize {
+					return result, totalSize, nil
 				}
 				result = append(result, currentKeyValues)
-				remainingLength -=currentKeyValuesSize
+				totalSize += currentKeyValuesSize
 				baseKeyValuesIndex++
 			}
 			continue
@@ -817,12 +861,12 @@ func (t *trieView) getKeyValues(
 		if !baseKeyValuesFinished {
 			currentBaseState := baseKeyValues[baseKeyValuesIndex]
 			currentSize := uint(len(currentBaseState.Key) + len(currentBaseState.Value))
-			if currentSize>uint(remainingLength) {
-				return result, nil
+			if totalSize + currentSize > maxSize {
+				return result, totalSize, nil
 			}
-			
+
 			result = append(result, currentBaseState)
-			remainingLength -= currentSize
+			totalSize += currentSize
 			baseKeyValuesIndex++
 			continue
 		}
@@ -831,15 +875,15 @@ func (t *trieView) getKeyValues(
 		// add the next changes value.
 		currentChangeState := changes[changesIndex]
 		currentSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
-		if currentSize>uint(remainingLength) {
-			return result, nil
+		if totalSize+ currentSize > maxSize {
+			return result, totalSize, nil
 		}
 		result = append(result, currentChangeState)
-		remainingLength -= currentSize
+		totalSize += currentSize
 		changesIndex++
 	}
 
-	return result, nil
+	return result, totalSize, nil
 }
 
 func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {

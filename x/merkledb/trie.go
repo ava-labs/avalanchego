@@ -57,7 +57,7 @@ type ReadOnlyTrie interface {
 		end []byte,
 		maxSize uint,
 		keysToIgnore set.Set[string],
-	) ([]KeyValue, error)
+	) ([]KeyValue, uint, error)
 }
 
 type Trie interface {

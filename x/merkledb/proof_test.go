@@ -224,7 +224,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte{2}, val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{5, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{5, 5}, 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -296,7 +296,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			require.NoError(t, err)
 			writeBasicBatch(t, db)
 
-			proof, err := db.GetRangeProof(context.Background(), []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetRangeProof(context.Background(), []byte{2}, []byte{3, 0}, 1000)
 			require.NoError(t, err)
 			require.NotNil(t, proof)
 
@@ -540,7 +540,7 @@ func Test_RangeProof(t *testing.T) {
 	require.NoError(err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{3, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{3, 5}, 1000)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.Len(proof.KeyValues, 3)
@@ -582,37 +582,28 @@ func Test_RangeProof_BadBounds(t *testing.T) {
 func Test_RangeProof_NilStart(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
-	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("value1"))
-	require.NoError(t, err)
-	err = batch.Put([]byte("key2"), []byte("value2"))
-	require.NoError(t, err)
-	err = batch.Put([]byte("key3"), []byte("value3"))
-	require.NoError(t, err)
-	err = batch.Put([]byte("key4"), []byte("value4"))
-	require.NoError(t, err)
-	err = batch.Write()
-	require.NoError(t, err)
+	writeBasicBatch(t, db)
 
-	val, err := db.Get([]byte("key1"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("value1"), val)
-
-	proof, err := db.GetRangeProof(context.Background(), nil, []byte("key35"), 20)
+	proof, err := db.GetRangeProof(context.Background(), nil, []byte{3,5}, 500)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	require.Len(t, proof.KeyValues, 2)
+	require.Len(t, proof.KeyValues, 4)
 
-	require.Equal(t, []byte("key1"), proof.KeyValues[0].Key)
-	require.Equal(t, []byte("key2"), proof.KeyValues[1].Key)
+	require.Equal(t, []byte{0}, proof.KeyValues[0].Key)
+	require.Equal(t, []byte{1}, proof.KeyValues[1].Key)
+	require.Equal(t, []byte{2}, proof.KeyValues[2].Key)
+	require.Equal(t, []byte{3}, proof.KeyValues[3].Key)
 
-	require.Equal(t, []byte("value1"), proof.KeyValues[0].Value)
-	require.Equal(t, []byte("value2"), proof.KeyValues[1].Value)
+	require.Equal(t, []byte{0}, proof.KeyValues[0].Value)
+	require.Equal(t, []byte{1}, proof.KeyValues[1].Value)
+	require.Equal(t, []byte{2}, proof.KeyValues[2].Value)
+	require.Equal(t, []byte{3}, proof.KeyValues[3].Value)
 
-	require.Equal(t, newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
-	require.Equal(t, SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
-	require.Equal(t, newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
+	require.Equal(t, []byte{}, proof.EndProof[0].KeyPath.Value)
+	require.Equal(t, []byte{0}, proof.EndProof[1].KeyPath.Value)
+	require.Equal(t, []byte{3}, proof.EndProof[2].KeyPath.Value)
+	
 
 	err = proof.Verify(
 		context.Background(),
@@ -629,23 +620,27 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	writeBasicBatch(t, db)
 	require.NoError(t, err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 5)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 500)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	require.Len(t, proof.KeyValues, 2)
+	require.Len(t, proof.KeyValues, 4)
 
 	require.Equal(t, []byte{1}, proof.KeyValues[0].Key)
 	require.Equal(t, []byte{2}, proof.KeyValues[1].Key)
+	require.Equal(t, []byte{3}, proof.KeyValues[2].Key)
+	require.Equal(t, []byte{4}, proof.KeyValues[3].Key)
 
 	require.Equal(t, []byte{1}, proof.KeyValues[0].Value)
 	require.Equal(t, []byte{2}, proof.KeyValues[1].Value)
+	require.Equal(t, []byte{3}, proof.KeyValues[2].Value)
+	require.Equal(t, []byte{4}, proof.KeyValues[3].Value)
 
 	require.Equal(t, []byte{1}, proof.StartProof[0].KeyPath.Value)
 
 	require.Equal(t, []byte{}, proof.EndProof[0].KeyPath.Value)
 	require.Equal(t, []byte{0}, proof.EndProof[1].KeyPath.Value)
-	require.Equal(t, []byte{2}, proof.EndProof[2].KeyPath.Value)
+	require.Equal(t, []byte{4}, proof.EndProof[2].KeyPath.Value)
 
 	err = proof.Verify(
 		context.Background(),
@@ -710,7 +705,7 @@ func Test_RangeProof_Marshal_Nil(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte{1}, val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key35"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key35"), 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 

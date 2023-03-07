@@ -979,21 +979,21 @@ func (db *Database) getKeyValues(
 	end []byte,
 	maxSize uint,
 	keysToIgnore set.Set[string],
-) ([]KeyValue, error) {
+) ([]KeyValue, uint, error) {
 	if maxSize <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
+		return nil, 0, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
-	remainingLength := maxSize
+	totalSize := uint(0)
 	result := make([]KeyValue, 0, maxSize)
 	// Keep adding key/value pairs until one of the following:
 	// * We hit a key that is lexicographically larger than the end key.
 	// * [maxSize] bytes worth of key/values are in the list
 	// * There are no more values to add.
-	for remainingLength > 0 && it.Next() {
+	for totalSize < maxSize && it.Next() {
 		key := it.Key()
 		if len(end) != 0 && bytes.Compare(it.Key(), end) > 0 {
 			break
@@ -1001,14 +1001,17 @@ func (db *Database) getKeyValues(
 		if keysToIgnore.Contains(string(key)) {
 			continue
 		}
+		currentSize := uint(len(key) + len(it.Value()))
+		if totalSize+currentSize > maxSize {
+			return result, totalSize, it.Error()
+		}
 		result = append(result, KeyValue{
 			Key:   key,
 			Value: it.Value(),
 		})
-		remainingLength-= uint(len(key) + len(it.Value()))
 	}
 
-	return result, it.Error()
+	return result, totalSize, it.Error()
 }
 
 // Returns a new view atop [db] with the changes in [ops] applied to it.
