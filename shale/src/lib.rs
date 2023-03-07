@@ -6,7 +6,6 @@ use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::rc::Rc;
 
-pub mod block;
 pub mod compact;
 pub mod util;
 
