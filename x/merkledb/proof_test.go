@@ -598,7 +598,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, []byte("key35"), 2)
+	proof, err := db.GetRangeProof(context.Background(), nil, []byte("key35"), 20)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -629,7 +629,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	writeBasicBatch(t, db)
 	require.NoError(t, err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 2)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 5)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -673,7 +673,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key2"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key2"), 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1000,7 +1000,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), []byte("key30"), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), []byte("key30"), 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1008,7 +1008,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 
 	// low maxLength
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 5)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1016,7 +1016,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 
 	// nil start/end
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 

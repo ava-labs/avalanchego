@@ -21,7 +21,7 @@ import (
 
 const (
 	defaultProofBytesLimit = 2 * uint(units.MiB)
-	maxTokenWaitTime        = 5 * time.Second
+	maxTokenWaitTime       = 5 * time.Second
 )
 
 var (
@@ -116,7 +116,7 @@ type StateSyncConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	MaxProofSizeKB        uint
+	MaxProofSizeBytes     uint
 }
 
 func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
@@ -278,7 +278,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			EndingRoot:   rootID,
 			Start:        workItem.start,
 			End:          workItem.end,
-			Limit:        uint16(m.config.MaxProofSizeKB),
+			Limit:        m.config.MaxProofSizeBytes,
 		},
 		m.config.SyncDB,
 	)
@@ -337,7 +337,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 			Root:  rootID,
 			Start: workItem.start,
 			End:   workItem.end,
-			Limit: uint16(m.config.MaxProofSizeKB),
+			Limit: m.config.MaxProofSizeBytes,
 		},
 	)
 	if err != nil {

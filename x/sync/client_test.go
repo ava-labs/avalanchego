@@ -109,9 +109,8 @@ func sendRequest(
 
 func TestGetRangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
-
-	smallTrieKeyCount := defaultProofBytesLimit
-	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
+	
+	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, 1000, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -127,7 +126,7 @@ func TestGetRangeProof(t *testing.T) {
 		request             *RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
-		expectedResponseLen int
+		expectedResponseLen uint
 	}{
 		"full response for small (single request) trie": {
 			db: smallTrieDB,
@@ -249,7 +248,7 @@ func TestGetRangeProof(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.Len(proof.KeyValues, test.expectedResponseLen)
+			require.Len(proof.KeyValues, int(test.expectedResponseLen))
 		})
 	}
 }

@@ -160,7 +160,7 @@ func Test_History_Large(t *testing.T) {
 			require.NoError(err)
 			roots = append(roots, root)
 		}
-		proof, err := db.GetRangeProofAtRoot(context.Background(), roots[0], nil, nil, 10)
+		proof, err := db.GetRangeProofAtRoot(context.Background(), roots[0], nil, nil, 200)
 		require.NoError(err)
 		require.NotNil(proof)
 
@@ -361,7 +361,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	endRoot := db.getMerkleRoot()
 
 	// changes should still be collectable even though the history has had to loop due to hitting max size
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 10)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 100)
 	require.NoError(err)
 	require.Contains(changes.values, newPath([]byte("key1")))
 	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.value)
@@ -578,7 +578,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	err = batch.Write()
 	require.NoError(err)
 
-	origProof, err := db.GetRangeProof(context.Background(), []byte("k"), []byte("key3"), 10)
+	origProof, err := db.GetRangeProof(context.Background(), []byte("k"), []byte("key3"), 100)
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
@@ -590,7 +590,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	require.NoError(err)
 	err = batch.Write()
 	require.NoError(err)
-	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
+	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 100)
 	require.NoError(err)
 	require.NotNil(newProof)
 	err = newProof.Verify(context.Background(), []byte("k"), []byte("key3"), origRootID)
@@ -699,7 +699,7 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 8)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 130)
 	require.NoError(err)
 	require.Equal(8, len(changes.values))
 }

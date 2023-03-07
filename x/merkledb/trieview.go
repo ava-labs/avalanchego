@@ -38,6 +38,7 @@ var (
 	ErrGetPathToFailure = errors.New("GetPathTo failed to return the closest node")
 	ErrStartAfterEnd    = errors.New("start key > end key")
 	ErrViewIsNotAChild  = errors.New("passed in view is required to be a child of the current view")
+	ErrMinProofIsLargerThanMaxSize  = errors.New("no proof is constructable because the minimum proof is larger than the passed maximum proof size")
 
 	_ TrieView = &trieView{}
 
@@ -402,6 +403,7 @@ func (t *trieView) getRangeProof(
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
+	remainingSize := maxSize
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -411,6 +413,25 @@ func (t *trieView) getRangeProof(
 		result RangeProof
 		err    error
 	)
+
+	startProofSize := uint(0)
+	
+	if len(result.StartProof) > 0 {
+		startProof, err := t.getProof(ctx, start)
+		if err != nil {
+			return nil, err
+		}
+		result.StartProof = startProof.Path
+		
+		for _, proofNode := range startProof.Path {
+			startProofSize += proofNode.size()
+		}
+	}
+
+	if startProofSize > maxSize {
+		return nil, ErrMinProofIsLargerThanMaxSize
+	}
+	maxSize -= startProofSize
 
 	result.KeyValues, err = t.getKeyValues(ctx, start, end, maxSize, set.Set[string]{})
 	if err != nil {
@@ -432,21 +453,13 @@ func (t *trieView) getRangeProof(
 		result.EndProof = endProof.Path
 	}
 
-	if len(start) > 0 {
-		startProof, err := t.getProof(ctx, start)
-		if err != nil {
-			return nil, err
-		}
-		result.StartProof = startProof.Path
-
-		// strip out any common nodes to reduce proof size
-		i := 0
-		for ; i < len(result.StartProof) &&
-			i < len(result.EndProof) &&
-			result.StartProof[i].KeyPath.Equal(result.EndProof[i].KeyPath); i++ {
-		}
-		result.StartProof = result.StartProof[i:]
+	// strip out any common nodes to reduce proof size
+	i := 0
+	for ; i < len(result.StartProof) &&
+		i < len(result.EndProof) &&
+		result.StartProof[i].KeyPath.Equal(result.EndProof[i].KeyPath); i++ {
 	}
+	result.StartProof = result.StartProof[i:]
 
 	if len(result.StartProof) == 0 && len(result.EndProof) == 0 && len(result.KeyValues) == 0 {
 		// If the range is empty, return the root proof.

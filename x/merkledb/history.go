@@ -135,6 +135,8 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
 	combinedChanges := newChangeSummary(int(maxSize/minKeyValueLen))
 
+	currentTotal := uint(0)
+
 	// For each change after [lastStartRootChange] up to and including
 	// [lastEndRootChange], record the change in [combinedChanges].
 	th.history.AscendGreaterOrEqual(
@@ -153,6 +155,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
 					if existing, ok := combinedChanges.values[key]; ok {
+						currentTotal  -= uint(len(existing.after.value) + len(key))
 						existing.after = valueChange.after
 					} else {
 						combinedChanges.values[key] = &change[Maybe[[]byte]]{
@@ -160,13 +163,15 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 							after:  valueChange.after,
 						}
 					}
+					currentTotal += uint(len(key) + len(valueChange.after.value))
 					sortedKeys.ReplaceOrInsert(key)
 				}
 			}
 
 			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for sortedKeys.Len() > maxLength {
+			for currentTotal > maxSize {
 				if greatestKey, found := sortedKeys.DeleteMax(); found {
+					currentTotal  -= uint(len(greatestKey) + len(combinedChanges.values[greatestKey].after.value))
 					delete(combinedChanges.values, greatestKey)
 				}
 			}

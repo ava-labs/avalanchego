@@ -240,7 +240,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	err = batch.Write()
 	require.NoError(t, err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 1000)
 	require.NoError(t, err)
 
 	freshDB, err := getBasicDB()
@@ -273,7 +273,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	err = batch.Write()
 	require.NoError(t, err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 1000)
 	require.NoError(t, err)
 
 	freshDB, err := getBasicDB()
@@ -755,7 +755,7 @@ func runRandDBTest(require *require.Assertions, db *Database, r *rand.Rand, rt r
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 100)
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 1000)
 			require.NoError(err)
 			err = rangeProof.Verify(
 				context.Background(),
