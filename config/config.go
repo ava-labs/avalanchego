@@ -82,7 +82,7 @@ var (
 	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
-	errZstdNotSupported              = errors.New("zstd compression not yet supported")
+	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
