@@ -435,7 +435,7 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
-	result.KeyValues, err = t.getKeyValues(ctx, start, end, maxLength, set.Set[string]{}, false)
+	result.KeyValues, err = t.getKeyValues(start, end, maxLength, set.Set[string]{}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	case trieToCommit == nil:
 		// no changes to apply
 		return nil
-	case trieToCommit.parentTrie != t:
+	case trieToCommit.getParentTrie() != t:
 		// trieToCommit needs to be a child of t, otherwise the changes merge would not work
 		return ErrViewIsNotAChild
 	case trieToCommit.isInvalid():
@@ -699,16 +699,12 @@ func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
 // the lock param controls whether or not this function needs to lock
 // if false, then [t.lock], either read or write, needs to be held
 func (t *trieView) getKeyValues(
-	ctx context.Context,
 	start []byte,
 	end []byte,
 	maxLength int,
 	keysToIgnore set.Set[string],
 	lock bool,
 ) ([]KeyValue, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieView.getKeyValues")
-	defer span.End()
-
 	if lock {
 		t.lock.RLock()
 		defer t.lock.RUnlock()
@@ -740,7 +736,7 @@ func (t *trieView) getKeyValues(
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
 
-	baseKeyValues, err := t.getParentTrie().getKeyValues(ctx, start, end, maxLength, keysToIgnore, true)
+	baseKeyValues, err := t.getParentTrie().getKeyValues(start, end, maxLength, keysToIgnore, true)
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +821,7 @@ func (t *trieView) getKeyValues(
 	return result, nil
 }
 
-func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -833,22 +829,22 @@ func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []er
 	errors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], errors[i] = t.getValue(ctx, newPath(key))
+		results[i], errors[i] = t.getValue(newPath(key))
 	}
 	return results, errors
 }
 
 // Returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	return t.getValue(ctx, newPath(key))
+	return t.getValue(newPath(key))
 }
 
 // Assumes [t.lock] read lock is held
-func (t *trieView) getValue(ctx context.Context, key path) ([]byte, error) {
+func (t *trieView) getValue(key path) ([]byte, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -863,7 +859,7 @@ func (t *trieView) getValue(ctx context.Context, key path) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(ctx, key)
+	value, err := t.getParentTrie().getValue(key)
 	if err != nil {
 		return nil, err
 	}
@@ -1266,7 +1262,7 @@ func (t *trieView) recordValueChange(ctx context.Context, key path, value Maybe[
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(ctx, key)
+	before, err := t.getParentTrie().getValue(key)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)

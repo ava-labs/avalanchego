@@ -304,7 +304,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return db.GetValue(context.Background(), key)
 }
 
-func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+func (db *Database) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -312,22 +312,22 @@ func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	errors := make([]error, len(keys))
 	for i, key := range keys {
 		path := newPath(key)
-		values[i], errors[i] = db.getValue(ctx, path)
+		values[i], errors[i] = db.getValue(path)
 	}
 	return values, errors
 }
 
 // Get the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+func (db *Database) GetValue(_ context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValue(ctx, newPath(key))
+	return db.getValue(newPath(key))
 }
 
 // Assumes [db.lock] is read locked.
-func (db *Database) getValue(_ context.Context, key path) ([]byte, error) {
+func (db *Database) getValue(key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -342,7 +342,7 @@ func (db *Database) getValue(_ context.Context, key path) ([]byte, error) {
 }
 
 // Returns a view of the trie as it was when the merkle root was [rootID].
-func (db *Database) GetHistoricalView(rootID ids.ID) (ReadOnlyTrie, error) {
+func (db *Database) GetHistoricalView(_ context.Context, rootID ids.ID) (ReadOnlyTrie, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -577,7 +577,7 @@ func (db *Database) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(context.Background(), newPath(k))
+	_, err := db.getValue(newPath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -809,7 +809,6 @@ func (*Database) CommitToDB(_ context.Context) error {
 }
 
 // Applies unwritten changes into the db.
-// Assumes [db.lock] is held.
 func (db *Database) commitToDB(ctx context.Context, trieToCommit *trieView) error {
 	return db.commitChanges(ctx, trieToCommit)
 }
@@ -965,7 +964,6 @@ func (db *Database) getNode(key path) (*node, error) {
 
 // Assumes [db.lock] is read locked.
 func (db *Database) getKeyValues(
-	_ context.Context,
 	start []byte,
 	end []byte,
 	maxLength int,
