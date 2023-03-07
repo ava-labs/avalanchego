@@ -598,14 +598,14 @@ func (db *Database) GetChangeProof(
 			changedKeys = changedKeys[:len(changedKeys)-1]
 
 			// update the greatestReturnedKey
-			if len(changedKeys) > 0 {
-				largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
-			} else {
+			if len(changedKeys) == 0 {
 				// there are no more keys
 				// the last key is now also the first key so the proof will be the same
 				result.EndProof = result.StartProof
 				break
-			}
+			} 
+
+			largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
 		}
 		result.EndProof = proof.Path
 	}

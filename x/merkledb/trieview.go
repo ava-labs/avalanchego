@@ -494,14 +494,14 @@ func (t *trieView) getRangeProof(
 			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 
 			// update the greatestReturnedKey
-			if len(result.KeyValues) > 0 {
-				greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
-			} else {
+			if len(result.KeyValues) == 0 {
 				// there are no more keys
 				// the last key is now also the first key so the proof will be the same
 				result.EndProof = result.StartProof
 				break
 			}
+
+			greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
 
 			// grab proof for new greatestReturnedKey
 			endProof, size, err = getLargestKeyProof()
