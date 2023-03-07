@@ -248,31 +248,29 @@ func (mb *msgBuilder) marshal(
 	return compressedMsgBytes, bytesSaved, compressTook, nil
 }
 
-func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, compression.Type, int, time.Duration, error) {
+func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 	m := new(p2p.Message)
 	if err := proto.Unmarshal(b, m); err != nil {
-		return nil, compression.TypeNone, 0, 0, err
+		return nil, 0, err
 	}
 
 	// Figure out what compression type, if any, was used to compress the message.
-	gzipCompressed := m.GetCompressedGzip()
-	zstdCompressed := m.GetCompressedZstd()
-	if len(gzipCompressed) == 0 && len(zstdCompressed) == 0 {
-		// The message wasn't compressed
-		return m, compression.TypeNone, 0, 0, nil
-	}
-	if len(gzipCompressed) > 0 && len(zstdCompressed) > 0 {
-		return nil, compression.TypeNone, 0, 0, errMultipleCompressionTypes
-	}
-
 	var (
 		compressionType compression.Type
 		compressor      compression.Compressor
+		gzipCompressed  = m.GetCompressedGzip()
+		zstdCompressed  = m.GetCompressedZstd()
 	)
-	if len(gzipCompressed) > 0 {
+	switch {
+	case len(gzipCompressed) == 0 && len(zstdCompressed) == 0:
+		// The message wasn't compressed
+		return m, 0, nil
+	case len(gzipCompressed) > 0 && len(zstdCompressed) > 0:
+		return nil, 0, errMultipleCompressionTypes
+	case len(gzipCompressed) > 0:
 		compressionType = compression.TypeGzip
 		compressor = mb.gzipCompressor
-	} else {
+	case len(zstdCompressed) > 0:
 		compressionType = compression.TypeZstd
 		compressor = mb.zstdCompressor
 	}
@@ -281,16 +279,28 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, compression.Type, int, 
 
 	decompressed, err := compressor.Decompress(gzipCompressed)
 	if err != nil {
-		return nil, compression.TypeGzip, 0, 0, err
+		return nil, 0, err
 	}
 	bytesSavedCompression := len(decompressed) - len(gzipCompressed)
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
-		return nil, compression.TypeNone, 0, 0, err
+		return nil, 0, err
 	}
 	decompressTook := time.Since(startTime)
 
-	return m, compressionType, bytesSavedCompression, decompressTook, nil
+	// Record decompression time metric
+	op, err := ToOp(m)
+	if err != nil {
+		return nil, 0, err
+	}
+	switch compressionType {
+	case compression.TypeGzip:
+		mb.gzipDecompressTimeMetrics[op].Observe(float64(decompressTook))
+	case compression.TypeZstd:
+		mb.zstdDecompressTimeMetrics[op].Observe(float64(decompressTook))
+	}
+
+	return m, bytesSavedCompression, nil
 }
 
 func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*outboundMessage, error) {
@@ -324,7 +334,7 @@ func (mb *msgBuilder) parseInbound(
 	nodeID ids.NodeID,
 	onFinishedHandling func(),
 ) (*inboundMessage, error) {
-	m, compressionType, bytesSavedCompression, decompressTook, err := mb.unmarshal(bytes)
+	m, bytesSavedCompression, err := mb.unmarshal(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -337,13 +347,6 @@ func (mb *msgBuilder) parseInbound(
 	msg, err := Unwrap(m)
 	if err != nil {
 		return nil, err
-	}
-
-	switch compressionType {
-	case compression.TypeGzip:
-		mb.gzipDecompressTimeMetrics[op].Observe(float64(decompressTook))
-	case compression.TypeZstd:
-		mb.zstdDecompressTimeMetrics[op].Observe(float64(decompressTook))
 	}
 
 	expiration := mockable.MaxTime
