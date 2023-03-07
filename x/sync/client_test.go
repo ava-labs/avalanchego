@@ -257,7 +257,7 @@ func TestRetries(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 	require := require.New(t)
 
-	keyCount := 1000
+	keyCount := 100
 	db, _, err := generateTrieWithMinKeyLen(t, r, keyCount, 1)
 	require.NoError(err)
 	root, err := db.GetMerkleRoot(context.Background())
@@ -266,7 +266,7 @@ func TestRetries(t *testing.T) {
 	maxRequests := 4
 	request := &RangeProofRequest{
 		Root:  root,
-		Limit: uint32(20 * keyCount),
+		Limit: uint32(100 * keyCount),
 	}
 
 	responseCount := 0

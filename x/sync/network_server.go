@@ -17,13 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 // Maximum number of key-value pairs to return in a proof.
 // This overrides any other Limit specified in a RangeProofRequest
 // or ChangeProofRequest if the given Limit is greater.
-const maxKeyValuesLimit = 1024
+const maxKeyValuesLimit = 2*uint32(units.MiB)
 
 var _ Handler = (*NetworkServer)(nil)
 
