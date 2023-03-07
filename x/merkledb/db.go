@@ -568,15 +568,15 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
-		for size + totalSize > maxSize {
+		for size+totalSize > maxSize {
 			if len(changedKeys) == 0 {
 				return nil, ErrMinProofIsLargerThanMaxSize
 			}
 
-			//remove the last key/value
+			// remove the last key/value
 			lastKey := changedKeys[len(changedKeys)-1]
 			serializedKey := lastKey.Serialize().Value
-			change := changes[lastKey] 
+			change := changes[lastKey]
 			if change.after.IsNothing() {
 				keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
 				if err != nil {
@@ -609,8 +609,6 @@ func (db *Database) GetChangeProof(
 		}
 		result.EndProof = proof.Path
 	}
-
-
 
 	// TODO: sync.pool these buffers
 	result.KeyValues = make([]KeyValue, 0, len(changedKeys))

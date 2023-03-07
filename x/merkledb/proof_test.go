@@ -584,7 +584,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.NoError(t, err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, []byte{3,5}, 500)
+	proof, err := db.GetRangeProof(context.Background(), nil, []byte{3, 5}, 500)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -603,7 +603,6 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal(t, []byte{}, proof.EndProof[0].KeyPath.Value)
 	require.Equal(t, []byte{0}, proof.EndProof[1].KeyPath.Value)
 	require.Equal(t, []byte{3}, proof.EndProof[2].KeyPath.Value)
-	
 
 	err = proof.Verify(
 		context.Background(),

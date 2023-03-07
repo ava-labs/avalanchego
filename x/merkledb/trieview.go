@@ -484,7 +484,7 @@ func (t *trieView) getRangeProof(
 				return nil, ErrMinProofIsLargerThanMaxSize
 			}
 
-			//remove the last key/value
+			// remove the last key/value
 			lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
 			kvSize, err := Codec.encodedKeyValueSize(Version, lastKeyValue)
 			if err != nil {

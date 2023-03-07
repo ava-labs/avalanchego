@@ -109,7 +109,7 @@ func sendRequest(
 
 func TestGetRangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
-	
+
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, 1000, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
@@ -266,7 +266,7 @@ func TestRetries(t *testing.T) {
 	maxRequests := 4
 	request := &RangeProofRequest{
 		Root:  root,
-		Limit: uint(20*keyCount),
+		Limit: uint(20 * keyCount),
 	}
 
 	responseCount := 0
