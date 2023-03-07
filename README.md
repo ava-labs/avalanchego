@@ -56,9 +56,6 @@ Linux VM must be used to run firewood. It is encouraged to enhance the project
 with I/O supports for other OSes, such as OSX (where `kqueue` needs to be used
 for async I/O) and Windows. Please contact us if you're interested in such contribution.
 
-Firewood is written in stable Rust, but relies on the Rust nightly toolchain
-for code linting/formatting.
-
 ## Run
 There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
