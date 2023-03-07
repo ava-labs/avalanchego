@@ -895,7 +895,7 @@ func (t *trieView) insert(ctx context.Context, key []byte, value []byte) error {
 
 	valCopy := slices.Clone(value)
 
-	if err := t.recordValueChange(ctx, newPath(key), Some(valCopy)); err != nil {
+	if err := t.recordValueChange(newPath(key), Some(valCopy)); err != nil {
 		return err
 	}
 
@@ -929,7 +929,7 @@ func (t *trieView) remove(ctx context.Context, key []byte) error {
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
 
-	if err := t.recordValueChange(ctx, newPath(key), Nothing[[]byte]()); err != nil {
+	if err := t.recordValueChange(newPath(key), Nothing[[]byte]()); err != nil {
 		return err
 	}
 
@@ -1247,7 +1247,7 @@ func (t *trieView) recordKeyChange(ctx context.Context, key path, after *node) e
 // Doesn't actually change the trie data structure.
 // That's deferred until we calculate node IDs.
 // Assumes [t.lock] is held.
-func (t *trieView) recordValueChange(ctx context.Context, key path, value Maybe[[]byte]) error {
+func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 	t.needsRecalculation = true
 
 	// record the value change so that it can be inserted
