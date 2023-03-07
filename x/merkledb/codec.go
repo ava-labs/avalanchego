@@ -75,9 +75,9 @@ type Encoder interface {
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
 
-	encodedProofNodeSize(version uint16, n ProofNode) (uint, error)
-	encodedKeyValueSize(version uint16, n KeyValue) (uint, error)
-	encodedByteSliceSize(version uint16, n []byte) (uint, error)
+	encodedProofNodeSize(version uint16, n ProofNode) (uint32, error)
+	encodedKeyValueSize(version uint16, n KeyValue) (uint32, error)
+	encodedByteSliceSize(version uint16, n []byte) (uint32, error)
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
 	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
 }
@@ -194,7 +194,7 @@ func (c *codecImpl) EncodeRangeProof(version uint16, proof *RangeProof) ([]byte,
 	return buf.Bytes(), nil
 }
 
-func (c *codecImpl) encodedKeyValueSize(version uint16, n KeyValue) (uint, error) {
+func (c *codecImpl) encodedKeyValueSize(version uint16, n KeyValue) (uint32, error) {
 	if version != codecVersion {
 		return 0, errUnknownVersion
 	}
@@ -202,10 +202,10 @@ func (c *codecImpl) encodedKeyValueSize(version uint16, n KeyValue) (uint, error
 	if err := c.encodeKeyValue(n, buf); err != nil {
 		return 0, err
 	}
-	return uint(buf.Len()), nil
+	return uint32(buf.Len()), nil
 }
 
-func (c *codecImpl) encodedByteSliceSize(version uint16, n []byte) (uint, error) {
+func (c *codecImpl) encodedByteSliceSize(version uint16, n []byte) (uint32, error) {
 	if version != codecVersion {
 		return 0, errUnknownVersion
 	}
@@ -213,10 +213,10 @@ func (c *codecImpl) encodedByteSliceSize(version uint16, n []byte) (uint, error)
 	if err := c.encodeByteSlice(buf, n); err != nil {
 		return 0, err
 	}
-	return uint(buf.Len()), nil
+	return uint32(buf.Len()), nil
 }
 
-func (c *codecImpl) encodedProofNodeSize(version uint16, n ProofNode) (uint, error) {
+func (c *codecImpl) encodedProofNodeSize(version uint16, n ProofNode) (uint32, error) {
 	if version != codecVersion {
 		return 0, errUnknownVersion
 	}
@@ -224,7 +224,7 @@ func (c *codecImpl) encodedProofNodeSize(version uint16, n ProofNode) (uint, err
 	if err := c.encodeProofNode(n, buf); err != nil {
 		return 0, err
 	}
-	return uint(buf.Len()), nil
+	return uint32(buf.Len()), nil
 }
 
 func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {

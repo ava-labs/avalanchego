@@ -126,7 +126,7 @@ func TestGetRangeProof(t *testing.T) {
 		request             *RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
-		expectedResponseLen uint
+		expectedResponseLen uint32
 	}{
 		"full response for small (single request) trie": {
 			db: smallTrieDB,
@@ -266,7 +266,7 @@ func TestRetries(t *testing.T) {
 	maxRequests := 4
 	request := &RangeProofRequest{
 		Root:  root,
-		Limit: uint(20 * keyCount),
+		Limit: uint32(20 * keyCount),
 	}
 
 	responseCount := 0

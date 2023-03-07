@@ -412,7 +412,7 @@ func (db *Database) GetRangeProof(
 	ctx context.Context,
 	start,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*RangeProof, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -427,7 +427,7 @@ func (db *Database) GetRangeProofAtRoot(
 	rootID ids.ID,
 	start,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*RangeProof, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -441,7 +441,7 @@ func (db *Database) getRangeProofAtRoot(
 	rootID ids.ID,
 	start,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*RangeProof, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
@@ -463,7 +463,7 @@ func (db *Database) GetChangeProof(
 	endRootID ids.ID,
 	start []byte,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*ChangeProof, error) {
 	if len(end) > 0 && bytes.Compare(start, end) == 1 {
 		return nil, ErrStartAfterEnd
@@ -503,7 +503,7 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-	totalSize := uint(0)
+	totalSize := uint32(0)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
@@ -547,8 +547,8 @@ func (db *Database) GetChangeProof(
 		largestKey = serializedKey
 	}
 
-	getLargestKeyProof := func() (*Proof, uint, error) {
-		proofSize := uint(0)
+	getLargestKeyProof := func() (*Proof, uint32, error) {
+		proofSize := uint32(0)
 		proof, err := historicalView.getProof(ctx, largestKey)
 		if err != nil {
 			return nil, 0, err
@@ -603,7 +603,7 @@ func (db *Database) GetChangeProof(
 				// the last key is now also the first key so the proof will be the same
 				result.EndProof = result.StartProof
 				break
-			} 
+			}
 
 			largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
 		}
@@ -1069,9 +1069,9 @@ func (db *Database) getKeyValues(
 	_ context.Context,
 	start []byte,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 	keysToIgnore set.Set[string],
-) ([]KeyValue, uint, error) {
+) ([]KeyValue, uint32, error) {
 	if maxSize <= 0 {
 		return nil, 0, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
@@ -1079,7 +1079,7 @@ func (db *Database) getKeyValues(
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
-	totalSize := uint(0)
+	totalSize := uint32(0)
 	result := make([]KeyValue, 0, maxSize)
 	// Keep adding key/value pairs until one of the following:
 	// * We hit a key that is lexicographically larger than the end key.
@@ -1093,14 +1093,18 @@ func (db *Database) getKeyValues(
 		if keysToIgnore.Contains(string(key)) {
 			continue
 		}
-		currentSize := uint(len(key) + len(it.Value()))
+		kv := KeyValue{
+			Key:   key,
+			Value: it.Value(),
+		}
+		currentSize, err := Codec.encodedKeyValueSize(Version, kv)
+			if err != nil {
+				return nil, 0, err
+			}
 		if totalSize+currentSize > maxSize {
 			return result, totalSize, it.Error()
 		}
-		result = append(result, KeyValue{
-			Key:   key,
-			Value: it.Value(),
-		})
+		result = append(result, kv)
 	}
 
 	return result, totalSize, it.Error()

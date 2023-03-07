@@ -373,7 +373,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 func (t *trieView) GetRangeProof(
 	ctx context.Context,
 	start, end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
@@ -391,7 +391,7 @@ func (t *trieView) GetRangeProof(
 func (t *trieView) getRangeProof(
 	ctx context.Context,
 	start, end []byte,
-	maxSize uint,
+	maxSize uint32,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getRangeProof")
 	defer span.End()
@@ -404,7 +404,7 @@ func (t *trieView) getRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
-	totalSize := uint(0)
+	totalSize := uint32(0)
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -416,7 +416,7 @@ func (t *trieView) getRangeProof(
 	)
 
 	greatestReturnedKey := end
-	startProofSize := uint(0)
+	startProofSize := uint32(0)
 
 	if len(start) > 0 {
 		startProof, err := t.getProof(ctx, start)
@@ -439,7 +439,7 @@ func (t *trieView) getRangeProof(
 	}
 	totalSize += startProofSize
 
-	var keyValeusSize uint
+	var keyValeusSize uint32
 
 	// estimate that the end proof will be of similar size to the start proof
 	result.KeyValues, keyValeusSize, err = t.getKeyValues(ctx, start, end, maxSize-2*startProofSize, set.Set[string]{})
@@ -456,8 +456,8 @@ func (t *trieView) getRangeProof(
 		greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
 	}
 
-	getLargestKeyProof := func() (*Proof, uint, error) {
-		proofSize := uint(0)
+	getLargestKeyProof := func() (*Proof, uint32, error) {
+		proofSize := uint32(0)
 		proof, err := t.getProof(ctx, greatestReturnedKey)
 		if err != nil {
 			return nil, 0, err
@@ -767,9 +767,9 @@ func (t *trieView) getKeyValues(
 	ctx context.Context,
 	start []byte,
 	end []byte,
-	maxSize uint,
+	maxSize uint32,
 	keysToIgnore set.Set[string],
-) ([]KeyValue, uint, error) {
+) ([]KeyValue, uint32, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieView.getKeyValues")
 	defer span.End()
 
@@ -812,7 +812,7 @@ func (t *trieView) getKeyValues(
 		baseKeyValuesIndex = 0
 		// The index of the next key/value pair to add from [changes].
 		changesIndex  = 0
-		totalSize     = uint(0)
+		totalSize     = uint32(0)
 		hasUpperBound = len(end) > 0
 		result        = make([]KeyValue, 0, len(baseKeyValues))
 	)

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultProofBytesLimit = 2 * uint(units.MiB)
+	defaultProofBytesLimit = 2 * uint32(units.MiB)
 	maxTokenWaitTime       = 5 * time.Second
 )
 
@@ -116,7 +116,7 @@ type StateSyncConfig struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	MaxProofSizeBytes     uint
+	MaxProofSizeBytes     uint32
 }
 
 func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
