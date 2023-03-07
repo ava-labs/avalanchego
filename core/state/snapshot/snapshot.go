@@ -379,11 +379,13 @@ func (t *Tree) verifyIntegrity(base *diskLayer, waitBuild bool) error {
 // Note: a blockHash is used instead of a state root so that the exact state
 // transition between the two states is well defined. This is intended to
 // prevent the following edge case
-//    A
-//   /  \
-//  B    C
-//       |
-//       D
+//
+//	  A
+//	 /  \
+//	B    C
+//	     |
+//	     D
+//
 // In this scenario, it's possible For (A, B) and (A, C, D) to be two
 // different paths to the resulting state. We use block hashes and parent
 // block hashes to ensure that the exact path through which we flatten

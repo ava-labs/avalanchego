@@ -64,11 +64,11 @@ func (u *PrecompileUpgrade) MarshalJSON() ([]byte, error) {
 }
 
 // verifyPrecompileUpgrades checks [c.PrecompileUpgrades] is well formed:
-// - [upgrades] must specify exactly one key per PrecompileUpgrade
-// - the specified blockTimestamps must monotonically increase
-// - the specified blockTimestamps must be compatible with those
-//   specified in the chainConfig by genesis.
-// - check a precompile is disabled before it is re-enabled
+//   - [upgrades] must specify exactly one key per PrecompileUpgrade
+//   - the specified blockTimestamps must monotonically increase
+//   - the specified blockTimestamps must be compatible with those
+//     specified in the chainConfig by genesis.
+//   - check a precompile is disabled before it is re-enabled
 func (c *ChainConfig) verifyPrecompileUpgrades() error {
 	// Store this struct to keep track of the last upgrade for each precompile key.
 	// Required for timestamp and disabled checks.

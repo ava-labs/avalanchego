@@ -105,7 +105,9 @@ func awaitWatcherEventsSubside(watcher *fsnotify.Watcher, subsideTimeout time.Du
 }
 
 func TestTrieCleanJournal(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -747,7 +749,9 @@ func TestCanonicalHashMarker(t *testing.T) {
 }
 
 func TestTransactionIndices(t *testing.T) {
-	t.Skip("FLAKY")
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	// Configure and generate a sample block chain
 	require := require.New(t)
 	var (

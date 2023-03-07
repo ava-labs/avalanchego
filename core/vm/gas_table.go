@@ -173,6 +173,7 @@ func gasSStore(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySi
 	return params.NetSstoreDirtyGas, nil
 }
 
+//nolint
 // 0. If *gasleft* is less than or equal to 2300, fail the current call.
 // 1. If current value equals new value (this is a no-op), SLOAD_GAS is deducted.
 // 2. If current value does not equal new value:

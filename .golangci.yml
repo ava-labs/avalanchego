@@ -12,7 +12,6 @@ run:
 linters:
   disable-all: true
   enable:
-    - deadcode
     - goconst
     - goimports
     - gosimple
@@ -20,7 +19,7 @@ linters:
     - ineffassign
     - misspell
     - unconvert
-    - varcheck
+    - unused
     - whitespace
 
 linters-settings:
@@ -29,30 +28,3 @@ linters-settings:
   goconst:
     min-len: 3 # minimum length of string constant
     min-occurrences: 6 # minimum number of occurrences
-
-issues:
-  exclude-rules:
-    - path: crypto/blake2b/
-      linters:
-        - deadcode
-    - path: crypto/bn256/cloudflare
-      linters:
-        - deadcode
-    - path: p2p/discv5/
-      linters:
-        - deadcode
-    - path: core/vm/instructions_test.go
-      linters:
-        - goconst
-    - path: cmd/faucet/
-      linters:
-        - deadcode
-    - path: core/types/gen_account_rlp.go
-      linters:
-        - goimports
-    - path: core/types/gen_header_rlp.go
-      linters:
-        - goimports
-    - path: core/types/gen_log_rlp.go
-      linters:
-        - goimports
