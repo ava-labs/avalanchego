@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -81,6 +82,7 @@ var (
 	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
+	errZstdNotSupported              = errors.New("zstd compression not yet supported")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
@@ -320,6 +322,12 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 		}
 	}
 
+	version110 := &version.Semantic{Major: 1, Minor: 10, Patch: 0}
+	if compressionType == compression.TypeZstd && version.Current.Compare(version110) < 0 {
+		// TODO change this to check for v1.10 upgrade time instead of version.
+		// TODO remove after all nodes are on v1.10.
+		return network.Config{}, errZstdNotSupported
+	}
 	config := network.Config{
 		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
