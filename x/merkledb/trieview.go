@@ -1359,15 +1359,12 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 		return nil, err
 	}
 
-	// copy the node so any alterations to it don't affect the parent trie
-	node := parentTrieNode.clone()
-
 	// only need to initialize the id if it's from the parent trie.
 	// nodes in the current view change list have already been initialized.
 	if id != ids.Empty {
-		node.id = id
+		parentTrieNode.id = id
 	}
-	return node, nil
+	return parentTrieNode, nil
 }
 
 // Get the parent trie of the view
