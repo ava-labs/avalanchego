@@ -71,9 +71,9 @@ type Database struct {
 	// Must be held when reading/writing fields.
 	lock sync.RWMutex
 
-	// Must be held when preparing work to be committed to the DB
+	// Must be held when preparing work to be committed to the DB.
 	// Used to prevent editing of the trie without restricting read access
-	// until the full set of changes is ready to be written
+	// until the full set of changes is ready to be written.
 	commitLock sync.Mutex
 
 	// versiondb that the other dbs are built on.
@@ -804,7 +804,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 // CommitToDB is a No Op for db since it is already in sync with itself
 // here to satify TrieView interface
-func (*Database) CommitToDB(_ context.Context) error {
+func (*Database) CommitToDB(context.Context) error {
 	return nil
 }
 
@@ -911,8 +911,10 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 	return keysNotInSet, it.Error()
 }
 
-// Returns the node with the given [key].
+// Returns a copy of the node with the given [key].
+// This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
+// Assumes [db.lock] isn't held.
 func (db *Database) getEditableNode(_ context.Context, key path) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -925,6 +927,7 @@ func (db *Database) getEditableNode(_ context.Context, key path) (*node, error) 
 }
 
 // Returns the node with the given [key].
+// Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
 func (db *Database) getNode(key path) (*node, error) {
@@ -962,7 +965,8 @@ func (db *Database) getNode(key path) (*node, error) {
 	return node, err
 }
 
-// Assumes [db.lock] is read locked.
+// If [lock], grabs [db.lock]'s read lock.
+// Otherwise assumes [db.lock] is already read locked.
 func (db *Database) getKeyValues(
 	start []byte,
 	end []byte,

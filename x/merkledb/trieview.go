@@ -69,12 +69,10 @@ type trieView struct {
 	//
 	// *Code Accessing Ancestor State*
 	//
-	// t.validityTrackingLock.Lock()
-	// if t.invalidated {
-	//     t.validityTrackingLock.Unlock()
+	// if t.isInvalid() {
 	//     return ErrInvalid
 	//  }
-	//  t.validityTrackingLock.Unlock()
+	// return [result]
 	//
 	// If the invalidated check passes, then we're guaranteed that no ancestor changes occurred
 	// during the code that accessed ancestor state and the result of that work is still valid
@@ -195,12 +193,8 @@ func newTrieViewWithChanges(
 		return nil, ErrNoValidRoot
 	}
 
-	var (
-		passedRootChange *change[*node]
-		ok               bool
-	)
-
-	if passedRootChange, ok = changes.nodes[RootPath]; !ok {
+	passedRootChange, ok := changes.nodes[RootPath]
+	if !ok {
 		return nil, ErrNoValidRoot
 	}
 
@@ -217,13 +211,12 @@ func newTrieViewWithChanges(
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
-	if t.isInvalid() {
+	switch {
+	case t.isInvalid():
 		return ErrInvalid
-	}
-	if !t.needsRecalculation {
+	case !t.needsRecalculation:
 		return nil
-	}
-	if t.committed {
+	case t.committed:
 		// Note that this should never happen. If a view is committed, it should
 		// never be edited, so [t.needsRecalculation] should always be false.
 		return ErrCommitted
@@ -435,7 +428,13 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
-	result.KeyValues, err = t.getKeyValues(start, end, maxLength, set.Set[string]{}, false)
+	result.KeyValues, err = t.getKeyValues(
+		start,
+		end,
+		maxLength,
+		set.Set[string]{},
+		false, /*lock*/
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -563,6 +562,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 // Commits the changes from [trieToCommit] to this view,
 // this view to its parent, and so on until committing to the db.
 // Assumes [t.db.commitlock] is held.
+// Assumes [trieToCommit.lock] is held if [trieToCommit] is not nil.
 func (t *trieView) commitToDB(ctx context.Context, trieToCommit *trieView) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -696,8 +696,8 @@ func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
 // Returns up to [maxLength] key/values from keys in closed range [start, end].
 // Acts similarly to the merge step of a merge sort to combine state from the view
 // with state from the parent trie.
-// the lock param controls whether or not this function needs to lock
-// if false, then [t.lock], either read or write, needs to be held
+// If [lock], grabs [t.lock]'s read lock.
+// Otherwise assumes [t.lock]'s read lock is held.
 func (t *trieView) getKeyValues(
 	start []byte,
 	end []byte,
@@ -736,7 +736,13 @@ func (t *trieView) getKeyValues(
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
 
-	baseKeyValues, err := t.getParentTrie().getKeyValues(start, end, maxLength, keysToIgnore, true)
+	baseKeyValues, err := t.getParentTrie().getKeyValues(
+		start,
+		end,
+		maxLength,
+		keysToIgnore,
+		true, /*lock*/
+	)
 	if err != nil {
 		return nil, err
 	}
