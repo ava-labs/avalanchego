@@ -58,7 +58,9 @@ impl MummyItem for Hash {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        Ok(Self(raw[..Self::MSIZE as usize].try_into().unwrap()))
+        Ok(Self(
+            raw.as_deref()[..Self::MSIZE as usize].try_into().unwrap(),
+        ))
     }
 
     fn dehydrated_len(&self) -> u64 {
@@ -467,24 +469,26 @@ impl MummyItem for Node {
         let meta_raw = mem
             .get_view(addr, META_SIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        let attrs = meta_raw[32];
+        let attrs = meta_raw.as_deref()[32];
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
         } else {
-            Some(Hash(meta_raw[0..32].try_into().map_err(dec_err)?))
+            Some(Hash(
+                meta_raw.as_deref()[0..32].try_into().map_err(dec_err)?,
+            ))
         };
         let eth_rlp_long = if attrs & Node::ETH_RLP_LONG_VALID_BIT == 0 {
             None
         } else {
             Some(attrs & Node::ETH_RLP_LONG_BIT != 0)
         };
-        match meta_raw[33] {
+        match meta_raw.as_deref()[33] {
             Self::BRANCH_NODE => {
                 let branch_header_size = NBRANCH as u64 * 8 + 4;
                 let node_raw = mem
                     .get_view(addr + META_SIZE, branch_header_size)
                     .ok_or(ShaleError::LinearMemStoreError)?;
-                let mut cur = Cursor::new(node_raw.deref());
+                let mut cur = Cursor::new(node_raw.as_deref());
                 let mut chd = [None; NBRANCH];
                 let mut buff = [0; 8];
                 for chd in chd.iter_mut() {
@@ -504,7 +508,7 @@ impl MummyItem for Node {
                     Some(Data(
                         mem.get_view(addr + META_SIZE + branch_header_size, raw_len)
                             .ok_or(ShaleError::LinearMemStoreError)?
-                            .to_vec(),
+                            .as_deref(),
                     ))
                 };
                 let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
@@ -519,7 +523,7 @@ impl MummyItem for Node {
                     let rlp_len_raw = mem
                         .get_view(offset + cur_rlp_len, 1)
                         .ok_or(ShaleError::LinearMemStoreError)?;
-                    cur = Cursor::new(rlp_len_raw.deref());
+                    cur = Cursor::new(rlp_len_raw.as_deref());
                     cur.read_exact(&mut buff)
                         .map_err(|_| ShaleError::DecodeError)?;
                     let rlp_len = buff[0] as u64;
@@ -528,7 +532,7 @@ impl MummyItem for Node {
                         let rlp_raw = mem
                             .get_view(offset + cur_rlp_len, rlp_len)
                             .ok_or(ShaleError::LinearMemStoreError)?;
-                        let rlp: Vec<u8> = rlp_raw[0..].to_vec();
+                        let rlp: Vec<u8> = rlp_raw.as_deref()[0..].to_vec();
                         *chd_rlp = Some(rlp);
                         cur_rlp_len += rlp_len
                     }
@@ -549,7 +553,7 @@ impl MummyItem for Node {
                 let node_raw = mem
                     .get_view(addr + META_SIZE, ext_header_size)
                     .ok_or(ShaleError::LinearMemStoreError)?;
-                let mut cur = Cursor::new(node_raw.deref());
+                let mut cur = Cursor::new(node_raw.as_deref());
                 let mut buff = [0; 8];
                 cur.read_exact(&mut buff[..1])
                     .map_err(|_| ShaleError::DecodeError)?;
@@ -559,7 +563,8 @@ impl MummyItem for Node {
                 let ptr = u64::from_le_bytes(buff);
                 let nibbles: Vec<_> = to_nibbles(
                     &mem.get_view(addr + META_SIZE + ext_header_size, path_len)
-                        .ok_or(ShaleError::LinearMemStoreError)?,
+                        .ok_or(ShaleError::LinearMemStoreError)?
+                        .as_deref(),
                 )
                 .collect();
                 let (path, _) = PartialPath::decode(nibbles);
@@ -568,7 +573,7 @@ impl MummyItem for Node {
                 let rlp_len_raw = mem
                     .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
                     .ok_or(ShaleError::LinearMemStoreError)?;
-                cur = Cursor::new(rlp_len_raw.deref());
+                cur = Cursor::new(rlp_len_raw.as_deref());
                 cur.read_exact(&mut buff)
                     .map_err(|_| ShaleError::DecodeError)?;
                 let rlp_len = buff[0] as u64;
@@ -576,7 +581,7 @@ impl MummyItem for Node {
                     let rlp_raw = mem
                         .get_view(addr + META_SIZE + ext_header_size + path_len + 1, rlp_len)
                         .ok_or(ShaleError::LinearMemStoreError)?;
-                    Some(rlp_raw[0..].to_vec())
+                    Some(rlp_raw.as_deref()[0..].to_vec())
                 } else {
                     None
                 };
@@ -592,7 +597,7 @@ impl MummyItem for Node {
                 let node_raw = mem
                     .get_view(addr + META_SIZE, leaf_header_size)
                     .ok_or(ShaleError::LinearMemStoreError)?;
-                let mut cur = Cursor::new(node_raw.deref());
+                let mut cur = Cursor::new(node_raw.as_deref());
                 let mut buff = [0; 4];
                 cur.read_exact(&mut buff[..1])
                     .map_err(|_| ShaleError::DecodeError)?;
@@ -603,9 +608,10 @@ impl MummyItem for Node {
                 let remainder = mem
                     .get_view(addr + META_SIZE + leaf_header_size, path_len + data_len)
                     .ok_or(ShaleError::LinearMemStoreError)?;
-                let nibbles: Vec<_> = to_nibbles(&remainder[..path_len as usize]).collect();
+                let nibbles: Vec<_> =
+                    to_nibbles(&remainder.as_deref()[..path_len as usize]).collect();
                 let (path, _) = PartialPath::decode(nibbles);
-                let value = Data(remainder[path_len as usize..].to_vec());
+                let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
                 Ok(Self::new_from_hash(
                     root_hash,
                     eth_rlp_long,
@@ -732,7 +738,7 @@ fn test_merkle_node_encoding() {
         bytes.resize(node.dehydrated_len() as usize, 0);
         node.dehydrate(&mut bytes);
 
-        let mem = shale::PlainMem::new(bytes.len() as u64, 0x0);
+        let mut mem = shale::PlainMem::new(bytes.len() as u64, 0x0);
         mem.write(0, &bytes);
         println!("{bytes:?}");
         let node_ = Node::hydrate(0, &mem).unwrap();

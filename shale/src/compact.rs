@@ -25,9 +25,9 @@ impl MummyItem for CompactHeader {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        let payload_size = u64::from_le_bytes(raw[..8].try_into().unwrap());
-        let is_freed = raw[8] != 0;
-        let desc_addr = u64::from_le_bytes(raw[9..17].try_into().unwrap());
+        let payload_size = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
+        let is_freed = raw.as_deref()[8] != 0;
+        let desc_addr = u64::from_le_bytes(raw.as_deref()[9..17].try_into().unwrap());
         Ok(Self {
             payload_size,
             is_freed,
@@ -60,7 +60,7 @@ impl MummyItem for CompactFooter {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        let payload_size = u64::from_le_bytes(raw.deref().try_into().unwrap());
+        let payload_size = u64::from_le_bytes(raw.as_deref().try_into().unwrap());
         Ok(Self { payload_size })
     }
 
@@ -90,8 +90,8 @@ impl MummyItem for CompactDescriptor {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        let payload_size = u64::from_le_bytes(raw[..8].try_into().unwrap());
-        let haddr = u64::from_le_bytes(raw[8..].try_into().unwrap());
+        let payload_size = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
+        let haddr = u64::from_le_bytes(raw.as_deref()[8..].try_into().unwrap());
         Ok(Self {
             payload_size,
             haddr,
@@ -159,10 +159,10 @@ impl MummyItem for CompactSpaceHeader {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        let meta_space_tail = u64::from_le_bytes(raw[..8].try_into().unwrap());
-        let compact_space_tail = u64::from_le_bytes(raw[8..16].try_into().unwrap());
-        let base_addr = u64::from_le_bytes(raw[16..24].try_into().unwrap());
-        let alloc_addr = u64::from_le_bytes(raw[24..].try_into().unwrap());
+        let meta_space_tail = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
+        let compact_space_tail = u64::from_le_bytes(raw.as_deref()[8..16].try_into().unwrap());
+        let base_addr = u64::from_le_bytes(raw.as_deref()[16..24].try_into().unwrap());
+        let alloc_addr = u64::from_le_bytes(raw.as_deref()[24..].try_into().unwrap());
         Ok(Self {
             meta_space_tail,
             compact_space_tail,
@@ -198,7 +198,7 @@ impl<T> MummyItem for ObjPtrField<T> {
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
         Ok(Self(ObjPtr::new_from_addr(u64::from_le_bytes(
-            raw.deref().try_into().unwrap(),
+            raw.as_deref().try_into().unwrap(),
         ))))
     }
 
@@ -237,7 +237,7 @@ impl MummyItem for U64Field {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        Ok(Self(u64::from_le_bytes(raw.deref().try_into().unwrap())))
+        Ok(Self(u64::from_le_bytes(raw.as_deref().try_into().unwrap())))
     }
 
     fn dehydrated_len(&self) -> u64 {
