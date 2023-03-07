@@ -79,13 +79,13 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
-func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxSize uint) (*changeSummary, error) {
+func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxSize uint) (map[path]*change[Maybe[[]byte]], error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
 	if startRoot == endRoot {
-		return newChangeSummary(int(maxSize/minKeyValueLen)), nil
+		return map[path]*change[Maybe[[]byte]]{}, nil
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -133,7 +133,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	combinedChanges := newChangeSummary(int(maxSize/minKeyValueLen))
+	combinedChanges := make(map[path]*change[Maybe[[]byte]], maxSize/minKeyValueLen)
 
 	currentTotal := uint(0)
 
@@ -154,16 +154,16 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 			for key, valueChange := range item.values {
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
-					if existing, ok := combinedChanges.values[key]; ok {
-						currentTotal  -= uint(len(existing.after.value) + len(key))
+					if existing, ok := combinedChanges[key]; ok {
+						currentTotal -= uint(len(existing.after.value) + len(key) + minMaybeByteSliceLen + minVarIntLen)
 						existing.after = valueChange.after
 					} else {
-						combinedChanges.values[key] = &change[Maybe[[]byte]]{
+						combinedChanges[key] = &change[Maybe[[]byte]]{
 							before: valueChange.before,
 							after:  valueChange.after,
 						}
 					}
-					currentTotal += uint(len(key) + len(valueChange.after.value))
+					currentTotal += uint(len(key) + len(valueChange.after.value) + minMaybeByteSliceLen + minVarIntLen)
 					sortedKeys.ReplaceOrInsert(key)
 				}
 			}
@@ -171,8 +171,8 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 			// Keep only the smallest [maxLength] items in [combinedChanges.values].
 			for currentTotal > maxSize {
 				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					currentTotal  -= uint(len(greatestKey) + len(combinedChanges.values[greatestKey].after.value))
-					delete(combinedChanges.values, greatestKey)
+					currentTotal -= uint(len(greatestKey) + len(combinedChanges[greatestKey].after.value) + minMaybeByteSliceLen + minVarIntLen)
+					delete(combinedChanges, greatestKey)
 				}
 			}
 

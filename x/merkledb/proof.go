@@ -45,10 +45,6 @@ type ProofNode struct {
 	Children    map[byte]ids.ID
 }
 
-func (proofNode *ProofNode) size() uint {
-	return uint(len(proofNode.KeyPath.Value) + len(proofNode.ValueOrHash.value) + len(proofNode.Children) * len(ids.Empty))
-}
-
 // An inclusion/exclustion proof of a key.
 type Proof struct {
 	// Nodes in the proof path from root --> target key

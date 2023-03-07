@@ -426,7 +426,11 @@ func (t *trieView) getRangeProof(
 		result.StartProof = startProof.Path
 
 		for _, proofNode := range startProof.Path {
-			startProofSize += proofNode.size()
+			nodeSize, err := Codec.encodedProofNodeSize(Version, proofNode)
+			if err != nil {
+				return nil, err
+			}
+			startProofSize += nodeSize
 		}
 	}
 
@@ -436,7 +440,9 @@ func (t *trieView) getRangeProof(
 	totalSize += startProofSize
 
 	var keyValeusSize uint
-	result.KeyValues, keyValeusSize, err = t.getKeyValues(ctx, start, end, maxSize-startProofSize, set.Set[string]{})
+
+	// estimate that the end proof will be of similar size to the start proof
+	result.KeyValues, keyValeusSize, err = t.getKeyValues(ctx, start, end, maxSize-2*startProofSize, set.Set[string]{})
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +463,11 @@ func (t *trieView) getRangeProof(
 			return nil, 0, err
 		}
 		for _, proofNode := range proof.Path {
-			proofSize += proofNode.size()
+			size, err := Codec.encodedProofNodeSize(Version, proofNode)
+			if err != nil {
+				return nil, 0, err
+			}
+			proofSize += size
 		}
 		return proof, proofSize, nil
 	}
@@ -466,10 +476,9 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
-		result.EndProof = endProof.Path
 
 		// shrink the number of key/values returned until we are under the size limit
-		for totalSize + size > maxSize {
+		for totalSize+size > maxSize {
 			if len(result.KeyValues) == 0 {
 				// no more keys to remove, so we cannot construct the proof
 				return nil, ErrMinProofIsLargerThanMaxSize
@@ -477,7 +486,11 @@ func (t *trieView) getRangeProof(
 
 			//remove the last key/value
 			lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
-			totalSize -= uint(len(lastKeyValue.Key) + len(lastKeyValue.Value))
+			kvSize, err := Codec.encodedKeyValueSize(Version, lastKeyValue)
+			if err != nil {
+				return nil, err
+			}
+			totalSize -= kvSize
 			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 
 			// update the greatestReturnedKey
@@ -487,7 +500,7 @@ func (t *trieView) getRangeProof(
 				// there are no more keys
 				// the last key is now also the first key so the proof will be the same
 				result.EndProof = result.StartProof
-				break;
+				break
 			}
 
 			// grab proof for new greatestReturnedKey
@@ -495,8 +508,9 @@ func (t *trieView) getRangeProof(
 			if err != nil {
 				return nil, err
 			}
-			result.EndProof = endProof.Path
 		}
+
+		result.EndProof = endProof.Path
 	}
 
 	// strip out any common nodes to reduce proof size
@@ -786,7 +800,7 @@ func (t *trieView) getKeyValues(
 	})
 	baseKeyValues, _, err := t.getParentTrie().getKeyValues(ctx, start, end, maxSize, keysToIgnore)
 	if err != nil {
-		return nil, 0,err
+		return nil, 0, err
 	}
 
 	var (
@@ -797,10 +811,10 @@ func (t *trieView) getKeyValues(
 		// The index of the next key/value pair to add from [baseKeyValues].
 		baseKeyValuesIndex = 0
 		// The index of the next key/value pair to add from [changes].
-		changesIndex    = 0
-		totalSize = uint(0)
-		hasUpperBound   = len(end) > 0
-		result          = make([]KeyValue, 0, len(baseKeyValues))
+		changesIndex  = 0
+		totalSize     = uint(0)
+		hasUpperBound = len(end) > 0
+		result        = make([]KeyValue, 0, len(baseKeyValues))
 	)
 
 	// keep adding key/value pairs until one of the following:
@@ -824,12 +838,19 @@ func (t *trieView) getKeyValues(
 		// both still have key/values available, so add the smallest key
 		if !changesFinished && !baseKeyValuesFinished {
 			currentChangeState := changes[changesIndex]
-			currentKeyValues := baseKeyValues[baseKeyValuesIndex]
+			currentKeyValue := baseKeyValues[baseKeyValuesIndex]
 
-			currentChangeSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
-			currentKeyValuesSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
+			currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentChangeState)
+			if err != nil {
+				return nil, 0, err
+			}
 
-			switch bytes.Compare(currentChangeState.Key, currentKeyValues.Key) {
+			currentKeyValuesSize, err := Codec.encodedKeyValueSize(Version, currentKeyValue)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			switch bytes.Compare(currentChangeState.Key, currentKeyValue.Key) {
 			case -1:
 				if totalSize+currentChangeSize > maxSize {
 					return result, totalSize, nil
@@ -838,7 +859,7 @@ func (t *trieView) getKeyValues(
 				changesIndex++
 			case 0:
 				// the keys are the same, so override the base value with the changed value
-				if totalSize+currentChangeSize > maxSize  {
+				if totalSize+currentChangeSize > maxSize {
 					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
@@ -849,7 +870,7 @@ func (t *trieView) getKeyValues(
 				if totalSize+currentKeyValuesSize > maxSize {
 					return result, totalSize, nil
 				}
-				result = append(result, currentKeyValues)
+				result = append(result, currentKeyValue)
 				totalSize += currentKeyValuesSize
 				baseKeyValuesIndex++
 			}
@@ -860,13 +881,16 @@ func (t *trieView) getKeyValues(
 		// add the next base state value.
 		if !baseKeyValuesFinished {
 			currentBaseState := baseKeyValues[baseKeyValuesIndex]
-			currentSize := uint(len(currentBaseState.Key) + len(currentBaseState.Value))
-			if totalSize + currentSize > maxSize {
+			currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentBaseState)
+			if err != nil {
+				return nil, 0, err
+			}
+			if totalSize+currentChangeSize > maxSize {
 				return result, totalSize, nil
 			}
 
 			result = append(result, currentBaseState)
-			totalSize += currentSize
+			totalSize += currentChangeSize
 			baseKeyValuesIndex++
 			continue
 		}
@@ -874,12 +898,15 @@ func (t *trieView) getKeyValues(
 		// the base state is finished, but the changes is not finished.
 		// add the next changes value.
 		currentChangeState := changes[changesIndex]
-		currentSize := uint(len(currentChangeState.Key) + len(currentChangeState.Value))
-		if totalSize+ currentSize > maxSize {
+		currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentChangeState)
+		if err != nil {
+			return nil, 0, err
+		}
+		if totalSize+currentChangeSize > maxSize {
 			return result, totalSize, nil
 		}
 		result = append(result, currentChangeState)
-		totalSize += currentSize
+		totalSize += currentChangeSize
 		changesIndex++
 	}
 

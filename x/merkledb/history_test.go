@@ -242,7 +242,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	// same start/end roots should yield an empty changelist
 	changes, err := db.history.getValueChanges(endRoot, endRoot, nil, nil, 10)
 	require.NoError(err)
-	require.Len(changes.values, 0)
+	require.Len(changes, 0)
 }
 
 func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
@@ -363,10 +363,10 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	// changes should still be collectable even though the history has had to loop due to hitting max size
 	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 100)
 	require.NoError(err)
-	require.Contains(changes.values, newPath([]byte("key1")))
-	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.value)
-	require.Contains(changes.values, newPath([]byte("key2")))
-	require.Equal([]byte("value3"), changes.values[newPath([]byte("key2"))].after.value)
+	require.Contains(changes, newPath([]byte("key1")))
+	require.Equal([]byte("value1"), changes[newPath([]byte("key1"))].after.value)
+	require.Contains(changes, newPath([]byte("key2")))
+	require.Equal([]byte("value3"), changes[newPath([]byte("key2"))].after.value)
 }
 
 func Test_History_RepeatedRoot(t *testing.T) {
@@ -699,9 +699,9 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 130)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 155)
 	require.NoError(err)
-	require.Equal(8, len(changes.values))
+	require.Equal(8, len(changes))
 }
 
 func TestHistoryRecord(t *testing.T) {

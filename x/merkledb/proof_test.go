@@ -870,7 +870,7 @@ func Test_ChangeProof_Marshal_Errors(t *testing.T) {
 	endroot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endroot, nil, nil, 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endroot, nil, nil, 5000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 	require.True(t, proof.HadRootsInHistory)
@@ -1003,7 +1003,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 
 	// low maxLength
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1025,7 +1025,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, endRoot, newRoot)
 
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), []byte("key30"), 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), []byte("key30"), 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -1086,7 +1086,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			dbClone, err := getBasicDB()
 			require.NoError(t, err)
 
-			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, []byte{3, 0}, 1000)
 			require.NoError(t, err)
 			require.NotNil(t, proof)
 

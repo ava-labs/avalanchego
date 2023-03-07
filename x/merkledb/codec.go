@@ -30,7 +30,7 @@ const (
 	minProofPathLen      = minVarIntLen
 	minKeyValueLen       = 2 * minByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minProofPathLen * minProofNodeLen + minByteSliceLen
+	minProofLen          = minProofPathLen*minProofNodeLen + minByteSliceLen
 	minChangeProofLen    = boolLen + 2*minProofPathLen + 2*minVarIntLen
 	minRangeProofLen     = 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
@@ -75,6 +75,9 @@ type Encoder interface {
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
 
+	encodedProofNodeSize(version uint16, n ProofNode) (uint, error)
+	encodedKeyValueSize(version uint16, n KeyValue) (uint, error)
+	encodedByteSliceSize(version uint16, n []byte) (uint, error)
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
 	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
 }
@@ -189,6 +192,39 @@ func (c *codecImpl) EncodeRangeProof(version uint16, proof *RangeProof) ([]byte,
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (c *codecImpl) encodedKeyValueSize(version uint16, n KeyValue) (uint, error) {
+	if version != codecVersion {
+		return 0, errUnknownVersion
+	}
+	buf := &bytes.Buffer{}
+	if err := c.encodeKeyValue(n, buf); err != nil {
+		return 0, err
+	}
+	return uint(buf.Len()), nil
+}
+
+func (c *codecImpl) encodedByteSliceSize(version uint16, n []byte) (uint, error) {
+	if version != codecVersion {
+		return 0, errUnknownVersion
+	}
+	buf := &bytes.Buffer{}
+	if err := c.encodeByteSlice(buf, n); err != nil {
+		return 0, err
+	}
+	return uint(buf.Len()), nil
+}
+
+func (c *codecImpl) encodedProofNodeSize(version uint16, n ProofNode) (uint, error) {
+	if version != codecVersion {
+		return 0, errUnknownVersion
+	}
+	buf := &bytes.Buffer{}
+	if err := c.encodeProofNode(n, buf); err != nil {
+		return 0, err
+	}
+	return uint(buf.Len()), nil
 }
 
 func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {

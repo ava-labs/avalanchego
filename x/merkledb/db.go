@@ -478,6 +478,7 @@ func (db *Database) GetChangeProof(
 	result := &ChangeProof{
 		HadRootsInHistory: true,
 	}
+
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxSize)
 	if err == ErrRootIDNotPresent {
 		result.HadRootsInHistory = false
@@ -490,29 +491,10 @@ func (db *Database) GetChangeProof(
 	// [changedKeys] are a subset of the keys that were added or had their
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
-	changedKeys := maps.Keys(changes.values)
+	changedKeys := maps.Keys(changes)
 	slices.SortFunc(changedKeys, func(i, j path) bool {
 		return i.Compare(j) < 0
 	})
-
-	// TODO: sync.pool these buffers
-	result.KeyValues = make([]KeyValue, 0, len(changedKeys))
-	result.DeletedKeys = make([][]byte, 0, len(changedKeys))
-
-	for _, key := range changedKeys {
-		change := changes.values[key]
-		serializedKey := key.Serialize().Value
-
-		if change.after.IsNothing() {
-			result.DeletedKeys = append(result.DeletedKeys, serializedKey)
-		} else {
-			result.KeyValues = append(result.KeyValues, KeyValue{
-				Key:   serializedKey,
-				Value: change.after.value,
-			})
-		}
-		end = serializedKey
-	}
 
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
@@ -521,13 +503,7 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-	if len(end) > 0 {
-		endProof, err := historicalView.getProof(ctx, end)
-		if err != nil {
-			return nil, err
-		}
-		result.EndProof = endProof.Path
-	}
+	totalSize := uint(0)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
@@ -536,14 +512,132 @@ func (db *Database) GetChangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		// strip out any common nodes to reduce proof size
-		commonNodeIndex := 0
-		for ; commonNodeIndex < len(result.StartProof) &&
-			commonNodeIndex < len(result.EndProof) &&
-			result.StartProof[commonNodeIndex].KeyPath.Equal(result.EndProof[commonNodeIndex].KeyPath); commonNodeIndex++ {
+		for _, proofNode := range result.StartProof {
+			size, err := Codec.encodedProofNodeSize(Version, proofNode)
+			if err != nil {
+				return nil, err
+			}
+			totalSize += size
 		}
-		result.StartProof = result.StartProof[commonNodeIndex:]
 	}
+
+	largestKey := end
+
+	for _, key := range changedKeys {
+		change := changes[key]
+		serializedKey := key.Serialize().Value
+
+		if change.after.IsNothing() {
+			keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
+			if err != nil {
+				return nil, err
+			}
+			totalSize += keySize
+		} else {
+			kv := KeyValue{
+				Key:   serializedKey,
+				Value: change.after.value,
+			}
+			kvSize, err := Codec.encodedKeyValueSize(Version, kv)
+			if err != nil {
+				return nil, err
+			}
+			totalSize += kvSize
+		}
+		largestKey = serializedKey
+	}
+
+	getLargestKeyProof := func() (*Proof, uint, error) {
+		proofSize := uint(0)
+		proof, err := historicalView.getProof(ctx, largestKey)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, proofNode := range proof.Path {
+			size, err := Codec.encodedProofNodeSize(Version, proofNode)
+			if err != nil {
+				return nil, 0, err
+			}
+			proofSize += size
+		}
+		return proof, proofSize, nil
+	}
+
+	if len(largestKey) > 0 {
+		proof, size, err := getLargestKeyProof()
+		if err != nil {
+			return nil, err
+		}
+		for size + totalSize > maxSize {
+			if len(changedKeys) == 0 {
+				return nil, ErrMinProofIsLargerThanMaxSize
+			}
+
+			//remove the last key/value
+			lastKey := changedKeys[len(changedKeys)-1]
+			serializedKey := lastKey.Serialize().Value
+			change := changes[lastKey] 
+			if change.after.IsNothing() {
+				keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
+				if err != nil {
+					return nil, err
+				}
+				totalSize -= keySize
+			} else {
+				kv := KeyValue{
+					Key:   serializedKey,
+					Value: change.after.value,
+				}
+				kvSize, err := Codec.encodedKeyValueSize(Version, kv)
+				if err != nil {
+					return nil, err
+				}
+				totalSize -= kvSize
+			}
+
+			changedKeys = changedKeys[:len(changedKeys)-1]
+
+			// update the greatestReturnedKey
+			if len(changedKeys) > 0 {
+				largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
+			} else {
+				// there are no more keys
+				// the last key is now also the first key so the proof will be the same
+				result.EndProof = result.StartProof
+				break
+			}
+		}
+		result.EndProof = proof.Path
+	}
+
+
+
+	// TODO: sync.pool these buffers
+	result.KeyValues = make([]KeyValue, 0, len(changedKeys))
+	result.DeletedKeys = make([][]byte, 0, len(changedKeys))
+
+	for _, key := range changedKeys {
+		change := changes[key]
+		serializedKey := key.Serialize().Value
+
+		if change.after.IsNothing() {
+			result.DeletedKeys = append(result.DeletedKeys, serializedKey)
+		} else {
+			result.KeyValues = append(result.KeyValues,
+				KeyValue{
+					Key:   serializedKey,
+					Value: change.after.value,
+				})
+		}
+	}
+
+	// strip out any common nodes to reduce proof size
+	commonNodeIndex := 0
+	for ; commonNodeIndex < len(result.StartProof) &&
+		commonNodeIndex < len(result.EndProof) &&
+		result.StartProof[commonNodeIndex].KeyPath.Equal(result.EndProof[commonNodeIndex].KeyPath); commonNodeIndex++ {
+	}
+	result.StartProof = result.StartProof[commonNodeIndex:]
 
 	// Note that one of the following must be true:
 	//  - [result.StartProof] is non-empty.
