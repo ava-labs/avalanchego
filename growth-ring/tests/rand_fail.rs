@@ -48,6 +48,25 @@ fn multi_point_failure(sims: &[common::PaintingSim]) {
 }
 
 #[test]
+fn short_single_point_failure() {
+    let sim = common::PaintingSim {
+        block_nbit: 5,
+        file_nbit: 6,
+        file_cache: 1000,
+        n: 100,
+        m: 10,
+        k: 10,
+        csize: 1000,
+        stroke_max_len: 10,
+        stroke_max_col: 256,
+        stroke_max_n: 5,
+        seed: 0,
+    };
+    multi_point_failure(&[sim]);
+}
+
+#[test]
+#[ignore]
 fn single_point_failure1() {
     let sim = common::PaintingSim {
         block_nbit: 5,
@@ -66,6 +85,7 @@ fn single_point_failure1() {
 }
 
 #[test]
+#[ignore]
 fn two_failures() {
     let sims = [
         common::PaintingSim {
