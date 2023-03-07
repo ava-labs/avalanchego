@@ -1372,7 +1372,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 
 // Get the parent trie of the view
 func (t *trieView) getParentTrie() TrieView {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
+	t.validityTrackingLock.RLock()
+	defer t.validityTrackingLock.RUnlock()
 	return t.parentTrie
 }
