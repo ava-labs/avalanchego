@@ -873,16 +873,16 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 }
 
 // Upserts the key/value pair into the trie.
-func (t *trieView) Insert(ctx context.Context, key []byte, value []byte) error {
+func (t *trieView) Insert(_ context.Context, key []byte, value []byte) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.insert(ctx, key, value)
+	return t.insert(key, value)
 }
 
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) insert(ctx context.Context, key []byte, value []byte) error {
+func (t *trieView) insert(key []byte, value []byte) error {
 	if t.committed {
 		return ErrCommitted
 	}
@@ -908,16 +908,16 @@ func (t *trieView) insert(ctx context.Context, key []byte, value []byte) error {
 }
 
 // Removes the value associated with [key] from this trie.
-func (t *trieView) Remove(ctx context.Context, key []byte) error {
+func (t *trieView) Remove(_ context.Context, key []byte) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.remove(ctx, key)
+	return t.remove( key)
 }
 
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) remove(ctx context.Context, key []byte) error {
+func (t *trieView) remove(key []byte) error {
 	if t.committed {
 		return ErrCommitted
 	}

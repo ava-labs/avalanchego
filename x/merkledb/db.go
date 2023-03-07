@@ -228,7 +228,7 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	view, err := db.prepareChangeProofView(ctx, proof)
+	view, err := db.prepareChangeProofView(proof)
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *R
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	view, err := db.prepareRangeProofView(ctx, start, proof)
+	view, err := db.prepareRangeProofView(start, proof)
 	if err != nil {
 		return err
 	}
@@ -597,7 +597,7 @@ func (db *Database) Insert(ctx context.Context, k, v []byte) error {
 		return err
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
-	if err := view.insert(ctx, k, v); err != nil {
+	if err := view.insert(k, v); err != nil {
 		return err
 	}
 	return view.commitToDB(ctx, nil)
@@ -683,7 +683,7 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 		return err
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
-	if err = view.remove(ctx, key); err != nil {
+	if err = view.remove(key); err != nil {
 		return err
 	}
 	return view.commitToDB(ctx, nil)
@@ -693,7 +693,7 @@ func (db *Database) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	view, err := db.prepareBatchView(context.Background(), ops)
+	view, err := db.prepareBatchView(ops)
 	if err != nil {
 		return err
 	}
@@ -1008,7 +1008,6 @@ func (db *Database) getKeyValues(
 // Returns a new view atop [db] with the changes in [ops] applied to it.
 // Assumes [db.lock] is read locked.
 func (db *Database) prepareBatchView(
-	ctx context.Context,
 	ops []database.BatchOp,
 ) (*trieView, error) {
 	view, err := db.newPreallocatedView(len(ops))
@@ -1020,10 +1019,10 @@ func (db *Database) prepareBatchView(
 	// write into the trie
 	for _, op := range ops {
 		if op.Delete {
-			if err := view.remove(ctx, op.Key); err != nil {
+			if err := view.remove(op.Key); err != nil {
 				return nil, err
 			}
-		} else if err := view.insert(ctx, op.Key, op.Value); err != nil {
+		} else if err := view.insert(op.Key, op.Value); err != nil {
 			return nil, err
 		}
 	}
@@ -1034,7 +1033,7 @@ func (db *Database) prepareBatchView(
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues]
 // inserted and the key/value pairs in [proof.DeletedKeys] removed.
 // Assumes [db.lock] is read locked.
-func (db *Database) prepareChangeProofView(ctx context.Context, proof *ChangeProof) (*trieView, error) {
+func (db *Database) prepareChangeProofView(proof *ChangeProof) (*trieView, error) {
 	view, err := db.newPreallocatedView(len(proof.KeyValues))
 	if err != nil {
 		return nil, err
@@ -1042,13 +1041,13 @@ func (db *Database) prepareChangeProofView(ctx context.Context, proof *ChangePro
 	// Don't need to lock [view] because nobody else has a reference to it.
 
 	for _, kv := range proof.KeyValues {
-		if err := view.insert(ctx, kv.Key, kv.Value); err != nil {
+		if err := view.insert(kv.Key, kv.Value); err != nil {
 			return nil, err
 		}
 	}
 
 	for _, keyToDelete := range proof.DeletedKeys {
-		if err := view.remove(ctx, keyToDelete); err != nil {
+		if err := view.remove(keyToDelete); err != nil {
 			return nil, err
 		}
 	}
@@ -1058,7 +1057,7 @@ func (db *Database) prepareChangeProofView(ctx context.Context, proof *ChangePro
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
 // any existing key-value pairs in the proof's range but not in the proof removed.
 // Assumes [db.lock] is read locked.
-func (db *Database) prepareRangeProofView(ctx context.Context, start []byte, proof *RangeProof) (*trieView, error) {
+func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
 	view, err := db.newPreallocatedView(len(proof.KeyValues))
 	if err != nil {
 		return nil, err
@@ -1068,7 +1067,7 @@ func (db *Database) prepareRangeProofView(ctx context.Context, start []byte, pro
 	keys := set.NewSet[string](len(proof.KeyValues))
 	for _, kv := range proof.KeyValues {
 		keys.Add(string(kv.Key))
-		if err := view.insert(ctx, kv.Key, kv.Value); err != nil {
+		if err := view.insert(kv.Key, kv.Value); err != nil {
 			return nil, err
 		}
 	}
@@ -1083,7 +1082,7 @@ func (db *Database) prepareRangeProofView(ctx context.Context, start []byte, pro
 		return nil, err
 	}
 	for _, keyToDelete := range keysToDelete {
-		if err := view.remove(ctx, keyToDelete); err != nil {
+		if err := view.remove(keyToDelete); err != nil {
 			return nil, err
 		}
 	}
