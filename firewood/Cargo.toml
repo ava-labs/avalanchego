@@ -2,7 +2,17 @@
 name = "firewood"
 version = "0.0.1"
 edition = "2021"
-
+authors = [
+     "Ted Yin (@Determinant) <ted@avalabs.org>",
+     "Dan Sover (@exdx) <dan.sover@avalabs.org>",
+     "Hao Hao (@haohao-os) <hao.hao@avalabs.org>",
+     "Gyuho Lee (@gyuho) <gyuho.lee@avalabs.org>",
+     "Sam Batschelet (@hexfusion) <sam.batschelet@avalabs.org>",
+     "Ron Kuris (@rkuris) <ron.kuris@avalabs.org>",
+]
+description = "Firewood is an embedded key-value store, optimized to store blockchain state."
+license-file = "../LICENSE.md"
+homepage = "https://avalabs.org"
 [dependencies]
 growth-ring = { version = "0.3.0", path = "../growth-ring" }
 libaio-futures = {version = "0.2.2", path = "../libaio-futures" }
