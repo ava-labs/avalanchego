@@ -26,7 +26,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 	)
 	require.NoError(err)
 
-	builder := newOutboundBuilder(compression.TypeGzip /*compress*/, mb) // TODO support zstd
+	builder := newOutboundBuilder(compression.TypeGzip, mb) // TODO support zstd
 
 	outMsg, err := builder.GetAcceptedStateSummary(
 		ids.GenerateTestID(),

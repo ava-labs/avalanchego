@@ -126,9 +126,8 @@ type Config struct {
 	PingFrequency      time.Duration     `json:"pingFrequency"`
 	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
 
-	// The preferred compression type to use when compressing outbound messages.
-	// If a peer doesn't support this compression type, the message will be
-	// compressed with a different compression type or not at all.
+	// The compression type to use when compressing outbound messages.
+	// Assumes all peers support this compression type.
 	CompressionType compression.Type `json:"compressionType"`
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
