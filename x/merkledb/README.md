@@ -50,7 +50,7 @@ A `trieView` is built atop another trie, and that trie could change at any point
 ### Locking
 
 `Database` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
-`Database` has a `Mutex` named `commitLock`.  It enforecs that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preperation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read->write.
+`Database` has a `Mutex` named `commitLock`.  It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read->write.
 
 A `trieView` is built atop another trie, which may be the underlying `Database` or another `trieView`.
 It's important to guarantee atomicity/consistency of trie operations.
