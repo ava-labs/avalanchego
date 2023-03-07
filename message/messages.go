@@ -200,21 +200,19 @@ func (mb *msgBuilder) marshal(
 		return nil, 0, 0, err
 	}
 
-	if compressionType == compression.TypeNone {
-		return uncompressedMsgBytes, 0, 0, nil
-	}
-
 	// If compression is enabled, we marshal twice:
 	// 1. the original message
 	// 2. the message with compressed bytes
 	//
 	// This recursive packing allows us to avoid an extra compression on/off
 	// field in the message.
-	startTime := time.Now()
-
-	var compressedMsg p2p.Message
-
+	var (
+		startTime     = time.Now()
+		compressedMsg p2p.Message
+	)
 	switch compressionType {
+	case compression.TypeNone:
+		return uncompressedMsgBytes, 0, 0, nil
 	case compression.TypeGzip:
 		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
