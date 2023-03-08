@@ -110,7 +110,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *RangeProofRequest) (*me
 		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
 			return nil, err
 		}
-		
+
 		if err := rangeProof.Verify(
 			ctx,
 			req.Start,
