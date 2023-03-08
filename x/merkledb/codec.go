@@ -30,7 +30,7 @@ const (
 	minProofPathLen      = minVarIntLen
 	minKeyValueLen       = 2 * minByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minProofPathLen*minProofNodeLen + minByteSliceLen
+	minProofLen          = minProofPathLen + minByteSliceLen
 	minChangeProofLen    = boolLen + 2*minProofPathLen + 2*minVarIntLen
 	minRangeProofLen     = 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
