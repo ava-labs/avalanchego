@@ -49,11 +49,6 @@ const (
 	TimeSinceLastMsgReceivedKey = "timeSinceLastMsgReceived"
 	TimeSinceLastMsgSentKey     = "timeSinceLastMsgSent"
 	SendFailRateKey             = "sendFailRate"
-
-	// lingerTimeout is the amount of time (in seconds) we allow for the
-	// remaining data in a connection to be flushed before forcibly closing the
-	// connection (TCP RST).
-	lingerTimeout = 15
 )
 
 var (
@@ -736,7 +731,6 @@ func (n *network) Dispatch() error {
 			n.metrics.acceptFailed.Inc()
 			continue
 		}
-		n.setLinger(conn)
 
 		// Note: listener.Accept is rate limited outside of this package, so a
 		// peer can not just arbitrarily spin up goroutines here.
@@ -1130,7 +1124,6 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				)
 				continue
 			}
-			n.setLinger(conn)
 
 			n.peerConfig.Log.Verbo("starting to upgrade connection",
 				zap.String("direction", "outbound"),
@@ -1149,24 +1142,6 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			return
 		}
 	}()
-}
-
-// setLinger sets the linger on [conn], if it is a [*net.TCPConn], to
-// [lingerTimeout].
-func (n *network) setLinger(conn net.Conn) {
-	tcpConn, ok := conn.(*net.TCPConn)
-	if !ok {
-		return
-	}
-
-	// If a connection is closed, we allow a grace period for the unsent
-	// data in the connection to be flushed before forcibly closing the
-	// connection (TCP RST).
-	if err := tcpConn.SetLinger(lingerTimeout); err != nil {
-		n.peerConfig.Log.Warn("failed to set no linger",
-			zap.Error(err),
-		)
-	}
 }
 
 // upgrade the provided connection, which may be an inbound connection or an
