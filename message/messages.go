@@ -194,8 +194,13 @@ func newMsgBuilder(
 func (mb *msgBuilder) marshal(
 	uncompressedMsg *p2p.Message,
 	compressionType compression.Type,
-) ([]byte, int, time.Duration, error) {
+) ([]byte, int, Op, error) {
 	uncompressedMsgBytes, err := proto.Marshal(uncompressedMsg)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	op, err := ToOp(uncompressedMsg)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -212,7 +217,7 @@ func (mb *msgBuilder) marshal(
 	)
 	switch compressionType {
 	case compression.TypeNone:
-		return uncompressedMsgBytes, 0, 0, nil
+		return uncompressedMsgBytes, 0, op, nil
 	case compression.TypeGzip:
 		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
@@ -244,14 +249,21 @@ func (mb *msgBuilder) marshal(
 	}
 	compressTook := time.Since(startTime)
 
+	switch compressionType {
+	case compression.TypeGzip:
+		mb.gzipCompressTimeMetrics[op].Observe(float64(compressTook))
+	case compression.TypeZstd:
+		mb.zstdCompressTimeMetrics[op].Observe(float64(compressTook))
+	}
+
 	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
-	return compressedMsgBytes, bytesSaved, compressTook, nil
+	return compressedMsgBytes, bytesSaved, op, nil
 }
 
-func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
+func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	m := new(p2p.Message)
 	if err := proto.Unmarshal(b, m); err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
 	// Figure out what compression type, if any, was used to compress the message.
@@ -264,10 +276,14 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 	)
 	switch {
 	case len(gzipCompressed) == 0 && len(zstdCompressed) == 0:
+		op, err := ToOp(m)
+		if err != nil {
+			return nil, 0, 0, err
+		}
 		// The message wasn't compressed
-		return m, 0, nil
+		return m, 0, op, nil
 	case len(gzipCompressed) > 0 && len(zstdCompressed) > 0:
-		return nil, 0, errMultipleCompressionTypes
+		return nil, 0, 0, errMultipleCompressionTypes
 	case len(gzipCompressed) > 0:
 		compressionType = compression.TypeGzip
 		compressor = mb.gzipCompressor
@@ -282,19 +298,19 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 
 	decompressed, err := compressor.Decompress(compressedBytes)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	bytesSavedCompression := len(decompressed) - len(compressedBytes)
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	decompressTook := time.Since(startTime)
 
 	// Record decompression time metric
 	op, err := ToOp(m)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	switch compressionType {
 	case compression.TypeGzip:
@@ -303,25 +319,13 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 		mb.zstdDecompressTimeMetrics[op].Observe(float64(decompressTook))
 	}
 
-	return m, bytesSavedCompression, nil
+	return m, bytesSavedCompression, op, nil
 }
 
 func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*outboundMessage, error) {
-	b, saved, compressTook, err := mb.marshal(m, compressionType)
+	b, saved, op, err := mb.marshal(m, compressionType)
 	if err != nil {
 		return nil, err
-	}
-
-	op, err := ToOp(m)
-	if err != nil {
-		return nil, err
-	}
-
-	switch compressionType {
-	case compression.TypeGzip:
-		mb.gzipCompressTimeMetrics[op].Observe(float64(compressTook))
-	case compression.TypeZstd:
-		mb.zstdCompressTimeMetrics[op].Observe(float64(compressTook))
 	}
 
 	return &outboundMessage{
@@ -337,15 +341,16 @@ func (mb *msgBuilder) parseInbound(
 	nodeID ids.NodeID,
 	onFinishedHandling func(),
 ) (*inboundMessage, error) {
-	m, bytesSavedCompression, err := mb.unmarshal(bytes)
+	m, bytesSavedCompression, op, err := mb.unmarshal(bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	op, err := ToOp(m)
-	if err != nil {
-		return nil, err
-	}
+	// TODO remove
+	// op, err := ToOp(m)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	msg, err := Unwrap(m)
 	if err != nil {
