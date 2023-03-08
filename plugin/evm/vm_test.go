@@ -17,17 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/internal/ethapi"
-	"github.com/ava-labs/subnet-evm/metrics"
-	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/precompile/allowlist"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/subnet-evm/trie"
-	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	avalancheConstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -48,18 +38,26 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
-	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
-
+	"github.com/ava-labs/subnet-evm/accounts/abi"
+	accountKeystore "github.com/ava-labs/subnet-evm/accounts/keystore"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
+	"github.com/ava-labs/subnet-evm/internal/ethapi"
+	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
-
-	"github.com/ava-labs/subnet-evm/accounts/abi"
-	accountKeystore "github.com/ava-labs/subnet-evm/accounts/keystore"
+	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 )
 
 var (
@@ -150,7 +148,7 @@ func setupGenesis(t *testing.T,
 ) (*snow.Context,
 	manager.Manager,
 	[]byte,
-	chan engCommon.Message,
+	chan commonEng.Message,
 ) {
 	if len(genesisJSON) == 0 {
 		genesisJSON = genesisJSONLatest
@@ -178,7 +176,7 @@ func setupGenesis(t *testing.T,
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
-	issuer := make(chan engCommon.Message, 1)
+	issuer := make(chan commonEng.Message, 1)
 	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
 	return ctx, prefixedDBManager, genesisBytes, issuer
 }
@@ -192,16 +190,16 @@ func GenesisVM(t *testing.T,
 	genesisJSON string,
 	configJSON string,
 	upgradeJSON string,
-) (chan engCommon.Message,
+) (chan commonEng.Message,
 	*VM, manager.Manager,
-	*engCommon.SenderTest,
+	*commonEng.SenderTest,
 ) {
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
-	appSender := &engCommon.SenderTest{T: t}
+	appSender := &commonEng.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
-	if err := vm.Initialize(
+	err := vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -209,11 +207,10 @@ func GenesisVM(t *testing.T,
 		[]byte(upgradeJSON),
 		[]byte(configJSON),
 		issuer,
-		[]*engCommon.Fx{},
+		[]*commonEng.Fx{},
 		appSender,
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.NoError(t, err, "error initializing GenesisVM")
 
 	if finishBootstrapping {
 		require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
@@ -345,7 +342,7 @@ func TestVMUpgrades(t *testing.T) {
 	}
 }
 
-func issueAndAccept(t *testing.T, issuer <-chan engCommon.Message, vm *VM) snowman.Block {
+func issueAndAccept(t *testing.T, issuer <-chan commonEng.Message, vm *VM) snowman.Block {
 	t.Helper()
 	<-issuer
 
@@ -416,7 +413,7 @@ func TestSubnetEVMUpgradeRequiredAtGenesis(t *testing.T) {
 			[]byte(""),
 			[]byte(test.configJSON),
 			issuer,
-			[]*engCommon.Fx{},
+			[]*commonEng.Fx{},
 			nil,
 		)
 
@@ -534,7 +531,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		[]byte(""),
 		[]byte("{\"pruning-enabled\":true}"),
 		issuer,
-		[]*engCommon.Fx{},
+		[]*commonEng.Fx{},
 		nil,
 	); err != nil {
 		t.Fatal(err)
@@ -2031,7 +2028,7 @@ func TestConfigureLogLevel(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
 			ctx, dbManager, genesisBytes, issuer := setupGenesis(t, test.genesisJSON)
-			appSender := &engCommon.SenderTest{T: t}
+			appSender := &commonEng.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 			err := vm.Initialize(
@@ -2042,7 +2039,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				[]byte(""),
 				[]byte(test.logConfig),
 				issuer,
-				[]*engCommon.Fx{},
+				[]*commonEng.Fx{},
 				appSender,
 			)
 			if len(test.expectedErr) == 0 && err != nil {
@@ -2992,12 +2989,12 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	require.NoError(t, err)
 
 	// this will not be allowed
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*engCommon.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*commonEng.Fx{}, appSender)
 	require.ErrorContains(t, err, "mismatching SubnetEVM fork block timestamp in database")
 
 	// try again with skip-upgrade-check
 	config := []byte("{\"skip-upgrade-check\": true}")
-	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*engCommon.Fx{}, appSender)
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*commonEng.Fx{}, appSender)
 	require.NoError(t, err)
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }

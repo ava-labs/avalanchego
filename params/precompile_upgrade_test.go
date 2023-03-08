@@ -78,13 +78,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(10), admins, nil),
 	}
 
-	type test struct {
-		configs             []*UpgradeConfig
-		startTimestamps     []*big.Int
-		expectedErrorString string
-	}
-
-	tests := map[string]test{
+	tests := map[string]upgradeCompatibilityTest{
 		"disable and re-enable": {
 			startTimestamps: []*big.Int{big.NewInt(5)},
 			configs: []*UpgradeConfig{
@@ -252,32 +246,39 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			// make a local copy of the chainConfig
-			chainConfig := chainConfig
-
-			// apply all the upgrade bytes specified in order
-			for i, upgrade := range tt.configs {
-				newCfg := chainConfig
-				newCfg.UpgradeConfig = *upgrade
-
-				err := chainConfig.checkCompatible(&newCfg, nil, tt.startTimestamps[i])
-
-				// if this is not the final upgradeBytes, continue applying
-				// the next upgradeBytes. (only check the result on the last apply)
-				if i != len(tt.configs)-1 {
-					if err != nil {
-						t.Fatalf("expecting ApplyUpgradeBytes call %d to return nil, got %s", i+1, err)
-					}
-					chainConfig = newCfg
-					continue
-				}
-
-				if tt.expectedErrorString != "" {
-					require.ErrorContains(t, err, tt.expectedErrorString)
-				} else {
-					require.Nil(t, err)
-				}
-			}
+			tt.run(t, chainConfig)
 		})
+	}
+}
+
+type upgradeCompatibilityTest struct {
+	configs             []*UpgradeConfig
+	startTimestamps     []*big.Int
+	expectedErrorString string
+}
+
+func (tt *upgradeCompatibilityTest) run(t *testing.T, chainConfig ChainConfig) {
+	// apply all the upgrade bytes specified in order
+	for i, upgrade := range tt.configs {
+		newCfg := chainConfig
+		newCfg.UpgradeConfig = *upgrade
+
+		err := chainConfig.checkCompatible(&newCfg, nil, tt.startTimestamps[i])
+
+		// if this is not the final upgradeBytes, continue applying
+		// the next upgradeBytes. (only check the result on the last apply)
+		if i != len(tt.configs)-1 {
+			if err != nil {
+				t.Fatalf("expecting checkCompatible call %d to return nil, got %s", i+1, err)
+			}
+			chainConfig = newCfg
+			continue
+		}
+
+		if tt.expectedErrorString != "" {
+			require.ErrorContains(t, err, tt.expectedErrorString)
+		} else {
+			require.Nil(t, err)
+		}
 	}
 }

@@ -142,6 +142,9 @@ type UpgradeConfig struct {
 	// forks must be present or upgradeBytes will be rejected.
 	NetworkUpgrades *NetworkUpgrades `json:"networkUpgrades,omitempty"`
 
+	// Config for modifying state as a network upgrade.
+	StateUpgrades []StateUpgrade `json:"stateUpgrades,omitempty"`
+
 	// Config for enabling and disabling precompiles as network upgrades.
 	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
 }
@@ -325,7 +328,7 @@ func (c *ChainConfig) IsSubnetEVM(blockTimestamp *big.Int) bool {
 
 // IsPrecompileEnabled returns whether precompile with [address] is enabled at [blockTimestamp].
 func (c *ChainConfig) IsPrecompileEnabled(address common.Address, blockTimestamp *big.Int) bool {
-	config := c.GetActivePrecompileConfig(address, blockTimestamp)
+	config := c.getActivePrecompileConfig(address, blockTimestamp)
 	return config != nil && !config.IsDisabled()
 }
 
@@ -357,6 +360,11 @@ func (c *ChainConfig) Verify() error {
 	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
 	if err := c.verifyPrecompileUpgrades(); err != nil {
 		return fmt.Errorf("invalid precompile upgrades: %w", err)
+	}
+
+	// Verify the state upgrades are internally consistent given the existing chainConfig.
+	if err := c.verifyStateUpgrades(); err != nil {
+		return fmt.Errorf("invalid state upgrades: %w", err)
 	}
 
 	return nil
@@ -493,6 +501,11 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, lastHeight *big.Int, 
 		return err
 	}
 
+	// Check that the state upgrades on the new config are compatible with the existing state upgrade config.
+	if err := c.CheckStateUpgradesCompatible(newcfg.StateUpgrades, lastTimestamp); err != nil {
+		return err
+	}
+
 	// TODO verify that the fee config is fully compatible between [c] and [newcfg].
 	return nil
 }
@@ -598,7 +611,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.ActivePrecompiles = make(map[common.Address]precompileconfig.Config)
 	for _, module := range modules.RegisteredModules() {
-		if config := c.GetActivePrecompileConfig(module.Address, blockTimestamp); config != nil && !config.IsDisabled() {
+		if config := c.getActivePrecompileConfig(module.Address, blockTimestamp); config != nil && !config.IsDisabled() {
 			rules.ActivePrecompiles[module.Address] = config
 		}
 	}

@@ -34,14 +34,11 @@ type StateDB interface {
 	GetState(common.Address, common.Hash) common.Hash
 	SetState(common.Address, common.Hash, common.Hash)
 
-	SetCode(common.Address, []byte)
-
 	SetNonce(common.Address, uint64)
 	GetNonce(common.Address) uint64
 
 	GetBalance(common.Address) *big.Int
 	AddBalance(common.Address, *big.Int)
-	SubBalance(common.Address, *big.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool

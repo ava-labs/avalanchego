@@ -179,7 +179,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 					Config: txallowlist.NewDisableConfig(big.NewInt(1)),
 				},
 			},
-			expectedError: " config block timestamp (1) <= previous timestamp (1) of same key",
+			expectedError: "config block timestamp (1) <= previous timestamp (1) of same key",
 		},
 	}
 	for _, tt := range tests {
@@ -269,16 +269,16 @@ func TestGetPrecompileConfig(t *testing.T) {
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(10), nil, nil),
 	}
 
-	deployerConfig := config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(0))
+	deployerConfig := config.getActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(0))
 	require.Nil(deployerConfig)
 
-	deployerConfig = config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(10))
+	deployerConfig = config.getActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(10))
 	require.NotNil(deployerConfig)
 
-	deployerConfig = config.GetActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(11))
+	deployerConfig = config.getActivePrecompileConfig(deployerallowlist.ContractAddress, big.NewInt(11))
 	require.NotNil(deployerConfig)
 
-	txAllowListConfig := config.GetActivePrecompileConfig(txallowlist.ContractAddress, big.NewInt(0))
+	txAllowListConfig := config.getActivePrecompileConfig(txallowlist.ContractAddress, big.NewInt(0))
 	require.Nil(txAllowListConfig)
 }
 
