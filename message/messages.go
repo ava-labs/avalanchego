@@ -258,6 +258,7 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 	var (
 		compressionType compression.Type
 		compressor      compression.Compressor
+		compressedBytes []byte
 		gzipCompressed  = m.GetCompressedGzip()
 		zstdCompressed  = m.GetCompressedZstd()
 	)
@@ -270,18 +271,20 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, error) {
 	case len(gzipCompressed) > 0:
 		compressionType = compression.TypeGzip
 		compressor = mb.gzipCompressor
+		compressedBytes = gzipCompressed
 	case len(zstdCompressed) > 0:
 		compressionType = compression.TypeZstd
 		compressor = mb.zstdCompressor
+		compressedBytes = zstdCompressed
 	}
 
 	startTime := time.Now()
 
-	decompressed, err := compressor.Decompress(gzipCompressed)
+	decompressed, err := compressor.Decompress(compressedBytes)
 	if err != nil {
 		return nil, 0, err
 	}
-	bytesSavedCompression := len(decompressed) - len(gzipCompressed)
+	bytesSavedCompression := len(decompressed) - len(compressedBytes)
 
 	if err := proto.Unmarshal(decompressed, m); err != nil {
 		return nil, 0, err
