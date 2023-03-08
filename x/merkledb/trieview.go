@@ -404,7 +404,7 @@ func (t *trieView) getRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
-	// leave room for the key/value count
+	// initialize to 4 to account for the varint storing the key/value count
 	totalSize := uint32(4)
 
 	if err := t.calculateIDs(ctx); err != nil {
@@ -416,7 +416,6 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
-	greatestReturnedKey := end
 	startProofSize := uint32(0)
 
 	if len(start) > 0 {
@@ -446,66 +445,57 @@ func (t *trieView) getRangeProof(
 	}
 	totalSize += keyValeusSize
 
-	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
-	// The end proof we provide should be for the last key-value pair in the proof, not for
-	// the last key-value pair requested, which may not be in this proof.
-	if len(result.KeyValues) > 0 {
-		greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
-	}
-
-	getLargestKeyProof := func() (*Proof, uint32, error) {
-		proof, err := t.getProof(ctx, greatestReturnedKey)
-		if err != nil {
-			return nil, 0, err
-		}
-		size, err := Codec.encodedProofPathSize(Version, proof.Path)
-		if err != nil {
-			return nil, 0, err
-		}
-		return proof, size, nil
-	}
-	if len(greatestReturnedKey) > 0 {
-		endProof, size, err := getLargestKeyProof()
+	if len(end) > 0 && len(result.KeyValues) == 0 {
+		proof, err := t.getProof(ctx, end)
 		if err != nil {
 			return nil, err
 		}
+		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		if err != nil {
+			return nil, err
+		}
+		result.EndProof = proof.Path
 
-		result.EndProof = endProof.Path
+		if totalSize+size > maxSize {
+			return nil, ErrMinProofIsLargerThanMaxSize
+		}
+	}
 
-		// shrink the number of key/values returned until we are under the size limit
-		for totalSize+size > maxSize {
-			if len(result.KeyValues) == 0 {
-				// no more keys to remove, so we cannot construct the proof
-				return nil, ErrMinProofIsLargerThanMaxSize
-			}
+	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
+	// The end proof we provide should be for the last key-value pair in the proof, not for
+	// the last key-value pair requested, which may not be in this proof.
+	// shrink the number of key/values returned until we are under the size limit
+	for len(result.KeyValues) > 0 {
+		proof, err := t.getProof(ctx, result.KeyValues[len(result.KeyValues)-1].Key)
+		if err != nil {
+			return nil, err
+		}
+		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		if err != nil {
+			return nil, err
+		}
+		result.EndProof = proof.Path
 
-			for totalSize+size > maxSize && len(result.KeyValues) > 0 {
-				// remove the last key/value
-				lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
-				kvSize, err := Codec.encodedKeyValueSize(Version, lastKeyValue)
-				if err != nil {
-					return nil, err
-				}
-				totalSize -= kvSize
-				result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
-			}
+		if totalSize+size <= maxSize {
+			break
+		}
 
-			// update the greatestReturnedKey
-			if len(result.KeyValues) == 0 {
-				// there are no more keys
-				// the last key is now also the first key so the proof will be the same
-				result.EndProof = result.StartProof
-				break
-			}
-
-			greatestReturnedKey = result.KeyValues[len(result.KeyValues)-1].Key
-
-			// grab proof for new greatestReturnedKey
-			endProof, size, err = getLargestKeyProof()
+		// remove key/values until the proof should fit within remaining size
+		for totalSize+size > maxSize && len(result.KeyValues) > 0 {
+			// remove the last key/value
+			kvSize, err := Codec.encodedKeyValueSize(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err
 			}
-			result.EndProof = endProof.Path
+			totalSize -= kvSize
+			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
+		}
+
+		// there are no more keys to remove
+		// the last key is now also the first key so the proof will be the same
+		if len(result.KeyValues) == 0 {
+			result.EndProof = result.StartProof
+			break
 		}
 	}
 

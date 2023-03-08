@@ -503,7 +503,9 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-	totalSize := uint32(0)
+	// initialize to 8 to take care of the two varints (one for change count, one for deleted count)
+	// it may is an over estimate, but it is close
+	totalSize := uint32(8)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
@@ -516,96 +518,100 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
+		if size > maxSize {
+			return nil, ErrMinProofIsLargerThanMaxSize
+		}
+
 		totalSize += size
 	}
 
-	largestKey := end
+	// if the end key exists and there are no changed keys
+	// generate a proof for the end key
+	if len(end) > 0 && len(changedKeys) == 0 {
+		endProof, err := historicalView.getProof(ctx, end)
+		if err != nil {
+			return nil, err
+		}
+		size, err := Codec.encodedProofPathSize(Version, endProof.Path)
+		if err != nil {
+			return nil, err
+		}
+		result.EndProof = endProof.Path
 
+		if totalSize+size > maxSize {
+			return nil, ErrMinProofIsLargerThanMaxSize
+		}
+	}
+
+	// determine how much space all of the changes will take up
 	for _, key := range changedKeys {
 		change := changes[key]
-		serializedKey := key.Serialize().Value
 
-		if change.after.IsNothing() {
-			keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
-			if err != nil {
-				return nil, err
-			}
-			totalSize += keySize
-		} else {
-			kv := KeyValue{
-				Key:   serializedKey,
-				Value: change.after.value,
-			}
-			kvSize, err := Codec.encodedKeyValueSize(Version, kv)
-			if err != nil {
-				return nil, err
-			}
-			totalSize += kvSize
+		keySize, err := Codec.encodedByteSliceSize(Version, key.Serialize().Value)
+		if err != nil {
+			return nil, err
 		}
-		largestKey = serializedKey
+		totalSize += keySize
+
+		if !change.after.IsNothing() {
+			valueSize, err := Codec.encodedByteSliceSize(Version, change.after.value)
+			if err != nil {
+				return nil, err
+			}
+			totalSize += valueSize
+		}
 	}
 
-	getLargestKeyProof := func() (*Proof, uint32, error) {
-		proof, err := historicalView.getProof(ctx, largestKey)
+	// if the size of the start proof + end proof + changes is too large, then we need to
+	// remove changes until we are under the max size
+	for len(changedKeys) > 0 {
+		proof, err := historicalView.getProof(ctx, changedKeys[len(changedKeys)-1].Serialize().Value)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		size, err := Codec.encodedProofPathSize(Version, proof.Path)
-		if err != nil {
-			return nil, 0, err
-		}
-		return proof, size, nil
-	}
-
-	if len(largestKey) > 0 {
-		proof, size, err := getLargestKeyProof()
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = proof.Path
-		for size+totalSize > maxSize {
-			if len(changedKeys) == 0 {
-				return nil, ErrMinProofIsLargerThanMaxSize
-			}
 
-			for size+totalSize > maxSize && len(changedKeys) > 0 {
-				// remove the last key/value
-				lastKey := changedKeys[len(changedKeys)-1]
-				serializedKey := lastKey.Serialize().Value
-				change := changes[lastKey]
-				if change.after.IsNothing() {
-					keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
-					if err != nil {
-						return nil, err
-					}
-					totalSize -= keySize
-				} else {
-					kv := KeyValue{
-						Key:   serializedKey,
-						Value: change.after.value,
-					}
-					kvSize, err := Codec.encodedKeyValueSize(Version, kv)
-					if err != nil {
-						return nil, err
-					}
-					totalSize -= kvSize
+		if totalSize+size <= maxSize {
+			break
+		}
+
+		for size+totalSize > maxSize && len(changedKeys) > 0 {
+			// remove the last key/value
+			lastPath := changedKeys[len(changedKeys)-1]
+			lastKey := lastPath.Serialize().Value
+			change := changes[lastPath]
+
+			keySize, err := Codec.encodedByteSliceSize(Version, lastKey)
+			if err != nil {
+				return nil, err
+			}
+			totalSize -= keySize
+
+			if !change.after.IsNothing() {
+				valueSize, err := Codec.encodedByteSliceSize(Version, change.after.value)
+				if err != nil {
+					return nil, err
 				}
-
-				changedKeys = changedKeys[:len(changedKeys)-1]
+				totalSize -= valueSize
 			}
 
-			// update the greatestReturnedKey
-			if len(changedKeys) == 0 {
-				// there are no more keys
-				// the last key is now also the first key so the proof will be the same
-				result.EndProof = result.StartProof
-				break
-			}
-			largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
-			result.EndProof = proof.Path
+			changedKeys = changedKeys[:len(changedKeys)-1]
+		}
+
+		// update the greatestReturnedKey
+		if len(changedKeys) == 0 {
+			// there are no more keys
+			// the last key is now also the first key so the proof will be the same
+			result.EndProof = result.StartProof
+			break
 		}
 	}
 
+	// add all of the remaining changed keys to the change proof
 	// TODO: sync.pool these buffers
 	result.KeyValues = make([]KeyValue, 0, len(changedKeys))
 	result.DeletedKeys = make([][]byte, 0, len(changedKeys))
