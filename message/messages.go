@@ -346,12 +346,6 @@ func (mb *msgBuilder) parseInbound(
 		return nil, err
 	}
 
-	// TODO remove
-	// op, err := ToOp(m)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	msg, err := Unwrap(m)
 	if err != nil {
 		return nil, err
