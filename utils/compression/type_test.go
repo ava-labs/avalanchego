@@ -53,5 +53,4 @@ func TestTypeMarshalJSON(t *testing.T) {
 			require.Equal(t, tt.expected, string(b))
 		})
 	}
-
 }
