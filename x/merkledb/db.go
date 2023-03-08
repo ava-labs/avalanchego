@@ -512,13 +512,11 @@ func (db *Database) GetChangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		for _, proofNode := range result.StartProof {
-			size, err := Codec.encodedProofNodeSize(Version, proofNode)
-			if err != nil {
-				return nil, err
-			}
-			totalSize += size
+		size, err := Codec.encodedProofPathSize(Version, result.StartProof)
+		if err != nil {
+			return nil, err
 		}
+		totalSize += size
 	}
 
 	largestKey := end
@@ -548,19 +546,15 @@ func (db *Database) GetChangeProof(
 	}
 
 	getLargestKeyProof := func() (*Proof, uint32, error) {
-		proofSize := uint32(0)
 		proof, err := historicalView.getProof(ctx, largestKey)
 		if err != nil {
 			return nil, 0, err
 		}
-		for _, proofNode := range proof.Path {
-			size, err := Codec.encodedProofNodeSize(Version, proofNode)
-			if err != nil {
-				return nil, 0, err
-			}
-			proofSize += size
+		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		if err != nil {
+			return nil, 0, err
 		}
-		return proof, proofSize, nil
+		return proof, size, nil
 	}
 
 	if len(largestKey) > 0 {
@@ -568,34 +562,37 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
+		result.EndProof = proof.Path
 		for size+totalSize > maxSize {
 			if len(changedKeys) == 0 {
 				return nil, ErrMinProofIsLargerThanMaxSize
 			}
 
-			// remove the last key/value
-			lastKey := changedKeys[len(changedKeys)-1]
-			serializedKey := lastKey.Serialize().Value
-			change := changes[lastKey]
-			if change.after.IsNothing() {
-				keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
-				if err != nil {
-					return nil, err
+			for size+totalSize > maxSize && len(changedKeys) > 0 {
+				// remove the last key/value
+				lastKey := changedKeys[len(changedKeys)-1]
+				serializedKey := lastKey.Serialize().Value
+				change := changes[lastKey]
+				if change.after.IsNothing() {
+					keySize, err := Codec.encodedByteSliceSize(Version, serializedKey)
+					if err != nil {
+						return nil, err
+					}
+					totalSize -= keySize
+				} else {
+					kv := KeyValue{
+						Key:   serializedKey,
+						Value: change.after.value,
+					}
+					kvSize, err := Codec.encodedKeyValueSize(Version, kv)
+					if err != nil {
+						return nil, err
+					}
+					totalSize -= kvSize
 				}
-				totalSize -= keySize
-			} else {
-				kv := KeyValue{
-					Key:   serializedKey,
-					Value: change.after.value,
-				}
-				kvSize, err := Codec.encodedKeyValueSize(Version, kv)
-				if err != nil {
-					return nil, err
-				}
-				totalSize -= kvSize
-			}
 
-			changedKeys = changedKeys[:len(changedKeys)-1]
+				changedKeys = changedKeys[:len(changedKeys)-1]
+			}
 
 			// update the greatestReturnedKey
 			if len(changedKeys) == 0 {
@@ -604,10 +601,9 @@ func (db *Database) GetChangeProof(
 				result.EndProof = result.StartProof
 				break
 			}
-
 			largestKey = changedKeys[len(changedKeys)-1].Serialize().Value
+			result.EndProof = proof.Path
 		}
-		result.EndProof = proof.Path
 	}
 
 	// TODO: sync.pool these buffers
@@ -1098,9 +1094,9 @@ func (db *Database) getKeyValues(
 			Value: it.Value(),
 		}
 		currentSize, err := Codec.encodedKeyValueSize(Version, kv)
-			if err != nil {
-				return nil, 0, err
-			}
+		if err != nil {
+			return nil, 0, err
+		}
 		if totalSize+currentSize > maxSize {
 			return result, totalSize, it.Error()
 		}

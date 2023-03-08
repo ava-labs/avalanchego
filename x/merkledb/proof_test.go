@@ -734,7 +734,7 @@ func Test_RangeProof_Marshal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte{1}, val)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, nil, 10)
+	proof, err := db.GetRangeProof(context.Background(), nil, nil, 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -759,7 +759,7 @@ func Test_RangeProof_Marshal_Errors(t *testing.T) {
 	require.NoError(t, err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, nil, 10)
+	proof, err := db.GetRangeProof(context.Background(), nil, nil, 1000)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 

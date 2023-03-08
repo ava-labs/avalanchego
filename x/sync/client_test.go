@@ -110,6 +110,7 @@ func sendRequest(
 func TestGetRangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
+	smallTrieKeyCount := 1000
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, 1000, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
@@ -126,7 +127,7 @@ func TestGetRangeProof(t *testing.T) {
 		request             *RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
-		expectedResponseLen uint32
+		expectedResponseLen int
 	}{
 		"full response for small (single request) trie": {
 			db: smallTrieDB,
@@ -134,18 +135,19 @@ func TestGetRangeProof(t *testing.T) {
 				Root:  smallTrieRoot,
 				Limit: defaultProofBytesLimit,
 			},
-			expectedResponseLen: defaultProofBytesLimit,
+			expectedResponseLen: smallTrieKeyCount,
 		},
 		"too many leaves in response": {
 			db: smallTrieDB,
 			request: &RangeProofRequest{
 				Root:  smallTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: 3000,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
+				response.KeyValues = append(response.KeyValues,
+					merkledb.KeyValue{Key: []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}})
 			},
-			expectedErr: errTooManyLeaves,
+			expectedErr: errProofTooLarge,
 		},
 		"partial response to request for entire trie (full leaf limit)": {
 			db: largeTrieDB,
@@ -153,7 +155,7 @@ func TestGetRangeProof(t *testing.T) {
 				Root:  largeTrieRoot,
 				Limit: defaultProofBytesLimit,
 			},
-			expectedResponseLen: defaultProofBytesLimit,
+			expectedResponseLen: largeTrieKeyCount,
 		},
 		"full response from near end of trie to end of trie (less than leaf limit)": {
 			db: largeTrieDB,
@@ -229,7 +231,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: 10000,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.StartProof = nil
@@ -248,7 +250,7 @@ func TestGetRangeProof(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.Len(proof.KeyValues, int(test.expectedResponseLen))
+			require.Len(proof.KeyValues, test.expectedResponseLen)
 		})
 	}
 }

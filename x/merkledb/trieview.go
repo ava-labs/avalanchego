@@ -404,7 +404,8 @@ func (t *trieView) getRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
-	totalSize := uint32(0)
+	// leave room for the key/value count
+	totalSize := uint32(4)
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -425,12 +426,9 @@ func (t *trieView) getRangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		for _, proofNode := range startProof.Path {
-			nodeSize, err := Codec.encodedProofNodeSize(Version, proofNode)
-			if err != nil {
-				return nil, err
-			}
-			startProofSize += nodeSize
+		startProofSize, err = Codec.encodedProofPathSize(Version, startProof.Path)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -446,7 +444,6 @@ func (t *trieView) getRangeProof(
 	if err != nil {
 		return nil, err
 	}
-
 	totalSize += keyValeusSize
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
@@ -457,25 +454,23 @@ func (t *trieView) getRangeProof(
 	}
 
 	getLargestKeyProof := func() (*Proof, uint32, error) {
-		proofSize := uint32(0)
 		proof, err := t.getProof(ctx, greatestReturnedKey)
 		if err != nil {
 			return nil, 0, err
 		}
-		for _, proofNode := range proof.Path {
-			size, err := Codec.encodedProofNodeSize(Version, proofNode)
-			if err != nil {
-				return nil, 0, err
-			}
-			proofSize += size
+		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		if err != nil {
+			return nil, 0, err
 		}
-		return proof, proofSize, nil
+		return proof, size, nil
 	}
 	if len(greatestReturnedKey) > 0 {
 		endProof, size, err := getLargestKeyProof()
 		if err != nil {
 			return nil, err
 		}
+
+		result.EndProof = endProof.Path
 
 		// shrink the number of key/values returned until we are under the size limit
 		for totalSize+size > maxSize {
@@ -484,14 +479,16 @@ func (t *trieView) getRangeProof(
 				return nil, ErrMinProofIsLargerThanMaxSize
 			}
 
-			// remove the last key/value
-			lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
-			kvSize, err := Codec.encodedKeyValueSize(Version, lastKeyValue)
-			if err != nil {
-				return nil, err
+			for totalSize+size > maxSize && len(result.KeyValues) > 0 {
+				// remove the last key/value
+				lastKeyValue := result.KeyValues[len(result.KeyValues)-1]
+				kvSize, err := Codec.encodedKeyValueSize(Version, lastKeyValue)
+				if err != nil {
+					return nil, err
+				}
+				totalSize -= kvSize
+				result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 			}
-			totalSize -= kvSize
-			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 
 			// update the greatestReturnedKey
 			if len(result.KeyValues) == 0 {
@@ -508,9 +505,8 @@ func (t *trieView) getRangeProof(
 			if err != nil {
 				return nil, err
 			}
+			result.EndProof = endProof.Path
 		}
-
-		result.EndProof = endProof.Path
 	}
 
 	// strip out any common nodes to reduce proof size
@@ -526,6 +522,13 @@ func (t *trieView) getRangeProof(
 		rootProof, err := t.getProof(ctx, rootKey)
 		if err != nil {
 			return nil, err
+		}
+		size, err := Codec.encodedProofPathSize(Version, rootProof.Path)
+		if err != nil {
+			return nil, err
+		}
+		if size > maxSize {
+			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 		result.EndProof = rootProof.Path
 	}

@@ -75,7 +75,7 @@ type Encoder interface {
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
 
-	encodedProofNodeSize(version uint16, n ProofNode) (uint32, error)
+	encodedProofPathSize(version uint16, n []ProofNode) (uint32, error)
 	encodedKeyValueSize(version uint16, n KeyValue) (uint32, error)
 	encodedByteSliceSize(version uint16, n []byte) (uint32, error)
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
@@ -216,12 +216,12 @@ func (c *codecImpl) encodedByteSliceSize(version uint16, n []byte) (uint32, erro
 	return uint32(buf.Len()), nil
 }
 
-func (c *codecImpl) encodedProofNodeSize(version uint16, n ProofNode) (uint32, error) {
+func (c *codecImpl) encodedProofPathSize(version uint16, n []ProofNode) (uint32, error) {
 	if version != codecVersion {
 		return 0, errUnknownVersion
 	}
 	buf := &bytes.Buffer{}
-	if err := c.encodeProofNode(n, buf); err != nil {
+	if err := c.encodeProofPath(buf, n); err != nil {
 		return 0, err
 	}
 	return uint32(buf.Len()), nil
