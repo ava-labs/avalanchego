@@ -133,7 +133,8 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	combinedChanges := make(map[path]*change[Maybe[[]byte]], maxSize/minKeyValueLen)
+	estimatedKeyCount := maxSize/(4*minKeyValueLen)
+	combinedChanges := make(map[path]*change[Maybe[[]byte]], estimatedKeyCount)
 
 	currentTotal := uint32(0)
 

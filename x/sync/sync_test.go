@@ -62,7 +62,7 @@ func Test_Creation(t *testing.T) {
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		MaxProofSizeBytes:     2 * units.MiB,
+		MaxProofSizeBytes:     units.MiB,
 	})
 	require.NotNil(t, syncer)
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func Test_Completion(t *testing.T) {
 			TargetRoot:            emptyRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -206,7 +206,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -287,7 +287,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -371,7 +371,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -426,7 +426,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -516,7 +516,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, syncer)
@@ -532,7 +532,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, newSyncer)
@@ -589,7 +589,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		MaxProofSizeBytes:     2 * units.MiB,
+		MaxProofSizeBytes:     units.MiB,
 	})
 	require.NoError(err)
 	require.NotNil(t, syncer)
@@ -650,7 +650,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
-			MaxProofSizeBytes:     2 * units.MiB,
+			MaxProofSizeBytes:     units.MiB,
 		})
 		require.NoError(err)
 		require.NotNil(t, syncer)
@@ -722,7 +722,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		MaxProofSizeBytes:     2 * units.MiB,
+		MaxProofSizeBytes:     units.MiB,
 	})
 	require.NoError(err)
 
