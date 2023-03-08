@@ -215,11 +215,10 @@ type stateBlk struct {
 type state struct {
 	validatorUptimes
 
-	cfg              *config.Config
-	ctx              *snow.Context
-	metrics          metrics.Metrics
-	nodeStakeLoggers []validators.NodeStakeLogger
-	rewards          reward.Calculator
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -484,12 +483,11 @@ func new(
 	return &state{
 		validatorUptimes: newValidatorUptimes(),
 
-		cfg:              cfg,
-		ctx:              ctx,
-		metrics:          metrics,
-		nodeStakeLoggers: make([]validators.NodeStakeLogger, 0),
-		rewards:          rewards,
-		baseDB:           baseDB,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+		baseDB:  baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1352,7 +1350,6 @@ func (s *state) initValidatorSets() error {
 
 	vl := validators.NewLogger(constants.PrimaryNetworkID, s.ctx.NodeID, s.ctx.Log)
 	primaryValidators.RegisterCallbackListener(vl)
-	s.nodeStakeLoggers = append(s.nodeStakeLoggers, vl)
 
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
@@ -1370,7 +1367,6 @@ func (s *state) initValidatorSets() error {
 
 		vl := validators.NewLogger(subnetID, s.ctx.NodeID, s.ctx.Log)
 		subnetValidators.RegisterCallbackListener(vl)
-		s.nodeStakeLoggers = append(s.nodeStakeLoggers, vl)
 	}
 	return nil
 }
