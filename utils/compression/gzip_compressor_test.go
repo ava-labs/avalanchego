@@ -13,41 +13,52 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-func TestGzipCompressDecompress(t *testing.T) {
-	data := make([]byte, 4096)
-	for i := 0; i < len(data); i++ {
-		data[i] = byte(rand.Intn(256)) // #nosec G404
+func TestCompressDecompress(t *testing.T) {
+	for _, compressionType := range []Type{TypeNone, TypeGzip, TypeZstd} {
+		t.Run(compressionType.String(), func(t *testing.T) {
+			data := make([]byte, 4096)
+			for i := 0; i < len(data); i++ {
+				data[i] = byte(rand.Intn(256)) // #nosec G404
+			}
+
+			data2 := make([]byte, 4096)
+			for i := 0; i < len(data); i++ {
+				data2[i] = byte(rand.Intn(256)) // #nosec G404
+			}
+
+			var compressor Compressor
+			switch compressionType {
+			case TypeNone:
+				compressor = &noCompressor{}
+			case TypeGzip:
+				var err error
+				compressor, err = NewGzipCompressor(2 * units.MiB) // Max message size. Can't import due to cycle.
+				require.NoError(t, err)
+			case TypeZstd:
+				compressor = NewZstdCompressor()
+			default:
+				t.Fatal("Unknown compression type")
+			}
+
+			dataCompressed, err := compressor.Compress(data)
+			require.NoError(t, err)
+
+			data2Compressed, err := compressor.Compress(data2)
+			require.NoError(t, err)
+
+			dataDecompressed, err := compressor.Decompress(dataCompressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data, dataDecompressed)
+
+			data2Decompressed, err := compressor.Decompress(data2Compressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data2, data2Decompressed)
+
+			dataDecompressed, err = compressor.Decompress(dataCompressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data, dataDecompressed)
+		})
 	}
-
-	data2 := make([]byte, 4096)
-	for i := 0; i < len(data); i++ {
-		data2[i] = byte(rand.Intn(256)) // #nosec G404
-	}
-
-	compressor, err := NewGzipCompressor(2 * units.MiB)
-	require.NoError(t, err)
-
-	dataCompressed, err := compressor.Compress(data)
-	require.NoError(t, err)
-
-	data2Compressed, err := compressor.Compress(data2)
-	require.NoError(t, err)
-
-	dataDecompressed, err := compressor.Decompress(dataCompressed)
-	require.NoError(t, err)
-	require.EqualValues(t, data, dataDecompressed)
-
-	data2Decompressed, err := compressor.Decompress(data2Compressed)
-	require.NoError(t, err)
-	require.EqualValues(t, data2, data2Decompressed)
-
-	dataDecompressed, err = compressor.Decompress(dataCompressed)
-	require.NoError(t, err)
-	require.EqualValues(t, data, dataDecompressed)
-
-	nonGzipData := []byte{1, 2, 3}
-	_, err = compressor.Decompress(nonGzipData)
-	require.Error(t, err)
 }
 
 func TestGzipSizeLimiting(t *testing.T) {
@@ -78,15 +89,32 @@ func TestNewGzipCompressorWithInvalidLimit(t *testing.T) {
 }
 
 func FuzzGzipCompressor(f *testing.F) {
+	fuzzHelper(f, TypeGzip)
+}
+
+func FuzzZstdCompressor(f *testing.F) {
+	fuzzHelper(f, TypeZstd)
+}
+
+func fuzzHelper(f *testing.F, compressionType Type) {
+	var compressor Compressor
+	switch compressionType {
+	case TypeGzip:
+		var err error
+		compressor, err = NewGzipCompressor(2 * units.MiB) // Max message size. Can't import due to cycle.
+		require.NoError(f, err)
+	case TypeZstd:
+		compressor = NewZstdCompressor()
+	default:
+		f.Fatal("Unknown compression type")
+	}
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
-		if len(data) > 2*units.MiB {
+		if len(data) > 2*units.MiB && compressionType == TypeGzip {
 			t.SkipNow()
 		}
-
-		compressor, err := NewGzipCompressor(2 * units.MiB)
-		require.NoError(err)
 
 		compressed, err := compressor.Compress(data)
 		require.NoError(err)

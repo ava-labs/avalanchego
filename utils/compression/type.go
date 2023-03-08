@@ -46,21 +46,13 @@ func TypeFromString(s string) (Type, error) {
 
 func (t Type) MarshalJSON() ([]byte, error) {
 	var b strings.Builder
-	_, err := b.WriteString("\"")
-	if err != nil {
+	if _, err := b.WriteString("\""); err != nil {
 		return nil, err
 	}
-	switch t {
-	case TypeNone, TypeGzip, TypeZstd:
-		_, err = b.WriteString(t.String())
-	default:
-		err = errUnknownCompressionType
-	}
-	if err != nil {
+	if _, err := b.WriteString(t.String()); err != nil {
 		return nil, err
 	}
-	_, err = b.WriteString("\"")
-	if err != nil {
+	if _, err := b.WriteString("\""); err != nil {
 		return nil, err
 	}
 	return []byte(b.String()), nil
