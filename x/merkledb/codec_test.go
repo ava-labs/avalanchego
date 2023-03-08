@@ -535,6 +535,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				value:    value,
 				children: children,
 			}
+			
 			nodeBytes, err := Codec.encodeDBNode(Version, &node)
 			require.NoError(err)
 
