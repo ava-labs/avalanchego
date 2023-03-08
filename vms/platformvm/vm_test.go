@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -1722,7 +1721,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter := &router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", compression.TypeGzip, 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
 	err = chainRouter.Initialize(

@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -186,7 +185,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		"",
-		compression.TypeGzip, // TODO support zstd
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
