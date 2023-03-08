@@ -6,6 +6,7 @@ package merkledb
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/google/btree"
 
@@ -31,6 +32,9 @@ type trieHistory struct {
 	history *btree.BTreeG[*changeSummaryAndIndex]
 
 	nextIndex uint64
+
+	estimatedValueSize float64
+	valuesCount int
 }
 
 // Tracks the beginning and ending state of a value.
@@ -99,12 +103,14 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// [lastStartRootChange] is the latest appearance of [startRoot]
 	// which came before [lastEndRootChange].
 	var lastStartRootChange *changeSummaryAndIndex
+	possbileValuesCount :=0
 	th.history.DescendLessOrEqual(
 		lastEndRootChange,
 		func(item *changeSummaryAndIndex) bool {
 			if item == lastEndRootChange {
 				return true // Skip first iteration
 			}
+			possbileValuesCount += len(item.values)
 			if item.rootID == startRoot {
 				lastStartRootChange = item
 				return false
@@ -133,7 +139,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	estimatedKeyCount := maxSize/(4*minKeyValueLen)
+	estimatedKeyCount := int(math.Min(float64(maxSize)/th.estimatedValueSize, float64(possbileValuesCount)))
 	combinedChanges := make(map[path]*change[Maybe[[]byte]], estimatedKeyCount)
 
 	currentTotal := uint32(0)
@@ -244,6 +250,8 @@ func (th *trieHistory) record(changes *changeSummary) {
 		// This change causes us to go over our lookback limit.
 		// Remove the oldest set of changes.
 		oldestEntry, _ := th.history.DeleteMin()
+		th.valuesCount -= len(oldestEntry.values)
+
 		latestChange := th.lastChanges[oldestEntry.rootID]
 		if latestChange == oldestEntry {
 			// The removed change was the most recent resulting in this root ID.
@@ -251,6 +259,16 @@ func (th *trieHistory) record(changes *changeSummary) {
 		}
 	}
 
+	if len( changes.values ) >0 {
+		size := 0
+		for key, value := range changes.values {
+			size += len(key) + len(value.after.value)
+		}
+		newCount := math.Max(float64(th.valuesCount + len(changes.values)),1)
+		th.estimatedValueSize = (th.estimatedValueSize * float64(th.valuesCount) + float64(size)) / newCount
+		th.valuesCount += len(changes.values)
+	}
+	
 	changesAndIndex := &changeSummaryAndIndex{
 		changeSummary: changes,
 		index:         th.nextIndex,
