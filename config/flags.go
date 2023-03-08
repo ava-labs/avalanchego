@@ -143,7 +143,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
 
 	fs.Bool(NetworkCompressionEnabledKey, constants.DefaultNetworkCompressionEnabled, "If true, compress certain outbound messages. This node will be able to parse compressed inbound messages regardless of this flag's value")
-	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), "Preferred compression type for outbound messages. If a peer doesn't support it, a different compression type will be used for that peer")
+	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), "Preferred compression type for outbound messages")
 
 	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
 	fs.Bool(NetworkAllowPrivateIPsKey, constants.DefaultNetworkAllowPrivateIPs, "Allows the node to initiate outbound connection attempts to peers with private IPs")
