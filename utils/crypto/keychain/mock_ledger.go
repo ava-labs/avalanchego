@@ -82,6 +82,21 @@ func (mr *MockLedgerMockRecorder) Disconnect() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnect", reflect.TypeOf((*MockLedger)(nil).Disconnect))
 }
 
+// Sign mocks base method.
+func (m *MockLedger) Sign(arg0 []byte, arg1 []uint32) ([][]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Sign", arg0, arg1)
+	ret0, _ := ret[0].([][]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Sign indicates an expected call of Sign.
+func (mr *MockLedgerMockRecorder) Sign(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockLedger)(nil).Sign), arg0, arg1)
+}
+
 // SignHash mocks base method.
 func (m *MockLedger) SignHash(arg0 []byte, arg1 []uint32) ([][]byte, error) {
 	m.ctrl.T.Helper()
