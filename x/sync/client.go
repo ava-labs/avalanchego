@@ -101,15 +101,16 @@ func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db
 func (c *client) GetRangeProof(ctx context.Context, req *RangeProofRequest) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
 		rangeProof := &merkledb.RangeProof{}
-		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
-			return nil, err
-		}
 
 		// Ensure the response is not larger than the limit
 		if len(responseBytes) > int(req.Limit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errProofTooLarge, len(responseBytes), req.Limit)
 		}
 
+		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
+			return nil, err
+		}
+		
 		if err := rangeProof.Verify(
 			ctx,
 			req.Start,
