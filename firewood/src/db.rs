@@ -186,7 +186,7 @@ impl DBHeader {
 }
 
 impl MummyItem for DBHeader {
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, shale::ShaleError> {
+    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(shale::ShaleError::LinearMemStoreError)?;
@@ -598,8 +598,8 @@ impl DB {
         }
 
         let (mut db_header_ref, merkle_payload_header_ref, blob_payload_header_ref) = {
-            let merkle_meta_ref = staging.merkle.meta.as_ref() as &dyn MemStore;
-            let blob_meta_ref = staging.blob.meta.as_ref() as &dyn MemStore;
+            let merkle_meta_ref = staging.merkle.meta.as_ref();
+            let blob_meta_ref = staging.blob.meta.as_ref();
 
             (
                 MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
@@ -790,8 +790,8 @@ impl DB {
         let space = &inner.revisions[nback - 1];
 
         let (db_header_ref, merkle_payload_header_ref, blob_payload_header_ref) = {
-            let merkle_meta_ref = &space.merkle.meta as &dyn MemStore;
-            let blob_meta_ref = &space.blob.meta as &dyn MemStore;
+            let merkle_meta_ref = &space.merkle.meta;
+            let blob_meta_ref = &space.blob.meta;
 
             (
                 MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),

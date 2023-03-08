@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 use std::cell::{RefCell, UnsafeCell};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
@@ -50,7 +51,7 @@ pub trait MemView {
 /// backed by a cached/memory-mapped pool of the accessed intervals from the underlying linear
 /// persistent store. Reads could trigger disk reads to bring data into memory, but writes will
 /// *only* be visible in memory (it does not write back to the disk).
-pub trait MemStore {
+pub trait MemStore: Debug {
     /// Returns a handle that pins the `length` of bytes starting from `offset` and makes them
     /// directly accessible.
     fn get_view(&self, offset: u64, length: u64)
@@ -272,7 +273,7 @@ pub trait ShaleStore<T> {
 pub trait MummyItem {
     fn dehydrated_len(&self) -> u64;
     fn dehydrate(&self, to: &mut [u8]);
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError>
+    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
     fn is_mem_mapped(&self) -> bool {
@@ -338,7 +339,7 @@ impl<T: MummyItem> TypedView<T> for MummyObj<T> {
 
 impl<T: MummyItem + 'static> MummyObj<T> {
     #[inline(always)]
-    fn new(offset: u64, len_limit: u64, space: &dyn MemStore) -> Result<Self, ShaleError> {
+    fn new<U: MemStore>(offset: u64, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::hydrate(offset, space)?;
         Ok(Self {
             offset,
@@ -364,8 +365,8 @@ impl<T: MummyItem + 'static> MummyObj<T> {
     }
 
     #[inline(always)]
-    pub fn ptr_to_obj(
-        store: &dyn MemStore,
+    pub fn ptr_to_obj<U: MemStore>(
+        store: &U,
         ptr: ObjPtr<T>,
         len_limit: u64,
     ) -> Result<Obj<T>, ShaleError> {
@@ -443,7 +444,7 @@ impl<T> MummyItem for ObjPtr<T> {
             .unwrap();
     }
 
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
+    fn hydrate<U: MemStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
@@ -458,6 +459,7 @@ impl<T> MummyItem for ObjPtr<T> {
 /// Purely volatile, vector-based implementation for [MemStore]. This is good for testing or trying
 /// out stuff (persistent data structures) built on [ShaleStore] in memory, without having to write
 /// your own [MemStore] implementation.
+#[derive(Debug)]
 pub struct PlainMem {
     space: Rc<RefCell<Vec<u8>>>,
     id: SpaceID,

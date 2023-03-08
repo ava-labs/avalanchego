@@ -2,7 +2,7 @@
 
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -24,7 +24,7 @@ pub(crate) const PAGE_SIZE_NBIT: u64 = 12;
 pub(crate) const PAGE_SIZE: u64 = 1 << PAGE_SIZE_NBIT;
 pub(crate) const PAGE_MASK: u64 = PAGE_SIZE - 1;
 
-pub trait MemStoreR {
+pub trait MemStoreR: Debug {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>>;
     fn id(&self) -> SpaceID;
 }
@@ -380,12 +380,13 @@ impl<S: Clone + MemStore + 'static> DerefMut for StoreShared<S> {
     }
 }
 
+#[derive(Debug)]
 struct StoreRevMutDelta {
     pages: HashMap<u64, Box<Page>>,
     plain: Ash,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StoreRevMut {
     prev: Rc<dyn MemStoreR>,
     deltas: Rc<RefCell<StoreRevMutDelta>>,
@@ -528,7 +529,7 @@ impl MemStore for StoreRevMut {
 }
 
 #[cfg(test)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ZeroStore(Rc<()>);
 
 #[cfg(test)]
@@ -598,6 +599,7 @@ pub struct StoreConfig {
     rootfd: Fd,
 }
 
+#[derive(Debug)]
 struct CachedSpaceInner {
     cached_pages: lru::LruCache<u64, Box<Page>>,
     pinned_pages: HashMap<u64, (usize, Box<Page>)>,
@@ -605,7 +607,7 @@ struct CachedSpaceInner {
     disk_buffer: DiskBufferRequester,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CachedSpace {
     inner: Rc<RefCell<CachedSpaceInner>>,
     space_id: SpaceID,
@@ -767,6 +769,7 @@ impl MemStoreR for CachedSpace {
     }
 }
 
+#[derive(Debug)]
 pub struct FilePool {
     files: parking_lot::Mutex<lru::LruCache<u64, Arc<File>>>,
     file_nbit: u64,
@@ -1187,7 +1190,7 @@ impl DiskBuffer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DiskBufferRequester {
     sender: mpsc::Sender<BufferCmd>,
 }

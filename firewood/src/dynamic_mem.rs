@@ -9,6 +9,7 @@ pub type SpaceID = u8;
 /// Purely volatile, dynamically allocated vector-based implementation for [MemStore]. This is similar to
 /// [PlainMem]. The only difference is, when [write] dynamically allocate more space if original space is
 /// not enough.
+#[derive(Debug)]
 pub struct DynamicMem {
     space: Rc<UnsafeCell<Vec<u8>>>,
     id: SpaceID,

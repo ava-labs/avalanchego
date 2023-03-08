@@ -124,7 +124,7 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
     );
     let compact_header =
         MummyObj::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
-    let mem_meta = Rc::new(dm) as Rc<dyn MemStore>;
+    let mem_meta = Rc::new(dm);
     let mem_payload = Rc::new(DynamicMem::new(compact_size, 0x1));
 
     let cache = shale::ObjCache::new(1);

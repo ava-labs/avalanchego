@@ -97,7 +97,7 @@ pub enum Blob {
 
 impl MummyItem for Blob {
     // currently there is only one variant of Blob: Code
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
+    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, 4)
             .ok_or(ShaleError::LinearMemStoreError)?;

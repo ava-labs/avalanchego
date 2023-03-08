@@ -54,7 +54,7 @@ impl std::ops::Deref for Hash {
 }
 
 impl MummyItem for Hash {
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
+    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::LinearMemStoreError)?;
@@ -463,7 +463,7 @@ impl Node {
 }
 
 impl MummyItem for Node {
-    fn hydrate(addr: u64, mem: &dyn MemStore) -> Result<Self, ShaleError> {
+    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let dec_err = |_| ShaleError::DecodeError;
         const META_SIZE: u64 = 32 + 1 + 1;
         let meta_raw = mem
