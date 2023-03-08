@@ -26,15 +26,20 @@ func Test_newOutboundBuilder(t *testing.T) {
 	)
 	require.NoError(err)
 
-	builder := newOutboundBuilder(compression.TypeGzip, mb) // TODO support zstd
+	for _, compressionType := range []compression.Type{
+		compression.TypeNone,
+		compression.TypeGzip,
+		compression.TypeZstd,
+	} {
+		builder := newOutboundBuilder(compressionType, mb)
 
-	outMsg, err := builder.GetAcceptedStateSummary(
-		ids.GenerateTestID(),
-		12345,
-		time.Hour,
-		[]uint64{1000, 2000},
-	)
-	require.NoError(err)
-
-	t.Logf("outbound message built with size %d", len(outMsg.Bytes()))
+		outMsg, err := builder.GetAcceptedStateSummary(
+			ids.GenerateTestID(),
+			12345,
+			time.Hour,
+			[]uint64{1000, 2000},
+		)
+		require.NoError(err)
+		t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes()))
+	}
 }
