@@ -34,7 +34,7 @@ type trieHistory struct {
 	nextIndex uint64
 
 	estimatedValueSize float64
-	valuesCount int
+	valuesCount        int
 }
 
 // Tracks the beginning and ending state of a value.
@@ -103,7 +103,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// [lastStartRootChange] is the latest appearance of [startRoot]
 	// which came before [lastEndRootChange].
 	var lastStartRootChange *changeSummaryAndIndex
-	possbileValuesCount :=0
+	possbileValuesCount := 0
 	th.history.DescendLessOrEqual(
 		lastEndRootChange,
 		func(item *changeSummaryAndIndex) bool {
@@ -259,16 +259,16 @@ func (th *trieHistory) record(changes *changeSummary) {
 		}
 	}
 
-	if len( changes.values ) >0 {
+	if len(changes.values) > 0 {
 		size := 0
 		for key, value := range changes.values {
 			size += len(key) + len(value.after.value)
 		}
-		newCount := math.Max(float64(th.valuesCount + len(changes.values)),1)
-		th.estimatedValueSize = (th.estimatedValueSize * float64(th.valuesCount) + float64(size)) / newCount
+		newCount := math.Max(float64(th.valuesCount+len(changes.values)), 1)
+		th.estimatedValueSize = (th.estimatedValueSize*float64(th.valuesCount) + float64(size)) / newCount
 		th.valuesCount += len(changes.values)
 	}
-	
+
 	changesAndIndex := &changeSummaryAndIndex{
 		changeSummary: changes,
 		index:         th.nextIndex,
