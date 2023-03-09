@@ -126,7 +126,7 @@ func (t *trieView) NewView() (TrieView, error) {
 // If this view is already committed, the new view's parent will
 // be set to the parent of the current view.
 // Otherwise adds the new view to [t.childViews].
-// Assumes this [t.lock] is unlocked.
+// Assumes [t.lock] is unlocked.
 func (t *trieView) NewPreallocatedView(
 	estimatedChanges int,
 ) (TrieView, error) {
