@@ -457,7 +457,7 @@ func (db *Database) getRangeProofAtRoot(
 
 // Returns a proof for a subset of the key/value changes in key range
 // [start, end] that occurred between [startRootID] and [endRootID].
-// Returns a proof of at most [maxSize] KB
+// Returns a proof of at most [maxSize] bytes
 func (db *Database) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
@@ -489,13 +489,6 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-	// [changedKeys] are a subset of the keys that were added or had their
-	// values modified between [startRootID] to [endRootID] sorted in increasing
-	// order.
-	changedKeys := maps.Keys(changes)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
-		return i.Compare(j) < 0
-	})
 
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
@@ -506,7 +499,10 @@ func (db *Database) GetChangeProof(
 
 	// initialize to take care of the two varints (one for change count, one for deleted count)
 	// it may is an over estimate, but it is close
-	totalSize := uint32(2*binary.MaxVarintLen64)
+	totalSize := uint64(2*binary.MaxVarintLen64)
+
+	// prevents overflow to do this in a larger int size
+	uint64MaxSize := uint64(maxSize)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
@@ -515,16 +511,24 @@ func (db *Database) GetChangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		size, err := Codec.encodedProofPathSize(Version, result.StartProof)
+		size, err := Codec.encodedProofPathByteCount(Version, result.StartProof)
 		if err != nil {
 			return nil, err
 		}
-		if size > maxSize {
+		totalSize += uint64(size)
+
+		if totalSize > uint64MaxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
-
-		totalSize += size
 	}
+
+	// [changedKeys] are a subset of the keys that were added or had their
+	// values modified between [startRootID] to [endRootID] sorted in increasing
+	// order.
+	changedKeys := maps.Keys(changes)
+	slices.SortFunc(changedKeys, func(i, j path) bool {
+		return i.Compare(j) < 0
+	})
 
 	// if the end key exists and there are no changed keys
 	// generate a proof for the end key
@@ -533,13 +537,13 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathSize(Version, endProof.Path)
+		size, err := Codec.encodedProofPathByteCount(Version, endProof.Path)
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = endProof.Path
 
-		if totalSize+size > maxSize {
+		if totalSize+uint64(size) > uint64MaxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -548,56 +552,57 @@ func (db *Database) GetChangeProof(
 	for _, key := range changedKeys {
 		change := changes[key]
 
-		keySize, err := Codec.encodedByteSliceSize(Version, key.Serialize().Value)
+		keySize, err := Codec.encodedByteSliceByteCount(Version, key.Serialize().Value)
 		if err != nil {
 			return nil, err
 		}
-		totalSize += keySize
+		totalSize += uint64(keySize)
 
 		if !change.after.IsNothing() {
-			valueSize, err := Codec.encodedByteSliceSize(Version, change.after.value)
+			valueSize, err := Codec.encodedByteSliceByteCount(Version, change.after.value)
 			if err != nil {
 				return nil, err
 			}
-			totalSize += valueSize
+			totalSize += uint64(valueSize)
 		}
 	}
 
 	// if the size of the start proof + end proof + changes is too large, then we need to
 	// remove changes until we are under the max size
 	for len(changedKeys) > 0 {
-		proof, err := historicalView.getProof(ctx, changedKeys[len(changedKeys)-1].Serialize().Value)
+		lastKey:=changedKeys[len(changedKeys)-1].Serialize().Value
+		proof, err := historicalView.getProof(ctx, lastKey)
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		size, err := Codec.encodedProofPathByteCount(Version, proof.Path)
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = proof.Path
 
-		if totalSize+size <= maxSize {
+		if totalSize+uint64(size) <= uint64MaxSize {
 			break
 		}
 
-		for size+totalSize > maxSize && len(changedKeys) > 0 {
+		for uint64(size)+totalSize > uint64MaxSize && len(changedKeys) > 0 {
 			// remove the last key/value
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
 			change := changes[lastPath]
 
-			keySize, err := Codec.encodedByteSliceSize(Version, lastKey)
+			keySize, err := Codec.encodedByteSliceByteCount(Version, lastKey)
 			if err != nil {
 				return nil, err
 			}
-			totalSize -= keySize
+			totalSize -= uint64(keySize)
 
 			if !change.after.IsNothing() {
-				valueSize, err := Codec.encodedByteSliceSize(Version, change.after.value)
+				valueSize, err := Codec.encodedByteSliceByteCount(Version, change.after.value)
 				if err != nil {
 					return nil, err
 				}
-				totalSize -= valueSize
+				totalSize -= uint64(valueSize)
 			}
 
 			changedKeys = changedKeys[:len(changedKeys)-1]
@@ -1100,7 +1105,7 @@ func (db *Database) getKeyValues(
 			Key:   key,
 			Value: it.Value(),
 		}
-		currentSize, err := Codec.encodedKeyValueSize(Version, kv)
+		currentSize, err := Codec.encodedKeyValueByteCount(Version, kv)
 		if err != nil {
 			return nil, 0, err
 		}

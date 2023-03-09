@@ -21,10 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-// Maximum number of key-value pairs to return in a proof.
+// Maximum number of bytes to return in a proof.
 // This overrides any other Limit specified in a RangeProofRequest
 // or ChangeProofRequest if the given Limit is greater.
-const maxKeyValuesLimit = 2 * uint32(units.MiB)
+const maxProofSizeLimit = 2 * uint32(units.MiB)
 
 var _ Handler = (*NetworkServer)(nil)
 
@@ -138,8 +138,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 
 	// override limit if it is greater than maxKeyValuesLimit
 	limit := req.Limit
-	if limit > maxKeyValuesLimit {
-		limit = maxKeyValuesLimit
+	if limit > maxProofSizeLimit {
+		limit = maxProofSizeLimit
 	}
 
 	changeProof, err := s.db.GetChangeProof(ctx, req.StartingRoot, req.EndingRoot, req.Start, req.End, limit)
@@ -185,8 +185,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 
 	// override limit if it is greater than maxKeyValuesLimit
 	limit := req.Limit
-	if limit > maxKeyValuesLimit {
-		limit = maxKeyValuesLimit
+	if limit > maxProofSizeLimit {
+		limit = maxProofSizeLimit
 	}
 
 	rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, limit)

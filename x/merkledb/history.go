@@ -103,14 +103,14 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// [lastStartRootChange] is the latest appearance of [startRoot]
 	// which came before [lastEndRootChange].
 	var lastStartRootChange *changeSummaryAndIndex
-	possbileValuesCount := 0
+	valuesCount := 0
 	th.history.DescendLessOrEqual(
 		lastEndRootChange,
 		func(item *changeSummaryAndIndex) bool {
 			if item == lastEndRootChange {
 				return true // Skip first iteration
 			}
-			possbileValuesCount += len(item.values)
+			valuesCount += len(item.values)
 			if item.rootID == startRoot {
 				lastStartRootChange = item
 				return false
@@ -139,7 +139,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	estimatedKeyCount := int(math.Min(float64(maxSize)/th.estimatedValueSize, float64(possbileValuesCount)))
+	estimatedKeyCount := int(math.Min(float64(maxSize)/th.estimatedValueSize, float64(valuesCount)))
 	combinedChanges := make(map[path]*change[Maybe[[]byte]], estimatedKeyCount)
 
 	currentTotal := uint32(0)

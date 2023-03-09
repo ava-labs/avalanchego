@@ -425,7 +425,7 @@ func (t *trieView) getRangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		startProofSize, err = Codec.encodedProofPathSize(Version, startProof.Path)
+		startProofSize, err = Codec.encodedProofPathByteCount(Version, startProof.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		size, err := Codec.encodedProofPathByteCount(Version, proof.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -470,7 +470,7 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathSize(Version, proof.Path)
+		size, err := Codec.encodedProofPathByteCount(Version, proof.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -483,7 +483,7 @@ func (t *trieView) getRangeProof(
 		// remove key/values until the proof should fit within remaining size
 		for totalSize+size > maxSize && len(result.KeyValues) > 0 {
 			// remove the last key/value
-			kvSize, err := Codec.encodedKeyValueSize(Version, result.KeyValues[len(result.KeyValues)-1])
+			kvSize, err := Codec.encodedKeyValueByteCount(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err
 			}
@@ -513,7 +513,7 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathSize(Version, rootProof.Path)
+		size, err := Codec.encodedProofPathByteCount(Version, rootProof.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -833,12 +833,12 @@ func (t *trieView) getKeyValues(
 			currentChangeState := changes[changesIndex]
 			currentKeyValue := baseKeyValues[baseKeyValuesIndex]
 
-			currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentChangeState)
+			currentChangeSize, err := Codec.encodedKeyValueByteCount(Version, currentChangeState)
 			if err != nil {
 				return nil, 0, err
 			}
 
-			currentKeyValuesSize, err := Codec.encodedKeyValueSize(Version, currentKeyValue)
+			currentKeyValuesSize, err := Codec.encodedKeyValueByteCount(Version, currentKeyValue)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -874,7 +874,7 @@ func (t *trieView) getKeyValues(
 		// add the next base state value.
 		if !baseKeyValuesFinished {
 			currentBaseState := baseKeyValues[baseKeyValuesIndex]
-			currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentBaseState)
+			currentChangeSize, err := Codec.encodedKeyValueByteCount(Version, currentBaseState)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -891,7 +891,7 @@ func (t *trieView) getKeyValues(
 		// the base state is finished, but the changes is not finished.
 		// add the next changes value.
 		currentChangeState := changes[changesIndex]
-		currentChangeSize, err := Codec.encodedKeyValueSize(Version, currentChangeState)
+		currentChangeSize, err := Codec.encodedKeyValueByteCount(Version, currentChangeState)
 		if err != nil {
 			return nil, 0, err
 		}
