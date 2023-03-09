@@ -380,7 +380,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		err = syncer.Wait(context.Background())
 		require.NoError(t, err)
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 2000)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 4000)
 		require.NoError(t, err)
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 
@@ -392,7 +392,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		err = dbToSync.Put(lastKey, []byte{2})
 		require.NoError(t, err)
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 2000)
+		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 4000)
 		require.NoError(t, err)
 
 		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
