@@ -62,6 +62,7 @@ func Test_Trie_GetKeyValues(t *testing.T) {
 	writeBasicBatch(t, db)
 
 	view, err := db.NewView(context.Background())
+	require.NoError(t, err)
 
 	kvs, size, err := view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 100, set.Set[string]{})
 	require.NoError(t, err)
