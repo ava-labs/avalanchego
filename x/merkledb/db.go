@@ -539,13 +539,13 @@ func (db *Database) GetChangeProof(
 		}
 		result.EndProof = endProof.Path
 
-		if size > maxSize - totalSize {
+		if size > maxSize-totalSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
 
 	// determine how much space all of the changes will take up
-	for _, key := range changedKeys  {
+	for _, key := range changedKeys {
 		if totalSize >= maxSize {
 			break
 		}
@@ -588,7 +588,7 @@ func (db *Database) GetChangeProof(
 		}
 
 		// while the proof remains too big to fit within the maxSize and there are keys to remove, remove key/values
-		for proofSize > maxSize - totalSize && len(changedKeys) > 0 {
+		for proofSize > maxSize-totalSize && len(changedKeys) > 0 {
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
 			change := changes[lastPath]
