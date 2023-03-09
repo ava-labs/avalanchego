@@ -2,13 +2,11 @@
 
 ## TODOs
 
-- [ ] Improve invariants around trieview commitment. Either:
-  - [ ] Consider allowing a child view to commit into a parent view without committing to the base DB.
-- [ ] Allow concurrent reads into the trieview.
+
+- [ ] Consider allowing a child view to commit into a parent view without committing to the base DB.
 - [ ] Remove special casing around the root node from the physical structure of the hashed tree.
 - [ ] Analyze performance impact of needing to skip intermediate nodes when generating range and change proofs
   - [ ] Consider moving nodes with values to a separate db prefix
-- [ ] Replace naive concurrent hashing with a more optimized implementation
 - [ ] Analyze performance of using database snapshots rather than in-memory history
 - [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
 
