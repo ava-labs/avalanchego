@@ -480,13 +480,14 @@ func (t *trieView) getRangeProof(
 		result.EndProof = proof.Path
 
 		uint64ProofSize := uint64(size)
+
+		// the current last key's proof fits within the max size limit, so we are done
 		if totalSize+uint64ProofSize <= uint64MaxSize {
 			break
 		}
 
-		// remove key/values until the proof should fit within remaining size
+		// keep removing key/values until the proof should fit within remaining size or we run out of key/values
 		for totalSize+uint64ProofSize > uint64MaxSize && len(result.KeyValues) > 0 {
-			// remove the last key/value
 			kvSize, err := Codec.encodedKeyValueByteCount(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err

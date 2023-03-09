@@ -569,6 +569,7 @@ func (db *Database) GetChangeProof(
 	// if the size of the start proof + end proof + changes is too large, then we need to
 	// remove changes until we are under the max size
 	for len(changedKeys) > 0 {
+		// grab the current last key's proof
 		lastKey := changedKeys[len(changedKeys)-1].Serialize().Value
 		proof, err := historicalView.getProof(ctx, lastKey)
 		if err != nil {
@@ -580,13 +581,14 @@ func (db *Database) GetChangeProof(
 		}
 		result.EndProof = proof.Path
 		proofSize := uint64(size)
+
+		// if the proof fits within the max size, then we are done
 		if totalSize+proofSize <= uint64MaxSize {
 			break
 		}
 
-		// while the proof remains too big to fit within the maxSize, remove key/values
+		// while the proof remains too big to fit within the maxSize and there are keys to remove, remove key/values
 		for totalSize+proofSize > uint64MaxSize && len(changedKeys) > 0 {
-			// remove the last key/value
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
 			change := changes[lastPath]
@@ -595,8 +597,10 @@ func (db *Database) GetChangeProof(
 			if err != nil {
 				return nil, err
 			}
+			// remove the key from the total size
 			totalSize -= uint64(keySize)
 
+			// remove the value if it exists from the total size
 			if !change.after.IsNothing() {
 				valueSize, err := Codec.encodedByteSliceByteCount(Version, change.after.value)
 				if err != nil {
@@ -608,10 +612,9 @@ func (db *Database) GetChangeProof(
 			changedKeys = changedKeys[:len(changedKeys)-1]
 		}
 
-		// update the greatestReturnedKey
+		// there are no more keys
+		// the last key is now also the first key so the proof will be the same
 		if len(changedKeys) == 0 {
-			// there are no more keys
-			// the last key is now also the first key so the proof will be the same
 			result.EndProof = result.StartProof
 			break
 		}
@@ -637,7 +640,7 @@ func (db *Database) GetChangeProof(
 		}
 	}
 
-	// strip out any common nodes to reduce proof size
+	// strip out any common nodes between the start and end proof to reduce total proof size
 	commonNodeIndex := 0
 	for ; commonNodeIndex < len(result.StartProof) &&
 		commonNodeIndex < len(result.EndProof) &&
