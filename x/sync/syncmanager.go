@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-const maxTokenWaitTime       = 5 * time.Second
+const maxTokenWaitTime = 5 * time.Second
 
 var (
 	token                         = struct{}{}

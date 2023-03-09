@@ -489,7 +489,6 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
 	historicalView, err := db.getHistoricalViewForRangeProof(ctx, endRootID, start, end)
@@ -499,7 +498,7 @@ func (db *Database) GetChangeProof(
 
 	// initialize to take care of the two varints (one for change count, one for deleted count)
 	// it may is an over estimate, but it is close
-	totalSize := uint64(2*binary.MaxVarintLen64)
+	totalSize := uint64(2 * binary.MaxVarintLen64)
 
 	// prevents overflow to do this in a larger int size
 	uint64MaxSize := uint64(maxSize)
@@ -570,7 +569,7 @@ func (db *Database) GetChangeProof(
 	// if the size of the start proof + end proof + changes is too large, then we need to
 	// remove changes until we are under the max size
 	for len(changedKeys) > 0 {
-		lastKey:=changedKeys[len(changedKeys)-1].Serialize().Value
+		lastKey := changedKeys[len(changedKeys)-1].Serialize().Value
 		proof, err := historicalView.getProof(ctx, lastKey)
 		if err != nil {
 			return nil, err

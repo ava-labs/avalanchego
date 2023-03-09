@@ -435,7 +435,7 @@ func (t *trieView) getRangeProof(
 	totalSize += uint64(startProofSize)
 	uint64MaxSize := uint64(maxSize)
 
-	if totalSize > uint64MaxSize{
+	if totalSize > uint64MaxSize {
 		return nil, ErrMinProofIsLargerThanMaxSize
 	}
 
