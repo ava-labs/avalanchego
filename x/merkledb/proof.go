@@ -359,7 +359,7 @@ func (proof *ChangeProof) Verify(
 	// Make sure the deleted keys are sorted and in [start, end].
 	deletedKeys := make([]KeyValue, len(proof.DeletedKeys))
 	for _, key := range proof.DeletedKeys {
-		deletedKeys = append(deletedKeys, KeyValue{Key:key, Value:nil})
+		deletedKeys = append(deletedKeys, KeyValue{Key: key, Value: nil})
 	}
 	if err := verifyKeyValues(deletedKeys, start, end); err != nil {
 		return err
