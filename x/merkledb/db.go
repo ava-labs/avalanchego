@@ -501,18 +501,18 @@ func (db *Database) GetChangeProof(
 				Value: change.after.value,
 			})
 		}
-		end = serializedKey
 	}
+	largestKey := result.getLargestKey(end)
 
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRangeProof(endRootID, start, end)
+	historicalView, err := db.getHistoricalViewForRangeProof(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(end) > 0 {
-		endProof, err := historicalView.getProof(ctx, end)
+	if len(largestKey) > 0 {
+		endProof, err := historicalView.getProof(ctx, largestKey)
 		if err != nil {
 			return nil, err
 		}

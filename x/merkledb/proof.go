@@ -365,23 +365,12 @@ func (proof *ChangeProof) Verify(
 		return err
 	}
 
-	largestKey := end
+	smallestPath := newPath(start)
 
 	// Find the greatest key in [proof.KeyValues] and [proof.DeletedKeys].
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestKey] is also used when we add children of proof nodes to [trie] below.
-	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
-	}
-	if len(proof.DeletedKeys) > 0 {
-		lastDeleted := proof.DeletedKeys[len(proof.DeletedKeys)-1]
-		if bytes.Compare(lastDeleted, largestKey) > 0 {
-			largestKey = lastDeleted
-		}
-	}
-
-	smallestPath := newPath(start)
-	largestPath := newPath(largestKey)
+	largestPath := newPath(proof.getLargestKey(end))
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -513,6 +502,20 @@ func verifyAllChangeProofKeyValuesPresent(
 func (proof *ChangeProof) Empty() bool {
 	return len(proof.KeyValues) == 0 && len(proof.DeletedKeys) == 0 &&
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
+}
+
+func  (proof *ChangeProof) getLargestKey(end []byte) []byte {
+	largestKey := end
+	if len(proof.KeyValues) > 0 {
+		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+	}
+	if len(proof.DeletedKeys) > 0 {
+		lastDeleted := proof.DeletedKeys[len(proof.DeletedKeys)-1]
+		if bytes.Compare(lastDeleted, largestKey) > 0 {
+			largestKey = lastDeleted
+		}
+	}
+	return largestKey
 }
 
 // Returns nil iff both hold:
