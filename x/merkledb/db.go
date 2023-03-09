@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
@@ -503,9 +504,9 @@ func (db *Database) GetChangeProof(
 		return nil, err
 	}
 
-	// initialize to 8 to take care of the two varints (one for change count, one for deleted count)
+	// initialize to take care of the two varints (one for change count, one for deleted count)
 	// it may is an over estimate, but it is close
-	totalSize := uint32(8)
+	totalSize := uint32(2*binary.MaxVarintLen64)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
