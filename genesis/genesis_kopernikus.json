@@ -108,7 +108,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3",
-        "xAmount": 987990000000000000,
+        "xAmount": 986990000000000000,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -172,6 +172,25 @@
             "depositOfferMemo": "presale3y"
           }
         ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1t3qjau2pf3ys83yallqt4y5xc3l6ya5f8yu5ex",
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 400000000000000
+          },
+          {
+            "amount": 600000000000000,
+            "depositDuration": 110376000,
+            "timestampOffset": 0,
+            "depositOfferMemo": "presale3y"
+          }
+        ]
       }
     ],
     "initialMultisigAddresses": [
@@ -181,6 +200,14 @@
           "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3"
         ],
         "threshold": 1
+      },
+      {
+        "alias": "X-kopernikus1k4przmfu79ypp4u7y98glmdpzwk0u3sc7saazy",
+        "addresses": [
+          "X-kopernikus18jma8ppw3nhx5r4ap8clazz0dps7rv5uuvjh68",
+          "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3"
+        ],
+        "threshold": 2
       }
     ]
   },

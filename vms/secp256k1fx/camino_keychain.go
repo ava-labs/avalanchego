@@ -48,13 +48,11 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	sigs := make([]uint32, 0, owners.Threshold)
 	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 
-	tf := func(_ bool, addr ids.ShortID, depth int, visited, _, _ uint32) (bool, error) {
+	tf := func(alias bool, addr ids.ShortID, visited, _, totalVisited, _ uint32) (bool, error) {
 		if key, exists := kc.get(addr); exists {
-			if depth == 1 {
-				sigs = append(sigs, visited)
-			}
+			sigs = append(sigs, totalVisited)
 			keys = append(keys, key)
-			// if alias is true, this prevents next level
+			// We return true also for alias to skip nested traversals
 			return true, nil
 		}
 		return false, nil
@@ -82,10 +80,10 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 type TraverserOwnerFunc func(
 	alias bool,
 	addr ids.ShortID,
-	depth int,
 	visited,
 	verified,
-	totalVisited uint32,
+	totalVisited,
+	totalVerified uint32,
 ) (bool, error)
 
 // TraverseOwners traverses through owners, visits every address and callbacks in case a
@@ -128,18 +126,18 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				success, err := callback(
 					true,
 					addr,
-					len(stack),
 					currentStack.index-1,
 					currentStack.verified,
 					visited,
+					verified,
 				)
 				if err != nil {
 					return 0, err
 				}
 
 				if success {
+					// Spend only: Accept the complete alias
 					currentStack.verified++
-					verified++
 				} else {
 					stack = append(stack, &stackItem{owners: owners})
 					goto Stack
@@ -151,10 +149,10 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				success, err := callback(
 					false,
 					addr,
-					len(stack),
 					currentStack.index-1,
 					currentStack.verified,
 					visited,
+					verified,
 				)
 				if err != nil {
 					return 0, err
