@@ -513,7 +513,7 @@ func (db *Database) GetChangeProof(
 		}
 		totalSize += size
 
-		if totalSize > size {
+		if totalSize > maxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}

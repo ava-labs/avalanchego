@@ -263,7 +263,7 @@ func (th *trieHistory) record(changes *changeSummary) {
 	}
 
 	// update the size estimate of all key/values
-	// used to estimate the number of key/values that will be returned by [getValueChanges]
+	// used to estimate how much memory to allocate for key/values that will be returned by [getValueChanges]
 	if len(changes.values) > 0 {
 		size := 0
 		for key, value := range changes.values {
