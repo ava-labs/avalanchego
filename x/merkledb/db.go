@@ -1096,7 +1096,7 @@ func (db *Database) getKeyValues(
 	// * We hit a key that is lexicographically larger than the end key.
 	// * [maxSize] bytes worth of key/values are in the list
 	// * There are no more values to add.
-	for totalSize < maxSize && it.Next() {
+	for totalSize <= maxSize && it.Next() {
 		key := it.Key()
 		if len(end) != 0 && bytes.Compare(key, end) > 0 {
 			break

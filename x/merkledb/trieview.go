@@ -795,7 +795,11 @@ func (t *trieView) getKeyValues(
 	slices.SortFunc(changes, func(a, b KeyValue) bool {
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
-	baseKeyValues, _, err := t.getParentTrie().getKeyValues(ctx, start, end, maxSize, keysToIgnore)
+
+	// increase max size for base to ensure all possible values are returned
+	// if there is overlap in keys between this view and the base and the values in the base are larger
+	// then fewer keys from the base might be returned than are needed
+	baseKeyValues, _, err := t.getParentTrie().getKeyValues(ctx, start, end, 2*maxSize, keysToIgnore)
 	if err != nil {
 		return nil, 0, err
 	}
