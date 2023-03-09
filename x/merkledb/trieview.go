@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"runtime"
@@ -404,8 +405,8 @@ func (t *trieView) getRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
-	// initialize to 4 to account for the varint storing the key/value count
-	totalSize := uint32(4)
+	// initialize to account for the varint storing the key/value count
+	totalSize := uint64(binary.MaxVarintLen64)
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -431,19 +432,21 @@ func (t *trieView) getRangeProof(
 		}
 	}
 
-	if startProofSize > maxSize {
+	totalSize += uint64(startProofSize)
+	uint64MaxSize := uint64(maxSize)
+
+	if totalSize > uint64MaxSize{
 		return nil, ErrMinProofIsLargerThanMaxSize
 	}
-	totalSize += startProofSize
 
-	var keyValeusSize uint32
+	var keyValuesSize uint32
 
 	// estimate that the end proof will be of similar size to the start proof
-	result.KeyValues, keyValeusSize, err = t.getKeyValues(ctx, start, end, maxSize-2*startProofSize, set.Set[string]{})
+	result.KeyValues, keyValuesSize, err = t.getKeyValues(ctx, start, end, maxSize-2*startProofSize, set.Set[string]{})
 	if err != nil {
 		return nil, err
 	}
-	totalSize += keyValeusSize
+	totalSize += uint64(keyValuesSize)
 
 	if len(end) > 0 && len(result.KeyValues) == 0 {
 		proof, err := t.getProof(ctx, end)
@@ -456,7 +459,7 @@ func (t *trieView) getRangeProof(
 		}
 		result.EndProof = proof.Path
 
-		if totalSize+size > maxSize {
+		if totalSize+uint64(size) > uint64MaxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -476,18 +479,19 @@ func (t *trieView) getRangeProof(
 		}
 		result.EndProof = proof.Path
 
-		if totalSize+size <= maxSize {
+		uint64ProofSize := uint64(size)
+		if totalSize+uint64ProofSize <= uint64MaxSize {
 			break
 		}
 
 		// remove key/values until the proof should fit within remaining size
-		for totalSize+size > maxSize && len(result.KeyValues) > 0 {
+		for totalSize+uint64ProofSize > uint64MaxSize && len(result.KeyValues) > 0 {
 			// remove the last key/value
 			kvSize, err := Codec.encodedKeyValueByteCount(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err
 			}
-			totalSize -= kvSize
+			totalSize -= uint64(kvSize)
 			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 		}
 
@@ -849,6 +853,7 @@ func (t *trieView) getKeyValues(
 					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
+				totalSize += currentChangeSize
 				changesIndex++
 			case 0:
 				// the keys are the same, so override the base value with the changed value

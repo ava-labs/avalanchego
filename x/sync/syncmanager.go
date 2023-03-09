@@ -15,14 +15,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-const (
-	defaultProofBytesLimit = 2 * uint32(units.MiB)
-	maxTokenWaitTime       = 5 * time.Second
-)
+const maxTokenWaitTime       = 5 * time.Second
 
 var (
 	token                         = struct{}{}

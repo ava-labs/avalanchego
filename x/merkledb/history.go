@@ -81,7 +81,7 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	}
 }
 
-// Returns up to [maxLength] key-value pair changes with keys in [start, end] that
+// Returns up to [maxSize] bytes worth of key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
 func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxSize uint32) (map[path]*change[Maybe[[]byte]], error) {
 	if maxSize == 0 {
@@ -138,12 +138,11 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// For each element in the history in the range between [startRoot]'s
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 	// add the changes to keys in [start, end] to [combinedChanges].
-	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
+	// Only the key-value pairs with total size less than [maxSize] bytes will be kept.
 	estimatedKeyCount := int(math.Min(float64(maxSize)/th.estimatedValueSize, float64(valuesCount)))
 	combinedChanges := make(map[path]*change[Maybe[[]byte]], estimatedKeyCount)
 
-	currentTotal := uint32(0)
-
+	totalSize := uint32(0)
 	// For each change after [lastStartRootChange] up to and including
 	// [lastEndRootChange], record the change in [combinedChanges].
 	th.history.AscendGreaterOrEqual(
@@ -162,7 +161,9 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
 					if existing, ok := combinedChanges[key]; ok {
-						currentTotal -= uint32(len(existing.after.value) + len(key) + minMaybeByteSliceLen + minVarIntLen)
+						// remove the old value from the size
+						// the meanVarIntLen takes into account storing the lengths of key and value
+						totalSize -= uint32(len(existing.after.value) + len(key) + meanVarIntLen)
 						existing.after = valueChange.after
 					} else {
 						combinedChanges[key] = &change[Maybe[[]byte]]{
@@ -170,15 +171,17 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 							after:  valueChange.after,
 						}
 					}
-					currentTotal += uint32(len(key) + len(valueChange.after.value) + minMaybeByteSliceLen + minVarIntLen)
+					// the meanVarIntLen takes into account storing the length of key and value
+					totalSize += uint32(len(key) + len(valueChange.after.value) + meanVarIntLen)
 					sortedKeys.ReplaceOrInsert(key)
 				}
 			}
 
-			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for currentTotal > maxSize {
+			// Keep only the smallest keys up to [maxSize] bytes in [combinedChanges].
+			for totalSize > maxSize {
 				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					currentTotal -= uint32(len(greatestKey) + len(combinedChanges[greatestKey].after.value) + minMaybeByteSliceLen + minVarIntLen)
+					// the meanVarIntLen takes into account storing the length of key and value
+					totalSize -= uint32(len(greatestKey) + len(combinedChanges[greatestKey].after.value) + meanVarIntLen)
 					delete(combinedChanges, greatestKey)
 				}
 			}
@@ -259,6 +262,8 @@ func (th *trieHistory) record(changes *changeSummary) {
 		}
 	}
 
+	// update the size estimate of all key/values
+	// used to estimate the number of key/values that will be returned by [getValueChanges]
 	if len(changes.values) > 0 {
 		size := 0
 		for key, value := range changes.values {

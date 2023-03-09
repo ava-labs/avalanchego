@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -133,7 +134,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: smallTrieDB,
 			request: &RangeProofRequest{
 				Root:  smallTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			expectedResponseLen: smallTrieKeyCount,
 		},
@@ -153,7 +154,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			expectedResponseLen: largeTrieKeyCount,
 		},
@@ -162,7 +163,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
 				Start: largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			expectedResponseLen: 30,
 		},
@@ -172,7 +173,7 @@ func TestGetRangeProof(t *testing.T) {
 				Root:  largeTrieRoot,
 				Start: largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
 				End:   largeTrieKeys[1099], // (inclusive range)
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			expectedResponseLen: 100,
 		},
@@ -180,7 +181,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[1:]
@@ -191,11 +192,11 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				start := response.KeyValues[1].Key
-				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultProofBytesLimit)
+				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, constants.DefaultMaxMessageSize)
 				if err != nil {
 					panic(err)
 				}
@@ -209,7 +210,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
@@ -220,7 +221,7 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &RangeProofRequest{
 				Root:  largeTrieRoot,
-				Limit: defaultProofBytesLimit,
+				Limit: constants.DefaultMaxMessageSize,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)

@@ -1088,14 +1088,14 @@ func (db *Database) getKeyValues(
 	defer it.Release()
 
 	totalSize := uint32(0)
-	result := make([]KeyValue, 0, maxSize)
+	result := make([]KeyValue, int(float64(maxSize)/db.history.estimatedValueSize))
 	// Keep adding key/value pairs until one of the following:
 	// * We hit a key that is lexicographically larger than the end key.
 	// * [maxSize] bytes worth of key/values are in the list
 	// * There are no more values to add.
 	for totalSize < maxSize && it.Next() {
 		key := it.Key()
-		if len(end) != 0 && bytes.Compare(it.Key(), end) > 0 {
+		if len(end) != 0 && bytes.Compare(key, end) > 0 {
 			break
 		}
 		if keysToIgnore.Contains(string(key)) {
@@ -1105,13 +1105,14 @@ func (db *Database) getKeyValues(
 			Key:   key,
 			Value: it.Value(),
 		}
-		currentSize, err := Codec.encodedKeyValueByteCount(Version, kv)
+		kvSize, err := Codec.encodedKeyValueByteCount(Version, kv)
 		if err != nil {
 			return nil, 0, err
 		}
-		if totalSize+currentSize > maxSize {
+		if totalSize+kvSize > maxSize {
 			return result, totalSize, it.Error()
 		}
+		totalSize += kvSize
 		result = append(result, kv)
 	}
 

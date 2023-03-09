@@ -37,6 +37,7 @@ const (
 	minHashValuesLen     = minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
 	minProofNodeChildLen = minVarIntLen + idLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
+	meanVarIntLen        = (minVarIntLen + binary.MaxVarintLen64)/2
 )
 
 var (
