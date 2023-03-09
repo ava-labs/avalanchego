@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
@@ -52,6 +53,59 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		return closestNode.value.value, nil
 	}
 	return nil, nil
+}
+
+func Test_Trie_GetKeyValues(t *testing.T) {
+	db, err := getBasicDB()
+	require.NoError(t, err)
+
+	writeBasicBatch(t, db)
+
+	view, err := db.NewView(context.Background())
+
+	kvs, size, err := view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 100, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 5)
+	require.Equal(t, uint32(20), size)
+
+	// reduce maxSize to eliminate one item
+	kvs, size, err = view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 16, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 4)
+	require.Equal(t, uint32(16), size)
+
+	// reduce maxSize by 1 byte
+	// should remove the next item but the next item is 4 bytes so size goes down by more than 1 byte
+	kvs, size, err = view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 15, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 3)
+	require.Equal(t, uint32(12), size)
+
+	// add more key/values that aren't in the underlying db
+	require.NoError(t, view.Insert(context.Background(), []byte{5}, []byte{5}))
+	require.NoError(t, view.Insert(context.Background(), []byte{6}, []byte{6}))
+	require.NoError(t, view.Insert(context.Background(), []byte{7}, []byte{7}))
+
+	// overwrite one key/value from underlying db
+	require.NoError(t, view.Insert(context.Background(), []byte{0}, []byte{1, 2, 3}))
+
+	kvs, size, err = view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 100, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 8)
+	require.Equal(t, uint32(34), size)
+
+	// reduce maxSize to eliminate one item
+	kvs, size, err = view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 30, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 7)
+	require.Equal(t, uint32(30), size)
+
+	// reduce maxSize by 1 byte
+	// should remove the next item but the next item is 4 bytes so size goes down by more than 1 byte
+	kvs, size, err = view.getKeyValues(context.Background(), []byte{0}, []byte{10}, 29, set.Set[string]{})
+	require.NoError(t, err)
+	require.Len(t, kvs, 6)
+	require.Equal(t, uint32(26), size)
 }
 
 func TestTrieViewGetPathTo(t *testing.T) {

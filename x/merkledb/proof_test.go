@@ -1032,6 +1032,40 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func Test_ChangeProof_NoKeyValues(t *testing.T) {
+	db, err := getBasicDB()
+	require.NoError(t, err)
+
+	writeBasicBatch(t, db)
+	require.NoError(t, err)
+	startRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(t, err)
+
+	require.NoError(t, db.Insert(context.Background(), []byte{9, 10}, []byte{10}))
+	require.NoError(t, db.Insert(context.Background(), []byte{10}, []byte{10}))
+	require.NoError(t, db.Insert(context.Background(), []byte{11}, []byte{11}))
+	require.NoError(t, db.Insert(context.Background(), []byte{12}, []byte{12}))
+	require.NoError(t, db.Insert(context.Background(), []byte{13}, []byte{13}))
+	require.NoError(t, db.Insert(context.Background(), []byte{14}, []byte{14}))
+	endRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(t, err)
+
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{6}, []byte{9}, 1000)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+	require.NotNil(t, proof.EndProof)
+	// []byte{9, 10} is the closest node that actually exists
+	require.Equal(t, []byte{9, 10}, proof.EndProof[len(proof.EndProof)-1].KeyPath.Value)
+
+	// the start proof is too large to fit within 100 bytes
+	_, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{6}, []byte{9}, 100)
+	require.ErrorIs(t, err, ErrMinProofIsLargerThanMaxSize)
+
+	// the start proof is smaller than the 450 limit, but the end proof will be too large to fit in the remainder
+	_, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{6}, []byte{9}, 450)
+	require.ErrorIs(t, err, ErrMinProofIsLargerThanMaxSize)
+}
+
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 	type test struct {
 		name        string
