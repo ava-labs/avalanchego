@@ -609,7 +609,6 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 // If [end] is empty, no children are > [end].
 // Assumes [t.lock] is held.
 func addPathInfo(
-	ctx context.Context,
 	t *trieView,
 	proofPath []ProofNode,
 	startPath path,

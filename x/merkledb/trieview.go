@@ -320,7 +320,7 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
 func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
+	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
 	defer span.End()
 
 	t.lock.Lock()
@@ -335,7 +335,7 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 // Returns a proof that [bytesPath] is in or not in trie [t].
 // Assumes [t.lock] is held.
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getProof")
+	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
 
 	proof := &Proof{
@@ -949,7 +949,7 @@ func (t *trieView) remove(key []byte) error {
 
 // Assumes [t.lock] is held.
 func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.applyChangedValuesToTrie")
+	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.applyChangedValuesToTrie")
 	defer span.End()
 
 	unappliedValues := t.unappliedValueChanges
