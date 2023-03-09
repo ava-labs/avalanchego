@@ -354,7 +354,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
-    let end = &items.len() - 1;
+    let end = items.len();
 
     let mut proof = merkle.prove(std::str::from_utf8(&[0x2]).unwrap())?;
     assert!(!proof.0.is_empty());
@@ -365,7 +365,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
 
     let mut keys: Vec<&str> = Vec::new();
     let mut vals: Vec<&str> = Vec::new();
-    for i in start..=end {
+    for i in start..end {
         keys.push(&items[i].0);
         vals.push(&items[i].1);
     }

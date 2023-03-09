@@ -12,6 +12,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::ops::Deref;
 
 /// Hash -> RLP encoding map
 #[derive(Serialize, Deserialize)]
@@ -235,11 +236,9 @@ impl Proof {
         }
 
         // Ensure the received batch is monotonic increasing and contains no deletions
-        if keys.len() > 0 {
-            for n in 0..keys.len() - 1 {
-                if compare(keys[n].as_ref(), keys[n + 1].as_ref()).is_ge() {
-                    return Err(ProofError::NonMonotonicIncreaseRange);
-                }
+        for n in 0..(keys.len() as i32 - 1) {
+            if compare(keys[n as usize].as_ref(), keys[(n + 1) as usize].as_ref()).is_ge() {
+                return Err(ProofError::NonMonotonicIncreaseRange);
             }
         }
 
@@ -266,11 +265,10 @@ impl Proof {
         // Special case when there is a provided edge proof but zero key/value pairs,
         // ensure there are no more accounts / slots in the trie.
         if keys.len() == 0 {
-            let data =
-                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
-
-            if data.is_some() {
-                // No more entries should be available
+            if let Some(_) =
+                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?
+            {
+                // No more entries should be available.
                 return Err(ProofError::InvalidData);
             }
             return Ok(false);
@@ -287,11 +285,16 @@ impl Proof {
                 return Err(ProofError::InvalidEdgeKeys);
             }
 
-            if data.is_none() || compare(&data.unwrap(), vals[0].as_ref()).is_ne() {
-                // correct proof but invalid data
-                return Err(ProofError::InvalidData);
-            }
-            return Ok(true);
+            return data.map_or_else(
+                || Err(ProofError::InvalidData),
+                |d| {
+                    if compare(&d, vals[0].as_ref()).is_ne() {
+                        Err(ProofError::InvalidData)
+                    } else {
+                        Ok(true)
+                    }
+                },
+            );
         }
         // Ok, in all other cases, we require two edge paths available.
         // First check the validity of edge keys.
@@ -446,26 +449,23 @@ impl Proof {
                                 match &u_ref.inner() {
                                     NodeType::Branch(n) => {
                                         if let Some(v) = n.value() {
-                                            data = v.value().clone();
+                                            data = v.deref().to_vec();
                                         }
                                     }
                                     NodeType::Leaf(n) => {
                                         if n.path().len() == 0 {
-                                            data = n.data().value().clone();
+                                            data = n.data().deref().to_vec().clone();
                                         }
                                     }
                                     _ => (),
                                 }
                             }
                         }
-                        // Release the handle to the node.
-                        drop(u_ref);
                         return Ok(Some(data));
                     }
 
                     // The trie doesn't contain the key.
                     if p.hash.is_none() {
-                        drop(u_ref);
                         if allow_non_existent_node {
                             return Ok(None);
                         }
@@ -479,11 +479,9 @@ impl Proof {
                 // we can prove all resolved nodes are correct, it's
                 // enough for us to prove range.
                 None => {
-                    drop(u_ref);
-                    if allow_non_existent_node {
-                        return Ok(None);
-                    }
-                    return Err(ProofError::NodeNotInTrie);
+                    return allow_non_existent_node
+                        .then_some(None)
+                        .ok_or(ProofError::NodeNotInTrie);
                 }
             }
         }
@@ -576,13 +574,13 @@ impl Proof {
                         chd_eth_rlp[i] = Some(data);
                     }
                 }
+                let chd = [None; NBRANCH];
+                let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp.clone()));
+                let branch_ptr = merkle
+                    .new_node(Node::new(t))
+                    .map_err(|_| ProofError::ProofNodeMissing)?;
                 // If the node is the last one to be decoded, then no subproof to be extracted.
                 if end_node {
-                    let chd = [None; NBRANCH];
-                    let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp));
-                    let branch_ptr = merkle
-                        .new_node(Node::new(t))
-                        .map_err(|_| ProofError::ProofNodeMissing)?;
                     return Ok((Some(branch_ptr.as_ptr()), None, 1));
                 } else if key.is_empty() {
                     return Err(ProofError::NoSuchNode);
@@ -591,17 +589,11 @@ impl Proof {
                 // Check if the subproof with the given key exist.
                 let index = key[0] as usize;
                 let data: Vec<u8> = if chd_eth_rlp[index].is_none() {
-                    return Ok((None, None, 0));
+                    return Ok((Some(branch_ptr.as_ptr()), None, 1));
                 } else {
                     chd_eth_rlp[index].clone().unwrap()
                 };
                 let subproof = self.generate_subproof(data)?;
-
-                let chd = [None; NBRANCH];
-                let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp));
-                let branch_ptr = merkle
-                    .new_node(Node::new(t))
-                    .map_err(|_| ProofError::ProofNodeMissing)?;
                 Ok((Some(branch_ptr.as_ptr()), subproof, 1))
             }
             // RLP length can only be the two cases above.

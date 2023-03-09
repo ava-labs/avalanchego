@@ -153,14 +153,8 @@ fn test_partial_path_encoding() {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Data(Vec<u8>);
-
-impl Data {
-    pub fn value(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
 
 impl std::ops::Deref for Data {
     type Target = [u8];
