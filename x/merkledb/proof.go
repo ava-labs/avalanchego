@@ -351,29 +351,18 @@ func (proof *ChangeProof) Verify(
 		return ErrNoStartProof
 	}
 
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyValues))
-	for _, keyValue := range proof.KeyValues {
-		keyValues[newPath(keyValue.Key)] = Some(keyValue.Value)
-	}
-	for _, key := range proof.DeletedKeys {
-		keyValues[newPath(key)] = Nothing[[]byte]()
-	}
-
 	// Make sure the key-value pairs are sorted and in [start, end].
 	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
 		return err
 	}
 
 	// Make sure the deleted keys are sorted and in [start, end].
-	for i := 0; i < len(proof.DeletedKeys); i++ {
-		deletedKey := proof.DeletedKeys[i]
-		if i < len(proof.DeletedKeys)-1 && bytes.Compare(deletedKey, proof.DeletedKeys[i+1]) >= 0 {
-			return ErrNonIncreasingValues
-		}
-		if (len(start) > 0 && bytes.Compare(deletedKey, start) < 0) ||
-			(len(end) > 0 && bytes.Compare(deletedKey, end) > 0) {
-			return ErrStateFromOutsideOfRange
-		}
+	deletedKeys := make([]KeyValue, len(proof.DeletedKeys))
+	for _, key := range proof.DeletedKeys {
+		deletedKeys = append(deletedKeys, KeyValue{Key:key, Value:nil})
+	}
+	if err := verifyKeyValues(deletedKeys, start, end); err != nil {
+		return err
 	}
 
 	largestKey := end
@@ -398,6 +387,15 @@ func (proof *ChangeProof) Verify(
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
 		return err
 	}
+
+	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyValues))
+	for _, keyValue := range proof.KeyValues {
+		keyValues[newPath(keyValue.Key)] = Some(keyValue.Value)
+	}
+	for _, key := range proof.DeletedKeys {
+		keyValues[newPath(key)] = Nothing[[]byte]()
+	}
+
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
