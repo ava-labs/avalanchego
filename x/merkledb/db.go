@@ -480,19 +480,14 @@ func (db *Database) GetChangeProof(
 		HadRootsInHistory: true,
 	}
 
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxSize)
-	if err == ErrRootIDNotPresent {
-		result.HadRootsInHistory = false
-		return result, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	// Since we hold [db.lock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
 	historicalView, err := db.getHistoricalViewForRangeProof(ctx, endRootID, start, end)
 	if err != nil {
+		if err == ErrRootIDNotPresent {
+			result.HadRootsInHistory = false
+			return result, nil
+		}
 		return nil, err
 	}
 
@@ -516,6 +511,12 @@ func (db *Database) GetChangeProof(
 
 	if totalSize > maxSize {
 		return nil, ErrMinProofIsLargerThanMaxSize
+	}
+
+	// leave room for end proof
+	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxSize-2*totalSize)
+	if err != nil {
+		return nil, err
 	}
 
 	// [changedKeys] are a subset of the keys that were added or had their
@@ -546,10 +547,6 @@ func (db *Database) GetChangeProof(
 
 	// determine how much space all of the changes will take up
 	for _, key := range changedKeys {
-		if totalSize >= maxSize {
-			break
-		}
-
 		change := changes[key]
 
 		keySize, err := Codec.encodedByteSliceByteCount(Version, key.Serialize().Value)

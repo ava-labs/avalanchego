@@ -417,8 +417,6 @@ func (t *trieView) getRangeProof(
 		err    error
 	)
 
-	startProofSize := uint32(0)
-
 	if len(start) > 0 {
 		startProof, err := t.getProof(ctx, start)
 		if err != nil {
@@ -426,7 +424,7 @@ func (t *trieView) getRangeProof(
 		}
 		result.StartProof = startProof.Path
 
-		startProofSize, err = Codec.encodedProofPathByteCount(Version, startProof.Path)
+		startProofSize, err := Codec.encodedProofPathByteCount(Version, startProof.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -440,7 +438,7 @@ func (t *trieView) getRangeProof(
 	var keyValuesSize uint32
 
 	// estimate that the end proof will be of similar size to the start proof
-	result.KeyValues, keyValuesSize, err = t.getKeyValues(ctx, start, end, maxSize-2*startProofSize, set.Set[string]{})
+	result.KeyValues, keyValuesSize, err = t.getKeyValues(ctx, start, end, maxSize-2*totalSize, set.Set[string]{})
 	if err != nil {
 		return nil, err
 	}
