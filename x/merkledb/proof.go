@@ -504,7 +504,7 @@ func (proof *ChangeProof) Empty() bool {
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
 }
 
-func  (proof *ChangeProof) getLargestKey(end []byte) []byte {
+func (proof *ChangeProof) getLargestKey(end []byte) []byte {
 	largestKey := end
 	if len(proof.KeyValues) > 0 {
 		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
