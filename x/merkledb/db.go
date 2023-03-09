@@ -1074,7 +1074,7 @@ func (db *Database) getKeyValues(
 	maxSize uint32,
 	keysToIgnore set.Set[string],
 ) ([]KeyValue, uint32, error) {
-	if maxSize <= 0 {
+	if maxSize == 0 {
 		return nil, 0, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
