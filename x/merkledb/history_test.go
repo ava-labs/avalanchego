@@ -699,7 +699,7 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 155)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 165)
 	require.NoError(err)
 	require.Equal(8, len(changes))
 }

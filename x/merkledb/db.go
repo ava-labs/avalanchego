@@ -579,12 +579,12 @@ func (db *Database) GetChangeProof(
 			return nil, err
 		}
 		result.EndProof = proof.Path
-
-		if totalSize+uint64(size) <= uint64MaxSize {
+		proofSize := uint64(size)
+		if totalSize+proofSize <= uint64MaxSize {
 			break
 		}
 
-		for uint64(size)+totalSize > uint64MaxSize && len(changedKeys) > 0 {
+		for totalSize + proofSize > uint64MaxSize && len(changedKeys) > 0 {
 			// remove the last key/value
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
@@ -1087,7 +1087,10 @@ func (db *Database) getKeyValues(
 	defer it.Release()
 
 	totalSize := uint32(0)
-	result := make([]KeyValue, int(float64(maxSize)/db.history.estimatedValueSize))
+	// guess how many key/values will fit within the maxSize bytes
+	// defend against divide by 0 when we have no estimates yet
+	estimatedKeyCount := int(float64(maxSize) / (math.Max(db.history.estimatedValueSize, 10)))
+	result := make([]KeyValue, 0, estimatedKeyCount)
 	// Keep adding key/value pairs until one of the following:
 	// * We hit a key that is lexicographically larger than the end key.
 	// * [maxSize] bytes worth of key/values are in the list
