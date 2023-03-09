@@ -430,9 +430,8 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
+		totalSize += startProofSize
 	}
-
-	totalSize += startProofSize
 
 	if totalSize > maxSize {
 		return nil, ErrMinProofIsLargerThanMaxSize
@@ -458,7 +457,7 @@ func (t *trieView) getRangeProof(
 		}
 		result.EndProof = proof.Path
 
-		if totalSize+size > maxSize {
+		if size > maxSize-totalSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -479,12 +478,12 @@ func (t *trieView) getRangeProof(
 		result.EndProof = proof.Path
 
 		// the current last key's proof fits within the max size limit, so we are done
-		if totalSize+proofSize <= maxSize {
+		if proofSize <= maxSize-totalSize {
 			break
 		}
 
 		// keep removing key/values until the proof should fit within remaining size or we run out of key/values
-		for totalSize+proofSize > maxSize && len(result.KeyValues) > 0 {
+		for proofSize > maxSize-totalSize && len(result.KeyValues) > 0 {
 			kvSize, err := Codec.encodedKeyValueByteCount(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err
@@ -851,7 +850,7 @@ func (t *trieView) getKeyValues(
 
 			switch bytes.Compare(currentChangeState.Key, currentKeyValue.Key) {
 			case -1:
-				if totalSize+currentChangeSize > maxSize {
+				if currentChangeSize > maxSize-totalSize {
 					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
@@ -859,7 +858,7 @@ func (t *trieView) getKeyValues(
 				changesIndex++
 			case 0:
 				// the keys are the same, so override the base value with the changed value
-				if totalSize+currentChangeSize > maxSize {
+				if currentChangeSize > maxSize-totalSize {
 					return result, totalSize, nil
 				}
 				result = append(result, currentChangeState)
@@ -867,7 +866,7 @@ func (t *trieView) getKeyValues(
 				changesIndex++
 				baseKeyValuesIndex++
 			case 1:
-				if totalSize+currentKeyValuesSize > maxSize {
+				if currentKeyValuesSize > maxSize-totalSize {
 					return result, totalSize, nil
 				}
 				result = append(result, currentKeyValue)
@@ -885,7 +884,7 @@ func (t *trieView) getKeyValues(
 			if err != nil {
 				return nil, 0, err
 			}
-			if totalSize+currentChangeSize > maxSize {
+			if currentChangeSize > maxSize-totalSize {
 				return result, totalSize, nil
 			}
 
@@ -902,7 +901,7 @@ func (t *trieView) getKeyValues(
 		if err != nil {
 			return nil, 0, err
 		}
-		if totalSize+currentChangeSize > maxSize {
+		if currentChangeSize > maxSize-totalSize {
 			return result, totalSize, nil
 		}
 		result = append(result, currentChangeState)

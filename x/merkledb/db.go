@@ -512,10 +512,10 @@ func (db *Database) GetChangeProof(
 			return nil, err
 		}
 		totalSize += size
+	}
 
-		if totalSize > maxSize {
-			return nil, ErrMinProofIsLargerThanMaxSize
-		}
+	if totalSize > maxSize {
+		return nil, ErrMinProofIsLargerThanMaxSize
 	}
 
 	// [changedKeys] are a subset of the keys that were added or had their
@@ -539,13 +539,17 @@ func (db *Database) GetChangeProof(
 		}
 		result.EndProof = endProof.Path
 
-		if totalSize+size > maxSize {
+		if size > maxSize - totalSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
 
 	// determine how much space all of the changes will take up
-	for _, key := range changedKeys {
+	for _, key := range changedKeys  {
+		if totalSize >= maxSize {
+			break
+		}
+
 		change := changes[key]
 
 		keySize, err := Codec.encodedByteSliceByteCount(Version, key.Serialize().Value)
@@ -579,12 +583,12 @@ func (db *Database) GetChangeProof(
 		result.EndProof = proof.Path
 
 		// if the proof fits within the max size, then we are done
-		if totalSize+proofSize <= maxSize {
+		if proofSize <= maxSize-totalSize {
 			break
 		}
 
 		// while the proof remains too big to fit within the maxSize and there are keys to remove, remove key/values
-		for totalSize+proofSize > maxSize && len(changedKeys) > 0 {
+		for proofSize > maxSize - totalSize && len(changedKeys) > 0 {
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
 			change := changes[lastPath]
