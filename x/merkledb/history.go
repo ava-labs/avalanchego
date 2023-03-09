@@ -103,7 +103,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// [lastStartRootChange] is the latest appearance of [startRoot]
 	// which came before [lastEndRootChange].
 	var lastStartRootChange *changeSummaryAndIndex
-	possbileValuesCount := 0
+	possibleValuesCount := 0
 	th.history.DescendLessOrEqual(
 		lastEndRootChange,
 		func(item *changeSummaryAndIndex) bool {
