@@ -406,7 +406,7 @@ func (t *trieView) getRangeProof(
 	}
 
 	// initialize to account for the varint storing the key/value count
-	totalSize := uint64(binary.MaxVarintLen64)
+	totalSize := uint32(binary.MaxVarintLen64)
 
 	if err := t.calculateIDs(ctx); err != nil {
 		return nil, err
@@ -432,10 +432,9 @@ func (t *trieView) getRangeProof(
 		}
 	}
 
-	totalSize += uint64(startProofSize)
-	uint64MaxSize := uint64(maxSize)
+	totalSize += startProofSize
 
-	if totalSize > uint64MaxSize {
+	if totalSize > maxSize {
 		return nil, ErrMinProofIsLargerThanMaxSize
 	}
 
@@ -446,7 +445,7 @@ func (t *trieView) getRangeProof(
 	if err != nil {
 		return nil, err
 	}
-	totalSize += uint64(keyValuesSize)
+	totalSize += keyValuesSize
 
 	if len(end) > 0 && len(result.KeyValues) == 0 {
 		proof, err := t.getProof(ctx, end)
@@ -459,7 +458,7 @@ func (t *trieView) getRangeProof(
 		}
 		result.EndProof = proof.Path
 
-		if totalSize+uint64(size) > uint64MaxSize {
+		if totalSize+size > maxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -473,26 +472,24 @@ func (t *trieView) getRangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathByteCount(Version, proof.Path)
+		proofSize, err := Codec.encodedProofPathByteCount(Version, proof.Path)
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = proof.Path
 
-		uint64ProofSize := uint64(size)
-
 		// the current last key's proof fits within the max size limit, so we are done
-		if totalSize+uint64ProofSize <= uint64MaxSize {
+		if totalSize+proofSize <= maxSize {
 			break
 		}
 
 		// keep removing key/values until the proof should fit within remaining size or we run out of key/values
-		for totalSize+uint64ProofSize > uint64MaxSize && len(result.KeyValues) > 0 {
+		for totalSize+proofSize > maxSize && len(result.KeyValues) > 0 {
 			kvSize, err := Codec.encodedKeyValueByteCount(Version, result.KeyValues[len(result.KeyValues)-1])
 			if err != nil {
 				return nil, err
 			}
-			totalSize -= uint64(kvSize)
+			totalSize -= kvSize
 			result.KeyValues = result.KeyValues[:len(result.KeyValues)-1]
 		}
 

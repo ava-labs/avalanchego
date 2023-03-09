@@ -498,10 +498,7 @@ func (db *Database) GetChangeProof(
 
 	// initialize to take care of the two varints (one for change count, one for deleted count)
 	// it may is an over estimate, but it is close
-	totalSize := uint64(2 * binary.MaxVarintLen64)
-
-	// prevents overflow to do this in a larger int size
-	uint64MaxSize := uint64(maxSize)
+	totalSize := uint32(2 * binary.MaxVarintLen64)
 
 	if len(start) > 0 {
 		startProof, err := historicalView.getProof(ctx, start)
@@ -514,9 +511,9 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
-		totalSize += uint64(size)
+		totalSize += size
 
-		if totalSize > uint64MaxSize {
+		if totalSize > size {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -542,7 +539,7 @@ func (db *Database) GetChangeProof(
 		}
 		result.EndProof = endProof.Path
 
-		if totalSize+uint64(size) > uint64MaxSize {
+		if totalSize+size > maxSize {
 			return nil, ErrMinProofIsLargerThanMaxSize
 		}
 	}
@@ -555,14 +552,14 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
-		totalSize += uint64(keySize)
+		totalSize += keySize
 
 		if !change.after.IsNothing() {
 			valueSize, err := Codec.encodedByteSliceByteCount(Version, change.after.value)
 			if err != nil {
 				return nil, err
 			}
-			totalSize += uint64(valueSize)
+			totalSize += valueSize
 		}
 	}
 
@@ -575,20 +572,19 @@ func (db *Database) GetChangeProof(
 		if err != nil {
 			return nil, err
 		}
-		size, err := Codec.encodedProofPathByteCount(Version, proof.Path)
+		proofSize, err := Codec.encodedProofPathByteCount(Version, proof.Path)
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = proof.Path
-		proofSize := uint64(size)
 
 		// if the proof fits within the max size, then we are done
-		if totalSize+proofSize <= uint64MaxSize {
+		if totalSize+proofSize <= maxSize {
 			break
 		}
 
 		// while the proof remains too big to fit within the maxSize and there are keys to remove, remove key/values
-		for totalSize+proofSize > uint64MaxSize && len(changedKeys) > 0 {
+		for totalSize+proofSize > maxSize && len(changedKeys) > 0 {
 			lastPath := changedKeys[len(changedKeys)-1]
 			lastKey := lastPath.Serialize().Value
 			change := changes[lastPath]
@@ -598,7 +594,7 @@ func (db *Database) GetChangeProof(
 				return nil, err
 			}
 			// remove the key from the total size
-			totalSize -= uint64(keySize)
+			totalSize -= keySize
 
 			// remove the value if it exists from the total size
 			if !change.after.IsNothing() {
@@ -606,7 +602,7 @@ func (db *Database) GetChangeProof(
 				if err != nil {
 					return nil, err
 				}
-				totalSize -= uint64(valueSize)
+				totalSize -= valueSize
 			}
 
 			changedKeys = changedKeys[:len(changedKeys)-1]
