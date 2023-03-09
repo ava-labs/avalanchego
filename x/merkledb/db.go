@@ -124,7 +124,7 @@ func newDatabase(
 	// disk as they are evicted from the cache.
 	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
 
-	root, err := trieDB.initializeRootIfNeeded(ctx)
+	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,12 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return db.GetValue(context.Background(), key)
 }
 
-func (db *Database) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
+func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+	_, span := db.tracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
+		attribute.Int("keyCount", len(keys)),
+	))
+	defer span.End()
+
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -319,7 +324,10 @@ func (db *Database) GetValues(_ context.Context, keys [][]byte) ([][]byte, []err
 
 // Get the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *Database) GetValue(_ context.Context, key []byte) ([]byte, error) {
+func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
+	defer span.End()
+
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -342,7 +350,10 @@ func (db *Database) getValue(key path) ([]byte, error) {
 }
 
 // Returns a view of the trie as it was when the merkle root was [rootID].
-func (db *Database) GetHistoricalView(_ context.Context, rootID ids.ID) (ReadOnlyTrie, error) {
+func (db *Database) GetHistoricalView(ctx context.Context, rootID ids.ID) (ReadOnlyTrie, error) {
+	_, span := db.tracer.Start(ctx, "MerkleDB.GetHistoricalView")
+	defer span.End()
+
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -725,9 +736,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	// move any child views of the committed trie onto the db
 	for _, childView := range trieToCommit.childViews {
-		// It's safe to manipulate [childView.parentTrie] because we hold
-		// [db.lock] so all calls to [childView.lockStack] are blocking.
-		childView.parentTrie = db
+		childView.updateParent(db)
 		db.childViews = append(db.childViews, childView)
 	}
 
@@ -831,7 +840,7 @@ func (db *Database) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *Database) initializeRootIfNeeded(_ context.Context) (ids.ID, error) {
+func (db *Database) initializeRootIfNeeded() (ids.ID, error) {
 	// ensure that root exists
 	nodeBytes, err := db.nodeDB.Get(rootKey)
 	if err == nil {
@@ -915,7 +924,7 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *Database) getEditableNode(_ context.Context, key path) (*node, error) {
+func (db *Database) getEditableNode(key path) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

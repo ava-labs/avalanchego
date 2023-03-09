@@ -116,7 +116,7 @@ type trieView struct {
 
 // Returns a new view on top of this one.
 // Adds the new view to [t.childViews].
-// Assumes [t.lock] is unlocked.
+// Assumes [t.lock] is not held.
 func (t *trieView) NewView() (TrieView, error) {
 	return t.NewPreallocatedView(defaultPreallocationSize)
 }
@@ -126,7 +126,7 @@ func (t *trieView) NewView() (TrieView, error) {
 // If this view is already committed, the new view's parent will
 // be set to the parent of the current view.
 // Otherwise adds the new view to [t.childViews].
-// Assumes [t.lock] is unlocked.
+// Assumes [t.lock] is not held.
 func (t *trieView) NewPreallocatedView(
 	estimatedChanges int,
 ) (TrieView, error) {
@@ -1065,7 +1065,7 @@ func (t *trieView) getPathTo(ctx context.Context, key path) ([]*node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(ctx, nextChildEntry.id, key[:matchedKeyIndex])
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex])
 		if err != nil {
 			return nil, err
 		}
@@ -1087,7 +1087,7 @@ func getLengthOfCommonPrefix(first, second path) int {
 // Get a copy of the node matching the passed key from the trie
 // Used by views to get nodes from their ancestors
 // assumes that [t.needsRecalculation] is false
-func (t *trieView) getEditableNode(ctx context.Context, key path) (*node, error) {
+func (t *trieView) getEditableNode(key path) (*node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -1096,7 +1096,7 @@ func (t *trieView) getEditableNode(ctx context.Context, key path) (*node, error)
 	}
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ctx, ids.Empty, key)
+	n, err := t.getNodeWithID(ids.Empty, key)
 	if err != nil {
 		return nil, err
 	}
@@ -1234,7 +1234,7 @@ func (t *trieView) recordKeyChange(ctx context.Context, key path, after *node) e
 		return nil
 	}
 
-	before, err := t.getParentTrie().getEditableNode(ctx, key)
+	before, err := t.getParentTrie().getEditableNode(key)
 	if err != nil {
 		if err != database.ErrNotFound {
 			return err
@@ -1334,7 +1334,7 @@ func (t *trieView) removeFromTrie(ctx context.Context, key path) error {
 func (t *trieView) getNodeFromParent(ctx context.Context, parent *node, key path) (*node, error) {
 	// confirm the child exists and get its ID before attempting to load it
 	if child, exists := parent.children[key[len(parent.key)]]; exists {
-		return t.getNodeWithID(ctx, child.id, key)
+		return t.getNodeWithID(child.id, key)
 	}
 
 	return nil, database.ErrNotFound
@@ -1345,7 +1345,7 @@ func (t *trieView) getNodeFromParent(ctx context.Context, parent *node, key path
 // sets the node's ID to [id].
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [t.lock] write or read lock is held.
-func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*node, error) {
+func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -1356,7 +1356,7 @@ func (t *trieView) getNodeWithID(ctx context.Context, id ids.ID, key path) (*nod
 	}
 
 	// get the node from the parent trie and store a localy copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(ctx, key)
+	parentTrieNode, err := t.getParentTrie().getEditableNode(key)
 	if err != nil {
 		return nil, err
 	}
