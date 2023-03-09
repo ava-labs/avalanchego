@@ -116,7 +116,7 @@ type trieView struct {
 
 // Returns a new view on top of this one.
 // Adds the new view to [t.childViews].
-// Assumes this [t.lock] is unlocked.
+// Assumes [t.lock] is unlocked.
 func (t *trieView) NewView() (TrieView, error) {
 	return t.NewPreallocatedView(defaultPreallocationSize)
 }
