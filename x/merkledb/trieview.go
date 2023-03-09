@@ -400,7 +400,7 @@ func (t *trieView) getRangeProof(
 		return nil, ErrStartAfterEnd
 	}
 
-	if maxSize <= 0 {
+	if maxSize == 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
@@ -766,7 +766,7 @@ func (t *trieView) getKeyValues(
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieView.getKeyValues")
 	defer span.End()
 
-	if maxSize <= 0 {
+	if maxSize == 0 {
 		return nil, 0, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 

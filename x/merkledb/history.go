@@ -84,7 +84,7 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 // Returns up to [maxLength] key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
 func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxSize uint32) (map[path]*change[Maybe[[]byte]], error) {
-	if maxSize <= 0 {
+	if maxSize == 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxSize, maxSize)
 	}
 
