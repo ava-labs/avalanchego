@@ -1,4 +1,4 @@
-name: Build + test + release
+name: Build + Test + Lint
 
 on:
   push:
@@ -43,6 +43,16 @@ jobs:
       - run: ./scripts/coverage.sh
         shell: bash
 
+  build_image:
+    name: Build Docker Image
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: echo ${{ secrets.docker_pass }} | docker login --username ${{ secrets.docker_username }} --password-stdin
+        shell: bash
+      - run: CURRENT_BRANCH=${{ github.head_ref || github.ref_name }} PUSH_DOCKER_IMAGE=true ./scripts/build_image.sh
+        shell: bash
+      
   e2e_test:
     name: e2e tests
     runs-on: ubuntu-latest
@@ -71,44 +81,3 @@ jobs:
       - name: Run E2E Tests
         shell: bash
         run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego DATA_DIR=/tmp/e2e-test/data ./scripts/run_ginkgo.sh
-
-  release:
-    # needs: [lint_test, unit_test, e2e_test, simulator_test]
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          path: subnet-evm
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.19"
-      - name: Set up arm64 cross compiler
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install gcc-aarch64-linux-gnu
-      - name: Checkout osxcross
-        uses: actions/checkout@v2
-        with:
-          repository: tpoechtrager/osxcross
-          path: osxcross
-      - name: Build osxcross
-        run: |
-          sudo apt-get -y install clang llvm-dev libxml2-dev uuid-dev libssl-dev bash patch make tar xz-utils bzip2 gzip sed cpio libbz2-dev
-          cd osxcross
-          wget https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz -O tarballs/MacOSX11.3.sdk.tar.xz
-          echo cd4f08a75577145b8f05245a2975f7c81401d75e9535dcffbb879ee1deefcbf4 tarballs/MacOSX11.3.sdk.tar.xz | sha256sum -c -
-          UNATTENDED=1 ./build.sh
-          echo $PWD/target/bin >> $GITHUB_PATH
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
-          workdir: ./subnet-evm/
-        env:
-          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

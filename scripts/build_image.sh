@@ -18,3 +18,7 @@ docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" "$SUBNET_EVM_PATH" -f "$SUBNET
   --build-arg AVALANCHE_VERSION="$AVALANCHEGO_VERSION" \
   --build-arg SUBNET_EVM_COMMIT="$SUBNET_EVM_COMMIT" \
   --build-arg CURRENT_BRANCH="$CURRENT_BRANCH"
+
+if [[ ${PUSH_DOCKER_IMAGE:-""} == "true" ]]; then
+  docker push $DOCKERHUB_REPO:$BUILD_IMAGE_ID
+fi
