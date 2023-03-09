@@ -104,7 +104,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
-	if err = addPathInfo(ctx, view, proof.Path, provenPath, provenPath); err != nil {
+	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
 	}
 
@@ -232,10 +232,10 @@ func (proof *RangeProof) Verify(
 	// By inserting all children < [start], we prove that there are no keys
 	// > [start] but less than the first key given. That is, the peer who
 	// gave us this proof is not omitting nodes.
-	if err := addPathInfo(ctx, view, proof.StartProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
 		return err
 	}
-	if err := addPathInfo(ctx, view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
 		return err
 	}
 
@@ -449,10 +449,10 @@ func (proof *ChangeProof) Verify(
 
 	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(ctx, view, proof.StartProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
 		return err
 	}
-	if err := addPathInfo(ctx, view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
 		return err
 	}
 
