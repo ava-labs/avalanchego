@@ -222,7 +222,7 @@ func (proof *RangeProof) Verify(
 
 	// Insert all key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(ctx, newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
@@ -435,14 +435,14 @@ func (proof *ChangeProof) Verify(
 
 	// Insert the key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(ctx, newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
 
 	// Remove the deleted keys from the trie.
 	for _, key := range proof.DeletedKeys {
-		if err := view.removeFromTrie(ctx, newPath(key)); err != nil {
+		if err := view.removeFromTrie(newPath(key)); err != nil {
 			return err
 		}
 	}
@@ -631,7 +631,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insertIntoTrie(ctx, keyPath, Nothing[[]byte]())
+		n, err := t.insertIntoTrie(keyPath, Nothing[[]byte]())
 		if err != nil {
 			return err
 		}

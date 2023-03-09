@@ -23,7 +23,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, err
 		}
 		path := newPath([]byte(key))
-		nodePath, err := asTrieView.getPathTo(context.Background(), path)
+		nodePath, err := asTrieView.getPathTo(path)
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, err
 		}
 		path := newPath([]byte(key))
-		nodePath, err := view.(*trieView).getPathTo(context.Background(), path)
+		nodePath, err := view.(*trieView).getPathTo(path)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	trie, ok := trieIntf.(*trieView)
 	require.True(ok)
 
-	path, err := trie.getPathTo(context.Background(), newPath(nil))
+	path, err := trie.getPathTo(newPath(nil))
 	require.NoError(err)
 
 	// Just the root
@@ -79,7 +79,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key1))
+	path, err = trie.getPathTo(newPath(key1))
 	require.NoError(err)
 
 	// Root and 1 value
@@ -94,7 +94,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -108,14 +108,14 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key3))
+	path, err = trie.getPathTo(newPath(key3))
 	require.NoError(err)
 	require.Len(path, 2)
 	require.Equal(trie.root, path[0])
 	require.Equal(newPath(key3), path[1].key)
 
 	// Other key paths not affected
-	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -124,7 +124,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
-	path, err = trie.getPathTo(context.Background(), newPath(key4))
+	path, err = trie.getPathTo(newPath(key4))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -133,7 +133,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
-	path, err = trie.getPathTo(context.Background(), newPath(key5))
+	path, err = trie.getPathTo(newPath(key5))
 	require.NoError(err)
 	require.Len(path, 1)
 	require.Equal(trie.root, path[0])

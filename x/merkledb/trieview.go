@@ -345,7 +345,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// Get the node at the given path, or the node closest to it.
 	keyPath := newPath(key)
 
-	proofPath, err := t.getPathTo(ctx, keyPath)
+	proofPath, err := t.getPathTo(keyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	childPath := closestNode.key + path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(ctx, closestNode, childPath)
+	childNode, err := t.getNodeFromParent(closestNode, childPath)
 	if err != nil {
 		return nil, err
 	}
@@ -957,11 +957,11 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 
 	for key, change := range unappliedValues {
 		if change.IsNothing() {
-			if err := t.removeFromTrie(ctx, key); err != nil {
+			if err := t.removeFromTrie(key); err != nil {
 				return err
 			}
 		} else {
-			if _, err := t.insertIntoTrie(ctx, key, change); err != nil {
+			if _, err := t.insertIntoTrie(key, change); err != nil {
 				return err
 			}
 		}
@@ -977,7 +977,7 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 // * [node] has a value.
 // * [node] has children.
 // Assumes [t.lock] is held.
-func (t *trieView) compressNodePath(ctx context.Context, parent, node *node) error {
+func (t *trieView) compressNodePath(parent, node *node) error {
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
@@ -985,11 +985,11 @@ func (t *trieView) compressNodePath(ctx context.Context, parent, node *node) err
 
 	// delete all empty nodes with a single child under [node]
 	for len(node.children) == 1 && !node.hasValue() {
-		if err := t.recordNodeDeleted(ctx, node); err != nil {
+		if err := t.recordNodeDeleted(node); err != nil {
 			return err
 		}
 
-		nextNode, err := t.getNodeFromParent(ctx, node, node.getSingleChildPath())
+		nextNode, err := t.getNodeFromParent(node, node.getSingleChildPath())
 		if err != nil {
 			return err
 		}
@@ -999,7 +999,7 @@ func (t *trieView) compressNodePath(ctx context.Context, parent, node *node) err
 	// [node] is the first node with multiple children.
 	// combine it with the [node] passed in.
 	parent.addChild(node)
-	return t.recordNodeChange(ctx, parent)
+	return t.recordNodeChange(parent)
 }
 
 // Starting from the last node in [nodePath], traverses toward the root
@@ -1007,19 +1007,19 @@ func (t *trieView) compressNodePath(ctx context.Context, parent, node *node) err
 // Stops when a node with a value or children is reached.
 // Assumes [nodePath] is a path from the root to a node.
 // Assumes [t.lock] is held.
-func (t *trieView) deleteEmptyNodes(ctx context.Context, nodePath []*node) error {
+func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 	node := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
 	for ; nextParentIndex >= 0 && len(node.children) == 0 && !node.hasValue(); nextParentIndex-- {
-		if err := t.recordNodeDeleted(ctx, node); err != nil {
+		if err := t.recordNodeDeleted(node); err != nil {
 			return err
 		}
 
 		parent := nodePath[nextParentIndex]
 
 		parent.removeChild(node)
-		if err := t.recordNodeChange(ctx, parent); err != nil {
+		if err := t.recordNodeChange(parent); err != nil {
 			return err
 		}
 
@@ -1031,7 +1031,7 @@ func (t *trieView) deleteEmptyNodes(ctx context.Context, nodePath []*node) error
 	}
 	parent := nodePath[nextParentIndex]
 
-	return t.compressNodePath(ctx, parent, node)
+	return t.compressNodePath(parent, node)
 }
 
 // Returns the nodes along the path to [key].
@@ -1039,7 +1039,7 @@ func (t *trieView) deleteEmptyNodes(ctx context.Context, nodePath []*node) error
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func (t *trieView) getPathTo(ctx context.Context, key path) ([]*node, error) {
+func (t *trieView) getPathTo(key path) ([]*node, error) {
 	var (
 		// all paths start at the root
 		currentNode     = t.root
@@ -1113,12 +1113,11 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 // Inserts a key/value pair into the trie.
 // Assumes [t.lock] is held.
 func (t *trieView) insertIntoTrie(
-	ctx context.Context,
 	key path,
 	value Maybe[[]byte],
 ) (*node, error) {
 	// find the node that most closely matches [key]
-	pathToNode, err := t.getPathTo(ctx, key)
+	pathToNode, err := t.getPathTo(key)
 	if err != nil {
 		return nil, err
 	}
@@ -1126,7 +1125,7 @@ func (t *trieView) insertIntoTrie(
 	// We're inserting a node whose ancestry is [pathToNode]
 	// so we'll need to recalculate their IDs.
 	for _, node := range pathToNode {
-		if err := t.recordNodeChange(ctx, node); err != nil {
+		if err := t.recordNodeChange(node); err != nil {
 			return nil, err
 		}
 	}
@@ -1154,7 +1153,7 @@ func (t *trieView) insertIntoTrie(
 			key,
 		)
 		newNode.setValue(value)
-		return newNode, t.recordNodeChange(ctx, newNode)
+		return newNode, t.recordNodeChange(newNode)
 	} else if err != nil {
 		return nil, err
 	}
@@ -1169,7 +1168,7 @@ func (t *trieView) insertIntoTrie(
 		closestNode,
 		key[:closestNodeKeyLength+1+getLengthOfCommonPrefix(existingChildEntry.compressedPath, remainingKey)],
 	)
-	if err := t.recordNodeChange(ctx, closestNode); err != nil {
+	if err := t.recordNodeChange(closestNode); err != nil {
 		return nil, err
 	}
 	nodeWithValue := branchNode
@@ -1184,7 +1183,7 @@ func (t *trieView) insertIntoTrie(
 			key,
 		)
 		newNode.setValue(value)
-		if err := t.recordNodeChange(ctx, newNode); err != nil {
+		if err := t.recordNodeChange(newNode); err != nil {
 			return nil, err
 		}
 		nodeWithValue = newNode
@@ -1205,28 +1204,28 @@ func (t *trieView) insertIntoTrie(
 		existingChildEntry.id,
 	)
 
-	return nodeWithValue, t.recordNodeChange(ctx, branchNode)
+	return nodeWithValue, t.recordNodeChange(branchNode)
 }
 
 // Records that a node has been changed.
 // Assumes [t.lock] is held.
-func (t *trieView) recordNodeChange(ctx context.Context, after *node) error {
-	return t.recordKeyChange(ctx, after.key, after)
+func (t *trieView) recordNodeChange(after *node) error {
+	return t.recordKeyChange(after.key, after)
 }
 
 // Records that the node associated with the given key has been deleted.
 // Assumes [t.lock] is held.
-func (t *trieView) recordNodeDeleted(ctx context.Context, after *node) error {
+func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
 	if len(after.key) == 0 {
-		return t.recordKeyChange(ctx, after.key, after)
+		return t.recordKeyChange(after.key, after)
 	}
-	return t.recordKeyChange(ctx, after.key, nil)
+	return t.recordKeyChange(after.key, nil)
 }
 
 // Records that the node associated with the given key has been changed.
 // Assumes [t.lock] is held.
-func (t *trieView) recordKeyChange(ctx context.Context, key path, after *node) error {
+func (t *trieView) recordKeyChange(key path, after *node) error {
 	t.needsRecalculation = true
 
 	if existing, ok := t.changes.nodes[key]; ok {
@@ -1287,8 +1286,8 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 // Removes the provided [key] from the trie.
 // Assumes [t.lock] write lock is held.
-func (t *trieView) removeFromTrie(ctx context.Context, key path) error {
-	nodePath, err := t.getPathTo(ctx, key)
+func (t *trieView) removeFromTrie(key path) error {
+	nodePath, err := t.getPathTo(key)
 	if err != nil {
 		return err
 	}
@@ -1303,19 +1302,19 @@ func (t *trieView) removeFromTrie(ctx context.Context, key path) error {
 	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
 	// all of the nodes in this path.
 	for _, node := range nodePath {
-		if err := t.recordNodeChange(ctx, node); err != nil {
+		if err := t.recordNodeChange(node); err != nil {
 			return err
 		}
 	}
 
 	nodeToDelete.setValue(Nothing[[]byte]())
-	if err := t.recordNodeChange(ctx, nodeToDelete); err != nil {
+	if err := t.recordNodeChange(nodeToDelete); err != nil {
 		return err
 	}
 
 	// if the removed node has no children, the node can be removed from the trie
 	if len(nodeToDelete.children) == 0 {
-		return t.deleteEmptyNodes(ctx, nodePath)
+		return t.deleteEmptyNodes(nodePath)
 	}
 
 	if len(nodePath) == 1 {
@@ -1324,14 +1323,14 @@ func (t *trieView) removeFromTrie(ctx context.Context, key path) error {
 	parent := nodePath[len(nodePath)-2]
 
 	// merge this node and its descendants into a single node if possible
-	return t.compressNodePath(ctx, parent, nodeToDelete)
+	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Retrieves the node with the given [key], which is a child of [parent], and
 // uses the [parent] node to initialize the child node's ID.
 // Returns database.ErrNotFound if the child doesn't exist.
 // Assumes [t.lock] write or read lock is held.
-func (t *trieView) getNodeFromParent(ctx context.Context, parent *node, key path) (*node, error) {
+func (t *trieView) getNodeFromParent(parent *node, key path) (*node, error) {
 	// confirm the child exists and get its ID before attempting to load it
 	if child, exists := parent.children[key[len(parent.key)]]; exists {
 		return t.getNodeWithID(child.id, key)
