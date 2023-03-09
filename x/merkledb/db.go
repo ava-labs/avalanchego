@@ -584,6 +584,7 @@ func (db *Database) GetChangeProof(
 			break
 		}
 
+		// while the proof remains too big to fit within the maxSize, remove key/values
 		for totalSize + proofSize > uint64MaxSize && len(changedKeys) > 0 {
 			// remove the last key/value
 			lastPath := changedKeys[len(changedKeys)-1]
