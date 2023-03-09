@@ -812,7 +812,7 @@ func (t *trieView) getKeyValues(
 
 	// keep adding key/value pairs until one of the following:
 	// * a key that is lexicographically larger than the end key is hit
-	// * the maxLength is hit
+	// * the maxSize is hit
 	// * no more values are available to add
 	for totalSize < maxSize {
 		// the baseKeyValues iterator is finished when we have run out of keys or hit a key greater than the end key
