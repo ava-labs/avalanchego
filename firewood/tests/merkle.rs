@@ -363,14 +363,20 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
 
     proof.concat_proofs(end_proof);
 
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
+    let mut keys: Vec<&str> = Vec::new();
+    let mut vals: Vec<&str> = Vec::new();
     for i in start..=end {
         keys.push(&items[i].0);
         vals.push(&items[i].1);
     }
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+    merkle.verify_range_proof(
+        &proof,
+        std::str::from_utf8(&[0x2]).unwrap(),
+        std::str::from_utf8(&[0x8]).unwrap(),
+        keys,
+        vals,
+    )?;
 
     Ok(())
 }
@@ -432,14 +438,11 @@ fn test_one_element_range_proof() -> Result<(), DataStoreError> {
 
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
     let start = 0;
-    let end = &items.len() - 1;
+    // start and end nodes are the same
+    let end = 0;
 
-    let mut start_proof = merkle.prove(&items[start].0)?;
+    let start_proof = merkle.prove(&items[start].0)?;
     assert!(!start_proof.0.is_empty());
-    let end_proof = merkle.prove(&items[start].0)?; // start and end nodes are the same
-    assert!(!end_proof.0.is_empty());
-
-    start_proof.concat_proofs(end_proof);
 
     let mut keys = Vec::new();
     let mut vals = Vec::new();
@@ -465,7 +468,7 @@ fn test_all_elements_proof() -> Result<(), DataStoreError> {
 
     let mut proof = merkle.prove(&items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0)?; // start and end nodes are the same
+    let end_proof = merkle.prove(&items[end].0)?;
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);
@@ -483,30 +486,29 @@ fn test_all_elements_proof() -> Result<(), DataStoreError> {
 }
 
 #[test]
-// Special case when there is a provided edge proof but zero key/value pairs.
-fn test_missing_key_value_pairs() -> Result<(), DataStoreError> {
-    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+// Tests the range proof with "no" element. The first edge proof must
+// be a non-existent proof.
+fn test_empty_range_proof() -> Result<(), DataStoreError> {
+    let mut items = vec![
+        (std::str::from_utf8(&[0x7]).unwrap(), "verb"),
+        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
+        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
+        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
+        (std::str::from_utf8(&[0x3]).unwrap(), "stallion"),
+    ];
+
     items.sort();
-
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
-    let start = 0;
-    let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0)?;
+    let first = std::str::from_utf8(&[0x8]).unwrap();
+    let proof = merkle.prove(first)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0)?; // start and end nodes are the same
-    assert!(!end_proof.0.is_empty());
 
-    proof.concat_proofs(end_proof);
+    // key and value vectors are intentionally empty.
+    let keys: Vec<&str> = Vec::new();
+    let vals: Vec<&str> = Vec::new();
 
-    // key and value vectors are intentionally empty
-    let keys: Vec<&&str> = Vec::new();
-    let vals: Vec<&&str> = Vec::new();
-
-    assert_eq!(
-        merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals),
-        Err(DataStoreError::ProofVerificationError)
-    );
+    merkle.verify_range_proof(&proof, first, first, keys, vals)?;
 
     Ok(())
 }

@@ -25,6 +25,7 @@ pub enum ProofError {
     InconsistentProofData,
     NonMonotonicIncreaseRange,
     RangeHasDeletion,
+    InvalidData,
     InvalidProof,
     InvalidEdgeKeys,
     InconsistentEdgeKeys,
@@ -32,7 +33,6 @@ pub enum ProofError {
     NodeNotInTrie,
     InvalidNode(MerkleError),
     EmptyRange,
-    EmptyKeyValues,
     BlobStoreError(BlobError),
     SystemError(Errno),
     InvalidRootHash,
@@ -43,7 +43,6 @@ impl From<DataStoreError> for ProofError {
         match d {
             DataStoreError::InsertionError => ProofError::NodesInsertionError,
             DataStoreError::RootHashError => ProofError::InvalidRootHash,
-            DataStoreError::ProofEmptyKeyValuesError => ProofError::EmptyKeyValues,
             _ => ProofError::InvalidProof,
         }
     }
@@ -71,6 +70,7 @@ impl fmt::Display for ProofError {
             ProofError::InconsistentProofData => write!(f, "inconsistent proof data"),
             ProofError::NonMonotonicIncreaseRange => write!(f, "nonmonotonic range increase"),
             ProofError::RangeHasDeletion => write!(f, "range has deletion"),
+            ProofError::InvalidData => write!(f, "invalid data"),
             ProofError::InvalidProof => write!(f, "invalid proof"),
             ProofError::InvalidEdgeKeys => write!(f, "invalid edge keys"),
             ProofError::InconsistentEdgeKeys => write!(f, "inconsistent edge keys"),
@@ -78,7 +78,6 @@ impl fmt::Display for ProofError {
             ProofError::NodeNotInTrie => write!(f, "node not in trie"),
             ProofError::InvalidNode(e) => write!(f, "invalid node: {e:?}"),
             ProofError::EmptyRange => write!(f, "empty range"),
-            ProofError::EmptyKeyValues => write!(f, "empty keys or values provided"),
             ProofError::BlobStoreError(e) => write!(f, "blob store error: {e:?}"),
             ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
             ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
@@ -235,14 +234,12 @@ impl Proof {
             return Err(ProofError::InconsistentProofData);
         }
 
-        if keys.is_empty() {
-            return Err(ProofError::EmptyKeyValues);
-        }
-
         // Ensure the received batch is monotonic increasing and contains no deletions
-        for n in 0..keys.len() - 1 {
-            if compare(keys[n].as_ref(), keys[n + 1].as_ref()).is_ge() {
-                return Err(ProofError::NonMonotonicIncreaseRange);
+        if keys.len() > 0 {
+            for n in 0..keys.len() - 1 {
+                if compare(keys[n].as_ref(), keys[n + 1].as_ref()).is_ge() {
+                    return Err(ProofError::NonMonotonicIncreaseRange);
+                }
             }
         }
 
@@ -252,23 +249,50 @@ impl Proof {
             }
         }
 
+        // Use in-memory merkle
+        let mut merkle_setup = new_merkle(0x10000, 0x10000);
         // Special case, there is no edge proof at all. The given range is expected
         // to be the whole leaf-set in the trie.
         if self.0.is_empty() {
-            // Use in-memory merkle
-            let mut merkle = new_merkle(0x10000, 0x10000);
             for (index, k) in keys.iter().enumerate() {
-                merkle.insert(k, vals[index].as_ref().to_vec())?;
+                merkle_setup.insert(k, vals[index].as_ref().to_vec())?;
             }
-            let merkle_root = &*merkle.root_hash()?;
+            let merkle_root = &*merkle_setup.root_hash()?;
             if merkle_root != &root_hash {
                 return Err(ProofError::InvalidProof);
             }
             return Ok(false);
         }
-        // TODO(Hao): handle special case when there is a provided edge proof but zero key/value pairs.
-        // TODO(Hao): handle special case when there is only one element and two edge keys are same.
+        // Special case when there is a provided edge proof but zero key/value pairs,
+        // ensure there are no more accounts / slots in the trie.
+        if keys.len() == 0 {
+            let data =
+                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
 
+            if data.is_some() {
+                // No more entries should be available
+                return Err(ProofError::InvalidData);
+            }
+            return Ok(false);
+        }
+
+        // Special case, there is only one element and two edge keys are same.
+        // In this case, we can't construct two edge paths. So handle it here.
+        if keys.len() == 1 && compare(first_key.as_ref(), last_key.as_ref()).is_eq() {
+            let data =
+                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, false)?;
+
+            if compare(first_key.as_ref(), keys[0].as_ref()).is_ne() {
+                // correct proof but invalid key
+                return Err(ProofError::InvalidEdgeKeys);
+            }
+
+            if data.is_none() || compare(&data.unwrap(), vals[0].as_ref()).is_ne() {
+                // correct proof but invalid data
+                return Err(ProofError::InvalidData);
+            }
+            return Ok(true);
+        }
         // Ok, in all other cases, we require two edge paths available.
         // First check the validity of edge keys.
         if compare(first_key.as_ref(), last_key.as_ref()).is_ge() {
@@ -283,7 +307,6 @@ impl Proof {
         // Convert the edge proofs to edge trie paths. Then we can
         // have the same tree architecture with the original one.
         // For the first edge proof, non-existent proof is allowed.
-        let mut merkle_setup = new_merkle(0x100000, 0x100000);
         self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
 
         // Pass the root node here, the second path will be merged
@@ -324,7 +347,8 @@ impl Proof {
         root_hash: [u8; 32],
         merkle_setup: &mut MerkleSetup,
         allow_non_existent_node: bool,
-    ) -> Result<(), ProofError> {
+    ) -> Result<Option<Vec<u8>>, ProofError> {
+        // Start with the sentinel root
         let root = merkle_setup.get_root();
         let merkle = merkle_setup.get_merkle_mut();
         let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
@@ -343,7 +367,8 @@ impl Proof {
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
             // TODO(Hao): (Optimization) If a node is alreay decode we don't need to decode again.
-            let (mut chd_ptr, sub_proof, size) = self.decode_node(merkle, cur_key, cur_proof)?;
+            let (mut chd_ptr, sub_proof, size) =
+                self.decode_node(merkle, cur_key, cur_proof, false)?;
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
                 NodeType::Branch(n) => {
@@ -406,16 +431,43 @@ impl Proof {
                 Some(p) => {
                     // Return when reaching the end of the key.
                     if key_index == chunks.len() {
+                        let mut data: Vec<u8> = Vec::new();
+                        // Decode the last subproof to get the value.
+                        if p.hash.is_some() {
+                            let proof = proofs_map
+                                .get(&p.hash.unwrap())
+                                .ok_or(ProofError::ProofNodeMissing)?;
+                            let (chd_ptr, _, _) = self.decode_node(merkle, cur_key, proof, true)?;
+
+                            if chd_ptr.is_some() {
+                                u_ref = merkle
+                                    .get_node(chd_ptr.unwrap())
+                                    .map_err(|_| ProofError::DecodeError)?;
+                                match &u_ref.inner() {
+                                    NodeType::Branch(n) => {
+                                        if let Some(v) = n.value() {
+                                            data = v.value().clone();
+                                        }
+                                    }
+                                    NodeType::Leaf(n) => {
+                                        if n.path().len() == 0 {
+                                            data = n.data().value().clone();
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
                         // Release the handle to the node.
                         drop(u_ref);
-                        return Ok(());
+                        return Ok(Some(data));
                     }
 
                     // The trie doesn't contain the key.
                     if p.hash.is_none() {
                         drop(u_ref);
                         if allow_non_existent_node {
-                            return Ok(());
+                            return Ok(None);
                         }
                         return Err(ProofError::NodeNotInTrie);
                     }
@@ -429,7 +481,7 @@ impl Proof {
                 None => {
                     drop(u_ref);
                     if allow_non_existent_node {
-                        return Ok(());
+                        return Ok(None);
                     }
                     return Err(ProofError::NodeNotInTrie);
                 }
@@ -438,11 +490,17 @@ impl Proof {
     }
 
     /// Decode the RLP value to generate the corresponding type of node, and locate the subproof.
+    ///
+    /// # Arguments
+    ///
+    /// * `end_node` - A boolean indicates whether this is the ebd node to decode, thus no `key`
+    ///                to be present.
     fn decode_node(
         &self,
         merkle: &Merkle,
         key: &[u8],
         buf: &[u8],
+        end_node: bool,
     ) -> Result<(Option<ObjPtr<Node>>, Option<SubProof>, usize), ProofError> {
         let rlp = rlp::Rlp::new(buf);
         let size = rlp.item_count().unwrap();
@@ -491,8 +549,17 @@ impl Proof {
                 }
             }
             BRANCH_NODE_SIZE => {
-                if key.is_empty() {
-                    return Err(ProofError::NoSuchNode);
+                // Extract the value of the branch node.
+                let mut value: Option<Vec<u8>> = None;
+                let data_rlp = rlp.at(NBRANCH).unwrap();
+                // Skip if rlp is empty data
+                if !data_rlp.is_empty() {
+                    let data = if data_rlp.is_data() {
+                        data_rlp.as_val::<Vec<u8>>().unwrap()
+                    } else {
+                        data_rlp.as_raw().to_vec()
+                    };
+                    value = Some(data);
                 }
 
                 // Record rlp values of all children.
@@ -509,18 +576,29 @@ impl Proof {
                         chd_eth_rlp[i] = Some(data);
                     }
                 }
+                // If the node is the last one to be decoded, then no subproof to be extracted.
+                if end_node {
+                    let chd = [None; NBRANCH];
+                    let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp));
+                    let branch_ptr = merkle
+                        .new_node(Node::new(t))
+                        .map_err(|_| ProofError::ProofNodeMissing)?;
+                    return Ok((Some(branch_ptr.as_ptr()), None, 1));
+                } else if key.is_empty() {
+                    return Err(ProofError::NoSuchNode);
+                }
 
-                // Subproof with the given key must exist.
+                // Check if the subproof with the given key exist.
                 let index = key[0] as usize;
                 let data: Vec<u8> = if chd_eth_rlp[index].is_none() {
-                    return Err(ProofError::DecodeError);
+                    return Ok((None, None, 0));
                 } else {
                     chd_eth_rlp[index].clone().unwrap()
                 };
                 let subproof = self.generate_subproof(data)?;
 
                 let chd = [None; NBRANCH];
-                let t = NodeType::Branch(BranchNode::new(chd, None, chd_eth_rlp));
+                let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp));
                 let branch_ptr = merkle
                     .new_node(Node::new(t))
                     .map_err(|_| ProofError::ProofNodeMissing)?;
