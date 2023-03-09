@@ -361,7 +361,10 @@ func (db *Database) GetHistoricalView(ctx context.Context, rootID ids.ID) (ReadO
 }
 
 // Returns the ID of the root node of the merkle trie.
-func (db *Database) GetMerkleRoot(_ context.Context) (ids.ID, error) {
+func (db *Database) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+	_, span := db.tracer.Start(ctx, "MerkleDB.GetMerkleRoot")
+	defer span.End()
+
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
