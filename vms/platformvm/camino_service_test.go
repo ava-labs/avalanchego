@@ -236,25 +236,25 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 			},
 			want: []*deposit.Offer{
 				{
-					ID:    ids.FromInt(0),
+					ID:    ids.ID{0},
 					Flags: 0,
 				},
 				{
-					ID:    ids.FromInt(1),
+					ID:    ids.ID{1},
 					Flags: 0,
 				},
 			},
 			prepare: func(service CaminoService) {
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(0),
+					ID:    ids.ID{0},
 					Flags: 0,
 				})
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(1),
+					ID:    ids.ID{1},
 					Flags: 0,
 				})
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(2),
+					ID:    ids.ID{2},
 					Flags: 1,
 				})
 			},
@@ -269,29 +269,29 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 			},
 			want: []*deposit.Offer{
 				{
-					ID:    ids.FromInt(0),
+					ID:    ids.ID{0},
 					Flags: 0,
 				},
 				{
-					ID:    ids.FromInt(1),
+					ID:    ids.ID{1},
 					Flags: 0,
 				},
 				{
-					ID:    ids.FromInt(2),
+					ID:    ids.ID{2},
 					Flags: 1,
 				},
 			},
 			prepare: func(service CaminoService) {
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(0),
+					ID:    ids.ID{0},
 					Flags: 0,
 				})
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(1),
+					ID:    ids.ID{1},
 					Flags: 0,
 				})
 				service.vm.state.AddDepositOffer(&deposit.Offer{
-					ID:    ids.FromInt(2),
+					ID:    ids.ID{2},
 					Flags: 1,
 				})
 			},

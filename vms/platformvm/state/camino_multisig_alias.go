@@ -25,6 +25,7 @@ type msigAlias struct {
 
 func (cs *caminoState) SetMultisigAlias(ma *multisig.Alias) {
 	cs.modifiedMultisigOwners[ma.ID] = ma
+	cs.multisigOwnersCache.Evict(ma.ID)
 }
 
 func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error) {
@@ -35,8 +36,18 @@ func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error)
 		return owner, nil
 	}
 
+	if alias, exist := cs.multisigOwnersCache.Get(id); exist {
+		if alias == nil {
+			return nil, database.ErrNotFound
+		}
+		return alias.(*multisig.Alias), nil
+	}
+
 	maBytes, err := cs.multisigOwnersDB.Get(id[:])
-	if err != nil {
+	if err == database.ErrNotFound {
+		cs.multisigOwnersCache.Put(id, nil)
+		return nil, err
+	} else if err != nil {
 		return nil, err
 	}
 

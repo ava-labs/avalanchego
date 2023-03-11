@@ -35,6 +35,7 @@ const (
 	addressStateCacheSize          = 1024
 	depositsCacheSize              = 1024
 	consortiumMemberNodesCacheSize = 1024
+	msigOwnersCacheSize            = 16_384
 )
 
 var (
@@ -170,7 +171,8 @@ type caminoState struct {
 	depositsDB    database.Database
 
 	// MSIG aliases
-	multisigOwnersDB database.Database
+	multisigOwnersCache cache.Cacher
+	multisigOwnersDB    database.Database
 
 	// shortIDs link
 	shortLinksCache cache.Cacher
@@ -222,6 +224,14 @@ func newCaminoState(baseDB *versiondb.Database, validatorsDB *prefixdb.Database,
 	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
 	deferredValidatorsDB := prefixdb.New(deferredPrefix, validatorsDB)
 
+	multisigOwnersCache, err := metercacher.New(
+		"msig_owners_cache",
+		metricsReg,
+		&cache.LRU{Size: msigOwnersCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &caminoState{
 		// Address State
 		addressStateDB:    prefixdb.New(addressStatePrefix, baseDB),
@@ -237,7 +247,8 @@ func newCaminoState(baseDB *versiondb.Database, validatorsDB *prefixdb.Database,
 		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
 
 		// Multisig Owners
-		multisigOwnersDB: prefixdb.New(multisigOwnersPrefix, baseDB),
+		multisigOwnersCache: multisigOwnersCache,
+		multisigOwnersDB:    prefixdb.New(multisigOwnersPrefix, baseDB),
 
 		// Consortium member nodes
 		shortLinksCache: consortiumMemberNodesCache,
