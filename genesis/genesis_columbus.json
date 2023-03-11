@@ -9,7 +9,7 @@
   "camino": {
     "verifyNodeSignature": true,
     "lockModeBondDeposit": true,
-    "initialAdmin": "X-columbus1xnzumqv2nzcg24g5ql34jv38qhpjyfxk0spcls",
+    "initialAdmin": "X-columbus1xkprh24vfyx8zghmvt2p60mmskwghzsn3q705m",
     "depositOffers": [
       {
         "interestRateNominator": 80000,
@@ -141,7 +141,7 @@
     "allocations": [
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1xnzumqv2nzcg24g5ql34jv38qhpjyfxk0spcls",
+        "avaxAddr": "X-columbus1xkprh24vfyx8zghmvt2p60mmskwghzsn3q705m",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1030,7 +1030,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19s08wlh8a79h32upup8xz5lqrne6ps6vx64fu6",
+        "avaxAddr": "X-columbus19m2e8p6ce2yx9uf00rw5jm70l4w24x0sun4s4v",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1047,7 +1047,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus185x26fkaac36mssg90r82dqal3qagd0usyucqs",
+        "avaxAddr": "X-columbus1udd7y4uv9kfyh2jsckfztz9crgfve3gcaf906k",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -1059,6 +1059,57 @@
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
             "memo": "44"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus196w4wzzzgc5vu38jywtr0na3uh9ml8vqc4030c",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "45"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ca5yhrucv5haavjsw4m8nwx28tzva6f8gxh0ce",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 135000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "46"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1jpsr4vqdek4kt79ccndunxscyq2n09lj6e2ecm",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "48"
           }
         ]
       },
@@ -1135,7 +1186,7 @@
         "avaxAddr": "X-columbus10jsl9f669s9dn6zpxjgerv57pmhnaup5tuefuw",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -1217,6 +1268,23 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18m8cg76v9pwywk0s228swwsnapzhgj5npdz6vp",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 2800000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "60"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ak489h9rs6e728wvrgpkx7rzuu9hf4kusjw968",
         "xAmount": 0,
         "addressStates": {
@@ -1250,6 +1318,23 @@
             "depositDuration": 110376000,
             "depositOfferMemo": "Seed 3 Years 0%",
             "memo": "64"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1gcmdk8edz6jfg2lk72229xs5r3nxcwv6t70mvf",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "Seed 3 Years 0%",
+            "memo": "65"
           }
         ]
       },
@@ -2496,7 +2581,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus17cm7uuukw5cx68sxlpzg6pzq5e723r9j7he0uy",
+        "avaxAddr": "X-columbus19hw2tjza5vuyjrgv0nlcle4mw573wxp559zf9w",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -2580,7 +2665,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
+        "avaxAddr": "X-columbus1gyk9tf69huuc7lrrt6myuzufg4zv4tewl4m5lz",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -2979,7 +3064,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1jn7h9l0phzh9lvj0744tvc6ta20vxsxffdpzkm",
+        "avaxAddr": "X-columbus13yjkkxgkg0mk7k727f30hwy78zukld6z4jnz9d",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -3084,7 +3169,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19rzuswq4ek9u0y47dzefcgvjuxlktwm2a4x827",
+        "avaxAddr": "X-columbus1hecqc6fahddfnr90nxdflt0lwkpshr89fz4tf3",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -3294,6 +3379,23 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ku4xvfreup02ugju8ls6npyfeu2d0vp2g9x3vd",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "165"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus16g8j2vrcywjskaygezkm5rl40df6m063kj5axq",
         "xAmount": 0,
         "addressStates": {
@@ -3311,7 +3413,41 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1tma7putyyyg9zka742mpdz8amn65m7gkj2zm4k",
+        "avaxAddr": "X-columbus16dkxe6puk3y4qm7hjfvg2lwl8r92e27sf93f8r",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 300000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "167"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ty3unkry6cqhyyrv4hl6zuhx0k6z59xyzeh6tj",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositDuration": 157680000,
+            "depositOfferMemo": "Team 5 Years 0%",
+            "memo": "169"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1s5nvfwlytnphhzjqm7ep9w7xe25zrep9hqtcue",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -3387,7 +3523,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dsp7mpvs7hk6hp9l22my4zgpz347celpuv4p94",
+        "avaxAddr": "X-columbus15wxmstyfxxx82ewdmz3usvfk20h39zqhvdqf66",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4586,7 +4722,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1e8ah48g40g95aw8h9kcysys43fxnjuaus6tgfr",
+        "avaxAddr": "X-columbus1ml9g8xcuemh3gly6pn90udkadtvqk49u8pc3mz",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5006,7 +5142,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kgfs032y5fxnvyp0nyhzgt78dzmk2y39r8zrac",
+        "avaxAddr": "X-columbus1anj83lc0h839vmvltws0a6h7k5znlyq84hp6m0",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5174,7 +5310,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus14l3kw0v2j5l606lst7kfcs4g5lwvgk53gtf3dj",
+        "avaxAddr": "X-columbus1yws8zcjfsnfgq39c6chsgtm94mt9596m06zm40",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5195,7 +5331,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dt2gmpynvaah9juxwpyw2l83lm78c2c9rvnsyw",
+        "avaxAddr": "X-columbus18eqxyetaqt8kym2nqhat532gxtewfsvk3ely5n",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5237,7 +5373,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
+        "avaxAddr": "X-columbus1gyk9tf69huuc7lrrt6myuzufg4zv4tewl4m5lz",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5342,7 +5478,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus165l9qxyvr0rcpfverhp6tadzpufrs4vlp045g9",
+        "avaxAddr": "X-columbus169u6vuaqkxl5pwcq3a33336ww7380c3qrmlcsg",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5447,7 +5583,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13rwnrf69r9dk2hn582gtpy0khntcrs99wxymhs",
+        "avaxAddr": "X-columbus1wpxa43ech79mxs5ta9kgrg3jx03rrjc3sv6qmv",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5489,27 +5625,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus15hskle63avvm98u2vlws8ftsvegpcvu5m0g033",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "275"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "275+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1t7hagl6tr9hj7hvt66xv73au3edt8fj0aagwk4",
         "xAmount": 0,
         "addressStates": {
@@ -5521,11 +5636,11 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "276"
+            "memo": "275"
           },
           {
             "amount": 1500000000000,
-            "memo": "276+"
+            "memo": "275+"
           }
         ]
       },
@@ -5542,11 +5657,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "277"
+            "memo": "276"
           },
           {
             "amount": 1000000000000,
-            "memo": "277+"
+            "memo": "276+"
           }
         ]
       },
@@ -5563,11 +5678,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "278"
+            "memo": "277"
           },
           {
             "amount": 100000000000,
-            "memo": "278+"
+            "memo": "277+"
           }
         ]
       },
@@ -5584,11 +5699,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "279"
+            "memo": "278"
           },
           {
             "amount": 1000000000000,
-            "memo": "279+"
+            "memo": "278+"
           }
         ]
       },
@@ -5605,11 +5720,11 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "280"
+            "memo": "279"
           },
           {
             "amount": 1500000000000,
-            "memo": "280+"
+            "memo": "279+"
           }
         ]
       },
@@ -5626,11 +5741,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "281"
+            "memo": "280"
           },
           {
             "amount": 1000000000000,
-            "memo": "281+"
+            "memo": "280+"
           }
         ]
       },
@@ -5647,11 +5762,11 @@
             "amount": 300000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "282"
+            "memo": "281"
           },
           {
             "amount": 3000000000000,
-            "memo": "282+"
+            "memo": "281+"
           }
         ]
       },
@@ -5668,17 +5783,17 @@
             "amount": 70000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "283"
+            "memo": "282"
           },
           {
             "amount": 700000000000,
-            "memo": "283+"
+            "memo": "282+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qkecpdfst3hjl4sdktn25dvrq4x4gt8ljqsnqp",
+        "avaxAddr": "X-columbus1rdh6676x0fdevchtu2xjxpm0pf9xun4kvsscvm",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5689,11 +5804,11 @@
             "amount": 250000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "284"
+            "memo": "283"
           },
           {
             "amount": 2500000000000,
-            "memo": "284+"
+            "memo": "283+"
           }
         ]
       },
@@ -5710,17 +5825,17 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "285"
+            "memo": "284"
           },
           {
             "amount": 100000000000,
-            "memo": "285+"
+            "memo": "284+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1e8ah48g40g95aw8h9kcysys43fxnjuaus6tgfr",
+        "avaxAddr": "X-columbus1ml9g8xcuemh3gly6pn90udkadtvqk49u8pc3mz",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5731,11 +5846,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "286"
+            "memo": "285"
           },
           {
             "amount": 1000000000000,
-            "memo": "286+"
+            "memo": "285+"
           }
         ]
       },
@@ -5752,11 +5867,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "287"
+            "memo": "286"
           },
           {
             "amount": 200000000000,
-            "memo": "287+"
+            "memo": "286+"
           }
         ]
       },
@@ -5773,11 +5888,11 @@
             "amount": 10000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "288"
+            "memo": "287"
           },
           {
             "amount": 100000000000,
-            "memo": "288+"
+            "memo": "287+"
           }
         ]
       },
@@ -5794,11 +5909,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "289"
+            "memo": "288"
           },
           {
             "amount": 100000000000,
-            "memo": "289+"
+            "memo": "288+"
           }
         ]
       },
@@ -5815,11 +5930,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "290"
+            "memo": "289"
           },
           {
             "amount": 1000000000000,
-            "memo": "290+"
+            "memo": "289+"
           }
         ]
       },
@@ -5836,11 +5951,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "291"
+            "memo": "290"
           },
           {
             "amount": 100000000000,
-            "memo": "291+"
+            "memo": "290+"
           }
         ]
       },
@@ -5857,11 +5972,11 @@
             "amount": 200000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "292"
+            "memo": "291"
           },
           {
             "amount": 2000000000000,
-            "memo": "292+"
+            "memo": "291+"
           }
         ]
       },
@@ -5878,17 +5993,38 @@
             "amount": 15000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "293"
+            "memo": "292"
           },
           {
             "amount": 150000000000,
+            "memo": "292+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "293"
+          },
+          {
+            "amount": 1000000000000,
             "memo": "293+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zwvhe3ldhusktgsfaphj482sq3sw37mu6884rn",
+        "avaxAddr": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5909,28 +6045,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1rvaashu2n3lgc8ar5mhk2rya4q8f0tq9kulpsy",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "295"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "295+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1x7mff9z99azsd2djf4j0yp43ne0gxuvsggpnms",
+        "avaxAddr": "X-columbus1qajjjmwlnytjfe6l8jtqhev4helx9x47hn6rdl",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -5941,11 +6056,11 @@
             "amount": 1500000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "296"
+            "memo": "295"
           },
           {
             "amount": 15000000000000,
-            "memo": "296+"
+            "memo": "295+"
           }
         ]
       },
@@ -5962,11 +6077,11 @@
             "amount": 30000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "297"
+            "memo": "296"
           },
           {
             "amount": 300000000000,
-            "memo": "297+"
+            "memo": "296+"
           }
         ]
       },
@@ -5983,11 +6098,11 @@
             "amount": 250000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "298"
+            "memo": "297"
           },
           {
             "amount": 2500000000000,
-            "memo": "298+"
+            "memo": "297+"
           }
         ]
       },
@@ -6004,11 +6119,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "299"
+            "memo": "298"
           },
           {
             "amount": 1000000000000,
-            "memo": "299+"
+            "memo": "298+"
           }
         ]
       },
@@ -6025,11 +6140,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "300"
+            "memo": "299"
           },
           {
             "amount": 1000000000000,
-            "memo": "300+"
+            "memo": "299+"
           }
         ]
       },
@@ -6046,11 +6161,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "301"
+            "memo": "300"
           },
           {
             "amount": 1000000000000,
-            "memo": "301+"
+            "memo": "300+"
           }
         ]
       },
@@ -6067,6 +6182,27 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "301"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "301+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1d68vs6523kp60s8ls67pexr5wmx539na8cm98x",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "302"
           },
           {
@@ -6077,7 +6213,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1d68vs6523kp60s8ls67pexr5wmx539na8cm98x",
+        "avaxAddr": "X-columbus1ulq0adze9dd7gv7taqrl7yyw80xng576wf77y3",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6098,7 +6234,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ulq0adze9dd7gv7taqrl7yyw80xng576wf77y3",
+        "avaxAddr": "X-columbus160qmkdkvhzszx4ph6hf7cwj4rmxdnngfjgeqm8",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6119,10 +6255,10 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus160qmkdkvhzszx4ph6hf7cwj4rmxdnngfjgeqm8",
+        "avaxAddr": "X-columbus1zpuwfdjtzmfvsrdpd742g6hek6m7tfntch8mgq",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -6140,27 +6276,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zpuwfdjtzmfvsrdpd742g6hek6m7tfntch8mgq",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "306"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "306+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ypmdpy7tlep95za2nt9tx5a8tvjykxxssa5kga",
         "xAmount": 0,
         "addressStates": {
@@ -6172,11 +6287,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "307"
+            "memo": "306"
           },
           {
             "amount": 1000000000000,
-            "memo": "307+"
+            "memo": "306+"
           }
         ]
       },
@@ -6193,17 +6308,17 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "308"
+            "memo": "307"
           },
           {
             "amount": 200000000000,
-            "memo": "308+"
+            "memo": "307+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1yp5mdt0mjgt7q956flks5m4gdjuh8xdc09a0t6",
+        "avaxAddr": "X-columbus14dc8m3xgfavwvwupq4krps8m5f4t2fefxlnafg",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6214,11 +6329,11 @@
             "amount": 3000000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "309"
+            "memo": "308"
           },
           {
             "amount": 30000000000000,
-            "memo": "309+"
+            "memo": "308+"
           }
         ]
       },
@@ -6235,17 +6350,38 @@
             "amount": 1000000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "310"
+            "memo": "309"
           },
           {
             "amount": 10000000000000,
-            "memo": "310+"
+            "memo": "309+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1h7u9p4pa9faxj3zezs9udxvj8quuqymrxmnfun",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "310"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "310+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kfnsy5p7pfsqh76k5zzmj2kd5svaf0qwrjl0t8",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6266,27 +6402,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kfnsy5p7pfsqh76k5zzmj2kd5svaf0qwrjl0t8",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "312"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "312+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1q9ka38c978mj2l77kuh5jtl8745xfuulqdcsly",
         "xAmount": 0,
         "addressStates": {
@@ -6298,11 +6413,11 @@
             "amount": 1000000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "313"
+            "memo": "312"
           },
           {
             "amount": 10000000000000,
-            "memo": "313+"
+            "memo": "312+"
           }
         ]
       },
@@ -6319,11 +6434,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "314"
+            "memo": "313"
           },
           {
             "amount": 1000000000000,
-            "memo": "314+"
+            "memo": "313+"
           }
         ]
       },
@@ -6340,11 +6455,11 @@
             "amount": 115000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "315"
+            "memo": "314"
           },
           {
             "amount": 1150000000000,
-            "memo": "315+"
+            "memo": "314+"
           }
         ]
       },
@@ -6361,11 +6476,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "316"
+            "memo": "315"
           },
           {
             "amount": 1000000000000,
-            "memo": "316+"
+            "memo": "315+"
           }
         ]
       },
@@ -6382,11 +6497,11 @@
             "amount": 150000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "317"
+            "memo": "316"
           },
           {
             "amount": 1500000000000,
-            "memo": "317+"
+            "memo": "316+"
           }
         ]
       },
@@ -6405,11 +6520,11 @@
             "validatorDuration": 31881600,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "318"
+            "memo": "317"
           },
           {
             "amount": 2000000000000,
-            "memo": "318+"
+            "memo": "317+"
           }
         ]
       },
@@ -6426,11 +6541,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "319"
+            "memo": "318"
           },
           {
             "amount": 1000000000000,
-            "memo": "319+"
+            "memo": "318+"
           }
         ]
       },
@@ -6449,11 +6564,11 @@
             "validatorDuration": 30412800,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "320"
+            "memo": "319"
           },
           {
             "amount": 2000000000000,
-            "memo": "320+"
+            "memo": "319+"
           }
         ]
       },
@@ -6470,11 +6585,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "321"
+            "memo": "320"
           },
           {
             "amount": 1000000000000,
-            "memo": "321+"
+            "memo": "320+"
           }
         ]
       },
@@ -6491,11 +6606,11 @@
             "amount": 500000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "322"
+            "memo": "321"
           },
           {
             "amount": 5000000000000,
-            "memo": "322+"
+            "memo": "321+"
           }
         ]
       },
@@ -6512,11 +6627,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "323"
+            "memo": "322"
           },
           {
             "amount": 1000000000000,
-            "memo": "323+"
+            "memo": "322+"
           }
         ]
       },
@@ -6533,11 +6648,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "324"
+            "memo": "323"
           },
           {
             "amount": 100000000000,
-            "memo": "324+"
+            "memo": "323+"
           }
         ]
       },
@@ -6554,11 +6669,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "325"
+            "memo": "324"
           },
           {
             "amount": 1000000000000,
-            "memo": "325+"
+            "memo": "324+"
           }
         ]
       },
@@ -6575,11 +6690,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "326"
+            "memo": "325"
           },
           {
             "amount": 1000000000000,
-            "memo": "326+"
+            "memo": "325+"
           }
         ]
       },
@@ -6596,32 +6711,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "327"
+            "memo": "326"
           },
           {
             "amount": 100000000000,
-            "memo": "327+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus10clljd8zjkjavtha70m6q3uvwjrefs0cmdzxuz",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "328"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "328+"
+            "memo": "326+"
           }
         ]
       },
@@ -6638,20 +6732,20 @@
             "amount": 200000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "329"
+            "memo": "328"
           },
           {
             "amount": 2000000000000,
-            "memo": "329+"
+            "memo": "328+"
           }
         ]
       }
     ],
     "initialMultisigAddresses": [
       {
-        "alias": "X-columbus1e8ah48g40g95aw8h9kcysys43fxnjuaus6tgfr",
+        "alias": "X-columbus1ml9g8xcuemh3gly6pn90udkadtvqk49u8pc3mz",
         "addresses": [
-          "X-columbus1g5rn3u8jfse893vc8suctmlkcvnpf097tmcs0l",
+          "X-columbus105juj7nnwlr43jju46ll3w0hk2jhh8qxeu70s8",
           "X-columbus15us5xx6cqyqke700r7zzrttkc8f8kkmz2mp9mq",
           "X-columbus1chgzlvlsuv24ul0lc2pe3s3u3kg2nth6sjlrf2",
           "X-columbus1lw0tt6jc6wtstw985dezs9slux395juc6jctw4"
@@ -6660,10 +6754,10 @@
         "memo": "108"
       },
       {
-        "alias": "X-columbus1qkecpdfst3hjl4sdktn25dvrq4x4gt8ljqsnqp",
+        "alias": "X-columbus1rdh6676x0fdevchtu2xjxpm0pf9xun4kvsscvm",
         "addresses": [
-          "X-columbus18jzw0k5pdcsmeyc55wevnxph8amaelt50wyzd3",
-          "X-columbus1604l4rly3kp5pexwm57p2gj5apdk78l9e09cl5"
+          "X-columbus1y927svmcmp4qrm6sa353heyaugv2m6q0jtgcz4",
+          "X-columbus178k05na3e3yvh43lwgn93xavgzd9g9uwzaenu5"
         ],
         "threshold": 1,
         "memo": "114"
@@ -6732,6 +6826,17 @@
         "memo": "157"
       },
       {
+        "alias": "X-columbus19m2e8p6ce2yx9uf00rw5jm70l4w24x0sun4s4v",
+        "addresses": [
+          "X-columbus19s08wlh8a79h32upup8xz5lqrne6ps6vx64fu6",
+          "X-columbus1w04tgtwve7er76ffz8taygd07d3kxjwcqtdsws",
+          "X-columbus14n7xd94q07gzsxlumhwtvydt9vmnh9ejdhcvvh",
+          "X-columbus17mmty08pa2ad43e53055a9ujdr5s9p3sfajpyn"
+        ],
+        "threshold": 2,
+        "memo": "158"
+      },
+      {
         "alias": "X-columbus1dgky8sv7ps46hrd29uhltjzjfuaavpgpxxnv80",
         "addresses": [
           "X-columbus1vveln3mjr9ee2ls5tx39sqygguatt5thk5spvq",
@@ -6749,12 +6854,12 @@
         "memo": "169"
       },
       {
-        "alias": "X-columbus165l9qxyvr0rcpfverhp6tadzpufrs4vlp045g9",
+        "alias": "X-columbus169u6vuaqkxl5pwcq3a33336ww7380c3qrmlcsg",
         "addresses": [
           "X-columbus10a979j54ladz0y9q2672vv4ygpxgfjnugq54r3",
           "X-columbus17j8tn7asys029zjxj5834zrp50nrl2jzrrl60n"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "175"
       },
       {
@@ -6839,22 +6944,14 @@
         "memo": "304"
       },
       {
-        "alias": "X-columbus14l3kw0v2j5l606lst7kfcs4g5lwvgk53gtf3dj",
+        "alias": "X-columbus1yws8zcjfsnfgq39c6chsgtm94mt9596m06zm40",
         "addresses": [
-          "X-columbus18dc4jdycs82yw3p9uk537kvt80snjvkyunge2d",
-          "X-columbus164ga3vuv2wr0ynrtfzhcw54mdz9appxp2t6s58",
-          "X-columbus17vmr4hvyl3dw9ec7clptmqt2dpd0uaqzderkkn"
+          "X-columbus1fkumksdh3cc3tjq6lauj4fgw0302s58t7c45us",
+          "X-columbus1ss45guv0dvndhqen29nqvj2z7uqcxse2kw9t2u",
+          "X-columbus164ga3vuv2wr0ynrtfzhcw54mdz9appxp2t6s58"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "348"
-      },
-      {
-        "alias": "X-columbus15hskle63avvm98u2vlws8ftsvegpcvu5m0g033",
-        "addresses": [
-          "X-columbus1w82n996zmcf0eswzlnqj9e63j7y2u34nvu4dpt"
-        ],
-        "threshold": 1,
-        "memo": "355"
       },
       {
         "alias": "X-columbus1ypmdpy7tlep95za2nt9tx5a8tvjykxxssa5kga",
@@ -6892,10 +6989,10 @@
         "memo": "388"
       },
       {
-        "alias": "X-columbus19rzuswq4ek9u0y47dzefcgvjuxlktwm2a4x827",
+        "alias": "X-columbus1hecqc6fahddfnr90nxdflt0lwkpshr89fz4tf3",
         "addresses": [
           "X-columbus1pv4gg2nlg3ul43cxt5s5lzgvmnxc6tgux7ez4v",
-          "X-columbus1raf8zahwesnyjm38cqf6dnnz0qtmqgyypkr8x6"
+          "X-columbus1k565fpq39tw3x9n9kaaexewnrjdtejej5hfl4x"
         ],
         "threshold": 1,
         "memo": "394"
@@ -6925,13 +7022,13 @@
         "memo": "421"
       },
       {
-        "alias": "X-columbus1dsp7mpvs7hk6hp9l22my4zgpz347celpuv4p94",
+        "alias": "X-columbus15wxmstyfxxx82ewdmz3usvfk20h39zqhvdqf66",
         "addresses": [
           "X-columbus1c5hzeksvkgaydyk5mvxqtdu5ud0smeqp9fk4nt",
           "X-columbus16h4jp22kqeykwsejfsqw2huaeka9hd37n4vdyv",
           "X-columbus1udmhtchhzknfrc674765p7haalzp5nthxh4zk7"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "422"
       },
       {
@@ -7066,9 +7163,9 @@
         "memo": "607"
       },
       {
-        "alias": "X-columbus1x7mff9z99azsd2djf4j0yp43ne0gxuvsggpnms",
+        "alias": "X-columbus1qajjjmwlnytjfe6l8jtqhev4helx9x47hn6rdl",
         "addresses": [
-          "X-columbus1n367g50tsmkgsspnp2qaf5vmrsa2kamc3c5q8h"
+          "X-columbus1j5uwju5lqmm7ja3atkayclj3fyemk4m4nxfe7n"
         ],
         "threshold": 1,
         "memo": "611"
@@ -7082,13 +7179,13 @@
         "memo": "674"
       },
       {
-        "alias": "X-columbus1zwvhe3ldhusktgsfaphj482sq3sw37mu6884rn",
+        "alias": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
         "addresses": [
           "X-columbus1vqt5lqcw4jrleckhp3z6r3mpame8gdhxhy9j8f",
           "X-columbus13xugknzqyfptssgke9fwmkveex8z2u3tm9zn3l",
           "X-columbus1lff8ns8ra2drccej8s6gx5sqadjupj9c7txpks"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "675"
       },
       {
@@ -7130,12 +7227,12 @@
         "memo": "723"
       },
       {
-        "alias": "X-columbus1rvaashu2n3lgc8ar5mhk2rya4q8f0tq9kulpsy",
+        "alias": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
         "addresses": [
           "X-columbus1p0v0fh8mtdqau6qvjfz6ksewgznkqwrf0h0wh2",
           "X-columbus1nr4nrvdqd8s5setmuuegqs5pv4k9ncvhfq4nt7"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "728"
       },
       {
@@ -7148,10 +7245,10 @@
         "memo": "730"
       },
       {
-        "alias": "X-columbus17cm7uuukw5cx68sxlpzg6pzq5e723r9j7he0uy",
+        "alias": "X-columbus19hw2tjza5vuyjrgv0nlcle4mw573wxp559zf9w",
         "addresses": [
           "X-columbus1v9n5mvtwe4t2fdk0qu3n8akysct6s7wv8uw982",
-          "X-columbus1skv4phaz8n6qcvpwe2jdnsu00gtyzagrwy4va3"
+          "X-columbus1vhluqqdmlt0kr0crxxyqufuazd0zhqz7r8qcus"
         ],
         "threshold": 1,
         "memo": "736"
@@ -7184,13 +7281,13 @@
         "memo": "766"
       },
       {
-        "alias": "X-columbus1yp5mdt0mjgt7q956flks5m4gdjuh8xdc09a0t6",
+        "alias": "X-columbus14dc8m3xgfavwvwupq4krps8m5f4t2fefxlnafg",
         "addresses": [
           "X-columbus1rzhscga3564359xlp666j8gnjth70ps6ycnx6q",
           "X-columbus1t0yu2fp26xwdw052m4v4549hw0cnehvn2n6fje",
           "X-columbus1vnfj3q296kaaat620npvzlqlhgcthuzkvrckjn"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "777"
       },
       {
@@ -7271,14 +7368,6 @@
         "memo": "933"
       },
       {
-        "alias": "X-columbus10clljd8zjkjavtha70m6q3uvwjrefs0cmdzxuz",
-        "addresses": [
-          "X-columbus17u7fq7jkawn59e680rwwax7ctjn473nl939vzv"
-        ],
-        "threshold": 1,
-        "memo": "955"
-      },
-      {
         "alias": "X-columbus1lsgwstc8edestl9v9t65kcfwjcy4gh8qv6jfc6",
         "addresses": [
           "X-columbus1ejmjsgslx2e2zqfu24xlthdnn5zt8255ys0fd8"
@@ -7287,13 +7376,13 @@
         "memo": "957"
       },
       {
-        "alias": "X-columbus13rwnrf69r9dk2hn582gtpy0khntcrs99wxymhs",
+        "alias": "X-columbus1wpxa43ech79mxs5ta9kgrg3jx03rrjc3sv6qmv",
         "addresses": [
           "X-columbus107pmtdx0rgq2dknf6ffxhlaehmnausdcpesjwg",
           "X-columbus13p3x5z04cfmln5mn5dj8ljr3a3rj733hgn5629",
           "X-columbus1ez6s747dce6w9f6tsl96l8ljxx36v8y8jkll4c"
         ],
-        "threshold": 1,
+        "threshold": 2,
         "memo": "975"
       },
       {
