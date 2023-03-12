@@ -13,7 +13,7 @@ import (
 var (
 	_ verify.State = (*OutputOwners)(nil)
 
-	errNoValueOutput = errors.New("output has no value")
+	ErrNoValueOutput = errors.New("output has no value")
 )
 
 type TransferOutput struct {
@@ -45,7 +45,7 @@ func (out *TransferOutput) Verify() error {
 	case out == nil:
 		return errNilOutput
 	case out.Amt == 0:
-		return errNoValueOutput
+		return ErrNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
