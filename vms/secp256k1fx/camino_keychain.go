@@ -20,6 +20,15 @@ var (
 	errCyclicAliases     = errors.New("cyclic aliases not allowed")
 )
 
+type TFResult int
+
+const (
+	TFVerify TFResult = iota
+	TFSkip
+	TFContinue
+	TFError
+)
+
 // Spend attempts to create an input from outputowners which can contain multisig aliases
 func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf interface{}) (
 	verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error,
@@ -48,18 +57,29 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	sigs := make([]uint32, 0, owners.Threshold)
 	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 
-	tf := func(alias bool, addr ids.ShortID, visited, _, totalVisited, _ uint32) (bool, error) {
+	tf := func(alias bool, addr ids.ShortID, visited, _, totalVisited, totalVerified uint32) (TFResult, error) {
 		if key, exists := kc.get(addr); exists {
+			// Remove signatures from failed children
+			if totalVerified < uint32(len(sigs)) {
+				sigs = sigs[:totalVerified]
+				keys = keys[:totalVerified]
+			}
 			sigs = append(sigs, totalVisited)
 			keys = append(keys, key)
-			// We return true also for alias to skip nested traversals
-			return true, nil
+			// For alias -> skip children
+			return TFVerify, nil
 		}
-		return false, nil
+		// Assumption we traverse with real addresses -> process children
+		return TFContinue, nil
 	}
 
-	if _, err := TraverseOwners(owners, msig, tf); err != nil {
+	totalVerified, err := TraverseOwners(owners, msig, tf)
+	if err != nil {
 		return nil, nil, err
+	}
+	if totalVerified < uint32(len(sigs)) {
+		sigs = sigs[:totalVerified]
+		keys = keys[:totalVerified]
 	}
 
 	switch out := out.(type) {
@@ -84,7 +104,7 @@ type TraverserOwnerFunc func(
 	verified,
 	totalVisited,
 	totalVerified uint32,
-) (bool, error)
+) (TFResult, error)
 
 // TraverseOwners traverses through owners, visits every address and callbacks in case a
 // non-multisig address is visited. Nested multisig alias are excluded from sigIndex concept.
@@ -93,8 +113,8 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 	var visited, verified uint32
 
 	type stackItem struct {
-		index, verified uint32
-		owners          *OutputOwners
+		index, verified, verifiedTotal, visitedTotal uint32
+		owners                                       *OutputOwners
 	}
 
 	cycleCheck := set.Set[ids.ShortID]{}
@@ -123,7 +143,7 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				if !ok {
 					return 0, errWrongOwnerType
 				}
-				success, err := callback(
+				result, err := callback(
 					true,
 					addr,
 					currentStack.index-1,
@@ -135,18 +155,20 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 					return 0, err
 				}
 
-				if success {
-					// Spend only: Accept the complete alias
+				switch result {
+				case TFVerify:
 					currentStack.verified++
-				} else {
-					stack = append(stack, &stackItem{owners: owners})
+					verified++
+				case TFContinue:
+					stack = append(stack, &stackItem{owners: owners, verifiedTotal: verified, visitedTotal: visited})
 					goto Stack
 				}
+				visited++
 			case database.ErrNotFound: // non-multi-sig
 				if visited > MaxSignatures {
 					return 0, errTooManySignatures
 				}
-				success, err := callback(
+				result, err := callback(
 					false,
 					addr,
 					currentStack.index-1,
@@ -157,7 +179,7 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				if err != nil {
 					return 0, err
 				}
-				if success {
+				if result == TFVerify {
 					currentStack.verified++
 					verified++
 				}
@@ -166,14 +188,19 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				return 0, err
 			}
 		}
-		// verify current level
-		if currentStack.verified < currentStack.owners.Threshold {
-			return 0, errCantSpend
-		}
+
 		// remove head
 		stack = stack[:len(stack)-1]
-		// apply child verification
-		if len(stack) > 0 {
+		// verify current level
+		if currentStack.verified < currentStack.owners.Threshold {
+			if len(stack) == 0 {
+				return 0, errCantSpend
+			}
+			// We recover to previous state
+			verified = currentStack.verifiedTotal
+			visited = currentStack.visitedTotal
+		} else if len(stack) > 0 {
+			// apply child verification
 			stack[len(stack)-1].verified++
 		}
 	}

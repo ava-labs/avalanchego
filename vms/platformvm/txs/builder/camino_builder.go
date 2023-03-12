@@ -509,22 +509,23 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	}
 	signers = append(signers, nodeSigners)
 
-	consortiumMemberOwner, err := state.GetOwner(b.state, consortiumMemberAddress)
+	kc := secp256k1fx.NewKeychain(keys...)
+	in, consortiumSigners, err := kc.SpendMultiSig(
+		&secp256k1fx.TransferOutput{
+			OutputOwners: secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{consortiumMemberAddress},
+				Threshold: 1,
+				Locktime:  0,
+			},
+		},
+		0,
+		b.state,
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	consortiumSigners, err := getSigners(keys, consortiumMemberOwner.Addrs)
-	if err != nil {
-		return nil, err
-	}
+	sigIndices := in.(*secp256k1fx.TransferInput).SigIndices
 	signers = append(signers, consortiumSigners)
-
-	kc := secp256k1fx.NewKeychain(consortiumSigners...)
-	sigIndices, _, able := kc.Match(consortiumMemberOwner, b.clk.Unix())
-	if !able {
-		return nil, fmt.Errorf("failed to get consortium member auth: %w", err)
-	}
 
 	utx := &txs.RegisterNodeTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{

@@ -148,8 +148,8 @@ func (vm *VM) Initialize(
 	vm.ctx = chainCtx
 	vm.dbManager = dbManager
 
-	vm.codecRegistry = linearcodec.NewDefault()
-	vm.fx = &secp256k1fx.Fx{}
+	vm.codecRegistry = linearcodec.NewCaminoDefault()
+	vm.fx = &secp256k1fx.CaminoFx{}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}

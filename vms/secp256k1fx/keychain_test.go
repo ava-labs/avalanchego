@@ -24,7 +24,8 @@ var (
 		"P5wdRuZeaDt28eHMP5S3w9ZdoBfo7wuzF",
 		"Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf",
 	}
-	msigAddress = ids.ShortID{255, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+	msigAddress    = ids.ShortID{255, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+	msigAddressLow = ids.ShortID{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 )
 
 func TestNewKeychain(t *testing.T) {

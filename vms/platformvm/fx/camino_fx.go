@@ -19,11 +19,11 @@ type CaminoFx interface {
 	// should be returned. Multisig aliases supported.
 	VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigIntf interface{}) error
 
-	// VerifyPermission returns nil if credential [credIntf] proves that [controlGroup] assents to transaction [utx].
+	// VerifyMultisigPermission returns nil if credential [credIntf] proves that [controlGroup] assents to transaction [utx].
 	// Multisig aliases supported.
 	VerifyMultisigPermission(txIntf, inIntf, credIntf, controlGroup, msigIntf interface{}) error
 
-	// VerifyPermission returns nil if credential [credIntf] proves that [controlGroup] assents to transaction [utx].
+	// VerifyMultisigUnorderedPermission returns nil if credential [credIntf] proves [ownerIntf].
 	// Multisig aliases supported. Signatures order and number doesn't matter.
 	VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msigIntf interface{}) error
 }

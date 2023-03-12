@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -35,6 +36,25 @@ type AliasGetter interface {
 type (
 	RecoverMap map[ids.ShortID][crypto.SECP256K1RSigLen]byte
 )
+
+type CaminoFx struct {
+	Fx
+}
+
+func (fx *CaminoFx) Initialize(vmIntf interface{}) error {
+	err := fx.Fx.Initialize(vmIntf)
+	if err != nil {
+		return err
+	}
+
+	c := fx.VM.CodecRegistry()
+	if camino, ok := c.(codec.CaminoRegistry); ok {
+		if err := camino.RegisterCustomType(&MultisigCredential{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (RecoverMap, error) {
 	ret := make(RecoverMap, len(verifies))
@@ -124,7 +144,7 @@ func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msig
 	if !ok {
 		return errWrongInputType
 	}
-	cred, ok := credIntf.(*Credential)
+	cred, ok := credIntf.(CredentialIntf)
 	if !ok {
 		return errWrongCredentialType
 	}
@@ -150,7 +170,7 @@ func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msi
 	if !ok {
 		return errWrongTxType
 	}
-	cred, ok := credIntf.(*Credential)
+	cred, ok := credIntf.([]verify.Verifiable)
 	if !ok {
 		return errWrongCredentialType
 	}
@@ -158,21 +178,25 @@ func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msi
 	if !ok {
 		return errWrongUTXOType
 	}
-
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
 		return errNotAliasGetter
 	}
 
-	if err := verify.All(owners, cred); err != nil {
+	if err := owners.Verify(); err != nil {
+		return err
+	}
+
+	if err := verify.All(cred...); err != nil {
 		return err
 	}
 
 	return fx.verifyMultisigUnorderedCredentials(tx, cred, owners, msig)
 }
 
-func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credential, owners *OutputOwners, msig AliasGetter) error {
-	if len(in.SigIndices) != len(cred.Sigs) {
+func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred CredentialIntf, owners *OutputOwners, msig AliasGetter) error {
+	mCred, _ := cred.(*MultisigCredential)
+	if len(in.SigIndices) != len(cred.Signatures()) {
 		return errInputCredentialSignersMismatch
 	}
 
@@ -188,49 +212,54 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred *Credenti
 		verified,
 		totalVisited,
 		totalVerified uint32,
-	) (bool, error) {
+	) (TFResult, error) {
 		if alias {
-			return false, nil // continue traversal
+			if mCred == nil || mCred.HasMultisig(addr) {
+				return TFContinue, nil // continue traversal
+			} else {
+				return TFSkip, nil // skip this element
+			}
 		}
 		// check that input sig index matches
-		if totalVerified >= uint32(len(cred.Sigs)) {
-			return false, errTooFewSigIndices
+		if totalVerified >= uint32(len(cred.Signatures())) {
+			return TFError, errTooFewSigIndices
 		}
 
 		if sig, exists := resolved[addr]; exists &&
-			sig == cred.Sigs[totalVerified] &&
+			sig == cred.Signatures()[totalVerified] &&
 			(in.SigIndices[totalVerified] == math.MaxUint32 ||
 				in.SigIndices[totalVerified] == totalVisited) {
-			return true, nil
+			return TFVerify, nil
 		}
-		return false, nil
+		return TFSkip, nil
 	}
 
 	sigsVerified, err := TraverseOwners(owners, msig, tf)
 	if err != nil {
 		return err
 	}
-	if sigsVerified < uint32(len(cred.Sigs)) {
+	if sigsVerified < uint32(len(cred.Signatures())) {
 		return errTooManySigners
 	}
 
 	return nil
 }
 
-func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, cred *Credential, owners *OutputOwners, msig AliasGetter) error {
-	resolved, err := fx.RecoverAddresses(tx, []verify.Verifiable{cred})
+func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, creds []verify.Verifiable, owners *OutputOwners, msig AliasGetter) error {
+	resolved, err := fx.RecoverAddresses(tx, creds)
 	if err != nil {
 		return err
 	}
 
-	tf := func(alias bool, addr ids.ShortID, _, _, _, _ uint32) (bool, error) {
+	tf := func(alias bool, addr ids.ShortID, _, _, _, _ uint32) (TFResult, error) {
 		if alias {
-			return false, nil
+			// We try to verify whatever we can _> jump into children
+			return TFContinue, nil
 		}
 		if _, exists := resolved[addr]; exists {
-			return true, nil
+			return TFVerify, nil
 		}
-		return false, nil
+		return TFSkip, nil
 	}
 
 	if _, err = TraverseOwners(owners, msig, tf); err != nil {

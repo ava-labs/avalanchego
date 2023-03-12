@@ -143,20 +143,18 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return fmt.Errorf("%w: %s", errNodeNotRegistered, err)
 	}
 
-	// verifying consortium member signatures
-
-	signersAddresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
-	if err != nil {
-		return err
-	}
-
-	consortiumMemberOwner, err := state.GetOwner(e.State, consortiumMemberAddress)
-	if err != nil {
-		return err
-	}
-
-	if err := verifyAddrsOwner(signersAddresses, consortiumMemberOwner); err != nil {
-		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+	if err = e.Fx.VerifyMultisigUnorderedPermission(
+		tx,
+		e.Tx.Creds,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				consortiumMemberAddress,
+			},
+		},
+		e.State,
+	); err != nil {
+		return errConsortiumSignatureMissing
 	}
 
 	// verify validator
@@ -804,7 +802,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 	// Common vars
 
 	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
-	claimableCredential := e.Tx.Creds[len(e.Tx.Creds)-1]
+	claimableCredential := []verify.Verifiable{e.Tx.Creds[len(e.Tx.Creds)-1]}
 	txID := e.Tx.ID()
 
 	// Checking deposits sigs and creating reward outputs
@@ -831,7 +829,12 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 			return errNotSECPOwner
 		}
 
-		if err := e.Fx.VerifyMultisigUnorderedPermission(tx, claimableCredential, depositRewardsOwner, e.State); err != nil {
+		if err := e.Fx.VerifyMultisigUnorderedPermission(
+			tx,
+			claimableCredential,
+			depositRewardsOwner,
+			e.State,
+		); err != nil {
 			return fmt.Errorf("%w: %s", errDepositCredentialMissmatch, err)
 		}
 
@@ -900,7 +903,12 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 			return err
 		}
 
-		if err := e.Fx.VerifyMultisigUnorderedPermission(tx, claimableCredential, claimable.Owner, e.State); err != nil {
+		if err := e.Fx.VerifyMultisigUnorderedPermission(
+			tx,
+			claimableCredential,
+			claimable.Owner,
+			e.State,
+		); err != nil {
 			return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
 		}
 
@@ -1016,17 +1024,15 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	}
 
 	// verify consortium member cred
-
-	consortiumMemberOwner, err := state.GetOwner(e.State, tx.ConsortiumMemberAddress)
-	if err != nil {
-		return err
-	}
-
-	if err := e.Backend.Fx.VerifyPermission(
+	if err := e.Backend.Fx.VerifyMultisigPermission(
 		e.Tx.Unsigned,
 		tx.ConsortiumMemberAuth,
 		e.Tx.Creds[len(e.Tx.Creds)-1], // consortium member cred
-		consortiumMemberOwner,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{tx.ConsortiumMemberAddress},
+		},
+		e.State,
 	); err != nil {
 		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
 	}
@@ -1396,19 +1402,6 @@ func verifyAccess(roles, statesBit uint64) error {
 		return errInvalidRoles
 	}
 	return nil
-}
-
-func verifyAddrsOwner(addrs secp256k1fx.RecoverMap, owner *secp256k1fx.OutputOwners) error {
-	matchingSigsCount := uint32(0)
-	for _, addr := range owner.Addrs {
-		if _, exists := addrs[addr]; exists {
-			matchingSigsCount++
-			if matchingSigsCount == owner.Threshold {
-				return nil
-			}
-		}
-	}
-	return errors.New("missing signature")
 }
 
 func validatorExists(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) error {

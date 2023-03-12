@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -471,7 +472,7 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 				copy(cred.Sigs[i][:], sig)
 			}
 
-			err := fx.verifyMultisigUnorderedCredentials(tx, cred, tt.owners, tt.msig(ctrl))
+			err := fx.verifyMultisigUnorderedCredentials(tx, []verify.Verifiable{cred}, tt.owners, tt.msig(ctrl))
 			require.ErrorIs(t, err, tt.expectedError)
 		})
 	}
