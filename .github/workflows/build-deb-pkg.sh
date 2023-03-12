@@ -1,14 +1,12 @@
 PKG_ROOT=/tmp/avalanchego
 DEBIAN_BASE_DIR=$PKG_ROOT/debian
 AVALANCHE_BUILD_BIN_DIR=$DEBIAN_BASE_DIR/usr/local/bin
-AVALANCHE_LIB_DIR=$DEBIAN_BASE_DIR/usr/local/lib/avalanchego
 TEMPLATE=.github/workflows/debian/template 
 DEBIAN_CONF=$DEBIAN_BASE_DIR/DEBIAN
 
 mkdir -p $DEBIAN_BASE_DIR
 mkdir -p $DEBIAN_CONF
 mkdir -p $AVALANCHE_BUILD_BIN_DIR
-mkdir -p $AVALANCHE_LIB_DIR
 
 # Assume binaries are at default locations
 OK=`cp ./build/avalanchego $AVALANCHE_BUILD_BIN_DIR`
