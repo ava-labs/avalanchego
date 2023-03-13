@@ -27,18 +27,18 @@ const (
 var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
 
 type Offer struct {
-	ID ids.ID
+	ID ids.ID `json:"id"`
 
-	InterestRateNominator   uint64              `serialize:"true" json:"InterestRateNominator"`
-	Start                   uint64              `serialize:"true" json:"Start"`
-	End                     uint64              `serialize:"true" json:"End"`
-	MinAmount               uint64              `serialize:"true" json:"MinAmount"`
-	MinDuration             uint32              `serialize:"true" json:"MinDuration"`
-	MaxDuration             uint32              `serialize:"true" json:"MaxDuration"`
-	UnlockPeriodDuration    uint32              `serialize:"true" json:"UnlockPeriodDuration"`
-	NoRewardsPeriodDuration uint32              `serialize:"true" json:"NoRewardsPeriodDuration"`
-	Memo                    types.JSONByteSlice `serialize:"true" json:"Memo"`
-	Flags                   uint64              `serialize:"true" json:"Flags"`
+	InterestRateNominator   uint64              `serialize:"true" json:"interestRateNominator"`
+	Start                   uint64              `serialize:"true" json:"start"`
+	End                     uint64              `serialize:"true" json:"end"`
+	MinAmount               uint64              `serialize:"true" json:"minAmount"`
+	MinDuration             uint32              `serialize:"true" json:"minDuration"`
+	MaxDuration             uint32              `serialize:"true" json:"maxDuration"`
+	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`
+	NoRewardsPeriodDuration uint32              `serialize:"true" json:"noRewardsPeriodDuration"`
+	Memo                    types.JSONByteSlice `serialize:"true" json:"memo"`
+	Flags                   uint64              `serialize:"true" json:"flags"`
 }
 
 // Sets offer id from its bytes hash
