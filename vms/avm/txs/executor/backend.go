@@ -4,6 +4,8 @@
 package executor
 
 import (
+	"reflect"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -12,11 +14,13 @@ import (
 )
 
 type Backend struct {
-	Ctx    *snow.Context
-	Config *config.Config
-	Fxs    []*fxs.ParsedFx
-	Codec  codec.Manager
+	Ctx           *snow.Context
+	Config        *config.Config
+	Fxs           []*fxs.ParsedFx
+	TypeToFxIndex map[reflect.Type]int
+	Codec         codec.Manager
 	// Note: FeeAssetID may be different than ctx.AVAXAssetID if this AVM is
 	// running in a subnet.
-	FeeAssetID ids.ID
+	FeeAssetID   ids.ID
+	Bootstrapped bool
 }

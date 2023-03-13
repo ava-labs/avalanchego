@@ -21,10 +21,9 @@ import (
 )
 
 var (
-	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
-	errMissingUTXO     = errors.New("missing utxo")
-	errUnknownTx       = errors.New("transaction is unknown")
-	errRejectedTx      = errors.New("transaction is rejected")
+	errMissingUTXO = errors.New("missing utxo")
+	errUnknownTx   = errors.New("transaction is unknown")
+	errRejectedTx  = errors.New("transaction is rejected")
 )
 
 var (
@@ -137,7 +136,7 @@ func (tx *UniqueTx) Accept(context.Context) error {
 			continue
 		}
 
-		utxo, err := tx.vm.getUTXO(utxoID)
+		utxo, err := tx.vm.dagState.GetUTXOFromID(utxoID)
 		if err != nil {
 			// should never happen because the UTXO was previously verified to
 			// exist
@@ -360,8 +359,9 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	return tx.Unsigned.Visit(&txSemanticVerify{
-		tx: tx.Tx,
-		vm: tx.vm,
+	return tx.Unsigned.Visit(&executor.SemanticVerifier{
+		Backend: tx.vm.txBackend,
+		State:   tx.vm.dagState,
+		Tx:      tx.Tx,
 	})
 }

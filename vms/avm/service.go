@@ -46,7 +46,6 @@ var (
 	errZeroAmount         = errors.New("amount must be positive")
 	errNoOutputs          = errors.New("no outputs to send")
 	errInvalidMintAmount  = errors.New("amount minted must be positive")
-	errInvalidUTXO        = errors.New("invalid utxo")
 	errNilTxID            = errors.New("nil transaction ID")
 	errNoAddresses        = errors.New("no addresses provided")
 	errNoKeys             = errors.New("from addresses have no keys or funds")
