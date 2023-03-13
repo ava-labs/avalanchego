@@ -257,6 +257,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	deferredStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetDeferredStakerIterator().Return(deferredStakersIt, nil).AnyTimes()
 
+	onParentAccept.EXPECT().GetNextToUnlockDepositTime().Return(time.Time{}, database.ErrNotFound).AnyTimes()
+	onParentAccept.EXPECT().GetNextToUnlockDepositIDsAndTime().Return(nil, time.Time{}, database.ErrNotFound).AnyTimes()
+
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/
 		time.Time{},         /*lastUpdated*/

@@ -284,11 +284,11 @@ func TestSyncGenesis(t *testing.T) {
 			require.ErrorIs(tt.err, err)
 
 			require.Len(tt.cs.modifiedDeposits, len(tt.want.modifiedDeposits))
-			for expectedModifiedDepositID, expectedModifiedDeposit := range tt.want.modifiedDeposits {
-				actualModifiedDeposit, ok := tt.cs.modifiedDeposits[expectedModifiedDepositID]
+			for expectedAddedDepositsID, expectedAddedDeposits := range tt.want.modifiedDeposits {
+				actualAddedDeposits, ok := tt.cs.modifiedDeposits[expectedAddedDepositsID]
 				require.True(ok)
-				require.Equal(expectedModifiedDeposit.DepositOfferID, actualModifiedDeposit.DepositOfferID)
-				require.Equal(expectedModifiedDeposit.Amount, actualModifiedDeposit.Amount)
+				require.Equal(expectedAddedDeposits.DepositOfferID, actualAddedDeposits.DepositOfferID)
+				require.Equal(expectedAddedDeposits.Amount, actualAddedDeposits.Amount)
 			}
 			for expectedModifiedDepositOfferID, expectedModifiedDepositOffer := range tt.want.modifiedDepositOffers {
 				actualModifiedDepositOffer, ok := tt.cs.modifiedDepositOffers[expectedModifiedDepositOfferID]

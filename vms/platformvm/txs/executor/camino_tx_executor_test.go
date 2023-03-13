@@ -2535,12 +2535,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
 	owner1Key, owner1Addr, owner1 := generateKeyAndOwner(t)
 	_, _, owner2 := generateKeyAndOwner(t)
-	_, _, deposit1RewardsOwner := generateKeyAndOwner(t)
+	// _, _, deposit1RewardsOwner := generateKeyAndOwner(t)
 	bondTxID := ids.GenerateTestID()
 	depositTxID1 := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
-	deposit1RewardOwnerID, err := txs.GetOwnerID(deposit1RewardsOwner)
-	require.NoError(t, err)
+	// deposit1RewardOwnerID, err := txs.GetOwnerID(deposit1RewardsOwner)
+	// require.NoError(t, err)
 
 	depositOffer := &deposit.Offer{
 		MinAmount:            1,
@@ -2570,11 +2570,11 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	deposit1Expired := deposit1.StartTime().
 		Add(time.Duration(deposit1.Duration) * time.Second)
 
-	depositTx1, err := txs.NewSigned(&txs.DepositTx{
-		BaseTx:       txs.BaseTx{BaseTx: avax.BaseTx{}},
-		RewardsOwner: &deposit1RewardsOwner,
-	}, txs.Codec, nil)
-	require.NoError(t, err)
+	// depositTx1, err := txs.NewSigned(&txs.DepositTx{
+	// 	BaseTx:       txs.BaseTx{BaseTx: avax.BaseTx{}},
+	// 	RewardsOwner: &deposit1RewardsOwner,
+	// }, txs.Codec, nil)
+	// require.NoError(t, err)
 
 	baseState := func(c *gomock.Controller) *state.MockState {
 		s := state.NewMockState(c)
@@ -3218,25 +3218,25 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 				// state update: deposit1
-				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
-				s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
-				s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
-				s.EXPECT().UpdateDeposit(depositTxID1, nil)
-				rewardUTXO := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs)),
-					},
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
-						OutputOwners: deposit1RewardsOwner,
-					},
-				}
-				s.EXPECT().AddUTXO(rewardUTXO)
-				s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
+				// s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				// s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
+				// s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
+				s.EXPECT().SetDeposit(depositTxID1, nil)
+				// rewardUTXO := &avax.UTXO{
+				// 	UTXOID: avax.UTXOID{
+				// 		TxID:        txID,
+				// 		OutputIndex: uint32(len(utx.Outs)),
+				// 	},
+				// 	Asset: avax.Asset{ID: ctx.AVAXAssetID},
+				// 	Out: &secp256k1fx.TransferOutput{
+				// 		Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
+				// 		OutputOwners: deposit1RewardsOwner,
+				// 	},
+				// }
+				// s.EXPECT().AddUTXO(rewardUTXO)
+				// s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
 				// state update: ins/outs/utxos
 				expectConsumeUTXOs(s, utx.Ins)
 				expectProduceUTXOs(s, utx.Outs, txID, 0)
@@ -3274,7 +3274,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				// state update: deposit1
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID1, &deposit.Deposit{
 					DepositOfferID:      deposit1.DepositOfferID,
 					UnlockedAmount:      deposit1.UnlockedAmount + unlockableAmount,
 					ClaimedRewardAmount: deposit1.ClaimedRewardAmount,
@@ -3322,7 +3322,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				// state update: deposit1
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(deposit1HalfUnlockTime.Unix()))
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID1, &deposit.Deposit{
 					DepositOfferID:      deposit1.DepositOfferID,
 					UnlockedAmount:      deposit1.UnlockedAmount + unlockableAmount,
 					ClaimedRewardAmount: deposit1.ClaimedRewardAmount,
@@ -3371,28 +3371,28 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
 				s.EXPECT().GetDepositOffer(deposit2.DepositOfferID).Return(depositOffer, nil)
 				// state update: deposit1
-				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
-				s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
-				s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
-				s.EXPECT().UpdateDeposit(depositTxID1, nil)
-				rewardUTXO := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs)),
-					},
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
-						OutputOwners: deposit1RewardsOwner,
-					},
-				}
-				s.EXPECT().AddUTXO(rewardUTXO)
-				s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
+				// s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				// s.EXPECT().GetClaimable(deposit1RewardOwnerID).Return(&state.Claimable{}, nil)
+				// s.EXPECT().SetClaimable(deposit1RewardOwnerID, &state.Claimable{})
+				s.EXPECT().SetDeposit(depositTxID1, nil)
+				// rewardUTXO := &avax.UTXO{
+				// 	UTXOID: avax.UTXOID{
+				// 		TxID:        txID,
+				// 		OutputIndex: uint32(len(utx.Outs)),
+				// 	},
+				// 	Asset: avax.Asset{ID: ctx.AVAXAssetID},
+				// 	Out: &secp256k1fx.TransferOutput{
+				// 		Amt:          deposit1.TotalReward(depositOffer) - deposit1.ClaimedRewardAmount,
+				// 		OutputOwners: deposit1RewardsOwner,
+				// 	},
+				// }
+				// s.EXPECT().AddUTXO(rewardUTXO)
+				// s.EXPECT().AddRewardUTXO(rewardUTXO.TxID, rewardUTXO)
 				// state update: deposit2
 				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
-				s.EXPECT().UpdateDeposit(depositTxID2, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID2, &deposit.Deposit{
 					DepositOfferID:      deposit2.DepositOfferID,
 					UnlockedAmount:      deposit2.UnlockedAmount + 1,
 					ClaimedRewardAmount: deposit2.ClaimedRewardAmount,
@@ -3712,7 +3712,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO1)
 				s.EXPECT().AddRewardUTXO(depositTxID1, depositRewardUTXO1)
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID1, &deposit.Deposit{
 					DepositOfferID:      deposit1.DepositOfferID,
 					UnlockedAmount:      deposit1.UnlockedAmount,
 					ClaimedRewardAmount: deposit1.ClaimedRewardAmount + claimedRewardAmount,
@@ -3752,7 +3752,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO2)
 				s.EXPECT().AddRewardUTXO(depositTxID2, depositRewardUTXO2)
-				s.EXPECT().UpdateDeposit(depositTxID2, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID2, &deposit.Deposit{
 					DepositOfferID:      deposit2.DepositOfferID,
 					UnlockedAmount:      deposit2.UnlockedAmount,
 					ClaimedRewardAmount: deposit2.ClaimedRewardAmount + claimedRewardAmount,
@@ -3844,7 +3844,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				}
 				s.EXPECT().AddUTXO(depositRewardUTXO)
 				s.EXPECT().AddRewardUTXO(depositTxID1, depositRewardUTXO)
-				s.EXPECT().UpdateDeposit(depositTxID1, &deposit.Deposit{
+				s.EXPECT().SetDeposit(depositTxID1, &deposit.Deposit{
 					DepositOfferID:      deposit1.DepositOfferID,
 					UnlockedAmount:      deposit1.UnlockedAmount,
 					ClaimedRewardAmount: deposit1.ClaimedRewardAmount + claimedRewardAmount,

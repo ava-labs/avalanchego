@@ -5,10 +5,12 @@ package state
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -32,6 +34,7 @@ func NewCaminoDiff(
 	}, nil
 }
 
+// TODO@ add tests
 func (d *diff) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID], lockState locked.State) ([]*avax.UTXO, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -152,11 +155,18 @@ func (d *diff) GetAllDepositOffers() ([]*deposit.Offer, error) {
 	return offers, nil
 }
 
-func (d *diff) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+func (d *diff) SetDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
 	d.caminoDiff.modifiedDeposits[depositTxID] = deposit
 }
 
+func (d *diff) RemoveDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+	d.caminoDiff.removedDeposits[depositTxID] = deposit
+}
+
 func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
+	if _, ok := d.caminoDiff.removedDeposits[depositTxID]; ok {
+		return nil, database.ErrNotFound
+	}
 	if deposit, ok := d.caminoDiff.modifiedDeposits[depositTxID]; ok {
 		return deposit, nil
 	}
@@ -167,6 +177,87 @@ func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	}
 
 	return parentState.GetDeposit(depositTxID)
+}
+
+func (d *diff) GetNextToUnlockDepositTime() (time.Time, error) {
+	nextUnlockTime := mockable.MaxTime
+	for _, deposit := range d.caminoDiff.modifiedDeposits {
+		if depositEndtime := deposit.EndTime(); depositEndtime.Before(nextUnlockTime) {
+			nextUnlockTime = depositEndtime
+		}
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentNextDepositIDs, parentNextUnlockTime, err := parentState.GetNextToUnlockDepositIDsAndTime()
+	if err == database.ErrNotFound && !nextUnlockTime.Equal(mockable.MaxTime) {
+		return nextUnlockTime, nil
+	} else if err != nil {
+		return time.Time{}, err
+	}
+
+	notAllParentStateNextDepositsRemoved := false
+	for _, depositID := range parentNextDepositIDs {
+		if _, ok := d.caminoDiff.removedDeposits[depositID]; !ok {
+			notAllParentStateNextDepositsRemoved = true
+			break
+		}
+	}
+
+	if notAllParentStateNextDepositsRemoved && parentNextUnlockTime.Before(nextUnlockTime) {
+		nextUnlockTime = parentNextUnlockTime
+	}
+	if nextUnlockTime.Equal(mockable.MaxTime) {
+		return time.Time{}, database.ErrNotFound
+	}
+
+	return nextUnlockTime, nil
+}
+
+func (d *diff) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+	nextUnlockTime := mockable.MaxTime
+	for _, deposit := range d.caminoDiff.modifiedDeposits {
+		if depositEndtime := deposit.EndTime(); depositEndtime.Before(nextUnlockTime) {
+			nextUnlockTime = depositEndtime
+		}
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentNextDeposits, parentNextUnlockTime, err := parentState.GetNextToUnlockDepositIDsAndTime()
+	if err != nil && err != database.ErrNotFound {
+		return nil, time.Time{}, err
+	}
+
+	if err != database.ErrNotFound &&
+		parentNextUnlockTime.Before(nextUnlockTime) &&
+		len(d.caminoDiff.removedDeposits) != len(parentNextDeposits) {
+		nextUnlockTime = parentNextUnlockTime
+	}
+
+	var nextDeposits []ids.ID
+
+	if parentNextUnlockTime.Equal(nextUnlockTime) {
+		for _, depositID := range parentNextDeposits {
+			if _, ok := d.caminoDiff.removedDeposits[depositID]; !ok {
+				nextDeposits = append(nextDeposits, depositID)
+			}
+		}
+	}
+
+	for depositID, deposit := range d.caminoDiff.modifiedDeposits {
+		if deposit.EndTime().Equal(nextUnlockTime) {
+			nextDeposits = append(nextDeposits, depositID)
+		}
+	}
+
+	return nextDeposits, nextUnlockTime, nil
 }
 
 func (d *diff) SetMultisigAlias(owner *multisig.Alias) {
@@ -301,8 +392,12 @@ func (d *diff) ApplyCaminoState(baseState State) {
 		baseState.AddDepositOffer(depositOffer)
 	}
 
+	for depositTxID, deposit := range d.caminoDiff.removedDeposits {
+		baseState.RemoveDeposit(depositTxID, deposit)
+	}
+
 	for depositTxID, deposit := range d.caminoDiff.modifiedDeposits {
-		baseState.UpdateDeposit(depositTxID, deposit)
+		baseState.SetDeposit(depositTxID, deposit)
 	}
 
 	for _, v := range d.caminoDiff.modifiedMultisigOwners {

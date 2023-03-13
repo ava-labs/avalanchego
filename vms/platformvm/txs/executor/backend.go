@@ -15,12 +15,13 @@ import (
 )
 
 type Backend struct {
-	Config       *config.Config
-	Ctx          *snow.Context
-	Clk          *mockable.Clock
-	Fx           fx.Fx
-	FlowChecker  utxo.Verifier
-	Uptimes      uptime.Manager
-	Rewards      reward.Calculator
-	Bootstrapped *utils.AtomicBool
+	Config        *config.Config
+	Ctx           *snow.Context
+	Clk           *mockable.Clock
+	Fx            fx.Fx
+	FlowChecker   utxo.Verifier
+	SystemSpender utxo.Unlocker
+	Uptimes       uptime.Manager
+	Rewards       reward.Calculator
+	Bootstrapped  *utils.AtomicBool
 }

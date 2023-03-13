@@ -637,7 +637,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	}
 
 	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
-	e.State.UpdateDeposit(txID, deposit)
+	e.State.SetDeposit(txID, deposit)
 
 	utxo.Consume(e.State, tx.Ins)
 	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateDeposited); err != nil {
@@ -680,6 +680,8 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 
 	txID := e.Tx.ID()
 
+	var fullyUnlockedDepositTxIDs []ids.ID
+
 	for depositTxID, newUnlockedAmount := range newUnlockedAmounts {
 		deposit, err := e.State.GetDeposit(depositTxID)
 		if err != nil {
@@ -692,66 +694,67 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		}
 
 		if newUnlockedAmount == deposit.Amount { // full unlock
-			offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
-			if err != nil {
-				return err
-			}
+			fullyUnlockedDepositTxIDs = append(fullyUnlockedDepositTxIDs, depositTxID)
+			// offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+			// if err != nil {
+			// 	return err
+			// }
 
-			signedDepositTx, _, err := e.State.GetTx(depositTxID)
-			if err != nil {
-				return fmt.Errorf("can't get depositTx: %w", err)
-			}
-			depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-			if !ok {
-				return fmt.Errorf("can't get depositTx: %w", errWrongTxType)
-			}
+			// if remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount; remainingReward > 0 {
+			// 	signedDepositTx, _, err := e.State.GetTx(depositTxID)
+			// 	if err != nil {
+			// 		return fmt.Errorf("can't get depositTx: %w", err)
+			// 	}
+			// 	depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
+			// 	if !ok {
+			// 		return fmt.Errorf("can't get depositTx: %w", errWrongTxType)
+			// 	}
 
-			claimableOwnerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
-			if err != nil {
-				return err
-			}
+			// 	claimableOwnerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
+			// 	if err != nil {
+			// 		return err
+			// 	}
 
-			remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount
+			// 	outIntf, err := e.Fx.CreateOutput(remainingReward, depositTx.RewardsOwner)
+			// 	if err != nil {
+			// 		return fmt.Errorf("failed to create output: %w", err)
+			// 	}
+			// 	out, ok := outIntf.(verify.State)
+			// 	if !ok {
+			// 		return errInvalidState
+			// 	}
 
-			outIntf, err := e.Fx.CreateOutput(remainingReward, depositTx.RewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
+			// 	claimable, err := e.State.GetClaimable(claimableOwnerID)
+			// 	if err != nil {
+			// 		return err
+			// 	}
 
-			claimable, err := e.State.GetClaimable(claimableOwnerID)
-			if err != nil {
-				return err
-			}
+			// 	newClaimable := &state.Claimable{
+			// 		Owner:           claimable.Owner,
+			// 		ValidatorReward: claimable.ValidatorReward,
+			// 	}
 
-			newClaimable := &state.Claimable{
-				Owner:           claimable.Owner,
-				ValidatorReward: claimable.ValidatorReward,
-			}
+			// 	newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
+			// 	if err != nil {
+			// 		return err
+			// 	}
 
-			newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
-			if err != nil {
-				return err
-			}
+			// 	utxo := &avax.UTXO{
+			// 		UTXOID: avax.UTXOID{
+			// 			TxID:        txID,
+			// 			OutputIndex: uint32(len(tx.Outs)),
+			// 		},
+			// 		Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
+			// 		Out:   out,
+			// 	}
 
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(tx.Outs)),
-				},
-				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
-				Out:   out,
-			}
-
-			e.State.SetClaimable(claimableOwnerID, newClaimable)
-			e.State.UpdateDeposit(depositTxID, nil)
-			e.State.AddUTXO(utxo)
-			e.State.AddRewardUTXO(utxo.TxID, utxo)
+			// 	e.State.SetClaimable(claimableOwnerID, newClaimable)
+			// 	e.State.AddUTXO(utxo)
+			// 	e.State.AddRewardUTXO(utxo.TxID, utxo)
+			// }
+			// e.State.RemoveDeposit(depositTxID, deposit)
 		} else { // partial unlock
-			e.State.UpdateDeposit(depositTxID, &deposits.Deposit{
+			e.State.SetDeposit(depositTxID, &deposits.Deposit{
 				DepositOfferID:      deposit.DepositOfferID,
 				UnlockedAmount:      newUnlockedAmount,
 				ClaimedRewardAmount: deposit.ClaimedRewardAmount,
@@ -759,6 +762,29 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				Start:               deposit.Start,
 				Duration:            deposit.Duration,
 			})
+		}
+	}
+
+	if len(fullyUnlockedDepositTxIDs) > 0 {
+		addedRewardUTXOs, updatedClaimables, err := unlockDepositsFull(
+			e.State,
+			e.Backend,
+			txID,
+			fullyUnlockedDepositTxIDs,
+			len(tx.Outs),
+		)
+		if err != nil {
+			return err
+		}
+		for _, depositTxID := range fullyUnlockedDepositTxIDs {
+			e.State.SetDeposit(depositTxID, nil)
+		}
+		for _, utxo := range addedRewardUTXOs {
+			e.State.AddRewardUTXO(txID, utxo)
+			e.State.AddUTXO(utxo)
+		}
+		for ownerID, claimable := range updatedClaimables {
+			e.State.SetClaimable(ownerID, claimable)
 		}
 	}
 
@@ -881,7 +907,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 
 			e.State.AddUTXO(utxo)
 			e.State.AddRewardUTXO(depositTxID, utxo)
-			e.State.UpdateDeposit(depositTxID, &deposits.Deposit{
+			e.State.SetDeposit(depositTxID, &deposits.Deposit{
 				DepositOfferID:      deposit.DepositOfferID,
 				UnlockedAmount:      deposit.UnlockedAmount,
 				ClaimedRewardAmount: deposit.ClaimedRewardAmount + claimableReward,
@@ -1417,4 +1443,85 @@ func validatorExists(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) erro
 		)
 	}
 	return nil
+}
+
+func unlockDepositsFull(
+	prefferedState state.Chain,
+	backend *Backend,
+	txID ids.ID,
+	depositTxIDs []ids.ID,
+	baseOutIndex int,
+) (
+	[]*avax.UTXO,
+	map[ids.ID]*state.Claimable,
+	error,
+) {
+	var rewardUTXOs []*avax.UTXO
+	claimables := make(map[ids.ID]*state.Claimable)
+	for i, depositTxID := range depositTxIDs {
+		deposit, err := prefferedState.GetDeposit(depositTxID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		offer, err := prefferedState.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount; remainingReward > 0 {
+			tx, _, err := prefferedState.GetTx(depositTxID)
+			if err != nil {
+				return nil, nil, err
+			}
+			depositTx, ok := tx.Unsigned.(*txs.DepositTx)
+			if !ok {
+				return nil, nil, errWrongTxType
+			}
+
+			ownerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			outIntf, err := backend.Fx.CreateOutput(remainingReward, depositTx.RewardsOwner)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create output: %w", err)
+			}
+			out, ok := outIntf.(verify.State)
+			if !ok {
+				return nil, nil, errInvalidState
+			}
+
+			claimable, err := prefferedState.GetClaimable(ownerID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			newClaimable := &state.Claimable{
+				Owner:           claimable.Owner,
+				ValidatorReward: claimable.ValidatorReward,
+			}
+
+			newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(baseOutIndex + i),
+				},
+				Asset: avax.Asset{ID: backend.Ctx.AVAXAssetID},
+				Out:   out,
+			}
+
+			rewardUTXOs = append(rewardUTXOs, utxo)
+
+			claimables[ownerID] = newClaimable
+		}
+	}
+
+	return rewardUTXOs, claimables, nil
 }

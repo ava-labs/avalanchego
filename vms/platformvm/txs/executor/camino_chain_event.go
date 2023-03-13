@@ -13,19 +13,26 @@ import (
 // GetNextChainEventTime returns the next chain event time
 // For example: stakers set changed, deposit expired
 func GetNextChainEventTime(state state.Chain, stakerChangeTime time.Time) (time.Time, error) {
-	// return stakerChangeTime, nil
+	earliestTime := stakerChangeTime
 	nextDeferredStakerEndTime, err := getNextDeferredStakerEndTime(state)
-	if err == database.ErrNotFound {
-		return stakerChangeTime, nil
-	} else if err != nil {
+	if err != nil && err != database.ErrNotFound {
 		return time.Time{}, err
 	}
 
-	if nextDeferredStakerEndTime.Before(stakerChangeTime) {
-		return nextDeferredStakerEndTime, nil
+	if err != database.ErrNotFound && nextDeferredStakerEndTime.Before(earliestTime) {
+		earliestTime = nextDeferredStakerEndTime
 	}
 
-	return stakerChangeTime, nil
+	depositUnlockTime, err := state.GetNextToUnlockDepositTime()
+	if err != nil && err != database.ErrNotFound {
+		return time.Time{}, err
+	}
+
+	if err != database.ErrNotFound && depositUnlockTime.Before(earliestTime) {
+		earliestTime = depositUnlockTime
+	}
+
+	return earliestTime, nil
 }
 
 func getNextDeferredStakerEndTime(state state.Chain) (time.Time, error) {

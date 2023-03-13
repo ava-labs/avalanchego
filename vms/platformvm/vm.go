@@ -202,14 +202,15 @@ func (vm *VM) Initialize(
 	)
 
 	vm.txExecutorBackend = &txexecutor.Backend{
-		Config:       &vm.Config,
-		Ctx:          vm.ctx,
-		Clk:          &vm.clock,
-		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
-		Bootstrapped: &vm.bootstrapped,
+		Config:        &vm.Config,
+		Ctx:           vm.ctx,
+		Clk:           &vm.clock,
+		Fx:            vm.fx,
+		FlowChecker:   utxoHandler,
+		SystemSpender: utxoHandler,
+		Uptimes:       vm.uptimeManager,
+		Rewards:       rewards,
+		Bootstrapped:  &vm.bootstrapped,
 	}
 
 	// Note: There is a circular dependency between the mempool and block

@@ -558,6 +558,7 @@ func (h *handler) unlockUTXOs(
 
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*locked.Out)
+		// TODO@ throw an error
 		if !ok {
 			// This output isn't locked
 			continue

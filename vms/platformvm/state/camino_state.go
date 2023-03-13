@@ -5,6 +5,7 @@ package state
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
+// TODO@ add tests
 func (s *state) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID], lockState locked.State) ([]*avax.UTXO, error) {
 	retUtxos := []*avax.UTXO{}
 	for address := range addresses {
@@ -67,12 +69,24 @@ func (s *state) GetAllDepositOffers() ([]*deposit.Offer, error) {
 	return s.caminoState.GetAllDepositOffers()
 }
 
-func (s *state) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
-	s.caminoState.UpdateDeposit(depositTxID, deposit)
+func (s *state) SetDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+	s.caminoState.SetDeposit(depositTxID, deposit)
+}
+
+func (s *state) RemoveDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+	s.caminoState.RemoveDeposit(depositTxID, deposit)
 }
 
 func (s *state) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return s.caminoState.GetDeposit(depositTxID)
+}
+
+func (s *state) GetNextToUnlockDepositTime() (time.Time, error) {
+	return s.caminoState.GetNextToUnlockDepositTime()
+}
+
+func (s *state) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+	return s.caminoState.GetNextToUnlockDepositIDsAndTime()
 }
 
 func (s *state) SetMultisigAlias(owner *multisig.Alias) {

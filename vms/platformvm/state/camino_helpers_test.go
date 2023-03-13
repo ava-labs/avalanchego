@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
@@ -73,4 +74,10 @@ func newEmptyState(t *testing.T) *state {
 	require.NoError(t, err)
 	require.NotNil(t, newState)
 	return newState
+}
+
+func newMockStateVersions(c *gomock.Controller, parentStateID ids.ID, parentState Chain) *MockVersions {
+	stateVersions := NewMockVersions(c)
+	stateVersions.EXPECT().GetState(parentStateID).Return(parentState, true)
+	return stateVersions
 }
