@@ -195,14 +195,16 @@
     ],
     "initialMultisigAddresses": [
       {
-        "alias": "X-kopernikus1fq0jc8svlyazhygkj0s36qnl6s0km0h3uuc99w",
+        "memo": "111",
+        "alias": "X-kopernikus1z5tv4tg04kf4l9ghclw6ssek8zugs7yd65prpl",
         "addresses": [
           "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3"
         ],
         "threshold": 1
       },
       {
-        "alias": "X-kopernikus1k4przmfu79ypp4u7y98glmdpzwk0u3sc7saazy",
+        "memo": "222",
+        "alias": "X-kopernikus1t5qgr9hcmf2vxj7k0hz77kawf9yr389cxte5j0",
         "addresses": [
           "X-kopernikus18jma8ppw3nhx5r4ap8clazz0dps7rv5uuvjh68",
           "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3"

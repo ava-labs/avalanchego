@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -34,6 +34,7 @@ var _ Client = (*client)(nil)
 
 // Client interface for interacting with the P Chain endpoint
 type Client interface {
+	CaminoClient
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
@@ -215,8 +216,6 @@ type Client interface {
 	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
-	// GetConfiguration returns genesis information of the primary network
-	GetConfiguration(ctx context.Context, options ...rpc.Option) (*GetConfigurationReply, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -819,10 +818,4 @@ func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Op
 	}
 
 	return formatting.Decode(response.Encoding, response.Block)
-}
-
-func (c *client) GetConfiguration(ctx context.Context, options ...rpc.Option) (*GetConfigurationReply, error) {
-	res := &GetConfigurationReply{}
-	err := c.requester.SendRequest(ctx, "getConfiguration", struct{}{}, res, options...)
-	return res, err
 }
