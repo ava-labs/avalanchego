@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -185,7 +186,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -241,7 +242,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID + 1,
+			NetworkID:    constants.UnitTestID + 1,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -286,7 +287,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID: networkID,
+			NetworkID: constants.UnitTestID,
 			BlockchainID: ids.ID{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -336,7 +337,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -382,7 +383,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -437,7 +438,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -504,7 +505,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -549,7 +550,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -606,7 +607,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
@@ -671,7 +672,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
@@ -736,7 +737,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 
 	tx := &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{

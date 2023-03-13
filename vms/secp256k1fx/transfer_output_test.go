@@ -62,7 +62,7 @@ func TestOutputVerifyNoValue(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errNoValueOutput)
+	require.ErrorIs(out.Verify(), ErrNoValueOutput)
 }
 
 func TestOutputVerifyUnspendable(t *testing.T) {

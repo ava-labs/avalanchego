@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 )
 
-var errNoValueInput = errors.New("input has no value")
+var ErrNoValueInput = errors.New("input has no value")
 
 type TransferInput struct {
 	Amt   uint64 `serialize:"true" json:"amount"`
@@ -29,7 +29,7 @@ func (in *TransferInput) Verify() error {
 	case in == nil:
 		return errNilInput
 	case in.Amt == 0:
-		return errNoValueInput
+		return ErrNoValueInput
 	default:
 		return in.Input.Verify()
 	}

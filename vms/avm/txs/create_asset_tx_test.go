@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -31,7 +32,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Manager, *snow.Cont
 	c := setupCodec()
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: assetID},
@@ -398,7 +399,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 
 	unsignedTx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Memo:         []byte{0x00, 0x01, 0x02, 0x03},
 		}},
@@ -457,7 +458,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -490,7 +491,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "",
@@ -512,7 +513,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name: "BRADY WINSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" +
@@ -536,7 +537,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -558,7 +559,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "TOM",
@@ -580,7 +581,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -599,7 +600,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -621,7 +622,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY ",
@@ -643,7 +644,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY!",
@@ -665,7 +666,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         illegalNameCharacter,
@@ -687,7 +688,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -709,7 +710,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID + 1,
+			NetworkID:    constants.UnitTestID + 1,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -731,7 +732,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
@@ -753,7 +754,7 @@ func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "BRADY",
