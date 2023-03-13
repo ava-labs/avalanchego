@@ -21,16 +21,10 @@ import (
 )
 
 var (
-	_ BlockTimer = (*noopBlkTimer)(nil)
-
 	keys    = secp256k1.TestKeys()
 	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
 )
-
-type noopBlkTimer struct{}
-
-func (*noopBlkTimer) ResetBlockTimer() {}
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
@@ -38,7 +32,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempoolIntf, err := New("mempool", registerer, &noopBlkTimer{})
+	mempoolIntf, err := New("mempool", registerer)
 	require.NoError(err)
 
 	mempool := mempoolIntf.(*mempool)
@@ -63,7 +57,7 @@ func TestTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer, &noopBlkTimer{})
+	mempool, err := New("mempool", registerer)
 	require.NoError(err)
 
 	testTxs := createTestTxs(2)
