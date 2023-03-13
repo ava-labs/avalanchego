@@ -128,8 +128,6 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
-	txID := tx.ID()
-
 	// Fetch the input UTXOs
 	inputUTXOIDs := tx.InputUTXOs()
 	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
@@ -148,9 +146,10 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
+	txID := tx.ID()
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
 		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
