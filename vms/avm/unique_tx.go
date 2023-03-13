@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -127,8 +128,6 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
-	txID := tx.ID()
-
 	// Fetch the input UTXOs
 	inputUTXOIDs := tx.InputUTXOs()
 	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
@@ -147,9 +146,10 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
+	txID := tx.ID()
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
 		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
@@ -343,21 +343,18 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(
-		tx.vm.ctx,
-		tx.vm.parser.Codec(),
-		tx.vm.feeAssetID,
-		&tx.vm.Config,
-		len(tx.vm.fxs),
-	)
+	tx.validity = tx.Tx.Unsigned.Visit(&executor.SyntacticVerifier{
+		Backend: tx.vm.txBackend,
+		Tx:      tx.Tx,
+	})
 	return tx.validity
 }
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	// SyntacticVerify sets the error on validity and is checked in the next
-	// statement
-	_ = tx.SyntacticVerify()
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity

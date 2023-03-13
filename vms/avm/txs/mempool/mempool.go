@@ -40,13 +40,6 @@ var (
 	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
-type BlockTimer interface {
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
-	ResetBlockTimer()
-}
-
 // Mempool contains transactions that have not yet been put into a block.
 type Mempool interface {
 	Add(tx *txs.Tx) error
@@ -79,14 +72,11 @@ type mempool struct {
 	droppedTxIDs *cache.LRU[ids.ID, string]
 
 	consumedUTXOs set.Set[ids.ID]
-
-	blkTimer BlockTimer
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -114,7 +104,6 @@ func New(
 		numTxs:               numTxsMetric,
 		droppedTxIDs:         &cache.LRU[ids.ID, string]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		blkTimer:             blkTimer,
 	}, nil
 }
 
@@ -159,8 +148,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
-
-	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 

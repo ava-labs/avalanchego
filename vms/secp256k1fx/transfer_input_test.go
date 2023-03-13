@@ -49,7 +49,7 @@ func TestTransferInputVerifyNoValue(t *testing.T) {
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	require.ErrorIs(in.Verify(), errNoValueInput)
+	require.ErrorIs(in.Verify(), ErrNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {

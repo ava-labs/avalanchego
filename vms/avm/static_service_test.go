@@ -20,7 +20,7 @@ var addrStrArray = []string{
 	"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
 }
 
-var testHRP = constants.NetworkIDToHRP[networkID]
+var testHRP = constants.NetworkIDToHRP[constants.UnitTestID]
 
 func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
