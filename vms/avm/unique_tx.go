@@ -152,19 +152,16 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
-	// Remove spent utxos
-	for _, utxo := range inputUTXOIDs {
-		if utxo.Symbolic() {
-			// If the UTXO is symbolic, it can't be spent
-			continue
-		}
-		utxoID := utxo.InputID()
-		tx.vm.state.DeleteUTXO(utxoID)
+	executor := &executor.Executor{
+		Codec: tx.vm.txBackend.Codec,
+		State: tx.vm.state,
+		Tx:    tx.Tx,
 	}
-	// Add new utxos
-	for _, utxo := range outputUTXOs {
-		tx.vm.state.AddUTXO(utxo)
+	err := tx.Tx.Unsigned.Visit(executor)
+	if err != nil {
+		return fmt.Errorf("error staging accepted state changes: %w", err)
 	}
+
 	tx.setStatus(choices.Accepted)
 
 	commitBatch, err := tx.vm.state.CommitBatch()
@@ -173,14 +170,12 @@ func (tx *UniqueTx) Accept(context.Context) error {
 	}
 
 	defer tx.vm.state.Abort()
-	err = tx.Tx.Unsigned.Visit(&executeTx{
-		tx:           tx.Tx,
-		batch:        commitBatch,
-		sharedMemory: tx.vm.ctx.SharedMemory,
-		parser:       tx.vm.parser,
-	})
+	err = tx.vm.ctx.SharedMemory.Apply(
+		executor.AtomicRequests,
+		commitBatch,
+	)
 	if err != nil {
-		return fmt.Errorf("ExecuteWithSideEffects erred while processing tx %s: %w", txID, err)
+		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
 	tx.vm.pubsub.Publish(NewPubSubFilterer(tx.Tx))
