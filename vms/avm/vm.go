@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -117,6 +118,8 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
+
+	txBackend *executor.Backend
 }
 
 func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
@@ -255,6 +258,15 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
+
+	vm.txBackend = &executor.Backend{
+		Ctx:        ctx,
+		Config:     &vm.Config,
+		Fxs:        vm.fxs,
+		Codec:      vm.parser.Codec(),
+		FeeAssetID: vm.feeAssetID,
+	}
+
 	return vm.state.Commit()
 }
 
