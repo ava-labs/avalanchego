@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -90,7 +91,7 @@ func TestBaseTxSerialization(t *testing.T) {
 	}
 
 	tx := &Tx{Unsigned: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -198,7 +199,7 @@ func TestBaseTxSerialization(t *testing.T) {
 
 func TestBaseTxGetters(t *testing.T) {
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -246,7 +247,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -288,7 +289,7 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -341,7 +342,7 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID + 1,
+		NetworkID:    constants.UnitTestID + 1,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -383,7 +384,7 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID.Prefix(0),
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -425,7 +426,7 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs:         []*avax.TransferableOutput{nil},
 		Ins: []*avax.TransferableInput{{
@@ -458,7 +459,7 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{
 			{
@@ -514,7 +515,7 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -539,7 +540,7 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
@@ -601,7 +602,7 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{
 			{
@@ -655,7 +656,7 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 	c := setupCodec()
 
 	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},

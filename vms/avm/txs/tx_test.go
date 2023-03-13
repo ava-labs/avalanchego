@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -19,9 +20,8 @@ import (
 )
 
 var (
-	networkID       uint32 = 10
-	chainID                = ids.ID{5, 4, 3, 2, 1}
-	platformChainID        = ids.Empty.Prefix(0)
+	chainID         = ids.ID{5, 4, 3, 2, 1}
+	platformChainID = ids.Empty.Prefix(0)
 
 	keys = secp256k1.TestKeys()
 
@@ -40,7 +40,7 @@ func setupCodec() codec.Manager {
 
 func NewContext(tb testing.TB) *snow.Context {
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
+	ctx.NetworkID = constants.UnitTestID
 	ctx.ChainID = chainID
 	avaxAssetID, err := ids.FromString("2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ")
 	if err != nil {
@@ -93,7 +93,7 @@ func TestTxInvalidCredential(t *testing.T) {
 
 	tx := &Tx{
 		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -126,7 +126,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 
 	tx := &Tx{
 		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{
@@ -179,7 +179,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 
 	tx := &Tx{
 		Unsigned: &BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				{

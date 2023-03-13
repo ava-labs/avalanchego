@@ -48,11 +48,10 @@ import (
 )
 
 var (
-	networkID     uint32 = 10
-	chainID              = ids.ID{5, 4, 3, 2, 1}
-	testTxFee            = uint64(1000)
-	testBanffTime        = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
-	startBalance         = uint64(50000)
+	chainID       = ids.ID{5, 4, 3, 2, 1}
+	testTxFee     = uint64(1000)
+	testBanffTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
+	startBalance  = uint64(50000)
 
 	keys  []*secp256k1.PrivateKey
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
@@ -87,7 +86,7 @@ func NewContext(tb testing.TB) *snow.Context {
 	tx := GetAVAXTxFromGenesisTest(genesisBytes, tb)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = networkID
+	ctx.NetworkID = constants.UnitTestID
 	ctx.ChainID = chainID
 	ctx.AVAXAssetID = tx.ID()
 	ctx.XChainID = ids.Empty.Prefix(0)
@@ -361,7 +360,7 @@ func NewTxWithAsset(t *testing.T, genesisBytes []byte, vm *VM, assetName string)
 
 	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -394,7 +393,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs
 	key := keys[0]
 	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -429,7 +428,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs
 
 	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -675,7 +674,7 @@ func TestIssueNFT(t *testing.T) {
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -711,7 +710,7 @@ func TestIssueNFT(t *testing.T) {
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -741,7 +740,7 @@ func TestIssueNFT(t *testing.T) {
 	transferNFTTx := &txs.Tx{
 		Unsigned: &txs.OperationTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
+				NetworkID:    constants.UnitTestID,
 				BlockchainID: chainID,
 			}},
 			Ops: []*txs.Operation{{
@@ -828,7 +827,7 @@ func TestIssueProperty(t *testing.T) {
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -856,7 +855,7 @@ func TestIssueProperty(t *testing.T) {
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -894,7 +893,7 @@ func TestIssueProperty(t *testing.T) {
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: []*txs.Operation{{
@@ -1017,7 +1016,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 
 	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{
 				// fee asset
@@ -1260,7 +1259,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	secondTx := issueTxs[2]
 	key := keys[0]
 	firstTxDescendant := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
@@ -1549,7 +1548,7 @@ func TestIssueImportTx(t *testing.T) {
 	txAssetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: txAssetID,
@@ -1719,7 +1718,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		SourceChain: constants.PlatformChainID,
@@ -1810,7 +1809,7 @@ func TestIssueExportTx(t *testing.T) {
 
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
@@ -1946,7 +1945,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	assetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
