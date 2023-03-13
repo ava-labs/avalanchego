@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -185,7 +186,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 
 	tx := &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: assetID},
@@ -230,7 +231,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 
 	tx := &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: assetID},

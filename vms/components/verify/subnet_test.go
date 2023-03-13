@@ -42,7 +42,7 @@ func TestSameSubnet(t *testing.T) {
 				}
 			},
 			chainID: chainID0,
-			result:  errSameChainID,
+			result:  ErrSameChainID,
 		},
 		{
 			name: "unknown chain",
@@ -70,7 +70,7 @@ func TestSameSubnet(t *testing.T) {
 				}
 			},
 			chainID: chainID1,
-			result:  errMismatchedSubnetIDs,
+			result:  ErrMismatchedSubnetIDs,
 		},
 		{
 			name: "same subnet",
