@@ -58,8 +58,8 @@ type Mempool interface {
 
 	// Note: Dropped txs are added to droppedTxIDs but not evicted from
 	// unissued. This allows previously dropped txs to be possibly reissued.
-	MarkDropped(txID ids.ID, reason string)
-	GetDropReason(txID ids.ID) (string, bool)
+	MarkDropped(txID ids.ID, reason error)
+	GetDropReason(txID ids.ID) error
 }
 
 type mempool struct {
@@ -72,8 +72,8 @@ type mempool struct {
 	toEngine chan<- common.Message
 
 	// Key: Tx ID
-	// Value: String representation of the verification error
-	droppedTxIDs *cache.LRU[ids.ID, string]
+	// Value: Verification error
+	droppedTxIDs *cache.LRU[ids.ID, error]
 
 	consumedUTXOs set.Set[ids.ID]
 }
@@ -108,7 +108,7 @@ func New(
 		unissuedTxs:          linkedhashmap.New[ids.ID, *txs.Tx](),
 		numTxs:               numTxsMetric,
 		toEngine:             toEngine,
-		droppedTxIDs:         &cache.LRU[ids.ID, string]{Size: droppedTxIDsCacheSize},
+		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
 	}, nil
 }
@@ -209,10 +209,11 @@ func (m *mempool) RequestBuildBlock() {
 	}
 }
 
-func (m *mempool) MarkDropped(txID ids.ID, reason string) {
+func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 	m.droppedTxIDs.Put(txID, reason)
 }
 
-func (m *mempool) GetDropReason(txID ids.ID) (string, bool) {
-	return m.droppedTxIDs.Get(txID)
+func (m *mempool) GetDropReason(txID ids.ID) error {
+	err, _ := m.droppedTxIDs.Get(txID)
+	return err
 }

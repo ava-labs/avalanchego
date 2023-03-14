@@ -2149,8 +2149,8 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 	// Note: we check if tx is dropped only after having looked for it
 	// in the database and the mempool, because dropped txs may be re-issued.
-	reason, dropped := s.vm.Builder.GetDropReason(args.TxID)
-	if !dropped {
+	reason := s.vm.Builder.GetDropReason(args.TxID)
+	if reason == nil {
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown
 		return nil
@@ -2158,7 +2158,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 	// The tx was recently dropped because it was invalid.
 	response.Status = status.Dropped
-	response.Reason = reason
+	response.Reason = reason.Error()
 	return nil
 }
 

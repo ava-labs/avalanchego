@@ -93,7 +93,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	env.Builder.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, errTestingDropped)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()

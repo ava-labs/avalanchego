@@ -132,7 +132,7 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
-	if _, dropped := n.blkBuilder.GetDropReason(txID); dropped {
+	if reason := n.blkBuilder.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
