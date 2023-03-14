@@ -231,7 +231,7 @@
         },
         "platformAllocations": [
           {
-            "amount": 352799350000000000,
+            "amount": 354203350000000000,
             "timestampOffset": 3600,
             "memo": "6+"
           }
@@ -3441,7 +3441,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "169"
+            "memo": "168"
           }
         ]
       },
@@ -3458,7 +3458,7 @@
             "amount": 300000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "170"
+            "memo": "169"
           }
         ]
       },
@@ -3475,13 +3475,34 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "172"
+            "memo": "171"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c6zz8pqjvyd40rq4mre4azaalur7rsdn69hh6u",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "172"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "172+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qh9nzgm6q5cfa2mpshwu9guzahf5se7f8cs7g4",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -3502,27 +3523,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qh9nzgm6q5cfa2mpshwu9guzahf5se7f8cs7g4",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "174"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "174+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus15wxmstyfxxx82ewdmz3usvfk20h39zqhvdqf66",
         "xAmount": 0,
         "addressStates": {
@@ -3534,11 +3534,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "175"
+            "memo": "174"
           },
           {
             "amount": 1000000000000,
-            "memo": "175+"
+            "memo": "174+"
           }
         ]
       },
@@ -3555,11 +3555,11 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "176"
+            "memo": "175"
           },
           {
             "amount": 1500000000000,
-            "memo": "176+"
+            "memo": "175+"
           }
         ]
       },
@@ -3576,11 +3576,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "177"
+            "memo": "176"
           },
           {
             "amount": 1000000000000,
-            "memo": "177+"
+            "memo": "176+"
           }
         ]
       },
@@ -3597,11 +3597,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "178"
+            "memo": "177"
           },
           {
             "amount": 100000000000,
-            "memo": "178+"
+            "memo": "177+"
           }
         ]
       },
@@ -3618,11 +3618,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "179"
+            "memo": "178"
           },
           {
             "amount": 200000000000,
-            "memo": "179+"
+            "memo": "178+"
           }
         ]
       },
@@ -3639,11 +3639,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "180"
+            "memo": "179"
           },
           {
             "amount": 100000000000,
-            "memo": "180+"
+            "memo": "179+"
           }
         ]
       },
@@ -3660,11 +3660,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "181"
+            "memo": "180"
           },
           {
             "amount": 200000000000,
-            "memo": "181+"
+            "memo": "180+"
           }
         ]
       },
@@ -3681,11 +3681,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "182"
+            "memo": "181"
           },
           {
             "amount": 100000000000,
-            "memo": "182+"
+            "memo": "181+"
           }
         ]
       },
@@ -3702,11 +3702,11 @@
             "amount": 30000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "183"
+            "memo": "182"
           },
           {
             "amount": 300000000000,
-            "memo": "183+"
+            "memo": "182+"
           }
         ]
       },
@@ -3723,11 +3723,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "184"
+            "memo": "183"
           },
           {
             "amount": 1000000000000,
-            "memo": "184+"
+            "memo": "183+"
           }
         ]
       },
@@ -3744,11 +3744,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "185"
+            "memo": "184"
           },
           {
             "amount": 100000000000,
-            "memo": "185+"
+            "memo": "184+"
           }
         ]
       },
@@ -3765,11 +3765,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "186"
+            "memo": "185"
           },
           {
             "amount": 1000000000000,
-            "memo": "186+"
+            "memo": "185+"
           }
         ]
       },
@@ -3786,11 +3786,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "187"
+            "memo": "186"
           },
           {
             "amount": 100000000000,
-            "memo": "187+"
+            "memo": "186+"
           }
         ]
       },
@@ -3807,11 +3807,11 @@
             "amount": 10000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "188"
+            "memo": "187"
           },
           {
             "amount": 100000000000,
-            "memo": "188+"
+            "memo": "187+"
           }
         ]
       },
@@ -3828,11 +3828,11 @@
             "amount": 250000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "189"
+            "memo": "188"
           },
           {
             "amount": 2500000000000,
-            "memo": "189+"
+            "memo": "188+"
           }
         ]
       },
@@ -3849,11 +3849,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "190"
+            "memo": "189"
           },
           {
             "amount": 1000000000000,
-            "memo": "190+"
+            "memo": "189+"
           }
         ]
       },
@@ -3870,17 +3870,38 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "191"
+            "memo": "190"
           },
           {
             "amount": 1500000000000,
-            "memo": "191+"
+            "memo": "190+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus19jfth3scmug3640fq5zhpye5cw88yqryee55sz",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 173448000,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "191"
+          },
+          {
+            "amount": 100000000000,
+            "memo": "191+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kpd227tfx0x9mfcg4m62tl2mm9d7eag0q4l3hx",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -3901,27 +3922,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kpd227tfx0x9mfcg4m62tl2mm9d7eag0q4l3hx",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositDuration": 173448000,
-            "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "193"
-          },
-          {
-            "amount": 100000000000,
-            "memo": "193+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ga0ut4yez75rp8077g77uycgchnxyg28n8t2st",
         "xAmount": 0,
         "addressStates": {
@@ -3933,11 +3933,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "194"
+            "memo": "193"
           },
           {
             "amount": 1000000000000,
-            "memo": "194+"
+            "memo": "193+"
           }
         ]
       },
@@ -3954,11 +3954,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "195"
+            "memo": "194"
           },
           {
             "amount": 1000000000000,
-            "memo": "195+"
+            "memo": "194+"
           }
         ]
       },
@@ -3975,11 +3975,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "196"
+            "memo": "195"
           },
           {
             "amount": 200000000000,
-            "memo": "196+"
+            "memo": "195+"
           }
         ]
       },
@@ -3996,11 +3996,11 @@
             "amount": 150000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "197"
+            "memo": "196"
           },
           {
             "amount": 1500000000000,
-            "memo": "197+"
+            "memo": "196+"
           }
         ]
       },
@@ -4017,11 +4017,11 @@
             "amount": 25000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "198"
+            "memo": "197"
           },
           {
             "amount": 250000000000,
-            "memo": "198+"
+            "memo": "197+"
           }
         ]
       },
@@ -4038,11 +4038,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "199"
+            "memo": "198"
           },
           {
             "amount": 100000000000,
-            "memo": "199+"
+            "memo": "198+"
           }
         ]
       },
@@ -4059,11 +4059,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "200"
+            "memo": "199"
           },
           {
             "amount": 200000000000,
-            "memo": "200+"
+            "memo": "199+"
           }
         ]
       },
@@ -4080,11 +4080,11 @@
             "amount": 200000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "201"
+            "memo": "200"
           },
           {
             "amount": 2000000000000,
-            "memo": "201+"
+            "memo": "200+"
           }
         ]
       },
@@ -4101,11 +4101,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "202"
+            "memo": "201"
           },
           {
             "amount": 200000000000,
-            "memo": "202+"
+            "memo": "201+"
           }
         ]
       },
@@ -4122,11 +4122,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "203"
+            "memo": "202"
           },
           {
             "amount": 100000000000,
-            "memo": "203+"
+            "memo": "202+"
           }
         ]
       },
@@ -4143,11 +4143,11 @@
             "amount": 10000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "204"
+            "memo": "203"
           },
           {
             "amount": 100000000000,
-            "memo": "204+"
+            "memo": "203+"
           }
         ]
       },
@@ -4164,11 +4164,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "205"
+            "memo": "204"
           },
           {
             "amount": 100000000000,
-            "memo": "205+"
+            "memo": "204+"
           }
         ]
       },
@@ -4185,11 +4185,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "206"
+            "memo": "205"
           },
           {
             "amount": 100000000000,
-            "memo": "206+"
+            "memo": "205+"
           }
         ]
       },
@@ -4206,11 +4206,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "207"
+            "memo": "206"
           },
           {
             "amount": 1000000000000,
-            "memo": "207+"
+            "memo": "206+"
           }
         ]
       },
@@ -4227,11 +4227,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "208"
+            "memo": "207"
           },
           {
             "amount": 200000000000,
-            "memo": "208+"
+            "memo": "207+"
           }
         ]
       },
@@ -4248,11 +4248,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "209"
+            "memo": "208"
           },
           {
             "amount": 100000000000,
-            "memo": "209+"
+            "memo": "208+"
           }
         ]
       },
@@ -4269,17 +4269,38 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "210"
+            "memo": "209"
           },
           {
             "amount": 200000000000,
-            "memo": "210+"
+            "memo": "209+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1vpqxc97jyqecl0arr7t0je08z06nljv0ls7yyv",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 173448000,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "210"
+          },
+          {
+            "amount": 100000000000,
+            "memo": "210+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1whe7zklwmyxw4ct0x2wsex0ztcfd0dyyva074q",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -4300,11 +4321,11 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1whe7zklwmyxw4ct0x2wsex0ztcfd0dyyva074q",
+        "avaxAddr": "X-columbus109x70su7sqqn9t2s4danjjueu5mc9jhyawxnly",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
-          "kycVerified": true
+          "kycVerified": false
         },
         "platformAllocations": [
           {
@@ -4321,27 +4342,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus109x70su7sqqn9t2s4danjjueu5mc9jhyawxnly",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositDuration": 173448000,
-            "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "213"
-          },
-          {
-            "amount": 100000000000,
-            "memo": "213+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1k8ahvt0k5uyycvtzs94cavjk26ratnhu42xtlp",
         "xAmount": 0,
         "addressStates": {
@@ -4353,11 +4353,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "214"
+            "memo": "213"
           },
           {
             "amount": 1000000000000,
-            "memo": "214+"
+            "memo": "213+"
           }
         ]
       },
@@ -4374,11 +4374,11 @@
             "amount": 10000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "215"
+            "memo": "214"
           },
           {
             "amount": 100000000000,
-            "memo": "215+"
+            "memo": "214+"
           }
         ]
       },
@@ -4395,11 +4395,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "216"
+            "memo": "215"
           },
           {
             "amount": 100000000000,
-            "memo": "216+"
+            "memo": "215+"
           }
         ]
       },
@@ -4416,11 +4416,11 @@
             "amount": 400000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "217"
+            "memo": "216"
           },
           {
             "amount": 4000000000000,
-            "memo": "217+"
+            "memo": "216+"
           }
         ]
       },
@@ -4437,11 +4437,11 @@
             "amount": 250000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "218"
+            "memo": "217"
           },
           {
             "amount": 2500000000000,
-            "memo": "218+"
+            "memo": "217+"
           }
         ]
       },
@@ -4458,11 +4458,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "219"
+            "memo": "218"
           },
           {
             "amount": 1000000000000,
-            "memo": "219+"
+            "memo": "218+"
           }
         ]
       },
@@ -4479,11 +4479,11 @@
             "amount": 50000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "220"
+            "memo": "219"
           },
           {
             "amount": 500000000000,
-            "memo": "220+"
+            "memo": "219+"
           }
         ]
       },
@@ -4500,11 +4500,11 @@
             "amount": 200000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "221"
+            "memo": "220"
           },
           {
             "amount": 2000000000000,
-            "memo": "221+"
+            "memo": "220+"
           }
         ]
       },
@@ -4521,11 +4521,11 @@
             "amount": 50000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "222"
+            "memo": "221"
           },
           {
             "amount": 500000000000,
-            "memo": "222+"
+            "memo": "221+"
           }
         ]
       },
@@ -4544,17 +4544,38 @@
             "validatorDuration": 31536000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "223"
+            "memo": "222"
           },
           {
             "amount": 20000000000000,
-            "memo": "223+"
+            "memo": "222+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1cvrvujyg3sd92tek7y02vgs6zlz35rh29djmqn",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "223"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "223+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus10ug0cakympud639d736slusv5smyfc56t8axgm",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4575,27 +4596,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus10ug0cakympud639d736slusv5smyfc56t8axgm",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "225"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "225+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18har8esnq6gww24qhgsq39g390mn8p7kq6fhl3",
         "xAmount": 0,
         "addressStates": {
@@ -4607,11 +4607,11 @@
             "amount": 500000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "226"
+            "memo": "225"
           },
           {
             "amount": 5000000000000,
-            "memo": "226+"
+            "memo": "225+"
           }
         ]
       },
@@ -4628,17 +4628,38 @@
             "amount": 300000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "227"
+            "memo": "226"
           },
           {
             "amount": 3000000000000,
-            "memo": "227+"
+            "memo": "226+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1c3kd4e02r5mzg83ezs7yxhwrvyfstqnjpfvrld",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "227"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "227+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1m56g7kzpyvwlcc3mzz9rs5x4u3xuqasq8w66s7",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4659,7 +4680,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1m56g7kzpyvwlcc3mzz9rs5x4u3xuqasq8w66s7",
+        "avaxAddr": "X-columbus1dxd66ecwj99xyezr4p5fq7cfwcqqhj29vxlzu9",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -4680,27 +4701,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dxd66ecwj99xyezr4p5fq7cfwcqqhj29vxlzu9",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "230"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "230+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ejtfvvpd268hg8xdjpxfagcnj7x52cep8ch0r0",
         "xAmount": 0,
         "addressStates": {
@@ -4712,11 +4712,11 @@
             "amount": 75000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "231"
+            "memo": "230"
           },
           {
             "amount": 750000000000,
-            "memo": "231+"
+            "memo": "230+"
           }
         ]
       },
@@ -4733,11 +4733,11 @@
             "amount": 400000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "232"
+            "memo": "231"
           },
           {
             "amount": 4000000000000,
-            "memo": "232+"
+            "memo": "231+"
           }
         ]
       },
@@ -4754,11 +4754,11 @@
             "amount": 20000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "233"
+            "memo": "232"
           },
           {
             "amount": 200000000000,
-            "memo": "233+"
+            "memo": "232+"
           }
         ]
       },
@@ -4775,11 +4775,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "234"
+            "memo": "233"
           },
           {
             "amount": 100000000000,
-            "memo": "234+"
+            "memo": "233+"
           }
         ]
       },
@@ -4796,11 +4796,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "235"
+            "memo": "234"
           },
           {
             "amount": 100000000000,
-            "memo": "235+"
+            "memo": "234+"
           }
         ]
       },
@@ -4817,17 +4817,17 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "236"
+            "memo": "235"
           },
           {
             "amount": 1000000000000,
-            "memo": "236+"
+            "memo": "235+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qwck6hzr4l02g8rnc3nmw76exxz5fej9mj9rjy",
+        "avaxAddr": "X-columbus1a28tjjxyplz3uq0737tgwv7k29e8dj24xeh877",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -4838,11 +4838,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "237"
+            "memo": "236"
           },
           {
             "amount": 200000000000,
-            "memo": "237+"
+            "memo": "236+"
           }
         ]
       },
@@ -4859,11 +4859,11 @@
             "amount": 200000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "238"
+            "memo": "237"
           },
           {
             "amount": 2000000000000,
-            "memo": "238+"
+            "memo": "237+"
           }
         ]
       },
@@ -4880,11 +4880,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "239"
+            "memo": "238"
           },
           {
             "amount": 100000000000,
-            "memo": "239+"
+            "memo": "238+"
           }
         ]
       },
@@ -4901,11 +4901,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "240"
+            "memo": "239"
           },
           {
             "amount": 100000000000,
-            "memo": "240+"
+            "memo": "239+"
           }
         ]
       },
@@ -4922,11 +4922,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "241"
+            "memo": "240"
           },
           {
             "amount": 100000000000,
-            "memo": "241+"
+            "memo": "240+"
           }
         ]
       },
@@ -4943,11 +4943,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "242"
+            "memo": "241"
           },
           {
             "amount": 200000000000,
-            "memo": "242+"
+            "memo": "241+"
           }
         ]
       },
@@ -4964,11 +4964,11 @@
             "amount": 25000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "243"
+            "memo": "242"
           },
           {
             "amount": 250000000000,
-            "memo": "243+"
+            "memo": "242+"
           }
         ]
       },
@@ -4985,11 +4985,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "244"
+            "memo": "243"
           },
           {
             "amount": 1000000000000,
-            "memo": "244+"
+            "memo": "243+"
           }
         ]
       },
@@ -5006,17 +5006,38 @@
             "amount": 200000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "245"
+            "memo": "244"
           },
           {
             "amount": 2000000000000,
-            "memo": "245+"
+            "memo": "244+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1y7mc7hekqxxhuerst0ukpeq9k63zy3782nr3dt",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "245"
+          },
+          {
+            "amount": 100000000000,
+            "memo": "245+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus153ejpsghh0tzamey70clpcd7g0y9r6g677x0f7",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5037,27 +5058,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus153ejpsghh0tzamey70clpcd7g0y9r6g677x0f7",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "247"
-          },
-          {
-            "amount": 100000000000,
-            "memo": "247+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1zj4gs3ldxz6sm5d6zjdv36p0ag8rjey6q5pt2t",
         "xAmount": 0,
         "addressStates": {
@@ -5069,17 +5069,38 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "248"
+            "memo": "247"
           },
           {
             "amount": 1000000000000,
-            "memo": "248+"
+            "memo": "247+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1fxsxvek9w0u6q2dy5zkcqxqqlf0kje67s7rd8u",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "248"
+          },
+          {
+            "amount": 100000000000,
+            "memo": "248+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1nl0pgg4fry3rwxcvw7h0n2ypt65ns0587dqu6g",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5100,31 +5121,31 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1nl0pgg4fry3rwxcvw7h0n2ypt65ns0587dqu6g",
+        "avaxAddr": "X-columbus1m6gxrjq7qesqz2y998zacjjphsehneaqj44pmm",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": false,
+          "consortiumMember": true,
           "kycVerified": true
         },
         "platformAllocations": [
           {
-            "amount": 10000000000000,
+            "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "250"
           },
           {
-            "amount": 100000000000,
+            "amount": 1000000000000,
             "memo": "250+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1m6gxrjq7qesqz2y998zacjjphsehneaqj44pmm",
+        "avaxAddr": "X-columbus1anj83lc0h839vmvltws0a6h7k5znlyq84hp6m0",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -5142,27 +5163,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1anj83lc0h839vmvltws0a6h7k5znlyq84hp6m0",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "252"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "252+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1gaxcm3petj9z6kvp2w5kcr4usvdvq3hvj5cyjd",
         "xAmount": 0,
         "addressStates": {
@@ -5174,11 +5174,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "253"
+            "memo": "252"
           },
           {
             "amount": 1000000000000,
-            "memo": "253+"
+            "memo": "252+"
           }
         ]
       },
@@ -5195,11 +5195,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "254"
+            "memo": "253"
           },
           {
             "amount": 100000000000,
-            "memo": "254+"
+            "memo": "253+"
           }
         ]
       },
@@ -5216,11 +5216,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "255"
+            "memo": "254"
           },
           {
             "amount": 200000000000,
-            "memo": "255+"
+            "memo": "254+"
           }
         ]
       },
@@ -5237,11 +5237,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "256"
+            "memo": "255"
           },
           {
             "amount": 100000000000,
-            "memo": "256+"
+            "memo": "255+"
           }
         ]
       },
@@ -5258,11 +5258,11 @@
             "amount": 50000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "257"
+            "memo": "256"
           },
           {
             "amount": 500000000000,
-            "memo": "257+"
+            "memo": "256+"
           }
         ]
       },
@@ -5279,11 +5279,11 @@
             "amount": 150000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "258"
+            "memo": "257"
           },
           {
             "amount": 1500000000000,
-            "memo": "258+"
+            "memo": "257+"
           }
         ]
       },
@@ -5293,6 +5293,27 @@
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 173448000,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "258"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "258+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1yws8zcjfsnfgq39c6chsgtm94mt9596m06zm40",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -5310,27 +5331,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1yws8zcjfsnfgq39c6chsgtm94mt9596m06zm40",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 173448000,
-            "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "260"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "260+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus18eqxyetaqt8kym2nqhat532gxtewfsvk3ely5n",
         "xAmount": 0,
         "addressStates": {
@@ -5342,11 +5342,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "261"
+            "memo": "260"
           },
           {
             "amount": 100000000000,
-            "memo": "261+"
+            "memo": "260+"
           }
         ]
       },
@@ -5363,11 +5363,11 @@
             "amount": 50000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "262"
+            "memo": "261"
           },
           {
             "amount": 500000000000,
-            "memo": "262+"
+            "memo": "261+"
           }
         ]
       },
@@ -5384,11 +5384,11 @@
             "amount": 50000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "263"
+            "memo": "262"
           },
           {
             "amount": 500000000000,
-            "memo": "263+"
+            "memo": "262+"
           }
         ]
       },
@@ -5405,11 +5405,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "264"
+            "memo": "263"
           },
           {
             "amount": 1000000000000,
-            "memo": "264+"
+            "memo": "263+"
           }
         ]
       },
@@ -5426,17 +5426,38 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "265"
+            "memo": "264"
           },
           {
             "amount": 1000000000000,
-            "memo": "265+"
+            "memo": "264+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus13hvsse9lhszwcktwyy74tgzzzmrqvjxkwgatw5",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositDuration": 173448000,
+            "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "265"
+          },
+          {
+            "amount": 100000000000,
+            "memo": "265+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1gxvvskyrpk7cjrd934rgmmxysqrvgqy7pkxft0",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": false,
@@ -5457,27 +5478,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1gxvvskyrpk7cjrd934rgmmxysqrvgqy7pkxft0",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositDuration": 173448000,
-            "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "267"
-          },
-          {
-            "amount": 100000000000,
-            "memo": "267+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus169u6vuaqkxl5pwcq3a33336ww7380c3qrmlcsg",
         "xAmount": 0,
         "addressStates": {
@@ -5489,11 +5489,11 @@
             "amount": 500000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "268"
+            "memo": "267"
           },
           {
             "amount": 5000000000000,
-            "memo": "268+"
+            "memo": "267+"
           }
         ]
       },
@@ -5510,11 +5510,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "269"
+            "memo": "268"
           },
           {
             "amount": 100000000000,
-            "memo": "269+"
+            "memo": "268+"
           }
         ]
       },
@@ -5531,11 +5531,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "270"
+            "memo": "269"
           },
           {
             "amount": 1000000000000,
-            "memo": "270+"
+            "memo": "269+"
           }
         ]
       },
@@ -5552,11 +5552,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "271"
+            "memo": "270"
           },
           {
             "amount": 1000000000000,
-            "memo": "271+"
+            "memo": "270+"
           }
         ]
       },
@@ -5573,11 +5573,11 @@
             "amount": 200000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "272"
+            "memo": "271"
           },
           {
             "amount": 2000000000000,
-            "memo": "272+"
+            "memo": "271+"
           }
         ]
       },
@@ -5594,11 +5594,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "273"
+            "memo": "272"
           },
           {
             "amount": 1000000000000,
-            "memo": "273+"
+            "memo": "272+"
           }
         ]
       },
@@ -5615,11 +5615,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "274"
+            "memo": "273"
           },
           {
             "amount": 200000000000,
-            "memo": "274+"
+            "memo": "273+"
           }
         ]
       },
@@ -5636,11 +5636,11 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "275"
+            "memo": "274"
           },
           {
             "amount": 1500000000000,
-            "memo": "275+"
+            "memo": "274+"
           }
         ]
       },
@@ -5657,11 +5657,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "276"
+            "memo": "275"
           },
           {
             "amount": 1000000000000,
-            "memo": "276+"
+            "memo": "275+"
           }
         ]
       },
@@ -5678,11 +5678,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "277"
+            "memo": "276"
           },
           {
             "amount": 100000000000,
-            "memo": "277+"
+            "memo": "276+"
           }
         ]
       },
@@ -5699,11 +5699,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "278"
+            "memo": "277"
           },
           {
             "amount": 1000000000000,
-            "memo": "278+"
+            "memo": "277+"
           }
         ]
       },
@@ -5720,11 +5720,11 @@
             "amount": 150000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "279"
+            "memo": "278"
           },
           {
             "amount": 1500000000000,
-            "memo": "279+"
+            "memo": "278+"
           }
         ]
       },
@@ -5741,11 +5741,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "280"
+            "memo": "279"
           },
           {
             "amount": 1000000000000,
-            "memo": "280+"
+            "memo": "279+"
           }
         ]
       },
@@ -5762,11 +5762,11 @@
             "amount": 300000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "281"
+            "memo": "280"
           },
           {
             "amount": 3000000000000,
-            "memo": "281+"
+            "memo": "280+"
           }
         ]
       },
@@ -5783,11 +5783,11 @@
             "amount": 70000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "282"
+            "memo": "281"
           },
           {
             "amount": 700000000000,
-            "memo": "282+"
+            "memo": "281+"
           }
         ]
       },
@@ -5804,11 +5804,11 @@
             "amount": 250000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "283"
+            "memo": "282"
           },
           {
             "amount": 2500000000000,
-            "memo": "283+"
+            "memo": "282+"
           }
         ]
       },
@@ -5825,11 +5825,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "284"
+            "memo": "283"
           },
           {
             "amount": 100000000000,
-            "memo": "284+"
+            "memo": "283+"
           }
         ]
       },
@@ -5846,11 +5846,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "285"
+            "memo": "284"
           },
           {
             "amount": 1000000000000,
-            "memo": "285+"
+            "memo": "284+"
           }
         ]
       },
@@ -5867,11 +5867,11 @@
             "amount": 20000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "286"
+            "memo": "285"
           },
           {
             "amount": 200000000000,
-            "memo": "286+"
+            "memo": "285+"
           }
         ]
       },
@@ -5888,11 +5888,11 @@
             "amount": 10000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "287"
+            "memo": "286"
           },
           {
             "amount": 100000000000,
-            "memo": "287+"
+            "memo": "286+"
           }
         ]
       },
@@ -5909,11 +5909,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "288"
+            "memo": "287"
           },
           {
             "amount": 100000000000,
-            "memo": "288+"
+            "memo": "287+"
           }
         ]
       },
@@ -5930,11 +5930,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "289"
+            "memo": "288"
           },
           {
             "amount": 1000000000000,
-            "memo": "289+"
+            "memo": "288+"
           }
         ]
       },
@@ -5951,11 +5951,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "290"
+            "memo": "289"
           },
           {
             "amount": 100000000000,
-            "memo": "290+"
+            "memo": "289+"
           }
         ]
       },
@@ -5972,11 +5972,11 @@
             "amount": 200000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "291"
+            "memo": "290"
           },
           {
             "amount": 2000000000000,
-            "memo": "291+"
+            "memo": "290+"
           }
         ]
       },
@@ -5993,17 +5993,38 @@
             "amount": 15000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "292"
+            "memo": "291"
           },
           {
             "amount": 150000000000,
-            "memo": "292+"
+            "memo": "291+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus195gy59enhat6qlcqsjrqqn4l68mt7n2x5mh2gv",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "292"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "292+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6024,27 +6045,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12hcmkc67wjvcdj7vqlzcqrpehs9lp50y3fpkas",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "294"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "294+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1qajjjmwlnytjfe6l8jtqhev4helx9x47hn6rdl",
         "xAmount": 0,
         "addressStates": {
@@ -6056,11 +6056,11 @@
             "amount": 1500000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "295"
+            "memo": "294"
           },
           {
             "amount": 15000000000000,
-            "memo": "295+"
+            "memo": "294+"
           }
         ]
       },
@@ -6077,11 +6077,11 @@
             "amount": 30000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "296"
+            "memo": "295"
           },
           {
             "amount": 300000000000,
-            "memo": "296+"
+            "memo": "295+"
           }
         ]
       },
@@ -6098,11 +6098,11 @@
             "amount": 250000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "297"
+            "memo": "296"
           },
           {
             "amount": 2500000000000,
-            "memo": "297+"
+            "memo": "296+"
           }
         ]
       },
@@ -6119,11 +6119,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "298"
+            "memo": "297"
           },
           {
             "amount": 1000000000000,
-            "memo": "298+"
+            "memo": "297+"
           }
         ]
       },
@@ -6140,11 +6140,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "299"
+            "memo": "298"
           },
           {
             "amount": 1000000000000,
-            "memo": "299+"
+            "memo": "298+"
           }
         ]
       },
@@ -6161,11 +6161,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "300"
+            "memo": "299"
           },
           {
             "amount": 1000000000000,
-            "memo": "300+"
+            "memo": "299+"
           }
         ]
       },
@@ -6182,6 +6182,27 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
+            "memo": "300"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "300+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1d68vs6523kp60s8ls67pexr5wmx539na8cm98x",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
             "memo": "301"
           },
           {
@@ -6192,7 +6213,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1d68vs6523kp60s8ls67pexr5wmx539na8cm98x",
+        "avaxAddr": "X-columbus1ulq0adze9dd7gv7taqrl7yyw80xng576wf77y3",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6213,7 +6234,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ulq0adze9dd7gv7taqrl7yyw80xng576wf77y3",
+        "avaxAddr": "X-columbus160qmkdkvhzszx4ph6hf7cwj4rmxdnngfjgeqm8",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6234,10 +6255,10 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus160qmkdkvhzszx4ph6hf7cwj4rmxdnngfjgeqm8",
+        "avaxAddr": "X-columbus1zpuwfdjtzmfvsrdpd742g6hek6m7tfntch8mgq",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -6255,27 +6276,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zpuwfdjtzmfvsrdpd742g6hek6m7tfntch8mgq",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "305"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "305+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1ypmdpy7tlep95za2nt9tx5a8tvjykxxssa5kga",
         "xAmount": 0,
         "addressStates": {
@@ -6287,11 +6287,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "306"
+            "memo": "305"
           },
           {
             "amount": 1000000000000,
-            "memo": "306+"
+            "memo": "305+"
           }
         ]
       },
@@ -6308,11 +6308,11 @@
             "amount": 20000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "307"
+            "memo": "306"
           },
           {
             "amount": 200000000000,
-            "memo": "307+"
+            "memo": "306+"
           }
         ]
       },
@@ -6329,11 +6329,11 @@
             "amount": 3000000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "308"
+            "memo": "307"
           },
           {
             "amount": 30000000000000,
-            "memo": "308+"
+            "memo": "307+"
           }
         ]
       },
@@ -6350,17 +6350,38 @@
             "amount": 1000000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "309"
+            "memo": "308"
           },
           {
             "amount": 10000000000000,
-            "memo": "309+"
+            "memo": "308+"
           }
         ]
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1h7u9p4pa9faxj3zezs9udxvj8quuqymrxmnfun",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositDuration": 110376000,
+            "depositOfferMemo": "PreSale 3 Years 8%",
+            "memo": "309"
+          },
+          {
+            "amount": 1000000000000,
+            "memo": "309+"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kfnsy5p7pfsqh76k5zzmj2kd5svaf0qwrjl0t8",
         "xAmount": 0,
         "addressStates": {
           "consortiumMember": true,
@@ -6381,27 +6402,6 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kfnsy5p7pfsqh76k5zzmj2kd5svaf0qwrjl0t8",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "311"
-          },
-          {
-            "amount": 1000000000000,
-            "memo": "311+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-columbus1q9ka38c978mj2l77kuh5jtl8745xfuulqdcsly",
         "xAmount": 0,
         "addressStates": {
@@ -6413,11 +6413,11 @@
             "amount": 1000000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "312"
+            "memo": "311"
           },
           {
             "amount": 10000000000000,
-            "memo": "312+"
+            "memo": "311+"
           }
         ]
       },
@@ -6434,11 +6434,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "313"
+            "memo": "312"
           },
           {
             "amount": 1000000000000,
-            "memo": "313+"
+            "memo": "312+"
           }
         ]
       },
@@ -6455,11 +6455,11 @@
             "amount": 115000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "314"
+            "memo": "313"
           },
           {
             "amount": 1150000000000,
-            "memo": "314+"
+            "memo": "313+"
           }
         ]
       },
@@ -6476,11 +6476,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "315"
+            "memo": "314"
           },
           {
             "amount": 1000000000000,
-            "memo": "315+"
+            "memo": "314+"
           }
         ]
       },
@@ -6497,11 +6497,11 @@
             "amount": 150000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "316"
+            "memo": "315"
           },
           {
             "amount": 1500000000000,
-            "memo": "316+"
+            "memo": "315+"
           }
         ]
       },
@@ -6520,11 +6520,11 @@
             "validatorDuration": 31881600,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "317"
+            "memo": "316"
           },
           {
             "amount": 2000000000000,
-            "memo": "317+"
+            "memo": "316+"
           }
         ]
       },
@@ -6541,11 +6541,11 @@
             "amount": 100000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "318"
+            "memo": "317"
           },
           {
             "amount": 1000000000000,
-            "memo": "318+"
+            "memo": "317+"
           }
         ]
       },
@@ -6564,11 +6564,11 @@
             "validatorDuration": 30412800,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "319"
+            "memo": "318"
           },
           {
             "amount": 2000000000000,
-            "memo": "319+"
+            "memo": "318+"
           }
         ]
       },
@@ -6585,11 +6585,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "320"
+            "memo": "319"
           },
           {
             "amount": 1000000000000,
-            "memo": "320+"
+            "memo": "319+"
           }
         ]
       },
@@ -6606,11 +6606,11 @@
             "amount": 500000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "321"
+            "memo": "320"
           },
           {
             "amount": 5000000000000,
-            "memo": "321+"
+            "memo": "320+"
           }
         ]
       },
@@ -6627,11 +6627,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "322"
+            "memo": "321"
           },
           {
             "amount": 1000000000000,
-            "memo": "322+"
+            "memo": "321+"
           }
         ]
       },
@@ -6648,11 +6648,11 @@
             "amount": 10000000000000,
             "depositDuration": 141912000,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "323"
+            "memo": "322"
           },
           {
             "amount": 100000000000,
-            "memo": "323+"
+            "memo": "322+"
           }
         ]
       },
@@ -6669,11 +6669,11 @@
             "amount": 100000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "324"
+            "memo": "323"
           },
           {
             "amount": 1000000000000,
-            "memo": "324+"
+            "memo": "323+"
           }
         ]
       },
@@ -6690,11 +6690,11 @@
             "amount": 100000000000000,
             "depositDuration": 173448000,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "325"
+            "memo": "324"
           },
           {
             "amount": 1000000000000,
-            "memo": "325+"
+            "memo": "324+"
           }
         ]
       },
@@ -6711,32 +6711,11 @@
             "amount": 10000000000000,
             "depositDuration": 110376000,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "326"
+            "memo": "325"
           },
           {
             "amount": 100000000000,
-            "memo": "326+"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1lsgwstc8edestl9v9t65kcfwjcy4gh8qv6jfc6",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositDuration": 110376000,
-            "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "328"
-          },
-          {
-            "amount": 2000000000000,
-            "memo": "328+"
+            "memo": "325+"
           }
         ]
       }

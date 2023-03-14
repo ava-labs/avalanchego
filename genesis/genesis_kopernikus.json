@@ -156,7 +156,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-kopernikus1fq0jc8svlyazhygkj0s36qnl6s0km0h3uuc99w",
+        "avaxAddr": "X-kopernikus1z5tv4tg04kf4l9ghclw6ssek8zugs7yd65prpl",
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -175,7 +175,7 @@
       },
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-kopernikus1k4przmfu79ypp4u7y98glmdpzwk0u3sc7saazy",
+        "avaxAddr": "X-kopernikus1t5qgr9hcmf2vxj7k0hz77kawf9yr389cxte5j0",
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
