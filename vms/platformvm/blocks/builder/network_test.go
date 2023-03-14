@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
