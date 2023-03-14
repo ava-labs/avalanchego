@@ -26,14 +26,13 @@ impl File {
         )
     }
 
-    pub fn create_file(rootfd: Fd, fname: &str) -> Fd {
+    pub fn create_file(rootfd: Fd, fname: &str) -> nix::Result<Fd> {
         openat(
             rootfd,
             fname,
             OFlag::O_CREAT | OFlag::O_RDWR,
             Mode::S_IRUSR | Mode::S_IWUSR,
         )
-        .unwrap()
     }
 
     fn _get_fname(fid: u64) -> String {
@@ -46,7 +45,7 @@ impl File {
             Ok(fd) => fd,
             Err(e) => match e {
                 Errno::ENOENT => {
-                    let fd = Self::create_file(rootfd, &fname);
+                    let fd = Self::create_file(rootfd, &fname)?;
                     nix::unistd::ftruncate(fd, flen as nix::libc::off_t)?;
                     fd
                 }
@@ -107,4 +106,13 @@ pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
         },
         reset_header,
     ))
+}
+
+#[test]
+/// This test simulates a filesystem error: for example the specified path
+/// does not exist when creating a file.
+fn test_create_file() {
+    if let Err(e) = File::create_file(0, "/badpath/baddir") {
+        assert_eq!(e.desc(), "No such file or directory")
+    }
 }
