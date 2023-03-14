@@ -34,6 +34,6 @@ pub fn run(opts: &Options) -> Result<()> {
             println!("{:X?}", *root);
             Ok(())
         }
-        Err(_) => return Err(anyhow!("root hash not found")),
+        Err(_) => Err(anyhow!("root hash not found")),
     }
 }

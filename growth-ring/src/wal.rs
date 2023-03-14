@@ -210,7 +210,7 @@ impl<'a, F: WALStore> std::ops::Deref for WALFileHandle<'a, F> {
 impl<'a, F: WALStore> Drop for WALFileHandle<'a, F> {
     fn drop(&mut self) {
         unsafe {
-            (&*self.pool).release_file(self.fid);
+            (*self.pool).release_file(self.fid);
         }
     }
 }
@@ -236,8 +236,8 @@ impl<F: WALStore> WALFilePool<F> {
         block_nbit: u64,
         cache_size: NonZeroUsize,
     ) -> Result<Self, ()> {
-        let file_nbit = file_nbit as u64;
-        let block_nbit = block_nbit as u64;
+        let file_nbit = file_nbit;
+        let block_nbit = block_nbit;
         let header_file = store.open_file("HEAD", true).await?;
         header_file.truncate(HEADER_SIZE)?;
         Ok(WALFilePool {
@@ -248,7 +248,7 @@ impl<F: WALStore> WALFilePool<F> {
             last_write: UnsafeCell::new(MaybeUninit::new(Box::pin(future::ready(Ok(()))))),
             last_peel: UnsafeCell::new(MaybeUninit::new(Box::pin(future::ready(Ok(()))))),
             file_nbit,
-            file_size: 1 << (file_nbit as u64),
+            file_size: 1 << file_nbit,
             block_nbit,
         })
     }
@@ -267,39 +267,33 @@ impl<F: WALStore> WALFilePool<F> {
         Ok(())
     }
 
-    fn get_file<'a>(
-        &'a self,
-        fid: u64,
-        touch: bool,
-    ) -> impl Future<Output = Result<WALFileHandle<'a, F>, ()>> {
-        async move {
-            let pool = self as *const WALFilePool<F>;
-            if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
-                let handle = match self.handle_used.borrow_mut().entry(fid) {
-                    hash_map::Entry::Vacant(e) => unsafe {
-                        &*(*e.insert(UnsafeCell::new((h, 1))).get()).0
-                    },
-                    _ => unreachable!(),
-                };
-                Ok(WALFileHandle { fid, handle, pool })
-            } else {
-                let v = unsafe {
-                    &mut *match self.handle_used.borrow_mut().entry(fid) {
-                        hash_map::Entry::Occupied(e) => e.into_mut(),
-                        hash_map::Entry::Vacant(e) => e.insert(UnsafeCell::new((
-                            self.store.open_file(&get_fname(fid), touch).await?,
-                            0,
-                        ))),
-                    }
-                    .get()
-                };
-                v.1 += 1;
-                Ok(WALFileHandle {
-                    fid,
-                    handle: &*v.0,
-                    pool,
-                })
-            }
+    async fn get_file<'a>(&'a self, fid: u64, touch: bool) -> Result<WALFileHandle<'a, F>, ()> {
+        let pool = self as *const WALFilePool<F>;
+        if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
+            let handle = match self.handle_used.borrow_mut().entry(fid) {
+                hash_map::Entry::Vacant(e) => unsafe {
+                    &*(*e.insert(UnsafeCell::new((h, 1))).get()).0
+                },
+                _ => unreachable!(),
+            };
+            Ok(WALFileHandle { fid, handle, pool })
+        } else {
+            let v = unsafe {
+                &mut *match self.handle_used.borrow_mut().entry(fid) {
+                    hash_map::Entry::Occupied(e) => e.into_mut(),
+                    hash_map::Entry::Vacant(e) => e.insert(UnsafeCell::new((
+                        self.store.open_file(&get_fname(fid), touch).await?,
+                        0,
+                    ))),
+                }
+                .get()
+            };
+            v.1 += 1;
+            Ok(WALFileHandle {
+                fid,
+                handle: &*v.0,
+                pool,
+            })
         }
     }
 
@@ -497,9 +491,9 @@ impl<F: WALStore> WALWriter<F> {
                     let d = remain - msize;
                     let rs0 = self.state.next + (bbuff_cur - bbuff_start) as u64;
                     let blob = unsafe {
-                        std::mem::transmute::<*mut u8, &mut WALRingBlob>(
-                            (&mut self.block_buffer[bbuff_cur as usize..]).as_mut_ptr(),
-                        )
+                        &mut *self.block_buffer[bbuff_cur as usize..]
+                            .as_mut_ptr()
+                            .cast::<WALRingBlob>()
                     };
                     bbuff_cur += msize;
                     if d >= rsize {
@@ -603,16 +597,15 @@ impl<F: WALStore> WALWriter<F> {
             .into_iter()
             .map(move |f| async move { f.await }.shared())
             .collect();
-        let res = res
-            .into_iter()
+
+        res.into_iter()
             .zip(records.into_iter())
             .map(|((ringid, blks), rec)| {
                 future::try_join_all(blks.into_iter().map(|idx| writes[idx].clone()))
                     .or_else(|_| future::ready(Err(())))
                     .and_then(move |_| future::ready(Ok((rec, ringid))))
             })
-            .collect();
-        res
+            .collect()
     }
 
     /// Inform the `WALWriter` that some data writes are complete so that it could automatically
@@ -630,13 +623,13 @@ impl<F: WALStore> WALWriter<F> {
         for rec in records.as_ref() {
             state.io_complete.push(*rec);
         }
-        while let Some(s) = state.io_complete.peek().and_then(|&e| Some(e.start)) {
+        while let Some(s) = state.io_complete.peek().map(|&e| e.start) {
             if s != state.next_complete.end {
                 break;
             }
             let mut m = state.io_complete.pop().unwrap();
             let block_remain = block_size - (m.end & (block_size - 1));
-            if block_remain <= msize as u64 {
+            if block_remain <= msize {
                 m.end += block_remain
             }
             let fid = m.start >> state.file_nbit;
@@ -888,13 +881,12 @@ impl WALLoader {
                 if v.done {
                     return None;
                 }
-                let header_raw = match check!(v.file.read(v.off, msize as usize).await) {
+                let header_raw = match check!(v.file.read(v.off, msize).await) {
                     Some(h) => h,
                     None => _yield!(),
                 };
                 v.off += msize as u64;
-                let header =
-                    unsafe { std::mem::transmute::<*const u8, &WALRingBlob>(header_raw.as_ptr()) };
+                let header = unsafe { &*header_raw.as_ptr().cast::<WALRingBlob>() };
                 let header = WALRingBlob {
                     counter: header.counter,
                     crc32: header.crc32,
@@ -1001,15 +993,13 @@ impl WALLoader {
                     return None;
                 }
                 loop {
-                    let header_raw = match check!(v.file.read(v.off, msize as usize).await) {
+                    let header_raw = match check!(v.file.read(v.off, msize).await) {
                         Some(h) => h,
                         None => _yield!(),
                     };
                     let ringid_start = (fid << file_nbit) + v.off;
                     v.off += msize as u64;
-                    let header = unsafe {
-                        std::mem::transmute::<*const u8, &WALRingBlob>(header_raw.as_ptr())
-                    };
+                    let header = unsafe { &*header_raw.as_ptr().cast::<WALRingBlob>() };
                     let rsize = header.rsize;
                     match header.rtype.try_into() {
                         Ok(WALRingType::Full) => {
@@ -1071,7 +1061,7 @@ impl WALLoader {
                                 payload.resize(chunks.iter().fold(0, |acc, v| acc + v.len()), 0);
                                 let mut ps = &mut payload[..];
                                 for c in chunks {
-                                    ps[..c.len()].copy_from_slice(&*c);
+                                    ps[..c.len()].copy_from_slice(&c);
                                     ps = &mut ps[c.len()..];
                                 }
                                 _yield!((

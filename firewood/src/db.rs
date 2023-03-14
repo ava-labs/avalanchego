@@ -563,15 +563,13 @@ impl DB {
         disk_requester.init_wal("wal", db_fd);
 
         // set up the storage layout
-        let db_header: ObjPtr<DBHeader>;
-        let merkle_payload_header: ObjPtr<CompactSpaceHeader>;
-        let blob_payload_header: ObjPtr<CompactSpaceHeader>;
-        db_header = ObjPtr::new_from_addr(offset);
+
+        let db_header: ObjPtr<DBHeader> = ObjPtr::new_from_addr(offset);
         offset += DBHeader::MSIZE;
-        merkle_payload_header = ObjPtr::new_from_addr(offset);
+        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
         offset += CompactSpaceHeader::MSIZE;
         assert!(offset <= SPACE_RESERVED);
-        blob_payload_header = ObjPtr::new_from_addr(0);
+        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
         if reset {
             // initialize space headers
@@ -773,19 +771,17 @@ impl DB {
             return None;
         }
         // set up the storage layout
-        let db_header: ObjPtr<DBHeader>;
-        let merkle_payload_header: ObjPtr<CompactSpaceHeader>;
-        let blob_payload_header: ObjPtr<CompactSpaceHeader>;
+
         let mut offset = std::mem::size_of::<DBParams>() as u64;
         // DBHeader starts after DBParams in merkle meta space
-        db_header = ObjPtr::new_from_addr(offset);
+        let db_header: ObjPtr<DBHeader> = ObjPtr::new_from_addr(offset);
         offset += DBHeader::MSIZE;
         // Merkle CompactHeader starts after DBHeader in merkle meta space
-        merkle_payload_header = ObjPtr::new_from_addr(offset);
+        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
         offset += CompactSpaceHeader::MSIZE;
         assert!(offset <= SPACE_RESERVED);
         // Blob CompactSpaceHeader starts right in blob meta space
-        blob_payload_header = ObjPtr::new_from_addr(0);
+        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
         let space = &inner.revisions[nback - 1];
 

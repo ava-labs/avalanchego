@@ -941,7 +941,7 @@ impl Merkle {
         Ok(())
     }
 
-    fn set_parent<'b>(&self, new_chd: ObjPtr<Node>, parents: &mut [(ObjRef<'b, Node>, u8)]) {
+    fn set_parent(&self, new_chd: ObjPtr<Node>, parents: &mut [(ObjRef<'_, Node>, u8)]) {
         let (p_ref, idx) = parents.last_mut().unwrap();
         p_ref
             .write(|p| {
@@ -1283,9 +1283,9 @@ impl Merkle {
         Ok(())
     }
 
-    fn after_remove_leaf<'b>(
+    fn after_remove_leaf(
         &self,
-        parents: &mut Vec<(ObjRef<'b, Node>, u8)>,
+        parents: &mut Vec<(ObjRef<'_, Node>, u8)>,
         deleted: &mut Vec<ObjPtr<Node>>,
     ) -> Result<(), MerkleError> {
         let (b_chd, val) = {
@@ -1456,10 +1456,10 @@ impl Merkle {
         Ok(())
     }
 
-    fn after_remove_branch<'b>(
+    fn after_remove_branch(
         &self,
         (c_ptr, idx): (ObjPtr<Node>, u8),
-        parents: &mut Vec<(ObjRef<'b, Node>, u8)>,
+        parents: &mut Vec<(ObjRef<'_, Node>, u8)>,
         deleted: &mut Vec<ObjPtr<Node>>,
     ) -> Result<(), MerkleError> {
         // [b] -> [u] -> [c]
@@ -2033,7 +2033,7 @@ fn test_cmp() {
         (vec![0xc0, 0xff], vec![0xc0, 0xff]),
     ] {
         let n = compare(&bytes_a, &bytes_b);
-        assert_eq!(n.is_eq(), true);
+        assert!(n.is_eq());
     }
 
     for (bytes_a, bytes_b) in [
@@ -2041,7 +2041,7 @@ fn test_cmp() {
         (vec![0xc0, 0xee], vec![0xc0, 0xff]),
     ] {
         let n = compare(&bytes_a, &bytes_b);
-        assert_eq!(n.is_lt(), true);
+        assert!(n.is_lt());
     }
 
     for (bytes_a, bytes_b) in [
@@ -2049,6 +2049,6 @@ fn test_cmp() {
         (vec![0xc0, 0xff, 0x33], vec![0xc0, 0xff]),
     ] {
         let n = compare(&bytes_a, &bytes_b);
-        assert_eq!(n.is_gt(), true);
+        assert!(n.is_gt());
     }
 }

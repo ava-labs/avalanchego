@@ -42,8 +42,8 @@ pub fn run(opts: &Options) -> Result<()> {
             if val.is_empty() {
                 return Err(anyhow!("no value found for key"));
             }
-            return Ok(());
+            Ok(())
         }
-        Err(_) => return Err(anyhow!("key not found")),
+        Err(_) => Err(anyhow!("key not found")),
     }
 }

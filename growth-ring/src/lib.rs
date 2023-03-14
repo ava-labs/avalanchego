@@ -75,8 +75,8 @@ impl WALFileAIO {
             OFlag::O_CREAT | OFlag::O_RDWR,
             Mode::S_IRUSR | Mode::S_IWUSR,
         )
-        .and_then(|fd| Ok(WALFileAIO { fd, aiomgr }))
-        .or_else(|_| Err(()))
+        .map(|fd| WALFileAIO { fd, aiomgr })
+        .map_err(|_| ())
     }
 }
 
@@ -97,8 +97,8 @@ impl WALFile for WALFileAIO {
             offset as off_t,
             length as off_t,
         )
-        .and_then(|_| Ok(()))
-        .or_else(|_| Err(()));
+        .map(|_| ())
+        .map_err(|_| ());
     }
     #[cfg(not(target_os = "linux"))]
     // TODO: macos support is possible here, but possibly unnecessary
@@ -107,12 +107,12 @@ impl WALFile for WALFileAIO {
     }
 
     fn truncate(&self, length: usize) -> Result<(), ()> {
-        ftruncate(self.fd, length as off_t).or_else(|_| Err(()))
+        ftruncate(self.fd, length as off_t).map_err(|_| ())
     }
 
     async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), ()> {
         let (res, data) = self.aiomgr.write(self.fd, offset, data, None).await;
-        res.or_else(|_| Err(())).and_then(|nwrote| {
+        res.map_err(|_| ()).and_then(|nwrote| {
             if nwrote == data.len() {
                 Ok(())
             } else {
@@ -123,8 +123,8 @@ impl WALFile for WALFileAIO {
 
     async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, ()> {
         let (res, data) = self.aiomgr.read(self.fd, offset, length, None).await;
-        res.or_else(|_| Err(()))
-            .and_then(|nread| Ok(if nread == length { Some(data) } else { None }))
+        res.map_err(|_| ())
+            .map(|nread| if nread == length { Some(data) } else { None })
     }
 }
 
@@ -176,10 +176,8 @@ impl WALStoreAIO {
                         libc::S_IRUSR | libc::S_IWUSR | libc::S_IXUSR,
                     )
                 };
-                if ret != 0 {
-                    if truncate {
-                        panic!("error while creating directory")
-                    }
+                if ret != 0 && truncate {
+                    panic!("error while creating directory")
                 }
                 walfd = match nix::fcntl::openat(fd, wal_dir, oflags(), Mode::empty()) {
                     Ok(fd) => fd,
@@ -211,7 +209,7 @@ impl WALStore for WALStoreAIO {
     async fn open_file(&self, filename: &str, _touch: bool) -> Result<Box<dyn WALFile>, ()> {
         let filename = filename.to_string();
         WALFileAIO::new(self.rootfd, &filename, self.aiomgr.clone())
-            .and_then(|f| Ok(Box::new(f) as Box<dyn WALFile>))
+            .map(|f| Box::new(f) as Box<dyn WALFile>)
     }
 
     async fn remove_file(&self, filename: String) -> Result<(), ()> {
@@ -220,7 +218,7 @@ impl WALStore for WALStoreAIO {
             filename.as_str(),
             UnlinkatFlags::NoRemoveDir,
         )
-        .or_else(|_| Err(()))
+        .map_err(|_| ())
     }
 
     fn enumerate_files(&self) -> Result<Self::FileNameIter, ()> {

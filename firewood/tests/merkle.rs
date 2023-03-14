@@ -366,8 +366,8 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
     let mut keys: Vec<&str> = Vec::new();
     let mut vals: Vec<&str> = Vec::new();
     for i in start..end {
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
+        keys.push(items[i].0);
+        vals.push(items[i].1);
     }
 
     merkle.verify_range_proof(
@@ -441,7 +441,7 @@ fn test_one_element_range_proof() -> Result<(), DataStoreError> {
     // start and end nodes are the same
     let end = 0;
 
-    let start_proof = merkle.prove(&items[start].0)?;
+    let start_proof = merkle.prove(items[start].0)?;
     assert!(!start_proof.0.is_empty());
 
     let mut keys = Vec::new();
@@ -466,9 +466,9 @@ fn test_all_elements_proof() -> Result<(), DataStoreError> {
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0)?;
+    let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0)?;
+    let end_proof = merkle.prove(items[end].0)?;
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);

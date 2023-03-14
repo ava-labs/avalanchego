@@ -42,7 +42,6 @@ fn simple2() {
         .unwrap();
     let fd = file.as_raw_fd();
     let ws = (0..4000)
-        .into_iter()
         .map(|i| {
             let off = i * 128;
             let s = char::from((97 + i % 26) as u8)

@@ -105,7 +105,7 @@ impl MummyItem for Blob {
         let bytes = mem
             .get_view(addr + 4, len)
             .ok_or(ShaleError::LinearMemStoreError)?;
-        Ok(Self::Code(bytes.as_deref().into()))
+        Ok(Self::Code(bytes.as_deref()))
     }
 
     fn dehydrated_len(&self) -> u64 {

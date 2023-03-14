@@ -264,7 +264,7 @@ impl Proof {
         }
         // Special case when there is a provided edge proof but zero key/value pairs,
         // ensure there are no more accounts / slots in the trie.
-        if keys.len() == 0 {
+        if keys.is_empty() {
             if let Some(_) =
                 self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?
             {
@@ -454,7 +454,7 @@ impl Proof {
                                     }
                                     NodeType::Leaf(n) => {
                                         if n.path().len() == 0 {
-                                            data = n.data().deref().to_vec().clone();
+                                            data = n.data().deref().to_vec();
                                         }
                                     }
                                     _ => (),
@@ -700,22 +700,8 @@ fn unset_internal<K: AsRef<[u8]>>(
             }
             let p = u_ref.as_ptr();
             drop(u_ref);
-            unset_node_ref(
-                merkle,
-                p,
-                left_node,
-                left_chunks[index..].to_vec(),
-                1,
-                false,
-            )?;
-            unset_node_ref(
-                merkle,
-                p,
-                right_node,
-                right_chunks[index..].to_vec(),
-                1,
-                true,
-            )?;
+            unset_node_ref(merkle, p, left_node, &left_chunks[index..], 1, false)?;
+            unset_node_ref(merkle, p, right_node, &right_chunks[index..], 1, true)?;
             Ok(false)
         }
         NodeType::Extension(n) => {
@@ -762,7 +748,7 @@ fn unset_internal<K: AsRef<[u8]>>(
                     merkle,
                     p,
                     Some(node),
-                    left_chunks[index..].to_vec(),
+                    &left_chunks[index..],
                     cur_key.len(),
                     false,
                 )?;
@@ -773,7 +759,7 @@ fn unset_internal<K: AsRef<[u8]>>(
                     merkle,
                     p,
                     Some(node),
-                    right_chunks[index..].to_vec(),
+                    &right_chunks[index..],
                     cur_key.len(),
                     true,
                 )?;

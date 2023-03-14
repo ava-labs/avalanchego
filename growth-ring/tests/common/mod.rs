@@ -80,7 +80,7 @@ impl<G: FailGen> WALFile for WALFileEmul<G> {
             Ok(None)
         } else {
             Ok(Some(
-                (&file[offset..offset + length]).to_vec().into_boxed_slice(),
+                file[offset..offset + length].to_vec().into_boxed_slice(),
             ))
         }
     }
@@ -158,7 +158,7 @@ where
             .files
             .remove(&filename)
             .ok_or(())
-            .and_then(|_| Ok(()))
+            .map(|_| ())
     }
 
     fn enumerate_files(&self) -> Result<Self::FileNameIter, ()> {
@@ -434,7 +434,7 @@ impl Canvas {
             for c in r.iter() {
                 print!("{:02x} ", c & 0xff);
             }
-            println!("");
+            println!();
         }
         println!("# end canvas");
     }
@@ -458,8 +458,8 @@ fn test_canvas() {
     assert!(canvas1.is_same(&canvas2));
     canvas1.rand_paint(&mut rng);
     assert!(!canvas1.is_same(&canvas2));
-    while let Some(_) = canvas1.rand_paint(&mut rng) {}
-    while let Some(_) = canvas2.rand_paint(&mut rng) {}
+    while canvas1.rand_paint(&mut rng).is_some() {}
+    while canvas2.rand_paint(&mut rng).is_some() {}
     assert!(canvas1.is_same(&canvas2));
     canvas1.print(10);
 }

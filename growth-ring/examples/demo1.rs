@@ -30,7 +30,7 @@ fn main() {
     let mut loader = WALLoader::new();
     loader.file_nbit(9).block_nbit(8);
 
-    let store = WALStoreAIO::new(&wal_dir, true, None, None).unwrap();
+    let store = WALStoreAIO::new(wal_dir, true, None, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -48,7 +48,7 @@ fn main() {
         );
     }
 
-    let store = WALStoreAIO::new(&wal_dir, false, None, None).unwrap();
+    let store = WALStoreAIO::new(wal_dir, false, None, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -62,7 +62,7 @@ fn main() {
         );
     }
 
-    let store = WALStoreAIO::new(&wal_dir, false, None, None).unwrap();
+    let store = WALStoreAIO::new(wal_dir, false, None, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 100)).unwrap();
     let mut history = std::collections::VecDeque::new();
     for _ in 0..3 {
