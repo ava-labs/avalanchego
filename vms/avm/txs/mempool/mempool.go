@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -47,14 +48,15 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// HasTxs returns true if there is at least one transaction in the mempool.
-	HasTxs() bool
-
 	// Peek returns the next first tx that was added to the mempool whose size
 	// is less than or equal to maxTxSize.
 	Peek(maxTxSize int) *txs.Tx
 
-	// Note: Dropped txs are added to droppedTxIDs but not not evicted from
+	// RequestBuildBlock notifies the consensus engine that a block should be
+	// built if there is at least one transaction in the mempool.
+	RequestBuildBlock()
+
+	// Note: Dropped txs are added to droppedTxIDs but not evicted from
 	// unissued. This allows previously dropped txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason string)
 	GetDropReason(txID ids.ID) (string, bool)
@@ -67,6 +69,8 @@ type mempool struct {
 	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 	numTxs      prometheus.Gauge
 
+	toEngine chan<- common.Message
+
 	// Key: Tx ID
 	// Value: String representation of the verification error
 	droppedTxIDs *cache.LRU[ids.ID, string]
@@ -77,6 +81,7 @@ type mempool struct {
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
+	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -102,6 +107,7 @@ func New(
 		bytesAvailable:       maxMempoolSize,
 		unissuedTxs:          linkedhashmap.New[ids.ID, *txs.Tx](),
 		numTxs:               numTxsMetric,
+		toEngine:             toEngine,
 		droppedTxIDs:         &cache.LRU[ids.ID, string]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
 	}, nil
@@ -180,10 +186,6 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) HasTxs() bool {
-	return m.unissuedTxs.Len() > 0
-}
-
 func (m *mempool) Peek(maxTxSize int) *txs.Tx {
 	txIter := m.unissuedTxs.NewIterator()
 	for txIter.Next() {
@@ -194,6 +196,17 @@ func (m *mempool) Peek(maxTxSize int) *txs.Tx {
 		}
 	}
 	return nil
+}
+
+func (m *mempool) RequestBuildBlock() {
+	if m.unissuedTxs.Len() == 0 {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason string) {

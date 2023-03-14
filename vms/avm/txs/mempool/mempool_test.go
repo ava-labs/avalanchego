@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -32,7 +33,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempoolIntf, err := New("mempool", registerer)
+	mempoolIntf, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	mempool := mempoolIntf.(*mempool)
@@ -57,13 +58,18 @@ func TestTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer)
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
 	require.NoError(err)
 
 	testTxs := createTestTxs(2)
 
-	// txs must not already there before we start
-	require.False(mempool.HasTxs())
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+		t.Fatalf("should not have sent message to engine")
+	default:
+	}
 
 	for _, tx := range testTxs {
 		txID := tx.ID()
@@ -91,6 +97,22 @@ func TestTxsInMempool(t *testing.T) {
 
 		// we can reinsert it again to grow the mempool
 		require.NoError(mempool.Add(tx))
+	}
+
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+	default:
+		t.Fatalf("should have sent message to engine")
+	}
+
+	mempool.Remove(testTxs)
+
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+		t.Fatalf("should not have sent message to engine")
+	default:
 	}
 }
 
