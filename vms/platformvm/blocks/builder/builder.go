@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -42,7 +43,8 @@ var (
 type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
-	Network
+
+	Dispatch(gossipper network.Gossipper)
 
 	// set preferred block on top of which we'll build next
 	SetPreference(blockID ids.ID)
@@ -64,7 +66,8 @@ type Builder interface {
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
 	mempool.Mempool
-	Network
+
+	gossipper network.Gossipper
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
@@ -88,7 +91,6 @@ func New(
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
-	appSender common.AppSender,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
@@ -98,16 +100,14 @@ func New(
 		toEngine:          toEngine,
 	}
 
-	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
-
-	builder.Network = NewNetwork(
-		txExecutorBackend.Ctx,
-		builder,
-		appSender,
-	)
-
-	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
+}
+
+func (b *builder) Dispatch(gossipper network.Gossipper) {
+	b.gossipper = gossipper
+	b.timer = timer.NewTimer(b.setNextBuildBlockTime)
+
+	go b.txExecutorBackend.Ctx.Log.RecoverAndPanic(b.timer.Dispatch)
 }
 
 func (b *builder) SetPreference(blockID ids.ID) {
@@ -150,7 +150,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	if err := b.Mempool.Add(tx); err != nil {
 		return err
 	}
-	return b.GossipTx(tx)
+	return b.gossipper.GossipTx(tx)
 }
 
 // BuildBlock builds a block to be added to consensus.

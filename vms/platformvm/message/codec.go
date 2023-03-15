@@ -25,7 +25,7 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		lc.RegisterType(&Tx{}),
+		lc.RegisterType(&TxGossip{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {

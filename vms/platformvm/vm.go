@@ -41,7 +41,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/handlers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -77,6 +79,8 @@ type VM struct {
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
+
+	network.Network
 
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
@@ -212,8 +216,10 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		vm.manager,
 		toEngine,
-		appSender,
 	)
+	gossipHandler := handlers.NewGossipHandler(vm.ctx, vm.Builder)
+	vm.Network = network.NewNetwork(vm.ctx, appSender, gossipHandler)
+	vm.Builder.Dispatch(vm.Network)
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {

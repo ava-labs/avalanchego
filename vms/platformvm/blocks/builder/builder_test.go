@@ -12,8 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -21,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -30,12 +34,26 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(t, err)
+	return tx
+}
+
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -45,9 +63,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	env.sender.SendAppGossipF = func(context.Context, []byte) error {
-		return nil
-	}
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
 
@@ -70,7 +85,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -103,7 +118,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t)
+	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}
@@ -679,4 +694,70 @@ func TestBuildBlock(t *testing.T) {
 			require.EqualValues(tt.expectedBlkF(require), gotBlk)
 		})
 	}
+}
+
+func TestAtomicTxImports(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	utxoID := avax.UTXOID{
+		TxID:        ids.Empty.Prefix(1),
+		OutputIndex: 1,
+	}
+	amount := uint64(70000)
+	recipientKey := preFundedKeys[1]
+
+	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
+
+	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	require.NoError(err)
+
+	inputID := utxo.InputID()
+	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
+			Key:   inputID[:],
+			Value: utxoBytes,
+			Traits: [][]byte{
+				recipientKey.PublicKey().Address().Bytes(),
+			},
+		}}},
+	})
+	require.NoError(err)
+
+	tx, err := env.txBuilder.NewImportTx(
+		env.ctx.XChainID,
+		recipientKey.PublicKey().Address(),
+		[]*secp256k1.PrivateKey{recipientKey},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	require.NoError(env.Builder.Add(tx))
+	b, err := env.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	// Test multiple verify calls work
+	require.NoError(b.Verify(context.Background()))
+	require.NoError(b.Accept(context.Background()))
+	_, txStatus, err := env.state.GetTx(tx.ID())
+	require.NoError(err)
+	// Ensure transaction is in the committed state
+	require.Equal(txStatus, status.Committed)
 }

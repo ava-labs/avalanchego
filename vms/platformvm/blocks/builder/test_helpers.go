@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -91,7 +89,6 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
-	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -108,7 +105,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment() *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
@@ -162,7 +159,6 @@ func newEnvironment(t *testing.T) *environment {
 			TTL:     recentlyAcceptedWindowTTL,
 		},
 	)
-	res.sender = &common.SenderTest{T: t}
 
 	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
 	if err != nil {
@@ -187,9 +183,9 @@ func newEnvironment(t *testing.T) *environment {
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
 	)
 
+	res.Dispatch(&noopGossiper{})
 	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
@@ -462,4 +458,10 @@ func shutdownEnvironment(env *environment) error {
 		env.baseDB.Close(),
 	)
 	return errs.Err
+}
+
+type noopGossiper struct{}
+
+func (*noopGossiper) GossipTx(*txs.Tx) error {
+	return nil
 }

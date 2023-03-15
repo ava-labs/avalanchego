@@ -16,7 +16,7 @@ func TestTx(t *testing.T) {
 	require := require.New(t)
 
 	tx := utils.RandomBytes(256 * units.KiB)
-	builtMsg := Tx{
+	builtMsg := TxGossip{
 		Tx: tx,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
@@ -27,7 +27,7 @@ func TestTx(t *testing.T) {
 	require.NoError(err)
 	require.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*Tx)
+	parsedMsg, ok := parsedMsgIntf.(*TxGossip)
 	require.True(ok)
 
 	require.Equal(tx, parsedMsg.Tx)

@@ -10,20 +10,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Handler = NoopHandler{}
+var _ GossipHandler = NoopGossipHandler{}
 
-type Handler interface {
-	HandleTx(nodeID ids.NodeID, requestID uint32, msg *Tx) error
+// GossipHandler handles incoming gossip messages
+type GossipHandler interface {
+	HandleTx(nodeID ids.NodeID, msg *TxGossip) error
 }
 
-type NoopHandler struct {
+type NoopGossipHandler struct {
 	Log logging.Logger
 }
 
-func (h NoopHandler) HandleTx(nodeID ids.NodeID, requestID uint32, _ *Tx) error {
+func (h NoopGossipHandler) HandleTx(nodeID ids.NodeID, _ *TxGossip) error {
 	h.Log.Debug("dropping unexpected Tx message",
 		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
 	)
 	return nil
 }
