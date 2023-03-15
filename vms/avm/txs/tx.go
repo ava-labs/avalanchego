@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -13,15 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var errNilTx = errors.New("nil tx is not valid")
 
 type UnsignedTx interface {
 	snow.ContextInitializable
@@ -38,13 +34,6 @@ type UnsignedTx interface {
 	// TODO: deprecate after x-chain linearization
 	InputUTXOs() []*avax.UTXOID
 
-	SyntacticVerify(
-		ctx *snow.Context,
-		c codec.Manager,
-		txFeeAssetID ids.ID,
-		config *config.Config,
-		numFxs int,
-	) error
 	// Visit calls [visitor] with this transaction's concrete type
 	Visit(visitor Visitor) error
 }
@@ -101,37 +90,6 @@ func (t *Tx) UTXOs() []*avax.UTXO {
 	// returned from the utxoGetter.
 	_ = t.Unsigned.Visit(&u)
 	return u.utxos
-}
-
-// SyntacticVerify verifies that this transaction is well-formed.
-func (t *Tx) SyntacticVerify(
-	ctx *snow.Context,
-	c codec.Manager,
-	txFeeAssetID ids.ID,
-	config *config.Config,
-	numFxs int,
-) error {
-	if t == nil || t.Unsigned == nil {
-		return errNilTx
-	}
-
-	if err := t.Unsigned.SyntacticVerify(ctx, c, txFeeAssetID, config, numFxs); err != nil {
-		return err
-	}
-
-	for _, cred := range t.Creds {
-		if err := cred.Verify(); err != nil {
-			return err
-		}
-	}
-
-	if numCreds := t.Unsigned.NumCredentials(); numCreds != len(t.Creds) {
-		return fmt.Errorf("tx has %d credentials but %d inputs. Should be same",
-			len(t.Creds),
-			numCreds,
-		)
-	}
-	return nil
 }
 
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {

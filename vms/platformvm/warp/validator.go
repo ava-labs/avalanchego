@@ -49,7 +49,7 @@ func GetCanonicalValidatorSet(
 	// Get the validator set at the given height.
 	vdrSet, err := pChainState.GetValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to fetch validator set (P-Chain Height: %d, SubnetID: %s): %w", pChainHeight, subnetID, err)
 	}
 
 	var (
@@ -97,7 +97,7 @@ func FilterValidators(
 	// Verify that all alleged signers exist
 	if indices.BitLen() > len(vdrs) {
 		return nil, fmt.Errorf(
-			"%w: %d >= %d",
+			"%w: NumIndices (%d) >= NumFilteredValidators (%d)",
 			ErrUnknownValidator,
 			indices.BitLen()-1, // -1 to convert from length to index
 			len(vdrs),

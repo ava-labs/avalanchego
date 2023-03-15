@@ -4,20 +4,13 @@
 package txs
 
 import (
-	"errors"
-
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	errNoImportInputs = errors.New("no import inputs")
-
 	_ UnsignedTx             = (*ImportTx)(nil)
 	_ secp256k1fx.UnsignedTx = (*ImportTx)(nil)
 )
@@ -72,39 +65,6 @@ func (t *ImportTx) AssetIDs() set.Set[ids.ID] {
 // NumCredentials returns the number of expected credentials
 func (t *ImportTx) NumCredentials() int {
 	return t.BaseTx.NumCredentials() + len(t.ImportedIns)
-}
-
-// SyntacticVerify that this import transaction is well-formed.
-func (t *ImportTx) SyntacticVerify(
-	ctx *snow.Context,
-	c codec.Manager,
-	txFeeAssetID ids.ID,
-	config *config.Config,
-	_ int,
-) error {
-	switch {
-	case t == nil:
-		return errNilTx
-	case len(t.ImportedIns) == 0:
-		return errNoImportInputs
-	}
-
-	// We don't call [t.BaseTx.SyntacticVerify] because the flow check performed
-	// here is less strict than the flow check performed in the [BaseTx].
-	if err := t.BaseTx.BaseTx.Verify(ctx); err != nil {
-		return err
-	}
-
-	return avax.VerifyTx(
-		config.TxFee,
-		txFeeAssetID,
-		[][]*avax.TransferableInput{
-			t.Ins,
-			t.ImportedIns,
-		},
-		[][]*avax.TransferableOutput{t.Outs},
-		c,
-	)
 }
 
 func (t *ImportTx) Visit(v Visitor) error {

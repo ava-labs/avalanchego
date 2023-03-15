@@ -68,6 +68,7 @@ type Server struct {
 	subscribedConnections *connections
 }
 
+// Deprecated: The pubsub server is deprecated.
 func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,

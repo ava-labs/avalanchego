@@ -14,6 +14,9 @@ import (
 var _ Client = (*client)(nil)
 
 // Client interface for Avalanche Keystore API Endpoint
+//
+// Deprecated: The Keystore API is deprecated. Dedicated wallets should be used
+// instead.
 type Client interface {
 	CreateUser(context.Context, api.UserPass, ...rpc.Option) error
 	// Returns the usernames of all keystore users
@@ -31,6 +34,8 @@ type client struct {
 	requester rpc.EndpointRequester
 }
 
+// Deprecated: The Keystore API is deprecated. Dedicated wallets should be used
+// instead.
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
 		uri + "/ext/keystore",
