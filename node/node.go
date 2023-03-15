@@ -862,7 +862,7 @@ func (n *Node) initKeystoreAPI() error {
 		n.Log.Info("skipping keystore API initialization because it has been disabled")
 		return nil
 	}
-	n.Log.Info("initializing keystore API")
+	n.Log.Warn("initializing deprecated keystore API")
 	handler := &common.HTTPHandler{
 		LockOptions: common.NoLock,
 		Handler:     keystoreHandler,
@@ -1120,7 +1120,7 @@ func (n *Node) initIPCAPI() error {
 		n.Log.Info("skipping ipc API initialization because it has been disabled")
 		return nil
 	}
-	n.Log.Info("initializing ipc API")
+	n.Log.Warn("initializing deprecated ipc API")
 	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.APIServer, n.IPCs)
 	if err != nil {
 		return err

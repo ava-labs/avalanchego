@@ -659,8 +659,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.Error(err)
 
 	txID := statelessBlk.Txs()[0].ID()
-	_, dropped := vm.Builder.GetDropReason(txID)
-	require.True(dropped)
+	reason := vm.Builder.GetDropReason(txID)
+	require.Error(reason)
 }
 
 // Reject attempt to add validator to primary network

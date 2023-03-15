@@ -784,7 +784,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			nil,
 			nodeID,
-			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -810,7 +809,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			nil,
 			nodeID,
-			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -837,7 +835,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			nil,
 			nil,
 			nodeID,
-			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}

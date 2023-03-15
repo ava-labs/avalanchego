@@ -91,12 +91,11 @@ func (mr *MockMempoolMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // GetDropReason mocks base method.
-func (m *MockMempool) GetDropReason(arg0 ids.ID) (string, bool) {
+func (m *MockMempool) GetDropReason(arg0 ids.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDropReason", arg0)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // GetDropReason indicates an expected call of GetDropReason.
@@ -148,7 +147,7 @@ func (mr *MockMempoolMockRecorder) HasTxs() *gomock.Call {
 }
 
 // MarkDropped mocks base method.
-func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 string) {
+func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 error) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "MarkDropped", arg0, arg1)
 }

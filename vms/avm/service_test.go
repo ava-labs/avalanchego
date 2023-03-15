@@ -1559,7 +1559,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 			Ins: []*avax.TransferableInput{{
@@ -1595,7 +1595,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
+				NetworkID:    constants.UnitTestID,
 				BlockchainID: chainID,
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
@@ -1627,7 +1627,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 func buildCreateAssetTx(key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -1766,7 +1766,7 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: op,
