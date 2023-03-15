@@ -79,7 +79,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
 	GetAccepted(
@@ -94,7 +93,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
 	GetAncestors(
@@ -109,7 +107,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
-		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
 	Get(
@@ -148,7 +145,6 @@ type OutboundMsgBuilder interface {
 		requestID uint32,
 		preferredContainerIDs []ids.ID,
 		acceptedContainerIDs []ids.ID,
-		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
 	AppRequest(
@@ -395,7 +391,6 @@ func (b *outMsgBuilder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -406,7 +401,6 @@ func (b *outMsgBuilder) AcceptedFrontier(
 					ChainId:      chainID[:],
 					RequestId:    requestID,
 					ContainerIds: containerIDBytes,
-					EngineType:   engineType,
 				},
 			},
 		},
@@ -445,7 +439,6 @@ func (b *outMsgBuilder) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -456,7 +449,6 @@ func (b *outMsgBuilder) Accepted(
 					ChainId:      chainID[:],
 					RequestId:    requestID,
 					ContainerIds: containerIDBytes,
-					EngineType:   engineType,
 				},
 			},
 		},
@@ -493,7 +485,6 @@ func (b *outMsgBuilder) Ancestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
-	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -502,7 +493,6 @@ func (b *outMsgBuilder) Ancestors(
 					ChainId:    chainID[:],
 					RequestId:  requestID,
 					Containers: containers,
-					EngineType: engineType,
 				},
 			},
 		},
@@ -610,7 +600,6 @@ func (b *outMsgBuilder) Chits(
 	requestID uint32,
 	preferredContainerIDs []ids.ID,
 	acceptedContainerIDs []ids.ID,
-	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
 	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
@@ -624,7 +613,6 @@ func (b *outMsgBuilder) Chits(
 					RequestId:             requestID,
 					PreferredContainerIds: preferredContainerIDBytes,
 					AcceptedContainerIds:  acceptedContainerIDBytes,
-					EngineType:            engineType,
 				},
 			},
 		},
