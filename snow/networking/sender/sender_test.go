@@ -980,7 +980,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
-					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -991,7 +990,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1012,7 +1010,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
-					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1023,7 +1020,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
