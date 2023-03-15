@@ -715,32 +715,6 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
-	// create bootstrap gear
-	bootstrapperConfig := avbootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       vtxManager,
-		VM:            vm,
-	}
-	bootstrapper, err := avbootstrap.New(
-		context.TODO(),
-		bootstrapperConfig,
-		func(ctx context.Context, lastReqID uint32) error {
-			return handler.Consensus().Start(ctx, lastReqID+1)
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
-	}
-
-	if m.TracingEnabled {
-		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
-	}
-
-	handler.SetBootstrapper(bootstrapper)
-
 	var consensus avcon.Consensus = &avcon.Topological{}
 	if m.TracingEnabled {
 		consensus = avcon.Trace(consensus, m.Tracer)
@@ -748,11 +722,11 @@ func (m *manager) createAvalancheChain(
 
 	// create engine gear
 	engineConfig := aveng.Config{
-		Ctx:           bootstrapperConfig.Ctx,
+		Ctx:           ctx,
 		AllGetsServer: avaGetHandler,
-		VM:            bootstrapperConfig.VM,
+		VM:            vm,
 		Manager:       vtxManager,
-		Sender:        bootstrapperConfig.Sender,
+		Sender:        messageSender,
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
@@ -767,6 +741,30 @@ func (m *manager) createAvalancheChain(
 	}
 
 	handler.SetConsensus(engine)
+
+	// create bootstrap gear
+	bootstrapperConfig := avbootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: avaGetHandler,
+		VtxBlocked:    vtxBlocker,
+		TxBlocked:     txBlocker,
+		Manager:       vtxManager,
+		VM:            vm,
+	}
+	bootstrapper, err := avbootstrap.New(
+		context.TODO(),
+		bootstrapperConfig,
+		engine.Start,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
+	}
+
+	if m.TracingEnabled {
+		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
+	}
+
+	handler.SetBootstrapper(bootstrapper)
 
 	// Register health check for this chain
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
