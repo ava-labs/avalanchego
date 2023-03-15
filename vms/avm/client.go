@@ -26,10 +26,14 @@ var _ Client = (*client)(nil)
 type Client interface {
 	WalletClient
 	// GetTxStatus returns the status of [txID]
+	//
+	// TODO: deprecate GetTxStatus after the linearization.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client
 	//       returns a decided status.
+	// TODO: Move this function off of the Client interface into a utility
+	// function.
 	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
@@ -59,10 +63,17 @@ type Client interface {
 	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
+	//
+	// Deprecated: GetUTXOs should be used instead.
 	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
+	//
+	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
 	// CreateAsset creates a new asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -76,6 +87,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateFixedCapAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -88,6 +102,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateVariableCapAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -100,6 +117,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateNFTAsset creates a new NFT asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateNFTAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -111,14 +131,25 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateAddress creates a new address controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns all addresses on this chain controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error)
 	// ImportKey imports [privateKey] to [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	ImportKey(ctx context.Context, user api.UserPass, privateKey *secp256k1.PrivateKey, options ...rpc.Option) (ids.ShortID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Mint(
 		ctx context.Context,
 		user api.UserPass,
@@ -130,6 +161,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendNFT sends an NFT and returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	SendNFT(
 		ctx context.Context,
 		user api.UserPass,
@@ -141,6 +175,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	MintNFT(
 		ctx context.Context,
 		user api.UserPass,
@@ -153,9 +190,15 @@ type Client interface {
 	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Export(
 		ctx context.Context,
 		user api.UserPass,

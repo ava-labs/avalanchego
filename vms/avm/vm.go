@@ -246,7 +246,7 @@ func (vm *VM) Initialize(
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Info("address transaction indexing is enabled")
+		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
 		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", registerer, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
