@@ -497,7 +497,6 @@ func TestMessage(t *testing.T) {
 						ChainId:    testID[:],
 						RequestId:  12345,
 						Containers: compressibleContainers,
-						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
