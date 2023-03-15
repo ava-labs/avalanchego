@@ -193,10 +193,11 @@ message GetAcceptedFrontier {
 //
 // See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
 message AcceptedFrontier {
+  reserved 4; // Until Cortina upgrade is activated
+
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes container_ids = 3;
-  EngineType engine_type = 4;
 }
 
 // Message to request for the accepted blocks/vertices of the "remote" peer.
@@ -222,10 +223,11 @@ message GetAccepted {
 // See "snow/engine/avalanche#GetAccepted" and "SendAccepted".
 // See "snow/engine/common/bootstrapper.go#Accepted".
 message Accepted {
+  reserved 4; // Until Cortina upgrade is activated
+
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes container_ids = 3;
-  EngineType engine_type = 4;
 }
 
 // Message that requests for the ancestors (parents) of the specified container ID.
@@ -248,10 +250,11 @@ message GetAncestors {
 // On receiving "ancestors", the engine parses the containers and queues them
 // to be accepted once we've received the entire chain history.
 message Ancestors {
+  reserved 4; // Until Cortina upgrade is activated
+
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes containers = 3;
-  EngineType engine_type = 4;
 }
 
 // Message that requests for the container data.
@@ -274,8 +277,6 @@ message Put {
   uint32 request_id = 2;
   bytes container = 3;
   EngineType engine_type = 4;
-
-  // NOTE: "container_id" is deprecated in packer based serializer
 }
 
 // Message that contains a preferred container ID and its container bytes
@@ -293,8 +294,6 @@ message PushQuery {
   uint64 deadline = 3;
   bytes container = 4;
   EngineType engine_type = 5;
-
-  // NOTE: "container_id" is deprecated in packer based serializer
 }
 
 // Message that contains a preferred container ID to query other peers
@@ -317,6 +316,8 @@ message PullQuery {
 // to the consensus. If the received container is not found, it responds back with
 // "get" message to fetch the missing container from the remote peer.
 message Chits {
+  reserved 5; // Until Cortina upgrade is activated
+
   bytes chain_id = 1;
   uint32 request_id = 2;
   // Represents the current preferred frontier.
@@ -325,7 +326,6 @@ message Chits {
   // Represents the current accepted frontier.
   // TODO: Remove `repeated` once all chains are running Snowman.
   repeated bytes accepted_container_ids = 4;
-  EngineType engine_type = 5;
 }
 
 message AppRequest {

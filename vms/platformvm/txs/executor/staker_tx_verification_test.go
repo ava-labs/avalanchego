@@ -657,7 +657,7 @@ func TestGetValidatorRules(t *testing.T) {
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getValidatorRules(tt.backend, chainState, tt.subnetID)
 			if tt.expectedErr != nil {
-				require.ErrorIs(tt.expectedErr, err)
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.NoError(err)
@@ -776,7 +776,7 @@ func TestGetDelegatorRules(t *testing.T) {
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getDelegatorRules(tt.backend, chainState, tt.subnetID)
 			if tt.expectedErr != nil {
-				require.ErrorIs(tt.expectedErr, err)
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.NoError(err)

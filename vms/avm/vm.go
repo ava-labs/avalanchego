@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -241,8 +241,7 @@ func (vm *VM) Initialize(
 		Size: txDeduplicatorSize,
 	}
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
-	vm.walletService.pendingTxOrdering = list.New()
+	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
