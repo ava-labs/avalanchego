@@ -9,7 +9,6 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	stdjson "encoding/json"
 
@@ -48,10 +47,9 @@ import (
 )
 
 var (
-	chainID       = ids.ID{5, 4, 3, 2, 1}
-	testTxFee     = uint64(1000)
-	testBanffTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
-	startBalance  = uint64(50000)
+	chainID      = ids.ID{5, 4, 3, 2, 1}
+	testTxFee    = uint64(1000)
+	startBalance = uint64(50000)
 
 	keys  []*secp256k1.PrivateKey
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]

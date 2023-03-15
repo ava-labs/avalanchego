@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -33,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -42,11 +42,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -119,6 +119,9 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
+
+	txBackend *executor.Backend
+	dagState  *dagState
 }
 
 func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
@@ -240,12 +243,11 @@ func (vm *VM) Initialize(
 		Size: txDeduplicatorSize,
 	}
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
-	vm.walletService.pendingTxOrdering = list.New()
+	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Info("address transaction indexing is enabled")
+		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
 		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", registerer, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
@@ -257,6 +259,21 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
+
+	vm.txBackend = &executor.Backend{
+		Ctx:           ctx,
+		Config:        &vm.Config,
+		Fxs:           vm.fxs,
+		TypeToFxIndex: vm.typeToFxIndex,
+		Codec:         vm.parser.Codec(),
+		FeeAssetID:    vm.feeAssetID,
+		VMState:       &vm.vmState,
+	}
+	vm.dagState = &dagState{
+		Chain: vm.state,
+		vm:    vm,
+	}
+
 	return vm.state.Commit()
 }
 
@@ -582,129 +599,6 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	case len(vm.txs) == 1:
 		vm.timer.SetTimeoutIn(vm.batchTimeout)
 	}
-}
-
-func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
-	inputID := utxoID.InputID()
-	utxo, err := vm.state.GetUTXO(inputID)
-	if err == nil {
-		return utxo, nil
-	}
-
-	inputTx, inputIndex := utxoID.InputSource()
-	parent := UniqueTx{
-		vm:   vm,
-		txID: inputTx,
-	}
-
-	if err := parent.verifyWithoutCacheWrites(); err != nil {
-		return nil, errMissingUTXO
-	} else if status := parent.Status(); status.Decided() {
-		return nil, errMissingUTXO
-	}
-
-	parentUTXOs := parent.UTXOs()
-	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-		return nil, errInvalidUTXO
-	}
-	return parentUTXOs[int(inputIndex)], nil
-}
-
-func (vm *VM) getFx(val interface{}) (int, error) {
-	valType := reflect.TypeOf(val)
-	fx, exists := vm.typeToFxIndex[valType]
-	if !exists {
-		return 0, errUnknownFx
-	}
-	return fx, nil
-}
-
-func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
-	// Check cache to see whether this asset supports this fx
-	if fxIDs, ok := vm.assetToFxCache.Get(assetID); ok {
-		return fxIDs.Contains(uint(fxID))
-	}
-	// Caches doesn't say whether this asset support this fx.
-	// Get the tx that created the asset and check.
-	tx := &UniqueTx{
-		vm:   vm,
-		txID: assetID,
-	}
-	if status := tx.Status(); !status.Fetched() {
-		return false
-	}
-	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
-	if !ok {
-		// This transaction was not an asset creation tx
-		return false
-	}
-	fxIDs := set.Bits64(0)
-	for _, state := range createAssetTx.States {
-		if state.FxIndex == uint32(fxID) {
-			// Cache that this asset supports this fx
-			fxIDs.Add(uint(fxID))
-		}
-	}
-	vm.assetToFxCache.Put(assetID, fxIDs)
-	return fxIDs.Contains(uint(fxID))
-}
-
-func (vm *VM) verifyTransferOfUTXO(utx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
-	fxIndex, err := vm.getFx(cred)
-	if err != nil {
-		return err
-	}
-	fx := vm.fxs[fxIndex].Fx
-
-	utxoAssetID := utxo.AssetID()
-	inAssetID := in.AssetID()
-	if utxoAssetID != inAssetID {
-		return errAssetIDMismatch
-	}
-
-	if !vm.verifyFxUsage(fxIndex, inAssetID) {
-		return errIncompatibleFx
-	}
-
-	return fx.VerifyTransfer(utx, in.In, cred, utxo.Out)
-}
-
-func (vm *VM) verifyTransfer(tx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
-	utxo, err := vm.getUTXO(&in.UTXOID)
-	if err != nil {
-		return err
-	}
-	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
-}
-
-func (vm *VM) verifyOperation(tx *txs.OperationTx, op *txs.Operation, cred verify.Verifiable) error {
-	opAssetID := op.AssetID()
-
-	numUTXOs := len(op.UTXOIDs)
-	utxos := make([]interface{}, numUTXOs)
-	for i, utxoID := range op.UTXOIDs {
-		utxo, err := vm.getUTXO(utxoID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		if utxoAssetID != opAssetID {
-			return errAssetIDMismatch
-		}
-		utxos[i] = utxo.Out
-	}
-
-	fxIndex, err := vm.getFx(op.Op)
-	if err != nil {
-		return err
-	}
-	fx := vm.fxs[fxIndex].Fx
-
-	if !vm.verifyFxUsage(fxIndex, opAssetID) {
-		return errIncompatibleFx
-	}
-	return fx.VerifyOperation(tx, op.Op, cred, utxos)
 }
 
 // LoadUser returns:

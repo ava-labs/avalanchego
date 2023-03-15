@@ -6,6 +6,8 @@ package health
 import (
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,21 +24,30 @@ type APIReply struct {
 
 // Readiness returns if the node has finished initialization
 func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIReply) error {
-	s.log.Debug("Health.readiness called")
+	s.log.Debug("API called",
+		zap.String("service", "health"),
+		zap.String("method", "readiness"),
+	)
 	reply.Checks, reply.Healthy = s.health.Readiness()
 	return nil
 }
 
 // Health returns a summation of the health of the node
 func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIReply) error {
-	s.log.Debug("Health.health called")
+	s.log.Debug("API called",
+		zap.String("service", "health"),
+		zap.String("method", "health"),
+	)
 	reply.Checks, reply.Healthy = s.health.Health()
 	return nil
 }
 
 // Liveness returns if the node is in need of a restart
 func (s *Service) Liveness(_ *http.Request, _ *struct{}, reply *APIReply) error {
-	s.log.Debug("Health.liveness called")
+	s.log.Debug("API called",
+		zap.String("service", "health"),
+		zap.String("method", "liveness"),
+	)
 	reply.Checks, reply.Healthy = s.health.Liveness()
 	return nil
 }

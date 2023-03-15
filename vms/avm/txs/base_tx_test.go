@@ -4,8 +4,6 @@
 package txs
 
 import (
-	"bytes"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,18 +11,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var TestConfig = config.Config{
-	TxFee:            0,
-	CreateAssetTxFee: 0,
-}
+var (
+	chainID = ids.ID{5, 4, 3, 2, 1}
+	assetID = ids.ID{1, 2, 3}
+	keys    = secp256k1.TestKeys()
+)
 
 func TestBaseTxSerialization(t *testing.T) {
+	require := require.New(t)
+
 	expected := []byte{
 		// Codec version:
 		0x00, 0x00,
@@ -124,15 +125,16 @@ func TestBaseTxSerialization(t *testing.T) {
 		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}}
 
-	c := setupCodec()
-	if err := tx.Initialize(c); err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
+	parser, err := NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	require.NoError(err)
+
+	require.NoError(parser.InitializeTx(tx))
+	require.Equal(tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
+
 	result := tx.Bytes()
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.Equal(expected, result)
 
 	credBytes := []byte{
 		// type id
@@ -183,21 +185,28 @@ func TestBaseTxSerialization(t *testing.T) {
 		0x5d, 0x73, 0x6d, 0x94, 0xfc, 0x80, 0xbc, 0x73, 0x5f, 0x51,
 		0xc8, 0x06, 0xd7, 0x43, 0x00,
 	}
-	if err := tx.SignSECP256K1Fx(c, [][]*secp256k1.PrivateKey{{keys[0], keys[0]}, {keys[0], keys[0]}}); err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, tx.ID().String(), "QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV")
-	result = tx.Bytes()
+
+	err = tx.SignSECP256K1Fx(
+		parser.Codec(),
+		[][]*secp256k1.PrivateKey{
+			{keys[0], keys[0]},
+			{keys[0], keys[0]},
+		},
+	)
+	require.NoError(err)
+	require.Equal(tx.ID().String(), "QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV")
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
 	expected = append(expected, credBytes...)
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+
+	result = tx.Bytes()
+	require.Equal(expected, result)
 }
 
 func TestBaseTxGetters(t *testing.T) {
+	require := require.New(t)
+
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
@@ -213,12 +222,7 @@ func TestBaseTxGetters(t *testing.T) {
 		}},
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
+				TxID:        ids.GenerateTestID(),
 				OutputIndex: 1,
 			},
 			Asset: avax.Asset{ID: assetID},
@@ -231,471 +235,19 @@ func TestBaseTxGetters(t *testing.T) {
 		}},
 	}}
 
-	if assets := tx.AssetIDs(); assets.Len() != 1 {
-		t.Fatalf("Wrong number of assets returned")
-	} else if !assets.Contains(assetID) {
-		t.Fatalf("Wrong asset returned")
-	} else if assets := tx.ConsumedAssetIDs(); assets.Len() != 1 {
-		t.Fatalf("Wrong number of consumed assets returned")
-	} else if !assets.Contains(assetID) {
-		t.Fatalf("Wrong consumed asset returned")
-	}
-}
+	assets := tx.AssetIDs()
+	require.Len(assets, 1)
+	require.Contains(assets, assetID)
 
-func TestBaseTxSyntacticVerify(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-		Memo: make([]byte, avax.MaxMemoSize+1),
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatal("should have failed because memo is too large")
-	}
-}
-
-func TestBaseTxSyntacticVerifyNil(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := (*BaseTx)(nil)
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Nil BaseTx should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID + 1,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Wrong networkID should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID.Prefix(0),
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Wrong chain ID should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs:         []*avax.TransferableOutput{nil},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Invalid output should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 2,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-			},
-			{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-			},
-		},
-		Ins: []*avax.TransferableInput{
-			{
-				UTXOID: avax.UTXOID{
-					TxID: ids.ID{
-						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-						0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-						0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-					},
-					OutputIndex: 1,
-				},
-				Asset: avax.Asset{ID: assetID},
-				In: &secp256k1fx.TransferInput{
-					Amt: 54321,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{2},
-					},
-				},
-			},
-		},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Unsorted outputs should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{nil},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Invalid input should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{
-			{
-				UTXOID: avax.UTXOID{
-					TxID: ids.ID{
-						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-						0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-						0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-					},
-					OutputIndex: 0,
-				},
-				Asset: avax.Asset{ID: assetID},
-				In: &secp256k1fx.TransferInput{
-					Amt: math.MaxUint64,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{2},
-					},
-				},
-			},
-			{
-				UTXOID: avax.UTXOID{
-					TxID: ids.ID{
-						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-						0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-						0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-					},
-					OutputIndex: 1,
-				},
-				Asset: avax.Asset{ID: assetID},
-				In: &secp256k1fx.TransferInput{
-					Amt: 1,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{2},
-					},
-				},
-			},
-		},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Input overflow should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 2,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-			},
-			{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: math.MaxUint64,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
-				},
-			},
-		},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 1,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Output overflow should have erred")
-	}
-}
-
-func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
-	ctx := NewContext(t)
-	c := setupCodec()
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: math.MaxUint64,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID: ids.ID{
-					0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
-					0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-					0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
-					0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-				},
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 1,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &TestConfig, 0); err == nil {
-		t.Fatalf("Insufficient funds should have erred")
-	}
+	consumedAssets := tx.ConsumedAssetIDs()
+	require.Len(consumedAssets, 1)
+	require.Contains(consumedAssets, assetID)
 }
 
 func TestBaseTxNotState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&BaseTx{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok, "should not be marked as state")
 }

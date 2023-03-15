@@ -6,6 +6,8 @@ package auth
 import (
 	"net/http"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api"
 )
 
@@ -33,7 +35,10 @@ type Token struct {
 }
 
 func (s *Service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
-	s.auth.log.Debug("Auth: NewToken called")
+	s.auth.log.Debug("API called",
+		zap.String("service", "auth"),
+		zap.String("method", "newToken"),
+	)
 
 	var err error
 	reply.Token, err = s.auth.NewToken(args.Password.Password, defaultTokenLifespan, args.Endpoints)
@@ -46,7 +51,10 @@ type RevokeTokenArgs struct {
 }
 
 func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, _ *api.EmptyReply) error {
-	s.auth.log.Debug("Auth: RevokeToken called")
+	s.auth.log.Debug("API called",
+		zap.String("service", "auth"),
+		zap.String("method", "revokeToken"),
+	)
 
 	return s.auth.RevokeToken(args.Token.Token, args.Password.Password)
 }
@@ -57,7 +65,10 @@ type ChangePasswordArgs struct {
 }
 
 func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, _ *api.EmptyReply) error {
-	s.auth.log.Debug("Auth: ChangePassword called")
+	s.auth.log.Debug("API called",
+		zap.String("service", "auth"),
+		zap.String("method", "changePassword"),
+	)
 
 	return s.auth.ChangePassword(args.OldPassword, args.NewPassword)
 }
