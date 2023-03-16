@@ -178,6 +178,7 @@ pub trait WALFile {
     /// Read data with offset. Return `Ok(None)` when it reaches EOF.
     async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, ()>;
     /// Truncate a file to a specified length.
+    #[allow(clippy::result_unit_err)]
     fn truncate(&self, length: usize) -> Result<(), ()>;
 }
 
@@ -191,6 +192,7 @@ pub trait WALStore {
     async fn remove_file(&self, filename: String) -> Result<(), ()>;
     /// Enumerate all WAL filenames. It should include all WAL files that are previously opened
     /// (created) but not removed. The list could be unordered.
+    #[allow(clippy::result_unit_err)]
     fn enumerate_files(&self) -> Result<Self::FileNameIter, ()>;
 }
 
@@ -221,8 +223,11 @@ struct WALFilePool<F: WALStore> {
     store: F,
     header_file: Box<dyn WALFile>,
     handle_cache: RefCell<lru::LruCache<WALFileId, Box<dyn WALFile>>>,
+    #[allow(clippy::type_complexity)]
     handle_used: RefCell<HashMap<WALFileId, UnsafeCell<(Box<dyn WALFile>, usize)>>>,
+    #[allow(clippy::type_complexity)]
     last_write: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), ()>>>>>>,
+    #[allow(clippy::type_complexity)]
     last_peel: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), ()>>>>>>,
     file_nbit: u64,
     file_size: u64,
@@ -267,7 +272,9 @@ impl<F: WALStore> WALFilePool<F> {
         Ok(())
     }
 
-    async fn get_file<'a>(&'a self, fid: u64, touch: bool) -> Result<WALFileHandle<'a, F>, ()> {
+    #[allow(clippy::await_holding_refcell_ref)]
+    // TODO: Refactor to remove mutable reference from being awaited.
+    async fn get_file(&self, fid: u64, touch: bool) -> Result<WALFileHandle<F>, ()> {
         let pool = self as *const WALFilePool<F>;
         if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
             let handle = match self.handle_used.borrow_mut().entry(fid) {
@@ -312,6 +319,7 @@ impl<F: WALStore> WALFilePool<F> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn write<'a>(
         &'a mut self,
         writes: Vec<(WALPos, WALBytes)>,
@@ -388,6 +396,7 @@ impl<F: WALStore> WALFilePool<F> {
         res
     }
 
+    #[allow(clippy::type_complexity)]
     fn remove_files<'a>(
         &'a mut self,
         state: &mut WALState,
@@ -612,8 +621,8 @@ impl<F: WALStore> WALWriter<F> {
     /// remove obsolete WAL files. The given list of `WALRingId` does not need to be ordered and
     /// could be of arbitrary length. Use `0` for `keep_nrecords` if all obsolete WAL files
     /// need to removed (the obsolete files do not affect the speed of recovery or correctness).
-    pub async fn peel<'a, T: AsRef<[WALRingId]>>(
-        &'a mut self,
+    pub async fn peel<T: AsRef<[WALRingId]>>(
+        &mut self,
         records: T,
         keep_nrecords: u32,
     ) -> Result<(), ()> {
@@ -815,6 +824,8 @@ impl WALLoader {
         Self::verify_checksum_(data, checksum, &self.recover_policy)
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
+    // TODO: Refactor to a more safe solution.
     fn read_rings<'a, F: WALStore + 'a>(
         file: &'a WALFileHandle<'a, F>,
         read_payload: bool,
@@ -923,6 +934,7 @@ impl WALLoader {
         })
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     fn read_records<'a, F: WALStore + 'a>(
         &'a self,
         file: &'a WALFileHandle<'a, F>,

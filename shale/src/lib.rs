@@ -563,6 +563,8 @@ impl<T> ObjCache<T> {
     }
 
     #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    // TODO: Refactor this function
     fn get_inner_mut(&self) -> &mut ObjCacheInner<T> {
         unsafe { &mut *self.0.get() }
     }

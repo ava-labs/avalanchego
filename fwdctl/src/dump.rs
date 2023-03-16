@@ -27,7 +27,7 @@ pub fn run(opts: &Options) -> Result<()> {
     };
 
     let mut stdout = std::io::stdout();
-    if let Err(_) = db.kv_dump(&mut stdout) {
+    if db.kv_dump(&mut stdout).is_err() {
         return Err(anyhow!("database dump not successful"));
     }
     Ok(())

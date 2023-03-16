@@ -67,6 +67,8 @@ pub struct WALFileAIO {
     aiomgr: Arc<AIOManager>,
 }
 
+#[allow(clippy::result_unit_err)]
+// TODO: Refactor to return a meaningful error.
 impl WALFileAIO {
     pub fn new(rootfd: RawFd, filename: &str, aiomgr: Arc<AIOManager>) -> Result<Self, ()> {
         openat(
@@ -136,6 +138,7 @@ pub struct WALStoreAIO {
 unsafe impl Send for WALStoreAIO {}
 
 impl WALStoreAIO {
+    #[allow(clippy::result_unit_err)]
     pub fn new(
         wal_dir: &str,
         truncate: bool,
@@ -151,18 +154,14 @@ impl WALStoreAIO {
         if truncate {
             let _ = std::fs::remove_dir_all(wal_dir);
         }
-        let walfd;
-        match rootfd {
+        let walfd = match rootfd {
             None => {
-                match mkdir(wal_dir, Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR) {
-                    Err(e) => {
-                        if truncate {
-                            panic!("error while creating directory: {}", e)
-                        }
+                if let Err(e) = mkdir(wal_dir, Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR) {
+                    if truncate {
+                        panic!("error while creating directory: {}", e)
                     }
-                    Ok(_) => (),
                 }
-                walfd = match open(wal_dir, oflags(), Mode::empty()) {
+                match open(wal_dir, oflags(), Mode::empty()) {
                     Ok(fd) => fd,
                     Err(_) => panic!("error while opening the WAL directory"),
                 }
@@ -179,12 +178,12 @@ impl WALStoreAIO {
                 if ret != 0 && truncate {
                     panic!("error while creating directory")
                 }
-                walfd = match nix::fcntl::openat(fd, wal_dir, oflags(), Mode::empty()) {
+                match nix::fcntl::openat(fd, wal_dir, oflags(), Mode::empty()) {
                     Ok(fd) => fd,
                     Err(_) => panic!("error while opening the WAL directory"),
                 }
             }
-        }
+        };
         Ok(WALStoreAIO {
             rootfd: walfd,
             aiomgr,

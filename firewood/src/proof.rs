@@ -265,8 +265,8 @@ impl Proof {
         // Special case when there is a provided edge proof but zero key/value pairs,
         // ensure there are no more accounts / slots in the trie.
         if keys.is_empty() {
-            if let Some(_) =
-                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?
+            if (self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?)
+                .is_some()
             {
                 // No more entries should be available.
                 return Err(ProofError::InvalidData);
@@ -398,11 +398,11 @@ impl Proof {
                         u_ref
                             .write(|u| {
                                 let uu = u.inner_mut().as_extension_mut().unwrap();
-                                *uu.chd_mut() = if chd_ptr.is_none() {
-                                    ObjPtr::null()
+                                *uu.chd_mut() = if let Some(chd_p) = chd_ptr {
+                                    chd_p
                                 } else {
-                                    chd_ptr.unwrap()
-                                };
+                                    ObjPtr::null()
+                                }
                             })
                             .unwrap();
                     } else {
@@ -493,6 +493,7 @@ impl Proof {
     ///
     /// * `end_node` - A boolean indicates whether this is the ebd node to decode, thus no `key`
     ///                to be present.
+    #[allow(clippy::type_complexity)]
     fn decode_node(
         &self,
         merkle: &Merkle,
@@ -562,6 +563,7 @@ impl Proof {
 
                 // Record rlp values of all children.
                 let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+                #[allow(clippy::needless_range_loop)]
                 for i in 0..NBRANCH {
                     let rlp = rlp.at(i).unwrap();
                     // Skip if rlp is empty data

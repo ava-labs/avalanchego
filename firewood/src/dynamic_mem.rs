@@ -21,6 +21,8 @@ impl DynamicMem {
         Self { space, id }
     }
 
+    #[allow(clippy::mut_from_ref)]
+    // TODO: Refactor this usage.
     fn get_space_mut(&self) -> &mut Vec<u8> {
         unsafe { &mut *self.space.get() }
     }

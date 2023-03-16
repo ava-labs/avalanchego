@@ -35,6 +35,7 @@
 //! ```
 
 mod abi;
+use abi::IOCb;
 use libc::time_t;
 use parking_lot::Mutex;
 use std::collections::{hash_map, HashMap};
@@ -81,7 +82,7 @@ impl AIOContext {
                 LIBAIO_ENOSYS => Err(Error::NotSupported),
                 _ => Err(Error::OtherError),
             }
-            .and_then(|_| Ok(AIOContext(ctx)))
+            .map(|_| AIOContext(ctx))
         }
     }
 }
@@ -112,7 +113,7 @@ impl AIO {
         flags: u32,
         opcode: abi::IOCmd,
     ) -> Self {
-        let mut iocb = Box::new(abi::IOCb::default());
+        let mut iocb = Box::<IOCb>::default();
         iocb.aio_fildes = fd as u32;
         iocb.aio_lio_opcode = opcode as u16;
         iocb.aio_reqprio = priority;
@@ -169,6 +170,7 @@ impl Drop for AIOFuture {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 enum AIOState {
     FutureInit(AIO, bool),
     FuturePending(AIO, std::task::Waker, bool),
@@ -192,15 +194,14 @@ impl AIONotifier {
 
     fn dropped(&self, id: u64) {
         let mut waiting = self.waiting.lock();
-        match waiting.entry(id) {
-            hash_map::Entry::Occupied(mut e) => match e.get_mut() {
+        if let hash_map::Entry::Occupied(mut e) = waiting.entry(id) {
+            match e.get_mut() {
                 AIOState::FutureInit(_, dropped) => *dropped = true,
                 AIOState::FuturePending(_, _, dropped) => *dropped = true,
                 AIOState::FutureDone(_) => {
                     e.remove();
                 }
-            },
-            _ => (),
+            }
         }
     }
 
@@ -367,19 +368,18 @@ impl AIOManager {
     ) -> Result<(), Error> {
         let n = self.notifier.clone();
         self.listener = Some(std::thread::spawn(move || {
-            let mut timespec = timeout.and_then(|sec: u32| {
-                Some(libc::timespec {
-                    tv_sec: sec as time_t,
-                    tv_nsec: 0,
-                })
+            let mut timespec = timeout.map(|sec: u32| libc::timespec {
+                tv_sec: sec as time_t,
+                tv_nsec: 0,
             });
+
             let mut ongoing = 0;
             loop {
                 // try to quiesce
                 if ongoing == 0 && scheduler_out.is_empty() {
                     let mut sel = crossbeam_channel::Select::new();
                     sel.recv(&exit_r);
-                    sel.recv(&scheduler_out.get_receiver());
+                    sel.recv(scheduler_out.get_receiver());
                     if sel.ready() == 0 {
                         exit_r.recv().unwrap();
                         break;
@@ -407,7 +407,7 @@ impl AIOManager {
                         events.as_mut_ptr(),
                         timespec
                             .as_mut()
-                            .and_then(|t| Some(t as *mut libc::timespec))
+                            .map(|t| t as *mut libc::timespec)
                             .unwrap_or(std::ptr::null_mut()),
                     )
                 };
@@ -420,7 +420,7 @@ impl AIOManager {
                 ongoing -= ret as usize;
                 for ev in events[..ret as usize].iter() {
                     #[cfg(not(feature = "emulated-failure"))]
-                    n.finish(ev.data as u64, ev.res);
+                    n.finish(ev.data, ev.res);
                     #[cfg(feature = "emulated-failure")]
                     {
                         let mut res = ev.res;
@@ -478,15 +478,13 @@ impl AIOManager {
     /// Get a copy of the current data in the buffer.
     pub fn copy_data(&self, aio_id: u64) -> Option<Vec<u8>> {
         let w = self.notifier.waiting.lock();
-        w.get(&aio_id).and_then(|state| {
-            Some(
-                match state {
-                    AIOState::FutureInit(aio, _) => &**aio.data.as_ref().unwrap(),
-                    AIOState::FuturePending(aio, _, _) => &**aio.data.as_ref().unwrap(),
-                    AIOState::FutureDone(res) => &res.1,
-                }
-                .to_vec(),
-            )
+        w.get(&aio_id).map(|state| {
+            match state {
+                AIOState::FutureInit(aio, _) => &**aio.data.as_ref().unwrap(),
+                AIOState::FuturePending(aio, _, _) => &**aio.data.as_ref().unwrap(),
+                AIOState::FutureDone(res) => &res.1,
+            }
+            .to_vec()
         })
     }
 
@@ -558,21 +556,21 @@ impl AIOBatchSchedulerOut {
                 }
             }
         }
-        if pending.len() == 0 {
+        if pending.is_empty() {
             return 0;
         }
         let mut ret = unsafe {
             abi::io_submit(
                 *notifier.io_ctx,
                 pending.len() as c_long,
-                (&mut pending).as_mut_ptr(),
+                pending.as_mut_ptr(),
             )
         };
         if ret < 0 && ret == LIBAIO_EAGAIN {
             ret = 0
         }
         let nacc = ret as usize;
-        self.leftover = (&pending[nacc..])
+        self.leftover = pending[nacc..]
             .iter()
             .map(|p| AtomicPtr::new(*p))
             .collect::<Vec<_>>();
