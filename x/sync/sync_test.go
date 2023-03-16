@@ -47,10 +47,9 @@ func Test_Creation(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		merkledb.Config{
-			Tracer:         newNoopTracer(),
-			HistoryLength:  0,
-			ValueCacheSize: 1000,
-			NodeCacheSize:  1000,
+			Tracer:        newNoopTracer(),
+			HistoryLength: 0,
+			NodeCacheSize: 1000,
 		},
 	)
 	require.NoError(t, err)
@@ -75,10 +74,9 @@ func Test_Completion(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -88,10 +86,9 @@ func Test_Completion(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -190,10 +187,9 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -270,10 +266,9 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -353,10 +348,9 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -407,10 +401,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -495,10 +488,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(t, err)
@@ -554,10 +546,9 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		merkledb.Config{
-			Tracer:         newNoopTracer(),
-			HistoryLength:  0,
-			ValueCacheSize: 1000,
-			NodeCacheSize:  1000,
+			Tracer:        newNoopTracer(),
+			HistoryLength: 0,
+			NodeCacheSize: 1000,
 		},
 	)
 	require.NoError(err)
@@ -609,10 +600,9 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			context.Background(),
 			memdb.New(),
 			merkledb.Config{
-				Tracer:         newNoopTracer(),
-				HistoryLength:  0,
-				ValueCacheSize: 1000,
-				NodeCacheSize:  1000,
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
 			},
 		)
 		require.NoError(err)
@@ -757,10 +747,9 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		context.Background(),
 		memdb.New(),
 		merkledb.Config{
-			Tracer:         newNoopTracer(),
-			HistoryLength:  1000,
-			ValueCacheSize: 1000,
-			NodeCacheSize:  1000,
+			Tracer:        newNoopTracer(),
+			HistoryLength: 1000,
+			NodeCacheSize: 1000,
 		},
 	)
 	if err != nil {
