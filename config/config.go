@@ -4,6 +4,7 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -56,6 +57,7 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
+	ipResolutionTimeout  = 30 * time.Second
 )
 
 var (
@@ -565,7 +567,9 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		}
 
 		// Use that to resolve our public IP.
-		ip, err := resolver.Resolve()
+		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
+		defer cancel()
+		ip, err := resolver.Resolve(ctx)
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
