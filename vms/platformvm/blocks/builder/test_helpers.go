@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -21,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -89,6 +92,7 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
+	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -105,7 +109,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment() *environment {
+func newEnvironment(t *testing.T) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
@@ -160,6 +164,8 @@ func newEnvironment() *environment {
 		},
 	)
 
+	res.sender = &common.SenderTest{T: t}
+
 	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
@@ -177,19 +183,33 @@ func newEnvironment() *environment {
 		window,
 	)
 
-	res.Builder = New(
+	res.Builder = Initialize(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
+		res.sender,
 	)
 
-	res.Dispatch(&noopGossiper{})
 	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
 	return res
+}
+
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	require.NoError(t, err)
+	return tx
 }
 
 func addSubnet(env *environment) {
@@ -458,10 +478,4 @@ func shutdownEnvironment(env *environment) error {
 		env.baseDB.Close(),
 	)
 	return errs.Err
-}
-
-type noopGossiper struct{}
-
-func (*noopGossiper) GossipTx(*txs.Tx) error {
-	return nil
 }

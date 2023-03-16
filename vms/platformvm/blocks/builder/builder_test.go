@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -34,27 +34,12 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		constants.AVMID,
-		nil,
-		"chain name",
-		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	require.NoError(t, err)
-	return tx
-}
-
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment()
-	env.ctx.Lock.Lock()
+	env := newEnvironment(t)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -63,9 +48,15 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
+	env.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
+
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
 
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 	has := env.mempool.Has(txID)
 	require.True(has)
 
@@ -85,8 +76,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment()
-	env.ctx.Lock.Lock()
+	env := newEnvironment(t)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -95,6 +85,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 	// A tx simply added to mempool is obviously not marked as dropped
 	require.NoError(env.mempool.Add(tx))
 	require.True(env.mempool.Has(txID))
@@ -118,9 +110,10 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment()
-	env.ctx.Lock.Lock()
+	env := newEnvironment(t)
 	env.isBootstrapped.Set(false)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 	env.ctx.Log = logging.NoWarn{}
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
@@ -699,8 +692,7 @@ func TestBuildBlock(t *testing.T) {
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment()
-	env.ctx.Lock.Lock()
+	env := newEnvironment(t)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -750,6 +742,8 @@ func TestAtomicTxImports(t *testing.T) {
 	)
 	require.NoError(err)
 
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 	require.NoError(env.Builder.Add(tx))
 	b, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -760,4 +754,110 @@ func TestAtomicTxImports(t *testing.T) {
 	require.NoError(err)
 	// Ensure transaction is in the committed state
 	require.Equal(txStatus, status.Committed)
+}
+
+func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var gossipedBytes []byte
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		gossipedBytes = b
+		return nil
+	}
+
+	// create a tx
+	tx := getValidTx(env.txBuilder, t)
+	txID := tx.ID()
+
+	// show that unknown tx is added to mempool
+	err := env.AddUnverifiedTx(tx)
+	require.NoError(err)
+
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+	require.True(env.Builder.Has(txID))
+
+	// and gossiped if it has just been discovered
+	require.True(gossipedBytes != nil)
+
+	// show gossiped bytes can be decoded to the original tx
+	replyIntf, err := message.Parse(gossipedBytes)
+	require.NoError(err)
+
+	reply := replyIntf.(*message.TxGossip)
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
+	require.NoError(err)
+
+	require.Equal(txID, retrivedTx.ID())
+}
+
+func TestMempoolInvalidTxIsNotAddedToMempool(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	// create a tx and mark as invalid
+	tx := getValidTx(env.txBuilder, t)
+	txID := tx.ID()
+	env.Builder.MarkDropped(txID, "dropped for testing")
+
+	// show that the invalid tx is not added
+	err := env.AddUnverifiedTx(tx)
+	require.NoError(err)
+
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+	require.False(env.Builder.Has(txID))
+}
+
+// show that locally generated txs are gossiped
+func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var gossipedBytes []byte
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		gossipedBytes = b
+		return nil
+	}
+
+	// add a tx to the mempool and show it gets gossiped
+	tx := getValidTx(env.txBuilder, t)
+	txID := tx.ID()
+
+	err := env.Builder.AddUnverifiedTx(tx)
+	require.NoError(err)
+	require.True(gossipedBytes != nil)
+
+	// show gossiped bytes can be decoded to the original tx
+	replyIntf, err := message.Parse(gossipedBytes)
+	require.NoError(err)
+
+	reply := replyIntf.(*message.TxGossip)
+	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
+	require.NoError(err)
+
+	require.Equal(txID, retrivedTx.ID())
+
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+	// show that transaction is not re-gossiped is recently added to mempool
+	gossipedBytes = nil
+	env.Builder.Remove([]*txs.Tx{tx})
+	err = env.Builder.Add(tx)
+	require.NoError(err)
+
+	require.True(gossipedBytes == nil)
 }

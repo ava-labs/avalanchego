@@ -27,13 +27,13 @@ func TestHandleTx(t *testing.T) {
 	handler := CounterHandler{}
 	msg := TxGossip{}
 
-	err := msg.Handle(&handler, ids.EmptyNodeID)
+	err := msg.Handle(&handler, ids.EmptyNodeID, 0)
 	require.NoError(err)
 	require.Equal(1, handler.Tx)
 }
 
 func TestNoopHandler(t *testing.T) {
-	handler := NoopGossipHandler{
+	handler := NoopHandler{
 		Log: logging.NoLog{},
 	}
 

@@ -10,14 +10,14 @@ import (
 )
 
 var (
-	_ GossipMessage = (*TxGossip)(nil)
+	_ Message = (*TxGossip)(nil)
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
 
-type GossipMessage interface {
+type Message interface {
 	// Handle this message with the correct message handler
-	Handle(handler GossipHandler, nodeID ids.NodeID) error
+	Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error
 
 	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)
@@ -38,18 +38,8 @@ func (m *message) Bytes() []byte {
 	return *m
 }
 
-type TxGossip struct {
-	message
-
-	Tx []byte `serialize:"true"`
-}
-
-func (msg *TxGossip) Handle(handler GossipHandler, nodeID ids.NodeID) error {
-	return handler.HandleTx(nodeID, msg)
-}
-
-func Parse(bytes []byte) (GossipMessage, error) {
-	var msg GossipMessage
+func Parse(bytes []byte) (Message, error) {
+	var msg Message
 	version, err := c.Unmarshal(bytes, &msg)
 	if err != nil {
 		return nil, err
@@ -61,7 +51,7 @@ func Parse(bytes []byte) (GossipMessage, error) {
 	return msg, nil
 }
 
-func Build(msg GossipMessage) ([]byte, error) {
+func Build(msg Message) ([]byte, error) {
 	bytes, err := c.Marshal(codecVersion, &msg)
 	msg.initialize(bytes)
 	return bytes, err

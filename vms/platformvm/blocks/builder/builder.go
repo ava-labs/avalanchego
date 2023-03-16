@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -18,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -26,6 +27,12 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+)
+
+const (
+	// We allow [recentCacheSize] to be fairly large because we only store hashes
+	// in the cache, not entire transactions.
+	recentCacheSize = 512
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -43,8 +50,6 @@ var (
 type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
-
-	Dispatch(gossipper network.Gossipper)
 
 	// set preferred block on top of which we'll build next
 	SetPreference(blockID ids.ID)
@@ -67,11 +72,13 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
-	gossipper network.Gossipper
+	appSender common.AppSender
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
+
+	recentTxs *cache.LRU[ids.ID, struct{}]
 
 	// ID of the preferred block to build on top of
 	preferredBlockID ids.ID
@@ -85,12 +92,13 @@ type builder struct {
 	timer *timer.Timer
 }
 
-func New(
+func Initialize(
 	mempool mempool.Mempool,
 	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
+	appSender common.AppSender,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
@@ -98,16 +106,15 @@ func New(
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		toEngine:          toEngine,
+		recentTxs:         &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
+		appSender:         appSender,
 	}
 
+	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
+
+	go builder.txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
+
 	return builder
-}
-
-func (b *builder) Dispatch(gossipper network.Gossipper) {
-	b.gossipper = gossipper
-	b.timer = timer.NewTimer(b.setNextBuildBlockTime)
-
-	go b.txExecutorBackend.Ctx.Log.RecoverAndPanic(b.timer.Dispatch)
 }
 
 func (b *builder) SetPreference(blockID ids.ID) {
@@ -125,11 +132,23 @@ func (b *builder) Preferred() (snowman.Block, error) {
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
+	txID := tx.ID()
+	ctx := b.txExecutorBackend.Ctx
+
+	// We need to grab the context lock here to avoid racy behavior with
+	// transaction verification + mempool modifications.
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	if _, dropped := b.GetDropReason(txID); dropped {
+		// If the tx is being dropped - just ignore it
+		return nil
+	}
+
 	if !b.txExecutorBackend.Bootstrapped.Get() {
 		return errChainNotSynced
 	}
 
-	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added
@@ -150,7 +169,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	if err := b.Mempool.Add(tx); err != nil {
 		return err
 	}
-	return b.gossipper.GossipTx(tx)
+	return b.gossipTx(tx)
 }
 
 // BuildBlock builds a block to be added to consensus.
@@ -166,7 +185,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
-	statelessBlk, err := b.buildBlock()
+	statelessBlk, err := b.buildNextBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +199,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 
 // Returns the block we want to build and issue.
 // Only modifies state to remove expired proposal txs.
-func (b *builder) buildBlock() (blocks.Block, error) {
+func (b *builder) buildNextBlock() (blocks.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
 	if err != nil {
@@ -285,7 +304,7 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	if _, err := b.buildBlock(); err == nil {
+	if _, err := b.buildNextBlock(); err == nil {
 		// We can build a block now
 		b.notifyBlockReady()
 		return
@@ -414,4 +433,24 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
+}
+
+func (b *builder) gossipTx(tx *txs.Tx) error {
+	txID := tx.ID()
+	// Don't gossip a transaction if it has been recently gossiped.
+	if _, has := b.recentTxs.Get(txID); has {
+		return nil
+	}
+	b.recentTxs.Put(txID, struct{}{})
+
+	b.txExecutorBackend.Ctx.Log.Debug("gossiping tx",
+		zap.Stringer("txID", txID),
+	)
+
+	msg := &message.TxGossip{Tx: tx.Bytes()}
+	msgBytes, err := message.Build(msg)
+	if err != nil {
+		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
+	}
+	return b.appSender.SendAppGossip(context.TODO(), msgBytes)
 }
