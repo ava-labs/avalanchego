@@ -405,7 +405,7 @@ func (*VM) LastAccepted(context.Context) (ids.ID, error) {
  */
 
 func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID) error {
-	time := version.GetXChainMigrationTime(vm.ctx.NetworkID)
+	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	return vm.state.InitializeChainState(stopVertexID, time)
 }
 

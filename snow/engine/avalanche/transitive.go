@@ -6,6 +6,7 @@ package avalanche
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Engine = (*Transitive)(nil)
@@ -367,6 +369,11 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
+		// After the linearization, we shouldn't be building any new vertices
+		if cortinaTime, ok := version.CortinaTimes[t.Ctx.NetworkID]; ok && time.Now().After(cortinaTime) {
+			return nil
+		}
+
 		txs := t.VM.PendingTxs(ctx)
 		t.pendingTxs = append(t.pendingTxs, txs...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
