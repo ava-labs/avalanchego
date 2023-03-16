@@ -345,7 +345,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Set up the initial access list.
 	if rules.IsSubnetEVM {
-		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+		st.state.PrepareAccessList(msg.From(), msg.To(), rules, vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 	var (
 		ret   []byte

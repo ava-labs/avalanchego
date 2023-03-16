@@ -3,6 +3,8 @@
 
 package utils
 
+import "github.com/ethereum/go-ethereum/common"
+
 // IncrOne increments bytes value by one
 func IncrOne(bytes []byte) {
 	index := len(bytes) - 1
@@ -15,4 +17,13 @@ func IncrOne(bytes []byte) {
 			index--
 		}
 	}
+}
+
+// HashSliceToBytes serializes a []common.Hash into a []byte
+func HashSliceToBytes(hashes []common.Hash) []byte {
+	bytes := make([]byte, common.HashLength*len(hashes))
+	for i, hash := range hashes {
+		copy(bytes[i*common.HashLength:], hash[:])
+	}
+	return bytes
 }

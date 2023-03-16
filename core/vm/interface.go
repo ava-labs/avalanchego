@@ -30,6 +30,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -68,7 +69,7 @@ type StateDB interface {
 	// is defined according to EIP161 (balance = nonce = code = 0).
 	Empty(common.Address) bool
 
-	PrepareAccessList(sender common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList)
+	PrepareAccessList(sender common.Address, dest *common.Address, rules params.Rules, precompiles []common.Address, txAccesses types.AccessList)
 	AddressInAccessList(addr common.Address) bool
 	SlotInAccessList(addr common.Address, slot common.Hash) (addressOk bool, slotOk bool)
 	// AddAddressToAccessList adds the given address to the access list. This operation is safe to perform
@@ -82,6 +83,7 @@ type StateDB interface {
 	Snapshot() int
 
 	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
+	GetPredicateStorageSlots(address common.Address) ([]byte, bool)
 	AddPreimage(common.Hash, []byte)
 
 	ForEachStorage(common.Address, func(common.Hash, common.Hash) bool) error

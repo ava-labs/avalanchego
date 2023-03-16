@@ -25,7 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -143,12 +145,14 @@ func NewContext() *snow.Context {
 }
 
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
-func setupGenesis(t *testing.T,
+func setupGenesis(
+	t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
 	manager.Manager,
 	[]byte,
 	chan commonEng.Message,
+	*atomic.Memory,
 ) {
 	if len(genesisJSON) == 0 {
 		genesisJSON = genesisJSONLatest
@@ -161,6 +165,10 @@ func setupGenesis(t *testing.T,
 		Minor: 4,
 		Patch: 5,
 	})
+
+	// initialize the atomic memory
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
@@ -178,7 +186,7 @@ func setupGenesis(t *testing.T,
 
 	issuer := make(chan commonEng.Message, 1)
 	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
-	return ctx, prefixedDBManager, genesisBytes, issuer
+	return ctx, prefixedDBManager, genesisBytes, issuer, atomicMemory
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
@@ -195,7 +203,7 @@ func GenesisVM(t *testing.T,
 	*commonEng.SenderTest,
 ) {
 	vm := &VM{}
-	ctx, dbManager, genesisBytes, issuer := setupGenesis(t, genesisJSON)
+	ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, genesisJSON)
 	appSender := &commonEng.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
@@ -403,7 +411,7 @@ func TestSubnetEVMUpgradeRequiredAtGenesis(t *testing.T) {
 	}
 
 	for _, test := range genesisTests {
-		ctx, dbManager, genesisBytes, issuer := setupGenesis(t, test.genesisJSON)
+		ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
 		vm := &VM{}
 		err := vm.Initialize(
 			context.Background(),
@@ -2027,7 +2035,7 @@ func TestConfigureLogLevel(t *testing.T) {
 	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
-			ctx, dbManager, genesisBytes, issuer := setupGenesis(t, test.genesisJSON)
+			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
 			appSender := &commonEng.SenderTest{T: t}
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }

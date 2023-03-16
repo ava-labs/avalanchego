@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -112,7 +113,7 @@ func (w *worker) setEtherbase(addr common.Address) {
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
-func (w *worker) commitNewWork() (*types.Block, error) {
+func (w *worker) commitNewWork(predicateContext *precompileconfig.ProposerPredicateContext) (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -192,8 +193,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, err
 	}
 
-	// Fill the block with all available pending transactions.
+	// Get the pending txs from TxPool
 	pending := w.eth.TxPool().Pending(true)
+	// Filter out transactions that don't satisfy predicateContext and remove them from TxPool
+	rules := w.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+	pending = w.enforcePredicates(rules, predicateContext, pending)
 
 	// Split the pending transactions into locals and remotes
 	localTxs := make(map[common.Address]types.Transactions)
@@ -390,4 +394,40 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
 		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), tx.GasPrice()))
 	}
 	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
+}
+
+// enforcePredicates takes a set of pending transactions (grouped by sender, and ordered by nonce)
+// and returns the subset of those transactions (following the same grouping) that satisfy predicateContext.
+// Any transaction that fails predicate verification will be removed from the tx pool and excluded
+// from the return value.
+// Transactions with a nonce that follows a removed transaction will be added back to the future
+// queue of the tx pool.
+func (w *worker) enforcePredicates(
+	rules params.Rules,
+	predicateContext *precompileconfig.ProposerPredicateContext,
+	pending map[common.Address]types.Transactions,
+) map[common.Address]types.Transactions {
+	// Short circuit early if there are no precompile predicates to verify and return the
+	// unmodified pending transactions.
+	if len(rules.PredicatePrecompiles) == 0 {
+		return pending
+	}
+	result := make(map[common.Address]types.Transactions, len(pending))
+	for addr, txs := range pending {
+		for i, tx := range txs {
+			if err := core.CheckPredicates(rules, predicateContext, tx); err != nil {
+				log.Debug("Transaction predicate failed verification in miner", "sender", addr, "err", err)
+				// If the transaction fails the predicate check, we remove the transaction from the mempool
+				// and move all transactions from the same address with a subsequent nonce back to the
+				// future queue of the transaction pool.
+				w.eth.TxPool().RemoveTx(tx.Hash())
+				txs = txs[:i] // Cut off any transactions past the failed predicate in the return value
+				break
+			}
+		}
+		if len(txs) > 0 {
+			result[addr] = txs
+		}
+	}
+	return result
 }

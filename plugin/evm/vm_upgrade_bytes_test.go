@@ -87,9 +87,14 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	}
 
 	// restart the vm
-	ctx := NewContext()
+	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we
+	// can initialize the VM twice.
+	metrics.Enabled = false
+	defer func() {
+		metrics.Enabled = true
+	}()
 	if err := vm.Initialize(
-		context.Background(), ctx, dbManager, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, issuer, []*commonEng.Fx{}, appSender,
+		context.Background(), vm.ctx, dbManager, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, issuer, []*commonEng.Fx{}, appSender,
 	); err != nil {
 		t.Fatal(err)
 	}
