@@ -564,8 +564,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.ConsensusAcceptor,
-		b.Ctx.DecisionAcceptor,
+		b.Ctx.BlockAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err

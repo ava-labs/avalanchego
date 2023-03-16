@@ -164,8 +164,9 @@ type ManagerConfig struct {
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
-	DecisionAcceptorGroup       snow.AcceptorGroup
-	ConsensusAcceptorGroup      snow.AcceptorGroup
+	BlockAcceptorGroup          snow.AcceptorGroup
+	TxAcceptorGroup             snow.AcceptorGroup
+	VertexAcceptorGroup         snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
@@ -466,8 +467,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		DecisionAcceptor:    m.DecisionAcceptorGroup,
-		ConsensusAcceptor:   m.ConsensusAcceptorGroup,
+		BlockAcceptor:       m.BlockAcceptorGroup,
+		TxAcceptor:          m.TxAcceptorGroup,
+		VertexAcceptor:      m.VertexAcceptorGroup,
 		Registerer:          consensusMetrics,
 		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
@@ -631,7 +633,7 @@ func (m *manager) createAvalancheChain(
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
+	if err := m.VertexAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dispatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -847,7 +849,7 @@ func (m *manager) createSnowmanChain(
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
+	if err := m.BlockAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dispatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 

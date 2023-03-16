@@ -134,8 +134,9 @@ type Node struct {
 	uptimeCalculator uptime.LockedCalculator
 
 	// dispatcher for events as they happen in consensus
-	DecisionAcceptorGroup  snow.AcceptorGroup
-	ConsensusAcceptorGroup snow.AcceptorGroup
+	BlockAcceptorGroup  snow.AcceptorGroup
+	TxAcceptorGroup     snow.AcceptorGroup
+	VertexAcceptorGroup snow.AcceptorGroup
 
 	IPCs *ipcs.ChainIPCs
 
@@ -496,8 +497,9 @@ func (n *Node) initBeacons() error {
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
 func (n *Node) initEventDispatchers() {
-	n.DecisionAcceptorGroup = snow.NewAcceptorGroup(n.Log)
-	n.ConsensusAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.BlockAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.TxAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.VertexAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -511,7 +513,15 @@ func (n *Node) initIPCs() error {
 	}
 
 	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusAcceptorGroup, n.DecisionAcceptorGroup, chainIDs)
+	n.IPCs, err = ipcs.NewChainIPCs(
+		n.Log,
+		n.Config.IPCPath,
+		n.Config.NetworkID,
+		n.BlockAcceptorGroup,
+		n.TxAcceptorGroup,
+		n.VertexAcceptorGroup,
+		chainIDs,
+	)
 	return err
 }
 
@@ -523,13 +533,14 @@ func (n *Node) initIndexer() error {
 	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:        n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
-		DB:                     txIndexerDB,
-		Log:                    n.Log,
-		DecisionAcceptorGroup:  n.DecisionAcceptorGroup,
-		ConsensusAcceptorGroup: n.ConsensusAcceptorGroup,
-		APIServer:              n.APIServer,
+		IndexingEnabled:      n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
+		DB:                   txIndexerDB,
+		Log:                  n.Log,
+		BlockAcceptorGroup:   n.BlockAcceptorGroup,
+		TxAcceptorGroup:      n.TxAcceptorGroup,
+		VertexAcceptorGroup:  n.VertexAcceptorGroup,
+		APIServer:            n.APIServer,
 		ShutdownF: func() {
 			n.Shutdown(0) // TODO put exit code here
 		},
@@ -700,8 +711,9 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
 		VMManager:                               n.VMManager,
-		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
-		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
+		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
+		TxAcceptorGroup:                         n.TxAcceptorGroup,
+		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
