@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
@@ -39,7 +40,6 @@ const (
 )
 
 var (
-	errUnknownAssetID     = errors.New("unknown asset ID")
 	errTxNotCreateAsset   = errors.New("transaction doesn't create an asset")
 	errNoMinters          = errors.New("no minters provided")
 	errNoHoldersOrMinters = errors.New("no minters or initialHolders provided")
@@ -81,6 +81,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 	return nil
 }
 
+// TODO: After the chain is linearized, remove this.
 func (s *Service) IssueStopVertex(_ *http.Request, _, _ *struct{}) error {
 	return s.vm.issueStopVertex()
 }
@@ -163,9 +164,10 @@ func (s *Service) GetAddressTxs(_ *http.Request, args *GetAddressTxsArgs, reply 
 
 // GetTxStatus returns the status of the specified transaction
 //
-// TODO: deprecate GetTxStatus after the linearization.
+// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
+// used instead to determine if the tx was accepted.
 func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	s.vm.ctx.Log.Debug("API called",
+	s.vm.ctx.Log.Debug("deprecated API called",
 		zap.String("service", "avm"),
 		zap.String("method", "getTxStatus"),
 		zap.Stringer("txID", args.TxID),
@@ -175,12 +177,18 @@ func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxS
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   s.vm,
-		txID: args.TxID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-
-	reply.Status = tx.Status()
+	_, err := chainState.GetTx(args.TxID)
+	switch err {
+	case nil:
+		reply.Status = choices.Accepted
+	case database.ErrNotFound:
+		reply.Status = choices.Unknown
+	default:
+		return err
+	}
 	return nil
 }
 
@@ -196,27 +204,25 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   s.vm,
-		txID: args.TxID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-	if status := tx.Status(); !status.Fetched() {
-		return errUnknownTx
+	tx, err := chainState.GetTx(args.TxID)
+	if err != nil {
+		return err
 	}
 
 	reply.Encoding = args.Encoding
-
 	if args.Encoding == formatting.JSON {
 		reply.Tx = tx
 		return tx.Unsigned.Visit(&txInit{
-			tx:            tx.Tx,
+			tx:            tx,
 			ctx:           s.vm.ctx,
 			typeToFxIndex: s.vm.typeToFxIndex,
 			fxs:           s.vm.fxs,
 		})
 	}
 
-	var err error
 	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %w", err)
@@ -349,12 +355,12 @@ func (s *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescription
 		return err
 	}
 
-	tx := &UniqueTx{
-		vm:   s.vm,
-		txID: assetID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-	if status := tx.Status(); !status.Fetched() {
-		return errUnknownAssetID
+	tx, err := chainState.GetTx(assetID)
+	if err != nil {
+		return err
 	}
 	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
 	if !ok {

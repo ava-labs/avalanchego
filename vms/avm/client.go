@@ -27,7 +27,8 @@ type Client interface {
 	WalletClient
 	// GetTxStatus returns the status of [txID]
 	//
-	// TODO: deprecate GetTxStatus after the linearization.
+	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
+	// used instead to determine if the tx was accepted.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client

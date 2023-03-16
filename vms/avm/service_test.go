@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -219,55 +220,45 @@ func TestServiceIssueTx(t *testing.T) {
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
-	genesisBytes, vm, s, _, _ := setup(t, true)
+	require := require.New(t)
+
+	genesisBytes, vm, s, issuer := setupWithIssuer(t, true)
+	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
+		require.NoError(vm.Shutdown(context.Background()))
+		ctx.Lock.Unlock()
 	}()
 
 	statusArgs := &api.JSONTxID{}
 	statusReply := &GetTxStatusReply{}
-	if err := s.GetTxStatus(nil, statusArgs, statusReply); err == nil {
-		t.Fatal("Expected empty transaction to return an error")
-	}
+	err := s.GetTxStatus(nil, statusArgs, statusReply)
+	require.ErrorIs(err, errNilTxID)
 
-	tx := NewTx(t, genesisBytes, vm)
-	statusArgs.TxID = tx.ID()
-	statusReply = &GetTxStatusReply{}
-	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
-		t.Fatal(err)
-	}
-	if expected := choices.Unknown; expected != statusReply.Status {
-		t.Fatalf(
-			"Expected an unsubmitted tx to have status %q, got %q",
-			expected.String(), statusReply.Status.String(),
-		)
-	}
+	newTx := newAvaxBaseTxWithOutputs(t, genesisBytes, vm)
+	txID := newTx.ID()
 
-	txStr, err := formatting.Encode(formatting.Hex, tx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	txArgs := &api.FormattedTx{
-		Tx:       txStr,
-		Encoding: formatting.Hex,
-	}
-	txReply := &api.JSONTxID{}
-	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
-		t.Fatal(err)
+	statusArgs = &api.JSONTxID{
+		TxID: txID,
 	}
 	statusReply = &GetTxStatusReply{}
-	if err := s.GetTxStatus(nil, statusArgs, statusReply); err != nil {
-		t.Fatal(err)
-	}
-	if expected := choices.Processing; expected != statusReply.Status {
-		t.Fatalf(
-			"Expected a submitted tx to have status %q, got %q",
-			expected.String(), statusReply.Status.String(),
-		)
-	}
+	require.NoError(s.GetTxStatus(nil, statusArgs, statusReply))
+	require.Equal(choices.Unknown, statusReply.Status)
+
+	_, err = vm.IssueTx(newTx.Bytes())
+	require.NoError(err)
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	require.Equal(common.PendingTxs, msg)
+	ctx.Lock.Lock()
+
+	txs := vm.PendingTxs(context.Background())
+	require.Len(txs, 1)
+	require.NoError(txs[0].Accept(context.Background()))
+
+	statusReply = &GetTxStatusReply{}
+	require.NoError(s.GetTxStatus(nil, statusArgs, statusReply))
+	require.Equal(choices.Accepted, statusReply.Status)
 }
 
 // Test the GetBalance method when argument Strict is true
@@ -688,119 +679,109 @@ func TestServiceGetTx(t *testing.T) {
 }
 
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes, vm, s, issuer := setupWithIssuer(t, true)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	newTx := newAvaxBaseTxWithOutputs(t, genesisBytes, vm)
 
 	txID, err := vm.IssueTx(newTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if txID != newTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(newTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
+	require.NoError(txs[0].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	err = s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
-	require.Contains(t, jsonString, "\"memo\":\"0x0102030405060708\"")
-	require.Contains(t, jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	require.Contains(t, jsonString, "\"outputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]")
+	require.Contains(jsonString, "\"memo\":\"0x0102030405060708\"")
+	require.Contains(jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
+	require.Contains(jsonString, "\"outputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]")
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes, vm, s, issuer := setupWithIssuer(t, true)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	newTx := newAvaxExportTxWithOutputs(t, genesisBytes, vm)
 
 	txID, err := vm.IssueTx(newTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if txID != newTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(newTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
-	ctx.Lock.Lock()
+	require.Equal(common.PendingTxs, msg)
 
+	ctx.Lock.Lock()
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
+	require.NoError(txs[0].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	err = s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
-	require.Contains(t, jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	require.Contains(t, jsonString, "\"exportedOutputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]}")
+	require.Contains(jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
+	require.Contains(jsonString, "\"exportedOutputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]}")
 }
 
 func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -821,42 +802,25 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	txID, err := vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != createAssetTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(createAssetTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
+	require.NoError(txs[0].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -864,35 +828,39 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]}")
-	require.Contains(t, jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[]}")
+	require.Contains(jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]}")
+	require.Contains(jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[]}")
 }
 
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -913,53 +881,34 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
 	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintNFTTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintNFTTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -967,39 +916,43 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 	// assert memo and payload are in hex
-	require.Contains(t, jsonString, "\"memo\":\"0x\"")
-	require.Contains(t, jsonString, "\"payload\":\"0x68656c6c6f\"")
+	require.Contains(jsonString, "\"memo\":\"0x\"")
+	require.Contains(jsonString, "\"payload\":\"0x68656c6c6f\"")
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 	// contains the fxID
-	require.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":2}],\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x571f18cfdb254263ab6b987f742409bd5403eafe08b4dbc297c5cd8d1c85eb8812e4541e11d3dc692cd14b5f4bccc1835ec001df6d8935ce881caf97017c2a4801\"]}}]")
+	require.Contains(jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":2}],\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x571f18cfdb254263ab6b987f742409bd5403eafe08b4dbc297c5cd8d1c85eb8812e4541e11d3dc692cd14b5f4bccc1835ec001df6d8935ce881caf97017c2a4801\"]}}]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1020,56 +973,37 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
 	mintNFTTx := buildOperationTxWithOp(mintOp1, mintOp2)
 
 	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintNFTTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintNFTTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -1077,38 +1011,42 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	require.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":2}],\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801\"]}},{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801\"]}}]")
+	require.Contains(jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":2}],\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801\"]}},{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"credential\":{\"signatures\":[\"0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd801\"]}}]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1129,53 +1067,34 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintSecpOpTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintSecpOpTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -1183,41 +1102,45 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// ensure memo is in hex
-	require.Contains(t, jsonString, "\"memo\":\"0x\"")
+	require.Contains(jsonString, "\"memo\":\"0x\"")
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
-	require.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}]}")
+	require.Contains(jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}]}")
 
 	// contains the fxID
-	require.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":0}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0x6d7406d5e1bdb1d80de542e276e2d162b0497d0df1170bec72b14d40e84ecf7929cb571211d60149404413a9342fdfa0a2b5d07b48e6f3eaea1e2f9f183b480500\"]}}]")
+	require.Contains(jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":0}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0x6d7406d5e1bdb1d80de542e276e2d162b0497d0df1170bec72b14d40e84ecf7929cb571211d60149404413a9342fdfa0a2b5d07b48e6f3eaea1e2f9f183b480500\"]}}]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1238,56 +1161,37 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
 	mintSecpOpTx := buildOperationTxWithOp(op1, op2)
 
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintSecpOpTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintSecpOpTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -1295,39 +1199,43 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
-	require.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}")
+	require.Contains(jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}")
 
 	// contains the fxID
-	require.Contains(t, jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":1}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401\"]}},{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401\"]}}]")
+	require.Contains(jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":1}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401\"]}},{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"credential\":{\"signatures\":[\"0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401\"]}}]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1348,52 +1256,34 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
 	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintPropertyFxOpTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintPropertyFxOpTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -1401,40 +1291,44 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// ensure memo is in hex
-	require.Contains(t, jsonString, "\"memo\":\"0x\"")
+	require.Contains(jsonString, "\"memo\":\"0x\"")
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	require.Contains(t, jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":4}],\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0xa3a00a03d3f1551ff696d6c0abdde73ae7002cd6dcce1c37d720de3b7ed80757411c9698cd9681a0fa55ca685904ca87056a3b8abc858a8ac08f45483b32a80201\"]}}]")
+	require.Contains(jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":4}],\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0xa3a00a03d3f1551ff696d6c0abdde73ae7002cd6dcce1c37d720de3b7ed80757411c9698cd9681a0fa55ca685904ca87056a3b8abc858a8ac08f45483b32a80201\"]}}]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) {
+	require := require.New(t)
+
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -1455,56 +1349,37 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		},
 		&common.SenderTest{T: t},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
 	mintPropertyFxOpTx := buildOperationTxWithOp(op1, op2)
 
 	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if txID != mintPropertyFxOpTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.NoError(err)
+	require.Equal(mintPropertyFxOpTx.ID(), txID)
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, msg)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(txs, 2)
+	require.NoError(txs[0].Accept(context.Background()))
+	require.NoError(txs[1].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
@@ -1512,19 +1387,19 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		TxID:     txID,
 		Encoding: formatting.JSON,
 	}, &reply)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, reply.Encoding, formatting.JSON)
+	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
-	require.NoError(t, err)
+	require.NoError(err)
 	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	require.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	require.Contains(jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	require.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":4}],\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\"")
-	require.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601\"]}},{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601\"]}}]")
+	require.Contains(jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":4}],\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\"")
+	require.Contains(jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601\"]}},{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"credential\":{\"signatures\":[\"0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb5601\"]}}]")
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
