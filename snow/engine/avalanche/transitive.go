@@ -113,6 +113,16 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
+
+	// If the chain is linearized, we should immediately drop all put messages.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex",
@@ -156,6 +166,16 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	// If the chain is linearized, we don't care that a get request failed, we
+	// have already moved into snowman consensus.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
@@ -186,6 +206,16 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
 
+	// If the chain is linearized, we don't care to attempt to issue any new
+	// vertices.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	// If we have [vtxID], attempt to put it into consensus, if we haven't
 	// already. If we don't not have [vtxID], fetch it from [nodeID].
 	if _, err := t.issueFromByID(ctx, nodeID, vtxID); err != nil {
@@ -198,6 +228,16 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
+
+	// If the chain is linearized, we don't care to attempt to issue any new
+	// vertices.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
 
 	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
@@ -227,6 +267,15 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) error {
+	// If the chain is linearized, we don't care to apply any votes.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	t.acceptedFrontiers.SetAcceptedFrontier(nodeID, accepted)
 
 	v := &voter{
@@ -249,6 +298,15 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	// If the chain is linearized, we don't care to apply any votes.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	lastAccepted := t.acceptedFrontiers.AcceptedFrontier(nodeID)
 	return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 }
@@ -297,6 +355,16 @@ func (t *Transitive) Shutdown(ctx context.Context) error {
 }
 
 func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
+	// If the chain is linearized, we shouldn't be processing any messages from
+	// the VM anymore.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	switch msg {
 	case common.PendingTxs:
 		txs := t.VM.PendingTxs(ctx)
