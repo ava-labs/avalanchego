@@ -368,7 +368,7 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 		logs = append(logs, receipt.Logs...)
 	}
 
-	log.Info("Commit new mining work", "number", block.Number(), "hash", hash, "uncles", 0, "txs", env.tcount,
+	log.Info("Commit new mining work", "number", block.Number(), "hash", hash, "timestamp", block.Time(), "uncles", 0, "txs", env.tcount,
 		"gas", block.GasUsed(), "fees", totalFees(block, receipts), "elapsed", common.PrettyDuration(time.Since(env.start)))
 
 	// Note: the miner no longer emits a NewMinedBlock event. Instead the caller
@@ -409,7 +409,7 @@ func (w *worker) enforcePredicates(
 ) map[common.Address]types.Transactions {
 	// Short circuit early if there are no precompile predicates to verify and return the
 	// unmodified pending transactions.
-	if len(rules.PredicatePrecompiles) == 0 {
+	if !rules.PredicatesExist() {
 		return pending
 	}
 	result := make(map[common.Address]types.Transactions, len(pending))

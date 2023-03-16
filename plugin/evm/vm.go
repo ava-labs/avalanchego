@@ -77,8 +77,9 @@ import (
 )
 
 var (
-	_ block.ChainVM              = &VM{}
-	_ block.HeightIndexedChainVM = &VM{}
+	_ block.ChainVM                      = &VM{}
+	_ block.HeightIndexedChainVM         = &VM{}
+	_ block.BuildBlockWithContextChainVM = &VM{}
 )
 
 const (

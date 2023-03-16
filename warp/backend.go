@@ -4,7 +4,6 @@
 package warp
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -22,10 +21,10 @@ var _ WarpBackend = &warpBackend{}
 // The backend is also used to query for warp message signatures by the signature request handler.
 type WarpBackend interface {
 	// AddMessage signs [unsignedMessage] and adds it to the warp backend database
-	AddMessage(ctx context.Context, unsignedMessage *avalancheWarp.UnsignedMessage) error
+	AddMessage(unsignedMessage *avalancheWarp.UnsignedMessage) error
 
 	// GetSignature returns the signature of the requested message hash.
-	GetSignature(ctx context.Context, messageHash ids.ID) ([bls.SignatureLen]byte, error)
+	GetSignature(messageHash ids.ID) ([bls.SignatureLen]byte, error)
 }
 
 // warpBackend implements WarpBackend, keeps track of warp messages, and generates message signatures.
@@ -44,7 +43,7 @@ func NewWarpBackend(snowCtx *snow.Context, db database.Database, signatureCacheS
 	}
 }
 
-func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *avalancheWarp.UnsignedMessage) error {
+func (w *warpBackend) AddMessage(unsignedMessage *avalancheWarp.UnsignedMessage) error {
 	messageID := hashing.ComputeHash256Array(unsignedMessage.Bytes())
 
 	// In the case when a node restarts, and possibly changes its bls key, the cache gets emptied but the database does not.
@@ -65,7 +64,7 @@ func (w *warpBackend) AddMessage(ctx context.Context, unsignedMessage *avalanche
 	return nil
 }
 
-func (w *warpBackend) GetSignature(ctx context.Context, messageID ids.ID) ([bls.SignatureLen]byte, error) {
+func (w *warpBackend) GetSignature(messageID ids.ID) ([bls.SignatureLen]byte, error) {
 	if sig, ok := w.signatureCache.Get(messageID); ok {
 		return sig, nil
 	}

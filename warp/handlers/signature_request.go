@@ -50,7 +50,7 @@ func (s *signatureRequestHandler) OnSignatureRequest(ctx context.Context, nodeID
 		s.stats.UpdateSignatureRequestTime(time.Since(startTime))
 	}()
 
-	signature, err := s.backend.GetSignature(ctx, signatureRequest.MessageID)
+	signature, err := s.backend.GetSignature(signatureRequest.MessageID)
 	if err != nil {
 		log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
 		s.stats.IncSignatureMiss()

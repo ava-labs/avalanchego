@@ -4,7 +4,6 @@
 package warp
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -34,12 +33,12 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	// Create a new unsigned message and add it to the warp backend.
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(sourceChainID, destinationChainID, payload)
 	require.NoError(t, err)
-	err = backend.AddMessage(context.Background(), unsignedMsg)
+	err = backend.AddMessage(unsignedMsg)
 	require.NoError(t, err)
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	messageID := hashing.ComputeHash256Array(unsignedMsg.Bytes())
-	signature, err := backend.GetSignature(context.Background(), messageID)
+	signature, err := backend.GetSignature(messageID)
 	require.NoError(t, err)
 
 	expectedSig, err := snowCtx.WarpSigner.Sign(unsignedMsg)
@@ -56,7 +55,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 
 	// Try getting a signature for a message that was not added.
 	messageID := hashing.ComputeHash256Array(unsignedMsg.Bytes())
-	_, err = backend.GetSignature(context.Background(), messageID)
+	_, err = backend.GetSignature(messageID)
 	require.Error(t, err)
 }
 
@@ -74,12 +73,12 @@ func TestZeroSizedCache(t *testing.T) {
 	// Create a new unsigned message and add it to the warp backend.
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(sourceChainID, destinationChainID, payload)
 	require.NoError(t, err)
-	err = backend.AddMessage(context.Background(), unsignedMsg)
+	err = backend.AddMessage(unsignedMsg)
 	require.NoError(t, err)
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	messageID := hashing.ComputeHash256Array(unsignedMsg.Bytes())
-	signature, err := backend.GetSignature(context.Background(), messageID)
+	signature, err := backend.GetSignature(messageID)
 	require.NoError(t, err)
 
 	expectedSig, err := snowCtx.WarpSigner.Sign(unsignedMsg)

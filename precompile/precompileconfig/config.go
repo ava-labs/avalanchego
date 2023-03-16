@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -76,10 +77,15 @@ type SharedMemoryWriter interface {
 	AddSharedMemoryRequests(chainID ids.ID, requests *atomic.Requests)
 }
 
+type WarpMessageWriter interface {
+	AddMessage(unsignedMessage *warp.UnsignedMessage) error
+}
+
 // AcceptContext defines the context passed in to a precompileconfig's Accepter
 type AcceptContext struct {
 	SnowCtx      *snow.Context
 	SharedMemory SharedMemoryWriter
+	Warp         WarpMessageWriter
 }
 
 // Accepter is an optional interface for StatefulPrecompiledContracts to implement.

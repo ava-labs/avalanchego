@@ -4,7 +4,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -13,8 +12,6 @@ import (
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
-
-var errNilProposerVMBlockCtxWithProposerPredicate = errors.New("engine cannot specify nil ProposerVM block context with non-empty proposer predicates")
 
 // CheckPredicates checks that all precompile predicates are satisfied within the current [predicateContext] for [tx]
 func CheckPredicates(rules params.Rules, predicateContext *precompileconfig.ProposerPredicateContext, tx *types.Transaction) error {
@@ -43,7 +40,8 @@ func checkPrecompilePredicates(rules params.Rules, predicateContext *precompilec
 			return fmt.Errorf("predicate %s failed verification for tx %s: specified %s in access list multiple times", address, tx.Hash(), address)
 		}
 		precompileAddressChecks[address] = struct{}{}
-		if err := predicater.VerifyPredicate(predicateContext, utils.HashSliceToBytes(accessTuple.StorageKeys)); err != nil {
+		predicateBytes := utils.HashSliceToBytes(accessTuple.StorageKeys)
+		if err := predicater.VerifyPredicate(predicateContext, predicateBytes); err != nil {
 			return fmt.Errorf("predicate %s failed verification for tx %s: %w", address, tx.Hash(), err)
 		}
 	}
@@ -55,10 +53,6 @@ func checkProposerPrecompilePredicates(rules params.Rules, predicateContext *pre
 	// Short circuit early if there are no precompile predicates to verify
 	if len(rules.ProposerPredicates) == 0 {
 		return nil
-	}
-	// If a proposer predicate is specified, reuqire that the ProposerVMBlockCtx is non-nil.
-	if predicateContext.ProposerVMBlockCtx == nil {
-		return errNilProposerVMBlockCtxWithProposerPredicate
 	}
 	precompilePredicates := rules.ProposerPredicates
 	// Track addresses that we've performed a predicate check for
@@ -74,7 +68,8 @@ func checkProposerPrecompilePredicates(rules params.Rules, predicateContext *pre
 			return fmt.Errorf("predicate %s failed verification for tx %s: specified %s in access list multiple times", address, tx.Hash(), address)
 		}
 		precompileAddressChecks[address] = struct{}{}
-		if err := predicater.VerifyPredicate(predicateContext, utils.HashSliceToBytes(accessTuple.StorageKeys)); err != nil {
+		predicateBytes := utils.HashSliceToBytes(accessTuple.StorageKeys)
+		if err := predicater.VerifyPredicate(predicateContext, predicateBytes); err != nil {
 			return fmt.Errorf("predicate %s failed verification for tx %s: %w", address, tx.Hash(), err)
 		}
 	}

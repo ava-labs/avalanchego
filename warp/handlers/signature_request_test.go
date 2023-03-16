@@ -33,8 +33,8 @@ func TestSignatureHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	messageID := hashing.ComputeHash256Array(msg.Bytes())
-	require.NoError(t, warpBackend.AddMessage(context.Background(), msg))
-	signature, err := warpBackend.GetSignature(context.Background(), messageID)
+	require.NoError(t, warpBackend.AddMessage(msg))
+	signature, err := warpBackend.GetSignature(messageID)
 	require.NoError(t, err)
 	unknownMessageID := ids.GenerateTestID()
 

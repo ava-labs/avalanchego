@@ -18,7 +18,7 @@ type WarpAPI struct {
 
 // GetSignature returns the BLS signature associated with a messageID.
 func (api *WarpAPI) GetSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	signature, err := api.Backend.GetSignature(ctx, messageID)
+	signature, err := api.Backend.GetSignature(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for with error %w", err)
 	}

@@ -148,11 +148,10 @@ func TestCheckPredicate(t *testing.T) {
 			}),
 			expectedErr: fmt.Errorf("unexpected bytes: 0x%x", common.Hash{2}.Bytes()),
 		},
-		"proposer predicate with empty proposer block ctx": {
+		"proposer predicate with empty proposer block ctx passes": {
 			address:               common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
 			proposerPredicater:    &mockProposerPredicater{predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error { return nil }},
 			emptyProposerBlockCtx: true,
-			expectedErr:           errNilProposerVMBlockCtxWithProposerPredicate,
 		},
 	} {
 		test := test

@@ -89,7 +89,6 @@ func (b *Block) Accept(context.Context) error {
 // contract.Accepter
 // This function assumes that the Accept function will ONLY operate on state maintained in the VM's versiondb.
 // This ensures that any DB operations are performed atomically with marking the block as accepted.
-// Passes in sharedMemoryWriter to accumulate any requests from shared memory to commit on block accept.
 func (b *Block) handlePrecompileAccept(sharedMemoryWriter *sharedMemoryWriter) error {
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 	// Short circuit early if there are no precompile accepters to execute
@@ -113,6 +112,7 @@ func (b *Block) handlePrecompileAccept(sharedMemoryWriter *sharedMemoryWriter) e
 			acceptCtx := &precompileconfig.AcceptContext{
 				SnowCtx:      b.vm.ctx,
 				SharedMemory: sharedMemoryWriter,
+				Warp:         b.vm.warpBackend,
 			}
 			if err := accepter.Accept(acceptCtx, log.TxHash, txIndex, log.Topics, log.Data); err != nil {
 				return err

@@ -4,10 +4,13 @@
 package utils
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIncrOne(t *testing.T) {
@@ -37,33 +40,27 @@ func TestIncrOne(t *testing.T) {
 	}
 }
 
-func TestHashSliceToBytes(t *testing.T) {
-	type test struct {
-		input    []common.Hash
-		expected []byte
+func testBytesToHashSlice(t testing.TB, b []byte) {
+	hashSlice := BytesToHashSlice(b)
+
+	copiedBytes := HashSliceToBytes(hashSlice)
+
+	if len(b)%32 == 0 {
+		require.Equal(t, b, copiedBytes)
+	} else {
+		require.Equal(t, b, copiedBytes[:len(b)])
+		// Require that any additional padding is all zeroes
+		padding := copiedBytes[len(b):]
+		require.Equal(t, bytes.Repeat([]byte{0x00}, len(padding)), padding)
 	}
-	for name, test := range map[string]test{
-		"empty slice": {
-			input:    []common.Hash{},
-			expected: []byte{},
-		},
-		"convert single hash": {
-			input: []common.Hash{
-				common.BytesToHash([]byte{1, 2, 3}),
-			},
-			expected: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3},
-		},
-		"convert hash slice": {
-			input: []common.Hash{
-				common.BytesToHash([]byte{1, 2, 3}),
-				common.BytesToHash([]byte{4, 5, 6}),
-			},
-			expected: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 5, 6},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			output := HashSliceToBytes(test.input)
-			assert.Equal(t, output, test.expected)
-		})
+}
+
+func FuzzHashSliceToBytes(f *testing.F) {
+	for i := 0; i < 100; i++ {
+		f.Add(utils.RandomBytes(i))
 	}
+
+	f.Fuzz(func(t *testing.T, a []byte) {
+		testBytesToHashSlice(t, a)
+	})
 }
