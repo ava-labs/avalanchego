@@ -217,6 +217,6 @@ func TestUnverifiedNestedOwner(t *testing.T) {
 
 	ti, sigs, err := kc.SpendMultiSig(&transfer, 54321, &TestGetter{msig: msigAddressLow, addresses: []ids.ShortID{addresses[0], addresses[1]}, threshold: 2})
 	require.NoError(err)
-	require.Equal(len(sigs), 1)
-	require.Equal(ti.(*TransferInput).SigIndices[0], uint32(0))
+	require.Equal(1, len(sigs), 1)
+	require.Equal(uint32(2), ti.(*TransferInput).SigIndices[0])
 }

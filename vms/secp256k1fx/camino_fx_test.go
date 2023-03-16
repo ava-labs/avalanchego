@@ -4,7 +4,6 @@
 package secp256k1fx
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/golang/mock/gomock"
@@ -90,7 +90,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				Addrs:     []ids.ShortID{addr1, addr2},
 			},
 			msig:          noAliasesMsigGetter,
-			expectedError: errTooFewSigIndices,
+			expectedError: errCantSpend,
 		},
 		"Fail: Wrong signature": {
 			in:      &Input{SigIndices: []uint32{0, 1}},
@@ -113,7 +113,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			expectedError: errCantSpend,
 		},
 		"OK msig: addr1, alias1{addr2, addr3, thresh: 1}": {
-			in:      &Input{SigIndices: []uint32{0, math.MaxUint32}},
+			in:      &Input{SigIndices: []uint32{0, 1}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -132,7 +132,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 		},
 		"OK msig: addr1, alias1{addr2, addr3, thresh: 2}": {
-			in:      &Input{SigIndices: []uint32{0, math.MaxUint32, 2}},
+			in:      &Input{SigIndices: []uint32{0, 1, 2}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -178,64 +178,8 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				return msig
 			},
 		},
-		"OK msig: alias1{ alias2{addr1, addr2 (wildcard), thresh: 2}, addr3, thresh: 2 }, addr4": {
-			in:      &Input{SigIndices: []uint32{0, math.MaxUint32, 2, 3}},
-			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
-			owners: &OutputOwners{
-				Threshold: 2,
-				Addrs:     []ids.ShortID{aliasAddr1, addr4},
-			},
-			msig: func(c *gomock.Controller) AliasGetter {
-				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
-						ID: aliasAddr1,
-						Owners: &OutputOwners{
-							Threshold: 2,
-							Addrs:     []ids.ShortID{aliasAddr2, addr3},
-						},
-					},
-					{
-						ID: aliasAddr2,
-						Owners: &OutputOwners{
-							Threshold: 2,
-							Addrs:     []ids.ShortID{addr1, addr2},
-						},
-					},
-				})
-				return msig
-			},
-		},
-		"OK msig: alias1{ alias2{addr1, addr2, thresh: 2}, addr3, thresh: 2 }, addr4, all wildcards": {
-			in:      &Input{SigIndices: []uint32{math.MaxUint32, math.MaxUint32, math.MaxUint32, math.MaxUint32}},
-			signers: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
-			owners: &OutputOwners{
-				Threshold: 2,
-				Addrs:     []ids.ShortID{aliasAddr1, addr4},
-			},
-			msig: func(c *gomock.Controller) AliasGetter {
-				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
-						ID: aliasAddr1,
-						Owners: &OutputOwners{
-							Threshold: 2,
-							Addrs:     []ids.ShortID{aliasAddr2, addr3},
-						},
-					},
-					{
-						ID: aliasAddr2,
-						Owners: &OutputOwners{
-							Threshold: 2,
-							Addrs:     []ids.ShortID{addr1, addr2},
-						},
-					},
-				})
-				return msig
-			},
-		},
 		"Fail msig: alias1{ alias2{addr1, addr2 (bad sig), thresh: 2}, addr3, thresh: 2 }, addr4": {
-			in:      &Input{SigIndices: []uint32{math.MaxUint32, 1, 2, 3}},
+			in:      &Input{SigIndices: []uint32{0, 1, 2, 3}},
 			signers: []*crypto.PrivateKeySECP256K1R{key1, key4, key3, key4},
 			owners: &OutputOwners{
 				Threshold: 2,
@@ -478,6 +422,38 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 	}
 }
 
+func TestExtractFromAndSigners(t *testing.T) {
+	key1, addr1 := generateKey(t)
+	key2, addr2 := generateKey(t)
+	key3, addr3 := generateKey(t)
+	key4, addr4 := generateKey(t)
+
+	tests := map[string]struct {
+		signers        []*crypto.PrivateKeySECP256K1R
+		expectedFrom   set.Set[ids.ShortID]
+		expectedSigner []*crypto.PrivateKeySECP256K1R
+		expectedError  error
+	}{
+		"OK: Split 4 + 0": {
+			signers:        []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
+			expectedFrom:   makeShortIDSet([]ids.ShortID{addr1, addr2, addr3, addr4}),
+			expectedSigner: []*crypto.PrivateKeySECP256K1R{key1, key2, key3, key4},
+		},
+		"OK: Split 2 + 2": {
+			signers:        []*crypto.PrivateKeySECP256K1R{key1, key2, nil, key3, key4},
+			expectedFrom:   makeShortIDSet([]ids.ShortID{addr1, addr2}),
+			expectedSigner: []*crypto.PrivateKeySECP256K1R{key3, key4},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			f, s := ExtractFromAndSigners(tt.signers)
+			require.Equal(t, f, tt.expectedFrom)
+			require.Equal(t, s, tt.expectedSigner)
+		})
+	}
+}
+
 func defaultFx(t *testing.T) *Fx {
 	require := require.New(t)
 	vm := TestVM{
@@ -513,4 +489,10 @@ func expectGetMultisigAliases(msig *MockAliasGetter, aliases []*multisig.Alias) 
 	}
 	msig.EXPECT().GetMultisigAlias(gomock.Not(gomock.All(aliasesMatchers...))).
 		Return(nil, database.ErrNotFound).AnyTimes()
+}
+
+func makeShortIDSet(src []ids.ShortID) set.Set[ids.ShortID] {
+	newSet := set.NewSet[ids.ShortID](len(src))
+	newSet.Add(src...)
+	return newSet
 }

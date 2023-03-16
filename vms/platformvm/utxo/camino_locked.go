@@ -88,10 +88,12 @@ type CaminoSpender interface {
 	// - [appliedLockState] state to set (except BondDeposit)
 	// - [to] owner of unlocked amounts if appliedLockState is Unlocked
 	// - [change] owner of unlocked amounts resulting from splittig inputs
+	// - [asOf] timestamp against LockTime is compared
 	// Returns:
 	// - [inputs] the inputs that should be consumed to fund the outputs
 	// - [outputs] the outputs that should be returned to the UTXO set
 	// - [signers] the proof of ownership of the funds being moved
+	// - [owners] the owners used for proof of ownership, used e.g. for multiSig
 	Lock(
 		keys []*crypto.PrivateKeySECP256K1R,
 		totalAmountToLock uint64,
@@ -104,6 +106,7 @@ type CaminoSpender interface {
 		[]*avax.TransferableInput, // inputs
 		[]*avax.TransferableOutput, // outputs
 		[][]*crypto.PrivateKeySECP256K1R, // signers
+		[]*secp256k1fx.OutputOwners, // owners
 		error,
 	)
 
@@ -210,6 +213,7 @@ func (h *handler) Lock(
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // outputs
 	[][]*crypto.PrivateKeySECP256K1R, // signers
+	[]*secp256k1fx.OutputOwners, // owners
 	error,
 ) {
 	switch appliedLockState {
@@ -217,21 +221,19 @@ func (h *handler) Lock(
 		locked.StateDeposited,
 		locked.StateUnlocked:
 	default:
-		return nil, nil, nil, errInvalidTargetLockState
+		return nil, nil, nil, nil, errInvalidTargetLockState
 	}
 
-	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
-	for _, key := range keys {
-		addrs.Add(key.PublicKey().Address())
-	}
+	addrs, signer := secp256k1fx.ExtractFromAndSigners(keys)
+
 	utxos, err := avax.GetAllUTXOs(h.utxosReader, addrs) // The UTXOs controlled by [keys]
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
 
 	sortUTXOs(utxos, h.ctx.AVAXAssetID, appliedLockState)
 
-	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
+	kc := secp256k1fx.NewKeychain(signer...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
 	now := asOf
@@ -242,6 +244,7 @@ func (h *handler) Lock(
 	ins := []*avax.TransferableInput{}
 	outs := []*avax.TransferableOutput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	owners := []*secp256k1fx.OutputOwners{}
 
 	// Amount of AVAX that has been locked
 	totalAmountLocked := uint64(0)
@@ -270,7 +273,7 @@ func (h *handler) Lock(
 	if to != nil && appliedLockState == locked.StateUnlocked {
 		id, err := txs.GetOwnerID(to)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		toOwnerID = &id
 	}
@@ -279,7 +282,7 @@ func (h *handler) Lock(
 	if change != nil {
 		id, err := txs.GetOwnerID(change)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		changeOwnerID = &id
 	}
@@ -381,6 +384,7 @@ func (h *handler) Lock(
 				In:     in,
 			})
 			signers = append(signers, inSigners)
+			owners = append(owners, &innerOut.OutputOwners)
 
 			otherLockTxID := lockIDs.DepositTxID
 			if appliedLockState == locked.StateDeposited {
@@ -398,7 +402,7 @@ func (h *handler) Lock(
 			amounts := ownerAmounts.amounts[otherLockTxID]
 			newAmount, err := math.Add64(amounts.locked, amountToLock)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 
 			amounts.locked = newAmount
@@ -418,7 +422,7 @@ func (h *handler) Lock(
 			amounts = ownerAmounts.amounts[otherLockTxID]
 			newAmount, err = math.Add64(amounts.remained, remainingValue)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			amounts.remained = newAmount
 
@@ -473,20 +477,20 @@ func (h *handler) Lock(
 			// We apply the unlocked amount in the remaining step to compact UTXOs
 			unlockAmount := addOut(amounts.locked, lockIDs.Lock(appliedLockState), true)
 			if unlockAmount, err = math.Add64(unlockAmount, amounts.remained); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			addOut(unlockAmount, lockIDs, false)
 		}
 	}
 
 	if totalAmountBurned < totalAmountToBurn || totalAmountLocked < totalAmountToLock {
-		return nil, nil, nil, errInsufficientBalance
+		return nil, nil, nil, nil, errInsufficientBalance
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
 	avax.SortTransferableOutputs(outs, txs.Codec)        // sort outputs
 
-	return ins, outs, signers, nil
+	return ins, outs, signers, owners, nil
 }
 
 func (h *handler) Unlock(

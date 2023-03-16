@@ -1041,8 +1041,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		nodeID = args.NodeID
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
@@ -1053,23 +1052,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		return fmt.Errorf("problem while parsing reward address: %w", err)
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	// Get the user's keys
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1085,7 +1068,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys.Keys,                        // Keys providing the staked tokens
+		keys,                                 // Keys providing the staked tokens
 		changeAddr,
 	)
 	if err != nil {
@@ -1099,7 +1082,6 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1149,29 +1131,12 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		return fmt.Errorf("problem parsing 'rewardAddress': %w", err)
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1186,7 +1151,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 		uint64(args.EndTime),   // End time
 		nodeID,                 // Node ID
 		rewardAddress,          // Reward Address
-		privKeys.Keys,          // Private keys
+		keys,                   // Private keys
 		changeAddr,             // Change address
 	)
 	if err != nil {
@@ -1200,7 +1165,6 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1247,28 +1211,12 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 		return errNamedSubnetCantBePrimary
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	keys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address.
-	if len(keys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := keys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1283,7 +1231,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 		uint64(args.EndTime),   // End time
 		args.NodeID,            // Node ID
 		subnetID,               // Subnet ID
-		keys.Keys,
+		keys,
 		changeAddr,
 	)
 	if err != nil {
@@ -1297,7 +1245,6 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1321,29 +1268,12 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 		return err
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1355,7 +1285,7 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	tx, err := s.vm.txBuilder.NewCreateSubnetTx(
 		uint32(args.Threshold), // Threshold
 		controlKeys.List(),     // Control Addresses
-		privKeys.Keys,          // Private keys
+		keys,                   // Private keys
 		changeAddr,
 	)
 	if err != nil {
@@ -1369,7 +1299,6 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1412,29 +1341,12 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 		}
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1447,7 +1359,7 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
-		privKeys.Keys,       // Private keys
+		keys,                // Private keys
 		changeAddr,          // Change address
 	)
 	if err != nil {
@@ -1461,7 +1373,6 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1495,29 +1406,12 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil { // Get keys
-		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
-	}
-
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1528,7 +1422,7 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	tx, err := s.vm.txBuilder.NewImportTx(
 		chainID,
 		to,
-		privKeys.Keys,
+		keys,
 		changeAddr,
 	)
 	if err != nil {
@@ -1542,7 +1436,6 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }
@@ -1612,29 +1505,12 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 		return txs.ErrCantValidatePrimaryNetwork
 	}
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	keys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address. Assumes that if the user has no keys,
-	// this operation will fail so the change address can be anything.
-	if len(keys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := keys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
+	changeAddr := keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
 		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
 		if err != nil {
@@ -1649,7 +1525,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 		vmID,
 		fxIDs,
 		args.Name,
-		keys.Keys,
+		keys,
 		changeAddr, // Change address
 	)
 	if err != nil {
@@ -1663,7 +1539,6 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 	errs.Add(
 		err,
 		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
 	)
 	return errs.Err
 }

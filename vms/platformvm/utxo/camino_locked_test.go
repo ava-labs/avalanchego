@@ -456,7 +456,7 @@ func TestLock(t *testing.T) {
 
 			testHandler := defaultCaminoHandler(t, internalState)
 
-			ins, outs, signers, err := testHandler.Lock(
+			ins, outs, signers, _, err := testHandler.Lock(
 				[]*crypto.PrivateKeySECP256K1R{secpKey},
 				tt.args.totalAmountToSpend,
 				tt.args.totalAmountToBurn,

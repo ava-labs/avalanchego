@@ -47,8 +47,11 @@ type JSONTxIDChangeAddr struct {
 }
 
 // JSONFromAddrs is a list of addresses to send funds from
+// Optional a list of addresses which will sign a multisig
+// operation can be passed.
 type JSONFromAddrs struct {
-	From []string `json:"from"`
+	From   []string `json:"from"`
+	Signer []string `json:"signer"`
 }
 
 // JSONSpendHeader is 3 arguments to a method that spends (including those with tx fees)

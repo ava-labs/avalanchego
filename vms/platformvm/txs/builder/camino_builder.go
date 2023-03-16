@@ -151,7 +151,7 @@ func (b *caminoBuilder) NewAddValidatorTx(
 		)
 	}
 
-	ins, outs, signers, err := b.Lock(
+	ins, outs, signers, _, err := b.Lock(
 		keys,
 		stakeAmount,
 		b.cfg.AddPrimaryNetworkValidatorFee,
@@ -269,7 +269,7 @@ func (b *caminoBuilder) NewAddressStateTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	ins, outs, signers, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -310,7 +310,7 @@ func (b *caminoBuilder) NewDepositTx(
 		return nil, errWrongLockMode
 	}
 
-	ins, outs, signers, err := b.Lock(keys, amount, b.cfg.TxFee, locked.StateDeposited, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(keys, amount, b.cfg.TxFee, locked.StateDeposited, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -358,7 +358,7 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	}
 
 	// burning fee
-	feeIns, feeOuts, feeSigners, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	feeIns, feeOuts, feeSigners, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -404,7 +404,7 @@ func (b *caminoBuilder) NewClaimTx(
 		return nil, errWrongLockMode
 	}
 
-	ins, outs, signers, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -454,7 +454,7 @@ func (b *caminoBuilder) NewClaimTx(
 	var claimableIns []*avax.TransferableInput
 	var claimableOuts []*avax.TransferableOutput
 	if totalAmountToClaim > 0 {
-		claimableIns, claimableOuts, _, err = b.Lock(
+		claimableIns, claimableOuts, _, _, err = b.Lock(
 			fakeTreasuryKeyArr,
 			totalAmountToClaim,
 			0,
@@ -499,7 +499,7 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	ins, outs, signers, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

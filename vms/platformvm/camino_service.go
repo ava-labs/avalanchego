@@ -34,10 +34,11 @@ import (
 var (
 	errInvalidChangeAddr      = "couldn't parse changeAddr: %w"
 	errCreateTx               = "couldn't create tx: %w"
-	errCreateTransferables    = errors.New("couldn't create transferables")
-	errSerializeTransferables = errors.New("couldn't serialize transferables")
-	errEncodeTransferables    = errors.New("couldn't encode transferables as string")
+	errCreateTransferables    = errors.New("can't create transferables")
+	errSerializeTransferables = errors.New("can't serialize transferables")
+	errEncodeTransferables    = errors.New("can't encode transferables as string")
 	errWrongOwnerType         = errors.New("wrong owner type")
+	errSerializeOwners        = errors.New("can't serialize owners")
 )
 
 // CaminoService defines the API calls that can be made to the platform chain
@@ -74,6 +75,8 @@ func (response GetBalanceResponseWrapper) MarshalJSON() ([]byte, error) {
 
 // GetBalance gets the balance of an address
 func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponseWrapper) error {
+	s.vm.ctx.Log.Debug("Platform: GetBalance called")
+
 	caminoConfig, err := s.vm.state.CaminoConfig()
 	if err != nil {
 		return err
@@ -242,7 +245,7 @@ type SetAddressStateArgs struct {
 func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: SetAddressState called")
 
-	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
+	privKeys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
@@ -262,7 +265,7 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 		targetAddr,  // Address to change state
 		args.Remove, // Add or remove State
 		args.State,  // The state to change
-		keys.Keys,   // Keys providing the staked tokens
+		privKeys,    // Keys providing the staked tokens
 		change,
 	)
 	if err != nil {
@@ -279,6 +282,8 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 
 // GetAdressStates retrieves the state applied to an address (see setAddressState)
 func (s *CaminoService) GetAddressStates(_ *http.Request, args *api.JSONAddress, response *utilsjson.Uint64) error {
+	s.vm.ctx.Log.Debug("Platform: GetAddressStates called")
+
 	addr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
 		return err
@@ -301,6 +306,8 @@ type GetMultisigAliasReply struct {
 
 // GetMultisigAlias retrieves the owners and threshold for a given multisig alias
 func (s *CaminoService) GetMultisigAlias(_ *http.Request, args *api.JSONAddress, response *GetMultisigAliasReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetMultisigAlias called")
+
 	addr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
 		return err
@@ -346,16 +353,17 @@ type SpendReply struct {
 	Ins     string          `json:"ins"`
 	Outs    string          `json:"outs"`
 	Signers [][]ids.ShortID `json:"signers"`
+	Owners  string          `json:"owners"`
 }
 
 func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendReply) error {
 	s.vm.ctx.Log.Debug("Platform: Spend called")
 
-	keys, err := s.getFakeKeys(&args.JSONFromAddrs)
+	privKeys, err := s.getFakeKeys(&args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
-	if len(keys.Keys) == 0 {
+	if len(privKeys) == 0 {
 		return errNoKeys
 	}
 
@@ -369,8 +377,8 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		return err
 	}
 
-	ins, outs, signers, err := s.vm.txBuilder.Lock(
-		keys.Keys,
+	ins, outs, signers, owners, err := s.vm.txBuilder.Lock(
+		privKeys,
 		uint64(args.AmountToLock),
 		uint64(args.AmountToBurn),
 		locked.State(args.LockMode),
@@ -408,6 +416,13 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		}
 	}
 
+	bytes, err = txs.Codec.Marshal(txs.Version, owners)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errSerializeOwners, err)
+	}
+	if response.Owners, err = formatting.Encode(args.Encoding, bytes); err != nil {
+		return fmt.Errorf("%w: %s", errSerializeOwners, err)
+	}
 	return nil
 }
 
@@ -425,29 +440,9 @@ type RegisterNodeArgs struct {
 func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, reply *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: RegisterNode called")
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	privKeys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
-	}
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-
-	// Get the user's keys
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	if err := user.Close(); err != nil {
-		return err
-	}
-
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
 	}
 
 	change, err := s.getOutputOwner(&args.Change)
@@ -466,7 +461,7 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 		args.OldNodeID,
 		args.NewNodeID,
 		consortiumMemberAddress,
-		privKeys.Keys,
+		privKeys,
 		change,
 	)
 	if err != nil {
@@ -496,29 +491,9 @@ type ClaimArgs struct {
 func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: Claim called")
 
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	privKeys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
-	}
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-
-	// Get the user's keys
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	if err := user.Close(); err != nil {
-		return err
-	}
-
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
 	}
 
 	change, err := s.getOutputOwner(&args.Change)
@@ -537,7 +512,7 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		args.ClaimableOwnerIDs,
 		args.AmountToClaim,
 		claimTo,
-		privKeys.Keys,
+		privKeys,
 		change,
 	)
 	if err != nil {
@@ -554,6 +529,8 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 }
 
 func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSONAddress, response *api.JSONAddress) error {
+	s.vm.ctx.Log.Debug("Platform: GetRegisteredShortIDLink called")
+
 	var id ids.ShortID
 	isNodeID := false
 	if nodeID, err := ids.NodeIDFromString(args.Address); err == nil {
@@ -703,48 +680,96 @@ func (s *Service) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.
 	return nil
 }
 
-func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP256K1R, error) {
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, creds.Username, creds.Password)
 	if err != nil {
 		return nil, err
 	}
 	defer user.Close()
 
-	// Get the user's keys
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
+	var keys []*crypto.PrivateKeySECP256K1R
+	if len(from.Signer) > 0 {
+		if len(from.From) == 0 {
+			return nil, errNoKeys
+		}
 
-	// Parse the change address.
-	if len(privKeys.Keys) == 0 {
-		return nil, errNoKeys
+		// Get fake keys for from addresses
+		keys, err = s.getFakeKeys(&api.JSONFromAddrs{From: from.From})
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse the signer addresses
+		signerAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.Signer)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get keys for multiSig
+		keyChain, err := keystore.GetKeychain(user, signerAddrs)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+		}
+		if len(keyChain.Keys) == 0 {
+			return nil, errNoKeys
+		}
+
+		keys = append(keys, nil)
+		keys = append(keys, keyChain.Keys...)
+	} else {
+		// Parse the from addresses
+		fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get the user's keys
+		keyChain, err := keystore.GetKeychain(user, fromAddrs)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+		}
+		if len(keyChain.Keys) == 0 {
+			return nil, errNoKeys
+		}
+
+		keys = keyChain.Keys
 	}
 
 	if err = user.Close(); err != nil {
 		return nil, err
 	}
-	return privKeys, nil
+	return keys, nil
 }
 
-func (s *Service) getFakeKeys(args *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
+// getFakeKeys creates SECP256K1 private keys which have only the purpose to provide the address.
+// Used for calls like spend() which provide fromAddrs and signers required to get the correct UTXOs
+// for the transaction. These private keys can never recover to the public address they contain.
+func (s *Service) getFakeKeys(from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP256K1R, error) {
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)
 	if err != nil {
 		return nil, err
 	}
 
-	privKeys := secp256k1fx.NewKeychain()
+	keys := []*crypto.PrivateKeySECP256K1R{}
 	for fromAddr := range fromAddrs {
-		privKeys.Add(crypto.FakePrivateKey(fromAddr))
+		keys = append(keys, crypto.FakePrivateKey(fromAddr))
 	}
-	return privKeys, nil
+
+	if len(from.Signer) > 0 {
+		// Parse the signer addresses
+		signerAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.Signer)
+		if err != nil {
+			return nil, err
+		}
+
+		keys = append(keys, nil)
+		for signerAddr := range signerAddrs {
+			keys = append(keys, crypto.FakePrivateKey(signerAddr))
+		}
+	}
+
+	return keys, nil
 }
 
 func (s *Service) getOutputOwner(args *platformapi.Owner) (*secp256k1fx.OutputOwners, error) {

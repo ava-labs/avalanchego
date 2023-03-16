@@ -6,23 +6,22 @@ package secp256k1fx
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
-	errNotSecp256Cred   = errors.New("expected secp256k1 credentials")
-	errWrongOutputType  = errors.New("wrong output type")
-	errMsigCombination  = errors.New("msig combinations not supported")
-	errNotAliasGetter   = errors.New("state isn't msig alias getter")
-	errTooFewSigIndices = errors.New("too few signature indices")
+	errNotSecp256Cred  = errors.New("expected secp256k1 credentials")
+	errWrongOutputType = errors.New("wrong output type")
+	errMsigCombination = errors.New("msig combinations not supported")
+	errNotAliasGetter  = errors.New("state isn't msig alias getter")
 )
 
 type Owned interface {
@@ -195,8 +194,12 @@ func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msi
 }
 
 func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred CredentialIntf, owners *OutputOwners, msig AliasGetter) error {
-	mCred, _ := cred.(*MultisigCredential)
-	if len(in.SigIndices) != len(cred.Signatures()) {
+	sigIdxs := cred.SignatureIndices()
+	if sigIdxs == nil {
+		sigIdxs = in.SigIndices
+	}
+
+	if len(sigIdxs) != len(cred.Signatures()) {
 		return errInputCredentialSignersMismatch
 	}
 
@@ -206,39 +209,28 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred Credentia
 	}
 
 	tf := func(
-		alias bool,
 		addr ids.ShortID,
-		visited,
-		verified,
 		totalVisited,
 		totalVerified uint32,
-	) (TFResult, error) {
-		if alias {
-			if mCred == nil || mCred.HasMultisig(addr) {
-				return TFContinue, nil // continue traversal
-			} else {
-				return TFSkip, nil // skip this element
-			}
-		}
+	) (bool, error) {
 		// check that input sig index matches
-		if totalVerified >= uint32(len(cred.Signatures())) {
-			return TFError, errTooFewSigIndices
+		if totalVerified >= uint32(len(sigIdxs)) {
+			return false, nil
 		}
 
 		if sig, exists := resolved[addr]; exists &&
 			sig == cred.Signatures()[totalVerified] &&
-			(in.SigIndices[totalVerified] == math.MaxUint32 ||
-				in.SigIndices[totalVerified] == totalVisited) {
-			return TFVerify, nil
+			sigIdxs[totalVerified] == totalVisited {
+			return true, nil
 		}
-		return TFSkip, nil
+		return false, nil
 	}
 
 	sigsVerified, err := TraverseOwners(owners, msig, tf)
 	if err != nil {
 		return err
 	}
-	if sigsVerified < uint32(len(cred.Signatures())) {
+	if sigsVerified < uint32(len(sigIdxs)) {
 		return errTooManySigners
 	}
 
@@ -251,15 +243,11 @@ func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, creds []verify.V
 		return err
 	}
 
-	tf := func(alias bool, addr ids.ShortID, _, _, _, _ uint32) (TFResult, error) {
-		if alias {
-			// We try to verify whatever we can _> jump into children
-			return TFContinue, nil
-		}
+	tf := func(addr ids.ShortID, _, _ uint32) (bool, error) {
 		if _, exists := resolved[addr]; exists {
-			return TFVerify, nil
+			return true, nil
 		}
-		return TFSkip, nil
+		return false, nil
 	}
 
 	if _, err = TraverseOwners(owners, msig, tf); err != nil {
@@ -267,4 +255,40 @@ func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, creds []verify.V
 	}
 
 	return nil
+}
+
+// ExtractFromAndSigners splits an array of PrivateKeys into `from` and `signers`
+// The delimiter is a `nil` PrivateKey.
+// If no delimiter exists, the given PrivateKeys are used for both from and signing
+// Having different sets of `from` and `signer` allows multisignature feature
+func ExtractFromAndSigners(keys []*crypto.PrivateKeySECP256K1R) (set.Set[ids.ShortID], []*crypto.PrivateKeySECP256K1R) {
+	// find nil key which splits froms and signer
+	splitIndex := len(keys)
+	for index, key := range keys {
+		if key == nil {
+			splitIndex = index
+			break
+		}
+	}
+
+	if splitIndex == len(keys) {
+		from := set.NewSet[ids.ShortID](len(keys))
+		for _, key := range keys {
+			from.Add(key.PublicKey().Address())
+		}
+		return from, keys
+	}
+
+	// Addresses we get UTXOs for
+	from := set.NewSet[ids.ShortID](splitIndex)
+	for index := 0; index < splitIndex; index++ {
+		from.Add(keys[index].PublicKey().Address())
+	}
+
+	// Signers which will signe the Outputs
+	signer := make([]*crypto.PrivateKeySECP256K1R, len(keys)-splitIndex-1)
+	for index := 0; index < len(signer); index++ {
+		signer[index] = keys[index+splitIndex+1]
+	}
+	return from, signer
 }

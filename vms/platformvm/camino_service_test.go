@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"testing"
 
+	json_api "github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -305,4 +307,132 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 			require.ElementsMatch(t, tt.want, tt.args.response.DepositOffers)
 		})
 	}
+}
+
+func TestGetKeystoreKeys(t *testing.T) {
+	s, _ := defaultService(t)
+	userPass := json_api.UserPass{Username: testUsername, Password: testPassword}
+	// Insert testAddress into keystore
+	defaultAddress(t, s)
+	_, _, testAddressBytes, _ := address.Parse(testAddress)
+	testAddressID, _ := ids.ToShortID(testAddressBytes)
+
+	tests := map[string]struct {
+		from          json_api.JSONFromAddrs
+		expectedAddrs []ids.ShortID
+		expectedError error
+	}{
+		"OK - No signers": {
+			from: json_api.JSONFromAddrs{
+				From: []string{testAddress},
+			},
+			expectedAddrs: []ids.ShortID{testAddressID},
+		},
+		"OK - From and signer are same": {
+			from: json_api.JSONFromAddrs{
+				From:   []string{testAddress},
+				Signer: []string{testAddress},
+			},
+			expectedAddrs: []ids.ShortID{testAddressID, ids.ShortEmpty, testAddressID},
+		},
+		"Not OK - From and signer are same": {
+			from: json_api.JSONFromAddrs{
+				Signer: []string{testAddress},
+			},
+			expectedError: errNoKeys,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			keys, err := s.getKeystoreKeys(&userPass, &tt.from)
+			require.ErrorIs(t, err, tt.expectedError)
+
+			for index, key := range keys {
+				if key == nil {
+					require.Equal(t, tt.expectedAddrs[index], ids.ShortEmpty)
+				} else {
+					require.Equal(t, tt.expectedAddrs[index], key.Address())
+				}
+			}
+		})
+	}
+}
+
+func TestGetFakeKeys(t *testing.T) {
+	s, _ := defaultService(t)
+
+	_, _, testAddressBytes, _ := address.Parse(testAddress)
+	testAddressID, _ := ids.ToShortID(testAddressBytes)
+
+	tests := map[string]struct {
+		from          json_api.JSONFromAddrs
+		expectedAddrs []ids.ShortID
+		expectedError error
+	}{
+		"OK - No signers": {
+			from: json_api.JSONFromAddrs{
+				From: []string{testAddress},
+			},
+			expectedAddrs: []ids.ShortID{testAddressID},
+		},
+		"OK - From and signer are same": {
+			from: json_api.JSONFromAddrs{
+				From:   []string{testAddress},
+				Signer: []string{testAddress},
+			},
+			expectedAddrs: []ids.ShortID{testAddressID, ids.ShortEmpty, testAddressID},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			keys, err := s.getFakeKeys(&tt.from)
+			require.ErrorIs(t, err, tt.expectedError)
+
+			for index, key := range keys {
+				if key == nil {
+					require.Equal(t, tt.expectedAddrs[index], ids.ShortEmpty)
+				} else {
+					require.Equal(t, tt.expectedAddrs[index], key.Address())
+				}
+			}
+		})
+	}
+}
+
+func TestSpend(t *testing.T) {
+	hrp := constants.NetworkIDToHRP[testNetworkID]
+	id := keys[0].PublicKey().Address()
+	addr, err := address.FormatBech32(hrp, id.Bytes())
+	require.NoError(t, err)
+
+	service := defaultCaminoService(
+		t,
+		api.Camino{
+			LockModeBondDeposit: true,
+		},
+		[]api.UTXO{{
+			Locktime: 0,
+			Amount:   100,
+			Address:  addr,
+			Message:  "",
+		}},
+	)
+
+	spendArgs := SpendArgs{
+		JSONFromAddrs: json_api.JSONFromAddrs{
+			From: []string{"P-" + addr},
+		},
+		AmountToBurn: 50,
+		Encoding:     formatting.Hex,
+		To: api.Owner{
+			Threshold: 1,
+			Addresses: []string{"P-" + addr},
+		},
+	}
+
+	spendReply := SpendReply{}
+
+	err = service.Spend(nil, &spendArgs, &spendReply)
+	require.NoError(t, err)
+	require.Equal(t, "0x00000000000100000000000000000000000100000001fceda8f90fcb5d30614b99d79fc4baa2930776262dcf0a4e", spendReply.Owners)
 }

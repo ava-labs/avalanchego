@@ -20,23 +20,16 @@ var (
 	errCyclicAliases     = errors.New("cyclic aliases not allowed")
 )
 
-type TFResult int
-
-const (
-	TFVerify TFResult = iota
-	TFSkip
-	TFContinue
-	TFError
-)
-
-// Spend attempts to create an input from outputowners which can contain multisig aliases
-func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf interface{}) (
+// SpendMultisig attempts to create an input from outputowners which can contain multisig aliases
+// Multisig alias are resolved into addresses and the sigIdxs returned are counted global.
+// Multisig occurrences itself do not count in any way in sigIdxs, only addresses do.
+func (kc *Keychain) SpendMultiSig(
+	out verify.Verifiable,
+	time uint64,
+	msigIntf interface{},
+) (
 	verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error,
 ) {
-	if len(kc.Keys) == 0 {
-		return nil, nil, errCantSpend
-	}
-
 	// get the multisig alias getter
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
@@ -57,26 +50,27 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 	sigs := make([]uint32, 0, owners.Threshold)
 	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
 
-	tf := func(alias bool, addr ids.ShortID, visited, _, totalVisited, totalVerified uint32) (TFResult, error) {
+	tf := func(addr ids.ShortID, totalVisited, totalVerified uint32) (bool, error) {
 		if key, exists := kc.get(addr); exists {
-			// Remove signatures from failed children
+			// In case a nested alias doesnt meet threshold,
 			if totalVerified < uint32(len(sigs)) {
 				sigs = sigs[:totalVerified]
 				keys = keys[:totalVerified]
 			}
 			sigs = append(sigs, totalVisited)
 			keys = append(keys, key)
-			// For alias -> skip children
-			return TFVerify, nil
+			// Verified address
+			return true, nil
 		}
-		// Assumption we traverse with real addresses -> process children
-		return TFContinue, nil
+		// This address cannot be verified
+		return false, nil
 	}
 
 	totalVerified, err := TraverseOwners(owners, msig, tf)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if totalVerified < uint32(len(sigs)) {
 		sigs = sigs[:totalVerified]
 		keys = keys[:totalVerified]
@@ -98,23 +92,22 @@ func (kc *Keychain) SpendMultiSig(out verify.Verifiable, time uint64, msigIntf i
 }
 
 type TraverserOwnerFunc func(
-	alias bool,
 	addr ids.ShortID,
-	visited,
-	verified,
 	totalVisited,
 	totalVerified uint32,
-) (TFResult, error)
+) (bool, error)
 
 // TraverseOwners traverses through owners, visits every address and callbacks in case a
 // non-multisig address is visited. Nested multisig alias are excluded from sigIndex concept.
-// The sigIndex(es) on base level must be set as MaxUint32
 func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwnerFunc) (uint32, error) {
-	var visited, verified uint32
+	var addrVisited, addrVerified uint32
 
 	type stackItem struct {
-		index, verified, verifiedTotal, visitedTotal uint32
-		owners                                       *OutputOwners
+		index,
+		verified,
+		addrVerifiedTotal uint32
+		parentVerified bool
+		owners         *OutputOwners
 	}
 
 	cycleCheck := set.Set[ids.ShortID]{}
@@ -123,8 +116,7 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 	Stack:
 		// get head
 		currentStack := stack[len(stack)-1]
-		for int(currentStack.index) < len(currentStack.owners.Addrs) &&
-			currentStack.verified < currentStack.owners.Threshold {
+		for int(currentStack.index) < len(currentStack.owners.Addrs) {
 			// get the next address to check
 			addr := currentStack.owners.Addrs[currentStack.index]
 			currentStack.index++
@@ -143,47 +135,32 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				if !ok {
 					return 0, errWrongOwnerType
 				}
-				result, err := callback(
-					true,
-					addr,
-					currentStack.index-1,
-					currentStack.verified,
-					visited,
-					verified,
-				)
-				if err != nil {
-					return 0, err
-				}
-
-				switch result {
-				case TFVerify:
-					currentStack.verified++
-					verified++
-				case TFContinue:
-					stack = append(stack, &stackItem{owners: owners, verifiedTotal: verified, visitedTotal: visited})
-					goto Stack
-				}
-				visited++
+				stack = append(stack, &stackItem{
+					owners:            owners,
+					addrVerifiedTotal: addrVerified,
+					parentVerified:    currentStack.parentVerified || currentStack.verified >= currentStack.owners.Threshold,
+				})
+				goto Stack
 			case database.ErrNotFound: // non-multi-sig
-				if visited > MaxSignatures {
-					return 0, errTooManySignatures
+				if !currentStack.parentVerified && currentStack.verified < currentStack.owners.Threshold {
+					success, err := callback(
+						addr,
+						addrVisited,
+						addrVerified,
+					)
+					if err != nil {
+						return 0, err
+					}
+					if success {
+						currentStack.verified++
+						addrVerified++
+
+						if addrVerified > MaxSignatures {
+							return 0, errTooManySignatures
+						}
+					}
 				}
-				result, err := callback(
-					false,
-					addr,
-					currentStack.index-1,
-					currentStack.verified,
-					visited,
-					verified,
-				)
-				if err != nil {
-					return 0, err
-				}
-				if result == TFVerify {
-					currentStack.verified++
-					verified++
-				}
-				visited++
+				addrVisited++
 			default:
 				return 0, err
 			}
@@ -197,12 +174,14 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 				return 0, errCantSpend
 			}
 			// We recover to previous state
-			verified = currentStack.verifiedTotal
-			visited = currentStack.visitedTotal
+			addrVerified = currentStack.addrVerifiedTotal
 		} else if len(stack) > 0 {
-			// apply child verification
-			stack[len(stack)-1].verified++
+			currentStack = stack[len(stack)-1]
+			if currentStack.verified < currentStack.owners.Threshold {
+				// apply child verification
+				currentStack.verified++
+			}
 		}
 	}
-	return verified, nil
+	return addrVerified, nil
 }

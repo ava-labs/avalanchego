@@ -63,7 +63,7 @@ func (h *caminoHandler) Spend(
 				Addrs:     []ids.ShortID{changeAddr},
 			}
 		}
-		inputs, outputs, signers, err := h.Lock(keys, amount, fee, locked.StateUnlocked, nil, change, 0)
+		inputs, outputs, signers, _, err := h.Lock(keys, amount, fee, locked.StateUnlocked, nil, change, 0)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
