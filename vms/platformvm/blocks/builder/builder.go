@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -151,7 +151,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		Tx:            tx,
 	}
 	if err := tx.Unsigned.Visit(&verifier); err != nil {
-		b.MarkDropped(txID, err.Error())
+		b.MarkDropped(txID, err)
 		return err
 	}
 
@@ -263,17 +263,17 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 		}
 
 		txID := tx.ID()
-		errMsg := fmt.Sprintf(
+		err := fmt.Errorf(
 			"synchrony bound (%s) is later than staker start time (%s)",
 			minStartTime,
 			startTime,
 		)
 
 		b.Mempool.Remove([]*txs.Tx{tx})
-		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
+		b.Mempool.MarkDropped(txID, err) // cache tx as dropped
 		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
-			zap.String("reason", errMsg),
 			zap.Stringer("txID", txID),
+			zap.Error(err),
 		)
 	}
 }

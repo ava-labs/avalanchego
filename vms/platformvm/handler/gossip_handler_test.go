@@ -4,13 +4,16 @@
 package handler
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/stretchr/testify/require"
 )
+
+var errTestingDropped = errors.New("testing dropped")
 
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
@@ -47,7 +50,7 @@ func TestMempoolInvalidTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := env.GetValidTx(t)
 	txID := tx.ID()
-	env.Builder.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, errTestingDropped)
 
 	gossipHandler := NewGossipHandler(env.Ctx, env.Builder)
 	msg := message.TxGossip{Tx: tx.Bytes()}

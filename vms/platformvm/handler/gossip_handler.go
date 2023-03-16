@@ -6,8 +6,8 @@ package handler
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"go.uber.org/zap"
 )
@@ -45,7 +45,7 @@ func (n *gossipHandler) HandleTx(nodeID ids.NodeID, msg *message.TxGossip) error
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
-	if _, dropped := n.blkBuilder.GetDropReason(tx.ID()); dropped {
+	if reason := n.blkBuilder.GetDropReason(tx.ID()); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}

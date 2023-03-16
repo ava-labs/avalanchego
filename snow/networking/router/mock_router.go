@@ -14,6 +14,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	message "github.com/ava-labs/avalanchego/message"
+	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	handler "github.com/ava-labs/avalanchego/snow/networking/handler"
 	timeout "github.com/ava-labs/avalanchego/snow/networking/timeout"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
@@ -136,15 +137,15 @@ func (mr *MockRouterMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5,
 }
 
 // RegisterRequest mocks base method.
-func (m *MockRouter) RegisterRequest(arg0 context.Context, arg1 ids.NodeID, arg2, arg3 ids.ID, arg4 uint32, arg5 message.Op, arg6 message.InboundMessage) {
+func (m *MockRouter) RegisterRequest(arg0 context.Context, arg1 ids.NodeID, arg2, arg3 ids.ID, arg4 uint32, arg5 message.Op, arg6 message.InboundMessage, arg7 p2p.EngineType) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterRequest", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	m.ctrl.Call(m, "RegisterRequest", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 // RegisterRequest indicates an expected call of RegisterRequest.
-func (mr *MockRouterMockRecorder) RegisterRequest(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
+func (mr *MockRouterMockRecorder) RegisterRequest(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequest", reflect.TypeOf((*MockRouter)(nil).RegisterRequest), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequest", reflect.TypeOf((*MockRouter)(nil).RegisterRequest), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 // Shutdown mocks base method.

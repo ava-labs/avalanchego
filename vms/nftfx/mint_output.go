@@ -16,7 +16,7 @@ type MintOutput struct {
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct
 // into a JSON readable format
-// If OutputOwners cannot be serialised then this will return error
+// If OutputOwners cannot be serialized then this will return error
 func (out *MintOutput) MarshalJSON() ([]byte, error) {
 	result, err := out.OutputOwners.Fields()
 	if err != nil {

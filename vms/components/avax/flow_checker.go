@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errInsufficientFunds = errors.New("insufficient funds")
+var ErrInsufficientFunds = errors.New("insufficient funds")
 
 type FlowChecker struct {
 	consumed, produced map[ids.ID]uint64
@@ -44,7 +44,7 @@ func (fc *FlowChecker) Verify() error {
 		for assetID, producedAssetAmount := range fc.produced {
 			consumedAssetAmount := fc.consumed[assetID]
 			if producedAssetAmount > consumedAssetAmount {
-				fc.errs.Add(errInsufficientFunds)
+				fc.errs.Add(ErrInsufficientFunds)
 				break
 			}
 		}

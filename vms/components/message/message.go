@@ -12,7 +12,7 @@ import (
 var (
 	_ Message = (*TxGossip)(nil)
 
-	errUnexpectedCodecVersion = errors.New("unexpected codec version")
+	ErrUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
 
 type Message interface {
@@ -45,7 +45,7 @@ func Parse(bytes []byte) (Message, error) {
 		return nil, err
 	}
 	if version != codecVersion {
-		return nil, errUnexpectedCodecVersion
+		return nil, ErrUnexpectedCodecVersion
 	}
 	msg.initialize(bytes)
 	return msg, nil

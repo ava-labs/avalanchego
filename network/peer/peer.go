@@ -606,7 +606,7 @@ func (p *peer) sendNetworkMessages() {
 			}
 
 			if len(peerIPs) == 0 {
-				p.Log.Debug(
+				p.Log.Verbo(
 					"skipping peer gossip as there are no unknown peers",
 					zap.Stringer("nodeID", p.id),
 				)

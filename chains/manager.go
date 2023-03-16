@@ -583,6 +583,11 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
+	ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		State: snow.Initializing,
+	})
+
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
@@ -676,7 +681,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx,
 		vdrs,
 		msgChan,
@@ -701,7 +706,7 @@ func (m *manager) createAvalancheChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
-		Timer:                          handler,
+		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -713,6 +718,31 @@ func (m *manager) createAvalancheChain(
 	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
+	}
+
+	var consensus avcon.Consensus = &avcon.Topological{}
+	if m.TracingEnabled {
+		consensus = avcon.Trace(consensus, m.Tracer)
+	}
+
+	// create engine gear
+	engineConfig := aveng.Config{
+		Ctx:           ctx,
+		AllGetsServer: avaGetHandler,
+		VM:            vm,
+		Manager:       vtxManager,
+		Sender:        messageSender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     consensus,
+	}
+	engine, err := aveng.New(engineConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
+
+	if m.TracingEnabled {
+		engine = aveng.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -727,9 +757,7 @@ func (m *manager) createAvalancheChain(
 	bootstrapper, err := avbootstrap.New(
 		context.TODO(),
 		bootstrapperConfig,
-		func(ctx context.Context, lastReqID uint32) error {
-			return handler.Consensus().Start(ctx, lastReqID+1)
-		},
+		engine.Start,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
@@ -739,39 +767,19 @@ func (m *manager) createAvalancheChain(
 		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
 	}
 
-	handler.SetBootstrapper(bootstrapper)
-
-	var consensus avcon.Consensus = &avcon.Topological{}
-	if m.TracingEnabled {
-		consensus = avcon.Trace(consensus, m.Tracer)
-	}
-
-	// create engine gear
-	engineConfig := aveng.Config{
-		Ctx:           bootstrapperConfig.Ctx,
-		AllGetsServer: avaGetHandler,
-		VM:            bootstrapperConfig.VM,
-		Manager:       vtxManager,
-		Sender:        bootstrapperConfig.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     consensus,
-	}
-	engine, err := aveng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
-	}
-
-	if m.TracingEnabled {
-		engine = aveng.TraceEngine(engine, m.Tracer)
-	}
-
-	handler.SetConsensus(engine)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+		Snowman: nil,
+	})
 
 	// Register health check for this chain
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -779,7 +787,7 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Context: ctx,
 		VM:      vm,
-		Handler: handler,
+		Handler: h,
 	}, nil
 }
 
@@ -796,6 +804,11 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
+	ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Initializing,
+	})
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
@@ -944,7 +957,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx,
 		vdrs,
 		msgChan,
@@ -969,7 +982,7 @@ func (m *manager) createSnowmanChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
-		Timer:                          handler,
+		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -1008,8 +1021,6 @@ func (m *manager) createSnowmanChain(
 		engine = smeng.TraceEngine(engine, m.Tracer)
 	}
 
-	handler.SetConsensus(engine)
-
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:        commonCfg,
@@ -1031,8 +1042,6 @@ func (m *manager) createSnowmanChain(
 		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
 	}
 
-	handler.SetBootstrapper(bootstrapper)
-
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
 		commonCfg,
@@ -1052,10 +1061,17 @@ func (m *manager) createSnowmanChain(
 		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
 	}
 
-	handler.SetStateSyncer(stateSyncer)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: nil,
+		Snowman: &handler.Engine{
+			StateSyncer:  stateSyncer,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1063,7 +1079,7 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Context: ctx,
 		VM:      vm,
-		Handler: handler,
+		Handler: h,
 	}, nil
 }
 

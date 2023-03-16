@@ -4,11 +4,9 @@
 package txs
 
 import (
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -45,30 +43,6 @@ func (t *BaseTx) InputIDs() set.Set[ids.ID] {
 		inputIDs.Add(in.InputID())
 	}
 	return inputIDs
-}
-
-func (t *BaseTx) SyntacticVerify(
-	ctx *snow.Context,
-	c codec.Manager,
-	txFeeAssetID ids.ID,
-	config *config.Config,
-	_ int,
-) error {
-	if t == nil {
-		return errNilTx
-	}
-
-	if err := t.BaseTx.Verify(ctx); err != nil {
-		return err
-	}
-
-	return avax.VerifyTx(
-		config.TxFee,
-		txFeeAssetID,
-		[][]*avax.TransferableInput{t.Ins},
-		[][]*avax.TransferableOutput{t.Outs},
-		c,
-	)
 }
 
 func (t *BaseTx) Visit(v Visitor) error {

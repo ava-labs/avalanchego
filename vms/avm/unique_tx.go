@@ -16,14 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
-	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
-	errMissingUTXO     = errors.New("missing utxo")
-	errUnknownTx       = errors.New("transaction is unknown")
-	errRejectedTx      = errors.New("transaction is rejected")
+	errMissingUTXO = errors.New("missing utxo")
+	errUnknownTx   = errors.New("transaction is unknown")
+	errRejectedTx  = errors.New("transaction is rejected")
 )
 
 var (
@@ -127,8 +127,6 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
-	txID := tx.ID()
-
 	// Fetch the input UTXOs
 	inputUTXOIDs := tx.InputUTXOs()
 	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
@@ -138,7 +136,7 @@ func (tx *UniqueTx) Accept(context.Context) error {
 			continue
 		}
 
-		utxo, err := tx.vm.getUTXO(utxoID)
+		utxo, err := tx.vm.dagState.GetUTXOFromID(utxoID)
 		if err != nil {
 			// should never happen because the UTXO was previously verified to
 			// exist
@@ -147,25 +145,23 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
+	txID := tx.ID()
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
 		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
-	// Remove spent utxos
-	for _, utxo := range inputUTXOIDs {
-		if utxo.Symbolic() {
-			// If the UTXO is symbolic, it can't be spent
-			continue
-		}
-		utxoID := utxo.InputID()
-		tx.vm.state.DeleteUTXO(utxoID)
+	executor := &executor.Executor{
+		Codec: tx.vm.txBackend.Codec,
+		State: tx.vm.state,
+		Tx:    tx.Tx,
 	}
-	// Add new utxos
-	for _, utxo := range outputUTXOs {
-		tx.vm.state.AddUTXO(utxo)
+	err := tx.Tx.Unsigned.Visit(executor)
+	if err != nil {
+		return fmt.Errorf("error staging accepted state changes: %w", err)
 	}
+
 	tx.setStatus(choices.Accepted)
 
 	commitBatch, err := tx.vm.state.CommitBatch()
@@ -174,14 +170,12 @@ func (tx *UniqueTx) Accept(context.Context) error {
 	}
 
 	defer tx.vm.state.Abort()
-	err = tx.Tx.Unsigned.Visit(&executeTx{
-		tx:           tx.Tx,
-		batch:        commitBatch,
-		sharedMemory: tx.vm.ctx.SharedMemory,
-		parser:       tx.vm.parser,
-	})
+	err = tx.vm.ctx.SharedMemory.Apply(
+		executor.AtomicRequests,
+		commitBatch,
+	)
 	if err != nil {
-		return fmt.Errorf("ExecuteWithSideEffects erred while processing tx %s: %w", txID, err)
+		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
 	tx.vm.pubsub.Publish(NewPubSubFilterer(tx.Tx))
@@ -343,28 +337,26 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(
-		tx.vm.ctx,
-		tx.vm.parser.Codec(),
-		tx.vm.feeAssetID,
-		&tx.vm.Config,
-		len(tx.vm.fxs),
-	)
+	tx.validity = tx.Tx.Unsigned.Visit(&executor.SyntacticVerifier{
+		Backend: tx.vm.txBackend,
+		Tx:      tx.Tx,
+	})
 	return tx.validity
 }
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	// SyntacticVerify sets the error on validity and is checked in the next
-	// statement
-	_ = tx.SyntacticVerify()
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity
 	}
 
-	return tx.Unsigned.Visit(&txSemanticVerify{
-		tx: tx.Tx,
-		vm: tx.vm,
+	return tx.Unsigned.Visit(&executor.SemanticVerifier{
+		Backend: tx.vm.txBackend,
+		State:   tx.vm.dagState,
+		Tx:      tx.Tx,
 	})
 }

@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	codecVersion   uint16 = 0
-	maxMessageSize        = 512 * units.KiB
-	maxSliceLen           = maxMessageSize
+	codecVersion   = 0
+	maxMessageSize = 512 * units.KiB
+	maxSliceLen    = maxMessageSize
 )
 
 // Codec does serialization and deserialization
