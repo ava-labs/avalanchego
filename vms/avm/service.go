@@ -50,14 +50,47 @@ var (
 	errNoAddresses        = errors.New("no addresses provided")
 	errNoKeys             = errors.New("from addresses have no keys or funds")
 	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
+	errNotLineraized      = errors.New("chain is not linearized")
 )
-
-// Service defines the base service for the asset vm
-type Service struct{ vm *VM }
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
 type FormattedAssetID struct {
 	AssetID ids.ID `json:"assetID"`
+}
+
+// Service defines the base service for the asset vm
+type Service struct{ vm *VM }
+
+// GetBlock returns the requested block.
+func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getBlock"),
+		zap.Stringer("blkID", args.BlockID),
+		zap.Stringer("encoding", args.Encoding),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLineraized
+	}
+	block, err := s.vm.chainManager.GetStatelessBlock(args.BlockID)
+	if err != nil {
+		return fmt.Errorf("couldn't get block with id %s: %w", args.BlockID, err)
+	}
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
+	}
+
+	return nil
 }
 
 // IssueTx attempts to issue a transaction into consensus

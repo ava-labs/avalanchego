@@ -25,6 +25,8 @@ var _ Client = (*client)(nil)
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
 	WalletClient
+	// GetBlock returns the block with the given id.
+	GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetTxStatus returns the status of [txID]
 	//
 	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
@@ -229,6 +231,19 @@ func NewClient(uri, chain string) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(path),
 	}
+}
+
+func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "avm.getBlock", &api.GetBlockArgs{
+		BlockID:  blkID,
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {

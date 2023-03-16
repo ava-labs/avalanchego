@@ -13,12 +13,15 @@ import (
 
 	stdjson "encoding/json"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,8 +33,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -2618,6 +2624,165 @@ func TestImport(t *testing.T) {
 			reply := &api.JSONTxID{}
 			if err := s.Import(nil, args, reply); err != nil {
 				t.Fatalf("Failed to import AVAX due to %s", err)
+			}
+		})
+	}
+}
+
+func TestServiceGetBlock(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	blockID := ids.GenerateTestID()
+
+	type test struct {
+		name                        string
+		serviceAndExpectedBlockFunc func(ctrl *gomock.Controller) (*Service, interface{})
+		encoding                    formatting.Encoding
+		expectedErr                 error
+	}
+
+	tests := []test{
+		{
+			name: "chain not linearized",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				return &Service{
+					vm: &VM{
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, nil
+			},
+			encoding:    formatting.Hex,
+			expectedErr: errNotLineraized,
+		},
+		{
+			name: "block not found",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
+				return &Service{
+					vm: &VM{
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, nil
+			},
+			encoding:    formatting.Hex,
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "JSON format",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				block.EXPECT().InitCtx(gomock.Any())
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, block
+			},
+			encoding:    formatting.JSON,
+			expectedErr: nil,
+		},
+		{
+			name: "hex format",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				expected, err := formatting.Encode(formatting.Hex, blockBytes)
+				require.NoError(err)
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.Hex,
+			expectedErr: nil,
+		},
+		{
+			name: "hexc format",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				expected, err := formatting.Encode(formatting.HexC, blockBytes)
+				require.NoError(err)
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.HexC,
+			expectedErr: nil,
+		},
+		{
+			name: "hexnc format",
+			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
+				require.NoError(err)
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.HexNC,
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service, expected := tt.serviceAndExpectedBlockFunc(ctrl)
+
+			args := &api.GetBlockArgs{
+				BlockID:  blockID,
+				Encoding: tt.encoding,
+			}
+			reply := &api.GetBlockResponse{}
+			err := service.GetBlock(nil, args, reply)
+			require.ErrorIs(err, tt.expectedErr)
+			if err == nil {
+				require.Equal(tt.encoding, reply.Encoding)
+				require.Equal(expected, reply.Block)
 			}
 		})
 	}
