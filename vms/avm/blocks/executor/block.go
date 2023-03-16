@@ -26,6 +26,7 @@ const SyncBound = 10 * time.Second
 var (
 	_ snowman.Block = (*Block)(nil)
 
+	ErrUnexpectedMerkleRoot        = errors.New("unexpected merkle root")
 	ErrTimestampBeyondSyncBound    = errors.New("proposed timestamp is too far in the future relative to local time")
 	ErrEmptyBlock                  = errors.New("block contains no transactions")
 	ErrChildBlockEarlierThanParent = errors.New("proposed timestamp before current chain time")
@@ -46,6 +47,12 @@ func (b *Block) Verify(context.Context) error {
 	if _, ok := b.manager.blkIDToState[blkID]; ok {
 		// This block has already been verified.
 		return nil
+	}
+
+	// Currently we don't populate the blocks merkle root.
+	merkleRoot := b.Block.MerkleRoot()
+	if merkleRoot != ids.Empty {
+		return fmt.Errorf("%w: %s", ErrUnexpectedMerkleRoot, merkleRoot)
 	}
 
 	// Only allow timestamp to reasonably far forward

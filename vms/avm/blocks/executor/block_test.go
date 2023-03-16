@@ -60,6 +60,20 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.GenerateTestID()).AnyTimes()
+				return &Block{
+					Block:   mockBlock,
+					manager: &manager{},
+				}
+			},
+			expectedErr: ErrUnexpectedMerkleRoot,
+		},
+		{
+			name: "block timestamp too far in the future",
+			blockFunc: func(ctrl *gomock.Controller) *Block {
+				mockBlock := blocks.NewMockBlock(ctrl)
+				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				now := time.Now()
 				tooFarInFutureTime := now.Add(SyncBound + 1)
 				mockBlock.EXPECT().Timestamp().Return(tooFarInFutureTime).AnyTimes()
@@ -79,6 +93,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return(nil).AnyTimes()
 				return &Block{
@@ -96,6 +111,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
 				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest)
@@ -122,6 +138,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
 
 				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
@@ -152,6 +169,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
@@ -187,6 +205,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
@@ -230,6 +249,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
@@ -277,6 +297,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
@@ -326,6 +347,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
@@ -402,6 +424,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
@@ -460,6 +483,7 @@ func TestBlockVerify(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
+				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
 				mockBlock.EXPECT().Timestamp().Return(blockTimestamp).AnyTimes()
 				blockHeight := uint64(1337)
