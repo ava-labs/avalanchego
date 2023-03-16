@@ -276,7 +276,7 @@ impl DBRev {
     }
 
     /// Get a value associated with a key.
-    pub fn kv_get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<u8>> {
         let obj_ref = self.merkle.get(key, self.header.kv_root);
         match obj_ref {
             Err(_) => None,
@@ -305,7 +305,7 @@ impl DBRev {
             .map_err(DBError::Merkle)
     }
 
-    fn get_account(&self, key: &[u8]) -> Result<Account, DBError> {
+    fn get_account<K: AsRef<[u8]>>(&self, key: K) -> Result<Account, DBError> {
         Ok(match self.merkle.get(key, self.header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => Account::default(),
@@ -314,7 +314,7 @@ impl DBRev {
     }
 
     /// Dump the MPT of the state storage under an account.
-    pub fn dump_account(&self, key: &[u8], w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
         let acc = match self.merkle.get(key, self.header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => Account::default(),
@@ -328,12 +328,12 @@ impl DBRev {
     }
 
     /// Get balance of the account.
-    pub fn get_balance(&self, key: &[u8]) -> Result<U256, DBError> {
+    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DBError> {
         Ok(self.get_account(key)?.balance)
     }
 
     /// Get code of the account.
-    pub fn get_code(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
+    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
         let code = self.get_account(key)?.code;
         if code.is_null() {
             return Ok(Vec::new());
@@ -365,12 +365,12 @@ impl DBRev {
     }
 
     /// Get nonce of the account.
-    pub fn get_nonce(&self, key: &[u8]) -> Result<u64, DBError> {
+    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DBError> {
         Ok(self.get_account(key)?.nonce)
     }
 
     /// Get the state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn get_state(&self, key: &[u8], sub_key: &[u8]) -> Result<Vec<u8>, DBError> {
+    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DBError> {
         let root = self.get_account(key)?.root;
         if root.is_null() {
             return Ok(Vec::new());
@@ -383,7 +383,7 @@ impl DBRev {
     }
 
     /// Check if the account exists.
-    pub fn exist(&self, key: &[u8]) -> Result<bool, DBError> {
+    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DBError> {
         Ok(match self.merkle.get(key, self.header.acc_root) {
             Ok(r) => r.is_some(),
             Err(e) => return Err(DBError::Merkle(e)),
@@ -692,7 +692,7 @@ impl DB {
     }
 
     /// Dump the MPT of the latest state storage under an account.
-    pub fn dump_account(&self, key: &[u8], w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
         self.inner.lock().latest.dump_account(key, w)
     }
 
@@ -702,7 +702,7 @@ impl DB {
     }
 
     /// Get a value in the kv store associated with a particular key.
-    pub fn kv_get(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
+    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
         self.inner
             .lock()
             .latest
@@ -716,27 +716,27 @@ impl DB {
     }
 
     /// Get the latest balance of the account.
-    pub fn get_balance(&self, key: &[u8]) -> Result<U256, DBError> {
+    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DBError> {
         self.inner.lock().latest.get_balance(key)
     }
 
     /// Get the latest code of the account.
-    pub fn get_code(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
+    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
         self.inner.lock().latest.get_code(key)
     }
 
     /// Get the latest nonce of the account.
-    pub fn get_nonce(&self, key: &[u8]) -> Result<u64, DBError> {
+    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DBError> {
         self.inner.lock().latest.get_nonce(key)
     }
 
     /// Get the latest state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn get_state(&self, key: &[u8], sub_key: &[u8]) -> Result<Vec<u8>, DBError> {
+    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DBError> {
         self.inner.lock().latest.get_state(key, sub_key)
     }
 
     /// Check if the account exists in the latest world state.
-    pub fn exist(&self, key: &[u8]) -> Result<bool, DBError> {
+    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DBError> {
         self.inner.lock().latest.exist(key)
     }
 
