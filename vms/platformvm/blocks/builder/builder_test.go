@@ -39,13 +39,15 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
+	env.Ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(env.Shutdown())
 	}()
 
 	// add a tx to it
-	tx := getValidTx(env.txBuilder, t)
+	tx := env.GetValidTx(t)
 	txID := tx.ID()
 
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
@@ -55,8 +57,6 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
 
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
 	has := env.mempool.Has(txID)
 	require.True(has)
 
@@ -76,17 +76,21 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
+	env.Ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(env.Shutdown())
 	}()
 
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		return nil
+	}
+
 	// create candidate tx
-	tx := getValidTx(env.txBuilder, t)
+	tx := env.GetValidTx(t)
 	txID := tx.ID()
 
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
 	// A tx simply added to mempool is obviously not marked as dropped
 	require.NoError(env.mempool.Add(tx))
 	require.True(env.mempool.Has(txID))
@@ -102,7 +106,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	env.mempool.Remove([]*txs.Tx{tx})
-	require.NoError(env.mempool.Add(tx))
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
 
 	require.True(env.mempool.Has(txID))
 	_, isDropped = env.mempool.GetDropReason(txID)
@@ -110,13 +114,13 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
 	env.isBootstrapped.Set(false)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-	env.ctx.Log = logging.NoWarn{}
+	env.Ctx.Lock.Lock()
+	env.Ctx.Log = logging.NoWarn{}
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(t, env.Shutdown())
 	}()
 
 	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic
@@ -692,9 +696,12 @@ func TestBuildBlock(t *testing.T) {
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
+	env.Ctx.Lock.Lock()
+
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(env.Shutdown())
 	}()
 
 	utxoID := avax.UTXOID{
@@ -706,8 +713,8 @@ func TestAtomicTxImports(t *testing.T) {
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
-	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
+	env.msm.SharedMemory = m.NewSharedMemory(env.Ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(env.Ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxAssetID},
@@ -724,7 +731,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	inputID := utxo.InputID()
 	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
-		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		env.Ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -735,15 +742,13 @@ func TestAtomicTxImports(t *testing.T) {
 	require.NoError(err)
 
 	tx, err := env.txBuilder.NewImportTx(
-		env.ctx.XChainID,
+		env.Ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
 
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
 	require.NoError(env.Builder.Add(tx))
 	b, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
@@ -759,9 +764,11 @@ func TestAtomicTxImports(t *testing.T) {
 func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
+	env.Ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(env.Shutdown())
 	}()
 
 	var gossipedBytes []byte
@@ -771,15 +778,13 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	}
 
 	// create a tx
-	tx := getValidTx(env.txBuilder, t)
+	tx := env.GetValidTx(t)
 	txID := tx.ID()
 
 	// show that unknown tx is added to mempool
 	err := env.AddUnverifiedTx(tx)
 	require.NoError(err)
 
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
 	require.True(env.Builder.Has(txID))
 
 	// and gossiped if it has just been discovered
@@ -796,35 +801,16 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	require.Equal(txID, retrivedTx.ID())
 }
 
-func TestMempoolInvalidTxIsNotAddedToMempool(t *testing.T) {
-	require := require.New(t)
-
-	env := newEnvironment(t)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-
-	// create a tx and mark as invalid
-	tx := getValidTx(env.txBuilder, t)
-	txID := tx.ID()
-	env.Builder.MarkDropped(txID, "dropped for testing")
-
-	// show that the invalid tx is not added
-	err := env.AddUnverifiedTx(tx)
-	require.NoError(err)
-
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-	require.False(env.Builder.Has(txID))
-}
-
 // show that locally generated txs are gossiped
 func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := NewEnvironment(t)
+
+	env.Ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		env.Ctx.Lock.Unlock()
+		require.NoError(env.Shutdown())
 	}()
 
 	var gossipedBytes []byte
@@ -834,7 +820,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	}
 
 	// add a tx to the mempool and show it gets gossiped
-	tx := getValidTx(env.txBuilder, t)
+	tx := env.GetValidTx(t)
 	txID := tx.ID()
 
 	err := env.Builder.AddUnverifiedTx(tx)
@@ -851,8 +837,6 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 
 	require.Equal(txID, retrivedTx.ID())
 
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})

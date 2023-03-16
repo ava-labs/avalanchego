@@ -98,7 +98,7 @@ type environment struct {
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
-	ctx            *snow.Context
+	Ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
@@ -109,7 +109,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func NewEnvironment(t *testing.T) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
@@ -119,22 +119,22 @@ func newEnvironment(t *testing.T) *environment {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
-	res.ctx, res.msm = defaultCtx(res.baseDB)
+	res.Ctx, res.msm = defaultCtx(res.baseDB)
 
-	res.ctx.Lock.Lock()
-	defer res.ctx.Lock.Unlock()
+	res.Ctx.Lock.Lock()
+	defer res.Ctx.Lock.Unlock()
 
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
+	res.fx = defaultFx(res.clk, res.Ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(res.config, res.Ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.Ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+	res.utxosHandler = utxo.NewHandler(res.Ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(
-		res.ctx,
+		res.Ctx,
 		res.config,
 		res.clk,
 		res.fx,
@@ -146,7 +146,7 @@ func newEnvironment(t *testing.T) *environment {
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
 		Config:       res.config,
-		Ctx:          res.ctx,
+		Ctx:          res.Ctx,
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
@@ -198,8 +198,8 @@ func newEnvironment(t *testing.T) *environment {
 	return res
 }
 
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
+func (env *environment) GetValidTx(t *testing.T) *txs.Tx {
+	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -451,7 +451,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	return genesisBytes
 }
 
-func shutdownEnvironment(env *environment) error {
+func (env *environment) Shutdown() error {
 	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {

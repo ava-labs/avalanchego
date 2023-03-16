@@ -216,7 +216,7 @@ func (vm *VM) Initialize(
 		toEngine,
 		appSender,
 	)
-	gossipHandler := handler.NewGossipHandler(vm.ctx.Log, vm.Builder)
+	gossipHandler := handler.NewGossipHandler(vm.ctx, vm.Builder)
 	vm.AppHandler = handler.NewAppHandler(vm.ctx, gossipHandler)
 
 	// Create all of the chains that the database says exist

@@ -133,17 +133,6 @@ func (b *builder) Preferred() (snowman.Block, error) {
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
-	ctx := b.txExecutorBackend.Ctx
-
-	// We need to grab the context lock here to avoid racy behavior with
-	// transaction verification + mempool modifications.
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
-	if _, dropped := b.GetDropReason(txID); dropped {
-		// If the tx is being dropped - just ignore it
-		return nil
-	}
 
 	if !b.txExecutorBackend.Bootstrapped.Get() {
 		return errChainNotSynced
