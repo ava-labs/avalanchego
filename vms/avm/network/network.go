@@ -86,7 +86,7 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		return nil
 	}
 
-	msg, ok := msgIntf.(*message.Tx)
+	msg, ok := msgIntf.(*message.TxGossip)
 	if !ok {
 		n.ctx.Log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
@@ -122,7 +122,7 @@ func (n *network) IssueTx(ctx context.Context, tx *txs.Tx) error {
 	}
 
 	txBytes := tx.Bytes()
-	msg := &message.Tx{
+	msg := &message.TxGossip{
 		Tx: txBytes,
 	}
 	msgBytes, err := message.Build(msg)

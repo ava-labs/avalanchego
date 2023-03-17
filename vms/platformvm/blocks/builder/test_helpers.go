@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network/client"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -183,13 +184,15 @@ func NewEnvironment(t *testing.T) *environment {
 		window,
 	)
 
+	client := client.NewClient(res.sender, res.Ctx.Log)
+
 	res.Builder = Initialize(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 		nil, // toEngine,
-		res.sender,
+		client,
 	)
 
 	res.Builder.SetPreference(genesisID)

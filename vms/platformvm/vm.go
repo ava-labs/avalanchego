@@ -41,8 +41,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/handler"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -52,6 +52,7 @@ import (
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	networkclient "github.com/ava-labs/avalanchego/vms/platformvm/network/client"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -208,16 +209,17 @@ func (vm *VM) Initialize(
 		txExecutorBackend,
 		vm.recentlyAccepted,
 	)
+	networkClient := networkclient.NewClient(appSender, vm.ctx.Log)
 	vm.Builder = blockbuilder.Initialize(
 		mempool,
 		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
 		toEngine,
-		appSender,
+		networkClient,
 	)
-	gossipHandler := handler.NewGossipHandler(vm.ctx, vm.Builder)
-	vm.AppHandler = handler.NewAppHandler(vm.ctx, gossipHandler)
+	gossipHandler := network.NewGossipHandler(vm.ctx, vm.Builder)
+	vm.AppHandler = network.NewNetwork(vm.ctx, gossipHandler)
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {

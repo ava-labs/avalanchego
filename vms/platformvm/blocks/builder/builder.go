@@ -11,15 +11,14 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network/client"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -27,12 +26,6 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-)
-
-const (
-	// We allow [recentCacheSize] to be fairly large because we only store hashes
-	// in the cache, not entire transactions.
-	recentCacheSize = 512
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -72,13 +65,11 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
-	appSender common.AppSender
+	networkClient client.Client
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
-
-	recentTxs *cache.LRU[ids.ID, struct{}]
 
 	// ID of the preferred block to build on top of
 	preferredBlockID ids.ID
@@ -98,7 +89,7 @@ func Initialize(
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
-	appSender common.AppSender,
+	networkClient client.Client,
 ) Builder {
 	builder := &builder{
 		Mempool:           mempool,
@@ -106,8 +97,7 @@ func Initialize(
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,
 		toEngine:          toEngine,
-		recentTxs:         &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
-		appSender:         appSender,
+		networkClient:     networkClient,
 	}
 
 	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
@@ -158,7 +148,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	if err := b.Mempool.Add(tx); err != nil {
 		return err
 	}
-	return b.gossipTx(tx)
+	return b.networkClient.GossipTx(tx)
 }
 
 // BuildBlock builds a block to be added to consensus.
@@ -422,24 +412,4 @@ func getNextStakerToReward(
 		}
 	}
 	return ids.Empty, false, nil
-}
-
-func (b *builder) gossipTx(tx *txs.Tx) error {
-	txID := tx.ID()
-	// Don't gossip a transaction if it has been recently gossiped.
-	if _, has := b.recentTxs.Get(txID); has {
-		return nil
-	}
-	b.recentTxs.Put(txID, struct{}{})
-
-	b.txExecutorBackend.Ctx.Log.Debug("gossiping tx",
-		zap.Stringer("txID", txID),
-	)
-
-	msg := &message.TxGossip{Tx: tx.Bytes()}
-	msgBytes, err := message.Build(msg)
-	if err != nil {
-		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
-	}
-	return b.appSender.SendAppGossip(context.TODO(), msgBytes)
 }

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handler
+package network
 
 import (
 	"context"
@@ -14,59 +14,59 @@ import (
 	"go.uber.org/zap"
 )
 
-type appHandler struct {
+type network struct {
 	ctx *snow.Context
 
 	gossipHandler message.Handler
 }
 
-func NewAppHandler(
+func NewNetwork(
 	ctx *snow.Context,
 	gossipHandler message.Handler,
 ) common.AppHandler {
-	return &appHandler{
+	return &network{
 		ctx:           ctx,
 		gossipHandler: gossipHandler,
 	}
 }
 
-func (*appHandler) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
+func (*network) CrossChainAppRequestFailed(context.Context, ids.ID, uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*appHandler) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
+func (*network) CrossChainAppRequest(context.Context, ids.ID, uint32, time.Time, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*appHandler) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
+func (*network) CrossChainAppResponse(context.Context, ids.ID, uint32, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*appHandler) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
+func (*network) AppRequestFailed(context.Context, ids.NodeID, uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*appHandler) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
+func (*network) AppRequest(context.Context, ids.NodeID, uint32, time.Time, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (*appHandler) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
+func (*network) AppResponse(context.Context, ids.NodeID, uint32, []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *appHandler) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),

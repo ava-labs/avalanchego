@@ -74,7 +74,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			// Shouldn't attempt to issue or gossip the tx
 			name: "invalid tx bytes",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
+				msg := message.TxGossip{
 					Tx: []byte{0x00},
 				}
 				msgBytes, err := message.Build(&msg)
@@ -94,7 +94,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			// Issue returns nil because mempool has tx. We should gossip the tx.
 			name: "issuance succeeds",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
+				msg := message.TxGossip{
 					Tx: testTx.Bytes(),
 				}
 				msgBytes, err := message.Build(&msg)
@@ -116,7 +116,7 @@ func TestNetworkAppGossip(t *testing.T) {
 			// Issue returns error because tx was dropped. We shouldn't gossip the tx.
 			name: "issuance fails",
 			msgBytesFunc: func() []byte {
-				msg := message.Tx{
+				msg := message.TxGossip{
 					Tx: testTx.Bytes(),
 				}
 				msgBytes, err := message.Build(&msg)
