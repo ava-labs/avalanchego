@@ -264,14 +264,20 @@ func TestSyncGenesis(t *testing.T) {
 					depositOffers[0].ID: depositOffers[0],
 					depositOffers[1].ID: depositOffers[1],
 				},
-				modifiedDeposits: map[ids.ID]*deposit.Deposit{
+				modifiedDeposits: map[ids.ID]*depositDiff{
 					depositTxs[0].ID(): {
-						DepositOfferID: depositTxs[0].Unsigned.(*txs.DepositTx).DepositOfferID,
-						Amount:         1,
+						Deposit: &deposit.Deposit{
+							DepositOfferID: depositTxs[0].Unsigned.(*txs.DepositTx).DepositOfferID,
+							Amount:         1,
+						},
+						added: true,
 					},
 					depositTxs[1].ID(): {
-						DepositOfferID: depositTxs[1].Unsigned.(*txs.DepositTx).DepositOfferID,
-						Amount:         2,
+						Deposit: &deposit.Deposit{
+							DepositOfferID: depositTxs[1].Unsigned.(*txs.DepositTx).DepositOfferID,
+							Amount:         2,
+						},
+						added: true,
 					},
 				},
 			},
@@ -284,11 +290,11 @@ func TestSyncGenesis(t *testing.T) {
 			require.ErrorIs(tt.err, err)
 
 			require.Len(tt.cs.modifiedDeposits, len(tt.want.modifiedDeposits))
-			for expectedModifiedDepositID, expectedModifiedDeposit := range tt.want.modifiedDeposits {
-				actualModifiedDeposit, ok := tt.cs.modifiedDeposits[expectedModifiedDepositID]
+			for expectedAddedDepositID, expectedAddedDeposit := range tt.want.modifiedDeposits {
+				actualAddedDepositDiff, ok := tt.cs.modifiedDeposits[expectedAddedDepositID]
 				require.True(ok)
-				require.Equal(expectedModifiedDeposit.DepositOfferID, actualModifiedDeposit.DepositOfferID)
-				require.Equal(expectedModifiedDeposit.Amount, actualModifiedDeposit.Amount)
+				require.Equal(expectedAddedDeposit.DepositOfferID, actualAddedDepositDiff.DepositOfferID)
+				require.Equal(expectedAddedDeposit.Amount, actualAddedDepositDiff.Amount)
 			}
 			for expectedModifiedDepositOfferID, expectedModifiedDepositOffer := range tt.want.modifiedDepositOffers {
 				actualModifiedDepositOffer, ok := tt.cs.modifiedDepositOffers[expectedModifiedDepositOfferID]

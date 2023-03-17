@@ -144,6 +144,10 @@ func (deposit *Deposit) UnlockableAmount(offer *Offer, unlockTime uint64) uint64
 		return 0
 	}
 
+	if offer.UnlockPeriodDuration == 0 {
+		return deposit.Amount - deposit.UnlockedAmount
+	}
+
 	unlockPeriodDuration := uint64(offer.UnlockPeriodDuration)
 	passedUnlockPeriodDuration := math.Min(unlockTime-unlockPeriodStart, unlockPeriodDuration)
 

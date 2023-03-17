@@ -91,6 +91,10 @@ type CaminoTxBuilder interface {
 	) (*txs.Tx, error)
 
 	NewRewardsImportTx() (*txs.Tx, error)
+
+	NewSystemUnlockDepositTx(
+		depositTxIDs []ids.ID,
+	) (*txs.Tx, error)
 }
 
 func NewCamino(
@@ -641,6 +645,30 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 		return nil, err
 	}
 
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *caminoBuilder) NewSystemUnlockDepositTx(
+	depositTxIDs []ids.ID,
+) (*txs.Tx, error) {
+	ins, outs, err := b.Unlock(b.state, depositTxIDs, locked.StateDeposited)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx := &txs.UnlockDepositTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, make([][]*crypto.PrivateKeySECP256K1R, len(ins)))
+	if err != nil {
+		return nil, err
+	}
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 

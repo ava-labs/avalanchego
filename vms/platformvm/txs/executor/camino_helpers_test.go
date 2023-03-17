@@ -342,6 +342,10 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 }
 
 func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
+	return generateTestUTXOWithIndex(txID, 0, assetID, amount, outputOwners, depositTxID, bondTxID, true)
+}
+
+func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID, init bool) *avax.UTXO {
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
 		OutputOwners: outputOwners,
@@ -358,12 +362,14 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 	testUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        txID,
-			OutputIndex: uint32(0),
+			OutputIndex: outIndex,
 		},
 		Asset: avax.Asset{ID: assetID},
 		Out:   out,
 	}
-	testUTXO.InputID()
+	if init {
+		testUTXO.InputID()
+	}
 	return testUTXO
 }
 
@@ -534,6 +540,7 @@ func newCaminoEnvironmentWithMocks(
 	caminoGenesisConf api.Camino,
 	mockableState state.State,
 	sharedMemory atomic.SharedMemory,
+	utxoHandler utxo.Handler,
 ) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
@@ -567,7 +574,10 @@ func newCaminoEnvironmentWithMocks(
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 
 	uptimes := uptime.NewManager(mockableState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, mockableState, fx, true)
+
+	if utxoHandler == nil {
+		utxoHandler = utxo.NewCaminoHandler(ctx, &clk, mockableState, fx, true)
+	}
 
 	txBuilder := builder.NewCamino(
 		ctx,

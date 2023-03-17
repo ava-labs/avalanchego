@@ -6,13 +6,13 @@ package state
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -45,6 +45,7 @@ var (
 	addressStatePrefix          = []byte("addressState")
 	depositOffersPrefix         = []byte("depositOffers")
 	depositsPrefix              = []byte("deposits")
+	depositIDsByEndtimePrefix   = []byte("depositIDsByEndtime")
 	multisigOwnersPrefix        = []byte("multisigOwners")
 	consortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
 	claimablesPrefix            = []byte("claimables")
@@ -80,8 +81,15 @@ type CaminoDiff interface {
 
 	// Deposits
 
-	UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
+	// deposit should never be nil
+	AddDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
+	// deposit start and duration should never be modified, deposit should never be nil
+	ModifyDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
+	// deposit start and duration should never be modified, deposit should never be nil
+	RemoveDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
 	GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error)
+	GetNextToUnlockDepositTime() (time.Time, error)
+	GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error)
 
 	// Multisig Owners
 
@@ -137,7 +145,7 @@ type caminoDiff struct {
 	deferredStakerDiffs                   diffStakers
 	modifiedAddressStates                 map[ids.ShortID]uint64
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
-	modifiedDeposits                      map[ids.ID]*deposit.Deposit
+	modifiedDeposits                      map[ids.ID]*depositDiff
 	modifiedMultisigOwners                map[ids.ShortID]*multisig.Alias
 	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
@@ -167,8 +175,11 @@ type caminoState struct {
 	depositOffersDB   database.Database
 
 	// Deposits
-	depositsCache cache.Cacher
-	depositsDB    database.Database
+	depositsNextToUnlockTime *time.Time
+	depositsNextToUnlockIDs  []ids.ID
+	depositsCache            cache.Cacher
+	depositsDB               database.Database
+	depositIDsByEndtimeDB    database.Database
 
 	// MSIG aliases
 	multisigOwnersCache cache.Cacher
@@ -186,14 +197,14 @@ func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
 		modifiedAddressStates:  make(map[ids.ShortID]uint64),
 		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:       make(map[ids.ID]*deposit.Deposit),
+		modifiedDeposits:       make(map[ids.ID]*depositDiff),
 		modifiedMultisigOwners: make(map[ids.ShortID]*multisig.Alias),
 		modifiedShortLinks:     make(map[ids.ID]*ids.ShortID),
 		modifiedClaimables:     make(map[ids.ID]*Claimable),
 	}
 }
 
-func newCaminoState(baseDB *versiondb.Database, validatorsDB *prefixdb.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
+func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
 	addressStateCache, err := metercacher.New(
 		"address_state_cache",
 		metricsReg,
@@ -243,8 +254,9 @@ func newCaminoState(baseDB *versiondb.Database, validatorsDB *prefixdb.Database,
 		depositOffersList: linkeddb.NewDefault(depositOffersDB),
 
 		// Deposits
-		depositsCache: depositsCache,
-		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
+		depositsCache:         depositsCache,
+		depositsDB:            prefixdb.New(depositsPrefix, baseDB),
+		depositIDsByEndtimeDB: prefixdb.New(depositIDsByEndtimePrefix, baseDB),
 
 		// Multisig Owners
 		multisigOwnersCache: multisigOwnersCache,
@@ -381,10 +393,11 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 		// add deposits
 		for _, tx := range block.Deposits {
-			if txIDs.Contains(tx.ID()) {
+			depositTxID := tx.ID()
+			if txIDs.Contains(depositTxID) {
 				return errNotUniqueTx
 			}
-			txIDs.Add(tx.ID())
+			txIDs.Add(depositTxID)
 
 			depositTx, ok := tx.Unsigned.(*txs.DepositTx)
 			if !ok {
@@ -422,7 +435,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 			}
 
 			s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
-			cs.UpdateDeposit(tx.ID(), deposit)
+			cs.AddDeposit(depositTxID, deposit)
 			s.AddTx(tx, status.Committed)
 		}
 
@@ -466,6 +479,7 @@ func (cs *caminoState) Load(s *state) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		cs.loadDepositOffers(),
+		cs.loadDeposits(),
 		cs.loadDeferredValidators(s),
 	)
 	return errs.Err

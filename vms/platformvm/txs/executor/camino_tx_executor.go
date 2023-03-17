@@ -637,7 +637,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	}
 
 	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
-	e.State.UpdateDeposit(txID, deposit)
+	e.State.AddDeposit(txID, deposit)
 
 	utxo.Consume(e.State, tx.Ins)
 	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateDeposited); err != nil {
@@ -679,6 +679,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 	}
 
 	txID := e.Tx.ID()
+	depositRewardOutIndex := 0
 
 	for depositTxID, newUnlockedAmount := range newUnlockedAmounts {
 		deposit, err := e.State.GetDeposit(depositTxID)
@@ -697,61 +698,70 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				return err
 			}
 
-			signedDepositTx, _, err := e.State.GetTx(depositTxID)
-			if err != nil {
-				return fmt.Errorf("can't get depositTx: %w", err)
-			}
-			depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-			if !ok {
-				return fmt.Errorf("can't get depositTx: %w", errWrongTxType)
-			}
+			if remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount; remainingReward > 0 {
+				signedDepositTx, _, err := e.State.GetTx(depositTxID)
+				if err != nil {
+					return fmt.Errorf("can't get depositTx: %w", err)
+				}
+				depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
+				if !ok {
+					return fmt.Errorf("can't get depositTx: %w", errWrongTxType)
+				}
 
-			claimableOwnerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
-			if err != nil {
-				return err
-			}
+				claimableOwnerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
+				if err != nil {
+					return err
+				}
 
-			remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount
+				outIntf, err := e.Fx.CreateOutput(remainingReward, treasury.Owner)
+				if err != nil {
+					return fmt.Errorf("failed to create output: %w", err)
+				}
+				out, ok := outIntf.(verify.State)
+				if !ok {
+					return errInvalidState
+				}
 
-			outIntf, err := e.Fx.CreateOutput(remainingReward, depositTx.RewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
+				claimable, err := e.State.GetClaimable(claimableOwnerID)
+				if err == database.ErrNotFound {
+					scepOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+					if !ok {
+						return errWrongOwnerType
+					}
+					claimable = &state.Claimable{
+						Owner: scepOwner,
+					}
+				} else if err != nil {
+					return err
+				}
 
-			claimable, err := e.State.GetClaimable(claimableOwnerID)
-			if err != nil {
-				return err
-			}
+				newClaimable := &state.Claimable{
+					Owner:           claimable.Owner,
+					ValidatorReward: claimable.ValidatorReward,
+				}
 
-			newClaimable := &state.Claimable{
-				Owner:           claimable.Owner,
-				ValidatorReward: claimable.ValidatorReward,
-			}
+				newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
+				if err != nil {
+					return err
+				}
 
-			newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
-			if err != nil {
-				return err
-			}
+				utxo := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(tx.Outs) + depositRewardOutIndex),
+					},
+					Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
+					Out:   out,
+				}
+				depositRewardOutIndex++
 
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(tx.Outs)),
-				},
-				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
-				Out:   out,
+				e.State.AddRewardUTXO(txID, utxo)
+				e.State.AddUTXO(utxo)
+				e.State.SetClaimable(claimableOwnerID, newClaimable)
 			}
-
-			e.State.SetClaimable(claimableOwnerID, newClaimable)
-			e.State.UpdateDeposit(depositTxID, nil)
-			e.State.AddUTXO(utxo)
-			e.State.AddRewardUTXO(utxo.TxID, utxo)
+			e.State.RemoveDeposit(depositTxID, deposit)
 		} else { // partial unlock
-			e.State.UpdateDeposit(depositTxID, &deposits.Deposit{
+			e.State.ModifyDeposit(depositTxID, &deposits.Deposit{
 				DepositOfferID:      deposit.DepositOfferID,
 				UnlockedAmount:      newUnlockedAmount,
 				ClaimedRewardAmount: deposit.ClaimedRewardAmount,
@@ -881,7 +891,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 
 			e.State.AddUTXO(utxo)
 			e.State.AddRewardUTXO(depositTxID, utxo)
-			e.State.UpdateDeposit(depositTxID, &deposits.Deposit{
+			e.State.ModifyDeposit(depositTxID, &deposits.Deposit{
 				DepositOfferID:      deposit.DepositOfferID,
 				UnlockedAmount:      deposit.UnlockedAmount,
 				ClaimedRewardAmount: deposit.ClaimedRewardAmount + claimableReward,

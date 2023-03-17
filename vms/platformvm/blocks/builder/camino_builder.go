@@ -4,13 +4,18 @@
 package builder
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	txBuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -53,6 +58,41 @@ func CaminoNew(
 	return builder
 }
 
+func caminoBuildBlock(
+	builder *builder,
+	parentID ids.ID,
+	height uint64,
+	timestamp time.Time,
+	parentState state.Chain,
+) (blocks.Block, error) {
+	txBuilder, ok := builder.txBuilder.(txBuilder.CaminoBuilder)
+	if !ok {
+		// if its not caminoBuilder, than its not our camino-node
+		// there will be no deposits and we don't need to process camino-specific logic
+		return nil, nil
+	}
+
+	depositsTxIDs, shouldUnlock, err := getNextDepositsToUnlock(parentState, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("could not find next deposits to unlock: %w", err)
+	}
+	if shouldUnlock {
+		unlockDepositTx, err := txBuilder.NewSystemUnlockDepositTx(depositsTxIDs)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to unlock deposits: %w", err)
+		}
+
+		return blocks.NewBanffStandardBlock(
+			timestamp,
+			parentID,
+			height,
+			[]*txs.Tx{unlockDepositTx},
+		)
+	}
+
+	return nil, nil
+}
+
 func getNextDeferredStakerToRemove(
 	chainTimestamp time.Time,
 	shouldRewardNextCurrentStaker bool,
@@ -74,4 +114,22 @@ func getNextDeferredStakerToRemove(
 	}
 
 	return nextCurrentStaker.TxID, shouldRewardNextCurrentStaker, nil
+}
+
+func getNextDepositsToUnlock(
+	preferredState state.Chain,
+	chainTime time.Time,
+) ([]ids.ID, bool, error) {
+	if !chainTime.Before(mockable.MaxTime) {
+		return nil, false, errEndOfTime
+	}
+
+	nextDeposits, nextDepositsEndtime, err := preferredState.GetNextToUnlockDepositIDsAndTime()
+	if err == database.ErrNotFound {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	return nextDeposits, nextDepositsEndtime.Equal(chainTime), nil
 }

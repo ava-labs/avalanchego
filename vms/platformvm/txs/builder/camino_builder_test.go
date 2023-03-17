@@ -239,7 +239,7 @@ func TestUnlockDepositTx(t *testing.T) {
 
 			// Add a deposit to state
 			deposit.DepositOfferID = genesisOffers[0].ID
-			env.state.UpdateDeposit(depositTxID, deposit)
+			env.state.AddDeposit(depositTxID, deposit)
 			err = env.state.Commit()
 			require.NoError(t, err)
 			env.clk.Set(depositExpiredTime)

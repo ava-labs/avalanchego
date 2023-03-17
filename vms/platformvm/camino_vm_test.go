@@ -17,11 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -445,4 +449,110 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
+}
+
+func TestDepositsAutoUnlock(t *testing.T) {
+	require := require.New(t)
+
+	depositOwnerKey, depositOwnerAddr, depositOwner := generateKeyAndOwner(t)
+	ownerID, err := txs.GetOwnerID(depositOwner)
+	require.NoError(err)
+	depositOwnerAddrBech32, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], depositOwnerAddr.Bytes())
+	require.NoError(err)
+
+	depositOffer := &deposit.Offer{
+		End:                   uint64(defaultGenesisTime.Unix() + 365*24*60*60 + 1),
+		MinAmount:             10000,
+		MaxDuration:           100,
+		InterestRateNominator: 1_000_000 * 365 * 24 * 60 * 60, // 100% per year
+	}
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+		DepositOffers:       []*deposit.Offer{depositOffer},
+	}
+	require.NoError(caminoGenesisConf.DepositOffers[0].SetID())
+
+	vm := newCaminoVM(caminoGenesisConf, []api.UTXO{{
+		Amount:  json.Uint64(depositOffer.MinAmount + defaultTxFee),
+		Address: depositOwnerAddrBech32,
+	}})
+	vm.ctx.Lock.Lock()
+	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:revive
+
+	// Add deposit
+	depositTx, err := vm.txBuilder.NewDepositTx(
+		depositOffer.MinAmount,
+		depositOffer.MaxDuration,
+		depositOffer.ID,
+		depositOwnerAddr,
+		[]*crypto.PrivateKeySECP256K1R{depositOwnerKey},
+		&depositOwner,
+	)
+	require.NoError(err)
+	buildAndAcceptBlock(t, vm, depositTx)
+	deposit, err := vm.state.GetDeposit(depositTx.ID())
+	require.NoError(err)
+	require.Zero(getUnlockedBalance(t, vm.state, treasury.Addr))
+	require.Zero(getUnlockedBalance(t, vm.state, depositOwnerAddr))
+
+	// Fast-forward clock to time a bit forward, but still before deposit will be unlocked
+	vm.clock.Set(vm.Clock().Time().Add(time.Duration(deposit.Duration) * time.Second / 2))
+	_, err = vm.Builder.BuildBlock(context.Background())
+	require.Error(err)
+
+	// Fast-forward clock to time for deposit to be unlocked
+	vm.clock.Set(deposit.EndTime())
+	blk := buildAndAcceptBlock(t, vm, nil)
+	txID := blk.Txs()[0].ID()
+	onAccept, ok := vm.manager.GetState(blk.ID())
+	require.True(ok)
+	_, txStatus, err := onAccept.GetTx(txID)
+	require.NoError(err)
+	require.Equal(status.Committed, txStatus)
+	_, txStatus, err = vm.state.GetTx(txID)
+	require.NoError(err)
+	require.Equal(status.Committed, txStatus)
+
+	// Verify that the deposit is unlocked and reward is transferred to treasury
+	_, err = vm.state.GetDeposit(depositTx.ID())
+	require.ErrorIs(err, database.ErrNotFound)
+	claimable, err := vm.state.GetClaimable(ownerID)
+	require.NoError(err)
+	require.Equal(&state.Claimable{
+		Owner:         &depositOwner,
+		DepositReward: deposit.TotalReward(depositOffer),
+	}, claimable)
+	require.Equal(getUnlockedBalance(t, vm.state, depositOwnerAddr), depositOffer.MinAmount)
+	require.Equal(getUnlockedBalance(t, vm.state, treasury.Addr), deposit.TotalReward(depositOffer))
+	require.Equal(deposit.EndTime(), vm.state.GetTimestamp())
+	_, err = vm.state.GetNextToUnlockDepositTime()
+	require.ErrorIs(err, database.ErrNotFound)
+}
+
+func buildAndAcceptBlock(t *testing.T, vm *VM, tx *txs.Tx) blocks.Block {
+	if tx != nil {
+		require.NoError(t, vm.Builder.AddUnverifiedTx(tx))
+	}
+	blk, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(t, err)
+	block, ok := blk.(blocks.Block)
+	require.True(t, ok)
+	require.NoError(t, blk.Verify(context.Background()))
+	require.NoError(t, blk.Accept(context.Background()))
+	require.NoError(t, vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	return block
+}
+
+func getUnlockedBalance(t *testing.T, db avax.UTXOReader, addr ids.ShortID) uint64 {
+	utxos, err := avax.GetAllUTXOs(db, set.Set[ids.ShortID]{addr: struct{}{}})
+	require.NoError(t, err)
+	balance := uint64(0)
+	for _, utxo := range utxos {
+		if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); ok {
+			balance += out.Amount()
+		}
+	}
+	return balance
 }

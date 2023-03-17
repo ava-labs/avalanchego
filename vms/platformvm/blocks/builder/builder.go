@@ -368,6 +368,12 @@ func buildBlock(
 		)
 	}
 
+	if block, err := caminoBuildBlock(builder, parentID, height, timestamp, parentState); err != nil {
+		return nil, err
+	} else if block != nil {
+		return block, nil
+	}
+
 	// Clean out the mempool's transactions with invalid timestamps.
 	builder.dropExpiredStakerTxs(timestamp)
 

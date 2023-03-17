@@ -426,6 +426,37 @@ func (mr *MockStateMockRecorder) GetDeposit(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeposit", reflect.TypeOf((*MockState)(nil).GetDeposit), arg0)
 }
 
+// GetNextToUnlockDepositTime mocks base method.
+func (m *MockState) GetNextToUnlockDepositTime() (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextToUnlockDepositTime")
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextToUnlockDepositTime indicates an expected call of GetNextToUnlockDepositTime.
+func (mr *MockStateMockRecorder) GetNextToUnlockDepositTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositTime", reflect.TypeOf((*MockState)(nil).GetNextToUnlockDepositTime))
+}
+
+// GetNextToUnlockDepositIDsAndTime mocks base method.
+func (m *MockState) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextToUnlockDepositIDsAndTime")
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(time.Time)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetNextToUnlockDepositIDsAndTime indicates an expected call of GetNextToUnlockDepositIDsAndTime.
+func (mr *MockStateMockRecorder) GetNextToUnlockDepositIDsAndTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositIDsAndTime", reflect.TypeOf((*MockState)(nil).GetNextToUnlockDepositIDsAndTime))
+}
+
 // GetDepositOffer mocks base method.
 func (m *MockState) GetDepositOffer(arg0 ids.ID) (*deposit.Offer, error) {
 	m.ctrl.T.Helper()
@@ -968,14 +999,38 @@ func (mr *MockStateMockRecorder) UTXOIDs(arg0, arg1, arg2 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), arg0, arg1, arg2)
 }
 
-// UpdateDeposit mocks base method.
-func (m *MockState) UpdateDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
+// AddDeposit mocks base method.
+func (m *MockState) AddDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateDeposit", arg0, arg1)
+	m.ctrl.Call(m, "AddDeposit", arg0, arg1)
 }
 
-// UpdateDeposit indicates an expected call of UpdateDeposit.
-func (mr *MockStateMockRecorder) UpdateDeposit(arg0, arg1 interface{}) *gomock.Call {
+// AddDeposit indicates an expected call of AddDeposit.
+func (mr *MockStateMockRecorder) AddDeposit(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDeposit", reflect.TypeOf((*MockState)(nil).UpdateDeposit), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDeposit", reflect.TypeOf((*MockState)(nil).AddDeposit), arg0, arg1)
+}
+
+// ModifyDeposit mocks base method.
+func (m *MockState) ModifyDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ModifyDeposit", arg0, arg1)
+}
+
+// ModifyDeposit indicates an expected call of ModifyDeposit.
+func (mr *MockStateMockRecorder) ModifyDeposit(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModifyDeposit", reflect.TypeOf((*MockState)(nil).ModifyDeposit), arg0, arg1)
+}
+
+// RemoveDeposit mocks base method.
+func (m *MockState) RemoveDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemoveDeposit", arg0, arg1)
+}
+
+// RemoveDeposit indicates an expected call of RemoveDeposit.
+func (mr *MockStateMockRecorder) RemoveDeposit(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDeposit", reflect.TypeOf((*MockState)(nil).RemoveDeposit), arg0, arg1)
 }

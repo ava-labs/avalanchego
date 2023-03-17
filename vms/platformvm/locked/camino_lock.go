@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package locked
@@ -57,7 +57,7 @@ func (ls State) IsDeposited() bool {
 	return StateDeposited&ls == StateDeposited
 }
 
-func (ls State) IsStateDepositedBonded() bool {
+func (ls State) IsDepositedBonded() bool {
 	return StateDepositedBonded&ls == StateDepositedBonded
 }
 

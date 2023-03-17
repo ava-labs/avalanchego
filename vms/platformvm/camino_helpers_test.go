@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -6,6 +6,7 @@ package platformvm
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -29,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -202,4 +205,19 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 	}
 
 	return &buildGenesisArgs, genesisBytes
+}
+
+func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+	key, err := testKeyFactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(t, ok)
+	addr := secpKey.Address()
+
+	return secpKey, addr, secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}
 }
