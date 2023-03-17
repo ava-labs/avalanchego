@@ -175,6 +175,7 @@ func (n *node) removeChild(child *node) {
 func (n *node) clone() *node {
 	result := *n
 	result.children = maps.Clone(n.children)
+	result.value = Clone(n.value)
 	return &result
 }
 

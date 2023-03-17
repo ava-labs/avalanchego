@@ -25,9 +25,12 @@ var _ Client = (*client)(nil)
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
 	WalletClient
+	// GetBlock returns the block with the given id.
+	GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetTxStatus returns the status of [txID]
 	//
-	// TODO: deprecate GetTxStatus after the linearization.
+	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
+	// used instead to determine if the tx was accepted.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client
@@ -228,6 +231,19 @@ func NewClient(uri, chain string) Client {
 	return &client{
 		requester: rpc.NewEndpointRequester(path),
 	}
+}
+
+func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "avm.getBlock", &api.GetBlockArgs{
+		BlockID:  blkID,
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {

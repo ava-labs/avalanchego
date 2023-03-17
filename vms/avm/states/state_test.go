@@ -280,7 +280,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()
-	genesisTimestamp := version.XChainMigrationDefaultTime
+	genesisTimestamp := version.CortinaDefaultTime
 	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
 	require.NoError(err)
 

@@ -591,12 +591,9 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionAcceptor.Accept / ConsensusAcceptor.Accept must be
-	// called before child.Accept to honor Acceptor.Accept's invariant.
-	if err := ts.ctx.DecisionAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
-		return err
-	}
-	if err := ts.ctx.ConsensusAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
+	// Note that BlockAcceptor.Accept must be called before child.Accept to
+	// honor Acceptor.Accept's invariant.
+	if err := ts.ctx.BlockAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
 

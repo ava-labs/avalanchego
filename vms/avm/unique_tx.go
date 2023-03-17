@@ -127,29 +127,8 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
-	// Fetch the input UTXOs
-	inputUTXOIDs := tx.InputUTXOs()
-	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := tx.vm.dagState.GetUTXOFromID(utxoID)
-		if err != nil {
-			// should never happen because the UTXO was previously verified to
-			// exist
-			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
-		}
-		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	txID := tx.ID()
-	outputUTXOs := tx.UTXOs()
-	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %w", err)
+	if err := tx.vm.onAccept(tx.Tx); err != nil {
+		return err
 	}
 
 	executor := &executor.Executor{
@@ -166,6 +145,7 @@ func (tx *UniqueTx) Accept(context.Context) error {
 
 	commitBatch, err := tx.vm.state.CommitBatch()
 	if err != nil {
+		txID := tx.ID()
 		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
@@ -175,11 +155,9 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		commitBatch,
 	)
 	if err != nil {
+		txID := tx.ID()
 		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
-
-	tx.vm.pubsub.Publish(NewPubSubFilterer(tx.Tx))
-	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
 	return nil

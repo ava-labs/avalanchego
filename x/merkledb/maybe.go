@@ -36,3 +36,15 @@ func (m Maybe[T]) IsNothing() bool {
 func (m Maybe[T]) Value() T {
 	return m.value
 }
+
+func Clone(m Maybe[[]byte]) Maybe[[]byte] {
+	if !m.hasValue {
+		return Nothing[[]byte]()
+	}
+	var valCopy []byte
+	if m.value != nil {
+		valCopy = make([]byte, len(m.value))
+		copy(valCopy, m.value)
+	}
+	return Some(valCopy)
+}

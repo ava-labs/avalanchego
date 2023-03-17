@@ -659,10 +659,10 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	switch {
 	case acceptable:
 		// I'm acceptable, why not accept?
-		// Note that ConsensusAcceptor.Accept must be called before vtx.Accept
-		// to honor Acceptor.Accept's invariant.
+		// Note that VertexAcceptor.Accept must be called before vtx.Accept to
+		// honor Acceptor.Accept's invariant.
 		vtxBytes := vtx.Bytes()
-		if err := ta.ctx.ConsensusAcceptor.Accept(ta.ctx, vtxID, vtxBytes); err != nil {
+		if err := ta.ctx.VertexAcceptor.Accept(ta.ctx, vtxID, vtxBytes); err != nil {
 			return err
 		}
 
