@@ -561,7 +561,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.DecisionAcceptor,
+		b.Ctx.TxAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
@@ -578,7 +578,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.ConsensusAcceptor,
+		b.Ctx.VertexAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err

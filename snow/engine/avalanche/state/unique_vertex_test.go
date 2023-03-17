@@ -605,11 +605,11 @@ func TestStopVertexVerifyNotAllowedTimestamp(t *testing.T) {
 
 	_, parseTx := generateTestTxs('a')
 	ts := newTestSerializer(t, parseTx)
-	ts.XChainMigrationTime = version.XChainMigrationDefaultTime
+	ts.CortinaTime = version.CortinaDefaultTime
 
 	svtx := newTestUniqueVertex(t, ts, nil, nil, true)
 	svtx.time = func() time.Time {
-		return version.XChainMigrationDefaultTime.Add(-time.Second)
+		return version.CortinaDefaultTime.Add(-time.Second)
 	}
 
 	if verr := svtx.Verify(context.Background()); !errors.Is(verr, errStopVertexNotAllowedTimestamp) {

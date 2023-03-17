@@ -95,6 +95,20 @@ func (mr *MockBlockMockRecorder) InitCtx(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockBlock)(nil).InitCtx), arg0)
 }
 
+// MerkleRoot mocks base method.
+func (m *MockBlock) MerkleRoot() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MerkleRoot")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// MerkleRoot indicates an expected call of MerkleRoot.
+func (mr *MockBlockMockRecorder) MerkleRoot() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MerkleRoot", reflect.TypeOf((*MockBlock)(nil).MerkleRoot))
+}
+
 // Parent mocks base method.
 func (m *MockBlock) Parent() ids.ID {
 	m.ctrl.T.Helper()
