@@ -27,6 +27,8 @@ type Client interface {
 	WalletClient
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetBlockByHeight returns the block at the given [height].
+	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 	// GetTxStatus returns the status of [txID]
 	//
 	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
@@ -237,6 +239,19 @@ func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Opti
 	res := &api.FormattedBlock{}
 	err := c.requester.SendRequest(ctx, "avm.getBlock", &api.GetBlockArgs{
 		BlockID:  blkID,
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "avm.getBlockByHeight", &api.GetBlockByHeightArgs{
+		Height:   height,
 		Encoding: formatting.HexNC,
 	}, res, options...)
 	if err != nil {

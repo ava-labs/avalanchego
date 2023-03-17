@@ -67,6 +67,12 @@ type GetBlockArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+// GetBlockByHeightArgs is the parameters supplied to the GetBlockByHeight API
+type GetBlockByHeightArgs struct {
+	Height   uint64              `json:"height"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 // GetBlockResponse is the response object for the GetBlock API.
 type GetBlockResponse struct {
 	Block interface{} `json:"block"`

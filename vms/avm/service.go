@@ -93,6 +93,46 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 	return nil
 }
 
+// GetBlockByHeight returns the block at the given height.
+func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightArgs, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getBlockByHeight"),
+		zap.Uint64("height", args.Height),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLineraized
+	}
+	reply.Encoding = args.Encoding
+
+	blockID, err := s.vm.state.GetBlockID(args.Height)
+	if err != nil {
+		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
+	}
+	block, err := s.vm.chainManager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
+	}
+
+	return nil
+}
+
 // IssueTx attempts to issue a transaction into consensus
 func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("API called",
