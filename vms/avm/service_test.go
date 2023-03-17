@@ -2988,3 +2988,90 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceGetHeight(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	blockID := ids.GenerateTestID()
+	blockHeight := uint64(1337)
+
+	type test struct {
+		name        string
+		serviceFunc func(ctrl *gomock.Controller) *Service
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "chain not linearized",
+			serviceFunc: func(ctrl *gomock.Controller) *Service {
+				return &Service{
+					vm: &VM{
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}
+			},
+			expectedErr: errNotLineraized,
+		},
+		{
+			name: "block not found",
+			serviceFunc: func(ctrl *gomock.Controller) *Service {
+				state := states.NewMockState(ctrl)
+				state.EXPECT().GetLastAccepted().Return(blockID)
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
+				return &Service{
+					vm: &VM{
+						state:        state,
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "happy path",
+			serviceFunc: func(ctrl *gomock.Controller) *Service {
+				state := states.NewMockState(ctrl)
+				state.EXPECT().GetLastAccepted().Return(blockID)
+
+				block := blocks.NewMockBlock(ctrl)
+				block.EXPECT().Height().Return(blockHeight)
+
+				manager := executor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						state:        state,
+						chainManager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := tt.serviceFunc(ctrl)
+
+			reply := &api.GetHeightResponse{}
+			err := service.GetHeight(nil, nil, reply)
+			require.ErrorIs(err, tt.expectedErr)
+			if err == nil {
+				require.Equal(json.Uint64(blockHeight), reply.Height)
+			}
+		})
+	}
+}

@@ -83,6 +83,10 @@ type GetBlockResponse struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+type GetHeightResponse struct {
+	Height json.Uint64 `json:"height"`
+}
+
 // FormattedBlock defines a JSON formatted struct containing a block in Hex
 // format
 type FormattedBlock struct {
