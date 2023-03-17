@@ -203,6 +203,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(HTTPAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
 	fs.Duration(HTTPShutdownWaitKey, 0, "Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown. The /health endpoint will return unhealthy during this duration")
 	fs.Duration(HTTPShutdownTimeoutKey, 10*time.Second, "Maximum duration to wait for existing connections to complete during node shutdown")
+	fs.Duration(HTTPReadTimeoutKey, 30*time.Second, "Maximum duration for reading the entire request, including the body. A zero or negative value means there will be no timeout")
+	fs.Duration(HTTPReadHeaderTimeoutKey, 30*time.Second, fmt.Sprintf("Maximum duration to read request headers. The connection's read deadline is reset after reading the headers. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPReadHeaderTimeoutKey, HTTPReadTimeoutKey))
+	fs.Duration(HTTPWriteTimeoutKey, 30*time.Second, "Maximum duration before timing out writes of the response. It is reset whenever a new request's header is read. A zero or negative value means there will be no timeout.")
+	fs.Duration(HTTPIdleTimeoutKey, 120*time.Second, fmt.Sprintf("Maximum duration to wait for the next request when keep-alives are enabled. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPIdleTimeoutKey, HTTPReadTimeoutKey))
 	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
 	fs.String(APIAuthPasswordFileKey, "",
 		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call",

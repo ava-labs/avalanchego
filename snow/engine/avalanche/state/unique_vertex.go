@@ -264,7 +264,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 		if vtx.time != nil {
 			now = vtx.time()
 		}
-		allowed := vtx.serializer.XChainMigrationTime
+		allowed := vtx.serializer.CortinaTime
 		if now.Before(allowed) {
 			return errStopVertexNotAllowedTimestamp
 		}

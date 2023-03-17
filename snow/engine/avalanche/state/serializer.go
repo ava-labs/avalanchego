@@ -44,11 +44,11 @@ type Serializer struct {
 }
 
 type SerializerConfig struct {
-	ChainID             ids.ID
-	VM                  vertex.DAGVM
-	DB                  database.Database
-	Log                 logging.Logger
-	XChainMigrationTime time.Time
+	ChainID     ids.ID
+	VM          vertex.DAGVM
+	DB          database.Database
+	Log         logging.Logger
+	CortinaTime time.Time
 }
 
 func NewSerializer(config SerializerConfig) vertex.Manager {

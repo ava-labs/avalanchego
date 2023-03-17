@@ -101,12 +101,12 @@ var (
 	}
 	BlsSigningProposerVMDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
-	XChainMigrationTimes = map[uint32]time.Time{
+	// TODO: update this before release
+	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
-	XChainMigrationDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
@@ -179,11 +179,11 @@ func GetBlsSigningForProposerVMTime(networkID uint32) time.Time {
 	return BlsSigningProposerVMDefaultTime
 }
 
-func GetXChainMigrationTime(networkID uint32) time.Time {
-	if upgradeTime, exists := XChainMigrationTimes[networkID]; exists {
+func GetCortinaTime(networkID uint32) time.Time {
+	if upgradeTime, exists := CortinaTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return XChainMigrationDefaultTime
+	return CortinaDefaultTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
