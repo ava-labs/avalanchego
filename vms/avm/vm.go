@@ -68,7 +68,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
-	_ vertex.DAGVM = (*VM)(nil)
+	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
 )
 
 type VM struct {
@@ -420,14 +420,14 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID) error {
+func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
 	}
 
-	mempool, err := mempool.New("mempool", vm.registerer, vm.toEngine)
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
