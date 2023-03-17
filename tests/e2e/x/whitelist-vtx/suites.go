@@ -224,8 +224,8 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 					// +0 since no node should ever successfully issue another whitelist vtx
 					gomega.Expect(mm[metricVtxIssueSuccess]).Should(gomega.Equal(prev[metricVtxIssueSuccess]))
 
-					// +1 since the local node engine failed the conflicting whitelist vtx issue request
-					gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure] + 1))
+					// +0 since the local node engine should have dropped the conflicting whitelist vtx issue request
+					gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure]))
 
 					// +0 since the local node snowstorm successfully issued the whitelist tx "before", and no whitelist tx is being processed
 					gomega.Expect(mm[metricTxProcessing]).Should(gomega.Equal(prev[metricTxProcessing]))

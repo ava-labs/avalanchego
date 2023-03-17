@@ -1823,7 +1823,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	sb2 := subnets.New(bootstrapConfig.Ctx.NodeID, subnets.Config{})
 	sb2.AddChain(bootstrapConfig.Ctx.ChainID)
 	bootstrapConfig.Ctx.SubnetStateTracker = sb2
-	handler, err := handler.New(
+	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
 		msgChan,
@@ -1855,8 +1855,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)
 
-	handler.SetConsensus(engine)
-
 	bootstrapper, err := bootstrap.New(
 		context.Background(),
 		bootstrapConfig,
@@ -1864,13 +1862,27 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	handler.SetBootstrapper(bootstrapper)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
+
+	consensusCtx.Start(snow.ExtendingFrontier)
+	consensusCtx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(context.Background(), handler)
+	chainRouter.AddChain(context.Background(), h)
 	ctx.Lock.Unlock()
 
-	handler.Start(context.Background(), false)
+	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
 	err = bootstrapper.Connected(context.Background(), peerID, version.CurrentApp)

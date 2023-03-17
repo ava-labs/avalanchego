@@ -118,6 +118,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			requestID,
 			message.StateSummaryFrontierOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -256,6 +257,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			requestID,
 			message.AcceptedStateSummaryOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -391,6 +393,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			requestID,
 			message.AcceptedFrontierOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -526,6 +529,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			requestID,
 			message.AcceptedOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -651,6 +655,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		requestID,
 		message.AncestorsOp,
 		inMsg,
+		s.engineType,
 	)
 
 	// Sending a GetAncestors to myself always fails.
@@ -775,6 +780,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		requestID,
 		message.PutOp,
 		inMsg,
+		s.engineType,
 	)
 
 	// Sending a Get to myself always fails.
@@ -912,6 +918,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			message.ChitsOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -1040,6 +1047,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			message.ChitsOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -1203,6 +1211,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 		requestID,
 		message.CrossChainAppResponseOp,
 		failedMsg,
+		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	)
 
 	inMsg := message.InternalCrossChainAppRequest(
@@ -1256,6 +1265,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			requestID,
 			message.AppResponseOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 

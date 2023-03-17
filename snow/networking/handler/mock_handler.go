@@ -12,9 +12,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	message "github.com/ava-labs/avalanchego/message"
 	snow "github.com/ava-labs/avalanchego/snow"
-	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -39,34 +37,6 @@ func NewMockHandler(ctrl *gomock.Controller) *MockHandler {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 	return m.recorder
-}
-
-// Bootstrapper mocks base method.
-func (m *MockHandler) Bootstrapper() common.BootstrapableEngine {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Bootstrapper")
-	ret0, _ := ret[0].(common.BootstrapableEngine)
-	return ret0
-}
-
-// Bootstrapper indicates an expected call of Bootstrapper.
-func (mr *MockHandlerMockRecorder) Bootstrapper() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Bootstrapper", reflect.TypeOf((*MockHandler)(nil).Bootstrapper))
-}
-
-// Consensus mocks base method.
-func (m *MockHandler) Consensus() common.Engine {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Consensus")
-	ret0, _ := ret[0].(common.Engine)
-	return ret0
-}
-
-// Consensus indicates an expected call of Consensus.
-func (mr *MockHandlerMockRecorder) Consensus() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Consensus", reflect.TypeOf((*MockHandler)(nil).Consensus))
 }
 
 // Context mocks base method.
@@ -113,7 +83,7 @@ func (mr *MockHandlerMockRecorder) Len() *gomock.Call {
 }
 
 // Push mocks base method.
-func (m *MockHandler) Push(arg0 context.Context, arg1 message.InboundMessage) {
+func (m *MockHandler) Push(arg0 context.Context, arg1 Message) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Push", arg0, arg1)
 }
@@ -124,28 +94,16 @@ func (mr *MockHandlerMockRecorder) Push(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Push", reflect.TypeOf((*MockHandler)(nil).Push), arg0, arg1)
 }
 
-// SetBootstrapper mocks base method.
-func (m *MockHandler) SetBootstrapper(arg0 common.BootstrapableEngine) {
+// SetEngineManager mocks base method.
+func (m *MockHandler) SetEngineManager(arg0 *EngineManager) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetBootstrapper", arg0)
+	m.ctrl.Call(m, "SetEngineManager", arg0)
 }
 
-// SetBootstrapper indicates an expected call of SetBootstrapper.
-func (mr *MockHandlerMockRecorder) SetBootstrapper(arg0 interface{}) *gomock.Call {
+// SetEngineManager indicates an expected call of SetEngineManager.
+func (mr *MockHandlerMockRecorder) SetEngineManager(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBootstrapper", reflect.TypeOf((*MockHandler)(nil).SetBootstrapper), arg0)
-}
-
-// SetConsensus mocks base method.
-func (m *MockHandler) SetConsensus(arg0 common.Engine) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetConsensus", arg0)
-}
-
-// SetConsensus indicates an expected call of SetConsensus.
-func (mr *MockHandlerMockRecorder) SetConsensus(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConsensus", reflect.TypeOf((*MockHandler)(nil).SetConsensus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEngineManager", reflect.TypeOf((*MockHandler)(nil).SetEngineManager), arg0)
 }
 
 // SetOnStopped mocks base method.
@@ -158,18 +116,6 @@ func (m *MockHandler) SetOnStopped(arg0 func()) {
 func (mr *MockHandlerMockRecorder) SetOnStopped(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetOnStopped", reflect.TypeOf((*MockHandler)(nil).SetOnStopped), arg0)
-}
-
-// SetStateSyncer mocks base method.
-func (m *MockHandler) SetStateSyncer(arg0 common.StateSyncer) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetStateSyncer", arg0)
-}
-
-// SetStateSyncer indicates an expected call of SetStateSyncer.
-func (mr *MockHandlerMockRecorder) SetStateSyncer(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStateSyncer", reflect.TypeOf((*MockHandler)(nil).SetStateSyncer), arg0)
 }
 
 // ShouldHandle mocks base method.
@@ -196,20 +142,6 @@ func (m *MockHandler) Start(arg0 context.Context, arg1 bool) {
 func (mr *MockHandlerMockRecorder) Start(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockHandler)(nil).Start), arg0, arg1)
-}
-
-// StateSyncer mocks base method.
-func (m *MockHandler) StateSyncer() common.StateSyncer {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StateSyncer")
-	ret0, _ := ret[0].(common.StateSyncer)
-	return ret0
-}
-
-// StateSyncer indicates an expected call of StateSyncer.
-func (mr *MockHandlerMockRecorder) StateSyncer() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateSyncer", reflect.TypeOf((*MockHandler)(nil).StateSyncer))
 }
 
 // Stop mocks base method.

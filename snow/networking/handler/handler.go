@@ -5,6 +5,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -38,7 +39,12 @@ const (
 	syncProcessingTimeWarnLimit = 30 * time.Second
 )
 
-var _ Handler = (*handler)(nil)
+var (
+	_ Handler = (*handler)(nil)
+
+	errMissingEngine  = errors.New("missing engine")
+	errNoStartingGear = errors.New("failed to select starting gear")
+)
 
 type Handler interface {
 	health.Checker
@@ -49,16 +55,11 @@ type Handler interface {
 	// this chain, the message should be dropped.
 	ShouldHandle(nodeID ids.NodeID) bool
 
-	SetStateSyncer(engine common.StateSyncer)
-	StateSyncer() common.StateSyncer
-	SetBootstrapper(engine common.BootstrapableEngine)
-	Bootstrapper() common.BootstrapableEngine
-	SetConsensus(engine common.Engine)
-	Consensus() common.Engine
+	SetEngineManager(engineManager *EngineManager)
 
 	SetOnStopped(onStopped func())
 	Start(ctx context.Context, recoverPanic bool)
-	Push(ctx context.Context, msg message.InboundMessage)
+	Push(ctx context.Context, msg Message)
 	Len() int
 	Stop(ctx context.Context)
 	StopWithError(ctx context.Context, err error)
@@ -81,9 +82,8 @@ type handler struct {
 	syncedSubnet    chan struct{}
 	gossipFrequency time.Duration
 
-	stateSyncer  common.StateSyncer
-	bootstrapper common.BootstrapableEngine
-	engine       common.Engine
+	engineManager *EngineManager
+
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
 	onStopped func()
@@ -164,28 +164,8 @@ func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 	return h.subnetAllower.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
-func (h *handler) SetStateSyncer(engine common.StateSyncer) {
-	h.stateSyncer = engine
-}
-
-func (h *handler) StateSyncer() common.StateSyncer {
-	return h.stateSyncer
-}
-
-func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
-	h.bootstrapper = engine
-}
-
-func (h *handler) Bootstrapper() common.BootstrapableEngine {
-	return h.bootstrapper
-}
-
-func (h *handler) SetConsensus(engine common.Engine) {
-	h.engine = engine
-}
-
-func (h *handler) Consensus() common.Engine {
-	return h.engine
+func (h *handler) SetEngineManager(engineManager *EngineManager) {
+	h.engineManager = engineManager
 }
 
 func (h *handler) SetOnStopped(onStopped func()) {
@@ -193,22 +173,25 @@ func (h *handler) SetOnStopped(onStopped func()) {
 }
 
 func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
-	if h.stateSyncer == nil {
-		return h.bootstrapper, nil
+	engines := h.engineManager.Get(h.ctx.CurrentEngineType.Get())
+	if engines == nil {
+		return nil, errNoStartingGear
+	}
+	if engines.StateSyncer == nil {
+		return engines.Bootstrapper, nil
 	}
 
-	stateSyncEnabled, err := h.stateSyncer.IsEnabled(ctx)
+	stateSyncEnabled, err := engines.StateSyncer.IsEnabled(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if !stateSyncEnabled {
-		return h.bootstrapper, nil
+		return engines.Bootstrapper, nil
 	}
 
-	// drop bootstrap state from previous runs
-	// before starting state sync
-	return h.stateSyncer, h.bootstrapper.Clear()
+	// drop bootstrap state from previous runs before starting state sync
+	return engines.StateSyncer, engines.Bootstrapper.Clear()
 }
 
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
@@ -263,15 +246,22 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	engine, err := h.getEngine()
-	if err != nil {
-		return nil, err
+	state := h.ctx.GetChainState()
+	engineType := h.ctx.CurrentEngineType.Get()
+	engine, ok := h.engineManager.Get(engineType).Get(state)
+	if !ok {
+		return nil, fmt.Errorf(
+			"%w %s running %s",
+			errMissingEngine,
+			state,
+			engineType,
+		)
 	}
 	return engine.HealthCheck(ctx)
 }
 
 // Push the message onto the handler's queue
-func (h *handler) Push(ctx context.Context, msg message.InboundMessage) {
+func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
 	case message.AppRequestOp, message.AppRequestFailedOp, message.AppResponseOp, message.AppGossipOp,
 		message.CrossChainAppRequestOp, message.CrossChainAppRequestFailedOp, message.CrossChainAppResponseOp:
@@ -302,7 +292,15 @@ func (h *handler) Stop(ctx context.Context) {
 		// [h.ctx.Lock] until the engine finished executing state transitions,
 		// which may take a long time. As a result, the router would time out on
 		// shutting down this chain.
-		h.bootstrapper.Halt(ctx)
+		currentEng := h.ctx.CurrentEngineType.Get()
+		bootstrapper, ok := h.engineManager.Get(currentEng).Get(snow.Bootstrapping)
+		if !ok {
+			h.ctx.Log.Error("bootstrapping engine doesn't exists",
+				zap.Stringer("type", currentEng),
+			)
+			return
+		}
+		bootstrapper.Halt(ctx)
 	})
 }
 
@@ -403,7 +401,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 }
 
 // Any returned error is treated as fatal
-func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage) error {
+func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
@@ -445,11 +443,53 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		}
 	}()
 
-	// TODO: Use message.GetEngineType to differentiate messages intended for
-	// the avalanche engine or the snowman engine.
-	engine, err := h.getEngine()
-	if err != nil {
-		return err
+	// We will attempt to pass the message to the requested type for the state
+	// we are currently in.
+	currentEngineType := h.ctx.CurrentEngineType.Get()
+	if msg.EngineType == p2p.EngineType_ENGINE_TYPE_SNOWMAN &&
+		currentEngineType == p2p.EngineType_ENGINE_TYPE_AVALANCHE {
+		// The peer is requesting an engine type that hasn't been initialized
+		// yet. This means we know that this isn't a response, so we can safely
+		// drop the message.
+		h.ctx.Log.Debug("dropping sync message",
+			zap.String("reason", "uninitialized engine type"),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("currentEngineType", currentEngineType),
+			zap.Stringer("requestedEngineType", msg.EngineType),
+		)
+		return nil
+	}
+
+	var engineType p2p.EngineType
+	switch msg.EngineType {
+	case p2p.EngineType_ENGINE_TYPE_AVALANCHE, p2p.EngineType_ENGINE_TYPE_SNOWMAN:
+		// The peer is requesting an engine type that has been initialized, so
+		// we should attempt to honor the request.
+		engineType = msg.EngineType
+	default:
+		// Note: [msg.EngineType] may have been provided by the peer as an
+		// invalid option. I.E. not one of AVALANCHE, SNOWMAN, or UNSPECIFIED.
+		// In this case, we treat the value the same way as UNSPECIFIED.
+		//
+		// If the peer didn't request a specific engine type, we default to the
+		// current engine.
+		engineType = currentEngineType
+	}
+
+	engineState := h.ctx.GetChainState()
+	engine, ok := h.engineManager.Get(engineType).Get(engineState)
+	if !ok {
+		// This should only happen if the peer is not following the protocol.
+		// This can happen if the chain only has a Snowman engine and the peer
+		// requested an Avalanche engine handle the message.
+		h.ctx.Log.Debug("dropping sync message",
+			zap.String("reason", "uninitialized engine state"),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("currentEngineType", currentEngineType),
+			zap.Stringer("requestedEngineType", msg.EngineType),
+			zap.Stringer("engineState", engineState),
+		)
+		return nil
 	}
 
 	// Invariant: Response messages can never be dropped here. This is because
@@ -669,7 +709,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	}
 }
 
-func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage) {
+func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 	h.asyncMessagePool.Send(func() {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
@@ -682,7 +722,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage
 }
 
 // Any returned error is treated as fatal
-func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
+func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
@@ -712,9 +752,16 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 		)
 	}()
 
-	engine, err := h.getEngine()
-	if err != nil {
-		return err
+	engineState := h.ctx.GetChainState()
+	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
+	if !ok {
+		return fmt.Errorf(
+			"%w %s running %s",
+			errMissingEngine,
+			engineState,
+			currentEngineType,
+		)
 	}
 
 	switch m := body.(type) {
@@ -797,9 +844,16 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		)
 	}()
 
-	engine, err := h.getEngine()
-	if err != nil {
-		return err
+	engineState := h.ctx.GetChainState()
+	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
+	if !ok {
+		return fmt.Errorf(
+			"%w %s running %s",
+			errMissingEngine,
+			engineState,
+			currentEngineType,
+		)
 	}
 
 	switch msg := body.(type) {
@@ -820,27 +874,16 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	}
 }
 
-func (h *handler) getEngine() (common.Engine, error) {
-	state := h.ctx.GetChainState()
-	switch state {
-	case snow.StateSyncing:
-		return h.stateSyncer, nil
-	case snow.Bootstrapping:
-		return h.bootstrapper, nil
-	case snow.ExtendingFrontier, snow.SubnetSynced:
-		return h.engine, nil
-	default:
-		return nil, fmt.Errorf("unknown handler for state %s", state)
-	}
-}
-
-func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (context.Context, message.InboundMessage, bool) {
+func (h *handler) popUnexpiredMsg(
+	queue MessageQueue,
+	expired prometheus.Counter,
+) (context.Context, Message, bool) {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
 		ctx, msg, ok := queue.Pop()
 		if !ok {
-			return nil, nil, false
+			return nil, Message{}, false
 		}
 
 		// If this message's deadline has passed, don't process it.
@@ -875,6 +918,7 @@ func (h *handler) closeDispatcher(ctx context.Context) {
 	h.shutdown(ctx)
 }
 
+// Note: shutdown is only called after all message dispatchers have exited.
 func (h *handler) shutdown(ctx context.Context) {
 	defer func() {
 		if h.onStopped != nil {
@@ -883,15 +927,18 @@ func (h *handler) shutdown(ctx context.Context) {
 		close(h.closed)
 	}()
 
-	currentEngine, err := h.getEngine()
-	if err != nil {
+	engineState := h.ctx.GetChainState()
+	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
+	if !ok {
 		h.ctx.Log.Error("failed fetching current engine during shutdown",
-			zap.Error(err),
+			zap.Stringer("type", currentEngineType),
+			zap.Stringer("state", engineState),
 		)
 		return
 	}
 
-	if err := currentEngine.Shutdown(ctx); err != nil {
+	if err := engine.Shutdown(ctx); err != nil {
 		h.ctx.Log.Error("failed while shutting down the chain",
 			zap.Error(err),
 		)

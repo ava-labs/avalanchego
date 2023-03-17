@@ -42,8 +42,9 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 		Context:             DefaultContextTest(),
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
-		DecisionAcceptor:    noOpAcceptor{},
-		ConsensusAcceptor:   noOpAcceptor{},
+		BlockAcceptor:       noOpAcceptor{},
+		TxAcceptor:          noOpAcceptor{},
+		VertexAcceptor:      noOpAcceptor{},
 		SubnetStateTracker: &SubnetStateTrackerTest{
 			T: t,
 			IsSyncedF: func() bool {
