@@ -2657,7 +2657,7 @@ func TestServiceGetBlock(t *testing.T) {
 				}, nil
 			},
 			encoding:    formatting.Hex,
-			expectedErr: errNotLineraized,
+			expectedErr: errNotLinearized,
 		},
 		{
 			name: "block not found",
@@ -2817,7 +2817,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				}, nil
 			},
 			encoding:    formatting.Hex,
-			expectedErr: errNotLineraized,
+			expectedErr: errNotLinearized,
 		},
 		{
 			name: "block height not found",
@@ -3015,7 +3015,7 @@ func TestServiceGetHeight(t *testing.T) {
 					},
 				}
 			},
-			expectedErr: errNotLineraized,
+			expectedErr: errNotLinearized,
 		},
 		{
 			name: "block not found",

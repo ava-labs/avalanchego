@@ -50,7 +50,7 @@ var (
 	errNoAddresses        = errors.New("no addresses provided")
 	errNoKeys             = errors.New("from addresses have no keys or funds")
 	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
-	errNotLineraized      = errors.New("chain is not linearized")
+	errNotLinearized      = errors.New("chain is not linearized")
 )
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
@@ -71,7 +71,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 	)
 
 	if s.vm.chainManager == nil {
-		return errNotLineraized
+		return errNotLinearized
 	}
 	block, err := s.vm.chainManager.GetStatelessBlock(args.BlockID)
 	if err != nil {
@@ -102,7 +102,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	)
 
 	if s.vm.chainManager == nil {
-		return errNotLineraized
+		return errNotLinearized
 	}
 	reply.Encoding = args.Encoding
 
@@ -141,7 +141,7 @@ func (s *Service) GetHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightRe
 	)
 
 	if s.vm.chainManager == nil {
-		return errNotLineraized
+		return errNotLinearized
 	}
 
 	blockID := s.vm.state.GetLastAccepted()
