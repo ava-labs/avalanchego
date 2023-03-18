@@ -117,6 +117,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&MultisigAliasTx{}),
 		targetCodec.RegisterCustomType(&ClaimTx{}),
 		targetCodec.RegisterCustomType(&RewardsImportTx{}),
+		targetCodec.RegisterCustomType(&secp256k1fx.MultisigCredential{}),
 	)
 	return errs.Err
 }

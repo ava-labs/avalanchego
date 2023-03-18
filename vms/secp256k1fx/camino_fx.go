@@ -61,11 +61,11 @@ func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (Re
 
 	txHash := hashing.ComputeHash256(utx.Bytes())
 	for _, v := range verifies {
-		cred, ok := v.(*Credential)
+		cred, ok := v.(CredentialIntf)
 		if !ok {
 			return nil, errNotSecp256Cred
 		}
-		for _, sig := range cred.Sigs {
+		for _, sig := range cred.Signatures() {
 			if visited[sig] {
 				continue
 			}
@@ -111,7 +111,7 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 	if !ok {
 		return errWrongInputType
 	}
-	cred, ok := credIntf.(*Credential)
+	cred, ok := credIntf.(CredentialIntf)
 	if !ok {
 		return errWrongCredentialType
 	}
