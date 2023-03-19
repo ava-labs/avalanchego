@@ -117,5 +117,5 @@ const (
 
 	// Delays
 	DefaultNetworkInitialReconnectDelay = time.Second
-	DefaultNetworkMaxReconnectDelay     = time.Hour
+	DefaultNetworkMaxReconnectDelay     = time.Minute
 )
