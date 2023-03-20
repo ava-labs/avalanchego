@@ -42,7 +42,7 @@ var errTestingDropped = errors.New("testing dropped")
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 	env.Ctx.Lock.Lock()
 	defer func() {
 		env.Ctx.Lock.Unlock()
@@ -79,7 +79,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 	env.Ctx.Lock.Lock()
 	defer func() {
 		env.Ctx.Lock.Unlock()
@@ -117,7 +117,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 	env.isBootstrapped.Set(false)
 	env.Ctx.Lock.Lock()
 	env.Ctx.Log = logging.NoWarn{}
@@ -699,7 +699,7 @@ func TestBuildBlock(t *testing.T) {
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 	env.Ctx.Lock.Lock()
 
 	defer func() {
@@ -767,7 +767,7 @@ func TestAtomicTxImports(t *testing.T) {
 func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 	env.Ctx.Lock.Lock()
 	defer func() {
 		env.Ctx.Lock.Unlock()
@@ -808,7 +808,7 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	require := require.New(t)
 
-	env := NewEnvironment(t)
+	env := newEnvironment(t)
 
 	env.Ctx.Lock.Lock()
 	defer func() {

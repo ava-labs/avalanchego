@@ -110,7 +110,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func NewEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
