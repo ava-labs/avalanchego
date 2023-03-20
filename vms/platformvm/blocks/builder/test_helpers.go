@@ -201,7 +201,7 @@ func newEnvironment(t *testing.T) *environment {
 	return res
 }
 
-func (env *environment) GetValidTx(t *testing.T) *txs.Tx {
+func (env *environment) getValidTx(t *testing.T) *txs.Tx {
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,

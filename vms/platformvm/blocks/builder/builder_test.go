@@ -50,7 +50,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	}()
 
 	// add a tx to it
-	tx := env.GetValidTx(t)
+	tx := env.getValidTx(t)
 	txID := tx.ID()
 
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
@@ -91,7 +91,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	}
 
 	// create candidate tx
-	tx := env.GetValidTx(t)
+	tx := env.getValidTx(t)
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
@@ -781,7 +781,7 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	}
 
 	// create a tx
-	tx := env.GetValidTx(t)
+	tx := env.getValidTx(t)
 	txID := tx.ID()
 
 	// show that unknown tx is added to mempool
@@ -823,7 +823,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	}
 
 	// add a tx to the mempool and show it gets gossiped
-	tx := env.GetValidTx(t)
+	tx := env.getValidTx(t)
 	txID := tx.ID()
 
 	err := env.Builder.AddUnverifiedTx(tx)

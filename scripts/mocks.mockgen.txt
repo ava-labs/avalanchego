@@ -32,6 +32,7 @@ github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/componen
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor=Manager=vms/platformvm/blocks/executor/mock_manager.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks=Block=vms/platformvm/blocks/mock_block.go
+github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder=Builder=vms/platformvm/blocks/builder/mock_builder.go
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx,Owner=vms/platformvm/fx/mock_fx.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/mock_chain.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/mock_diff.go
