@@ -55,6 +55,27 @@ func (fx *CaminoFx) Initialize(vmIntf interface{}) error {
 	return nil
 }
 
+func (fx *CaminoFx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
+	if cred, ok := credIntf.(*MultisigCredential); ok {
+		credIntf = &cred.Credential
+	}
+	return fx.Fx.VerifyPermission(txIntf, inIntf, credIntf, ownerIntf)
+}
+
+func (fx *CaminoFx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
+	if cred, ok := credIntf.(*MultisigCredential); ok {
+		credIntf = &cred.Credential
+	}
+	return fx.Fx.VerifyOperation(txIntf, opIntf, credIntf, utxosIntf)
+}
+
+func (fx *CaminoFx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
+	if cred, ok := credIntf.(*MultisigCredential); ok {
+		credIntf = &cred.Credential
+	}
+	return fx.Fx.VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf)
+}
+
 func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (RecoverMap, error) {
 	ret := make(RecoverMap, len(verifies))
 	visited := make(map[[crypto.SECP256K1RSigLen]byte]bool)
