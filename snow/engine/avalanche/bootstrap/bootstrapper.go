@@ -608,6 +608,17 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return err
 	}
 
+	// If the chain is linearized, we should immediately move on to start
+	// bootstrapping snowman.
+	linearized, err := b.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		b.processedCache.Flush()
+		return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	}
+
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedVts
 
