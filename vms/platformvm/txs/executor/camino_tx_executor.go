@@ -54,6 +54,7 @@ var (
 	errConsortiumSignatureMissing   = errors.New("wrong consortium's member signature")
 	errNodeNotRegistered            = errors.New("no address registered for this node")
 	errNotNodeOwner                 = errors.New("node is registered for another address")
+	errNodeAlreadyRegistered        = errors.New("node is already registered")
 	errDepositCredentialMissmatch   = errors.New("deposit credential isn't matching")
 	errClaimableCredentialMissmatch = errors.New("claimable credential isn't matching")
 	errDepositNotFound              = errors.New("deposit tx not found")
@@ -1029,8 +1030,14 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		return err
 	}
 
-	if oldNodeIDEmpty && haslinkedNode {
-		return errConsortiumMemberHasNode
+	if oldNodeIDEmpty {
+		if haslinkedNode {
+			return errConsortiumMemberHasNode
+		}
+		// Verify that the node is not already registered
+		if _, err := e.State.GetShortIDLink(ids.ShortID(tx.NewNodeID), state.ShortLinkKeyRegisterNode); err == nil {
+			return errNodeAlreadyRegistered
+		}
 	}
 
 	// verify consortium member cred
