@@ -219,12 +219,15 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 func (n *pushGossiper) awaitEthTxGossip() {
 	n.shutdownWg.Add(1)
 	go n.ctx.Log.RecoverAndPanic(func() {
-		defer n.shutdownWg.Done()
-
 		var (
 			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
 			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
 		)
+		defer func() {
+			gossipTicker.Stop()
+			regossipTicker.Stop()
+			n.shutdownWg.Done()
+		}()
 
 		for {
 			select {
