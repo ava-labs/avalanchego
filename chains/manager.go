@@ -918,13 +918,15 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// create bootstrap gear
+	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
 	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config:        avalancheCommonCfg,
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       vtxManager,
-		VM:            linearizableVM,
+		Config:             avalancheCommonCfg,
+		AllGetsServer:      avaGetHandler,
+		VtxBlocked:         vtxBlocker,
+		TxBlocked:          txBlocker,
+		Manager:            vtxManager,
+		VM:                 linearizableVM,
+		LinearizeOnStartup: !specifiedLinearizationTime,
 	}
 
 	var avalancheConsensus avcon.Consensus = &avcon.Topological{}

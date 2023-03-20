@@ -358,6 +358,42 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 
 	b.Config.SharedCfg.RequestID = startReqID
 
+	// If the network was already linearized, don't attempt to linearize it
+	// again.
+	linearized, err := b.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get linearization status: %w", err)
+	}
+	if linearized {
+		edge := b.Manager.Edge(ctx)
+		return b.ForceAccepted(ctx, edge)
+	}
+
+	// If requested, assume the currently accepted state is what was linearized.
+	//
+	// Note: This is used to linearize networks that were created after the
+	// linearization occurred.
+	if b.Config.LinearizeOnStartup {
+		edge := b.Manager.Edge(ctx)
+		stopVertex, err := b.Manager.BuildStopVtx(ctx, edge)
+		if err != nil {
+			return fmt.Errorf("failed to create stop vertex: %w", err)
+		}
+		if err := stopVertex.Verify(ctx); err != nil {
+			return fmt.Errorf("failed to verify stop vertex: %w", err)
+		}
+		if err := stopVertex.Accept(ctx); err != nil {
+			return fmt.Errorf("failed to accept stop vertex: %w", err)
+		}
+
+		stopVertexID := stopVertex.ID()
+		b.Ctx.Log.Info("accepted stop vertex",
+			zap.Stringer("vtxID", stopVertexID),
+		)
+
+		return b.ForceAccepted(ctx, []ids.ID{stopVertexID})
+	}
+
 	if !b.StartupTracker.ShouldStart() {
 		return nil
 	}
@@ -606,6 +642,16 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	)
 	if err != nil || b.Halted() {
 		return err
+	}
+
+	// If the chain is linearized, we should immediately move on to start
+	// bootstrapping snowman.
+	linearized, err := b.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 	}
 
 	previouslyExecuted := b.executedStateTransitions
