@@ -1,6 +1,4 @@
-PKG_ROOT=/tmp
-VERSION=$TAG
-AVALANCHE_ROOT=$PKG_ROOT/avalanchego-$VERSION
+AVALANCHE_ROOT=$PKG_ROOT/avalanchego-$TAG
 
 mkdir -p $AVALANCHE_ROOT
 
@@ -12,7 +10,6 @@ fi
 
 echo "Build tgz package..."
 cd $PKG_ROOT
-echo "Version: $VERSION"
-tar -czvf "avalanchego-linux-$ARCH-$VERSION.tar.gz" avalanchego-$VERSION
-aws s3 cp avalanchego-linux-$ARCH-$VERSION.tar.gz s3://$BUCKET/linux/binaries/ubuntu/$RELEASE/$ARCH/
-rm -rf $PKG_ROOT/avalanchego*
+echo "Tag: $TAG"
+tar -czvf "avalanchego-linux-$ARCH-$TAG.tar.gz" avalanchego-$TAG
+aws s3 cp avalanchego-linux-$ARCH-$TAG.tar.gz s3://$BUCKET/linux/binaries/ubuntu/$RELEASE/$ARCH/
