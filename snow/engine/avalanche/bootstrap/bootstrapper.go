@@ -5,10 +5,7 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -31,16 +28,9 @@ const (
 	stripeDistance = 2000
 	stripeWidth    = 5
 	cacheSize      = 100000
-
-	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	bootstrappingDelay = 10 * time.Second
 )
 
-var (
-	_ common.BootstrapableEngine = (*bootstrapper)(nil)
-
-	errUnexpectedTimeout = errors.New("unexpected timeout fired")
-)
+var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 func New(
 	ctx context.Context,
@@ -79,7 +69,6 @@ func New(
 				return startSnowmanBootstrapping(ctx, lastReqID)
 			},
 		},
-		executedStateTransitions: math.MaxInt32,
 	}
 
 	if err := b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer); err != nil {
@@ -132,10 +121,6 @@ type bootstrapper struct {
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU[ids.ID, struct{}]
-	// number of state transitions executed
-	executedStateTransitions int
-
-	awaitingTimeout bool
 }
 
 func (b *bootstrapper) Clear() error {
@@ -319,16 +304,8 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (b *bootstrapper) Timeout(ctx context.Context) error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.Restart(ctx, true)
-	}
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+func (*bootstrapper) Timeout(context.Context) error {
+	return nil
 }
 
 func (*bootstrapper) Gossip(context.Context) error {
@@ -606,7 +583,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
+	if b.IsBootstrapped() || len(pendingJobs) > 0 {
 		return nil
 	}
 
@@ -633,7 +610,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Ctx.Log.Debug("executing vertices")
 	}
 
-	executedVts, err := b.VtxBlocked.ExecuteAll(
+	_, err = b.VtxBlocked.ExecuteAll(
 		ctx,
 		b.Config.Ctx,
 		b,
@@ -651,37 +628,10 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return err
 	}
 	if linearized {
+		b.processedCache.Flush()
 		return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 	}
 
-	previouslyExecuted := b.executedStateTransitions
-	b.executedStateTransitions = executedVts
-
-	// Note that executedVts < c*previouslyExecuted is enforced so that the
-	// bootstrapping process will terminate even as new vertices are being
-	// issued.
-	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.Config.RetryBootstrap {
-		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
-		return b.Restart(ctx, true)
-	}
-
-	// Notify the subnet that this chain is synced
-	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
-	b.processedCache.Flush()
-
-	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing.
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		if !b.Config.SharedCfg.Restarted {
-			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
-		} else {
-			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
-		}
-		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
-		// on the latest tip.
-		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
-		b.awaitingTimeout = true
-		return nil
-	}
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	b.Ctx.Log.Debug("checking for stop vertex before finishing bootstrapping")
+	return b.Restart(ctx, true)
 }
