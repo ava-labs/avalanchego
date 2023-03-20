@@ -319,7 +319,7 @@ func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	errors := make([]error, len(keys))
 	for i, key := range keys {
 		path := newPath(key)
-		values[i], errors[i] = db.getValue(path)
+		values[i], errors[i] = db.getValue(path, false)
 	}
 	return values, errors
 }
@@ -330,14 +330,15 @@ func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	return db.getValue(newPath(key))
+	return db.getValue(newPath(key), true)
 }
 
-// Assumes [db.lock] is read locked.
-func (db *Database) getValue(key path) ([]byte, error) {
+func (db *Database) getValue(key path, lock bool) ([]byte, error) {
+	if lock {
+		db.lock.RLock()
+		defer db.lock.RUnlock()
+	}
+
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -350,17 +351,6 @@ func (db *Database) getValue(key path) ([]byte, error) {
 		return nil, database.ErrNotFound
 	}
 	return clonedVal.value, nil
-}
-
-// Returns a view of the trie as it was when the merkle root was [rootID].
-func (db *Database) GetHistoricalView(ctx context.Context, rootID ids.ID) (ReadOnlyTrie, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetHistoricalView")
-	defer span.End()
-
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	return db.getHistoricalViewForRangeProof(rootID, nil, nil)
 }
 
 // Returns the ID of the root node of the merkle trie.
@@ -382,14 +372,14 @@ func (db *Database) getMerkleRoot() ids.ID {
 
 // Returns a proof of the existence/non-existence of [key] in this trie.
 func (db *Database) GetProof(ctx context.Context, key []byte) (*Proof, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	return db.getProof(ctx, key)
 }
 
 // Returns a proof of the existence/non-existence of [key] in this trie.
-// Assumes [db.lock] is read locked.
+// Assumes [db.commitLock] is read locked.
 func (db *Database) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	view, err := db.newUntrackedView(defaultPreallocationSize)
 	if err != nil {
@@ -407,8 +397,8 @@ func (db *Database) GetRangeProof(
 	end []byte,
 	maxLength int,
 ) (*RangeProof, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
 }
@@ -422,13 +412,13 @@ func (db *Database) GetRangeProofAtRoot(
 	end []byte,
 	maxLength int,
 ) (*RangeProof, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	return db.getRangeProofAtRoot(ctx, rootID, start, end, maxLength)
 }
 
-// Assumes [db.lock] is read locked.
+// Assumes [db.commitLock] is read locked.
 func (db *Database) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
@@ -440,11 +430,11 @@ func (db *Database) getRangeProofAtRoot(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	historicalView, err := db.getHistoricalViewForRangeProof(rootID, start, end)
+	historicalView, err := db.getHistoricalViewForRange(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return historicalView.getRangeProof(ctx, start, end, maxLength)
+	return historicalView.GetRangeProof(ctx, start, end, maxLength)
 }
 
 // Returns a proof for a subset of the key/value changes in key range
@@ -465,8 +455,8 @@ func (db *Database) GetChangeProof(
 		return nil, errSameRoot
 	}
 
-	db.lock.RLock()
-	defer db.lock.RUnlock()
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	result := &ChangeProof{
 		HadRootsInHistory: true,
@@ -507,9 +497,9 @@ func (db *Database) GetChangeProof(
 	}
 	largestKey := result.getLargestKey(end)
 
-	// Since we hold [db.lock] we must still have sufficient
+	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRangeProof(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +578,7 @@ func (db *Database) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k))
+	_, err := db.getValue(newPath(k), true)
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -901,8 +891,8 @@ func (db *Database) initializeRootIfNeeded() (ids.ID, error) {
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
-// Assumes [db.lock] is read locked.
-func (db *Database) getHistoricalViewForRangeProof(
+// Assumes [db.commitLock] is read locked.
+func (db *Database) getHistoricalViewForRange(
 	rootID ids.ID,
 	start []byte,
 	end []byte,
@@ -924,8 +914,10 @@ func (db *Database) getHistoricalViewForRangeProof(
 // Returns all of the keys in range [start, end] that aren't in [keySet].
 // If [start] is nil, then the range has no lower bound.
 // If [end] is nil, then the range has no upper bound.
-// Assumes [db.lock] is read locked.
 func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
 	it := db.NewIteratorWithStart(start)
 	defer it.Release()
 
@@ -1093,11 +1085,13 @@ func (db *Database) prepareChangeProofView(proof *ChangeProof) (*trieView, error
 
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
 // any existing key-value pairs in the proof's range but not in the proof removed.
+// assumes [db.commitLock] is held
 func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
 	// Don't need to lock [view] because nobody else has a reference to it.
 	db.lock.RLock()
 	view, err := db.newUntrackedView(len(proof.KeyValues))
 	db.lock.RUnlock()
+
 	if err != nil {
 		return nil, err
 	}
@@ -1113,7 +1107,6 @@ func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 	if len(proof.KeyValues) > 0 {
 		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
-
 	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return nil, err
@@ -1126,10 +1119,6 @@ func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 	return view, nil
 }
 
-// Assumes [db.lock] is read locked.
-// This is required because putting a node in [db.nodeCache] can cause an eviction,
-// which puts a node in [db.nodeDB], and we don't want to put anything in [db.nodeDB]
-// after [db] is closed.
 // Non-nil error is fatal -- [db] will close.
 func (db *Database) putNodeInCache(key path, n *node) error {
 	// TODO Cache metrics
