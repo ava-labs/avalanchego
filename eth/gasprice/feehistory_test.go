@@ -44,9 +44,9 @@ import (
 func TestFeeHistory(t *testing.T) {
 	var cases = []struct {
 		pending      bool
-		maxCallBlock int
+		maxCallBlock uint64
 		maxBlock     int
-		count        int
+		count        uint64
 		last         rpc.BlockNumber
 		percent      []float64
 		expFirst     uint64

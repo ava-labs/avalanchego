@@ -51,7 +51,7 @@ import (
 const (
 	// DefaultMaxCallBlockHistory is the number of blocks that can be fetched in
 	// a single call to eth_feeHistory.
-	DefaultMaxCallBlockHistory int = 2048
+	DefaultMaxCallBlockHistory uint64 = 2048
 	// DefaultMaxBlockHistory is the number of blocks from the last accepted
 	// block that can be fetched in eth_feeHistory.
 	//
@@ -83,7 +83,7 @@ type Config struct {
 	MaxLookbackSeconds uint64
 	// MaxCallBlockHistory specifies the maximum number of blocks that can be
 	// fetched in a single eth_feeHistory call.
-	MaxCallBlockHistory int
+	MaxCallBlockHistory uint64
 	// MaxBlockHistory specifies the furthest back behind the last accepted block that can
 	// be requested by fee history.
 	MaxBlockHistory int
@@ -126,7 +126,7 @@ type Oracle struct {
 
 	checkBlocks, percentile int
 	maxLookbackSeconds      uint64
-	maxCallBlockHistory     int
+	maxCallBlockHistory     uint64
 	maxBlockHistory         int
 	historyCache            *lru.Cache
 	feeInfoProvider         *feeInfoProvider
