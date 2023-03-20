@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.11.9](https://github.com/ava-labs/coreth/releases/tag/v0.11.9)
+
+- Downgrade SetPreference log from warn to debug
+
 ## [v0.11.8](https://github.com/ava-labs/coreth/releases/tag/v0.11.8)
 
 - Fix shutdown hanging during state sync
