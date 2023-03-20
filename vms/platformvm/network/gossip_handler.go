@@ -4,12 +4,13 @@
 package network
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"go.uber.org/zap"
 )
 
 // gossipHandler handles incoming gossip messages
@@ -25,14 +26,14 @@ func NewGossipHandler(ctx *snow.Context, blkBuilder builder.Builder) message.Han
 	}
 }
 
-func (n *gossipHandler) HandleTx(nodeID ids.NodeID, msg *message.TxGossip) error {
-	n.ctx.Log.Debug("called HandleTx message handler",
+func (g *gossipHandler) HandleTxGossip(nodeID ids.NodeID, msg *message.TxGossip) error {
+	g.ctx.Log.Debug("called HandleTx message handler",
 		zap.Stringer("nodeID", nodeID),
 	)
 
 	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.ctx.Log.Verbo("received invalid tx",
+		g.ctx.Log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("tx", msg.Tx),
 			zap.Error(err),
@@ -42,16 +43,16 @@ func (n *gossipHandler) HandleTx(nodeID ids.NodeID, msg *message.TxGossip) error
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
-	n.ctx.Lock.Lock()
-	defer n.ctx.Lock.Unlock()
+	g.ctx.Lock.Lock()
+	defer g.ctx.Lock.Unlock()
 
-	if reason := n.blkBuilder.GetDropReason(tx.ID()); reason != nil {
+	if reason := g.blkBuilder.GetDropReason(tx.ID()); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
 
-	if err := n.blkBuilder.AddUnverifiedTx(tx); err != nil {
-		n.ctx.Log.Debug("tx failed verification",
+	if err := g.blkBuilder.AddUnverifiedTx(tx); err != nil {
+		g.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
 		)

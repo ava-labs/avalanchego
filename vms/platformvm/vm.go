@@ -76,11 +76,11 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
+	common.AppHandler
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
 
-	common.AppHandler
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
 

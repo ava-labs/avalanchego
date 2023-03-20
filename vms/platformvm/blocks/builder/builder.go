@@ -122,12 +122,11 @@ func (b *builder) Preferred() (snowman.Block, error) {
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
-	txID := tx.ID()
-
 	if !b.txExecutorBackend.Bootstrapped.Get() {
 		return errChainNotSynced
 	}
 
+	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
 		// as if it was successfully added

@@ -14,14 +14,14 @@ var _ Handler = NoopHandler{}
 
 // Handler handles incoming gossip messages
 type Handler interface {
-	HandleTx(nodeID ids.NodeID, msg *TxGossip) error
+	HandleTxGossip(nodeID ids.NodeID, msg *TxGossip) error
 }
 
 type NoopHandler struct {
 	Log logging.Logger
 }
 
-func (h NoopHandler) HandleTx(nodeID ids.NodeID, _ *TxGossip) error {
+func (h NoopHandler) HandleTxGossip(nodeID ids.NodeID, _ *TxGossip) error {
 	h.Log.Debug("dropping unexpected Tx message",
 		zap.Stringer("nodeID", nodeID),
 	)

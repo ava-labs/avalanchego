@@ -16,12 +16,12 @@ type CounterHandler struct {
 	Tx int
 }
 
-func (h *CounterHandler) HandleTx(ids.NodeID, *TxGossip) error {
+func (h *CounterHandler) HandleTxGossip(ids.NodeID, *TxGossip) error {
 	h.Tx++
 	return nil
 }
 
-func TestHandleTx(t *testing.T) {
+func TestHandleTxGossip(t *testing.T) {
 	require := require.New(t)
 
 	handler := CounterHandler{}
@@ -37,6 +37,6 @@ func TestNoopHandler(t *testing.T) {
 		Log: logging.NoLog{},
 	}
 
-	err := handler.HandleTx(ids.EmptyNodeID, nil)
+	err := handler.HandleTxGossip(ids.EmptyNodeID, nil)
 	require.NoError(t, err)
 }

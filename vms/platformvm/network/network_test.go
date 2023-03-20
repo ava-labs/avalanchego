@@ -15,12 +15,12 @@ type CounterHandler struct {
 	TxGossip int
 }
 
-func (h *CounterHandler) HandleTx(ids.NodeID, *message.TxGossip) error {
+func (h *CounterHandler) HandleTxGossip(ids.NodeID, *message.TxGossip) error {
 	h.TxGossip++
 	return nil
 }
 
-func TestHandleTx(t *testing.T) {
+func TestHandleTxGossip(t *testing.T) {
 	require := require.New(t)
 
 	handler := CounterHandler{}

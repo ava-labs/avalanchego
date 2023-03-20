@@ -16,5 +16,5 @@ type TxGossip struct {
 }
 
 func (msg *TxGossip) Handle(handler Handler, nodeID ids.NodeID, _ uint32) error {
-	return handler.HandleTx(nodeID, msg)
+	return handler.HandleTxGossip(nodeID, msg)
 }
