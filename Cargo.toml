@@ -5,6 +5,7 @@ members = [
   "shale",
   "firewood",
   "fwdctl",
+  "firewood-connection"
 ]
 
 [profile.release]

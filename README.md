@@ -61,6 +61,8 @@ There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
+To integrate firewood into a custom VM or other project, see the [firewood-connection](./firewood-connection/README.md) for a straightforward way to use firewood via custom message-passing. 
+
 ## CLI
 Firewood comes with a CLI tool called `fwdctl` that enables one to create and interact with a local instance of a firewood database. For more information, see the [fwdctl README](fwdctl/README.md).
 
