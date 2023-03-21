@@ -1,6 +1,6 @@
-use crate::dynamic_mem::DynamicMem;
 use crate::merkle::*;
 use crate::proof::Proof;
+use crate::{dynamic_mem::DynamicMem, proof::ProofError};
 use shale::{compact::CompactSpaceHeader, MemStore, MummyObj, ObjPtr};
 use std::rc::Rc;
 
@@ -104,11 +104,9 @@ impl MerkleSetup {
         last_key: K,
         keys: Vec<K>,
         vals: Vec<V>,
-    ) -> Result<bool, DataStoreError> {
+    ) -> Result<bool, ProofError> {
         let hash: [u8; 32] = *self.root_hash()?;
-        proof
-            .verify_range_proof(hash, first_key, last_key, keys, vals)
-            .map_err(|_err| DataStoreError::ProofVerificationError)
+        proof.verify_range_proof(hash, first_key, last_key, keys, vals)
     }
 }
 

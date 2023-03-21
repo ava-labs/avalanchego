@@ -178,6 +178,11 @@ impl Debug for BranchNode {
                 write!(f, " ({i:x} {c})")?;
             }
         }
+        for (i, c) in self.chd_eth_rlp.iter().enumerate() {
+            if let Some(c) = c {
+                write!(f, " ({i:x} {:?})", c)?;
+            }
+        }
         write!(
             f,
             " v={}]",
@@ -230,7 +235,12 @@ impl BranchNode {
                     if self.chd_eth_rlp[i].is_none() {
                         stream.append_empty_data()
                     } else {
-                        stream.append_raw(&self.chd_eth_rlp[i].clone().unwrap(), 1)
+                        let v = self.chd_eth_rlp[i].clone().unwrap();
+                        if v.len() == 32 {
+                            stream.append(&v)
+                        } else {
+                            stream.append_raw(&v, 1)
+                        }
                     }
                 }
             };
@@ -311,7 +321,7 @@ pub struct ExtNode(PartialPath, ObjPtr<Node>, Option<Vec<u8>>);
 
 impl Debug for ExtNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "[Extension {:?} {}]", self.0, self.1)
+        write!(f, "[Extension {:?} {} {:?}]", self.0, self.1, self.2)
     }
 }
 
@@ -336,7 +346,12 @@ impl ExtNode {
             if self.2.is_none() {
                 stream.append_empty_data();
             } else {
-                stream.append_raw(&self.2.clone().unwrap(), 1);
+                let v = self.2.clone().unwrap();
+                if v.len() == 32 {
+                    stream.append(&v);
+                } else {
+                    stream.append_raw(&v, 1);
+                }
             }
         }
         stream.out().into()
@@ -356,6 +371,10 @@ impl ExtNode {
 
     pub fn chd_mut(&mut self) -> &mut ObjPtr<Node> {
         &mut self.1
+    }
+
+    pub fn chd_eth_rlp_mut(&mut self) -> &mut Option<Vec<u8>> {
+        &mut self.2
     }
 }
 

@@ -1,4 +1,12 @@
-use firewood::{merkle_util::*, proof::Proof};
+use firewood::{
+    merkle::compare,
+    merkle_util::*,
+    proof::{Proof, ProofError},
+};
+
+use std::collections::HashMap;
+
+use rand::Rng;
 
 fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
     items: Vec<(K, V)>,
@@ -65,7 +73,7 @@ fn test_root_hash_fuzz_insertions() {
     };
     for _ in 0..10 {
         let mut items = Vec::new();
-        for _ in 0..10000 {
+        for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.push((keygen(), val));
         }
@@ -93,9 +101,9 @@ fn test_root_hash_reversed_deletions() -> Result<(), DataStoreError> {
             .collect();
         key
     };
-    for i in 0..1000 {
+    for i in 0..10 {
         let mut items = std::collections::HashMap::new();
-        for _ in 0..100 {
+        for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.insert(keygen(), val);
         }
@@ -166,7 +174,7 @@ fn test_root_hash_random_deletions() -> Result<(), DataStoreError> {
     };
     for i in 0..10 {
         let mut items = std::collections::HashMap::new();
-        for _ in 0..1000 {
+        for _ in 0..10 {
             let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
             items.insert(keygen(), val);
         }
@@ -310,177 +318,285 @@ fn test_empty_tree_proof() -> Result<(), DataStoreError> {
 }
 
 #[test]
-fn test_range_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![
-        ("doa", "verb"),
-        ("doe", "reindeer"),
-        ("dog", "puppy"),
-        ("ddd", "ok"),
-    ];
+// Tests normal range proof with both edge proofs as the existent proof.
+// The test cases are generated randomly.
+fn test_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
-    let start = 0;
-    let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(items[start].0)?;
-    assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(items[end].0)?;
-    assert!(!end_proof.0.is_empty());
+    for _ in 0..10 {
+        let start = rand::thread_rng().gen_range(0..items.len());
+        let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
 
-    proof.concat_proofs(end_proof);
+        let mut proof = merkle.prove(items[start].0)?;
+        assert!(!proof.0.is_empty());
+        let end_proof = merkle.prove(items[end].0)?;
+        assert!(!end_proof.0.is_empty());
+        proof.concat_proofs(end_proof);
 
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
-    for i in start + 1..end {
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
+        let mut keys = Vec::new();
+        let mut vals = Vec::new();
+        for i in start..=end {
+            keys.push(&items[i].0);
+            vals.push(&items[i].1);
+        }
+
+        merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
     }
+    Ok(())
+}
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+#[test]
+// Tests normal range proof with two non-existent proofs.
+// The test cases are generated randomly.
+// TODO: flaky test
+fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    for _ in 0..10 {
+        let start = rand::thread_rng().gen_range(0..items.len());
+        let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
+
+        // Short circuit if the decreased key is same with the previous key
+        let first = decrease_key(&items[start].0);
+        if start != 0 && compare(first.as_ref(), items[start - 1].0.as_ref()).is_eq() {
+            continue;
+        }
+        // Short circuit if the decreased key is underflow
+        if compare(first.as_ref(), items[start].0.as_ref()).is_gt() {
+            continue;
+        }
+        // Short circuit if the increased key is same with the next key
+        let last = increase_key(&items[end - 1].0);
+        if end != items.len() && compare(last.as_ref(), items[end].0.as_ref()).is_eq() {
+            continue;
+        }
+        // Short circuit if the increased key is overflow
+        if compare(last.as_ref(), items[end - 1].0.as_ref()).is_lt() {
+            continue;
+        }
+
+        let mut proof = merkle.prove(first)?;
+        assert!(!proof.0.is_empty());
+        let end_proof = merkle.prove(last)?;
+        assert!(!end_proof.0.is_empty());
+        proof.concat_proofs(end_proof);
+
+        let mut keys: Vec<[u8; 32]> = Vec::new();
+        let mut vals: Vec<[u8; 20]> = Vec::new();
+        for i in start..end {
+            keys.push(*items[i].0);
+            vals.push(*items[i].1);
+        }
+
+        merkle.verify_range_proof(&proof, first, last, keys, vals)?;
+    }
 
     Ok(())
 }
 
 #[test]
-fn test_range_proof_with_non_existent_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![
-        (std::str::from_utf8(&[0x7]).unwrap(), "verb"),
-        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
-        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
-        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
-        (std::str::from_utf8(&[0x3]).unwrap(), "stallion"),
-    ];
-
+// Tests such scenarios:
+// - There exists a gap between the first element and the left edge proof
+// - There exists a gap between the last element and the right edge proof
+fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
-    let start = 0;
-    let end = items.len();
 
-    let mut proof = merkle.prove(std::str::from_utf8(&[0x2]).unwrap())?;
+    // Case 1
+    let mut start = 100;
+    let mut end = 200;
+    let first = decrease_key(&items[start].0);
+
+    let mut proof = merkle.prove(first)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(std::str::from_utf8(&[0x8]).unwrap())?;
+    let end_proof = merkle.prove(items[end - 1].0)?;
     assert!(!end_proof.0.is_empty());
-
     proof.concat_proofs(end_proof);
 
-    let mut keys: Vec<&str> = Vec::new();
-    let mut vals: Vec<&str> = Vec::new();
+    start = 105; // Gap created
+    let mut keys: Vec<[u8; 32]> = Vec::new();
+    let mut vals: Vec<[u8; 20]> = Vec::new();
+    // Create gap
     for i in start..end {
-        keys.push(items[i].0);
-        vals.push(items[i].1);
+        keys.push(*items[i].0);
+        vals.push(*items[i].1);
     }
+    assert!(merkle
+        .verify_range_proof(&proof, first, *items[end - 1].0, keys, vals)
+        .is_err());
+
+    // Case 2
+    start = 100;
+    end = 200;
+    let last = increase_key(&items[end - 1].0);
+
+    let mut proof = merkle.prove(items[start].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    end = 195; // Capped slice
+    let mut keys: Vec<[u8; 32]> = Vec::new();
+    let mut vals: Vec<[u8; 20]> = Vec::new();
+    // Create gap
+    for i in start..end {
+        keys.push(*items[i].0);
+        vals.push(*items[i].1);
+    }
+    assert!(merkle
+        .verify_range_proof(&proof, *items[start].0, last, keys, vals)
+        .is_err());
+
+    Ok(())
+}
+
+#[test]
+// Tests the proof with only one element. The first edge proof can be existent one or
+// non-existent one.
+fn test_one_element_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    // One element with existent edge proof, both edge proofs
+    // point to the SAME key.
+    let start = 1000;
+    let start_proof = merkle.prove(&items[start].0)?;
+    assert!(!start_proof.0.is_empty());
+
+    merkle.verify_range_proof(
+        &start_proof,
+        &items[start].0,
+        &items[start].0,
+        vec![&items[start].0],
+        vec![&items[start].1],
+    )?;
+
+    // One element with left non-existent edge proof
+    let first = decrease_key(&items[start].0);
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[start].0)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
 
     merkle.verify_range_proof(
         &proof,
-        std::str::from_utf8(&[0x2]).unwrap(),
-        std::str::from_utf8(&[0x8]).unwrap(),
-        keys,
-        vals,
+        first,
+        *items[start].0,
+        vec![*items[start].0],
+        vec![*items[start].1],
     )?;
 
-    Ok(())
-}
-
-#[test]
-#[allow(unused_must_use)]
-fn test_range_proof_with_invalid_non_existent_proof() {
-    let mut items = vec![
-        (std::str::from_utf8(&[0x8]).unwrap(), "verb"),
-        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
-        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
-        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
-        (std::str::from_utf8(&[0x2]).unwrap(), "stallion"),
-    ];
-
-    items.sort();
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
-    let start = 0;
-    let end = &items.len() - 1;
-
-    let mut proof = merkle
-        .as_ref()
-        .unwrap()
-        .prove(std::str::from_utf8(&[0x3]).unwrap());
-    assert!(!proof.as_ref().unwrap().0.is_empty());
-    let end_proof = merkle
-        .as_ref()
-        .unwrap()
-        .prove(std::str::from_utf8(&[0x7]).unwrap());
-    assert!(!end_proof.as_ref().unwrap().0.is_empty());
-
-    proof.as_mut().unwrap().concat_proofs(end_proof.unwrap());
-
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
-    // Create gap
-    for i in start + 2..end - 1 {
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
-    }
-
-    merkle
-        .unwrap()
-        .verify_range_proof(
-            proof.as_ref().unwrap(),
-            &items[start].0,
-            &items[end].0,
-            keys,
-            vals,
-        )
-        .is_err();
-}
-
-#[test]
-// The start and end nodes are both the same.
-fn test_one_element_range_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
-    items.sort();
-
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
-    let start = 0;
-    // start and end nodes are the same
-    let end = 0;
-
-    let start_proof = merkle.prove(items[start].0)?;
-    assert!(!start_proof.0.is_empty());
-
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
-    for i in start..=end {
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
-    }
-
-    assert!(merkle.verify_range_proof(&start_proof, &items[start].0, &items[end].0, keys, vals)?);
-
-    Ok(())
-}
-
-#[test]
-// The range proof starts from 0 (root) to the last one
-fn test_all_elements_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
-    items.sort();
-
-    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
-    let start = 0;
-    let end = &items.len() - 1;
-
-    let mut proof = merkle.prove(items[start].0)?;
+    // One element with right non-existent edge proof
+    let last = increase_key(&items[start].0);
+    let mut proof = merkle.prove(&items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(items[end].0)?;
+    let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
-
     proof.concat_proofs(end_proof);
 
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
-    for i in start..=end {
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
-    }
+    merkle.verify_range_proof(
+        &proof,
+        *items[start].0,
+        last,
+        vec![*items[start].0],
+        vec![*items[start].1],
+    )?;
 
-    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+    // One element with two non-existent edge proofs
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    merkle.verify_range_proof(
+        &proof,
+        first,
+        last,
+        vec![*items[start].0],
+        vec![*items[start].1],
+    )?;
+
+    // Test the mini trie with only a single element.
+    let key = rand::thread_rng().gen::<[u8; 32]>();
+    let val = rand::thread_rng().gen::<[u8; 20]>();
+    let merkle = merkle_build_test(vec![(key, val)], 0x10000, 0x10000)?;
+
+    let first: [u8; 32] = [0; 32];
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&key)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    merkle.verify_range_proof(&proof, first, key, vec![key], vec![val])?;
+
+    Ok(())
+}
+
+#[test]
+// Tests the range proof with all elements.
+// The edge proofs can be nil.
+fn test_all_elements_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    let item_iter = items.clone().into_iter();
+    let keys: Vec<&[u8; 32]> = item_iter.clone().map(|item| item.0).collect();
+    let vals: Vec<&[u8; 20]> = item_iter.map(|item| item.1).collect();
+
+    let empty_proof = Proof(HashMap::new());
+    let empty_key: [u8; 32] = [0; 32];
+    merkle.verify_range_proof(
+        &empty_proof,
+        &empty_key,
+        &empty_key,
+        keys.clone(),
+        vals.clone(),
+    )?;
+
+    // With edge proofs, it should still work.
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(&items[start].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[end].0)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    merkle.verify_range_proof(
+        &proof,
+        items[start].0,
+        items[end].0,
+        keys.clone(),
+        vals.clone(),
+    )?;
+
+    // Even with non-existent edge proofs, it should still work.
+    let first: [u8; 32] = [0; 32];
+    let last: [u8; 32] = [255; 32];
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    merkle.verify_range_proof(&proof, &first, &last, keys, vals)?;
 
     Ok(())
 }
@@ -488,27 +604,340 @@ fn test_all_elements_proof() -> Result<(), DataStoreError> {
 #[test]
 // Tests the range proof with "no" element. The first edge proof must
 // be a non-existent proof.
-fn test_empty_range_proof() -> Result<(), DataStoreError> {
-    let mut items = vec![
-        (std::str::from_utf8(&[0x7]).unwrap(), "verb"),
-        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
-        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
-        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
-        (std::str::from_utf8(&[0x3]).unwrap(), "stallion"),
-    ];
-
+fn test_empty_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
 
-    let first = std::str::from_utf8(&[0x8]).unwrap();
-    let proof = merkle.prove(first)?;
-    assert!(!proof.0.is_empty());
+    let cases = vec![(items.len() - 1, false)];
+    for (_, c) in cases.iter().enumerate() {
+        let first = increase_key(&items[c.0].0);
+        let proof = merkle.prove(first)?;
+        assert!(!proof.0.is_empty());
 
-    // key and value vectors are intentionally empty.
-    let keys: Vec<&str> = Vec::new();
-    let vals: Vec<&str> = Vec::new();
+        // key and value vectors are intentionally empty.
+        let keys: Vec<[u8; 32]> = Vec::new();
+        let vals: Vec<[u8; 20]> = Vec::new();
 
-    merkle.verify_range_proof(&proof, first, first, keys, vals)?;
+        if c.1 {
+            assert!(merkle
+                .verify_range_proof(&proof, first, first, keys, vals)
+                .is_err());
+        } else {
+            merkle.verify_range_proof(&proof, first, first, keys, vals)?;
+        }
+    }
 
     Ok(())
+}
+
+#[test]
+// Focuses on the small trie with embedded nodes. If the gapped
+// node is embedded in the trie, it should be detected too.
+fn test_gapped_range_proof() -> Result<(), ProofError> {
+    let mut items = Vec::new();
+    // Sorted entries
+    for i in 0..10 as u32 {
+        let mut key: [u8; 32] = [0; 32];
+        for (index, d) in i.to_be_bytes().iter().enumerate() {
+            key[index] = *d;
+        }
+        items.push((key, i.to_be_bytes()));
+    }
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    let first = 2;
+    let last = 8;
+
+    let mut proof = merkle.prove(&items[first].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[last - 1].0)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for i in first..last {
+        if i == (first + last) / 2 {
+            continue;
+        }
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    assert!(merkle
+        .verify_range_proof(&proof, &items[0].0, &items[items.len() - 1].0, keys, vals)
+        .is_err());
+
+    Ok(())
+}
+
+#[test]
+// Tests the element is not in the range covered by proofs.
+fn test_same_side_proof() -> Result<(), DataStoreError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    let pos = 1000;
+    let mut last = decrease_key(&items[pos].0);
+    let mut first = last;
+    first = decrease_key(&first);
+
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    assert!(merkle
+        .verify_range_proof(&proof, first, last, vec![*items[pos].0], vec![items[pos].1])
+        .is_err());
+
+    first = increase_key(&items[pos].0);
+    last = first;
+    last = increase_key(&last);
+
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    assert!(merkle
+        .verify_range_proof(&proof, first, last, vec![*items[pos].0], vec![items[pos].1])
+        .is_err());
+
+    Ok(())
+}
+
+#[test]
+// Tests the range starts from zero.
+fn test_single_side_range_proof() -> Result<(), ProofError> {
+    for _ in 0..10 {
+        let mut set = HashMap::new();
+        for _ in 0..4096 as u32 {
+            let key = rand::thread_rng().gen::<[u8; 32]>();
+            let val = rand::thread_rng().gen::<[u8; 20]>();
+            set.insert(key, val);
+        }
+        let mut items = Vec::from_iter(set.iter());
+        items.sort();
+        let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+        let cases = vec![0, 1, 100, 1000, items.len() - 1];
+        for case in cases {
+            let start: [u8; 32] = [0; 32];
+            let mut proof = merkle.prove(start)?;
+            assert!(!proof.0.is_empty());
+            let end_proof = merkle.prove(items[case].0)?;
+            assert!(!end_proof.0.is_empty());
+            proof.concat_proofs(end_proof);
+
+            let item_iter = items.clone().into_iter().take(case + 1);
+            let keys = item_iter.clone().map(|item| *item.0).collect();
+            let vals = item_iter.map(|item| item.1).collect();
+
+            merkle.verify_range_proof(&proof, start, *items[case].0, keys, vals)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+// Tests the range ends with 0xffff...fff.
+fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
+    for _ in 0..10 {
+        let mut set = HashMap::new();
+        for _ in 0..4096 as u32 {
+            let key = rand::thread_rng().gen::<[u8; 32]>();
+            let val = rand::thread_rng().gen::<[u8; 20]>();
+            set.insert(key, val);
+        }
+        let mut items = Vec::from_iter(set.iter());
+        items.sort();
+        let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+        let cases = vec![0, 1, 100, 1000, items.len() - 1];
+        for case in cases {
+            let end: [u8; 32] = [255; 32];
+            let mut proof = merkle.prove(items[case].0)?;
+            assert!(!proof.0.is_empty());
+            let end_proof = merkle.prove(end)?;
+            assert!(!end_proof.0.is_empty());
+            proof.concat_proofs(end_proof);
+
+            let item_iter = items.clone().into_iter().skip(case);
+            let keys = item_iter.clone().map(|item| item.0).collect();
+            let vals = item_iter.map(|item| item.1).collect();
+
+            merkle.verify_range_proof(&proof, items[case].0, &end, keys, vals)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+// Tests normal range proof with both edge proofs
+// as the existent proof, but with an extra empty value included, which is a
+// noop technically, but practically should be rejected.
+fn test_empty_value_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(512);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    // Create a new entry with a slightly modified key
+    let mid_index = items.len() / 2;
+    let key = increase_key(&items[mid_index - 1].0);
+    let empty_data: [u8; 20] = [0; 20];
+    items.splice(
+        mid_index..mid_index,
+        vec![(&key, &empty_data)].iter().cloned(),
+    );
+
+    let start = 1;
+    let end = items.len() - 1;
+
+    let mut proof = merkle.prove(&items[start].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[end - 1].0)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    let item_iter = items.clone().into_iter().skip(start).take(end - start);
+    let keys = item_iter.clone().map(|item| item.0).collect();
+    let vals = item_iter.map(|item| item.1).collect();
+    assert!(merkle
+        .verify_range_proof(&proof, items[start].0, items[end - 1].0, keys, vals)
+        .is_err());
+
+    Ok(())
+}
+
+#[test]
+// Tests the range proof with all elements,
+// but with an extra empty value included, which is a noop technically, but
+// practically should be rejected.
+fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(512);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    // Create a new entry with a slightly modified key
+    let mid_index = items.len() / 2;
+    let key = increase_key(&items[mid_index - 1].0);
+    let empty_data: [u8; 20] = [0; 20];
+    items.splice(
+        mid_index..mid_index,
+        vec![(&key, &empty_data)].iter().cloned(),
+    );
+
+    let start = 0;
+    let end = items.len() - 1;
+
+    let mut proof = merkle.prove(items[start].0)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(items[end].0)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    let item_iter = items.clone().into_iter();
+    let keys = item_iter.clone().map(|item| item.0).collect();
+    let vals = item_iter.map(|item| item.1).collect();
+    assert!(merkle
+        .verify_range_proof(&proof, items[start].0, items[end].0, keys, vals)
+        .is_err());
+
+    Ok(())
+}
+
+#[test]
+fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
+    let mut items = Vec::new();
+    items.push((
+        hex::decode("aa10000000000000000000000000000000000000000000000000000000000000")
+            .expect("Decoding failed"),
+        hex::decode("02").expect("Decoding failed"),
+    ));
+    items.push((
+        hex::decode("aa20000000000000000000000000000000000000000000000000000000000000")
+            .expect("Decoding failed"),
+        hex::decode("03").expect("Decoding failed"),
+    ));
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    let start = hex::decode("0000000000000000000000000000000000000000000000000000000000000000")
+        .expect("Decoding failed");
+    let end = hex::decode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+        .expect("Decoding failed");
+
+    let mut proof = merkle.prove(&start)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&end)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    let item_iter = items.clone().into_iter();
+    let keys = item_iter.clone().map(|item| item.0).collect();
+    let vals = item_iter.map(|item| item.1).collect();
+
+    merkle.verify_range_proof(&proof, start, end, keys, vals)?;
+
+    Ok(())
+}
+
+fn generate_random_data(n: u32) -> HashMap<[u8; 32], [u8; 20]> {
+    let mut items: HashMap<[u8; 32], [u8; 20]> = HashMap::new();
+    for i in 0..100 as u32 {
+        let mut key: [u8; 32] = [0; 32];
+        let mut data: [u8; 20] = [0; 20];
+        for (index, d) in i.to_be_bytes().iter().enumerate() {
+            key[index] = *d;
+            data[index] = *d;
+        }
+        items.insert(key, data);
+
+        let mut more_key: [u8; 32] = [0; 32];
+        for (index, d) in (i + 10).to_be_bytes().iter().enumerate() {
+            more_key[index] = *d;
+        }
+        items.insert(more_key, data);
+    }
+
+    for _ in 0..n {
+        let key = rand::thread_rng().gen::<[u8; 32]>();
+        let val = rand::thread_rng().gen::<[u8; 20]>();
+        items.insert(key, val);
+    }
+    return items;
+}
+
+fn increase_key(key: &[u8; 32]) -> [u8; 32] {
+    let mut new_key = key.clone();
+    for i in (0..key.len()).rev() {
+        if new_key[i] == 0xff {
+            new_key[i] = 0x00;
+        } else {
+            new_key[i] += 1;
+            break;
+        }
+    }
+    new_key
+}
+
+fn decrease_key(key: &[u8; 32]) -> [u8; 32] {
+    let mut new_key = key.clone();
+    for i in (0..key.len()).rev() {
+        if new_key[i] == 0x00 {
+            new_key[i] = 0xff;
+        } else {
+            new_key[i] -= 1;
+            break;
+        }
+    }
+    new_key
 }

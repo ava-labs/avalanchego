@@ -15,7 +15,7 @@ use std::fmt;
 use std::ops::Deref;
 
 /// Hash -> RLP encoding map
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Proof(pub HashMap<[u8; 32], Vec<u8>>);
 
 #[derive(Debug)]
@@ -34,6 +34,8 @@ pub enum ProofError {
     NodeNotInTrie,
     InvalidNode(MerkleError),
     EmptyRange,
+    ForkLeft,
+    ForkRight,
     BlobStoreError(BlobError),
     SystemError(Errno),
     InvalidRootHash,
@@ -79,6 +81,8 @@ impl fmt::Display for ProofError {
             ProofError::NodeNotInTrie => write!(f, "node not in trie"),
             ProofError::InvalidNode(e) => write!(f, "invalid node: {e:?}"),
             ProofError::EmptyRange => write!(f, "empty range"),
+            ProofError::ForkLeft => write!(f, "fork left"),
+            ProofError::ForkRight => write!(f, "fork right"),
             ProofError::BlobStoreError(e) => write!(f, "blob store error: {e:?}"),
             ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
             ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
@@ -434,34 +438,79 @@ impl Proof {
                 Some(p) => {
                     // Return when reaching the end of the key.
                     if key_index == chunks.len() {
-                        let mut data: Vec<u8> = Vec::new();
+                        cur_key = &chunks[key_index..];
+                        let mut data = None;
                         // Decode the last subproof to get the value.
                         if p.hash.is_some() {
                             let proof = proofs_map
                                 .get(&p.hash.unwrap())
                                 .ok_or(ProofError::ProofNodeMissing)?;
-                            let (chd_ptr, _, _) = self.decode_node(merkle, cur_key, proof, true)?;
+                            (chd_ptr, _, _) = self.decode_node(merkle, cur_key, proof, true)?;
 
-                            if chd_ptr.is_some() {
-                                u_ref = merkle
-                                    .get_node(chd_ptr.unwrap())
-                                    .map_err(|_| ProofError::DecodeError)?;
-                                match &u_ref.inner() {
-                                    NodeType::Branch(n) => {
-                                        if let Some(v) = n.value() {
-                                            data = v.deref().to_vec();
+                            // Link the child to the parent based on the node type.
+                            match &u_ref.inner() {
+                                NodeType::Branch(n) => {
+                                    match n.chd()[branch_index as usize] {
+                                        // If the child already resolved, then use the existing node.
+                                        Some(_) => {}
+                                        None => {
+                                            // insert the leaf to the empty slot
+                                            u_ref
+                                                .write(|u| {
+                                                    let uu = u.inner_mut().as_branch_mut().unwrap();
+                                                    uu.chd_mut()[branch_index as usize] = chd_ptr;
+                                                })
+                                                .unwrap();
                                         }
-                                    }
-                                    NodeType::Leaf(n) => {
-                                        if n.path().len() == 0 {
-                                            data = n.data().deref().to_vec();
-                                        }
-                                    }
-                                    _ => (),
+                                    };
                                 }
+                                NodeType::Extension(_) => {
+                                    // If the child already resolved, then use the existing node.
+                                    let node = u_ref.inner().as_extension().unwrap().chd();
+                                    if node.is_null() {
+                                        u_ref
+                                            .write(|u| {
+                                                let uu = u.inner_mut().as_extension_mut().unwrap();
+                                                *uu.chd_mut() = if let Some(chd_p) = chd_ptr {
+                                                    chd_p
+                                                } else {
+                                                    ObjPtr::null()
+                                                }
+                                            })
+                                            .unwrap();
+                                    }
+                                }
+                                // We should not hit a leaf node as a parent.
+                                _ => {
+                                    return Err(ProofError::InvalidNode(
+                                        MerkleError::ParentLeafBranch,
+                                    ))
+                                }
+                            };
+                        }
+                        drop(u_ref);
+                        if chd_ptr.is_some() {
+                            let c_ref = merkle
+                                .get_node(chd_ptr.unwrap())
+                                .map_err(|_| ProofError::DecodeError)?;
+                            match &c_ref.inner() {
+                                NodeType::Branch(n) => {
+                                    if let Some(v) = n.value() {
+                                        data = Some(v.deref().to_vec());
+                                    }
+                                }
+                                NodeType::Leaf(n) => {
+                                    // Return the value on the node only when the key matches exactly
+                                    // (e.g. the length path of subproof node is 0).
+                                    if p.hash.is_none() || (p.hash.is_some() && n.path().len() == 0)
+                                    {
+                                        data = Some(n.data().deref().to_vec());
+                                    }
+                                }
+                                _ => (),
                             }
                         }
-                        return Ok(Some(data));
+                        return Ok(data);
                     }
 
                     // The trie doesn't contain the key.
@@ -491,7 +540,7 @@ impl Proof {
     ///
     /// # Arguments
     ///
-    /// * `end_node` - A boolean indicates whether this is the ebd node to decode, thus no `key`
+    /// * `end_node` - A boolean indicates whether this is the end node to decode, thus no `key`
     ///                to be present.
     #[allow(clippy::type_complexity)]
     fn decode_node(
@@ -517,35 +566,41 @@ impl Proof {
                     rlp.as_raw().to_vec()
                 };
 
+                let ext_ptr: Option<ObjPtr<Node>>;
+                let subproof: Option<SubProof>;
+                if term {
+                    ext_ptr = Some(
+                        merkle
+                            .new_node(Node::new(NodeType::Leaf(LeafNode::new(
+                                cur_key.clone(),
+                                data.clone(),
+                            ))))
+                            .map_err(|_| ProofError::DecodeError)?
+                            .as_ptr(),
+                    );
+                    subproof = Some(SubProof {
+                        rlp: data,
+                        hash: None,
+                    });
+                } else {
+                    ext_ptr = Some(
+                        merkle
+                            .new_node(Node::new(NodeType::Extension(ExtNode::new(
+                                cur_key.clone(),
+                                ObjPtr::null(),
+                                Some(data.clone()),
+                            ))))
+                            .map_err(|_| ProofError::DecodeError)?
+                            .as_ptr(),
+                    );
+                    subproof = self.generate_subproof(data)?;
+                }
+
                 // Check if the key of current node match with the given key.
                 if key.len() < cur_key.len() || key[..cur_key.len()] != cur_key {
-                    return Ok((None, None, 0));
+                    return Ok((ext_ptr, None, 0));
                 }
-                if term {
-                    let leaf =
-                        Node::new(NodeType::Leaf(LeafNode::new(cur_key.clone(), data.clone())));
-                    let leaf_ptr = merkle.new_node(leaf).map_err(|_| ProofError::DecodeError)?;
-                    Ok((
-                        Some(leaf_ptr.as_ptr()),
-                        Some(SubProof {
-                            rlp: data,
-                            hash: None,
-                        }),
-                        cur_key.len(),
-                    ))
-                } else {
-                    let ext_ptr = merkle
-                        .new_node(Node::new(NodeType::Extension(ExtNode::new(
-                            cur_key.clone(),
-                            ObjPtr::null(),
-                            Some(data.clone()),
-                        ))))
-                        .map_err(|_| ProofError::DecodeError)?;
-                    let subproof = self
-                        .generate_subproof(data)
-                        .map(|subproof| (subproof, cur_key.len()))?;
-                    Ok((Some(ext_ptr.as_ptr()), subproof.0, subproof.1))
-                }
+                Ok((ext_ptr, subproof, cur_key.len()))
             }
             BRANCH_NODE_SIZE => {
                 // Extract the value of the branch node.
@@ -681,8 +736,21 @@ fn unset_internal<K: AsRef<[u8]>>(
                     .map_err(|_| ProofError::DecodeError)?;
                 index += cur_key.len();
             }
-            // The fork point cannot be a leaf since it doesn't have any children.
-            _ => return Err(ProofError::InvalidNode(MerkleError::UnsetInternal)),
+            NodeType::Leaf(n) => {
+                let cur_key = n.path().clone().into_inner();
+                if left_chunks.len() - index < cur_key.len() {
+                    fork_left = compare(&left_chunks[index..], &cur_key)
+                } else {
+                    fork_left = compare(&left_chunks[index..index + cur_key.len()], &cur_key)
+                }
+
+                if right_chunks.len() - index < cur_key.len() {
+                    fork_right = compare(&right_chunks[index..], &cur_key)
+                } else {
+                    fork_right = compare(&right_chunks[index..index + cur_key.len()], &cur_key)
+                }
+                break;
+            }
         }
     }
 
@@ -696,6 +764,7 @@ fn unset_internal<K: AsRef<[u8]>>(
                 u_ref
                     .write(|u| {
                         let uu = u.inner_mut().as_branch_mut().unwrap();
+                        uu.chd_mut()[i as usize] = None;
                         uu.chd_eth_rlp_mut()[i as usize] = None;
                     })
                     .unwrap();
@@ -716,17 +785,14 @@ fn unset_internal<K: AsRef<[u8]>>(
             let node = n.chd();
             let cur_key = n.path().clone().into_inner();
             if fork_left.is_lt() && fork_right.is_lt() {
-                drop(u_ref);
                 return Err(ProofError::EmptyRange);
             }
             if fork_left.is_gt() && fork_right.is_gt() {
-                drop(u_ref);
                 return Err(ProofError::EmptyRange);
             }
             if fork_left.is_ne() && fork_right.is_ne() {
                 // The fork point is root node, unset the entire trie
                 if parent.is_null() {
-                    drop(u_ref);
                     return Ok(true);
                 }
                 let mut p_ref = merkle
@@ -735,11 +801,10 @@ fn unset_internal<K: AsRef<[u8]>>(
                 p_ref
                     .write(|p| {
                         let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                        pp.chd_mut()[left_chunks[index - 1] as usize] = None;
                         pp.chd_eth_rlp_mut()[left_chunks[index - 1] as usize] = None;
                     })
                     .unwrap();
-                drop(p_ref);
-                drop(u_ref);
                 return Ok(false);
             }
             let p = u_ref.as_ptr();
@@ -769,7 +834,49 @@ fn unset_internal<K: AsRef<[u8]>>(
             }
             Ok(false)
         }
-        _ => Err(ProofError::InvalidNode(MerkleError::UnsetInternal)),
+        NodeType::Leaf(_) => {
+            if fork_left.is_lt() && fork_right.is_lt() {
+                return Err(ProofError::EmptyRange);
+            }
+            if fork_left.is_gt() && fork_right.is_gt() {
+                return Err(ProofError::EmptyRange);
+            }
+            let mut p_ref = merkle
+                .get_node(parent)
+                .map_err(|_| ProofError::NoSuchNode)?;
+            if fork_left.is_ne() && fork_right.is_ne() {
+                p_ref
+                    .write(|p| match p.inner_mut() {
+                        NodeType::Extension(n) => {
+                            *n.chd_mut() = ObjPtr::null();
+                            *n.chd_eth_rlp_mut() = None;
+                        }
+                        NodeType::Branch(n) => {
+                            n.chd_mut()[left_chunks[index - 1] as usize] = None;
+                            n.chd_eth_rlp_mut()[left_chunks[index - 1] as usize] = None;
+                        }
+                        _ => {}
+                    })
+                    .unwrap();
+            } else if fork_right.is_ne() {
+                p_ref
+                    .write(|p| {
+                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                        pp.chd_mut()[left_chunks[index - 1] as usize] = None;
+                        pp.chd_eth_rlp_mut()[left_chunks[index - 1] as usize] = None;
+                    })
+                    .unwrap();
+            } else if fork_left.is_ne() {
+                p_ref
+                    .write(|p| {
+                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                        pp.chd_mut()[right_chunks[index - 1] as usize] = None;
+                        pp.chd_eth_rlp_mut()[right_chunks[index - 1] as usize] = None;
+                    })
+                    .unwrap();
+            }
+            Ok(false)
+        }
     }
 }
 
@@ -798,9 +905,9 @@ fn unset_node_ref<K: AsRef<[u8]>>(
         // fullnode(it's a non-existent branch).
         return Ok(());
     }
-    // Add the sentinel root
-    let mut chunks = vec![0];
-    chunks.extend(to_nibbles(key.as_ref()));
+
+    let mut chunks = Vec::new();
+    chunks.extend(key.as_ref());
 
     let mut u_ref = merkle
         .get_node(node.unwrap())
@@ -815,6 +922,7 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     u_ref
                         .write(|u| {
                             let uu = u.inner_mut().as_branch_mut().unwrap();
+                            uu.chd_mut()[i as usize] = None;
                             uu.chd_eth_rlp_mut()[i as usize] = None;
                         })
                         .unwrap();
@@ -824,6 +932,7 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     u_ref
                         .write(|u| {
                             let uu = u.inner_mut().as_branch_mut().unwrap();
+                            uu.chd_mut()[i as usize] = None;
                             uu.chd_eth_rlp_mut()[i as usize] = None;
                         })
                         .unwrap();
@@ -851,6 +960,7 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                         p_ref
                             .write(|p| {
                                 let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                                pp.chd_mut()[chunks[index - 1] as usize] = None;
                                 pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
                             })
                             .unwrap();
@@ -868,17 +978,15 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     // cached hash.
                     p_ref
                         .write(|p| {
-                            let pp = p.inner_mut().as_branch_mut().unwrap();
+                            let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                            pp.chd_mut()[chunks[index - 1] as usize] = None;
                             pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
                         })
                         .unwrap();
                 }
-                drop(u_ref);
-                drop(p_ref);
                 return Ok(());
             }
 
-            drop(u_ref);
             return unset_node_ref(
                 merkle,
                 p,
@@ -888,8 +996,24 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                 remove_left,
             );
         }
-        // Noop for leaf node as it doesn't have any children and no precalculated RLP value stored.
-        NodeType::Leaf(_) => (),
+        NodeType::Leaf(_) => {
+            let mut p_ref = merkle
+                .get_node(parent)
+                .map_err(|_| ProofError::NoSuchNode)?;
+            p_ref
+                .write(|p| match p.inner_mut() {
+                    NodeType::Extension(n) => {
+                        *n.chd_mut() = ObjPtr::null();
+                        *n.chd_eth_rlp_mut() = None;
+                    }
+                    NodeType::Branch(n) => {
+                        n.chd_mut()[chunks[index - 1] as usize] = None;
+                        n.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                    }
+                    _ => {}
+                })
+                .unwrap();
+        }
     }
 
     Ok(())
