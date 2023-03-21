@@ -2,6 +2,8 @@ name: Publish Docker Image
 
 on:
   push:
+    tags:
+      - "*"
     branches:
       - master
       - dev
