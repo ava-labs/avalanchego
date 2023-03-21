@@ -300,7 +300,12 @@ func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 	}
 }
 
-func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duration) (network.Config, error) {
+func getNetworkConfig(
+	v *viper.Viper,
+	stakingEnabled bool,
+	halflife time.Duration,
+	networkID uint32, // TODO remove after cortina upgrade
+) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
 	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
@@ -329,10 +334,12 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 		}
 	}
 
-	version110 := &version.Semantic{Major: 1, Minor: 10, Patch: 0}
-	if compressionType == compression.TypeZstd && version.Current.Compare(version110) < 0 {
-		// TODO change this to check for v1.10 upgrade time instead of version.
-		// TODO remove after all nodes are on v1.10.
+	cortinaTime, ok := version.CortinaTimes[networkID]
+	if !ok {
+		cortinaTime = version.CortinaDefaultTime
+	}
+	if compressionType == compression.TypeZstd && !time.Now().After(cortinaTime) {
+		// TODO remove after cortina upgrade
 		return network.Config{}, errZstdNotSupported
 	}
 	config := network.Config{
@@ -1371,7 +1378,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, err
 	}
