@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -470,7 +469,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mc, err := message.NewCreator(
 		metrics,
 		"dummyNamespace",
-		compression.TypeGzip,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
