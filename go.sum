@@ -57,8 +57,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0 h1:TVi9JEdKNU/RevYZ9PyW4pULbEdS+KQDA9Ki2DUvuAs=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0/go.mod h1:SgKJvtqvgo/Bl/c8fxEHCLaSxEbzimYfBopcfrajxQk=
-github.com/ava-labs/coreth v0.11.8-rc.3 h1:pS+OTFPc9edcFuCJIQGn5TdyAZncT9Hhs9jCcmm7+PM=
-github.com/ava-labs/coreth v0.11.8-rc.3/go.mod h1:pc44yvJD4jTPIwkPI64pUXyJDvQ/UAqkbmhXOx78PXA=
+github.com/ava-labs/coreth v0.11.9-rc.0 h1:7oK5DWtvDEMKEaduw/34r5kdwUssRsFszCl1FFUvvPc=
+github.com/ava-labs/coreth v0.11.9-rc.0/go.mod h1:y41I9mWK04s8oObvQeYjkdoidtPhkPqV8prRPN6zrd4=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7 h1:EdxD90j5sClfL5Ngpz2TlnbnkNYdFPDXa0jDOjam65c=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7/go.mod h1:XhiXSrh90sHUbkERzaxEftCmUz53eCijshDLZ4fByVM=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
