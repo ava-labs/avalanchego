@@ -1,0 +1,22 @@
+name: Publish Docker Image
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+
+jobs:
+  publish_docker_image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Publish image to DockerHub
+        env:
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+          DOCKER_REPO: ${{ secrets.docker_repo }}
+        run: .github/workflows/publish_image.sh

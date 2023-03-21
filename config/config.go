@@ -4,6 +4,7 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -57,6 +59,7 @@ const (
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
+	ipResolutionTimeout  = 30 * time.Second
 )
 
 var (
@@ -205,6 +208,12 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 	}
 
 	config := node.HTTPConfig{
+		HTTPConfig: server.HTTPConfig{
+			ReadTimeout:       v.GetDuration(HTTPReadTimeoutKey),
+			ReadHeaderTimeout: v.GetDuration(HTTPReadHeaderTimeoutKey),
+			WriteTimeout:      v.GetDuration(HTTPWriteTimeoutKey),
+			IdleTimeout:       v.GetDuration(HTTPIdleTimeoutKey),
+		},
 		APIConfig: node.APIConfig{
 			APIIndexerConfig: node.APIIndexerConfig{
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
@@ -222,9 +231,8 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		HTTPSKey:          httpsKey,
 		HTTPSCert:         httpsCert,
 		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
-
-		ShutdownTimeout: v.GetDuration(HTTPShutdownTimeoutKey),
-		ShutdownWait:    v.GetDuration(HTTPShutdownWaitKey),
+		ShutdownTimeout:   v.GetDuration(HTTPShutdownTimeoutKey),
+		ShutdownWait:      v.GetDuration(HTTPShutdownWaitKey),
 	}
 
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
@@ -592,7 +600,9 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		}
 
 		// Use that to resolve our public IP.
-		ip, err := resolver.Resolve()
+		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
+		defer cancel()
+		ip, err := resolver.Resolve(ctx)
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
 		}

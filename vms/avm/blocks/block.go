@@ -21,6 +21,7 @@ type Block interface {
 	Height() uint64
 	// Timestamp that this block was created at
 	Timestamp() time.Time
+	MerkleRoot() ids.ID
 	Bytes() []byte
 
 	// Txs returns the transactions contained in the block

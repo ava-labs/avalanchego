@@ -19,5 +19,5 @@ type Config struct {
 	TxBlocked *queue.Jobs
 
 	Manager vertex.Manager
-	VM      vertex.DAGVM
+	VM      vertex.LinearizableVM
 }
