@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ NodeStakeLogger = (*logger)(nil)
-
-// NodeStakeLogger allows logging stake changes of a specified validator
-type NodeStakeLogger SetCallbackListener
+var _ SetCallbackListener = (*logger)(nil)
 
 type logger struct {
 	log      logging.Logger
@@ -25,12 +22,14 @@ type logger struct {
 	nodeIDs  set.Set[ids.NodeID]
 }
 
+// NewLogger returns a callback listener that will log validator set changes for
+// the specified validators
 func NewLogger(
 	log logging.Logger,
 	enabled *utils.Atomic[bool],
 	subnetID ids.ID,
 	nodeIDs ...ids.NodeID,
-) NodeStakeLogger {
+) SetCallbackListener {
 	nodeIDSet := set.NewSet[ids.NodeID](len(nodeIDs))
 	nodeIDSet.Add(nodeIDs...)
 	return &logger{
