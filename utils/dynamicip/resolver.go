@@ -4,6 +4,7 @@
 package dynamicip
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -25,7 +26,7 @@ const (
 // Resolver resolves our public IP
 type Resolver interface {
 	// Resolve and return our public IP.
-	Resolve() (net.IP, error)
+	Resolve(context.Context) (net.IP, error)
 }
 
 // Returns a new Resolver that uses the given service

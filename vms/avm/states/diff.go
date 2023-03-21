@@ -76,6 +76,10 @@ func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	return parentState.GetUTXO(utxoID)
 }
 
+func (d *diff) GetUTXOFromID(utxoID *avax.UTXOID) (*avax.UTXO, error) {
+	return d.GetUTXO(utxoID.InputID())
+}
+
 func (d *diff) AddUTXO(utxo *avax.UTXO) {
 	d.modifiedUTXOs[utxo.InputID()] = utxo
 }

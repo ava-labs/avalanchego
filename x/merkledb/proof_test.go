@@ -21,10 +21,9 @@ func getBasicDB() (*Database, error) {
 		context.Background(),
 		memdb.New(),
 		Config{
-			Tracer:         newNoopTracer(),
-			ValueCacheSize: 1000,
-			HistoryLength:  1000,
-			NodeCacheSize:  1000,
+			Tracer:        newNoopTracer(),
+			HistoryLength: 1000,
+			NodeCacheSize: 1000,
 		},
 		&mockMetrics{},
 	)
@@ -312,7 +311,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	_, err = trie.GetRangeProof(context.Background(), nil, nil, -1)
@@ -326,7 +325,7 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	err = trie.Insert(context.Background(), []byte("key0"), []byte("value0"))

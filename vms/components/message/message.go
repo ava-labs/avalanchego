@@ -12,7 +12,7 @@ import (
 var (
 	_ Message = (*Tx)(nil)
 
-	errUnexpectedCodecVersion = errors.New("unexpected codec version")
+	ErrUnexpectedCodecVersion = errors.New("unexpected codec version")
 )
 
 type Message interface {
@@ -38,16 +38,6 @@ func (m *message) Bytes() []byte {
 	return *m
 }
 
-type Tx struct {
-	message
-
-	Tx []byte `serialize:"true"`
-}
-
-func (msg *Tx) Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error {
-	return handler.HandleTx(nodeID, requestID, msg)
-}
-
 func Parse(bytes []byte) (Message, error) {
 	var msg Message
 	version, err := c.Unmarshal(bytes, &msg)
@@ -55,7 +45,7 @@ func Parse(bytes []byte) (Message, error) {
 		return nil, err
 	}
 	if version != codecVersion {
-		return nil, errUnexpectedCodecVersion
+		return nil, ErrUnexpectedCodecVersion
 	}
 	msg.initialize(bytes)
 	return msg, nil

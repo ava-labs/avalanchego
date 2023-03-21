@@ -32,9 +32,3 @@ func TestTx(t *testing.T) {
 
 	require.Equal(tx, parsedMsg.Tx)
 }
-
-func TestParseGibberish(t *testing.T) {
-	randomBytes := utils.RandomBytes(256 * units.KiB)
-	_, err := Parse(randomBytes)
-	require.Error(t, err)
-}

@@ -659,8 +659,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.Error(err)
 
 	txID := statelessBlk.Txs()[0].ID()
-	_, dropped := vm.Builder.GetDropReason(txID)
-	require.True(dropped)
+	reason := vm.Builder.GetDropReason(txID)
+	require.Error(reason)
 }
 
 // Reject attempt to add validator to primary network
@@ -1822,7 +1822,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	handler, err := handler.New(
+	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
 		msgChan,
@@ -1854,8 +1854,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	engine, err := smeng.New(engineConfig)
 	require.NoError(err)
 
-	handler.SetConsensus(engine)
-
 	bootstrapper, err := bootstrap.New(
 		context.Background(),
 		bootstrapConfig,
@@ -1863,13 +1861,29 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
-	handler.SetBootstrapper(bootstrapper)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
+
+	consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.NormalOp,
+	})
 
 	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(context.Background(), handler)
+	chainRouter.AddChain(context.Background(), h)
 	ctx.Lock.Unlock()
 
-	handler.Start(context.Background(), false)
+	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
 	err = bootstrapper.Connected(context.Background(), peerID, version.CurrentApp)
