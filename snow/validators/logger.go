@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var _ SetCallbackListener = (*logger)(nil)
@@ -42,14 +43,19 @@ func NewLogger(
 
 func (l *logger) OnValidatorAdded(
 	nodeID ids.NodeID,
-	_ *bls.PublicKey,
+	pk *bls.PublicKey,
 	txID ids.ID,
 	weight uint64,
 ) {
 	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+		var pkBytes []byte
+		if pk != nil {
+			pkBytes = bls.PublicKeyToBytes(pk)
+		}
 		l.log.Info("node added to validator set",
 			zap.Stringer("subnetID", l.subnetID),
 			zap.Stringer("nodeID", nodeID),
+			zap.Reflect("publicKey", types.JSONByteSlice(pkBytes)),
 			zap.Stringer("txID", txID),
 			zap.Uint64("weight", weight),
 		)
