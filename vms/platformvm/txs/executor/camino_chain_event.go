@@ -23,7 +23,7 @@ func GetNextChainEventTime(state state.Chain, stakerChangeTime time.Time) (time.
 		earliestTime = nextDeferredStakerEndTime
 	}
 
-	depositUnlockTime, err := state.GetNextToUnlockDepositTime()
+	depositUnlockTime, err := state.GetNextToUnlockDepositTime(nil)
 	if err != nil && err != database.ErrNotFound {
 		return time.Time{}, err
 	}

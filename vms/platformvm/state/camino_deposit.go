@@ -6,11 +6,14 @@ package state
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 )
@@ -61,18 +64,37 @@ func (cs *caminoState) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) 
 	return d, nil
 }
 
-func (cs *caminoState) GetNextToUnlockDepositTime() (time.Time, error) {
+func (cs *caminoState) GetNextToUnlockDepositTime(removedDepositIDs set.Set[ids.ID]) (time.Time, error) {
 	if cs.depositsNextToUnlockTime == nil {
-		return time.Time{}, database.ErrNotFound
+		return mockable.MaxTime, database.ErrNotFound
 	}
-	return *cs.depositsNextToUnlockTime, nil
+
+	for _, depositID := range cs.depositsNextToUnlockIDs {
+		if !removedDepositIDs.Contains(depositID) {
+			return *cs.depositsNextToUnlockTime, nil
+		}
+	}
+
+	_, nextUnlockTime, err := cs.getNextToUnlockDepositIDsAndTimeFromDB(removedDepositIDs)
+	return nextUnlockTime, err
 }
 
-func (cs *caminoState) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+func (cs *caminoState) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
 	if cs.depositsNextToUnlockTime == nil {
-		return nil, time.Time{}, database.ErrNotFound
+		return nil, mockable.MaxTime, database.ErrNotFound
 	}
-	return cs.depositsNextToUnlockIDs, *cs.depositsNextToUnlockTime, nil
+
+	var nextUnlockIDs []ids.ID
+	for _, depositID := range cs.depositsNextToUnlockIDs {
+		if !removedDepositIDs.Contains(depositID) {
+			nextUnlockIDs = append(nextUnlockIDs, depositID)
+		}
+	}
+	if len(nextUnlockIDs) > 0 {
+		return nextUnlockIDs, *cs.depositsNextToUnlockTime, nil
+	}
+
+	return cs.getNextToUnlockDepositIDsAndTimeFromDB(removedDepositIDs)
 }
 
 func (cs *caminoState) writeDeposits() error {
@@ -147,7 +169,7 @@ func (cs *caminoState) writeDeposits() error {
 
 	// getting earliest deposits from db if depositsNextToUnlockIDs is empty
 	if len(nextUnlockIDs) == 0 {
-		nextUnlockIDs, nextUnlockTime, err := cs.getNextToUnlockDepositIDsAndTimeFromDB()
+		nextUnlockIDs, nextUnlockTime, err := cs.getNextToUnlockDepositIDsAndTimeFromDB(nil)
 		switch {
 		case err == database.ErrNotFound:
 			cs.depositsNextToUnlockIDs = nil
@@ -165,7 +187,7 @@ func (cs *caminoState) writeDeposits() error {
 func (cs *caminoState) loadDeposits() error {
 	cs.depositsNextToUnlockIDs = nil
 	cs.depositsNextToUnlockTime = nil
-	depositsNextToUnlockIDs, depositsNextToUnlockTime, err := cs.getNextToUnlockDepositIDsAndTimeFromDB()
+	depositsNextToUnlockIDs, depositsNextToUnlockTime, err := cs.getNextToUnlockDepositIDsAndTimeFromDB(nil)
 	if err == database.ErrNotFound {
 		return nil
 	} else if err != nil {
@@ -176,33 +198,37 @@ func (cs *caminoState) loadDeposits() error {
 	return nil
 }
 
-func (cs caminoState) getNextToUnlockDepositIDsAndTimeFromDB() ([]ids.ID, time.Time, error) {
+func (cs caminoState) getNextToUnlockDepositIDsAndTimeFromDB(removedDepositIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
 	depositIterator := cs.depositIDsByEndtimeDB.NewIterator()
 	defer depositIterator.Release()
 
-	next := depositIterator.Next()
-	if !next {
-		return nil, time.Time{}, database.ErrNotFound
-	}
-
-	depositID, depositEndtime, err := bytesToDepositIDAndEndtime(depositIterator.Key())
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-
-	nextDepositsEndTimestamp := depositEndtime
-	nextDeposits := []ids.ID{depositID}
+	var nextDeposits []ids.ID
+	nextDepositsEndTimestamp := uint64(math.MaxUint64)
 
 	for depositIterator.Next() {
 		depositID, depositEndtime, err := bytesToDepositIDAndEndtime(depositIterator.Key())
 		if err != nil {
 			return nil, time.Time{}, err
 		}
-		if depositEndtime > nextDepositsEndTimestamp { // we expect values to be sorted by endtime in ascending order
+
+		if removedDepositIDs.Contains(depositID) {
+			continue
+		}
+
+		// we expect values to be sorted by endtime in ascending order
+		if depositEndtime > nextDepositsEndTimestamp {
 			break
+		}
+		if depositEndtime < nextDepositsEndTimestamp {
+			nextDepositsEndTimestamp = depositEndtime
 		}
 		nextDeposits = append(nextDeposits, depositID)
 	}
+
+	if len(nextDeposits) == 0 {
+		return nil, mockable.MaxTime, database.ErrNotFound
+	}
+
 	return nextDeposits, time.Unix(int64(nextDepositsEndTimestamp), 0), nil
 }
 

@@ -4,7 +4,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
-
-var errInvalidatedNextToUnlockTime = errors.New("parent state next deposit to unlock time is invalidated by removed deposit in diff")
 
 func NewCaminoDiff(
 	parentID ids.ID,
@@ -186,87 +183,89 @@ func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return parentState.GetDeposit(depositTxID)
 }
 
-func (d *diff) GetNextToUnlockDepositTime() (time.Time, error) {
+func (d *diff) GetNextToUnlockDepositTime(removedDepositIDs set.Set[ids.ID]) (time.Time, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	parentNextDepositIDs, parentNextUnlockTime, err := parentState.GetNextToUnlockDepositIDsAndTime()
+	for depositID, depositDiff := range d.caminoDiff.modifiedDeposits {
+		if depositDiff.removed {
+			removedDepositIDs.Add(depositID)
+		}
+	}
+
+	nextUnlockTime, err := parentState.GetNextToUnlockDepositTime(removedDepositIDs)
 	if err != nil && err != database.ErrNotFound {
 		return time.Time{}, err
 	}
 
-	nextUnlockTime := mockable.MaxTime
-	if len(parentNextDepositIDs) > 0 {
-		nextUnlockTime = parentNextUnlockTime
-	}
-
-	for _, depositDiff := range d.caminoDiff.modifiedDeposits {
-		if depositDiff.removed {
-			return time.Time{}, errInvalidatedNextToUnlockTime
-		}
-
-		if depositEndtime := depositDiff.EndTime(); depositDiff.added && depositEndtime.Before(nextUnlockTime) {
+	// calculating earliest unlock time from added deposits and parent unlock time
+	for depositID, depositDiff := range d.caminoDiff.modifiedDeposits {
+		depositEndtime := depositDiff.EndTime()
+		if depositDiff.added && depositEndtime.Before(nextUnlockTime) && !removedDepositIDs.Contains(depositID) {
 			nextUnlockTime = depositEndtime
 		}
 	}
 
+	// no deposits
 	if nextUnlockTime.Equal(mockable.MaxTime) {
-		return time.Time{}, database.ErrNotFound
+		return mockable.MaxTime, database.ErrNotFound
 	}
 
 	return nextUnlockTime, nil
 }
 
-func (d *diff) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+func (d *diff) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, time.Time{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	parentNextDepositIDs, parentNextUnlockTime, err := parentState.GetNextToUnlockDepositIDsAndTime()
+	for depositID, depositDiff := range d.caminoDiff.modifiedDeposits {
+		if depositDiff.removed {
+			removedDepositIDs.Add(depositID)
+		}
+	}
+
+	parentNextDepositIDs, parentNextUnlockTime, err := parentState.GetNextToUnlockDepositIDsAndTime(removedDepositIDs)
 	if err != nil && err != database.ErrNotFound {
 		return nil, time.Time{}, err
 	}
 
-	nextUnlockTime := mockable.MaxTime
-	if len(parentNextDepositIDs) > 0 {
-		nextUnlockTime = parentNextUnlockTime
-	}
-
-	for _, depositDiff := range d.caminoDiff.modifiedDeposits {
-		if depositDiff.removed {
-			return nil, time.Time{}, errInvalidatedNextToUnlockTime
-		}
-
-		if depositEndtime := depositDiff.EndTime(); depositDiff.added && depositEndtime.Before(nextUnlockTime) {
+	// calculating earliest unlock time from added deposits and parent unlock time
+	nextUnlockTime := parentNextUnlockTime
+	for depositID, depositDiff := range d.caminoDiff.modifiedDeposits {
+		depositEndtime := depositDiff.EndTime()
+		if depositDiff.added && depositEndtime.Before(nextUnlockTime) && !removedDepositIDs.Contains(depositID) {
 			nextUnlockTime = depositEndtime
 		}
 	}
 
-	var nextDepositsIDs []ids.ID
-	if parentNextUnlockTime.Equal(nextUnlockTime) {
-		nextDepositsIDs = parentNextDepositIDs
+	// no deposits
+	if nextUnlockTime.Equal(mockable.MaxTime) {
+		return nil, mockable.MaxTime, database.ErrNotFound
 	}
 
-	needSort := false // depositIDs from parent state are already sorted
+	var nextDepositIDs []ids.ID
+	if !parentNextUnlockTime.After(nextUnlockTime) {
+		nextDepositIDs = parentNextDepositIDs
+	}
+
+	// getting added deposits with endtime matching nextUnlockTime
+	needSort := false
 	for depositID, depositDiff := range d.caminoDiff.modifiedDeposits {
-		if depositDiff.added && depositDiff.EndTime().Equal(nextUnlockTime) {
-			nextDepositsIDs = append(nextDepositsIDs, depositID)
+		if depositDiff.added && depositDiff.EndTime().Equal(nextUnlockTime) && !removedDepositIDs.Contains(depositID) {
+			nextDepositIDs = append(nextDepositIDs, depositID)
 			needSort = true
 		}
 	}
 
 	if needSort {
-		utils.Sort(nextDepositsIDs)
+		utils.Sort(nextDepositIDs)
 	}
 
-	if len(nextDepositsIDs) == 0 {
-		return nil, time.Time{}, database.ErrNotFound
-	}
-
-	return nextDepositsIDs, nextUnlockTime, nil
+	return nextDepositIDs, nextUnlockTime, nil
 }
 
 func (d *diff) SetMultisigAlias(owner *multisig.Alias) {

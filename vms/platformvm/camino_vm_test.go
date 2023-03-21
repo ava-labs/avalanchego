@@ -526,7 +526,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	require.Equal(getUnlockedBalance(t, vm.state, depositOwnerAddr), depositOffer.MinAmount)
 	require.Equal(getUnlockedBalance(t, vm.state, treasury.Addr), deposit.TotalReward(depositOffer))
 	require.Equal(deposit.EndTime(), vm.state.GetTimestamp())
-	_, err = vm.state.GetNextToUnlockDepositTime()
+	_, err = vm.state.GetNextToUnlockDepositTime(nil)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 

@@ -88,8 +88,8 @@ type CaminoDiff interface {
 	// deposit start and duration should never be modified, deposit should never be nil
 	RemoveDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
 	GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error)
-	GetNextToUnlockDepositTime() (time.Time, error)
-	GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error)
+	GetNextToUnlockDepositTime(removedDepositIDs set.Set[ids.ID]) (time.Time, error)
+	GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error)
 
 	// Multisig Owners
 

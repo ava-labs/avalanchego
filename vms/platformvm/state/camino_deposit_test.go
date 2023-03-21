@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/golang/mock/gomock"
@@ -253,26 +255,99 @@ func TestRemoveDeposit(t *testing.T) {
 }
 
 func TestGetNextToUnlockDepositTime(t *testing.T) {
-	time1 := time.Unix(100, 0)
+	depositTxID1 := ids.GenerateTestID()
+	depositTxID2 := ids.GenerateTestID()
+	depositTxID31 := ids.GenerateTestID()
+	depositTxID32 := ids.GenerateTestID()
+	deposit2 := &deposit.Deposit{Duration: 102}
+	deposit31 := &deposit.Deposit{Duration: 103}
+	deposit32 := &deposit.Deposit{Duration: 103}
+	deposit1Endtime := time.Unix(100, 0)
 
 	tests := map[string]struct {
-		caminoState            *caminoState
+		caminoState            func(c *gomock.Controller) *caminoState
+		removedDepositIDs      set.Set[ids.ID]
 		expectedNextUnlockTime time.Time
 		expectedErr            error
 	}{
 		"Fail: no deposits": {
-			caminoState:            &caminoState{},
-			expectedNextUnlockTime: time.Time{},
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{}
+			},
+			expectedNextUnlockTime: mockable.MaxTime,
+			expectedErr:            database.ErrNotFound,
+		},
+		"Fail: no deposits (all removed)": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				it := database.NewMockIterator(c)
+				it.EXPECT().Next().Return(false)
+				it.EXPECT().Release()
+
+				db := database.NewMockDatabase(c)
+				db.EXPECT().NewIterator().Return(it)
+
+				return &caminoState{
+					depositIDsByEndtimeDB:    db,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			removedDepositIDs:      set.Set[ids.ID]{depositTxID1: struct{}{}},
+			expectedNextUnlockTime: mockable.MaxTime,
 			expectedErr:            database.ErrNotFound,
 		},
 		"OK": {
-			caminoState:            &caminoState{depositsNextToUnlockTime: &time1},
-			expectedNextUnlockTime: time1,
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			expectedNextUnlockTime: deposit1Endtime,
+		},
+		"Ok: in-mem deposits removed, but db has some": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				it := database.NewMockIterator(c)
+				it.EXPECT().Next().Return(true).Times(3)
+				it.EXPECT().Key().Return(depositToKey(depositTxID2[:], deposit2))
+				it.EXPECT().Key().Return(depositToKey(depositTxID31[:], deposit31))
+				it.EXPECT().Key().Return(depositToKey(depositTxID32[:], deposit32))
+				it.EXPECT().Next().Return(false)
+				it.EXPECT().Release()
+
+				db := database.NewMockDatabase(c)
+				db.EXPECT().NewIterator().Return(it)
+
+				return &caminoState{
+					depositIDsByEndtimeDB:    db,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			removedDepositIDs: set.Set[ids.ID]{
+				depositTxID1: struct{}{},
+				depositTxID2: struct{}{},
+			},
+			expectedNextUnlockTime: deposit31.EndTime(),
+		},
+		"OK: some deposits removed": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+				}
+			},
+			removedDepositIDs: set.Set[ids.ID]{
+				depositTxID1: struct{}{},
+			},
+			expectedNextUnlockTime: deposit1Endtime,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			nextUnlockTime, err := tt.caminoState.GetNextToUnlockDepositTime()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			nextUnlockTime, err := tt.caminoState(ctrl).GetNextToUnlockDepositTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedNextUnlockTime, nextUnlockTime)
 		})
@@ -280,33 +355,103 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 }
 
 func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
-	time1 := time.Unix(100, 0)
 	depositTxID1 := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
+	depositTxID31 := ids.GenerateTestID()
+	depositTxID32 := ids.GenerateTestID()
+	deposit2 := &deposit.Deposit{Duration: 102}
+	deposit31 := &deposit.Deposit{Duration: 103}
+	deposit32 := &deposit.Deposit{Duration: 103}
+	deposit1Endtime := time.Unix(100, 0)
 
 	tests := map[string]struct {
-		caminoState            *caminoState
+		caminoState            func(c *gomock.Controller) *caminoState
+		removedDepositIDs      set.Set[ids.ID]
 		expectedNextUnlockTime time.Time
 		expectedNextUnlockIDs  []ids.ID
 		expectedErr            error
 	}{
 		"Fail: no deposits": {
-			caminoState:            &caminoState{},
-			expectedNextUnlockTime: time.Time{},
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{}
+			},
+			expectedNextUnlockTime: mockable.MaxTime,
+			expectedErr:            database.ErrNotFound,
+		},
+		"Fail: no deposits (all removed)": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				it := database.NewMockIterator(c)
+				it.EXPECT().Next().Return(false)
+				it.EXPECT().Release()
+
+				db := database.NewMockDatabase(c)
+				db.EXPECT().NewIterator().Return(it)
+
+				return &caminoState{
+					depositIDsByEndtimeDB:    db,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			removedDepositIDs:      set.Set[ids.ID]{depositTxID1: struct{}{}},
+			expectedNextUnlockTime: mockable.MaxTime,
 			expectedErr:            database.ErrNotFound,
 		},
 		"OK": {
-			caminoState: &caminoState{
-				depositsNextToUnlockTime: &time1,
-				depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
 			},
-			expectedNextUnlockTime: time1,
-			expectedNextUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+			expectedNextUnlockTime: deposit1Endtime,
+			expectedNextUnlockIDs:  []ids.ID{depositTxID1},
+		},
+		"Ok: in-mem deposits removed, but db has some": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				it := database.NewMockIterator(c)
+				it.EXPECT().Next().Return(true).Times(3)
+				it.EXPECT().Key().Return(depositToKey(depositTxID2[:], deposit2))
+				it.EXPECT().Key().Return(depositToKey(depositTxID31[:], deposit31))
+				it.EXPECT().Key().Return(depositToKey(depositTxID32[:], deposit32))
+				it.EXPECT().Next().Return(false)
+				it.EXPECT().Release()
+
+				db := database.NewMockDatabase(c)
+				db.EXPECT().NewIterator().Return(it)
+
+				return &caminoState{
+					depositIDsByEndtimeDB:    db,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			removedDepositIDs: set.Set[ids.ID]{
+				depositTxID1: struct{}{},
+				depositTxID2: struct{}{},
+			},
+			expectedNextUnlockTime: deposit31.EndTime(),
+			expectedNextUnlockIDs:  []ids.ID{depositTxID31, depositTxID32},
+		},
+		"OK: some deposits removed": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+				}
+			},
+			removedDepositIDs: set.Set[ids.ID]{
+				depositTxID1: struct{}{},
+			},
+			expectedNextUnlockTime: deposit1Endtime,
+			expectedNextUnlockIDs:  []ids.ID{depositTxID2},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			nextUnlockIDs, nextUnlockTime, err := tt.caminoState.GetNextToUnlockDepositIDsAndTime()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			nextUnlockIDs, nextUnlockTime, err := tt.caminoState(ctrl).GetNextToUnlockDepositIDsAndTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedNextUnlockTime, nextUnlockTime)
 			require.Equal(t, tt.expectedNextUnlockIDs, nextUnlockIDs)

@@ -124,7 +124,7 @@ func getNextDepositsToUnlock(
 		return nil, false, errEndOfTime
 	}
 
-	nextDeposits, nextDepositsEndtime, err := preferredState.GetNextToUnlockDepositIDsAndTime()
+	nextDeposits, nextDepositsEndtime, err := preferredState.GetNextToUnlockDepositIDsAndTime(nil)
 	if err == database.ErrNotFound {
 		return nil, false, nil
 	} else if err != nil {

@@ -356,24 +356,24 @@ func (mr *MockChainMockRecorder) GetDeposit(arg0 interface{}) *gomock.Call {
 }
 
 // GetNextToUnlockDepositTime mocks base method.
-func (m *MockChain) GetNextToUnlockDepositTime() (time.Time, error) {
+func (m *MockChain) GetNextToUnlockDepositTime(arg0 set.Set[ids.ID]) (time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNextToUnlockDepositTime")
+	ret := m.ctrl.Call(m, "GetNextToUnlockDepositTime", arg0)
 	ret0, _ := ret[0].(time.Time)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNextToUnlockDepositTime indicates an expected call of GetNextToUnlockDepositTime.
-func (mr *MockChainMockRecorder) GetNextToUnlockDepositTime() *gomock.Call {
+func (mr *MockChainMockRecorder) GetNextToUnlockDepositTime(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositTime", reflect.TypeOf((*MockChain)(nil).GetNextToUnlockDepositTime))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositTime", reflect.TypeOf((*MockChain)(nil).GetNextToUnlockDepositTime), arg0)
 }
 
 // GetNextToUnlockDepositIDsAndTime mocks base method.
-func (m *MockChain) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
+func (m *MockChain) GetNextToUnlockDepositIDsAndTime(arg0 set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNextToUnlockDepositIDsAndTime")
+	ret := m.ctrl.Call(m, "GetNextToUnlockDepositIDsAndTime", arg0)
 	ret0, _ := ret[0].([]ids.ID)
 	ret1, _ := ret[1].(time.Time)
 	ret2, _ := ret[2].(error)
@@ -381,9 +381,9 @@ func (m *MockChain) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, err
 }
 
 // GetNextToUnlockDepositIDsAndTime indicates an expected call of GetNextToUnlockDepositIDsAndTime.
-func (mr *MockChainMockRecorder) GetNextToUnlockDepositIDsAndTime() *gomock.Call {
+func (mr *MockChainMockRecorder) GetNextToUnlockDepositIDsAndTime(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositIDsAndTime", reflect.TypeOf((*MockChain)(nil).GetNextToUnlockDepositIDsAndTime))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextToUnlockDepositIDsAndTime", reflect.TypeOf((*MockChain)(nil).GetNextToUnlockDepositIDsAndTime), arg0)
 }
 
 // GetDepositOffer mocks base method.

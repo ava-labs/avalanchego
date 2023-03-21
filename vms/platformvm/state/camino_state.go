@@ -84,12 +84,12 @@ func (s *state) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return s.caminoState.GetDeposit(depositTxID)
 }
 
-func (s *state) GetNextToUnlockDepositTime() (time.Time, error) {
-	return s.caminoState.GetNextToUnlockDepositTime()
+func (s *state) GetNextToUnlockDepositTime(removedDepositIDs set.Set[ids.ID]) (time.Time, error) {
+	return s.caminoState.GetNextToUnlockDepositTime(removedDepositIDs)
 }
 
-func (s *state) GetNextToUnlockDepositIDsAndTime() ([]ids.ID, time.Time, error) {
-	return s.caminoState.GetNextToUnlockDepositIDsAndTime()
+func (s *state) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID]) ([]ids.ID, time.Time, error) {
+	return s.caminoState.GetNextToUnlockDepositIDsAndTime(removedDepositIDs)
 }
 
 func (s *state) SetMultisigAlias(owner *multisig.Alias) {
