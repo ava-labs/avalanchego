@@ -7,8 +7,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ NodeStakeLogger = (*logger)(nil)
@@ -17,47 +19,51 @@ var _ NodeStakeLogger = (*logger)(nil)
 type NodeStakeLogger SetCallbackListener
 
 type logger struct {
-	subnetID ids.ID
-	nodeID   ids.NodeID
 	log      logging.Logger
+	enabled  *utils.Atomic[bool]
+	subnetID ids.ID
+	nodeIDs  set.Set[ids.NodeID]
 }
 
-func NewLogger(subnetID ids.ID, targetNode ids.NodeID, log logging.Logger) NodeStakeLogger {
+func NewLogger(log logging.Logger, enabled *utils.Atomic[bool], subnetID ids.ID, nodeIDs ...ids.NodeID) NodeStakeLogger {
+	nodeIDSet := set.NewSet[ids.NodeID](len(nodeIDs))
+	nodeIDSet.Add(nodeIDs...)
 	return &logger{
-		subnetID: subnetID,
-		nodeID:   targetNode,
 		log:      log,
+		enabled:  enabled,
+		subnetID: subnetID,
+		nodeIDs:  nodeIDSet,
 	}
 }
 
 func (l *logger) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, txID ids.ID, weight uint64) {
-	if nodeID == l.nodeID {
-		l.log.Info("tracking validator: validator added to validators set",
-			zap.Stringer("subnetID ", l.subnetID),
-			zap.Stringer("nodeID ", nodeID),
-			zap.Uint64("weight ", weight),
+	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+		l.log.Info("node added to validator set",
+			zap.Stringer("subnetID", l.subnetID),
+			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("txID", txID),
+			zap.Uint64("weight", weight),
 		)
 	}
 }
 
 func (l *logger) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
-	if nodeID == l.nodeID {
-		l.log.Info("tracking validator: validator dropped from validators set",
-			zap.Stringer("subnetID ", l.subnetID),
-			zap.Stringer("nodeID ", nodeID),
-			zap.Uint64("weight ", weight),
+	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+		l.log.Info("node removed from validator set",
+			zap.Stringer("subnetID", l.subnetID),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("weight", weight),
 		)
 	}
 }
 
 func (l *logger) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight uint64) {
-	if nodeID == l.nodeID {
-		l.log.Info("tracking validator: validator weight change",
-			zap.Stringer("subnetID ", l.subnetID),
-			zap.Stringer("nodeID ", nodeID),
-			zap.Uint64("previous weight ", oldWeight),
-			zap.Uint64("current weight ", newWeight),
+	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
+		l.log.Info("validator weight changed",
+			zap.Stringer("subnetID", l.subnetID),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("previousWeight ", oldWeight),
+			zap.Uint64("newWeight ", newWeight),
 		)
 	}
 }
