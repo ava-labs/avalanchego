@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+var _ Client = (*client)(nil)
+
 const (
 	// We allow [recentCacheSize] to be fairly large because we only store hashes
 	// in the cache, not entire transactions.

@@ -43,9 +43,9 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
-	env.Ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(env.Shutdown())
 	}()
 
@@ -80,9 +80,9 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
-	env.Ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(env.Shutdown())
 	}()
 
@@ -119,10 +119,10 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env := newEnvironment(t)
 	env.isBootstrapped.Set(false)
-	env.Ctx.Lock.Lock()
-	env.Ctx.Log = logging.NoWarn{}
+	env.ctx.Lock.Lock()
+	env.ctx.Log = logging.NoWarn{}
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(t, env.Shutdown())
 	}()
 
@@ -700,10 +700,10 @@ func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
-	env.Ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(env.Shutdown())
 	}()
 
@@ -716,8 +716,8 @@ func TestAtomicTxImports(t *testing.T) {
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
-	env.msm.SharedMemory = m.NewSharedMemory(env.Ctx.ChainID)
-	peerSharedMemory := m.NewSharedMemory(env.Ctx.XChainID)
+	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  avax.Asset{ID: avaxAssetID},
@@ -734,7 +734,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	inputID := utxo.InputID()
 	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
-		env.Ctx.ChainID: {PutRequests: []*atomic.Element{{
+		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
@@ -745,7 +745,7 @@ func TestAtomicTxImports(t *testing.T) {
 	require.NoError(err)
 
 	tx, err := env.txBuilder.NewImportTx(
-		env.Ctx.XChainID,
+		env.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
 		ids.ShortEmpty, // change addr
@@ -768,9 +768,9 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
-	env.Ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(env.Shutdown())
 	}()
 
@@ -810,9 +810,9 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 
 	env := newEnvironment(t)
 
-	env.Ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 	defer func() {
-		env.Ctx.Lock.Unlock()
+		env.ctx.Lock.Unlock()
 		require.NoError(env.Shutdown())
 	}()
 

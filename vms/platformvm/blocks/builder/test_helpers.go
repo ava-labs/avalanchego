@@ -99,7 +99,7 @@ type environment struct {
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
-	Ctx            *snow.Context
+	ctx            *snow.Context
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
@@ -120,22 +120,22 @@ func newEnvironment(t *testing.T) *environment {
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
-	res.Ctx, res.msm = defaultCtx(res.baseDB)
+	res.ctx, res.msm = defaultCtx(res.baseDB)
 
-	res.Ctx.Lock.Lock()
-	defer res.Ctx.Lock.Unlock()
+	res.ctx.Lock.Lock()
+	defer res.ctx.Lock.Unlock()
 
-	res.fx = defaultFx(res.clk, res.Ctx.Log, res.isBootstrapped.Get())
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.Ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.Ctx.SharedMemory, txs.Codec)
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
-	res.utxosHandler = utxo.NewHandler(res.Ctx, res.clk, res.fx)
+	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 
 	res.txBuilder = txbuilder.New(
-		res.Ctx,
+		res.ctx,
 		res.config,
 		res.clk,
 		res.fx,
@@ -147,7 +147,7 @@ func newEnvironment(t *testing.T) *environment {
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
 		Config:       res.config,
-		Ctx:          res.Ctx,
+		Ctx:          res.ctx,
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
@@ -184,7 +184,7 @@ func newEnvironment(t *testing.T) *environment {
 		window,
 	)
 
-	client := client.NewClient(res.sender, res.Ctx.Log)
+	client := client.NewClient(res.sender, res.ctx.Log)
 
 	res.Builder = Initialize(
 		res.mempool,

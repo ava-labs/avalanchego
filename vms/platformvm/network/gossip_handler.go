@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+var _ message.Handler = (*gossipHandler)(nil)
+
 // gossipHandler handles incoming gossip messages
 type gossipHandler struct {
 	ctx        *snow.Context

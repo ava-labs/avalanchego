@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var _ common.AppHandler = (*network)(nil)
+
 type network struct {
 	ctx *snow.Context
 
