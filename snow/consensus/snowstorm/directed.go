@@ -227,9 +227,9 @@ func (dg *Directed) shouldVote(ctx context.Context, tx Tx) (bool, error) {
 	txBytes := tx.Bytes()
 	txBytesLen := len(txBytes)
 	if txBytesLen > 0 {
-		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
-		// honor Acceptor.Accept's invariant.
-		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
+		// Note that TxAcceptor.Accept must be called before tx.Accept to honor
+		// Acceptor.Accept's invariant.
+		if err := dg.ctx.TxAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
 			return false, err
 		}
 	}
@@ -670,9 +670,9 @@ func (dg *Directed) acceptTx(ctx context.Context, tx Tx) error {
 	txBytes := tx.Bytes()
 	txBytesLen := len(txBytes)
 	if txBytesLen > 0 {
-		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
-		// honor Acceptor.Accept's invariant.
-		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
+		// Note that TxAcceptor.Accept must be called before tx.Accept to honor
+		// Acceptor.Accept's invariant.
+		if err := dg.ctx.TxAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
 			return err
 		}
 	}

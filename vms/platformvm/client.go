@@ -265,7 +265,7 @@ func NewClient(uri string) Client {
 }
 
 func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
-	res := &GetHeightResponse{}
+	res := &api.GetHeightResponse{}
 	err := c.requester.SendRequest(ctx, "platform.getHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }

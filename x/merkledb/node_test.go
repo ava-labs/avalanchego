@@ -10,6 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_Node_Clone_Value_Safety(t *testing.T) {
+	root := newNode(nil, EmptyPath)
+	require.NotNil(t, root)
+
+	childNode := newNode(root, newPath([]byte("key")))
+	childNode.setValue(Some([]byte{1, 2, 3}))
+	require.NotNil(t, childNode)
+
+	clone := childNode.clone()
+	clone.value.value[0] = 0
+	require.NotEqual(t, clone.value.value[0], childNode.value.value[0])
+}
+
 func Test_Node_Marshal(t *testing.T) {
 	root := newNode(nil, EmptyPath)
 	require.NotNil(t, root)

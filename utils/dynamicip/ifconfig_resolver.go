@@ -19,8 +19,8 @@ type ifConfigResolver struct {
 	url string
 }
 
-func (r *ifConfigResolver) Resolve() (net.IP, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", r.url, nil)
+func (r *ifConfigResolver) Resolve(ctx context.Context) (net.IP, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", r.url, nil)
 	if err != nil {
 		return nil, err
 	}

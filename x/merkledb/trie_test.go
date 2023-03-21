@@ -19,11 +19,11 @@ import (
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 	if asTrieView, ok := t.(*trieView); ok {
-		if err := asTrieView.calculateIDs(context.Background()); err != nil {
+		if err := asTrieView.calculateNodeIDs(context.Background()); err != nil {
 			return nil, err
 		}
 		path := newPath([]byte(key))
-		nodePath, err := asTrieView.getPathTo(context.Background(), path)
+		nodePath, err := asTrieView.getPathTo(path)
 		if err != nil {
 			return nil, err
 		}
@@ -35,12 +35,12 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		return closestNode.value.value, nil
 	}
 	if asDatabases, ok := t.(*Database); ok {
-		view, err := asDatabases.NewView(context.Background())
+		view, err := asDatabases.NewView()
 		if err != nil {
 			return nil, err
 		}
 		path := newPath([]byte(key))
-		nodePath, err := view.(*trieView).getPathTo(context.Background(), path)
+		nodePath, err := view.(*trieView).getPathTo(path)
 		if err != nil {
 			return nil, err
 		}
@@ -60,12 +60,12 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	trieIntf, err := db.NewView(context.Background())
+	trieIntf, err := db.NewView()
 	require.NoError(err)
 	trie, ok := trieIntf.(*trieView)
 	require.True(ok)
 
-	path, err := trie.getPathTo(context.Background(), newPath(nil))
+	path, err := trie.getPathTo(newPath(nil))
 	require.NoError(err)
 
 	// Just the root
@@ -76,10 +76,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key1 := []byte{0}
 	err = trie.Insert(context.Background(), key1, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key1))
+	path, err = trie.getPathTo(newPath(key1))
 	require.NoError(err)
 
 	// Root and 1 value
@@ -91,10 +91,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key2 := []byte{0, 1}
 	err = trie.Insert(context.Background(), key2, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -105,17 +105,17 @@ func TestTrieViewGetPathTo(t *testing.T) {
 	key3 := []byte{255}
 	err = trie.Insert(context.Background(), key3, []byte("value"))
 	require.NoError(err)
-	err = trie.calculateIDs(context.Background())
+	err = trie.calculateNodeIDs(context.Background())
 	require.NoError(err)
 
-	path, err = trie.getPathTo(context.Background(), newPath(key3))
+	path, err = trie.getPathTo(newPath(key3))
 	require.NoError(err)
 	require.Len(path, 2)
 	require.Equal(trie.root, path[0])
 	require.Equal(newPath(key3), path[1].key)
 
 	// Other key paths not affected
-	path, err = trie.getPathTo(context.Background(), newPath(key2))
+	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -124,7 +124,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Gets closest node when key doesn't exist
 	key4 := []byte{0, 1, 2}
-	path, err = trie.getPathTo(context.Background(), newPath(key4))
+	path, err = trie.getPathTo(newPath(key4))
 	require.NoError(err)
 	require.Len(path, 3)
 	require.Equal(trie.root, path[0])
@@ -133,7 +133,7 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Gets just root when key doesn't exist and no key shares a prefix
 	key5 := []byte{128}
-	path, err = trie.getPathTo(context.Background(), newPath(key5))
+	path, err = trie.getPathTo(newPath(key5))
 	require.NoError(err)
 	require.Len(path, 1)
 	require.Equal(trie.root, path[0])
@@ -144,14 +144,14 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
 
-	committedTrie, err := dbTrie.NewView(context.Background())
+	committedTrie, err := dbTrie.NewView()
 	require.NoError(t, err)
 	err = committedTrie.Insert(context.Background(), []byte{0}, []byte{0})
 	require.NoError(t, err)
 
 	require.NoError(t, committedTrie.CommitToDB(context.Background()))
 
-	newView, err := committedTrie.NewView(context.Background())
+	newView, err := committedTrie.NewView()
 	require.NoError(t, err)
 
 	err = newView.Insert(context.Background(), []byte{1}, []byte{1})
@@ -171,22 +171,22 @@ func Test_Trie_Partial_Commit_Leaves_Valid_Tries(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
 
-	trie2, err := dbTrie.NewView(context.Background())
+	trie2, err := dbTrie.NewView()
 	require.NoError(t, err)
 	err = trie2.Insert(context.Background(), []byte("key"), []byte("value"))
 	require.NoError(t, err)
 
-	trie3, err := trie2.NewView(context.Background())
+	trie3, err := trie2.NewView()
 	require.NoError(t, err)
 	err = trie3.Insert(context.Background(), []byte("key1"), []byte("value1"))
 	require.NoError(t, err)
 
-	trie4, err := trie3.NewView(context.Background())
+	trie4, err := trie3.NewView()
 	require.NoError(t, err)
 	err = trie4.Insert(context.Background(), []byte("key2"), []byte("value2"))
 	require.NoError(t, err)
 
-	trie5, err := trie4.NewView(context.Background())
+	trie5, err := trie4.NewView()
 	require.NoError(t, err)
 	err = trie5.Insert(context.Background(), []byte("key3"), []byte("value3"))
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	// value hasn't been inserted so shouldn't exist
@@ -441,7 +441,7 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	oldCount := trie.metrics.(*mockMetrics).hashCount
 
 	// delete the middle values
-	view, err := trie.NewView(context.Background())
+	view, err := trie.NewView()
 	require.NoError(t, err)
 	err = view.Remove(context.Background(), []byte("k"))
 	require.NoError(t, err)
@@ -494,7 +494,7 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
@@ -533,7 +533,7 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Make more views atop the existing one
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
@@ -549,12 +549,12 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	// view1 has 1 --> 1
 	// view2 has 2 --> 2
 
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
 
-	view4Intf, err := view2.NewView(context.Background())
+	view4Intf, err := view2.NewView()
 	require.NoError(err)
 	view4, ok := view4Intf.(*trieView)
 	require.True(ok)
@@ -593,7 +593,7 @@ func Test_Trie_BatchApply(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
@@ -622,7 +622,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	trie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, trie)
-	newTrie, err := trie.NewView(context.Background())
+	newTrie, err := trie.NewView()
 	require.NoError(t, err)
 
 	err = newTrie.Insert(context.Background(), []byte("k"), []byte("value0"))
@@ -633,9 +633,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value3"))
 	require.NoError(t, err)
-	err = newTrie.(*trieView).calculateIDs(context.Background())
+	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err := newTrie.getNode(context.Background(), EmptyPath)
+	root, err := newTrie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
@@ -647,9 +647,9 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	err = newTrie.Remove(context.Background(), []byte("key1"))
 	require.NoError(t, err)
-	err = newTrie.(*trieView).calculateIDs(context.Background())
+	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err = newTrie.getNode(context.Background(), EmptyPath)
+	root, err = newTrie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Equal(t, 0, len(root.children))
@@ -660,14 +660,14 @@ func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
 
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
-	childTrie1, err := trie.NewView(context.Background())
+	childTrie1, err := trie.NewView()
 	require.NoError(t, err)
-	childTrie2, err := trie.NewView(context.Background())
+	childTrie2, err := trie.NewView()
 	require.NoError(t, err)
-	childTrie3, err := trie.NewView(context.Background())
+	childTrie3, err := trie.NewView()
 	require.NoError(t, err)
 
 	require.False(t, childTrie1.(*trieView).isInvalid())
@@ -687,15 +687,15 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
 
-	baseView, err := dbTrie.NewView(context.Background())
+	baseView, err := dbTrie.NewView()
 	require.NoError(t, err)
 
-	viewToCommit, err := baseView.NewView(context.Background())
+	viewToCommit, err := baseView.NewView()
 	require.NoError(t, err)
 
-	sibling1, err := baseView.NewView(context.Background())
+	sibling1, err := baseView.NewView()
 	require.NoError(t, err)
-	sibling2, err := baseView.NewView(context.Background())
+	sibling2, err := baseView.NewView()
 	require.NoError(t, err)
 
 	require.False(t, sibling1.(*trieView).isInvalid())
@@ -713,7 +713,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	err = trie.Insert(context.Background(), []byte("k"), []byte("value0"))
@@ -727,17 +727,17 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	err = trie.Insert(context.Background(), []byte("key2"), []byte("value4"))
 	require.NoError(t, err)
 
-	err = trie.(*trieView).calculateIDs(context.Background())
+	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
-	root, err := trie.getNode(context.Background(), EmptyPath)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(root.children))
-
-	root, err = trie.getNode(context.Background(), EmptyPath)
+	root, err := trie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
-	firstNode, err := trie.getNode(context.Background(), root.getSingleChildPath())
+	root, err = trie.getEditableNode(EmptyPath)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(root.children))
+
+	firstNode, err := trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(t, err)
 	require.Equal(t, 1, len(firstNode.children))
 
@@ -749,14 +749,14 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	err = trie.Remove(context.Background(), []byte("key"))
 	require.NoError(t, err)
 
-	err = trie.(*trieView).calculateIDs(context.Background())
+	err = trie.(*trieView).calculateNodeIDs(context.Background())
 	require.NoError(t, err)
 
-	root, err = trie.getNode(context.Background(), EmptyPath)
+	root, err = trie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(root.children))
 
-	firstNode, err = trie.getNode(context.Background(), root.getSingleChildPath())
+	firstNode, err = trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(firstNode.children))
 }
@@ -773,10 +773,9 @@ func Test_Trie_MultipleStates(t *testing.T) {
 				context.Background(),
 				rdb,
 				Config{
-					Tracer:         newNoopTracer(),
-					HistoryLength:  100,
-					ValueCacheSize: minCacheSize,
-					NodeCacheSize:  100,
+					Tracer:        newNoopTracer(),
+					HistoryLength: 100,
+					NodeCacheSize: 100,
 				},
 			)
 			require.NoError(t, err)
@@ -784,7 +783,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 
 			initialSet := 1000
 			// Populate initial set of keys
-			root, err := db.NewView(context.Background())
+			root, err := db.NewView()
 			require.NoError(t, err)
 			kv := [][]byte{}
 			for i := 0; i < initialSet; i++ {
@@ -804,7 +803,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			// Populate additional states
 			concurrentStates := []Trie{}
 			for i := 0; i < 5; i++ {
-				newState, err := root.NewView(context.Background())
+				newState, err := root.NewView()
 				require.NoError(t, err)
 				concurrentStates = append(concurrentStates, newState)
 			}
@@ -862,7 +861,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
@@ -891,7 +890,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal(db, view1.parentTrie)
 
 	// Create a new view on the committed view
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
@@ -913,7 +912,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal([]byte{1}, got)
 
 	// Make another view
-	view3Intf, err := view2.NewView(context.Background())
+	view3Intf, err := view2.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -963,20 +962,20 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal(db, view3.parentTrie)
 }
 
-func TestTrieViewNewView(t *testing.T) {
+func Test_TrieView_NewView(t *testing.T) {
 	require := require.New(t)
 
 	db, err := getBasicDB()
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
 	// Create a view atop view1
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
@@ -997,7 +996,7 @@ func TestTrieViewNewView(t *testing.T) {
 	require.NoError(err)
 
 	// Make another view atop view1
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -1017,7 +1016,7 @@ func TestTrieViewNewView(t *testing.T) {
 
 	// Assert that NewPreallocatedView on an invalid view fails
 	invalidView := &trieView{invalidated: true}
-	_, err = invalidView.NewView(context.Background())
+	_, err = invalidView.NewView()
 	require.ErrorIs(err, ErrInvalid)
 }
 
@@ -1028,18 +1027,18 @@ func TestTrieViewInvalidate(t *testing.T) {
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
 	// Create 2 views atop view1
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -1066,19 +1065,19 @@ func TestTrieViewMoveChildViewsToView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
 	// Create a view atop view1
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
 	// Create a view atop view2
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
@@ -1106,18 +1105,18 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background())
+	view1Intf, err := db.NewView()
 	require.NoError(err)
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
 	// Create 2 views atop view1
-	view2Intf, err := view1.NewView(context.Background())
+	view2Intf, err := view1.NewView()
 	require.NoError(err)
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
-	view3Intf, err := view1.NewView(context.Background())
+	view3Intf, err := view1.NewView()
 	require.NoError(err)
 	view3, ok := view3Intf.(*trieView)
 	require.True(ok)
