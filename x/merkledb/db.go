@@ -318,21 +318,32 @@ func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		path := newPath(key)
-		values[i], errors[i] = db.getValue(path, false)
+		values[i], errors[i] = db.getValueCopy(newPath(key), false)
 	}
 	return values, errors
 }
 
-// Get the value associated with [key].
+// GetValue returns the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValue(newPath(key), true)
+	return db.getValueCopy(newPath(key), true)
 }
 
+// getValueCopy returns a copy of the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+func (db *Database) getValueCopy(key path, lock bool) ([]byte, error) {
+	val, err := db.getValue(key, lock)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
+}
+
+// getValue returns the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
 func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	if lock {
 		db.lock.RLock()
@@ -346,11 +357,10 @@ func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	clonedVal := Clone(n.value)
-	if clonedVal.IsNothing() {
+	if n.value.IsNothing() {
 		return nil, database.ErrNotFound
 	}
-	return clonedVal.value, nil
+	return n.value.value, nil
 }
 
 // Returns the ID of the root node of the merkle trie.
@@ -490,8 +500,9 @@ func (db *Database) GetChangeProof(
 			result.DeletedKeys = append(result.DeletedKeys, serializedKey)
 		} else {
 			result.KeyValues = append(result.KeyValues, KeyValue{
-				Key:   serializedKey,
-				Value: change.after.value,
+				Key: serializedKey,
+				// create a copy so edits of the []byte don't affect the db
+				Value: slices.Clone(change.after.value),
 			})
 		}
 	}

@@ -361,7 +361,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
-		proof.Value = closestNode.value
+		proof.Value = Clone(closestNode.value)
 		return proof, nil
 	}
 
@@ -434,6 +434,11 @@ func (t *trieView) GetRangeProof(
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// copy values, so edits won't affect the underlying arrays
+	for i, kv := range result.KeyValues {
+		result.KeyValues[i] = KeyValue{Key: kv.Key, Value: slices.Clone(kv.Value)}
 	}
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
@@ -859,7 +864,7 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValue(newPath(key), false)
+		results[i], valueErrors[i] = t.getValueCopy(newPath(key), false)
 	}
 	return results, valueErrors
 }
@@ -867,7 +872,17 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
-	return t.getValue(newPath(key), true)
+	return t.getValueCopy(newPath(key), true)
+}
+
+// getValueCopy returns a copy of the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+func (t *trieView) getValueCopy(key path, lock bool) ([]byte, error) {
+	val, err := t.getValue(key, lock)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
 }
 
 func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
