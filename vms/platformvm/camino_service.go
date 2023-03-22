@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -480,11 +479,11 @@ type ClaimArgs struct {
 	api.UserPass
 	api.JSONFromAddrs
 
-	DepositTxIDs      []ids.ID          `json:"depositTxIDs"`
-	ClaimableOwnerIDs []ids.ID          `json:"claimableOwnerIDs"`
-	AmountToClaim     []uint64          `json:"amountToClaim"`
-	ClaimTo           platformapi.Owner `json:"claimTo"`
-	Change            platformapi.Owner `json:"change"`
+	DepositTxIDs    []ids.ID            `json:"depositTxIDs"`
+	ClaimableOwners []platformapi.Owner `json:"claimableOwners"`
+	AmountToClaim   []uint64            `json:"amountToClaim"`
+	ClaimTo         platformapi.Owner   `json:"claimTo"`
+	Change          platformapi.Owner   `json:"change"`
 }
 
 // Claim issues an ClaimTx
@@ -506,10 +505,19 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		return err
 	}
 
+	claimableOwnerIDs := make([]ids.ID, len(args.ClaimableOwners))
+	for i := range args.ClaimableOwners {
+		ownerID, err := txs.GetOwnerID(args.ClaimableOwners[i])
+		if err != nil {
+			return fmt.Errorf("failed to calculate ownerID from owner: %w", err)
+		}
+		claimableOwnerIDs[i] = ownerID
+	}
+
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewClaimTx(
 		args.DepositTxIDs,
-		args.ClaimableOwnerIDs,
+		claimableOwnerIDs,
 		args.AmountToClaim,
 		claimTo,
 		privKeys,
@@ -561,12 +569,9 @@ func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSON
 
 type GetClaimablesArgs struct {
 	platformapi.Owner
-
-	DepositTxIDs []ids.ID `json:"depositTxIDs"`
 }
 
 type GetClaimablesReply struct {
-	DepositRewards        uint64 `json:"depositRewards"`
 	ValidatorRewards      uint64 `json:"validatorRewards"`
 	ExpiredDepositRewards uint64 `json:"expiredDepositRewards"`
 }
@@ -590,24 +595,6 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 		claimable = &state.Claimable{}
 	} else if err != nil {
 		return err
-	}
-
-	for i := range args.DepositTxIDs {
-		deposit, err := s.vm.state.GetDeposit(args.DepositTxIDs[i])
-		if err != nil {
-			return err
-		}
-		offer, err := s.vm.state.GetDepositOffer(deposit.DepositOfferID)
-		if err != nil {
-			return err
-		}
-		response.DepositRewards, err = math.Add64(
-			response.DepositRewards,
-			deposit.ClaimableReward(offer, s.vm.clock.Unix()),
-		)
-		if err != nil {
-			return err
-		}
 	}
 
 	response.ValidatorRewards = claimable.ValidatorReward
@@ -643,18 +630,27 @@ type GetDepositsArgs struct {
 }
 
 type GetDepositsReply struct {
-	Deposits []*APIDeposit `json:"deposits"`
+	Deposits         []*APIDeposit `json:"deposits"`
+	AvailableRewards []uint64      `json:"availableRewards"`
+	Timestamp        uint64        `json:"timestamp"`
 }
 
 // GetDeposits returns deposits by IDs
 func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, reply *GetDepositsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetDeposits called")
 	reply.Deposits = make([]*APIDeposit, len(args.DepositTxIDs))
+	reply.AvailableRewards = make([]uint64, len(args.DepositTxIDs))
+	reply.Timestamp = s.vm.clock.Unix()
 	for i := range args.DepositTxIDs {
 		deposit, err := s.vm.state.GetDeposit(args.DepositTxIDs[i])
 		if err != nil {
 			return fmt.Errorf("could't get deposit from state: %w", err)
 		}
+		offer, err := s.vm.state.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+		reply.AvailableRewards[i] = deposit.ClaimableReward(offer, reply.Timestamp)
 		reply.Deposits[i] = APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
 	}
 	return nil
