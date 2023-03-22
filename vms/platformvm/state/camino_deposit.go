@@ -225,6 +225,10 @@ func (cs caminoState) getNextToUnlockDepositIDsAndTimeFromDB(removedDepositIDs s
 		nextDeposits = append(nextDeposits, depositID)
 	}
 
+	if err := depositIterator.Error(); err != nil {
+		return nil, time.Time{}, err
+	}
+
 	if len(nextDeposits) == 0 {
 		return nil, mockable.MaxTime, database.ErrNotFound
 	}

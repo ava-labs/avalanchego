@@ -281,6 +281,7 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				it := database.NewMockIterator(c)
 				it.EXPECT().Next().Return(false)
+				it.EXPECT().Error().Return(nil)
 				it.EXPECT().Release()
 
 				db := database.NewMockDatabase(c)
@@ -313,6 +314,7 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 				it.EXPECT().Key().Return(depositToKey(depositTxID31[:], deposit31))
 				it.EXPECT().Key().Return(depositToKey(depositTxID32[:], deposit32))
 				it.EXPECT().Next().Return(false)
+				it.EXPECT().Error().Return(nil)
 				it.EXPECT().Release()
 
 				db := database.NewMockDatabase(c)
@@ -382,6 +384,7 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				it := database.NewMockIterator(c)
 				it.EXPECT().Next().Return(false)
+				it.EXPECT().Error().Return(nil)
 				it.EXPECT().Release()
 
 				db := database.NewMockDatabase(c)
@@ -415,6 +418,7 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 				it.EXPECT().Key().Return(depositToKey(depositTxID31[:], deposit31))
 				it.EXPECT().Key().Return(depositToKey(depositTxID32[:], deposit32))
 				it.EXPECT().Next().Return(false)
+				it.EXPECT().Error().Return(nil)
 				it.EXPECT().Release()
 
 				db := database.NewMockDatabase(c)
@@ -594,6 +598,7 @@ func TestWriteDeposits(t *testing.T) {
 				depositsIterator.EXPECT().Next().Return(true)
 				depositsIterator.EXPECT().Key().Return(depositToKey(depositTxID1[:], deposit1))
 				depositsIterator.EXPECT().Next().Return(false)
+				depositsIterator.EXPECT().Error().Return(nil)
 				depositsIterator.EXPECT().Release()
 
 				depositIDsByEndtimeDB := database.NewMockDatabase(c)
@@ -662,6 +667,7 @@ func TestLoadDeposits(t *testing.T) {
 				depositsIterator.EXPECT().Key().Return(depositToKey(depositTxID1[:], deposit1))
 				depositsIterator.EXPECT().Key().Return(depositToKey(depositTxID2[:], deposit2))
 				depositsIterator.EXPECT().Key().Return(depositToKey(depositTxID3[:], deposit3))
+				depositsIterator.EXPECT().Error().Return(nil)
 				depositsIterator.EXPECT().Release()
 				depositIDsByEndtimeDB := database.NewMockDatabase(c)
 				depositIDsByEndtimeDB.EXPECT().NewIterator().Return(depositsIterator)
@@ -680,6 +686,7 @@ func TestLoadDeposits(t *testing.T) {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositsIterator := database.NewMockIterator(c)
 				depositsIterator.EXPECT().Next().Return(false)
+				depositsIterator.EXPECT().Error().Return(nil)
 				depositsIterator.EXPECT().Release()
 				depositIDsByEndtimeDB := database.NewMockDatabase(c)
 				depositIDsByEndtimeDB.EXPECT().NewIterator().Return(depositsIterator)

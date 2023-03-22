@@ -44,6 +44,7 @@ var (
 	errUnlockedMoreThanAvailable = errors.New("unlocked more deposited tokens, than was available for unlock")
 	errNotConsumedDeposit        = errors.New("didn't consume whole deposit amount, but deposit is expired and can't be partially unlocked")
 	errLockedUTXO                = errors.New("can't spend locked utxo")
+	errNotLockedUTXO             = errors.New("can't spend unlocked utxo")
 )
 
 // Creates UTXOs from [outs] and adds them to the UTXO set.
@@ -564,16 +565,16 @@ func (h *handler) unlockUTXOs(
 		out, ok := utxo.Out.(*locked.Out)
 		if !ok {
 			// This output isn't locked
-			continue
+			return nil, nil, errNotLockedUTXO
 		} else if !out.IsLockedWith(removedLockState) {
 			// This output doesn't have required lockState
-			continue
+			return nil, nil, errNotLockedUTXO
 		}
 
 		innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
 		if !ok {
 			// We only know how to clone secp256k1 outputs for now
-			continue
+			return nil, nil, errWrongOutType
 		}
 
 		// Add the input to the consumed inputs

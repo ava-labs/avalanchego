@@ -95,10 +95,11 @@ func TestUnlockUTXOs(t *testing.T) {
 			},
 			generateWant: func(utxos []*avax.UTXO) want {
 				return want{
-					ins:  []*avax.TransferableInput{},
-					outs: []*avax.TransferableOutput{},
+					ins:  nil,
+					outs: nil,
 				}
 			},
+			expectedError: errNotLockedUTXO,
 		},
 		"Undeposit bonded UTXOs": {
 			lockState: locked.StateDeposited,
@@ -107,10 +108,11 @@ func TestUnlockUTXOs(t *testing.T) {
 			},
 			generateWant: func(utxos []*avax.UTXO) want {
 				return want{
-					ins:  []*avax.TransferableInput{},
-					outs: []*avax.TransferableOutput{},
+					ins:  nil,
+					outs: nil,
 				}
 			},
+			expectedError: errNotLockedUTXO,
 		},
 		"Unlock unlocked UTXOs": {
 			lockState: locked.StateBonded,
@@ -119,10 +121,11 @@ func TestUnlockUTXOs(t *testing.T) {
 			},
 			generateWant: func(utxos []*avax.UTXO) want {
 				return want{
-					ins:  []*avax.TransferableInput{},
-					outs: []*avax.TransferableOutput{},
+					ins:  nil,
+					outs: nil,
 				}
 			},
+			expectedError: errNotLockedUTXO,
 		},
 		"Wrong state, lockStateUnlocked": {
 			lockState: locked.StateUnlocked,
