@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -549,7 +550,10 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	state.AddBlock(parentBlk)
 	state.SetLastAccepted(parentBlk.ID())
 
-	manager := blkexecutor.NewManager(mempool, state, backend, clk, onAccept)
+	metrics, err := metrics.New("", registerer)
+	require.NoError(err)
+
+	manager := blkexecutor.NewManager(mempool, metrics, state, backend, clk, onAccept)
 
 	manager.SetPreference(parentBlk.ID())
 

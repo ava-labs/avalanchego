@@ -164,6 +164,7 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
+		&vm.bootstrapped,
 	)
 	if err != nil {
 		return err

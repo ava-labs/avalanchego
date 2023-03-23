@@ -174,6 +174,9 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 
 func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	utxo, err := s.GetUTXO(utxoID)
+	if err == database.ErrNotFound {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

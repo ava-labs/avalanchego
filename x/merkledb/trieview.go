@@ -315,12 +315,21 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
 	defer span.End()
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return nil, err
+	// only need full lock if nodes ids need to be calculated
+	// looped to ensure that the value didn't change after the lock was released
+	for t.needsRecalculation {
+		t.lock.RUnlock()
+		t.lock.Lock()
+		if err := t.calculateNodeIDs(ctx); err != nil {
+			return nil, err
+		}
+		t.lock.Unlock()
+		t.lock.RLock()
 	}
+
 	return t.getProof(ctx, key)
 }
 
@@ -352,7 +361,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
-		proof.Value = closestNode.value
+		proof.Value = Clone(closestNode.value)
 		return proof, nil
 	}
 
@@ -388,24 +397,6 @@ func (t *trieView) GetRangeProof(
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.getRangeProof(ctx, start, end, maxLength)
-}
-
-// Returns a range proof for (at least part of) the key range [start, end].
-// The returned proof's [KeyValues] has at most [maxLength] values.
-// [maxLength] must be > 0.
-// Assumes [t.lock] is held.
-func (t *trieView) getRangeProof(
-	ctx context.Context,
-	start, end []byte,
-	maxLength int,
-) (*RangeProof, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getRangeProof")
-	defer span.End()
-
 	if len(end) > 0 && bytes.Compare(start, end) == 1 {
 		return nil, ErrStartAfterEnd
 	}
@@ -414,8 +405,19 @@ func (t *trieView) getRangeProof(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return nil, err
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	// only need full lock if nodes ids need to be calculated
+	// looped to ensure that the value didn't change after the lock was released
+	for t.needsRecalculation {
+		t.lock.RUnlock()
+		t.lock.Lock()
+		if err := t.calculateNodeIDs(ctx); err != nil {
+			return nil, err
+		}
+		t.lock.Unlock()
+		t.lock.RLock()
 	}
 
 	var (
@@ -432,6 +434,11 @@ func (t *trieView) getRangeProof(
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// copy values, so edits won't affect the underlying arrays
+	for i, kv := range result.KeyValues {
+		result.KeyValues[i] = KeyValue{Key: kv.Key, Value: slices.Clone(kv.Value)}
 	}
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
@@ -857,7 +864,7 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValue(newPath(key))
+		results[i], valueErrors[i] = t.getValueCopy(newPath(key), false)
 	}
 	return results, valueErrors
 }
@@ -865,14 +872,25 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	return t.getValue(newPath(key))
+	return t.getValueCopy(newPath(key), true)
 }
 
-// Assumes [t.lock] read lock is held
-func (t *trieView) getValue(key path) ([]byte, error) {
+// getValueCopy returns a copy of the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+func (t *trieView) getValueCopy(key path, lock bool) ([]byte, error) {
+	val, err := t.getValue(key, lock)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
+}
+
+func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
+	if lock {
+		t.lock.RLock()
+		defer t.lock.RUnlock()
+	}
+
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -887,7 +905,7 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key)
+	value, err := t.getParentTrie().getValue(key, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1289,7 +1307,7 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key)
+	before, err := t.getParentTrie().getValue(key, true)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)

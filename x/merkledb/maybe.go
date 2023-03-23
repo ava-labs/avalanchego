@@ -3,6 +3,8 @@
 
 package merkledb
 
+import "golang.org/x/exp/slices"
+
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
 // Maybe is used to wrap types:
@@ -41,10 +43,5 @@ func Clone(m Maybe[[]byte]) Maybe[[]byte] {
 	if !m.hasValue {
 		return Nothing[[]byte]()
 	}
-	var valCopy []byte
-	if m.value != nil {
-		valCopy = make([]byte, len(m.value))
-		copy(valCopy, m.value)
-	}
-	return Some(valCopy)
+	return Some(slices.Clone(m.value))
 }

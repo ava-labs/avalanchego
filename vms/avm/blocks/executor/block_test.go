@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -126,6 +127,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool:      mempool,
+						metrics:      metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{},
 						clk:          &mockable.Clock{},
 					},
@@ -279,6 +281,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool: mempool,
+						metrics: metrics.NewMockMetrics(ctrl),
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
 								onAcceptState:  mockParentState,
@@ -328,6 +331,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool: mempool,
+						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -405,6 +409,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool: mempool,
+						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -514,6 +519,7 @@ func TestBlockVerify(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool: mockMempool,
+						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{},
 						blkIDToState: map[ids.ID]*blockState{
 							parentID: {
@@ -589,6 +595,7 @@ func TestBlockAccept(t *testing.T) {
 					Block: mockBlock,
 					manager: &manager{
 						mempool: mempool,
+						metrics: metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
@@ -686,6 +693,106 @@ func TestBlockAccept(t *testing.T) {
 			},
 			expectedErr: errTest,
 		},
+		{
+			name: "failed to apply metrics",
+			blockFunc: func(ctrl *gomock.Controller) *Block {
+				blockID := ids.GenerateTestID()
+				mockBlock := blocks.NewMockBlock(ctrl)
+				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
+				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
+				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
+
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+
+				mockManagerState := states.NewMockState(ctrl)
+				// Note the returned batch is nil but not used
+				// because we mock the call to shared memory
+				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
+				mockManagerState.EXPECT().Abort()
+
+				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
+				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
+
+				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState.EXPECT().Apply(mockManagerState)
+
+				metrics := metrics.NewMockMetrics(ctrl)
+				metrics.EXPECT().MarkBlockAccepted(gomock.Any()).Return(errTest)
+
+				return &Block{
+					Block: mockBlock,
+					manager: &manager{
+						state:   mockManagerState,
+						mempool: mempool,
+						metrics: metrics,
+						backend: &executor.Backend{
+							Ctx: &snow.Context{
+								SharedMemory: mockSharedMemory,
+								Log:          logging.NoLog{},
+							},
+						},
+						blkIDToState: map[ids.ID]*blockState{
+							blockID: {
+								onAcceptState: mockOnAcceptState,
+							},
+						},
+					},
+				}
+			},
+			expectedErr: errTest,
+		},
+		{
+			name: "no error",
+			blockFunc: func(ctrl *gomock.Controller) *Block {
+				blockID := ids.GenerateTestID()
+				mockBlock := blocks.NewMockBlock(ctrl)
+				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
+				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
+				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
+
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
+
+				mockManagerState := states.NewMockState(ctrl)
+				// Note the returned batch is nil but not used
+				// because we mock the call to shared memory
+				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
+				mockManagerState.EXPECT().Abort()
+
+				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
+				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
+
+				mockOnAcceptState := states.NewMockDiff(ctrl)
+				mockOnAcceptState.EXPECT().Apply(mockManagerState)
+
+				metrics := metrics.NewMockMetrics(ctrl)
+				metrics.EXPECT().MarkBlockAccepted(gomock.Any()).Return(nil)
+
+				return &Block{
+					Block: mockBlock,
+					manager: &manager{
+						state:   mockManagerState,
+						mempool: mempool,
+						metrics: metrics,
+						backend: &executor.Backend{
+							Ctx: &snow.Context{
+								SharedMemory: mockSharedMemory,
+								Log:          logging.NoLog{},
+							},
+						},
+						blkIDToState: map[ids.ID]*blockState{
+							blockID: {
+								onAcceptState: mockOnAcceptState,
+							},
+						},
+					},
+				}
+			},
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -769,6 +876,7 @@ func TestBlockReject(t *testing.T) {
 					manager: &manager{
 						preferred: preferredID,
 						mempool:   mempool,
+						metrics:   metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
 							Ctx: &snow.Context{
@@ -827,6 +935,7 @@ func TestBlockReject(t *testing.T) {
 					manager: &manager{
 						preferred: preferredID,
 						mempool:   mempool,
+						metrics:   metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
 							Bootstrapped: true,
 							Ctx: &snow.Context{

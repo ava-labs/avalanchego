@@ -36,7 +36,27 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	n, err := db.getNode(newPath([]byte{0}))
 	require.NoError(t, err)
 	val[0] = 1
+
+	// node's value shouldn't be affected by the edit
 	require.NotEqual(t, val, n.value.value)
+}
+
+func Test_MerkleDB_GetValues_Safety(t *testing.T) {
+	db, err := getBasicDB()
+	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+
+	vals, errs := db.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(t, errs, 1)
+	require.NoError(t, errs[0])
+	require.Equal(t, []byte{0, 1, 2}, vals[0])
+	vals[0][0] = 1
+
+	// editing the value array shouldn't affect the db
+	vals, errs = db.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(t, errs, 1)
+	require.NoError(t, errs[0])
+	require.Equal(t, []byte{0, 1, 2}, vals[0])
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {

@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -215,10 +216,11 @@ type stateBlk struct {
 type state struct {
 	validatorUptimes
 
-	cfg     *config.Config
-	ctx     *snow.Context
-	metrics metrics.Metrics
-	rewards reward.Calculator
+	cfg          *config.Config
+	ctx          *snow.Context
+	metrics      metrics.Metrics
+	rewards      reward.Calculator
+	bootstrapped *utils.Atomic[bool]
 
 	baseDB *versiondb.Database
 
@@ -341,6 +343,7 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
 	s, err := new(
 		db,
@@ -349,6 +352,7 @@ func New(
 		ctx,
 		metricsReg,
 		rewards,
+		bootstrapped,
 	)
 	if err != nil {
 		return nil, err
@@ -371,6 +375,7 @@ func new(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
 	blockCache, err := metercacher.New[ids.ID, *stateBlk](
 		"block_cache",
@@ -483,11 +488,12 @@ func new(
 	return &state{
 		validatorUptimes: newValidatorUptimes(),
 
-		cfg:     cfg,
-		ctx:     ctx,
-		metrics: metrics,
-		rewards: rewards,
-		baseDB:  baseDB,
+		cfg:          cfg,
+		ctx:          ctx,
+		metrics:      metrics,
+		rewards:      rewards,
+		bootstrapped: bootstrapped,
+		baseDB:       baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1348,6 +1354,9 @@ func (s *state) initValidatorSets() error {
 		return err
 	}
 
+	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
+	primaryValidators.RegisterCallbackListener(vl)
+
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
@@ -1361,6 +1370,9 @@ func (s *state) initValidatorSets() error {
 		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
+
+		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
+		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil
 }
