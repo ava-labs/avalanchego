@@ -996,10 +996,37 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                 remove_left,
             );
         }
-        NodeType::Leaf(_) => {
+        NodeType::Leaf(n) => {
             let mut p_ref = merkle
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
+            let cur_key = n.path().clone().into_inner();
+            // Similar to branch node, we need to compare the path to see if the node
+            // needs to be unset.
+            if chunks[index..].len() < cur_key.len()
+                || compare(&cur_key, &chunks[index..index + cur_key.len()]).is_ne()
+            {
+                if remove_left {
+                    if compare(&cur_key, &chunks[index..]).is_lt() {
+                        p_ref
+                            .write(|p| {
+                                let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                                pp.chd_mut()[chunks[index - 1] as usize] = None;
+                                pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                            })
+                            .unwrap();
+                    }
+                } else if compare(&cur_key, &chunks[index..]).is_gt() {
+                    p_ref
+                        .write(|p| {
+                            let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                            pp.chd_mut()[chunks[index - 1] as usize] = None;
+                            pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                        })
+                        .unwrap();
+                }
+                return Ok(());
+            }
             p_ref
                 .write(|p| match p.inner_mut() {
                     NodeType::Extension(n) => {

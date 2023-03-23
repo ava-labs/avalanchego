@@ -430,7 +430,6 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
 #[test]
 // Tests normal range proof with two non-existent proofs.
 // The test cases are generated randomly.
-// TODO: flaky test
 fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
     let set = generate_random_data(4096);
     let mut items = Vec::from_iter(set.iter());
@@ -475,6 +474,21 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
 
         merkle.verify_range_proof(&proof, first, last, keys, vals)?;
     }
+
+    // Special case, two edge proofs for two edge key.
+    let first: [u8; 32] = [0; 32];
+    let last: [u8; 32] = [255; 32];
+    let mut proof = merkle.prove(first)?;
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(last)?;
+    assert!(!end_proof.0.is_empty());
+    proof.concat_proofs(end_proof);
+
+    let item_iter = items.clone().into_iter();
+    let keys = item_iter.clone().map(|item| item.0).collect();
+    let vals = item_iter.map(|item| item.1).collect();
+
+    merkle.verify_range_proof(&proof, &first, &last, keys, vals)?;
 
     Ok(())
 }
