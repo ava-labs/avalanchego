@@ -171,12 +171,22 @@ func (n *node) removeChild(child *node) {
 	delete(n.children, child.key[len(n.key)])
 }
 
-// Returns a copy of [n].
+// clone Returns a copy of [n].
+// nodeBytes is intentionally not included because it can cause a race.
+// nodes being evicted by the cache can write nodeBytes,
+// so reading them during the cloning would be a data race.
+// Note: value isn't cloned because it is never edited, only overwritten
+// if this ever changes, value will need to be copied as well
 func (n *node) clone() *node {
-	result := *n
-	result.children = maps.Clone(n.children)
-	result.value = Clone(n.value)
-	return &result
+	return &node{
+		id:  n.id,
+		key: n.key,
+		dbNode: dbNode{
+			value:    n.value,
+			children: maps.Clone(n.children),
+		},
+		valueDigest: n.valueDigest,
+	}
 }
 
 // Returns the ProofNode representation of this node.
@@ -184,7 +194,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		KeyPath:     n.key.Serialize(),
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: n.valueDigest,
+		ValueOrHash: Clone(n.valueDigest),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

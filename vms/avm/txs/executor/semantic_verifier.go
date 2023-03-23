@@ -64,6 +64,10 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 		return err
 	}
 
+	if !v.Bootstrapped {
+		return nil
+	}
+
 	offset := len(tx.Ins)
 	for i, op := range tx.Ops {
 		// Note: Verification of the length of [t.tx.Creds] happens during

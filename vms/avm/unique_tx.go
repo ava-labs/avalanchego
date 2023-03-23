@@ -55,7 +55,7 @@ type TxCachedState struct {
 }
 
 func (tx *UniqueTx) refresh() {
-	tx.vm.numTxRefreshes.Inc()
+	tx.vm.metrics.IncTxRefreshes()
 
 	if tx.TxCachedState == nil {
 		tx.TxCachedState = &TxCachedState{}
@@ -66,7 +66,7 @@ func (tx *UniqueTx) refresh() {
 	unique := tx.vm.DeduplicateTx(tx)
 	prevTx := tx.Tx
 	if unique == tx {
-		tx.vm.numTxRefreshMisses.Inc()
+		tx.vm.metrics.IncTxRefreshMisses()
 
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
@@ -75,7 +75,7 @@ func (tx *UniqueTx) refresh() {
 		}
 		tx.unique = true
 	} else {
-		tx.vm.numTxRefreshHits.Inc()
+		tx.vm.metrics.IncTxRefreshHits()
 
 		// If someone is in the cache, they must be up to date
 
@@ -160,7 +160,7 @@ func (tx *UniqueTx) Accept(context.Context) error {
 	}
 
 	tx.deps = nil // Needed to prevent a memory leak
-	return nil
+	return tx.vm.metrics.MarkTxAccepted(tx.Tx)
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus

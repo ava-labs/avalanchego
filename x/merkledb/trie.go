@@ -24,7 +24,7 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key path) ([]byte, error)
+	getValue(key path, lock bool) ([]byte, error)
 
 	// GetMerkleRoot returns the merkle root of the Trie
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)

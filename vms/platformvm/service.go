@@ -96,12 +96,8 @@ type stakerAttributes struct {
 	proofOfPossession      *signer.ProofOfPossession
 }
 
-type GetHeightResponse struct {
-	Height json.Uint64 `json:"height"`
-}
-
 // GetHeight returns the height of the last accepted block
-func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *GetHeightResponse) error {
+func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeightResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getHeight"),

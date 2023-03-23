@@ -264,6 +264,22 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 		return
 	}
 
+	index, err := i.registerChainHelper(chainID, blockPrefix, chainName, "block", i.blockAcceptorGroup)
+	if err != nil {
+		i.log.Fatal("failed to create index",
+			zap.String("chainName", chainName),
+			zap.String("endpoint", "block"),
+			zap.Error(err),
+		)
+		if err := i.close(); err != nil {
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
+		}
+		return
+	}
+	i.blockIndices[chainID] = index
+
 	switch vm.(type) {
 	case vertex.DAGVM:
 		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, chainName, "vtx", i.vertexAcceptorGroup)
@@ -298,21 +314,6 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 		}
 		i.txIndices[chainID] = txIndex
 	case block.ChainVM:
-		index, err := i.registerChainHelper(chainID, blockPrefix, chainName, "block", i.blockAcceptorGroup)
-		if err != nil {
-			i.log.Fatal("failed to create index",
-				zap.String("chainName", chainName),
-				zap.String("endpoint", "block"),
-				zap.Error(err),
-			)
-			if err := i.close(); err != nil {
-				i.log.Error("failed to close indexer",
-					zap.Error(err),
-				)
-			}
-			return
-		}
-		i.blockIndices[chainID] = index
 	default:
 		vmType := fmt.Sprintf("%T", vm)
 		i.log.Error("got unexpected vm type",
