@@ -64,7 +64,7 @@ func TestUTXOState(t *testing.T) {
 	require.Equal(database.ErrNotFound, err)
 
 	err = s.DeleteUTXO(utxoID)
-	require.Equal(database.ErrNotFound, err)
+	require.NoError(err)
 
 	err = s.PutUTXO(utxo)
 	require.NoError(err)
