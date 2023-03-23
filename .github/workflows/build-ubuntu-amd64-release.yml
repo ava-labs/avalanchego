@@ -2,6 +2,10 @@ name: build-amd64-debian-packages
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to include in artifact name'
+        required: true
   push:
     tags:
       - "*"
@@ -14,7 +18,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.19'
+          go-version: '~1.19.6'
           check-latest: true
       - run: go version
 
@@ -26,12 +30,6 @@ jobs:
           sudo apt update
           sudo apt -y install awscli
 
-      - name: Get the version
-        id: get_version
-        run: |
-          echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
-        shell: bash
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -39,13 +37,39 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+        shell: bash
+
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ env.VERSION }}
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
           RELEASE: "jammy"
+
+      - name: Save as Github artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: jammy
+          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
+
+      - name: Cleanup
+        run: |
+          rm -rf ./build
+          rm -rf /tmp/avalanchego
 
   build-focal-amd64-package:
     runs-on: ubuntu-20.04
@@ -54,7 +78,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.19'
+          go-version: '~1.19.6'
           check-latest: true
       - run: go version
 
@@ -66,10 +90,18 @@ jobs:
           sudo apt update
           sudo apt -y install awscli
 
-      - name: Get the version
-        id: get_version
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
         run: |
-          echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
         shell: bash
 
       - name: Configure AWS credentials
@@ -82,7 +114,19 @@ jobs:
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ env.VERSION }}
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
           RELEASE: "focal"
+
+      - name: Save as Github artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: focal
+          path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
+
+      - name: Cleanup
+        run: |
+          rm -rf ./build
+          rm -rf /tmp/avalanchego

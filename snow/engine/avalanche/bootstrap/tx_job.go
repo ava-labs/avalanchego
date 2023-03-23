@@ -26,7 +26,7 @@ var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transa
 type txParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
-	vm                      vertex.DAGVM
+	vm                      vertex.LinearizableVM
 }
 
 func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error) {

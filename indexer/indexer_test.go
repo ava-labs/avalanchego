@@ -134,6 +134,7 @@ func TestIndexer(t *testing.T) {
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
+	server := &apiServerMock{}
 	config := Config{
 		IndexingEnabled:      true,
 		AllowIncompleteIndex: false,
@@ -142,7 +143,7 @@ func TestIndexer(t *testing.T) {
 		BlockAcceptorGroup:   snow.NewAcceptorGroup(logging.NoLog{}),
 		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:            &apiServerMock{},
+		APIServer:            server,
 		ShutdownF:            func() {},
 	}
 
@@ -173,7 +174,6 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.True(previouslyIndexed)
-	server := config.APIServer.(*apiServerMock)
 	require.EqualValues(1, server.timesCalled)
 	require.EqualValues("index/chain1", server.bases[0])
 	require.EqualValues("/block", server.endpoints[0])
@@ -257,6 +257,8 @@ func TestIndexer(t *testing.T) {
 	container, err = blkIdx.GetLastAccepted()
 	require.NoError(err)
 	require.Equal(blkID, container.ID)
+	require.EqualValues(1, server.timesCalled) // block index for chain
+	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
 	chain2Ctx := snow.DefaultConsensusContextTest()
@@ -267,15 +269,15 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	dagVM := vertex.NewMockDAGVM(ctrl)
+	dagVM := vertex.NewMockLinearizableVM(ctrl)
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 	require.NoError(err)
-	server = config.APIServer.(*apiServerMock)
-	require.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
+	require.EqualValues(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
 	require.Contains(server.bases, "index/chain2")
+	require.Contains(server.endpoints, "/block")
 	require.Contains(server.endpoints, "/vtx")
 	require.Contains(server.endpoints, "/tx")
-	require.Len(idxr.blockIndices, 1)
+	require.Len(idxr.blockIndices, 2)
 	require.Len(idxr.txIndices, 1)
 	require.Len(idxr.vtxIndices, 1)
 

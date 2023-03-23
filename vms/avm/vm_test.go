@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -1116,7 +1117,7 @@ func TestTxCached(t *testing.T) {
 
 	registerer := prometheus.NewRegistry()
 
-	err = vm.metrics.Initialize("", registerer)
+	vm.metrics, err = metrics.New("", registerer)
 	require.NoError(t, err)
 
 	db := memdb.New()
@@ -1151,7 +1152,7 @@ func TestTxNotCached(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	require.NoError(t, err)
 
-	err = vm.metrics.Initialize("", registerer)
+	vm.metrics, err = metrics.New("", registerer)
 	require.NoError(t, err)
 
 	db := memdb.New()

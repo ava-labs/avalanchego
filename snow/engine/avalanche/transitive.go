@@ -30,8 +30,11 @@ import (
 
 var _ Engine = (*Transitive)(nil)
 
-func New(config Config) (Engine, error) {
-	return newTransitive(config)
+func New(
+	config Config,
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error,
+) (Engine, error) {
+	return newTransitive(config, startSnowmanConsensus)
 }
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -75,13 +78,18 @@ type Transitive struct {
 	// optimal number.
 	pendingTxs []snowstorm.Tx
 
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error
+
 	// A uniform sampler without replacement
 	uniformSampler sampler.Uniform
 
 	errs wrappers.Errs
 }
 
-func newTransitive(config Config) (*Transitive, error) {
+func newTransitive(
+	config Config,
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error,
+) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	acceptedFrontiers := tracker.NewAccepted()
@@ -104,7 +112,8 @@ func newTransitive(config Config) (*Transitive, error) {
 			"",
 			config.Ctx.AvalancheRegisterer,
 		),
-		uniformSampler: sampler.NewUniform(),
+		startSnowmanConsensus: startSnowmanConsensus,
+		uniformSampler:        sampler.NewUniform(),
 	}
 
 	return t, t.metrics.Initialize("", config.Ctx.AvalancheRegisterer)
@@ -205,9 +214,6 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
-
 	// If the chain is linearized, we don't care to attempt to issue any new
 	// vertices.
 	linearized, err := t.Manager.StopVertexAccepted(ctx)
@@ -215,8 +221,17 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return err
 	}
 	if linearized {
+		// Immediately respond to the query with the stop vertex.
+		//
+		// Invariant: This is done here, because the Consensus instance may have
+		// never been initialized if bootstrapping accepted the stop vertex.
+		edge := t.Manager.Edge(ctx)
+		t.Sender.SendChits(ctx, nodeID, requestID, edge, edge)
 		return nil
 	}
+
+	// Immediately respond to the query with the current consensus preferences.
+	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
 
 	// If we have [vtxID], attempt to put it into consensus, if we haven't
 	// already. If we don't not have [vtxID], fetch it from [nodeID].
@@ -228,9 +243,6 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
-
 	// If the chain is linearized, we don't care to attempt to issue any new
 	// vertices.
 	linearized, err := t.Manager.StopVertexAccepted(ctx)
@@ -238,8 +250,17 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return err
 	}
 	if linearized {
+		// Immediately respond to the query with the stop vertex.
+		//
+		// Invariant: This is done here, because the Consensus instance may have
+		// never been initialized if bootstrapping accepted the stop vertex.
+		edge := t.Manager.Edge(ctx)
+		t.Sender.SendChits(ctx, nodeID, requestID, edge, edge)
 		return nil
 	}
+
+	// Immediately respond to the query with the current consensus preferences.
+	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
 
 	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {

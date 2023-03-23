@@ -242,7 +242,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				}
 			})
 
-			ginkgo.By("issue regular, virtuous X-Chain tx, after whitelist vtx, should fail", func() {
+			ginkgo.By("issue regular, virtuous X-Chain tx, after whitelist vtx, should pass", func() {
 				balances, err := wallets[0].X().Builder().GetFTBalance()
 				gomega.Expect(err).Should(gomega.BeNil())
 
@@ -270,16 +270,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err.Error()).Should(gomega.ContainSubstring(context.DeadlineExceeded.Error()))
-
-				ep := uris[0] + "/ext/metrics"
-				mm, err := tests.GetMetricsValue(ep, allMetrics...)
 				gomega.Expect(err).Should(gomega.BeNil())
-
-				// regular, virtuous transaction should not change whitelist vtx metrics
-				prev := curMetrics[uris[0]]
-				gomega.Expect(mm).Should(gomega.Equal(prev))
-				curMetrics[uris[0]] = mm
 			})
 		})
 })

@@ -15,7 +15,7 @@ import (
 type Config struct {
 	Ctx *snow.ConsensusContext
 	common.AllGetsServer
-	VM         vertex.DAGVM
+	VM         vertex.LinearizableVM
 	Manager    vertex.Manager
 	Sender     common.Sender
 	Validators validators.Set
