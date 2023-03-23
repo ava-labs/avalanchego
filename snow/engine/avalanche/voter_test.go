@@ -19,7 +19,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	engCfg.Manager = mngr
-	transitive, err := newTransitive(engCfg)
+	transitive, err := newTransitive(engCfg, noopStarter)
 	require.NoError(t, err)
 	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 
@@ -110,7 +110,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	engCfg.Manager = mngr
-	transitive, err := newTransitive(engCfg)
+	transitive, err := newTransitive(engCfg, noopStarter)
 	require.NoError(t, err)
 	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 
@@ -244,7 +244,7 @@ func TestSharedDependency(t *testing.T) {
 	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
 	engCfg.Manager = mngr
-	transitive, err := newTransitive(engCfg)
+	transitive, err := newTransitive(engCfg, noopStarter)
 	require.NoError(t, err)
 	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 

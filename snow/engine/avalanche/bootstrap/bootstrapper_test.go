@@ -31,6 +31,10 @@ var (
 	errUnknownTx           = errors.New("unknown tx")
 )
 
+func noopStarter(context.Context, uint32) error {
+	return nil
+}
+
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	ctx := snow.DefaultConsensusContextTest()
 
@@ -152,6 +156,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -258,6 +263,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -439,6 +445,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -586,6 +593,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -710,6 +718,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -833,6 +842,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -967,6 +977,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1137,6 +1148,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			})
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)

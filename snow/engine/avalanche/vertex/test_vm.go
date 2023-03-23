@@ -16,7 +16,7 @@ var (
 	errPending   = errors.New("unexpectedly called Pending")
 	errLinearize = errors.New("unexpectedly called Linearize")
 
-	_ DAGVM = (*TestVM)(nil)
+	_ LinearizableVM = (*TestVM)(nil)
 )
 
 type TestVM struct {
