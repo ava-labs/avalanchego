@@ -5,6 +5,7 @@ package snow
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 // SubnetStateTracker describes the standard interface for tracking the status of
@@ -21,9 +22,9 @@ type SubnetStateTracker interface {
 	IsChainBootstrapped(chainID ids.ID) bool
 
 	// GetState returns latest started state for chainID
-	GetState(chainID ids.ID) State
+	GetState(chainID ids.ID) (State, p2p.EngineType)
 
-	StartState(chainID ids.ID, state State)
+	StartState(chainID ids.ID, state State, currentEngineType p2p.EngineType)
 	StopState(chainID ids.ID, state State)
 
 	// one sync channel per chain, to make sure each chain gets notified

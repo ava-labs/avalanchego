@@ -147,8 +147,7 @@ func TestShutdown(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.CurrentEngineType.Set(engineType)
-	ctx.Start(snow.ExtendingFrontier) // assumed bootstrapping is done
+	ctx.Start(snow.ExtendingFrontier, engineType) // assumed bootstrapping is done
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -283,8 +282,7 @@ func TestShutdownTimesOut(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.CurrentEngineType.Set(engineType)
-	ctx.Start(snow.ExtendingFrontier) // assumed bootstrapping is done
+	ctx.Start(snow.ExtendingFrontier, engineType) // assumed bootstrapping is done
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -457,8 +455,7 @@ func TestRouterTimeout(t *testing.T) {
 		return nil
 	}
 
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.Bootstrapping) // assumed bootstrapping is done
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrapping is done
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -894,8 +891,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.ExtendingFrontier) // assumed bootstrapping is done
+	ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrapping is done
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -1171,8 +1167,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return nil
 	}
 
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrapping is ongoing
 
 	engine := &common.EngineTest{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
@@ -1325,11 +1320,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	// assumed bootstrapping is done
-	responder.CurrentEngineType.Set(engineType)
-	responder.Start(snow.ExtendingFrontier)
-
-	requester.CurrentEngineType.Set(engineType)
-	requester.Start(snow.ExtendingFrontier)
+	responder.Start(snow.ExtendingFrontier, engineType)
+	requester.Start(snow.ExtendingFrontier, engineType)
 
 	// router tracks two chains - one will send a message to the other
 	chainRouter.AddChain(context.Background(), requesterHandler)
@@ -1430,8 +1422,7 @@ func TestConnectedSubnet(t *testing.T) {
 	platform.Registerer = prometheus.NewRegistry()
 	platform.Metrics = metrics.NewOptionalGatherer()
 	platform.Executing.Set(false)
-	platform.CurrentEngineType.Set(engineType)
-	platform.Start(snow.ExtendingFrontier)
+	platform.Start(snow.ExtendingFrontier, engineType)
 
 	myConnectedMsg := handler.Message{
 		InboundMessage: message.InternalConnected(myNodeID, version.CurrentApp),
@@ -1586,8 +1577,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		return nil
 	}
 
-	ctx.CurrentEngineType.Set(engineType)
-	ctx.Start(snow.Bootstrapping) // assumed bootstrapping is ongoing
+	ctx.Start(snow.Bootstrapping, engineType) // assumed bootstrapping is ongoing
 	engine := &common.EngineTest{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx

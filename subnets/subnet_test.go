@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -31,11 +32,11 @@ func TestSingleChainSubnetFullySyncedWithStateSync(t *testing.T) {
 	require.False(tracker.IsChainBootstrapped(chainID))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chainID, snow.StateSyncing)
+	tracker.StartState(chainID, snow.StateSyncing, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chainID))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chainID, snow.Bootstrapping)
+	tracker.StartState(chainID, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chainID))
 	require.False(tracker.IsSynced())
 
@@ -47,7 +48,7 @@ func TestSingleChainSubnetFullySyncedWithStateSync(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chainID))
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chainID, snow.ExtendingFrontier)
+	tracker.StartState(chainID, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsChainBootstrapped(chainID))
 	require.True(tracker.IsSynced())
 }
@@ -70,7 +71,7 @@ func TestSingleChainSubnetFullySyncedWithoutStateSync(t *testing.T) {
 	require.False(tracker.IsChainBootstrapped(chainID))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chainID, snow.Bootstrapping)
+	tracker.StartState(chainID, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chainID))
 	require.False(tracker.IsSynced())
 
@@ -78,7 +79,7 @@ func TestSingleChainSubnetFullySyncedWithoutStateSync(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chainID))
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chainID, snow.ExtendingFrontier)
+	tracker.StartState(chainID, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsChainBootstrapped(chainID))
 	require.True(tracker.IsSynced())
 }
@@ -102,7 +103,7 @@ func TestMultipleChainsSubnetNoRestart(t *testing.T) {
 	tracker.AddChain(chain0)
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain0, snow.Bootstrapping)
+	tracker.StartState(chain0, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chain0))
 	require.False(tracker.IsSynced())
 
@@ -116,10 +117,10 @@ func TestMultipleChainsSubnetNoRestart(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chain0))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.StateSyncing)
+	tracker.StartState(chain1, snow.StateSyncing, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain2, snow.Bootstrapping)
+	tracker.StartState(chain2, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chain2))
 	require.False(tracker.IsSynced())
 
@@ -131,7 +132,7 @@ func TestMultipleChainsSubnetNoRestart(t *testing.T) {
 	require.False(tracker.IsChainBootstrapped(chain1))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.Bootstrapping)
+	tracker.StartState(chain1, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chain1))
 	require.False(tracker.IsSynced())
 
@@ -139,13 +140,13 @@ func TestMultipleChainsSubnetNoRestart(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chain1))
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chain0, snow.ExtendingFrontier)
+	tracker.StartState(chain0, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chain2, snow.ExtendingFrontier)
+	tracker.StartState(chain2, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.ExtendingFrontier)
+	tracker.StartState(chain1, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsSynced())
 }
 
@@ -167,7 +168,7 @@ func TestMultipleChainsSubnetWithRestart(t *testing.T) {
 	tracker.AddChain(chain0)
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain0, snow.Bootstrapping)
+	tracker.StartState(chain0, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chain0))
 	require.False(tracker.IsSynced())
 
@@ -178,20 +179,20 @@ func TestMultipleChainsSubnetWithRestart(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chain0))
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.StateSyncing)
+	tracker.StartState(chain1, snow.StateSyncing, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsSynced())
 
 	// chain0 restarts bootstrapping while chain1 state syncs
 	// Assume chain0 will take longer than chain1 to complete
 	// the second bootstrap run
-	tracker.StartState(chain0, snow.Bootstrapping)
+	tracker.StartState(chain0, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsChainBootstrapped(chain0))
 	require.False(tracker.IsSynced())
 
 	tracker.StopState(chain1, snow.StateSyncing)
 	require.False(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.Bootstrapping)
+	tracker.StartState(chain1, snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.False(tracker.IsSynced())
 
 	tracker.StopState(chain1, snow.Bootstrapping)
@@ -202,10 +203,10 @@ func TestMultipleChainsSubnetWithRestart(t *testing.T) {
 	require.True(tracker.IsChainBootstrapped(chain0))
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chain0, snow.ExtendingFrontier)
+	tracker.StartState(chain0, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsSynced())
 
-	tracker.StartState(chain1, snow.ExtendingFrontier)
+	tracker.StartState(chain1, snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED)
 	require.True(tracker.IsSynced())
 }
 

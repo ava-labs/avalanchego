@@ -116,9 +116,7 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
-
-	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	b.Ctx.Start(snow.Bootstrapping)
+	b.Ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}

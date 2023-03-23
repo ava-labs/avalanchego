@@ -1874,9 +1874,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-
-	consensusCtx.Start(snow.ExtendingFrontier)
-	consensusCtx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	consensusCtx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(context.Background(), h)

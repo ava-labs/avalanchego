@@ -156,8 +156,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// create bootstrapper
 	dummyCallback := func(context.Context, uint32) error {
-		cfg.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-		cfg.Ctx.Start(snow.ExtendingFrontier)
+		cfg.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 		return nil
 	}
 	bs, err := New(context.Background(), cfg, dummyCallback)
@@ -235,8 +234,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -340,8 +338,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -502,8 +499,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -667,8 +663,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -854,8 +849,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -998,8 +992,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1209,8 +1202,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1350,8 +1342,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1438,8 +1429,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-			config.Ctx.Start(snow.ExtendingFrontier)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)

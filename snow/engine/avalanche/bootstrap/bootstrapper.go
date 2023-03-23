@@ -332,9 +332,7 @@ func (*bootstrapper) Notify(context.Context, common.Message) error {
 
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
-
-	b.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
-	b.Ctx.Start(snow.Bootstrapping)
+	b.Ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}

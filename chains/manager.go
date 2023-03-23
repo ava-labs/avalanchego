@@ -598,8 +598,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	ctx.Start(snow.Initializing)
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+	ctx.Start(snow.Initializing, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
@@ -1004,8 +1003,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	ctx.Start(snow.Initializing)
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	ctx.Start(snow.Initializing, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {

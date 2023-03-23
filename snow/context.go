@@ -92,15 +92,13 @@ type ConsensusContext struct {
 	// accepted.
 	VertexAcceptor Acceptor
 
-	CurrentEngineType utils.Atomic[p2p.EngineType]
-
 	// True iff this chain is executing transactions as part of bootstrapping.
 	Executing utils.Atomic[bool]
 }
 
 // Helpers section
-func (cc *ConsensusContext) Start(state State) {
-	cc.SubnetStateTracker.StartState(cc.ChainID, state)
+func (cc *ConsensusContext) Start(state State, currentEngineType p2p.EngineType) {
+	cc.SubnetStateTracker.StartState(cc.ChainID, state, currentEngineType)
 }
 
 func (cc *ConsensusContext) Done(state State) {
@@ -112,6 +110,6 @@ func (cc *ConsensusContext) IsChainBootstrapped() bool {
 }
 
 // TODO: consider dropping GetChainState
-func (cc *ConsensusContext) GetChainState() State {
+func (cc *ConsensusContext) GetChainState() (State, p2p.EngineType) {
 	return cc.SubnetStateTracker.GetState(cc.ChainID)
 }

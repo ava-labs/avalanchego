@@ -458,8 +458,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to initialize consensus: %w", err)
 	}
 
-	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
-	t.Ctx.Start(snow.ExtendingFrontier)
+	t.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 	return t.VM.SetState(ctx, snow.ExtendingFrontier)
 }
 

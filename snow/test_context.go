@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -53,14 +54,14 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 			IsChainBootstrappedF: func(ids.ID) bool {
 				return stoppedState == Bootstrapping || stoppedState == StateSyncing
 			},
-			StartStateF: func(chainID ids.ID, state State) {
+			StartStateF: func(chainID ids.ID, state State, currentEngineType p2p.EngineType) {
 				startedState = state
 			},
 			StopStateF: func(chainID ids.ID, state State) {
 				stoppedState = state
 			},
-			GetStateF: func(chainID ids.ID) State {
-				return startedState
+			GetStateF: func(chainID ids.ID) (State, p2p.EngineType) {
+				return startedState, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
 			},
 		},
 	}

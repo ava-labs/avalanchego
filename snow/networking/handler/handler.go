@@ -173,7 +173,8 @@ func (h *handler) SetOnStopped(onStopped func()) {
 }
 
 func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
-	engines := h.engineManager.Get(h.ctx.CurrentEngineType.Get())
+	_, currentEngineType := h.ctx.GetChainState()
+	engines := h.engineManager.Get(currentEngineType)
 	if engines == nil {
 		return nil, errNoStartingGear
 	}
@@ -246,8 +247,7 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	state := h.ctx.GetChainState()
-	engineType := h.ctx.CurrentEngineType.Get()
+	state, engineType := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(engineType).Get(state)
 	if !ok {
 		return nil, fmt.Errorf(
@@ -292,7 +292,7 @@ func (h *handler) Stop(ctx context.Context) {
 		// [h.ctx.Lock] until the engine finished executing state transitions,
 		// which may take a long time. As a result, the router would time out on
 		// shutting down this chain.
-		currentEng := h.ctx.CurrentEngineType.Get()
+		_, currentEng := h.ctx.GetChainState()
 		bootstrapper, ok := h.engineManager.Get(currentEng).Get(snow.Bootstrapping)
 		if !ok {
 			h.ctx.Log.Error("bootstrapping engine doesn't exists",
@@ -445,7 +445,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// We will attempt to pass the message to the requested type for the state
 	// we are currently in.
-	currentEngineType := h.ctx.CurrentEngineType.Get()
+	_, currentEngineType := h.ctx.GetChainState()
 	if msg.EngineType == p2p.EngineType_ENGINE_TYPE_SNOWMAN &&
 		currentEngineType == p2p.EngineType_ENGINE_TYPE_AVALANCHE {
 		// The peer is requesting an engine type that hasn't been initialized
@@ -476,7 +476,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		engineType = currentEngineType
 	}
 
-	engineState := h.ctx.GetChainState()
+	engineState, _ := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(engineType).Get(engineState)
 	if !ok {
 		// This should only happen if the peer is not following the protocol.
@@ -752,8 +752,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 	}()
 
-	engineState := h.ctx.GetChainState()
-	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engineState, currentEngineType := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
 	if !ok {
 		return fmt.Errorf(
@@ -844,8 +843,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		)
 	}()
 
-	engineState := h.ctx.GetChainState()
-	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engineState, currentEngineType := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
 	if !ok {
 		return fmt.Errorf(
@@ -927,8 +925,7 @@ func (h *handler) shutdown(ctx context.Context) {
 		close(h.closed)
 	}()
 
-	engineState := h.ctx.GetChainState()
-	currentEngineType := h.ctx.CurrentEngineType.Get()
+	engineState, currentEngineType := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(currentEngineType).Get(engineState)
 	if !ok {
 		h.ctx.Log.Error("failed fetching current engine during shutdown",

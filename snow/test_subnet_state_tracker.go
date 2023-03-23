@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var _ SubnetStateTracker = (*SubnetStateTrackerTest)(nil)
@@ -19,9 +20,9 @@ type SubnetStateTrackerTest struct {
 	CantGetState, CantIsChainBootstrapped, CantOnSyncCompleted bool
 
 	IsSyncedF            func() bool
-	StartStateF          func(chainID ids.ID, state State)
+	StartStateF          func(chainID ids.ID, state State, currentEngineType p2p.EngineType)
 	StopStateF           func(chainID ids.ID, state State)
-	GetStateF            func(chainID ids.ID) State
+	GetStateF            func(chainID ids.ID) (State, p2p.EngineType)
 	IsChainBootstrappedF func(chainID ids.ID) bool
 	OnSyncCompletedF     func(ids.ID) (chan struct{}, error)
 }
@@ -52,9 +53,9 @@ func (s *SubnetStateTrackerTest) IsSynced() bool {
 // SetState calls SetStateF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SubnetStateTrackerTest) StartState(chainID ids.ID, state State) {
+func (s *SubnetStateTrackerTest) StartState(chainID ids.ID, state State, currentEngineType p2p.EngineType) {
 	if s.StartStateF != nil {
-		s.StartStateF(chainID, state)
+		s.StartStateF(chainID, state, currentEngineType)
 	} else if s.CantStartState && s.T != nil {
 		s.T.Fatalf("Unexpectedly called StartState")
 	}
@@ -77,13 +78,13 @@ func (s *SubnetStateTrackerTest) IsChainBootstrapped(chainID ids.ID) bool {
 	return false
 }
 
-func (s *SubnetStateTrackerTest) GetState(chainID ids.ID) State {
+func (s *SubnetStateTrackerTest) GetState(chainID ids.ID) (State, p2p.EngineType) {
 	if s.GetStateF != nil {
 		return s.GetStateF(chainID)
 	} else if s.CantGetState && s.T != nil {
 		s.T.Fatalf("Unexpectedly called GetState")
 	}
-	return Initializing
+	return Initializing, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
 func (s *SubnetStateTrackerTest) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {

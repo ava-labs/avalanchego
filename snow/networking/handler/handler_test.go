@@ -86,8 +86,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 			Bootstrapper: bootstrapper,
 		},
 	})
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
@@ -192,8 +191,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.Bootstrapping)
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -271,8 +269,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 			Bootstrapper: bootstrapper,
 		},
 	})
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -354,8 +351,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.ExtendingFrontier) // assumed bootstrap is done
+	ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -428,8 +424,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx.Start(snow.ExtendingFrontier) // assumed bootstrap is done
+	ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -599,8 +594,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 
 			test.setup(handler, bootstrapper, engine)
 
-			ctx.CurrentEngineType.Set(test.currentEngineType)
-			ctx.Start(snow.ExtendingFrontier) // assumed bootstrap is done
+			ctx.Start(snow.ExtendingFrontier, test.currentEngineType) // assumed bootstrap is done
 
 			bootstrapper.StartF = func(context.Context, uint32) error {
 				return nil

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -36,6 +37,8 @@ type Subnet interface {
 
 type subnet struct {
 	lock sync.RWMutex
+
+	currentEngineType p2p.EngineType
 
 	// currentState maps chainID to chain's latest started state
 	currentState map[ids.ID]snow.State
@@ -126,16 +129,18 @@ func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
 	return stoppedStateSync.Contains(chainID)
 }
 
-func (s *subnet) GetState(chainID ids.ID) snow.State {
+func (s *subnet) GetState(chainID ids.ID) (snow.State, p2p.EngineType) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.currentState[chainID]
+	return s.currentState[chainID], s.currentEngineType
 }
 
-func (s *subnet) StartState(chainID ids.ID, state snow.State) {
+func (s *subnet) StartState(chainID ids.ID, state snow.State, currentEngineType p2p.EngineType) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	s.currentEngineType = currentEngineType
 
 	s.currentState[chainID] = state
 	started, anyChainStarted := s.started[state]

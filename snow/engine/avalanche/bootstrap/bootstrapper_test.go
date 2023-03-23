@@ -141,8 +141,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -246,8 +245,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -426,8 +424,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -572,8 +569,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -695,8 +691,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -817,8 +812,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -950,8 +944,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,
@@ -1119,8 +1112,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		context.Background(),
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.Start(snow.ExtendingFrontier)
-			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 		noopStarter,

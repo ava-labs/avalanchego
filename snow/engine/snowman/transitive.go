@@ -430,8 +430,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	t.Ctx.Start(snow.ExtendingFrontier)
+	t.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	return t.VM.SetState(ctx, snow.ExtendingFrontier)
 }
 

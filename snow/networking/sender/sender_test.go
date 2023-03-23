@@ -161,8 +161,7 @@ func TestTimeout(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -448,8 +447,7 @@ func TestReliableMessages(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -599,8 +597,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	ctx2.Start(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
