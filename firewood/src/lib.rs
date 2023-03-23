@@ -203,3 +203,6 @@ pub mod merkle;
 pub mod merkle_util;
 pub mod proof;
 pub(crate) mod storage;
+
+pub mod api;
+pub mod service;

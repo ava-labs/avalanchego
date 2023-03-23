@@ -40,7 +40,7 @@ impl fmt::Display for MerkleError {
 
 impl Error for MerkleError {}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Hash(pub [u8; HASH_SIZE]);
 
 impl Hash {

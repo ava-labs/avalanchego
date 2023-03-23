@@ -853,6 +853,7 @@ pub struct BufferWrite {
     pub delta: StoreDelta,
 }
 
+#[derive(Debug)]
 pub enum BufferCmd {
     InitWAL(Fd, String),
     WriteBatch(Vec<BufferWrite>, AshRecord),

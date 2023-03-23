@@ -476,7 +476,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
         }
 
         // Short circuit if the decreased key is same with the previous key
-        let first = decrease_key(&items[start].0);
+        let first = decrease_key(items[start].0);
         if start != 0 && compare(first.as_ref(), items[start - 1].0.as_ref()).is_eq() {
             continue;
         }
@@ -485,7 +485,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
             continue;
         }
         // Short circuit if the increased key is same with the next key
-        let last = increase_key(&items[end - 1].0);
+        let last = increase_key(items[end - 1].0);
         if end != items.len() && compare(last.as_ref(), items[end].0.as_ref()).is_eq() {
             continue;
         }
@@ -538,7 +538,7 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     // Case 1
     let mut start = 100;
     let mut end = 200;
-    let first = decrease_key(&items[start].0);
+    let first = decrease_key(items[start].0);
 
     let mut proof = merkle.prove(first)?;
     assert!(!proof.0.is_empty());
@@ -561,7 +561,7 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     // Case 2
     start = 100;
     end = 200;
-    let last = increase_key(&items[end - 1].0);
+    let last = increase_key(items[end - 1].0);
 
     let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
@@ -596,7 +596,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     // One element with existent edge proof, both edge proofs
     // point to the SAME key.
     let start = 1000;
-    let start_proof = merkle.prove(&items[start].0)?;
+    let start_proof = merkle.prove(items[start].0)?;
     assert!(!start_proof.0.is_empty());
 
     merkle.verify_range_proof(
@@ -608,10 +608,10 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     )?;
 
     // One element with left non-existent edge proof
-    let first = decrease_key(&items[start].0);
+    let first = decrease_key(items[start].0);
     let mut proof = merkle.prove(first)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[start].0)?;
+    let end_proof = merkle.prove(items[start].0)?;
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
@@ -624,8 +624,8 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     )?;
 
     // One element with right non-existent edge proof
-    let last = increase_key(&items[start].0);
-    let mut proof = merkle.prove(&items[start].0)?;
+    let last = increase_key(items[start].0);
+    let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
     let end_proof = merkle.prove(last)?;
     assert!(!end_proof.0.is_empty());
@@ -662,7 +662,7 @@ fn test_one_element_range_proof() -> Result<(), ProofError> {
     let first: [u8; 32] = [0; 32];
     let mut proof = merkle.prove(first)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&key)?;
+    let end_proof = merkle.prove(key)?;
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
@@ -698,9 +698,9 @@ fn test_all_elements_proof() -> Result<(), ProofError> {
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0)?;
+    let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0)?;
+    let end_proof = merkle.prove(items[end].0)?;
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
@@ -737,7 +737,7 @@ fn test_empty_range_proof() -> Result<(), ProofError> {
 
     let cases = vec![(items.len() - 1, false)];
     for (_, c) in cases.iter().enumerate() {
-        let first = increase_key(&items[c.0].0);
+        let first = increase_key(items[c.0].0);
         let proof = merkle.prove(first)?;
         assert!(!proof.0.is_empty());
 
@@ -763,7 +763,7 @@ fn test_empty_range_proof() -> Result<(), ProofError> {
 fn test_gapped_range_proof() -> Result<(), ProofError> {
     let mut items = Vec::new();
     // Sorted entries
-    for i in 0..10 as u32 {
+    for i in 0..10_u32 {
         let mut key: [u8; 32] = [0; 32];
         for (index, d) in i.to_be_bytes().iter().enumerate() {
             key[index] = *d;
@@ -775,9 +775,9 @@ fn test_gapped_range_proof() -> Result<(), ProofError> {
     let first = 2;
     let last = 8;
 
-    let mut proof = merkle.prove(&items[first].0)?;
+    let mut proof = merkle.prove(items[first].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[last - 1].0)?;
+    let end_proof = merkle.prove(items[last - 1].0)?;
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
@@ -807,7 +807,7 @@ fn test_same_side_proof() -> Result<(), DataStoreError> {
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
 
     let pos = 1000;
-    let mut last = decrease_key(&items[pos].0);
+    let mut last = decrease_key(items[pos].0);
     let mut first = last;
     first = decrease_key(&first);
 
@@ -821,7 +821,7 @@ fn test_same_side_proof() -> Result<(), DataStoreError> {
         .verify_range_proof(&proof, first, last, vec![*items[pos].0], vec![items[pos].1])
         .is_err());
 
-    first = increase_key(&items[pos].0);
+    first = increase_key(items[pos].0);
     last = first;
     last = increase_key(&last);
 
@@ -843,7 +843,7 @@ fn test_same_side_proof() -> Result<(), DataStoreError> {
 fn test_single_side_range_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let mut set = HashMap::new();
-        for _ in 0..4096 as u32 {
+        for _ in 0..4096_u32 {
             let key = rand::thread_rng().gen::<[u8; 32]>();
             let val = rand::thread_rng().gen::<[u8; 20]>();
             set.insert(key, val);
@@ -876,7 +876,7 @@ fn test_single_side_range_proof() -> Result<(), ProofError> {
 fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let mut set = HashMap::new();
-        for _ in 0..4096 as u32 {
+        for _ in 0..4096_u32 {
             let key = rand::thread_rng().gen::<[u8; 32]>();
             let val = rand::thread_rng().gen::<[u8; 20]>();
             set.insert(key, val);
@@ -916,7 +916,7 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
 
     // Create a new entry with a slightly modified key
     let mid_index = items.len() / 2;
-    let key = increase_key(&items[mid_index - 1].0);
+    let key = increase_key(items[mid_index - 1].0);
     let empty_data: [u8; 20] = [0; 20];
     items.splice(
         mid_index..mid_index,
@@ -926,9 +926,9 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
     let start = 1;
     let end = items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0)?;
+    let mut proof = merkle.prove(items[start].0)?;
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end - 1].0)?;
+    let end_proof = merkle.prove(items[end - 1].0)?;
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
@@ -954,7 +954,7 @@ fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
 
     // Create a new entry with a slightly modified key
     let mid_index = items.len() / 2;
-    let key = increase_key(&items[mid_index - 1].0);
+    let key = increase_key(items[mid_index - 1].0);
     let empty_data: [u8; 20] = [0; 20];
     items.splice(
         mid_index..mid_index,
@@ -1054,7 +1054,7 @@ fn test_bloadted_range_proof() -> Result<(), ProofError> {
 
 fn generate_random_data(n: u32) -> HashMap<[u8; 32], [u8; 20]> {
     let mut items: HashMap<[u8; 32], [u8; 20]> = HashMap::new();
-    for i in 0..100 as u32 {
+    for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
         let mut data: [u8; 20] = [0; 20];
         for (index, d) in i.to_be_bytes().iter().enumerate() {
@@ -1075,11 +1075,11 @@ fn generate_random_data(n: u32) -> HashMap<[u8; 32], [u8; 20]> {
         let val = rand::thread_rng().gen::<[u8; 20]>();
         items.insert(key, val);
     }
-    return items;
+    items
 }
 
 fn increase_key(key: &[u8; 32]) -> [u8; 32] {
-    let mut new_key = key.clone();
+    let mut new_key = *key;
     for i in (0..key.len()).rev() {
         if new_key[i] == 0xff {
             new_key[i] = 0x00;
@@ -1092,7 +1092,7 @@ fn increase_key(key: &[u8; 32]) -> [u8; 32] {
 }
 
 fn decrease_key(key: &[u8; 32]) -> [u8; 32] {
-    let mut new_key = key.clone();
+    let mut new_key = *key;
     for i in (0..key.len()).rev() {
         if new_key[i] == 0x00 {
             new_key[i] = 0xff;
