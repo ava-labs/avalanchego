@@ -13,6 +13,7 @@ use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
 
 pub const NBRANCH: usize = 16;
+pub const HASH_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub enum MerkleError {
@@ -40,15 +41,15 @@ impl fmt::Display for MerkleError {
 impl Error for MerkleError {}
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct Hash(pub [u8; 32]);
+pub struct Hash(pub [u8; HASH_SIZE]);
 
 impl Hash {
     const MSIZE: u64 = 32;
 }
 
 impl std::ops::Deref for Hash {
-    type Target = [u8; 32];
-    fn deref(&self) -> &[u8; 32] {
+    type Target = [u8; HASH_SIZE];
+    fn deref(&self) -> &[u8; HASH_SIZE] {
         &self.0
     }
 }
@@ -236,7 +237,7 @@ impl BranchNode {
                         stream.append_empty_data()
                     } else {
                         let v = self.chd_eth_rlp[i].clone().unwrap();
-                        if v.len() == 32 {
+                        if v.len() == HASH_SIZE {
                             stream.append(&v)
                         } else {
                             stream.append_raw(&v, 1)
@@ -347,7 +348,7 @@ impl ExtNode {
                 stream.append_empty_data();
             } else {
                 let v = self.2.clone().unwrap();
-                if v.len() == 32 {
+                if v.len() == HASH_SIZE {
                     stream.append(&v);
                 } else {
                     stream.append_raw(&v, 1);
@@ -442,7 +443,7 @@ impl Node {
     fn get_eth_rlp_long<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> bool {
         *self.eth_rlp_long.get_or_init(|| {
             self.lazy_dirty.set(true);
-            self.get_eth_rlp::<T>(store).len() >= 32
+            self.get_eth_rlp::<T>(store).len() >= HASH_SIZE
         })
     }
 
@@ -1798,7 +1799,7 @@ impl Merkle {
         let mut chunks = Vec::new();
         chunks.extend(to_nibbles(key.as_ref()));
 
-        let mut proofs: HashMap<[u8; 32], Vec<u8>> = HashMap::new();
+        let mut proofs: HashMap<[u8; HASH_SIZE], Vec<u8>> = HashMap::new();
         if root.is_null() {
             return Ok(Proof(proofs));
         }
@@ -1864,7 +1865,7 @@ impl Merkle {
         for node in nodes {
             let node = self.get_node(node)?;
             let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T>(self.store.as_ref()));
-            let hash: [u8; 32] = sha3::Keccak256::digest(rlp).into();
+            let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(rlp).into();
             proofs.insert(hash, rlp.to_vec());
         }
         Ok(Proof(proofs))

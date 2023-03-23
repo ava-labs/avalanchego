@@ -332,19 +332,98 @@ fn test_range_proof() -> Result<(), ProofError> {
 
         let mut proof = merkle.prove(items[start].0)?;
         assert!(!proof.0.is_empty());
-        let end_proof = merkle.prove(items[end].0)?;
+        let end_proof = merkle.prove(items[end - 1].0)?;
         assert!(!end_proof.0.is_empty());
         proof.concat_proofs(end_proof);
 
         let mut keys = Vec::new();
         let mut vals = Vec::new();
-        for i in start..=end {
+        for i in start..end {
             keys.push(&items[i].0);
             vals.push(&items[i].1);
         }
 
-        merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals)?;
+        merkle.verify_range_proof(&proof, &items[start].0, &items[end - 1].0, keys, vals)?;
     }
+    Ok(())
+}
+
+#[test]
+// Tests a few cases which the proof is wrong.
+// The prover is expected to detect the error.
+fn test_bad_range_proof() -> Result<(), ProofError> {
+    let set = generate_random_data(4096);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    for _ in 0..10 {
+        let start = rand::thread_rng().gen_range(0..items.len());
+        let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
+
+        let mut proof = merkle.prove(items[start].0)?;
+        assert!(!proof.0.is_empty());
+        let end_proof = merkle.prove(items[end - 1].0)?;
+        assert!(!end_proof.0.is_empty());
+        proof.concat_proofs(end_proof);
+
+        let mut keys: Vec<[u8; 32]> = Vec::new();
+        let mut vals: Vec<[u8; 20]> = Vec::new();
+        for i in start..end {
+            keys.push(items[i].0.clone());
+            vals.push(items[i].1.clone());
+        }
+
+        let test_case: u32 = rand::thread_rng().gen_range(0..6);
+        let index = rand::thread_rng().gen_range(0..end - start);
+        match test_case {
+            0 => {
+                // Modified key
+                keys[index] = rand::thread_rng().gen::<[u8; 32]>(); // In theory it can't be same
+            }
+            1 => {
+                // Modified val
+                vals[index] = rand::thread_rng().gen::<[u8; 20]>(); // In theory it can't be same
+            }
+            2 => {
+                // Gapped entry slice
+                if index == 0 || index == end - start - 1 {
+                    continue;
+                }
+                keys.remove(index);
+                vals.remove(index);
+            }
+            3 => {
+                // Out of order
+                let index_1 = rand::thread_rng().gen_range(0..end - start);
+                let index_2 = rand::thread_rng().gen_range(0..end - start);
+                if index_1 == index_2 {
+                    continue;
+                }
+                keys.swap(index_1, index_2);
+                vals.swap(index_1, index_2);
+            }
+            4 => {
+                // Set random key to empty, do nothing
+                keys[index] = [0; 32];
+            }
+            5 => {
+                // Set random value to nil
+                vals[index] = [0; 20];
+            }
+            _ => unreachable!(),
+        }
+        assert!(merkle
+            .verify_range_proof(
+                &proof,
+                items[start].0.clone(),
+                items[end - 1].0.clone(),
+                keys,
+                vals
+            )
+            .is_err());
+    }
+
     Ok(())
 }
 
@@ -886,6 +965,43 @@ fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
     let vals = item_iter.map(|item| item.1).collect();
 
     merkle.verify_range_proof(&proof, start, end, keys, vals)?;
+
+    Ok(())
+}
+
+#[test]
+// Tests a malicious proof, where the proof is more or less the
+// whole trie. This is to match correpsonding test in geth.
+fn test_bloadted_range_proof() -> Result<(), ProofError> {
+    // Use a small trie
+    let mut items = Vec::new();
+    for i in 0..100 as u32 {
+        let mut key: [u8; 32] = [0; 32];
+        let mut data: [u8; 20] = [0; 20];
+        for (index, d) in i.to_be_bytes().iter().enumerate() {
+            key[index] = *d;
+            data[index] = *d;
+        }
+        items.push((key, data));
+    }
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+    // In the 'malicious' case, we add proofs for every single item
+    // (but only one key/value pair used as leaf)
+    let mut proof = Proof(HashMap::new());
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        let cur_proof = merkle.prove(&item.0)?;
+        assert!(!cur_proof.0.is_empty());
+        proof.concat_proofs(cur_proof);
+        if i == 50 {
+            keys.push(item.0);
+            vals.push(item.1);
+        }
+    }
+
+    merkle.verify_range_proof(&proof, keys[0], keys[keys.len() - 1], keys, vals)?;
 
     Ok(())
 }
