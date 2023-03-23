@@ -112,8 +112,8 @@ type Manager interface {
 	// Given an alias, return the ID of the VM associated with that alias
 	LookupVM(string) (ids.ID, error)
 
-	// Returns true iff the chain with the given ID exists and is full synced
-	IsFullySynced(ids.ID) bool
+	// Returns true iff the chain with the given ID exists and is synced
+	IsSynced(ids.ID) bool
 
 	// Starts the chain creator with the initial platform chain parameters, must
 	// be called once.
@@ -1078,7 +1078,7 @@ func (m *manager) createSnowmanChain(
 	}, nil
 }
 
-func (m *manager) IsFullySynced(id ids.ID) bool {
+func (m *manager) IsSynced(id ids.ID) bool {
 	m.chainsLock.Lock()
 	chain, exists := m.chains[id]
 	m.chainsLock.Unlock()

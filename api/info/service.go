@@ -278,7 +278,7 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 	if err != nil {
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
-	reply.IsBootstrapped = i.chainManager.IsFullySynced(chainID)
+	reply.IsBootstrapped = i.chainManager.IsSynced(chainID)
 	return nil
 }
 
