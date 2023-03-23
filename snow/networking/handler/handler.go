@@ -381,7 +381,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 
 		case _, ok := <-h.syncedSubnet:
 			// h.syncedSubnet is closed immediately, which makes it
-			// immediately available and would cause and endless loop.
+			// immediately available and would cause an endless loop.
 			// We nil h.syncedSubnet to ensure it is never selected again.
 			if !ok {
 				h.syncedSubnet = nil

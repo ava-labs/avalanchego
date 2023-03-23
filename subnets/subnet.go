@@ -4,7 +4,7 @@
 package subnets
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,8 +43,8 @@ type subnet struct {
 	// started maps a vm state to the set of VMs that has started that state
 	started map[snow.State]set.Set[ids.ID]
 
-	// stopped maps a vm state to the set of VMs that has done with that state
-	stopped map[snow.State]set.Set[ids.ID]
+	// done maps a vm state to the set of VMs that has done with that state
+	done map[snow.State]set.Set[ids.ID]
 
 	once       sync.Once
 	semaphores map[ids.ID]chan struct{}
@@ -56,7 +56,7 @@ func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
 		currentState: make(map[ids.ID]snow.State),
 		started:      make(map[snow.State]set.Set[ids.ID]),
-		stopped:      make(map[snow.State]set.Set[ids.ID]),
+		done:         make(map[snow.State]set.Set[ids.ID]),
 		semaphores:   make(map[ids.ID]chan struct{}),
 		config:       config,
 		myNodeID:     myNodeID,
@@ -72,16 +72,16 @@ func (s *subnet) IsSynced() bool {
 
 // isSynced assumes s.lock is held
 func (s *subnet) isSynced() bool {
-	bootstrapped, anyChainDoneBootstrap := s.stopped[snow.Bootstrapping]
+	bootstrapped, anyChainDoneBootstrap := s.done[snow.Bootstrapping]
 	if !anyChainDoneBootstrap {
 		return false
 	}
 
 	stateSyncedStarted, anyChainStartedStateSync := s.started[snow.StateSyncing]
-	stateSyncedDone, anyChainDoneStateSync := s.stopped[snow.StateSyncing]
+	stateSyncedDone, anyChainDoneStateSync := s.done[snow.StateSyncing]
 
 	if anyChainStartedStateSync && !anyChainDoneStateSync {
-		// some chains have started state sync but not chain finished it.
+		// some chains have started state sync but none have finished it.
 		// Can't be fully synced
 		return false
 	}
@@ -95,7 +95,7 @@ func (s *subnet) isSynced() bool {
 		}
 
 		// full sync requires state sync done, if ever started
-		if (stateSyncedStarted != nil && stateSyncedStarted.Contains(chain)) &&
+		if stateSyncedStarted.Contains(chain) &&
 			(stateSyncedDone != nil && !stateSyncedDone.Contains(chain)) {
 			synced = false
 			break
@@ -109,21 +109,21 @@ func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
 	defer s.lock.RUnlock()
 
 	// chain must have completed bootstrap
-	doneBootstrap, found := s.stopped[snow.Bootstrapping]
-	if !found || !doneBootstrap.Contains(chainID) {
+	doneBootstrap := s.done[snow.Bootstrapping]
+	if !doneBootstrap.Contains(chainID) {
 		return false
 	}
 
 	// chain must have complete state sync only if it ever started
-	startedStateSync, found := s.started[snow.StateSyncing]
-	if !found || !startedStateSync.Contains(chainID) {
+	startedStateSync := s.started[snow.StateSyncing]
+	if !startedStateSync.Contains(chainID) {
 		// bootstrap done, state sync never started
 		return true
 	}
 
 	// state sync started, must have finished
-	stoppedStateSync, found := s.stopped[snow.StateSyncing]
-	return found && stoppedStateSync.Contains(chainID)
+	stoppedStateSync := s.done[snow.StateSyncing]
+	return stoppedStateSync.Contains(chainID)
 }
 
 func (s *subnet) GetState(chainID ids.ID) snow.State {
@@ -146,7 +146,7 @@ func (s *subnet) StartState(chainID ids.ID, state snow.State) {
 	started.Add(chainID)
 
 	// if we are restarting a given state, make sure it is not marked as stopped
-	if stopped, anyChainStopped := s.stopped[state]; anyChainStopped {
+	if stopped, anyChainStopped := s.done[state]; anyChainStopped {
 		stopped.Remove(chainID)
 	}
 
@@ -164,10 +164,10 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	stopped, anyChainDoneBootstrap := s.stopped[state]
+	stopped, anyChainDoneBootstrap := s.done[state]
 	if !anyChainDoneBootstrap {
-		s.stopped[state] = set.NewSet[ids.ID](3)
-		stopped = s.stopped[state]
+		s.done[state] = set.NewSet[ids.ID](3)
+		stopped = s.done[state]
 	}
 	stopped.Add(chainID)
 
@@ -183,7 +183,7 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 
 func (s *subnet) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
 	if _, found := s.currentState[chainID]; !found {
-		return nil, errors.New("unknown chain")
+		return nil, fmt.Errorf("unknown chain %s", chainID)
 	}
 
 	ch := make(chan struct{})

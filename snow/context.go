@@ -66,6 +66,10 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// SubnetStateTracker tracks state of each VM associated with
+	// Context.SubnetID
+	SubnetStateTracker
+
 	// Registers all common and snowman consensus metrics. Unlike the avalanche
 	// consensus engine metrics, we do not prefix the name with the engine name,
 	// as snowman is used for all chains by default.
@@ -87,10 +91,6 @@ type ConsensusContext struct {
 	// VertexAcceptor is the callback that will be fired whenever a vertex was
 	// accepted.
 	VertexAcceptor Acceptor
-
-	// SubnetStateTracker tracks state of each VM associated with
-	// Context.SubnetID
-	SubnetStateTracker
 
 	CurrentEngineType utils.Atomic[p2p.EngineType]
 
