@@ -35,6 +35,11 @@ To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compress
 
 ## Design choices
 
+### []byte copying
+Nodes contain a []byte which represents its value.  This slice should never be edited internally.  This allows usage without having to make copies of it for safety.
+Anytime these values leave the library, for example in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc, they need to be copied into a new slice to prevent
+edits made outside of the library from being reflected in the DB/TrieViews.
+
 ### Single node type
 
 A `Merkle Node` holds the IDs of its children, its value, as well as any path extension. This simplifies some logic and allows all of the data about a node to be loaded in a single database read. This trades off a small amount of storage efficiency (some fields may be `nil` but are still stored for every node).

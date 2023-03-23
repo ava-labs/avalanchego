@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
@@ -50,6 +51,7 @@ type Manager interface {
 
 func NewManager(
 	mempool mempool.Mempool,
+	metrics metrics.Metrics,
 	state states.State,
 	backend *executor.Backend,
 	clk *mockable.Clock,
@@ -59,6 +61,7 @@ func NewManager(
 	return &manager{
 		backend:      backend,
 		state:        state,
+		metrics:      metrics,
 		mempool:      mempool,
 		clk:          clk,
 		onAccept:     onAccept,
@@ -71,6 +74,7 @@ func NewManager(
 type manager struct {
 	backend *executor.Backend
 	state   states.State
+	metrics metrics.Metrics
 	mempool mempool.Mempool
 	clk     *mockable.Clock
 	// Invariant: onAccept is called when [tx] is being marked as accepted, but

@@ -126,7 +126,7 @@ func newEnvironment(postBanff bool) *environment {
 	fx := defaultFx(&clk, ctx.Log, true /*isBootstrapped*/)
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(&config, ctx, &vmState, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -218,6 +218,7 @@ func addSubnet(
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
+	vmState *utils.Atomic[snow.State],
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
@@ -230,6 +231,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		vmState,
 	)
 	if err != nil {
 		panic(err)

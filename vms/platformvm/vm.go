@@ -162,6 +162,7 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
+		&vm.vmState,
 	)
 	if err != nil {
 		return err

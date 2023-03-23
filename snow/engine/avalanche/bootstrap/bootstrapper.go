@@ -38,7 +38,12 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(ctx context.Context, config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(
+	ctx context.Context,
+	config Config,
+	startAvalancheConsensus func(ctx context.Context, lastReqID uint32) error,
+	startSnowmanBootstrapping func(ctx context.Context, lastReqID uint32) error,
+) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
@@ -49,8 +54,27 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
-		processedCache:           &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
-		Fetcher:                  common.Fetcher{OnFinished: onFinished},
+		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
+		Fetcher: common.Fetcher{
+			OnFinished: func(ctx context.Context, lastReqID uint32) error {
+				linearized, err := config.Manager.StopVertexAccepted(ctx)
+				if err != nil {
+					return err
+				}
+				if !linearized {
+					return startAvalancheConsensus(ctx, lastReqID)
+				}
+
+				// Invariant: edge will only be the stop vertex after its
+				// acceptance.
+				edge := config.Manager.Edge(ctx)
+				stopVertexID := edge[0]
+				if err := config.VM.Linearize(ctx, stopVertexID); err != nil {
+					return err
+				}
+				return startSnowmanBootstrapping(ctx, lastReqID)
+			},
+		},
 		executedStateTransitions: math.MaxInt32,
 	}
 
@@ -565,6 +589,17 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	)
 	if err != nil || b.Halted() {
 		return err
+	}
+
+	// If the chain is linearized, we should immediately move on to start
+	// bootstrapping snowman.
+	linearized, err := b.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		b.processedCache.Flush()
+		return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 	}
 
 	previouslyExecuted := b.executedStateTransitions

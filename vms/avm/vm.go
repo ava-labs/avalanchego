@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -70,14 +71,16 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
-	_ vertex.DAGVM = (*VM)(nil)
+	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
 )
 
 type VM struct {
 	network.Atomic
 
 	config.Config
-	metrics
+
+	metrics metrics.Metrics
+
 	avax.AddressManager
 	avax.AtomicUTXOManager
 	ids.Aliaser
@@ -185,10 +188,13 @@ func (vm *VM) Initialize(
 	}
 	vm.registerer = registerer
 
-	err := vm.metrics.Initialize("", vm.registerer)
+	// Initialize metrics as soon as possible
+	var err error
+	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
+
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.Aliaser = ids.NewAliaser()
 
@@ -364,8 +370,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -374,8 +380,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
@@ -432,20 +438,21 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID) error {
+func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
 	time := version.GetCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
 	}
 
-	mempool, err := mempool.New("mempool", vm.registerer, vm.toEngine)
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
 
 	vm.chainManager = blockexecutor.NewManager(
 		mempool,
+		vm.metrics,
 		&chainState{
 			State: vm.state,
 		},
@@ -746,6 +753,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
 func (vm *VM) onAccept(tx *txs.Tx) error {
 	// Fetch the input UTXOs
+	txID := tx.ID()
 	inputUTXOIDs := tx.Unsigned.InputUTXOs()
 	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
 	for _, utxoID := range inputUTXOIDs {
@@ -755,6 +763,14 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		}
 
 		utxo, err := vm.state.GetUTXOFromID(utxoID)
+		if err == database.ErrNotFound {
+			vm.ctx.Log.Debug("dropping utxo from index",
+				zap.Stringer("txID", txID),
+				zap.Stringer("utxoTxID", utxoID.TxID),
+				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
+			)
+			continue
+		}
 		if err != nil {
 			// should never happen because the UTXO was previously verified to
 			// exist
@@ -763,7 +779,6 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
-	txID := tx.ID()
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
 	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {

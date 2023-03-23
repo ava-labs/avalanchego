@@ -129,7 +129,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.fx = defaultFx(res.clk, res.ctx.Log, true /*bootstrapped*/)
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(res.config, res.ctx, res.vmState, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -240,6 +240,7 @@ func addSubnet(env *environment) {
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
+	vmState *utils.Atomic[snow.State],
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
@@ -252,6 +253,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		vmState,
 	)
 	if err != nil {
 		panic(err)

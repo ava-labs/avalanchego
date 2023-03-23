@@ -149,7 +149,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 
 	if ctrl == nil {
-		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.state = defaultState(res.config, res.ctx, res.vmState, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state)
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
@@ -274,6 +274,7 @@ func addSubnet(env *environment) {
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
+	vmState *utils.Atomic[snow.State],
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
@@ -286,6 +287,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		vmState,
 	)
 	if err != nil {
 		panic(err)

@@ -65,6 +65,9 @@ func (e *Executor) OperationTx(tx *txs.OperationTx) error {
 	txID := e.Tx.ID()
 	index := len(tx.Outs)
 	for _, op := range tx.Ops {
+		for _, utxoID := range op.UTXOIDs {
+			e.State.DeleteUTXO(utxoID.InputID())
+		}
 		asset := op.AssetID()
 		for _, out := range op.Op.Outs() {
 			e.State.AddUTXO(&avax.UTXO{

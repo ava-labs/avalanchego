@@ -50,7 +50,7 @@ var (
 	errNoAddresses        = errors.New("no addresses provided")
 	errNoKeys             = errors.New("from addresses have no keys or funds")
 	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
-	errNotLineraized      = errors.New("chain is not linearized")
+	errNotLinearized      = errors.New("chain is not linearized")
 )
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
@@ -71,7 +71,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 	)
 
 	if s.vm.chainManager == nil {
-		return errNotLineraized
+		return errNotLinearized
 	}
 	block, err := s.vm.chainManager.GetStatelessBlock(args.BlockID)
 	if err != nil {
@@ -90,6 +90,71 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
 	}
 
+	return nil
+}
+
+// GetBlockByHeight returns the block at the given height.
+func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightArgs, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getBlockByHeight"),
+		zap.Uint64("height", args.Height),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLinearized
+	}
+	reply.Encoding = args.Encoding
+
+	blockID, err := s.vm.state.GetBlockID(args.Height)
+	if err != nil {
+		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
+	}
+	block, err := s.vm.chainManager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
+	}
+
+	return nil
+}
+
+// GetHeight returns the height of the last accepted block.
+func (s *Service) GetHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getHeight"),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLinearized
+	}
+
+	blockID := s.vm.state.GetLastAccepted()
+	block, err := s.vm.chainManager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get last accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+
+	reply.Height = json.Uint64(block.Height())
 	return nil
 }
 

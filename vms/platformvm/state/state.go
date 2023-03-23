@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -219,6 +220,7 @@ type state struct {
 	ctx     *snow.Context
 	metrics metrics.Metrics
 	rewards reward.Calculator
+	vmState *utils.Atomic[snow.State]
 
 	baseDB *versiondb.Database
 
@@ -341,6 +343,7 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
+	vmState *utils.Atomic[snow.State],
 ) (State, error) {
 	s, err := new(
 		db,
@@ -349,6 +352,7 @@ func New(
 		ctx,
 		metricsReg,
 		rewards,
+		vmState,
 	)
 	if err != nil {
 		return nil, err
@@ -371,6 +375,7 @@ func new(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
+	vmState *utils.Atomic[snow.State],
 ) (*state, error) {
 	blockCache, err := metercacher.New[ids.ID, *stateBlk](
 		"block_cache",
@@ -487,6 +492,7 @@ func new(
 		ctx:     ctx,
 		metrics: metrics,
 		rewards: rewards,
+		vmState: vmState,
 		baseDB:  baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
@@ -1348,6 +1354,9 @@ func (s *state) initValidatorSets() error {
 		return err
 	}
 
+	vl := newValidatorsLogger(s.ctx.Log, s.vmState, constants.PrimaryNetworkID, s.ctx.NodeID)
+	primaryValidators.RegisterCallbackListener(vl)
+
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
@@ -1361,6 +1370,9 @@ func (s *state) initValidatorSets() error {
 		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
+
+		vl := newValidatorsLogger(s.ctx.Log, s.vmState, subnetID, s.ctx.NodeID)
+		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil
 }

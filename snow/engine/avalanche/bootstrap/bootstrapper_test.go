@@ -32,6 +32,10 @@ var (
 	errUnknownTx           = errors.New("unknown tx")
 )
 
+func noopStarter(context.Context, uint32) error {
+	return nil
+}
+
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	ctx := snow.DefaultConsensusContextTest(t)
 	sb := subnets.New(ctx.NodeID, subnets.Config{})
@@ -141,6 +145,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -245,6 +250,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -424,6 +430,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -569,6 +576,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -691,6 +699,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -812,6 +821,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -944,6 +954,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1112,6 +1123,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			config.Ctx.CurrentEngineType.Set(p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
