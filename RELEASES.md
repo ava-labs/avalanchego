@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v1.9.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.13)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
 ## [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
