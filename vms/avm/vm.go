@@ -314,6 +314,20 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
+
+	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
+	if err != nil {
+		return err
+	}
+	utxoID := avax.UTXOID{
+		TxID:        txID,
+		OutputIndex: 192,
+	}
+	vm.state.DeleteUTXO(utxoID.InputID())
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+
 	vm.bootstrapped = true
 	return nil
 }
