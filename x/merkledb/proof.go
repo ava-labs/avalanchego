@@ -507,6 +507,8 @@ func (proof *ChangeProof) Empty() bool {
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
 }
 
+// Returns the largest key in [proof.KeyValues] and [proof.DeletedKeys].
+// If there are no keys in the proof, returns [end].
 func (proof *ChangeProof) getLargestKey(end []byte) []byte {
 	largestKey := end
 	if len(proof.KeyValues) > 0 {
@@ -514,7 +516,7 @@ func (proof *ChangeProof) getLargestKey(end []byte) []byte {
 	}
 	if len(proof.DeletedKeys) > 0 {
 		lastDeleted := proof.DeletedKeys[len(proof.DeletedKeys)-1]
-		if bytes.Compare(lastDeleted, largestKey) > 0 {
+		if bytes.Compare(lastDeleted, largestKey) > 0 || len(proof.KeyValues) == 0 {
 			largestKey = lastDeleted
 		}
 	}
