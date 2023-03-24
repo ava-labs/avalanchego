@@ -737,17 +737,17 @@ fn unset_internal<K: AsRef<[u8]>>(
                 index += cur_key.len();
             }
             NodeType::Leaf(n) => {
-                let cur_key = n.path().clone().into_inner();
+                let cur_key = n.path();
                 if left_chunks.len() - index < cur_key.len() {
-                    fork_left = compare(&left_chunks[index..], &cur_key)
+                    fork_left = compare(&left_chunks[index..], cur_key)
                 } else {
-                    fork_left = compare(&left_chunks[index..index + cur_key.len()], &cur_key)
+                    fork_left = compare(&left_chunks[index..index + cur_key.len()], cur_key)
                 }
 
                 if right_chunks.len() - index < cur_key.len() {
-                    fork_right = compare(&right_chunks[index..], &cur_key)
+                    fork_right = compare(&right_chunks[index..], cur_key)
                 } else {
-                    fork_right = compare(&right_chunks[index..index + cur_key.len()], &cur_key)
+                    fork_right = compare(&right_chunks[index..index + cur_key.len()], cur_key)
                 }
                 break;
             }
@@ -943,17 +943,15 @@ fn unset_node_ref<K: AsRef<[u8]>>(
             return unset_node_ref(merkle, p, node, key, index + 1, remove_left);
         }
         NodeType::Extension(n) => {
-            let cur_key = n.path().clone().into_inner();
+            let cur_key = n.path();
             let node = n.chd();
-            if chunks[index..].len() < cur_key.len()
-                || compare(&cur_key, &chunks[index..index + cur_key.len()]).is_ne()
-            {
+            if !(chunks[index..]).starts_with(cur_key) {
                 let mut p_ref = merkle
                     .get_node(parent)
                     .map_err(|_| ProofError::NoSuchNode)?;
                 // Find the fork point, it's an non-existent branch.
                 if remove_left {
-                    if compare(&cur_key, &chunks[index..]).is_lt() {
+                    if compare(cur_key, &chunks[index..]).is_lt() {
                         // The key of fork shortnode is less than the path
                         // (it belongs to the range), unset the entire
                         // branch. The parent must be a fullnode.
@@ -970,7 +968,7 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     // path(it doesn't belong to the range), keep
                     // it with the cached hash available.
                     //}
-                } else if compare(&cur_key, &chunks[index..]).is_gt() {
+                } else if compare(cur_key, &chunks[index..]).is_gt() {
                     // The key of fork shortnode is greater than the
                     // path(it belongs to the range), unset the entrie
                     // branch. The parent must be a fullnode. Otherwise the
@@ -1000,30 +998,21 @@ fn unset_node_ref<K: AsRef<[u8]>>(
             let mut p_ref = merkle
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
-            let cur_key = n.path().clone().into_inner();
+            let cur_key = n.path();
             // Similar to branch node, we need to compare the path to see if the node
             // needs to be unset.
-            if chunks[index..].len() < cur_key.len()
-                || compare(&cur_key, &chunks[index..index + cur_key.len()]).is_ne()
-            {
-                if remove_left {
-                    if compare(&cur_key, &chunks[index..]).is_lt() {
+            if !(chunks[index..]).starts_with(cur_key) {
+                match (cur_key.cmp(&chunks[index..]), remove_left) {
+                    (Ordering::Greater, false) | (Ordering::Less, true) => {
                         p_ref
                             .write(|p| {
                                 let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
                                 pp.chd_mut()[chunks[index - 1] as usize] = None;
                                 pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
                             })
-                            .unwrap();
+                            .expect("node write failure");
                     }
-                } else if compare(&cur_key, &chunks[index..]).is_gt() {
-                    p_ref
-                        .write(|p| {
-                            let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                            pp.chd_mut()[chunks[index - 1] as usize] = None;
-                            pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
-                        })
-                        .unwrap();
+                    _ => (),
                 }
                 return Ok(());
             }
@@ -1039,7 +1028,7 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     }
                     _ => {}
                 })
-                .unwrap();
+                .expect("node write failure");
         }
     }
 

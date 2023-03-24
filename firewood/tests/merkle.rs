@@ -484,10 +484,7 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
-    let item_iter = items.clone().into_iter();
-    let keys = item_iter.clone().map(|item| item.0).collect();
-    let vals = item_iter.map(|item| item.1).collect();
-
+    let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
     merkle.verify_range_proof(&proof, &first, &last, keys, vals)?;
 
     Ok(())
