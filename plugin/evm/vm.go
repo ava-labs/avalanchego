@@ -629,7 +629,9 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 	close(vm.shutdownChan)
 	vm.eth.Stop()
+	log.Info("Ethereum backend stop completed")
 	vm.shutdownWg.Wait()
+	log.Info("Subnet-EVM Shutdown completed")
 	return nil
 }
 
