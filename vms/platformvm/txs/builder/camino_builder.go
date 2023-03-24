@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -30,7 +29,6 @@ var (
 	_ CaminoBuilder = (*caminoBuilder)(nil)
 
 	fakeTreasuryKey      = crypto.FakePrivateKey(treasury.Addr)
-	fakeTreasuryKeyArr   = []*crypto.PrivateKeySECP256K1R{fakeTreasuryKey}
 	fakeTreasuryKeychain = secp256k1fx.NewKeychain(fakeTreasuryKey)
 
 	errKeyMissing       = errors.New("couldn't find key matching address")
@@ -38,7 +36,6 @@ var (
 	errTxIsNotCommitted = errors.New("tx is not committed")
 	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongTxType      = errors.New("wrong transaction type")
-	errWrongOutType     = errors.New("wrong output type")
 	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 	errNoUTXOsForImport = errors.New("no utxos for import")
 )
@@ -442,32 +439,6 @@ func (b *caminoBuilder) NewClaimTx(
 			claimableSignersKC.Add(signer)
 		}
 	}
-
-	totalAmountToClaim := uint64(0)
-	for _, amt := range amountToClaim {
-		totalAmountToClaim, err = math.Add64(totalAmountToClaim, amt)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var claimableIns []*avax.TransferableInput
-	var claimableOuts []*avax.TransferableOutput
-	if totalAmountToClaim > 0 {
-		claimableIns, claimableOuts, _, _, err = b.Lock(
-			fakeTreasuryKeyArr,
-			totalAmountToClaim,
-			0,
-			locked.StateUnlocked,
-			claimTo,
-			nil,
-			0,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		}
-	}
-
 	signers = append(signers, claimableSignersKC.Keys)
 
 	utx := &txs.ClaimTx{
@@ -477,12 +448,10 @@ func (b *caminoBuilder) NewClaimTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		ClaimableIns:        claimableIns,
-		ClaimableOuts:       claimableOuts,
-		DepositTxs:          depositTxIDs,
-		ClaimableOwnerIDs:   claimableOwnerIDs,
-		ClaimedAmount:       amountToClaim,
-		DepositRewardsOwner: claimTo,
+		DepositTxIDs:      depositTxIDs,
+		ClaimableOwnerIDs: claimableOwnerIDs,
+		ClaimedAmounts:    amountToClaim,
+		ClaimTo:           claimTo,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
@@ -589,23 +558,6 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 		return nil, errNoUTXOsForImport
 	}
 
-	// Calculating imported amount, getting utxoids
-
-	utxoIDs := make([][]byte, len(utxos))
-	importedAmount := uint64(0)
-	for i, utxo := range utxos {
-		utxoID := utxo.InputID()
-		utxoIDs[i] = utxoID[:]
-		secpOut, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			return nil, errWrongOutType
-		}
-		importedAmount, err = math.Add64(importedAmount, secpOut.Amt)
-		if err != nil {
-			return nil, fmt.Errorf("can't compact imported UTXOs: %w", err)
-		}
-	}
-
 	ins := make([]*avax.TransferableInput, len(utxos))
 
 	for i, utxo := range utxos {
@@ -631,13 +583,6 @@ func (b *caminoBuilder) NewRewardsImportTx() (*txs.Tx, error) {
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,
 			Ins:          ins,
-			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          importedAmount,
-					OutputOwners: *treasury.Owner,
-				},
-			}},
 		}},
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)

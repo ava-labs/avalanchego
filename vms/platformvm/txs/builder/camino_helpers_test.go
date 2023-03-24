@@ -545,7 +545,7 @@ func generateKeyAndOwner() (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1
 	}
 }
 
-func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.TransferableInput {
+func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32, init bool) *avax.TransferableInput {
 	var in avax.TransferableIn
 	switch out := utxo.Out.(type) {
 	case *secp256k1fx.TransferOutput:
@@ -565,33 +565,17 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 		panic("unknown utxo.Out type")
 	}
 
-	// to be sure that utxoid.id is set in both entities
-	utxo.InputID()
-	return &avax.TransferableInput{
-		UTXOID: utxo.UTXOID,
+	input := &avax.TransferableInput{
+		UTXOID: avax.UTXOID{TxID: utxo.UTXOID.TxID, OutputIndex: utxo.UTXOID.OutputIndex},
 		Asset:  utxo.Asset,
 		In:     in,
 	}
-}
 
-func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
-	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
-		Amt:          amount,
-		OutputOwners: outputOwners,
+	if init {
+		input.InputID()
 	}
-	if depositTxID != ids.Empty || bondTxID != ids.Empty {
-		out = &locked.Out{
-			IDs: locked.IDs{
-				DepositTxID: depositTxID,
-				BondTxID:    bondTxID,
-			},
-			TransferableOut: out,
-		}
-	}
-	return &avax.TransferableOutput{
-		Asset: avax.Asset{ID: assetID},
-		Out:   out,
-	}
+
+	return input
 }
 
 func newCaminoBuilderWithMocks(postBanff bool, state state.State, sharedMemory atomic.SharedMemory) (*caminoBuilder, *versiondb.Database) {

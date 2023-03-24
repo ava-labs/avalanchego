@@ -654,7 +654,7 @@ func expectConsumeUTXOs(s *state.MockDiff, ins []*avax.TransferableInput) {
 	}
 }
 
-func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) {
+func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) { //nolint:unparam
 	for i := range outs {
 		s.EXPECT().AddUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{

@@ -285,7 +285,6 @@ func TestNewClaimTx(t *testing.T) {
 	claimableOwnerID := ids.GenerateTestID()
 
 	feeUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, feeUTXOOwner, ids.Empty, ids.Empty)
-	treasuryUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, 110, *treasury.Owner, ids.Empty, ids.Empty)
 
 	baseTx := txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -340,9 +339,9 @@ func TestNewClaimTx(t *testing.T) {
 			},
 			expectedTx: func(t *testing.T) *txs.Tx {
 				tx, err := txs.NewSigned(&txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1},
-					DepositRewardsOwner: &rewardOwner1,
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1},
+					ClaimTo:      &rewardOwner1,
 				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{feeKey}, {rewardOwner1Key}})
 				require.NoError(t, err)
 				return tx
@@ -373,9 +372,9 @@ func TestNewClaimTx(t *testing.T) {
 			},
 			expectedTx: func(t *testing.T) *txs.Tx {
 				tx, err := txs.NewSigned(&txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1, depositTxID2},
-					DepositRewardsOwner: &rewardOwner1,
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1, depositTxID2},
+					ClaimTo:      &rewardOwner1,
 				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{feeKey}, {rewardOwner1Key, rewardOwner2Key}})
 				require.NoError(t, err)
 				return tx
@@ -414,9 +413,9 @@ func TestNewClaimTx(t *testing.T) {
 			},
 			expectedTx: func(t *testing.T) *txs.Tx {
 				tx, err := txs.NewSigned(&txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1, depositTxID2},
-					DepositRewardsOwner: &rewardOwner1,
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1, depositTxID2},
+					ClaimTo:      &rewardOwner1,
 				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{feeKey}, {rewardOwner1Key, rewardOwner2Key}})
 				require.NoError(t, err)
 				return tx
@@ -432,7 +431,6 @@ func TestNewClaimTx(t *testing.T) {
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, DepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}})
 				return s
 			},
 			args: args{
@@ -448,15 +446,8 @@ func TestNewClaimTx(t *testing.T) {
 				tx, err := txs.NewSigned(&txs.ClaimTx{
 					BaseTx:            baseTx,
 					ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
-					ClaimedAmount:     []uint64{60},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXO, []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 50, *treasury.Owner, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, 60, rewardOwner1, ids.Empty, ids.Empty),
-					},
-					DepositRewardsOwner: &rewardOwner1,
+					ClaimedAmounts:    []uint64{60},
+					ClaimTo:           &rewardOwner1,
 				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{feeKey}, {rewardOwner1Key}})
 				require.NoError(t, err)
 				return tx
@@ -480,7 +471,6 @@ func TestNewClaimTx(t *testing.T) {
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, DepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{treasury.Addr: {treasuryUTXO}})
 				return s
 			},
 			args: args{
@@ -497,17 +487,10 @@ func TestNewClaimTx(t *testing.T) {
 			expectedTx: func(t *testing.T) *txs.Tx {
 				tx, err := txs.NewSigned(&txs.ClaimTx{
 					BaseTx:            baseTx,
-					DepositTxs:        []ids.ID{depositTxID1},
+					DepositTxIDs:      []ids.ID{depositTxID1},
 					ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
-					ClaimedAmount:     []uint64{60},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXO, []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 50, *treasury.Owner, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, 60, rewardOwner1, ids.Empty, ids.Empty),
-					},
-					DepositRewardsOwner: &rewardOwner1,
+					ClaimedAmounts:    []uint64{60},
+					ClaimTo:           &rewardOwner1,
 				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{feeKey}, {rewardOwner1Key, rewardOwner2Key}})
 				require.NoError(t, err)
 				return tx
@@ -736,11 +719,8 @@ func TestNewRewardsImportTx(t *testing.T) {
 						NetworkID:    ctx.NetworkID,
 						BlockchainID: ctx.ChainID,
 						Ins: []*avax.TransferableInput{
-							generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
-							generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
-						},
-						Outs: []*avax.TransferableOutput{
-							generateTestOut(ctx.AVAXAssetID, 101, *treasury.Owner, ids.Empty, ids.Empty),
+							generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}, false),
+							generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}, false),
 						},
 					},
 					SyntacticallyVerified: true,
@@ -778,7 +758,7 @@ func TestNewRewardsImportTx(t *testing.T) {
 			tx, err := b.NewRewardsImportTx()
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedTx != nil {
-				require.Equal(tx, tt.expectedTx(t, tt.utxos))
+				require.Equal(tt.expectedTx(t, tt.utxos), tx)
 			} else {
 				require.Nil(tx)
 			}

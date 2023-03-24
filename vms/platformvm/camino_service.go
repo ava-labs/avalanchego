@@ -507,7 +507,11 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 
 	claimableOwnerIDs := make([]ids.ID, len(args.ClaimableOwners))
 	for i := range args.ClaimableOwners {
-		ownerID, err := txs.GetOwnerID(args.ClaimableOwners[i])
+		claimableOwner, err := s.getOutputOwner(&args.ClaimableOwners[i])
+		if err != nil {
+			return fmt.Errorf("failed to parse api owner to secp owner: %w", err)
+		}
+		ownerID, err := txs.GetOwnerID(claimableOwner)
 		if err != nil {
 			return fmt.Errorf("failed to calculate ownerID from owner: %w", err)
 		}

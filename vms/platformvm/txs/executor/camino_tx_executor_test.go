@@ -3235,19 +3235,6 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 					Owner:         &owner1,
 					DepositReward: remainingReward,
 				})
-				rewardUTXO := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs)),
-					},
-					Asset: avax.Asset{ID: ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt:          remainingReward,
-						OutputOwners: *treasury.Owner,
-					},
-				}
-				s.EXPECT().AddRewardUTXO(txID, rewardUTXO)
-				s.EXPECT().AddUTXO(rewardUTXO)
 				s.EXPECT().RemoveDeposit(deposit1WithRewardTxID1, deposit1WithReward)
 				// state update: ins/outs/utxos
 				expectConsumeUTXOs(s, utx.Ins)
@@ -3486,15 +3473,14 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state         func(*gomock.Controller, *txs.ClaimTx, ids.ID, []*avax.UTXO, []*state.Claimable) *state.MockDiff
-		utx           func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx
-		signers       [][]*crypto.PrivateKeySECP256K1R
-		treasuryUTXOs []*avax.UTXO
-		claimables    []*state.Claimable
-		expectedErr   error
+		state       func(*gomock.Controller, *txs.ClaimTx, ids.ID, []*state.Claimable) *state.MockDiff
+		utx         func([]*state.Claimable) *txs.ClaimTx
+		signers     [][]*crypto.PrivateKeySECP256K1R
+		claimables  []*state.Claimable
+		expectedErr error
 	}{
 		"Deposit not found": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3504,18 +3490,18 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, database.ErrNotFound)
 				return s
 			},
-			utx: func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx {
+			utx: func([]*state.Claimable) *txs.ClaimTx {
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1},
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1},
+					ClaimTo:      &secp256k1fx.OutputOwners{},
 				}
 			},
 			signers:     [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {}},
 			expectedErr: errDepositNotFound,
 		},
 		"Bad deposit credential": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3530,18 +3516,18 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				return s
 			},
-			utx: func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx {
+			utx: func([]*state.Claimable) *txs.ClaimTx {
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1},
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1},
+					ClaimTo:      &secp256k1fx.OutputOwners{},
 				}
 			},
 			signers:     [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {}},
 			expectedErr: errDepositCredentialMissmatch,
 		},
 		"Bad claimable credential": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3552,110 +3538,61 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
 				return s
 			},
-			utx: func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx {
+			utx: func([]*state.Claimable) *txs.ClaimTx {
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
-					ClaimableOwnerIDs:   []ids.ID{claimableOwnerID1},
-					ClaimedAmount:       []uint64{1},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestIn(ctx.AVAXAssetID, 2, ids.Empty, ids.Empty, []uint32{}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, 1, claimableOwner1, ids.Empty, ids.Empty),
-					},
+					BaseTx:            baseTx,
+					ClaimTo:           &secp256k1fx.OutputOwners{},
+					ClaimableOwnerIDs: []ids.ID{claimableOwnerID1},
+					ClaimedAmounts:    []uint64{1},
 				}
 			},
 			signers:     [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {}},
 			claimables:  []*state.Claimable{{Owner: &claimableOwner1}},
 			expectedErr: errClaimableCredentialMissmatch,
 		},
-		"Claimable ins not owned by treasury": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
-				s := state.NewMockDiff(c)
-				// common checks and fee
-				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
-				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO})
-				s.EXPECT().GetTimestamp().Return(timestamp)
-
-				// claimable
-				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimables[0], nil)
-				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
-				s.EXPECT().SetClaimable(claimableOwnerID1, nil)
-				expectGetUTXOsFromInputs(s, utx.ClaimableIns, treasuryUTXOs)
-				return s
-			},
-			utx: func(treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *txs.ClaimTx {
-				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
-					ClaimedAmount:       []uint64{claimables[0].ValidatorReward},
-					ClaimableOwnerIDs:   []ids.ID{claimableOwnerID1},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXOs[0], []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, claimables[0].ValidatorReward, claimableOwner1, ids.Empty, ids.Empty),
-					},
-				}
-			},
-			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {claimableOwnerKey1}},
-			treasuryUTXOs: []*avax.UTXO{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          10,
-					OutputOwners: depositRewardOwner, // not treasury owner
-				},
-			}},
-			claimables: []*state.Claimable{{
-				Owner:           &claimableOwner1,
-				ValidatorReward: 10,
-			}},
-			expectedErr: errClaimingNonTreasuryUTXO,
-		},
 		"Claimed more than available": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO})
 				s.EXPECT().GetTimestamp().Return(timestamp)
 
-				// claimable
+				// claimable 1
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimables[0], nil)
 				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:           claimables[0].Owner,
-					ValidatorReward: claimables[0].ValidatorReward - utx.ClaimedAmount[0],
+					ValidatorReward: claimables[0].ValidatorReward - utx.ClaimedAmounts[0],
 				})
+				claimableUTXO1 := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(utx.Outs)),
+					},
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          utx.ClaimedAmounts[0],
+						OutputOwners: *claimables[0].Owner,
+					},
+				}
+				s.EXPECT().AddUTXO(claimableUTXO1)
+				s.EXPECT().AddRewardUTXO(txID, claimableUTXO1)
+
+				// claimable 2
 				s.EXPECT().GetClaimable(claimableOwnerID2).Return(claimables[1], nil)
 				expectVerifyMultisigPermission(s, claimableOwner2.Addrs, nil)
 				return s
 			},
-			utx: func(treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *txs.ClaimTx {
+			utx: func(claimables []*state.Claimable) *txs.ClaimTx {
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
-					ClaimableOwnerIDs:   []ids.ID{claimableOwnerID1, claimableOwnerID2},
-					ClaimedAmount:       []uint64{claimables[0].ValidatorReward - 1, claimables[1].ValidatorReward + 1},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXOs[0], []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, claimables[0].ValidatorReward-1, claimableOwner1, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, claimables[1].ValidatorReward+1, claimableOwner2, ids.Empty, ids.Empty),
-					},
+					BaseTx:            baseTx,
+					ClaimTo:           &secp256k1fx.OutputOwners{},
+					ClaimableOwnerIDs: []ids.ID{claimableOwnerID1, claimableOwnerID2},
+					ClaimedAmounts:    []uint64{claimables[0].ValidatorReward - 1, claimables[1].ValidatorReward + 1},
 				}
 			},
 			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {claimableOwnerKey1, claimableOwnerKey2}},
-			treasuryUTXOs: []*avax.UTXO{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          20,
-					OutputOwners: *treasury.Owner,
-				},
-			}},
 			claimables: []*state.Claimable{
 				{
 					Owner:           &claimableOwner1,
@@ -3669,7 +3606,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"OK, claimable and 2 deposits": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3698,7 +3635,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				depositRewardUTXO1 := &avax.UTXO{
 					UTXOID: avax.UTXOID{
 						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs) + len(utx.ClaimableOuts)),
+						OutputIndex: uint32(len(utx.Outs)),
 					},
 					Asset: avax.Asset{ID: ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -3738,7 +3675,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				depositRewardUTXO2 := &avax.UTXO{
 					UTXOID: avax.UTXOID{
 						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs)+len(utx.ClaimableOuts)) + 1,
+						OutputIndex: uint32(len(utx.Outs) + 1),
 					},
 					Asset: avax.Asset{ID: ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -3761,37 +3698,32 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				s.EXPECT().GetClaimable(claimableOwnerID1).Return(claimables[0], nil)
 				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, nil)
-				expectVerifyLock(s, utx.ClaimableIns, treasuryUTXOs)
-				s.EXPECT().DeleteUTXO(treasuryUTXOs[0].InputID())
-				expectProduceUTXOs(s, utx.ClaimableOuts, txID, len(utx.Outs))
+				claimableUTXO1 := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(utx.Outs) + 2),
+					},
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          utx.ClaimedAmounts[0],
+						OutputOwners: claimableOwner1,
+					},
+				}
+				s.EXPECT().AddUTXO(claimableUTXO1)
+				s.EXPECT().AddRewardUTXO(txID, claimableUTXO1)
 				return s
 			},
-			utx: func(treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *txs.ClaimTx {
-				utxoAmt := treasuryUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amt
+			utx: func(claimables []*state.Claimable) *txs.ClaimTx {
 				claimedAmt := claimables[0].ValidatorReward + claimables[0].DepositReward
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1, depositTxID2},
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
-					ClaimableOwnerIDs:   []ids.ID{claimableOwnerID1},
-					ClaimedAmount:       []uint64{claimedAmt},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXOs[0], []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, utxoAmt-claimedAmt, *treasury.Owner, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, claimedAmt, claimableOwner1, ids.Empty, ids.Empty),
-					},
+					BaseTx:            baseTx,
+					DepositTxIDs:      []ids.ID{depositTxID1, depositTxID2},
+					ClaimTo:           &secp256k1fx.OutputOwners{},
+					ClaimableOwnerIDs: []ids.ID{claimableOwnerID1},
+					ClaimedAmounts:    []uint64{claimedAmt},
 				}
 			},
 			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {depositRewardOwnerKey, claimableOwnerKey1}},
-			treasuryUTXOs: []*avax.UTXO{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          50,
-					OutputOwners: *treasury.Owner,
-				},
-			}},
 			claimables: []*state.Claimable{{
 				Owner:           &claimableOwner1,
 				ValidatorReward: 10,
@@ -3799,7 +3731,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			}},
 		},
 		"OK, deposit with new DepositRewardsOwner, non-zero already claimed reward and no rewards period": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3830,7 +3762,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				depositRewardUTXO := &avax.UTXO{
 					UTXOID: avax.UTXOID{
 						TxID:        txID,
-						OutputIndex: uint32(len(utx.Outs) + len(utx.ClaimableOuts)),
+						OutputIndex: uint32(len(utx.Outs)),
 					},
 					Asset: avax.Asset{ID: ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -3850,17 +3782,17 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				})
 				return s
 			},
-			utx: func([]*avax.UTXO, []*state.Claimable) *txs.ClaimTx {
+			utx: func([]*state.Claimable) *txs.ClaimTx {
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositTxs:          []ids.ID{depositTxID1},
-					DepositRewardsOwner: &feeOwner, // not depositTx.RewardsOwner
+					BaseTx:       baseTx,
+					DepositTxIDs: []ids.ID{depositTxID1},
+					ClaimTo:      &feeOwner, // not depositTx.RewardsOwner
 				}
 			},
 			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {depositRewardOwnerKey}},
 		},
 		"OK, partial claim": {
-			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
@@ -3873,38 +3805,33 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectVerifyMultisigPermission(s, claimableOwner1.Addrs, nil)
 				s.EXPECT().SetClaimable(claimableOwnerID1, &state.Claimable{
 					Owner:         claimables[0].Owner,
-					DepositReward: claimables[0].ValidatorReward + claimables[0].DepositReward - utx.ClaimedAmount[0],
+					DepositReward: claimables[0].ValidatorReward + claimables[0].DepositReward - utx.ClaimedAmounts[0],
 				})
-				expectVerifyLock(s, utx.ClaimableIns, treasuryUTXOs)
-				s.EXPECT().DeleteUTXO(treasuryUTXOs[0].InputID())
-				expectProduceUTXOs(s, utx.ClaimableOuts, txID, len(utx.Outs))
+				claimableUTXO1 := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        txID,
+						OutputIndex: uint32(len(utx.Outs)),
+					},
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          utx.ClaimedAmounts[0],
+						OutputOwners: *claimables[0].Owner,
+					},
+				}
+				s.EXPECT().AddUTXO(claimableUTXO1)
+				s.EXPECT().AddRewardUTXO(txID, claimableUTXO1)
 				return s
 			},
-			utx: func(treasuryUTXOs []*avax.UTXO, claimables []*state.Claimable) *txs.ClaimTx {
-				utxoAmt := treasuryUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amt
+			utx: func(claimables []*state.Claimable) *txs.ClaimTx {
 				claimedAmt := claimables[0].ValidatorReward + claimables[0].DepositReward/2
 				return &txs.ClaimTx{
-					BaseTx:              baseTx,
-					DepositRewardsOwner: &secp256k1fx.OutputOwners{},
-					ClaimableOwnerIDs:   []ids.ID{claimableOwnerID1},
-					ClaimedAmount:       []uint64{claimedAmt},
-					ClaimableIns: []*avax.TransferableInput{
-						generateTestInFromUTXO(treasuryUTXOs[0], []uint32{0}),
-					},
-					ClaimableOuts: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, utxoAmt-claimedAmt, *treasury.Owner, ids.Empty, ids.Empty),
-						generateTestOut(ctx.AVAXAssetID, claimedAmt, claimableOwner1, ids.Empty, ids.Empty),
-					},
+					BaseTx:            baseTx,
+					ClaimTo:           &secp256k1fx.OutputOwners{},
+					ClaimableOwnerIDs: []ids.ID{claimableOwnerID1},
+					ClaimedAmounts:    []uint64{claimedAmt},
 				}
 			},
 			signers: [][]*crypto.PrivateKeySECP256K1R{{feeOwnerKey}, {depositRewardOwnerKey, claimableOwnerKey1}},
-			treasuryUTXOs: []*avax.UTXO{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          50,
-					OutputOwners: *treasury.Owner,
-				},
-			}},
 			claimables: []*state.Claimable{{
 				Owner:           &claimableOwner1,
 				ValidatorReward: 10,
@@ -3923,12 +3850,10 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 
 			// ensuring that ins and outs from test case are sorted, signing tx
 
-			utx := tt.utx(tt.treasuryUTXOs, tt.claimables)
+			utx := tt.utx(tt.claimables)
 
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
-			avax.SortTransferableInputsWithSigners(utx.ClaimableIns, tt.signers)
-			avax.SortTransferableOutputs(utx.ClaimableOuts, txs.Codec)
 
 			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
 			require.NoError(err)
@@ -3938,7 +3863,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: &env.backend,
-					State:   tt.state(ctrl, utx, tx.ID(), tt.treasuryUTXOs, tt.claimables),
+					State:   tt.state(ctrl, utx, tx.ID(), tt.claimables),
 					Tx:      tx,
 				},
 			})
@@ -4226,9 +4151,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
 						generateTestInFromUTXO(&utxos[1].UTXO, []uint32{0}),
 					},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
-					},
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{
@@ -4263,9 +4185,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 					Ins: []*avax.TransferableInput{
 						generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 					},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
-					},
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
@@ -4295,9 +4214,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 						},
 					}},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
-					},
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{{
@@ -4385,12 +4301,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 					ValidatorReward: 1,
 				})
 
-				s.EXPECT().AddUTXO(&avax.UTXO{
-					UTXOID: avax.UTXOID{TxID: txID},
-					Asset:  utx.Outs[0].Asset,
-					Out:    utx.Outs[0].Out,
-				})
-
 				return s
 			},
 			sharedMemory: shmWithUTXOs,
@@ -4401,9 +4311,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 					Ins: []*avax.TransferableInput{
 						generateTestInFromUTXO(&utxos[0].UTXO, []uint32{0}),
 						generateTestInFromUTXO(&utxos[2].UTXO, []uint32{0}),
-					},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 4, *treasury.Owner, ids.Empty, ids.Empty),
 					},
 				}}}
 			},
