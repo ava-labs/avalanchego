@@ -110,7 +110,7 @@ func (d *diff) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return parentState.GetAddressStates(address)
 }
 
-func (d *diff) AddDepositOffer(offer *deposit.Offer) {
+func (d *diff) SetDepositOffer(offer *deposit.Offer) {
 	d.caminoDiff.modifiedDepositOffers[offer.ID] = offer
 }
 
@@ -397,7 +397,7 @@ func (d *diff) ApplyCaminoState(baseState State) {
 	}
 
 	for _, depositOffer := range d.caminoDiff.modifiedDepositOffers {
-		baseState.AddDepositOffer(depositOffer)
+		baseState.SetDepositOffer(depositOffer)
 	}
 
 	for depositTxID, depositDiff := range d.caminoDiff.modifiedDeposits {

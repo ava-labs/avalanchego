@@ -56,8 +56,8 @@ func (s *state) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return s.caminoState.GetAddressStates(address)
 }
 
-func (s *state) AddDepositOffer(offer *deposit.Offer) {
-	s.caminoState.AddDepositOffer(offer)
+func (s *state) SetDepositOffer(offer *deposit.Offer) {
+	s.caminoState.SetDepositOffer(offer)
 }
 
 func (s *state) GetDepositOffer(offerID ids.ID) (*deposit.Offer, error) {

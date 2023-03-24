@@ -58,16 +58,16 @@ func (mr *MockChainMockRecorder) AddChain(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddChain", reflect.TypeOf((*MockChain)(nil).AddChain), arg0)
 }
 
-// AddDepositOffer mocks base method.
-func (m *MockChain) AddDepositOffer(arg0 *deposit.Offer) {
+// SetDepositOffer mocks base method.
+func (m *MockChain) SetDepositOffer(arg0 *deposit.Offer) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddDepositOffer", arg0)
+	m.ctrl.Call(m, "SetDepositOffer", arg0)
 }
 
-// AddDepositOffer indicates an expected call of AddDepositOffer.
-func (mr *MockChainMockRecorder) AddDepositOffer(arg0 interface{}) *gomock.Call {
+// SetDepositOffer indicates an expected call of SetDepositOffer.
+func (mr *MockChainMockRecorder) SetDepositOffer(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddDepositOffer", reflect.TypeOf((*MockChain)(nil).AddDepositOffer), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDepositOffer", reflect.TypeOf((*MockChain)(nil).SetDepositOffer), arg0)
 }
 
 // AddRewardUTXO mocks base method.

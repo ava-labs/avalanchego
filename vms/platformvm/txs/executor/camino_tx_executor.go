@@ -44,7 +44,8 @@ var (
 	errRemoveWrongValidator         = errors.New("attempting to remove wrong validator")
 	errDepositOfferNotActiveYet     = errors.New("deposit offer not active yet")
 	errDepositOfferInactive         = errors.New("deposit offer inactive")
-	errDepositToSmall               = errors.New("deposit amount is less than deposit offer minmum amount")
+	errDepositToSmall               = errors.New("deposit amount is less than deposit offer minimum amount")
+	errDepositToBig                 = errors.New("deposit amount is greater than deposit offer available amount")
 	errDepositDurationToSmall       = errors.New("deposit duration is less than deposit offer minmum duration")
 	errDepositDurationToBig         = errors.New("deposit duration is greater than deposit offer maximum duration")
 	errSupplyOverflow               = errors.New("resulting total supply would be more, than allowed maximum")
@@ -588,6 +589,8 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errDepositDurationToBig
 	case depositAmount < depositOffer.MinAmount:
 		return errDepositToSmall
+	case depositOffer.TotalMaxAmount > 0 && depositAmount > depositOffer.RemainingAmount():
+		return errDepositToBig
 	}
 
 	rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -635,6 +638,12 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	newSupply, err := math.Add64(currentSupply, potentialReward)
 	if err != nil || newSupply > e.Config.RewardConfig.SupplyCap {
 		return errSupplyOverflow
+	}
+
+	if depositOffer.TotalMaxAmount > 0 {
+		updatedOffer := *depositOffer
+		updatedOffer.DepositedAmount += depositAmount
+		e.State.SetDepositOffer(&updatedOffer)
 	}
 
 	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)

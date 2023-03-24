@@ -75,7 +75,7 @@ type CaminoDiff interface {
 	// Deposit offers
 
 	// precondition: offer.SetID() must be called and return no error
-	AddDepositOffer(offer *deposit.Offer)
+	SetDepositOffer(offer *deposit.Offer)
 	GetDepositOffer(offerID ids.ID) (*deposit.Offer, error)
 	GetAllDepositOffers() ([]*deposit.Offer, error)
 
@@ -348,7 +348,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	depositOffers := make(map[ids.ID]*deposit.Offer, len(g.Camino.DepositOffers))
 	for _, offer := range g.Camino.DepositOffers {
 		depositOffers[offer.ID] = offer
-		cs.AddDepositOffer(offer)
+		cs.SetDepositOffer(offer)
 	}
 
 	// adding msig aliases

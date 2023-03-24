@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 )
 
-func (cs *caminoState) AddDepositOffer(offer *deposit.Offer) {
+func (cs *caminoState) SetDepositOffer(offer *deposit.Offer) {
 	cs.modifiedDepositOffers[offer.ID] = offer
 }
 
@@ -61,9 +61,7 @@ func (cs *caminoState) loadDepositOffers() error {
 		}
 
 		depositOfferBytes := depositOffersIt.Value()
-		depositOffer := &deposit.Offer{
-			ID: depositOfferID,
-		}
+		depositOffer := &deposit.Offer{ID: depositOfferID}
 		if _, err := blocks.GenesisCodec.Unmarshal(depositOfferBytes, depositOffer); err != nil {
 			return err
 		}

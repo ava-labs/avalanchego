@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -247,15 +247,15 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 				},
 			},
 			prepare: func(service CaminoService) {
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{0},
 					Flags: 0,
 				})
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{1},
 					Flags: 0,
 				})
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{2},
 					Flags: 1,
 				})
@@ -284,15 +284,15 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 				},
 			},
 			prepare: func(service CaminoService) {
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{0},
 					Flags: 0,
 				})
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{1},
 					Flags: 0,
 				})
-				service.vm.state.AddDepositOffer(&deposit.Offer{
+				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{2},
 					Flags: 1,
 				})

@@ -1,3 +1,5 @@
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+// See the file LICENSE for licensing terms.
 package deposit
 
 import (
@@ -39,12 +41,10 @@ func TestTotalReward(t *testing.T) {
 				Duration: uint32(tt.DepositDuration),
 			}
 
-			depOffer := Offer{
+			require.EqualValues(expectedRewardAmount, dep.TotalReward(&Offer{
 				InterestRateNominator:   tt.InterestRateNominator,
 				NoRewardsPeriodDuration: tt.NoRewardsPeriodDuration,
-			}
-
-			require.EqualValues(expectedRewardAmount, dep.TotalReward(&depOffer))
+			}))
 		})
 	}
 }

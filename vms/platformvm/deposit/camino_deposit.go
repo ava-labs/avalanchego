@@ -33,6 +33,8 @@ type Offer struct {
 	Start                   uint64              `serialize:"true" json:"start"`
 	End                     uint64              `serialize:"true" json:"end"`
 	MinAmount               uint64              `serialize:"true" json:"minAmount"`
+	TotalMaxAmount          uint64              `serialize:"true" json:"totalMaxAmount"`
+	DepositedAmount         uint64              `serialize:"true" json:"depositedAmount"`
 	MinDuration             uint32              `serialize:"true" json:"minDuration"`
 	MaxDuration             uint32              `serialize:"true" json:"maxDuration"`
 	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`
@@ -59,6 +61,10 @@ func (o *Offer) StartTime() time.Time {
 // Time when this offer becomes inactive
 func (o *Offer) EndTime() time.Time {
 	return time.Unix(int64(o.End), 0)
+}
+
+func (o *Offer) RemainingAmount() uint64 {
+	return o.TotalMaxAmount - o.DepositedAmount
 }
 
 func (o *Offer) InterestRateFloat64() float64 {
