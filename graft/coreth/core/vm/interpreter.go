@@ -90,8 +90,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	// If jump table was not initialised we set the default one.
 	if cfg.JumpTable == nil {
 		switch {
-		case evm.chainRules.IsCortina:
-			cfg.JumpTable = &cortinaInstructionSet
+		case evm.chainRules.IsDUpgrade:
+			cfg.JumpTable = &dUpgradeInstructionSet
 		case evm.chainRules.IsApricotPhase3:
 			cfg.JumpTable = &apricotPhase3InstructionSet
 		case evm.chainRules.IsApricotPhase2:
