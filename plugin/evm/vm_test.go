@@ -35,6 +35,7 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	avalancheConstants "github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -60,6 +61,8 @@ import (
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/vmerrs"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
@@ -141,6 +144,12 @@ func NewContext() *snow.Context {
 			return subnetID, nil
 		},
 	}
+	blsSecretKey, err := bls.NewSecretKey()
+	if err != nil {
+		panic(err)
+	}
+	ctx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, ctx.ChainID)
+	ctx.PublicKey = bls.PublicFromSecretKey(blsSecretKey)
 	return ctx
 }
 
