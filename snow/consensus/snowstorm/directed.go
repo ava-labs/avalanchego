@@ -565,7 +565,10 @@ func (dg *Directed) accept(ctx context.Context, txID ids.ID) error {
 // reject all the named txIDs and remove them from the graph
 func (dg *Directed) reject(ctx context.Context, conflictIDs set.Set[ids.ID]) error {
 	for conflictKey := range conflictIDs {
-		conflict := dg.txs[conflictKey]
+		conflict, exists := dg.txs[conflictKey]
+		if !exists {
+			continue
+		}
 		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
 		for _, inputID := range conflict.tx.InputIDs() {
