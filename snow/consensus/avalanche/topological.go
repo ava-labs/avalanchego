@@ -578,12 +578,7 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 				zap.Stringer("vtxID", vtxID),
 				zap.Stringer("parentID", dep.ID()),
 			)
-			if !txv.Status().Decided() {
-				if err := ta.cg.Remove(ctx, vtxID); err != nil {
-					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
-				}
-				ta.virtuousVoting.Remove(vtxID)
-			}
+			ta.virtuousVoting.Remove(vtxID)
 			if err := vtx.Reject(ctx); err != nil {
 				return err
 			}
