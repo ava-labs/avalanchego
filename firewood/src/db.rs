@@ -749,7 +749,8 @@ impl DB {
             return None;
         }
         if rlen < nback {
-            let ashes = inner.disk_requester.collect_ash(nback);
+            // TODO: Remove unwrap
+            let ashes = inner.disk_requester.collect_ash(nback).ok().unwrap();
             for mut ash in ashes.into_iter().skip(rlen) {
                 for (_, a) in ash.0.iter_mut() {
                     a.old.reverse()

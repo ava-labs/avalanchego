@@ -15,6 +15,9 @@ use growthring::{
 };
 use nix::fcntl::{flock, FlockArg};
 use shale::{MemStore, MemView, SpaceID};
+use thiserror::Error;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
 use typed_builder::TypedBuilder;
 
@@ -23,6 +26,20 @@ use crate::file::{Fd, File};
 pub(crate) const PAGE_SIZE_NBIT: u64 = 12;
 pub(crate) const PAGE_SIZE: u64 = 1 << PAGE_SIZE_NBIT;
 pub(crate) const PAGE_MASK: u64 = PAGE_SIZE - 1;
+
+#[derive(Debug, Error)]
+pub enum StoreError<T> {
+    #[error("system error: `{0}`")]
+    System(#[from] nix::Error),
+    #[error("init error: `{0}`")]
+    Init(String),
+    // TODO: more error report from the DiskBuffer
+    //WriterError,
+    #[error("error sending data: `{0}`")]
+    Send(#[from] SendError<T>),
+    #[error("error receiving data: `{0}")]
+    Receive(#[from] RecvError),
+}
 
 pub trait MemStoreR: Debug {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>>;
@@ -614,7 +631,7 @@ pub struct CachedSpace {
 }
 
 impl CachedSpace {
-    pub fn new(cfg: &StoreConfig) -> Result<Self, StoreError> {
+    pub fn new(cfg: &StoreConfig) -> Result<Self, StoreError<nix::Error>> {
         let space_id = cfg.space_id;
         let files = Arc::new(FilePool::new(cfg)?);
         Ok(Self {
@@ -645,7 +662,11 @@ impl CachedSpace {
 }
 
 impl CachedSpaceInner {
-    fn fetch_page(&mut self, space_id: SpaceID, pid: u64) -> Result<Box<Page>, StoreError> {
+    fn fetch_page(
+        &mut self,
+        space_id: SpaceID,
+        pid: u64,
+    ) -> Result<Box<Page>, StoreError<nix::Error>> {
         if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
             return Ok(Box::new(*p));
         }
@@ -663,7 +684,11 @@ impl CachedSpaceInner {
         Ok(Box::new(page))
     }
 
-    fn pin_page(&mut self, space_id: SpaceID, pid: u64) -> Result<&'static mut [u8], StoreError> {
+    fn pin_page(
+        &mut self,
+        space_id: SpaceID,
+        pid: u64,
+    ) -> Result<&'static mut [u8], StoreError<nix::Error>> {
         let base = match self.pinned_pages.get_mut(&pid) {
             Some(mut e) => {
                 e.0 += 1;
@@ -777,7 +802,7 @@ pub struct FilePool {
 }
 
 impl FilePool {
-    fn new(cfg: &StoreConfig) -> Result<Self, StoreError> {
+    fn new(cfg: &StoreConfig) -> Result<Self, StoreError<nix::Error>> {
         let rootfd = cfg.rootfd;
         let file_nbit = cfg.file_nbit;
         let s = Self {
@@ -789,12 +814,12 @@ impl FilePool {
         };
         let f0 = s.get_file(0)?;
         if flock(f0.get_fd(), FlockArg::LockExclusiveNonblock).is_err() {
-            return Err(StoreError::InitError("the store is busy".into()));
+            return Err(StoreError::Init("the store is busy".into()));
         }
         Ok(s)
     }
 
-    fn get_file(&self, fid: u64) -> Result<Arc<File>, StoreError> {
+    fn get_file(&self, fid: u64) -> Result<Arc<File>, StoreError<nix::Error>> {
         let mut files = self.files.lock();
         let file_size = 1 << self.file_nbit;
         Ok(match files.get(&fid) {
@@ -1212,16 +1237,16 @@ impl DiskBufferRequester {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.sender
             .blocking_send(BufferCmd::GetPage((space_id, pid), resp_tx))
-            .ok()
-            .unwrap();
+            .map_err(StoreError::Send)
+            .ok();
         resp_rx.blocking_recv().unwrap()
     }
 
     pub fn write(&self, page_batch: Vec<BufferWrite>, write_batch: AshRecord) {
         self.sender
             .blocking_send(BufferCmd::WriteBatch(page_batch, write_batch))
-            .ok()
-            .unwrap()
+            .map_err(StoreError::Send)
+            .ok();
     }
 
     pub fn shutdown(&self) {
@@ -1231,17 +1256,17 @@ impl DiskBufferRequester {
     pub fn init_wal(&self, waldir: &str, rootfd: Fd) {
         self.sender
             .blocking_send(BufferCmd::InitWAL(rootfd, waldir.to_string()))
-            .ok()
-            .unwrap()
+            .map_err(StoreError::Send)
+            .ok();
     }
 
-    pub fn collect_ash(&self, nrecords: usize) -> Vec<AshRecord> {
+    pub fn collect_ash(&self, nrecords: usize) -> Result<Vec<AshRecord>, StoreError<RecvError>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.sender
             .blocking_send(BufferCmd::CollectAsh(nrecords, resp_tx))
-            .ok()
-            .unwrap();
-        resp_rx.blocking_recv().unwrap()
+            .map_err(StoreError::Send)
+            .ok();
+        resp_rx.blocking_recv().map_err(StoreError::Receive)
     }
 
     pub fn reg_cached_space(&self, space: &CachedSpace) {
@@ -1249,21 +1274,7 @@ impl DiskBufferRequester {
         inner.disk_buffer = self.clone();
         self.sender
             .blocking_send(BufferCmd::RegCachedSpace(space.id(), inner.files.clone()))
-            .ok()
-            .unwrap()
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum StoreError {
-    System(nix::Error),
-    InitError(String),
-    // TODO: more error report from the DiskBuffer
-    //WriterError,
-}
-
-impl From<nix::Error> for StoreError {
-    fn from(e: nix::Error) -> Self {
-        StoreError::System(e)
+            .map_err(StoreError::Send)
+            .ok();
     }
 }
