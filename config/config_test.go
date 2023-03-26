@@ -550,7 +550,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
 				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
-				require.Equal(1024, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			errMessage: "",
 		},
