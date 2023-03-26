@@ -650,7 +650,7 @@ func (p *peer) sendNetworkMessages() {
 				}
 			}
 
-			pingMessage, err := p.Config.MessageCreator.Ping()
+			pingMessage, err := p.createPingMessage()
 			if err != nil {
 				p.Log.Error("failed to create message",
 					zap.Stringer("messageOp", message.PingOp),
@@ -672,6 +672,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePing(m)
 		msg.OnFinishedHandling()
 		return
+	// Deprecated, remove this in the future.
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
@@ -704,7 +705,83 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.Router.HandleInbound(context.Background(), msg)
 }
 
-func (p *peer) handlePing(*p2p.Ping) {
+func (p *peer) handlePing(msg *p2p.Ping) {
+	if len(msg.GetSubnetUptimes()) > 0 {
+		p.handleNewPing(msg)
+	} else {
+		p.handleOldPing(msg)
+	}
+}
+
+func (p *peer) createPingMessage() (message.OutboundMessage, error) {
+	idList := p.trackedSubnets.List()
+	idList = append(idList, constants.PrimaryNetworkID)
+
+	subnetUptimes := make([]*p2p.SubnetUptime, 0, len(idList))
+
+	for _, subnetID := range idList {
+		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
+		if err != nil {
+			p.Log.Debug("failed to get peer uptime percentage",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("subnetID", subnetID),
+				zap.Error(err),
+			)
+			// Make sure we always include the primary network ID
+			// in the ping message.
+			if subnetID != constants.PrimaryNetworkID {
+				continue
+			}
+			subnetUptime = 0
+		}
+
+		copyID := subnetID
+		subnetUptimes = append(subnetUptimes, &p2p.SubnetUptime{
+			SubnetId: copyID[:],
+			Uptime:   uint32(subnetUptime * 100),
+		})
+	}
+
+	msg, err := p.MessageCreator.Ping(subnetUptimes)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.PingOp),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	return msg, nil
+}
+
+func (p *peer) handleNewPing(msg *p2p.Ping) {
+	for _, subnetUptime := range msg.GetSubnetUptimes() {
+		subnetID, err := ids.ToID(subnetUptime.GetSubnetId())
+		if err != nil {
+			p.Log.Debug("dropping ping message with invalid subnetID",
+				zap.Stringer("nodeID", p.id),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+
+		uptime := subnetUptime.GetUptime()
+		if uptime > 100 {
+			p.Log.Debug("dropping ping message with invalid uptime",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("subnetID", subnetID),
+				zap.Uint32("uptime", uptime),
+			)
+			p.StartClose()
+			return
+		}
+		p.observeUptime(subnetID, uptime)
+	}
+}
+
+// Deprecated: This function is deprecated and will be removed in the future.
+func (p *peer) handleOldPing(*p2p.Ping) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
 		constants.PrimaryNetworkID,
@@ -749,6 +826,7 @@ func (p *peer) handlePing(*p2p.Ping) {
 	p.Send(p.onClosingCtx, msg)
 }
 
+// Deprecated: This function is deprecated and will be removed in the future.
 func (p *peer) handlePong(msg *p2p.Pong) {
 	if msg.Uptime > 100 {
 		p.Log.Debug("dropping pong message with invalid uptime",

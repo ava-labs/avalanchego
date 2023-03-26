@@ -56,7 +56,7 @@ func TestMessage(t *testing.T) {
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
 		{
-			desc: "ping message with no compression",
+			desc: "ping message with no compression no subnet uptimes",
 			op:   PingOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_Ping{
@@ -74,6 +74,25 @@ func TestMessage(t *testing.T) {
 				Message: &p2p.Message_Pong{
 					Pong: &p2p.Pong{
 						Uptime: 100,
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "ping message with no compression and subnet uptimes",
+			op:   PingOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ping{
+					Ping: &p2p.Ping{
+						SubnetUptimes: []*p2p.SubnetUptime{
+							{
+								SubnetId: testID[:],
+								Uptime:   100,
+							},
+						},
 					},
 				},
 			},

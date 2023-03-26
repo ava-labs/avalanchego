@@ -62,7 +62,11 @@ message Message {
 //
 // On receiving "ping", the remote peer responds with the observed
 // uptime value of the message sender in "pong" message.
-message Ping {}
+message Ping {
+  // subnet_uptimes contains subnet uptime percentages, including the primary
+  // network.
+  repeated SubnetUptime subnet_uptimes = 1;
+}
 
 // Contains subnet id and the related observed subnet uptime of the message
 // receiver (remote peer).
@@ -74,6 +78,7 @@ message SubnetUptime {
 // Contains the uptime percentage of the message receiver (remote peer)
 // from the sender's point of view, in response to "ping" message.
 // Uptimes are expected to be provided as integers ranging in [0, 100].
+// DEPRECATED
 message Pong {
   // uptime is the primary network uptime percentage.
   uint32 uptime = 1;
