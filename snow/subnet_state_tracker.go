@@ -28,6 +28,6 @@ type SubnetStateTracker interface {
 	StopState(chainID ids.ID, state State)
 
 	// one sync channel per chain, to make sure each chain gets notified
-	// when subnet completes sync
+	// when subnet completes sync. Errs if chainID is not registered in subnet.
 	OnSyncCompleted(chainID ids.ID) (chan struct{}, error)
 }
