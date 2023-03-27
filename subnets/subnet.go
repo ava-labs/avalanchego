@@ -194,6 +194,9 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 }
 
 func (s *subnet) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	if _, found := s.semaphores[chainID]; !found {
 		return nil, fmt.Errorf("unknown chain %s", chainID)
 	}
