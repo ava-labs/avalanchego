@@ -445,7 +445,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// We will attempt to pass the message to the requested type for the state
 	// we are currently in.
-	_, currentEngineType := h.ctx.GetChainState()
+	engineState, currentEngineType := h.ctx.GetChainState()
 	if msg.EngineType == p2p.EngineType_ENGINE_TYPE_SNOWMAN &&
 		currentEngineType == p2p.EngineType_ENGINE_TYPE_AVALANCHE {
 		// The peer is requesting an engine type that hasn't been initialized
@@ -476,7 +476,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		engineType = currentEngineType
 	}
 
-	engineState, _ := h.ctx.GetChainState()
 	engine, ok := h.engineManager.Get(engineType).Get(engineState)
 	if !ok {
 		// This should only happen if the peer is not following the protocol.

@@ -38,7 +38,7 @@ type Subnet interface {
 type subnet struct {
 	lock sync.RWMutex
 
-	currentEngineType p2p.EngineType
+	engineTypes map[ids.ID]p2p.EngineType
 
 	// currentState maps chainID to chain's latest started state
 	currentState map[ids.ID]snow.State
@@ -57,6 +57,7 @@ type subnet struct {
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
+		engineTypes:  make(map[ids.ID]p2p.EngineType),
 		currentState: make(map[ids.ID]snow.State),
 		started:      make(map[snow.State]set.Set[ids.ID]),
 		done:         make(map[snow.State]set.Set[ids.ID]),
@@ -137,15 +138,14 @@ func (s *subnet) GetState(chainID ids.ID) (snow.State, p2p.EngineType) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.currentState[chainID], s.currentEngineType
+	return s.currentState[chainID], s.engineTypes[chainID]
 }
 
 func (s *subnet) StartState(chainID ids.ID, state snow.State, currentEngineType p2p.EngineType) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.currentEngineType = currentEngineType
-
+	s.engineTypes[chainID] = currentEngineType
 	s.currentState[chainID] = state
 	started, anyChainStarted := s.started[state]
 	if !anyChainStarted {
