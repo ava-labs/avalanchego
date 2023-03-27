@@ -77,6 +77,9 @@ func (s *subnet) IsSynced() bool {
 func (s *subnet) isSynced() bool {
 	bootstrapped, anyChainDoneBootstrap := s.done[snow.Bootstrapping]
 	if !anyChainDoneBootstrap {
+		// Note: a subnet with no registered chains is marked as not synced.
+		// This choice avoid the subnet flipping between synced and not synced
+		// in case chains are added at a later time.
 		return false
 	}
 
