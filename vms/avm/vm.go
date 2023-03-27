@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -316,6 +316,20 @@ func (vm *VM) onExtendingFrontierStarted() error {
 			return err
 		}
 	}
+
+	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
+	if err != nil {
+		return err
+	}
+	utxoID := avax.UTXOID{
+		TxID:        txID,
+		OutputIndex: 192,
+	}
+	vm.state.DeleteUTXO(utxoID.InputID())
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+
 	return nil
 }
 

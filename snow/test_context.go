@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snow
@@ -37,6 +37,7 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 	var (
 		startedState State = Initializing
 		stoppedState State = Initializing
+		engineType         = p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
 	)
 
 	return &ConsensusContext{
@@ -56,12 +57,13 @@ func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 			},
 			StartStateF: func(chainID ids.ID, state State, currentEngineType p2p.EngineType) {
 				startedState = state
+				engineType = currentEngineType
 			},
 			StopStateF: func(chainID ids.ID, state State) {
 				stoppedState = state
 			},
 			GetStateF: func(chainID ids.ID) (State, p2p.EngineType) {
-				return startedState, p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
+				return startedState, engineType
 			},
 		},
 	}
