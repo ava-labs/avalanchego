@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -498,8 +498,7 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// reissued.
 	ta.orphans.Remove(vtxID)
 
-	switch vtx.Status() {
-	case choices.Accepted:
+	if vtx.Status() == choices.Accepted {
 		ta.preferred.Add(vtxID) // I'm preferred
 		ta.virtuous.Add(vtxID)  // Accepted is defined as virtuous
 
@@ -507,11 +506,6 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 
 		ta.preferenceCache[vtxID] = true
 		ta.virtuousCache[vtxID] = true
-		return nil
-	case choices.Rejected:
-		// I'm rejected
-		ta.preferenceCache[vtxID] = false
-		ta.virtuousCache[vtxID] = false
 		return nil
 	}
 
@@ -584,12 +578,7 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 				zap.Stringer("vtxID", vtxID),
 				zap.Stringer("parentID", dep.ID()),
 			)
-			if !txv.Status().Decided() {
-				if err := ta.cg.Remove(ctx, vtxID); err != nil {
-					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
-				}
-				ta.virtuousVoting.Remove(vtxID)
-			}
+			ta.virtuousVoting.Remove(vtxID)
 			if err := vtx.Reject(ctx); err != nil {
 				return err
 			}
@@ -614,11 +603,12 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// Also, this will only happen from a byzantine node issuing the vertex.
 	// Therefore, this is very unlikely to actually be triggered in practice.
 
-	// Remove all my parents from the frontier
-	for _, dep := range deps {
-		delete(ta.frontier, dep.ID())
+	if !rejectable {
+		for _, dep := range deps {
+			delete(ta.frontier, dep.ID())
+		}
+		ta.frontier[vtxID] = vtx // I have no descendents yet
 	}
-	ta.frontier[vtxID] = vtx // I have no descendents yet
 
 	ta.preferenceCache[vtxID] = preferred
 	ta.virtuousCache[vtxID] = virtuous
