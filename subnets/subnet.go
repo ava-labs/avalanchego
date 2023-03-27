@@ -49,7 +49,7 @@ type subnet struct {
 	// done maps a vm state to the set of VMs that has done with that state
 	done map[snow.State]set.Set[ids.ID]
 
-	once       sync.Once
+	onces      map[ids.ID]*sync.Once
 	semaphores map[ids.ID]chan struct{}
 	config     Config
 	myNodeID   ids.NodeID
@@ -60,6 +60,7 @@ func New(myNodeID ids.NodeID, config Config) Subnet {
 		currentState: make(map[ids.ID]snow.State),
 		started:      make(map[snow.State]set.Set[ids.ID]),
 		done:         make(map[snow.State]set.Set[ids.ID]),
+		onces:        make(map[ids.ID]*sync.Once),
 		semaphores:   make(map[ids.ID]chan struct{}),
 		config:       config,
 		myNodeID:     myNodeID,
@@ -161,11 +162,13 @@ func (s *subnet) StartState(chainID ids.ID, state snow.State, currentEngineType 
 	if !s.isSynced() {
 		return
 	}
-	s.once.Do(func() {
-		for _, ch := range s.semaphores {
+
+	for chainID, ch := range s.semaphores {
+		once := s.onces[chainID]
+		once.Do(func() {
 			close(ch)
-		}
-	})
+		})
+	}
 }
 
 func (s *subnet) StopState(chainID ids.ID, state snow.State) {
@@ -182,21 +185,20 @@ func (s *subnet) StopState(chainID ids.ID, state snow.State) {
 	if !s.isSynced() {
 		return
 	}
-	s.once.Do(func() {
-		for _, ch := range s.semaphores {
+	for chainID, ch := range s.semaphores {
+		once := s.onces[chainID]
+		once.Do(func() {
 			close(ch)
-		}
-	})
+		})
+	}
 }
 
 func (s *subnet) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
-	if _, found := s.currentState[chainID]; !found {
+	if _, found := s.semaphores[chainID]; !found {
 		return nil, fmt.Errorf("unknown chain %s", chainID)
 	}
 
-	ch := make(chan struct{})
-	s.semaphores[chainID] = ch
-	return ch, nil
+	return s.semaphores[chainID], nil
 }
 
 func (s *subnet) AddChain(chainID ids.ID) bool {
@@ -208,6 +210,8 @@ func (s *subnet) AddChain(chainID ids.ID) bool {
 	}
 
 	s.currentState[chainID] = snow.Initializing
+	s.onces[chainID] = &sync.Once{}
+	s.semaphores[chainID] = make(chan struct{})
 	return true
 }
 
