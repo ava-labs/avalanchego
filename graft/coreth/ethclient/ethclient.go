@@ -632,12 +632,12 @@ func ToBlockNumArg(number *big.Int) string {
 	// negative numbers to special strings (latest, pending) then is
 	// used on its server side. See rpc/types.go for the comparison.
 	// In Coreth, latest, pending, and accepted are all treated the same
-	// therefore, if [number] is nil or a negative number in [-3, -1]
+	// therefore, if [number] is nil or a negative number in [-4, -1]
 	// we want the latest accepted block
 	if number == nil {
 		return "latest"
 	}
-	low := big.NewInt(-3)
+	low := big.NewInt(-4)
 	high := big.NewInt(-1)
 	if number.Cmp(low) >= 0 && number.Cmp(high) <= 0 {
 		return "latest"

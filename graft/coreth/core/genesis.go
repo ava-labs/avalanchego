@@ -131,7 +131,6 @@ func (h *storageJSON) UnmarshalText(text []byte) error {
 	}
 	offset := len(h) - len(text)/2 // pad on the left
 	if _, err := hex.Decode(h[offset:], text); err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("invalid hex storage key/value %q", text)
 	}
 	return nil
@@ -164,22 +163,22 @@ func (e *GenesisMismatchError) Error() string {
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
 func SetupGenesisBlock(
 	db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash, skipChainConfigCheckCompatible bool,
-) (*params.ChainConfig, error) {
+) (*params.ChainConfig, common.Hash, error) {
 	if genesis == nil {
-		return nil, ErrNoGenesis
+		return nil, common.Hash{}, ErrNoGenesis
 	}
 	if genesis.Config == nil {
-		return nil, errGenesisNoConfig
+		return nil, common.Hash{}, errGenesisNoConfig
 	}
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		log.Info("Writing genesis to database")
-		_, err := genesis.Commit(db)
+		block, err := genesis.Commit(db)
 		if err != nil {
-			return genesis.Config, err
+			return genesis.Config, common.Hash{}, err
 		}
-		return genesis.Config, nil
+		return genesis.Config, block.Hash(), nil
 	}
 	// We have the genesis block in database but the corresponding state is missing.
 	header := rawdb.ReadHeader(db, stored, 0)
@@ -187,28 +186,27 @@ func SetupGenesisBlock(
 		// Ensure the stored genesis matches with the given one.
 		hash := genesis.ToBlock(nil).Hash()
 		if hash != stored {
-			return genesis.Config, &GenesisMismatchError{stored, hash}
+			return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 		}
 		_, err := genesis.Commit(db)
-		return genesis.Config, err
+		return genesis.Config, common.Hash{}, err
 	}
 	// Check whether the genesis block is already written.
 	hash := genesis.ToBlock(nil).Hash()
 	if hash != stored {
-		return genesis.Config, &GenesisMismatchError{stored, hash}
+		return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 	}
 	// Get the existing chain configuration.
 	newcfg := genesis.Config
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
-		return newcfg, err
+		return newcfg, common.Hash{}, err
 	}
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	if storedcfg == nil {
 		log.Warn("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
-		return newcfg, nil
+		return newcfg, stored, nil
 	}
-
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	// we use last accepted block for cfg compatibility check. Note this allows
@@ -219,7 +217,7 @@ func SetupGenesisBlock(
 	// when we start syncing from scratch, the last accepted block
 	// will be genesis block
 	if lastBlock == nil {
-		return newcfg, fmt.Errorf("missing last accepted block")
+		return newcfg, common.Hash{}, fmt.Errorf("missing last accepted block")
 	}
 	height := lastBlock.NumberU64()
 	timestamp := lastBlock.Time()
@@ -228,11 +226,11 @@ func SetupGenesisBlock(
 	} else {
 		compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
 		if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
-			return newcfg, compatErr
+			return newcfg, stored, compatErr
 		}
 	}
 	rawdb.WriteChainConfig(db, stored, newcfg)
-	return newcfg, nil
+	return newcfg, stored, nil
 }
 
 // ToBlock creates the genesis block and writes state of a genesis specification

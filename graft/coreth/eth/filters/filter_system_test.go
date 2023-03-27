@@ -199,13 +199,12 @@ func TestBlockSubscription(t *testing.T) {
 		db           = rawdb.NewMemoryDatabase()
 		backend, sys = newTestFilterSystem(t, db, Config{})
 		api          = NewFilterAPI(sys, false)
-		gspec        = &core.Genesis{
+		genesis      = &core.Genesis{
 			Config:  params.TestChainConfig,
 			BaseFee: big.NewInt(params.ApricotPhase4MinBaseFee),
 		}
-		genesis     = gspec.MustCommit(db)
-		chain, _, _ = core.GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, 10, 10, func(i int, b *core.BlockGen) {})
-		chainEvents = []core.ChainEvent{}
+		_, chain, _, _ = core.GenerateChainWithGenesis(genesis, dummy.NewFaker(), 10, 10, func(i int, b *core.BlockGen) {})
+		chainEvents    = []core.ChainEvent{}
 	)
 
 	for _, blk := range chain {
@@ -768,14 +767,13 @@ func flattenLogs(pl [][]*types.Log) []*types.Log {
 
 func TestGetLogsRegression(t *testing.T) {
 	var (
-		db     = rawdb.NewMemoryDatabase()
-		_, sys = newSectionedTestFilterSystem(t, db, Config{}, 4096)
-		api    = NewFilterAPI(sys, false)
-		gspec  = core.Genesis{
+		db      = rawdb.NewMemoryDatabase()
+		_, sys  = newSectionedTestFilterSystem(t, db, Config{}, 4096)
+		api     = NewFilterAPI(sys, false)
+		genesis = &core.Genesis{
 			Config: params.TestChainConfig,
 		}
-		genesis = gspec.MustCommit(db)
-		_, _, _ = core.GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, 10, 10, func(i int, b *core.BlockGen) {})
+		_, _, _, _ = core.GenerateChainWithGenesis(genesis, dummy.NewFaker(), 10, 10, func(i int, gen *core.BlockGen) {})
 	)
 
 	test := FilterCriteria{BlockHash: &common.Hash{}, FromBlock: big.NewInt(rpc.LatestBlockNumber.Int64())}

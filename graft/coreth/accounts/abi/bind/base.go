@@ -43,6 +43,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+const basefeeWiggleMultiplier = 2
+
 var (
 	ErrNilAssetAmount            = errors.New("cannot specify nil asset amount for native asset call")
 	errNativeAssetDeployContract = errors.New("cannot specify native asset params while deploying a contract")
@@ -316,7 +318,7 @@ func (c *BoundContract) createDynamicTx(opts *TransactOpts, contract *common.Add
 	if gasFeeCap == nil {
 		gasFeeCap = new(big.Int).Add(
 			gasTipCap,
-			new(big.Int).Mul(head.BaseFee, big.NewInt(2)),
+			new(big.Int).Mul(head.BaseFee, big.NewInt(basefeeWiggleMultiplier)),
 		)
 	}
 	if gasFeeCap.Cmp(gasTipCap) < 0 {

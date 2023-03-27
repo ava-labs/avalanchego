@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ava-labs/coreth/trie"
@@ -41,6 +42,7 @@ type syncHandler struct {
 // NewSyncHandler constructs the handler for serving state sync.
 func NewSyncHandler(
 	provider SyncDataProvider,
+	diskDB ethdb.KeyValueReader,
 	evmTrieDB *trie.Database,
 	atomicTrieDB *trie.Database,
 	networkCodec codec.Manager,
@@ -50,7 +52,7 @@ func NewSyncHandler(
 		stateTrieLeafsRequestHandler:  NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, stats),
 		atomicTrieLeafsRequestHandler: NewLeafsRequestHandler(atomicTrieDB, nil, networkCodec, stats),
 		blockRequestHandler:           NewBlockRequestHandler(provider, networkCodec, stats),
-		codeRequestHandler:            NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, stats),
+		codeRequestHandler:            NewCodeRequestHandler(diskDB, networkCodec, stats),
 	}
 }
 

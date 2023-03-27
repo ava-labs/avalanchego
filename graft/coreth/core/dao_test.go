@@ -37,39 +37,51 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// setDAOForkBlock makes a copy of [cfg] and assigns the DAO fork block to [forkBlock].
+// This is necessary for testing since coreth restricts the DAO fork to be enabled at
+// genesis only.
+func setDAOForkBlock(cfg *params.ChainConfig, forkBlock *big.Int) *params.ChainConfig {
+	config := *cfg
+	config.DAOForkBlock = forkBlock
+	return &config
+}
+
 // Tests that DAO-fork enabled clients can properly filter out fork-commencing
 // blocks based on their extradata fields.
 func TestDAOForkRangeExtradata(t *testing.T) {
 	forkBlock := big.NewInt(32)
+	chainConfig := *params.TestApricotPhase2Config
+	chainConfig.DAOForkBlock = nil
 
 	// Generate a common prefix for both pro-forkers and non-forkers
-	db := rawdb.NewMemoryDatabase()
 	gspec := &Genesis{
 		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
-		Config:  params.TestApricotPhase2Config,
+		Config:  &chainConfig,
 	}
-	genesis := gspec.MustCommit(db)
-	prefix, _, _ := GenerateChain(params.TestApricotPhase2Config, genesis, dummy.NewFaker(), db, int(forkBlock.Int64()-1), 10, func(i int, gen *BlockGen) {})
+	genDb, prefix, _, _ := GenerateChainWithGenesis(gspec, dummy.NewFaker(), int(forkBlock.Int64()-1), 10, func(i int, gen *BlockGen) {})
 
 	// Create the concurrent, conflicting two nodes
 	proDb := rawdb.NewMemoryDatabase()
-	gspec.MustCommit(proDb)
-
 	proConf := *params.TestApricotPhase2Config
-	proConf.DAOForkBlock = forkBlock
 	proConf.DAOForkSupport = true
 
-	proBc, _ := NewBlockChain(proDb, DefaultCacheConfig, &proConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	progspec := &Genesis{
+		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+		Config:  &proConf,
+	}
+	proBc, _ := NewBlockChain(proDb, DefaultCacheConfig, progspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
+	proBc.chainConfig = setDAOForkBlock(proBc.chainConfig, forkBlock)
 	defer proBc.Stop()
 
 	conDb := rawdb.NewMemoryDatabase()
-	gspec.MustCommit(conDb)
-
 	conConf := *params.TestApricotPhase2Config
-	conConf.DAOForkBlock = forkBlock
 	conConf.DAOForkSupport = false
-
-	conBc, _ := NewBlockChain(conDb, DefaultCacheConfig, &conConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	congspec := &Genesis{
+		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
+		Config:  &conConf,
+	}
+	conBc, _ := NewBlockChain(conDb, DefaultCacheConfig, congspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
+	conBc.chainConfig = setDAOForkBlock(conBc.chainConfig, forkBlock)
 	defer conBc.Stop()
 
 	if _, err := proBc.InsertChain(prefix); err != nil {
@@ -81,9 +93,8 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	// Try to expand both pro-fork and non-fork chains iteratively with other camp's blocks
 	for i := int64(0); i < params.DAOForkExtraRange.Int64(); i++ {
 		// Create a pro-fork block, and try to feed into the no-fork chain
-		db = rawdb.NewMemoryDatabase()
-		gspec.MustCommit(db)
-		bc, _ := NewBlockChain(db, DefaultCacheConfig, &conConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+		bc, _ := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, congspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
+		bc.chainConfig = setDAOForkBlock(bc.chainConfig, forkBlock)
 		defer bc.Stop()
 
 		blocks := conBc.GetBlocksFromHash(conBc.CurrentBlock().Hash(), int(conBc.CurrentBlock().NumberU64()))
@@ -96,19 +107,17 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 		if err := bc.stateCache.TrieDB().Commit(bc.CurrentHeader().Root, true, nil); err != nil {
 			t.Fatalf("failed to commit contra-fork head for expansion: %v", err)
 		}
-		blocks, _, _ = GenerateChain(&proConf, conBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+		blocks, _, _ = GenerateChain(&proConf, conBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 		if _, err := conBc.InsertChain(blocks); err != nil {
 			t.Fatalf("contra-fork chain accepted pro-fork block: %v", blocks[0])
 		}
 		// Create a proper no-fork block for the contra-forker
-		blocks, _, _ = GenerateChain(&conConf, conBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+		blocks, _, _ = GenerateChain(&conConf, conBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 		if _, err := conBc.InsertChain(blocks); err != nil {
 			t.Fatalf("contra-fork chain didn't accepted no-fork block: %v", err)
 		}
 		// Create a no-fork block, and try to feed into the pro-fork chain
-		db = rawdb.NewMemoryDatabase()
-		gspec.MustCommit(db)
-		bc, _ = NewBlockChain(db, DefaultCacheConfig, &proConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+		bc, _ = NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, progspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 		defer bc.Stop()
 
 		blocks = proBc.GetBlocksFromHash(proBc.CurrentBlock().Hash(), int(proBc.CurrentBlock().NumberU64()))
@@ -121,20 +130,18 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 		if err := bc.stateCache.TrieDB().Commit(bc.CurrentHeader().Root, true, nil); err != nil {
 			t.Fatalf("failed to commit pro-fork head for expansion: %v", err)
 		}
-		blocks, _, _ = GenerateChain(&conConf, proBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+		blocks, _, _ = GenerateChain(&conConf, proBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 		if _, err := proBc.InsertChain(blocks); err != nil {
 			t.Fatalf("pro-fork chain accepted contra-fork block: %v", blocks[0])
 		}
 		// Create a proper pro-fork block for the pro-forker
-		blocks, _, _ = GenerateChain(&proConf, proBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+		blocks, _, _ = GenerateChain(&proConf, proBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 		if _, err := proBc.InsertChain(blocks); err != nil {
 			t.Fatalf("pro-fork chain didn't accepted pro-fork block: %v", err)
 		}
 	}
 	// Verify that contra-forkers accept pro-fork extra-datas after forking finishes
-	db = rawdb.NewMemoryDatabase()
-	gspec.MustCommit(db)
-	bc, _ := NewBlockChain(db, DefaultCacheConfig, &conConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	bc, _ := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, congspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 	defer bc.Stop()
 
 	blocks := conBc.GetBlocksFromHash(conBc.CurrentBlock().Hash(), int(conBc.CurrentBlock().NumberU64()))
@@ -147,14 +154,12 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	if err := bc.stateCache.TrieDB().Commit(bc.CurrentHeader().Root, true, nil); err != nil {
 		t.Fatalf("failed to commit contra-fork head for expansion: %v", err)
 	}
-	blocks, _, _ = GenerateChain(&proConf, conBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+	blocks, _, _ = GenerateChain(&proConf, conBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 	if _, err := conBc.InsertChain(blocks); err != nil {
 		t.Fatalf("contra-fork chain didn't accept pro-fork block post-fork: %v", err)
 	}
 	// Verify that pro-forkers accept contra-fork extra-datas after forking finishes
-	db = rawdb.NewMemoryDatabase()
-	gspec.MustCommit(db)
-	bc, _ = NewBlockChain(db, DefaultCacheConfig, &proConf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	bc, _ = NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, progspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 	defer bc.Stop()
 
 	blocks = proBc.GetBlocksFromHash(proBc.CurrentBlock().Hash(), int(proBc.CurrentBlock().NumberU64()))
@@ -167,7 +172,7 @@ func TestDAOForkRangeExtradata(t *testing.T) {
 	if err := bc.stateCache.TrieDB().Commit(bc.CurrentHeader().Root, true, nil); err != nil {
 		t.Fatalf("failed to commit pro-fork head for expansion: %v", err)
 	}
-	blocks, _, _ = GenerateChain(&conConf, proBc.CurrentBlock(), dummy.NewFaker(), db, 1, 10, func(i int, gen *BlockGen) {})
+	blocks, _, _ = GenerateChain(&conConf, proBc.CurrentBlock(), dummy.NewFaker(), genDb, 1, 10, func(i int, gen *BlockGen) {})
 	if _, err := proBc.InsertChain(blocks); err != nil {
 		t.Fatalf("pro-fork chain didn't accept contra-fork block post-fork: %v", err)
 	}
@@ -185,11 +190,10 @@ func TestDAOForkSupportPostApricotPhase3(t *testing.T) {
 		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 		Config:  &conf,
 	}
-	genesis := gspec.MustCommit(db)
-	bc, _ := NewBlockChain(db, DefaultCacheConfig, &conf, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	bc, _ := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 	defer bc.Stop()
 
-	blocks, _, _ := GenerateChain(&conf, genesis, dummy.NewFaker(), db, 32, 10, func(i int, gen *BlockGen) {})
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, dummy.NewFaker(), 32, 10, func(i int, gen *BlockGen) {})
 
 	if _, err := bc.InsertChain(blocks); err != nil {
 		t.Fatalf("failed to import blocks: %v", err)

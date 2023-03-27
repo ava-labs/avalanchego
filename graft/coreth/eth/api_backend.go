@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
@@ -445,11 +446,11 @@ func (b *EthAPIBackend) GetMaxBlocksPerRequest() int64 {
 	return b.eth.settings.MaxBlocksPerRequest
 }
 
-func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (*state.StateDB, error) {
-	return b.eth.StateAtBlock(block, reexec, base, checkLive, preferDisk)
+func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	return b.eth.StateAtBlock(block, reexec, base, readOnly, preferDisk)
 }
 
-func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, error) {
+func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	return b.eth.stateAtTransaction(block, txIndex, reexec)
 }
 
