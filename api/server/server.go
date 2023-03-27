@@ -115,10 +115,21 @@ func New(
 	wrappers ...Wrapper,
 ) Server {
 	router := newRouter()
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,
+	corsOptions := cors.Options{
 		AllowCredentials: true,
-	}).Handler(router)
+	}
+
+	// If and only if allowed origin only contains the wildcard, copy the hostname to the allow
+	// origins header
+	if len(allowedOrigins) == 1 && allowedOrigins[0] == "*" {
+		corsOptions.AllowOriginFunc = func(origin string) bool {
+			return true
+		}
+	} else {
+		corsOptions.AllowedOrigins = allowedOrigins
+	}
+
+	corsHandler := cors.New(corsOptions).Handler(router)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
