@@ -953,6 +953,7 @@ func (vm *VM) setAppRequestHandlers() {
 	)
 	syncRequestHandler := handlers.NewSyncHandler(
 		vm.blockChain,
+		vm.chaindb,
 		evmTrieDB,
 		vm.atomicTrie.TrieDB(),
 		vm.networkCodec,
