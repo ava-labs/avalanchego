@@ -44,6 +44,7 @@ var (
 		TransitiveVotingTest,
 		AcceptParentOfPreviouslyRejectedVertexTest,
 		RejectParentOfPreviouslyRejectedVertexTest,
+		QuiesceAfterRejectedVertexTest,
 		SplitVotingTest,
 		TransitiveRejectionTest,
 		IsVirtuousTest,
@@ -1426,6 +1427,97 @@ func RejectParentOfPreviouslyRejectedVertexTest(t *testing.T, factory Factory) {
 
 	orphans := avl.Orphans()
 	require.Empty(orphans)
+}
+
+func QuiesceAfterRejectedVertexTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	avl := factory.New()
+
+	params := Parameters{
+		Parameters: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          1,
+			BetaRogue:             1,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Parents:   2,
+		BatchSize: 1,
+	}
+	vts := []Vertex{
+		&TestVertex{TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		}},
+	}
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	require.NoError(avl.Initialize(context.Background(), snow.DefaultConsensusContextTest(), params, vts))
+
+	txA := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+	txB := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: utxos,
+	}
+
+	vtxA := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{txA},
+	}
+
+	vtxB0 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		TxsV:     []snowstorm.Tx{txB},
+	}
+	vtxB1 := &TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []Vertex{vtxB0},
+		HeightV:  2,
+		TxsV:     []snowstorm.Tx{txB},
+	}
+
+	require.NoError(avl.Add(context.Background(), vtxA))
+	require.NoError(avl.Add(context.Background(), vtxB0))
+	require.NoError(avl.Add(context.Background(), vtxB1))
+
+	sm1 := bag.UniqueBag[ids.ID]{}
+	sm1.Add(0, vtxA.IDV)
+
+	require.NoError(avl.RecordPoll(context.Background(), sm1))
+	require.Equal(choices.Accepted, txA.Status())
+	require.Equal(choices.Accepted, vtxA.Status())
+	require.Equal(choices.Rejected, txB.Status())
+	require.Equal(choices.Rejected, vtxB0.Status())
+	require.Equal(choices.Rejected, vtxB1.Status())
+	require.Zero(avl.NumProcessing())
+	require.True(avl.Finalized())
+	require.True(avl.Quiesce())
 }
 
 func SplitVotingTest(t *testing.T, factory Factory) {

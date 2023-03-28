@@ -587,6 +587,10 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 				zap.Stringer("vtxID", vtxID),
 				zap.Stringer("parentID", dep.ID()),
 			)
+			// Note: because the parent was rejected, the transaction vertex
+			// will have already been marked as rejected by the conflict graph.
+			// However, we still need to remove it from the set of virtuous
+			// transactions.
 			ta.virtuousVoting.Remove(vtxID)
 			if err := vtx.Reject(ctx); err != nil {
 				return err
