@@ -315,15 +315,29 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 	}
 
-	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
-	if err != nil {
-		return err
+	{
+		txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
+		if err != nil {
+			return err
+		}
+		utxoID := avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: 192,
+		}
+		vm.state.DeleteUTXO(utxoID.InputID())
 	}
-	utxoID := avax.UTXOID{
-		TxID:        txID,
-		OutputIndex: 192,
+	{
+		txID, err := ids.FromString("uhvby2sBpBvwfxALBKcAqVnX4R7RbDRLLd3vUECQhNgguweNU")
+		if err != nil {
+			return err
+		}
+		utxoID := avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: 110,
+		}
+		vm.state.DeleteUTXO(utxoID.InputID())
 	}
-	vm.state.DeleteUTXO(utxoID.InputID())
+
 	if err := vm.state.Commit(); err != nil {
 		return err
 	}
