@@ -16,93 +16,93 @@ import (
 
 func TestValidatorUptimes(t *testing.T) {
 	require := require.New(t)
-	uptimes := newValidatorUptimes()
+	state := newValidatorState()
 
 	// get non-existent uptime
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
-	_, _, err := uptimes.GetUptime(nodeID, subnetID)
+	_, _, err := state.GetUptime(nodeID, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// set non-existent uptime
-	err = uptimes.SetUptime(nodeID, subnetID, 1, time.Now())
+	err = state.SetUptime(nodeID, subnetID, 1, time.Now())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	testUptimeReward := &uptimeAndReward{
+	testMetadata := &validatorMetadata{
 		UpDuration:  time.Hour,
 		lastUpdated: time.Now(),
 	}
 	// load uptime
-	uptimes.LoadUptime(nodeID, subnetID, testUptimeReward)
+	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
 
 	// get uptime
-	upDuration, lastUpdated, err := uptimes.GetUptime(nodeID, subnetID)
+	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
 	require.NoError(err)
-	require.Equal(testUptimeReward.UpDuration, upDuration)
-	require.Equal(testUptimeReward.lastUpdated, lastUpdated)
+	require.Equal(testMetadata.UpDuration, upDuration)
+	require.Equal(testMetadata.lastUpdated, lastUpdated)
 
 	// set uptime
-	newUpDuration := testUptimeReward.UpDuration + 1
-	newLastUpdated := testUptimeReward.lastUpdated.Add(time.Hour)
-	err = uptimes.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
+	newUpDuration := testMetadata.UpDuration + 1
+	newLastUpdated := testMetadata.lastUpdated.Add(time.Hour)
+	err = state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
 	require.NoError(err)
 
 	// get new uptime
-	upDuration, lastUpdated, err = uptimes.GetUptime(nodeID, subnetID)
+	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
 	require.NoError(err)
 	require.Equal(newUpDuration, upDuration)
 	require.Equal(newLastUpdated, lastUpdated)
 
 	// load uptime changes uptimes
-	newTestUptimeReward := &uptimeAndReward{
-		UpDuration:  testUptimeReward.UpDuration + time.Hour,
-		lastUpdated: testUptimeReward.lastUpdated.Add(time.Hour),
+	newTestMetadata := &validatorMetadata{
+		UpDuration:  testMetadata.UpDuration + time.Hour,
+		lastUpdated: testMetadata.lastUpdated.Add(time.Hour),
 	}
-	uptimes.LoadUptime(nodeID, subnetID, newTestUptimeReward)
+	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
 
 	// get new uptime
-	upDuration, lastUpdated, err = uptimes.GetUptime(nodeID, subnetID)
+	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
 	require.NoError(err)
-	require.Equal(newTestUptimeReward.UpDuration, upDuration)
-	require.Equal(newTestUptimeReward.lastUpdated, lastUpdated)
+	require.Equal(newTestMetadata.UpDuration, upDuration)
+	require.Equal(newTestMetadata.lastUpdated, lastUpdated)
 
 	// delete uptime
-	uptimes.DeleteUptime(nodeID, subnetID)
+	state.DeleteValidatorMetadata(nodeID, subnetID)
 
 	// get deleted uptime
-	_, _, err = uptimes.GetUptime(nodeID, subnetID)
+	_, _, err = state.GetUptime(nodeID, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
-func TestWriteUptimes(t *testing.T) {
+func TestWriteValidatorMetadata(t *testing.T) {
 	require := require.New(t)
-	uptimes := newValidatorUptimes()
+	state := newValidatorState()
 
 	primaryDB := memdb.New()
 	subnetDB := memdb.New()
 	// write empty uptimes
-	err := uptimes.WriteUptimes(primaryDB, subnetDB)
+	err := state.WriteValidatorMetadata(primaryDB, subnetDB)
 	require.NoError(err)
 
 	// load uptime
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
-	testUptimeReward := &uptimeAndReward{
+	testUptimeReward := &validatorMetadata{
 		UpDuration:      time.Hour,
 		lastUpdated:     time.Now(),
 		PotentialReward: 100,
 		txID:            ids.GenerateTestID(),
 	}
-	uptimes.LoadUptime(nodeID, subnetID, testUptimeReward)
+	state.LoadValidatorMetadata(nodeID, subnetID, testUptimeReward)
 
-	// write uptimes, should not reflect to DB yet
-	err = uptimes.WriteUptimes(primaryDB, subnetDB)
+	// write state, should not reflect to DB yet
+	err = state.WriteValidatorMetadata(primaryDB, subnetDB)
 	require.NoError(err)
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.False(subnetDB.Has(testUptimeReward.txID[:]))
 
 	// get uptime should still return the loaded value
-	upDuration, lastUpdated, err := uptimes.GetUptime(nodeID, subnetID)
+	upDuration, lastUpdated, err := state.GetUptime(nodeID, subnetID)
 	require.NoError(err)
 	require.Equal(testUptimeReward.UpDuration, upDuration)
 	require.Equal(testUptimeReward.lastUpdated, lastUpdated)
@@ -110,11 +110,11 @@ func TestWriteUptimes(t *testing.T) {
 	// update uptimes
 	newUpDuration := testUptimeReward.UpDuration + 1
 	newLastUpdated := testUptimeReward.lastUpdated.Add(time.Hour)
-	err = uptimes.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
+	err = state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
 	require.NoError(err)
 
 	// write uptimes, should reflect to subnet DB
-	err = uptimes.WriteUptimes(primaryDB, subnetDB)
+	err = state.WriteValidatorMetadata(primaryDB, subnetDB)
 	require.NoError(err)
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.True(subnetDB.Has(testUptimeReward.txID[:]))
