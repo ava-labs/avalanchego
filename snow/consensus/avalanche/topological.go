@@ -80,6 +80,8 @@ type Topological struct {
 	virtuousVoting set.Set[ids.ID]
 
 	// frontier is the set of vts that have no descendents
+	//
+	// Invariant: frontier never contains a rejected vertex
 	frontier map[ids.ID]Vertex
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
@@ -498,6 +500,13 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// reissued.
 	ta.orphans.Remove(vtxID)
 
+	// Note: it is not possible for the status to be rejected here. Update is
+	// only called when adding a new processing vertex and when updating the
+	// frontiers. If update is called with a rejected vertex when updating the
+	// frontiers, it is guaranteed that the vertex was rejected during the same
+	// frontier update. This means that the rejected vertex must have already
+	// been visited, which means update will have exited from the above
+	// preferenceCache check.
 	if vtx.Status() == choices.Accepted {
 		ta.preferred.Add(vtxID) // I'm preferred
 		ta.virtuous.Add(vtxID)  // Accepted is defined as virtuous
@@ -603,6 +612,10 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// Also, this will only happen from a byzantine node issuing the vertex.
 	// Therefore, this is very unlikely to actually be triggered in practice.
 
+	// If the vertex is going to be rejected, it and all of its children are
+	// going to be removed from the graph. This means that the parents may still
+	// exist in the frontier. If the vertex is not rejectable, then it will
+	// still be in the graph and the parents can not be part of the frontier.
 	if !rejectable {
 		for _, dep := range deps {
 			delete(ta.frontier, dep.ID())
