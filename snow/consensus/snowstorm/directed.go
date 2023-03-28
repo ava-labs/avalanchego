@@ -567,6 +567,11 @@ func (dg *Directed) reject(ctx context.Context, conflictIDs set.Set[ids.ID]) err
 	for conflictKey := range conflictIDs {
 		conflict, exists := dg.txs[conflictKey]
 		if !exists {
+			// Transaction dependencies are cleaned up when the dependency is
+			// either accepted or rejected. However, a transaction may have
+			// already been rejected due to a conflict of its own. In this case,
+			// the transaction has already been cleaned up from memory and there
+			// is nothing more to be done.
 			continue
 		}
 		// This tx is no longer an option for consuming the UTXOs from its
