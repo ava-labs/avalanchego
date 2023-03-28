@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package client
+package sender
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Client = (*client)(nil)
+var _ Sender = (*sender)(nil)
 
 const (
 	// We allow [recentCacheSize] to be fairly large because we only store hashes
@@ -25,27 +25,27 @@ const (
 	recentCacheSize = 512
 )
 
-type Client interface {
+type Sender interface {
 	common.AppSender
+
 	GossipTx(tx *txs.Tx) error
 }
 
-type client struct {
+type sender struct {
 	common.AppSender
-
 	log       logging.Logger
 	recentTxs *cache.LRU[ids.ID, struct{}]
 }
 
-func NewClient(appSender common.AppSender, logger logging.Logger) Client {
-	return &client{
+func NewSender(appSender common.AppSender, logger logging.Logger) Sender {
+	return &sender{
 		AppSender: appSender,
 		recentTxs: &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 		log:       logger,
 	}
 }
 
-func (c *client) GossipTx(tx *txs.Tx) error {
+func (c *sender) GossipTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	// Don't gossip a transaction if it has been recently gossiped.
 	if _, has := c.recentTxs.Get(txID); has {

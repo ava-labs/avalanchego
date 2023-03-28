@@ -178,17 +178,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
 	}
 
-	res.backend = &executor.Backend{
-		Config:       res.config,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
-		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
-	}
-
 	registerer := prometheus.NewRegistry()
 	window := window.New[ids.ID](
 		window.Config{
@@ -207,9 +196,20 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 
+	res.backend = &executor.Backend{
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
+		Rewards:      rewardsCalc,
+		Mempool:      res.mempool,
+	}
+
 	if ctrl == nil {
 		res.blkManager = NewManager(
-			res.mempool,
 			metrics,
 			res.state,
 			res.backend,
@@ -218,7 +218,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		addSubnet(res)
 	} else {
 		res.blkManager = NewManager(
-			res.mempool,
 			metrics,
 			res.mockedState,
 			res.backend,

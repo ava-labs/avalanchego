@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
@@ -23,4 +24,5 @@ type Backend struct {
 	Uptimes      uptime.Manager
 	Rewards      reward.Calculator
 	Bootstrapped *utils.Atomic[bool]
+	Mempool      mempool.Mempool
 }

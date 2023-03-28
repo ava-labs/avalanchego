@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 var _ Manager = (*manager)(nil)
@@ -27,14 +26,13 @@ type Manager interface {
 }
 
 func NewManager(
-	mempool mempool.Mempool,
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
 	recentlyAccepted window.Window[ids.ID],
 ) Manager {
 	backend := &backend{
-		Mempool:      mempool,
+		Mempool:      txExecutorBackend.Mempool,
 		lastAccepted: s.GetLastAccepted(),
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,

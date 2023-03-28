@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network/client"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network/sender"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -65,7 +65,7 @@ type Builder interface {
 type builder struct {
 	mempool.Mempool
 
-	networkClient client.Client
+	networkClient sender.Sender
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
@@ -83,16 +83,15 @@ type builder struct {
 	timer *timer.Timer
 }
 
-func Initialize(
-	mempool mempool.Mempool,
+func New(
 	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
-	networkClient client.Client,
+	networkClient sender.Sender,
 ) Builder {
 	builder := &builder{
-		Mempool:           mempool,
+		Mempool:           txExecutorBackend.Mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
 		blkManager:        blkManager,

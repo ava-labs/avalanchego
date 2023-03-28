@@ -52,7 +52,7 @@ import (
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	networkclient "github.com/ava-labs/avalanchego/vms/platformvm/network/client"
+	networkclient "github.com/ava-labs/avalanchego/vms/platformvm/network/sender"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -185,6 +185,13 @@ func (vm *VM) Initialize(
 		utxoHandler,
 	)
 
+	// Note: There is a circular dependency between the mempool and block
+	//       builder which is broken by passing in the vm.
+	mempool, err := mempool.NewMempool("mempool", registerer, vm)
+	if err != nil {
+		return fmt.Errorf("failed to create mempool: %w", err)
+	}
+
 	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,
 		Ctx:          vm.ctx,
@@ -194,25 +201,17 @@ func (vm *VM) Initialize(
 		Uptimes:      vm.uptimeManager,
 		Rewards:      rewards,
 		Bootstrapped: &vm.bootstrapped,
-	}
-
-	// Note: There is a circular dependency between the mempool and block
-	//       builder which is broken by passing in the vm.
-	mempool, err := mempool.NewMempool("mempool", registerer, vm)
-	if err != nil {
-		return fmt.Errorf("failed to create mempool: %w", err)
+		Mempool:      mempool,
 	}
 
 	vm.manager = blockexecutor.NewManager(
-		mempool,
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
 		vm.recentlyAccepted,
 	)
-	networkClient := networkclient.NewClient(appSender, vm.ctx.Log)
-	vm.Builder = blockbuilder.Initialize(
-		mempool,
+	networkClient := networkclient.NewSender(appSender, vm.ctx.Log)
+	vm.Builder = blockbuilder.New(
 		vm.txBuilder,
 		txExecutorBackend,
 		vm.manager,
@@ -220,7 +219,7 @@ func (vm *VM) Initialize(
 		networkClient,
 	)
 	gossipHandler := network.NewGossipHandler(vm.ctx, vm.Builder)
-	vm.AppHandler = network.NewNetwork(vm.ctx, gossipHandler)
+	vm.AppHandler = network.NewHandler(vm.ctx, gossipHandler)
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {

@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network/client"
+	"github.com/ava-labs/avalanchego/vms/platformvm/network/sender"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -145,16 +145,6 @@ func newEnvironment(t *testing.T) *environment {
 	)
 
 	genesisID := res.state.GetLastAccepted()
-	res.backend = txexecutor.Backend{
-		Config:       res.config,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
-		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
-	}
 
 	registerer := prometheus.NewRegistry()
 	window := window.New[ids.ID](
@@ -176,18 +166,29 @@ func newEnvironment(t *testing.T) *environment {
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
+
+	res.backend = txexecutor.Backend{
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
+		Rewards:      rewardsCalc,
+		Mempool:      res.mempool,
+	}
+
 	res.blkManager = blockexecutor.NewManager(
-		res.mempool,
 		metrics,
 		res.state,
 		&res.backend,
 		window,
 	)
 
-	client := client.NewClient(res.sender, res.ctx.Log)
+	client := sender.NewSender(res.sender, res.ctx.Log)
 
-	res.Builder = Initialize(
-		res.mempool,
+	res.Builder = New(
 		res.txBuilder,
 		&res.backend,
 		res.blkManager,
