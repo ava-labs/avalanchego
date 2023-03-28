@@ -326,6 +326,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 		vm.state.DeleteUTXO(utxoID.InputID())
 	}
+
 	{
 		txID, err := ids.FromString("uhvby2sBpBvwfxALBKcAqVnX4R7RbDRLLd3vUECQhNgguweNU")
 		if err != nil {
@@ -334,6 +335,15 @@ func (vm *VM) onNormalOperationsStarted() error {
 		utxoID := avax.UTXOID{
 			TxID:        txID,
 			OutputIndex: 110,
+		}
+		_, err = vm.state.GetUTXO(utxoID.InputID())
+		switch err {
+		case nil:
+			vm.ctx.Log.Warn("deleting UTXO that should not exist")
+		case database.ErrNotFound:
+			vm.ctx.Log.Info("UTXO does not exist")
+		default:
+			return err
 		}
 		vm.state.DeleteUTXO(utxoID.InputID())
 	}
