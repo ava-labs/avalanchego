@@ -896,13 +896,14 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		}
 	}
 
-	// Checking claimables sigs and claimable amounts, updating claimables in state // todo@ comment
+	// Checking claimables sigs and claimable amounts,
+	// updating claimables in state, minting reward utxos and adding them to state
 
 	for i, ownerID := range tx.ClaimableOwnerIDs {
 		claimable, err := e.State.GetClaimable(ownerID)
 		if err == database.ErrNotFound {
 			// tx.ClaimedAmount[i] > 0, so we'r trying to claim more, than available
-			return errWrongClaimedAmount
+			return fmt.Errorf("no claimable found for the ownerID (%s): %w", ownerID, errWrongClaimedAmount)
 		} else if err != nil {
 			return err
 		}

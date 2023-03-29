@@ -46,11 +46,17 @@ func (cs *caminoState) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) 
 	}
 
 	if depositIntf, ok := cs.depositsCache.Get(depositTxID); ok {
+		if depositIntf == nil {
+			return nil, database.ErrNotFound
+		}
 		return depositIntf.(*deposit.Deposit), nil
 	}
 
 	depositBytes, err := cs.depositsDB.Get(depositTxID[:])
-	if err != nil {
+	if err == database.ErrNotFound {
+		cs.depositsCache.Put(depositTxID, nil)
+		return nil, err
+	} else if err != nil {
 		return nil, err
 	}
 

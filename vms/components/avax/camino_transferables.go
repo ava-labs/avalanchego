@@ -65,7 +65,7 @@ func (utxos *innerSortTransferableTimedUTXOs) Swap(i, j int) {
 	utxos.utxos[j], utxos.utxos[i] = utxos.utxos[i], utxos.utxos[j]
 }
 
-// SortTransferableUTXOs sorts the utxos based on the utxoid
+// SortTransferableTimedUTXOs sorts the utxos based on the utxoid
 func SortTransferableTimedUTXOs(utxos []*TimedUTXO) {
 	sort.Sort(&innerSortTransferableTimedUTXOs{utxos: utxos})
 }

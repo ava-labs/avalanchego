@@ -24,18 +24,18 @@ func TestGetDeposit(t *testing.T) {
 	deposit1 := &deposit.Deposit{Duration: 101}
 	depositBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, deposit1)
 	require.NoError(t, err)
+	testError := errors.New("test error")
 
 	tests := map[string]struct {
-		caminoState     func(*gomock.Controller) *caminoState
-		depositTxID     ids.ID
-		expectedDeposit *deposit.Deposit
-		expectedErr     error
+		caminoState         func(*gomock.Controller) *caminoState
+		depositTxID         ids.ID
+		expectedCaminoState func(*caminoState) *caminoState
+		expectedDeposit     *deposit.Deposit
+		expectedErr         error
 	}{
 		"Fail: deposit removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				return &caminoState{
-					depositsDB:    database.NewMockDatabase(c),
-					depositsCache: cache.NewMockCacher(c),
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{
 							depositTxID: {Deposit: deposit1, removed: true},
@@ -43,15 +43,48 @@ func TestGetDeposit(t *testing.T) {
 					},
 				}
 			},
-			depositTxID:     depositTxID,
-			expectedDeposit: nil,
-			expectedErr:     database.ErrNotFound,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					caminoDiff: &caminoDiff{
+						modifiedDeposits: map[ids.ID]*depositDiff{
+							depositTxID: {Deposit: deposit1, removed: true},
+						},
+					},
+				}
+			},
+			depositTxID: depositTxID,
+			expectedErr: database.ErrNotFound,
+		},
+		"Fail: deposit in cache, but removed": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				cache := cache.NewMockCacher(c)
+				cache.EXPECT().Get(depositTxID).Return(nil, true)
+				return &caminoState{
+					depositsCache: cache,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsCache: actualCaminoState.depositsCache,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			depositTxID: depositTxID,
+			expectedErr: database.ErrNotFound,
 		},
 		"OK: deposit added": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				return &caminoState{
-					depositsDB:    database.NewMockDatabase(c),
-					depositsCache: cache.NewMockCacher(c),
+					caminoDiff: &caminoDiff{
+						modifiedDeposits: map[ids.ID]*depositDiff{
+							depositTxID: {Deposit: deposit1, added: true},
+						},
+					},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{
 							depositTxID: {Deposit: deposit1, added: true},
@@ -65,8 +98,15 @@ func TestGetDeposit(t *testing.T) {
 		"OK: deposit modified": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				return &caminoState{
-					depositsDB:    database.NewMockDatabase(c),
-					depositsCache: cache.NewMockCacher(c),
+					caminoDiff: &caminoDiff{
+						modifiedDeposits: map[ids.ID]*depositDiff{
+							depositTxID: {Deposit: deposit1},
+						},
+					},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{
 							depositTxID: {Deposit: deposit1},
@@ -82,8 +122,13 @@ func TestGetDeposit(t *testing.T) {
 				cache := cache.NewMockCacher(c)
 				cache.EXPECT().Get(depositTxID).Return(deposit1, true)
 				return &caminoState{
-					depositsDB:    database.NewMockDatabase(c),
 					depositsCache: cache,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsCache: actualCaminoState.depositsCache,
 					caminoDiff:    &caminoDiff{},
 				}
 			},
@@ -103,6 +148,13 @@ func TestGetDeposit(t *testing.T) {
 					caminoDiff:    &caminoDiff{},
 				}
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsDB:    actualCaminoState.depositsDB,
+					depositsCache: actualCaminoState.depositsCache,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
 			depositTxID:     depositTxID,
 			expectedDeposit: deposit1,
 		},
@@ -111,24 +163,33 @@ func TestGetDeposit(t *testing.T) {
 				cache := cache.NewMockCacher(c)
 				cache.EXPECT().Get(depositTxID).Return(nil, false)
 				db := database.NewMockDatabase(c)
-				db.EXPECT().Get(depositTxID[:]).Return(nil, database.ErrNotFound)
+				db.EXPECT().Get(depositTxID[:]).Return(nil, testError)
 				return &caminoState{
 					depositsDB:    db,
 					depositsCache: cache,
 					caminoDiff:    &caminoDiff{},
 				}
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsDB:    actualCaminoState.depositsDB,
+					depositsCache: actualCaminoState.depositsCache,
+					caminoDiff:    &caminoDiff{},
+				}
+			},
 			depositTxID: depositTxID,
-			expectedErr: database.ErrNotFound,
+			expectedErr: testError,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			actualDeposit, err := tt.caminoState(ctrl).GetDeposit(tt.depositTxID)
+			caminoState := tt.caminoState(ctrl)
+			actualDeposit, err := caminoState.GetDeposit(tt.depositTxID)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedDeposit, actualDeposit)
+			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
 		})
 	}
 }
@@ -174,7 +235,7 @@ func TestModifyDeposit(t *testing.T) {
 		caminoState         func(*gomock.Controller) *caminoState
 		depositTxID         ids.ID
 		deposit             *deposit.Deposit
-		expectedCaminoState func(cache.Cacher) *caminoState
+		expectedCaminoState func(*caminoState) *caminoState
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -187,9 +248,9 @@ func TestModifyDeposit(t *testing.T) {
 			},
 			depositTxID: depositTxID,
 			deposit:     deposit1,
-			expectedCaminoState: func(depositsCache cache.Cacher) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					depositsCache: depositsCache,
+					depositsCache: actualCaminoState.depositsCache,
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{
 							depositTxID: {Deposit: deposit1},
@@ -205,7 +266,7 @@ func TestModifyDeposit(t *testing.T) {
 			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			actualCaminoState.ModifyDeposit(tt.depositTxID, tt.deposit)
-			require.Equal(t, tt.expectedCaminoState(actualCaminoState.depositsCache), actualCaminoState)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }
@@ -218,7 +279,7 @@ func TestRemoveDeposit(t *testing.T) {
 		caminoState         func(*gomock.Controller) *caminoState
 		depositTxID         ids.ID
 		deposit             *deposit.Deposit
-		expectedCaminoState func(cache.Cacher) *caminoState
+		expectedCaminoState func(*caminoState) *caminoState
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -231,9 +292,9 @@ func TestRemoveDeposit(t *testing.T) {
 			},
 			depositTxID: depositTxID,
 			deposit:     deposit1,
-			expectedCaminoState: func(depositsCache cache.Cacher) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					depositsCache: depositsCache,
+					depositsCache: actualCaminoState.depositsCache,
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{
 							depositTxID: {Deposit: deposit1, removed: true},
@@ -249,7 +310,7 @@ func TestRemoveDeposit(t *testing.T) {
 			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			actualCaminoState.RemoveDeposit(tt.depositTxID, tt.deposit)
-			require.Equal(t, tt.expectedCaminoState(actualCaminoState.depositsCache), actualCaminoState)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }
@@ -267,11 +328,15 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 	tests := map[string]struct {
 		caminoState            func(c *gomock.Controller) *caminoState
 		removedDepositIDs      set.Set[ids.ID]
+		expectedCaminoState    func(*caminoState) *caminoState
 		expectedNextUnlockTime time.Time
 		expectedErr            error
 	}{
 		"Fail: no deposits": {
 			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{}
 			},
 			expectedNextUnlockTime: mockable.MaxTime,
@@ -293,12 +358,25 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
 				}
 			},
-			removedDepositIDs:      set.Set[ids.ID]{depositTxID1: struct{}{}},
+			removedDepositIDs: set.Set[ids.ID]{depositTxID1: struct{}{}},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositIDsByEndtimeDB:    actualCaminoState.depositIDsByEndtimeDB,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
 			expectedNextUnlockTime: mockable.MaxTime,
 			expectedErr:            database.ErrNotFound,
 		},
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					depositsNextToUnlockTime: &deposit1Endtime,
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
@@ -330,6 +408,13 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 				depositTxID1: struct{}{},
 				depositTxID2: struct{}{},
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositIDsByEndtimeDB:    actualCaminoState.depositIDsByEndtimeDB,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
 			expectedNextUnlockTime: deposit31.EndTime(),
 		},
 		"OK: some deposits removed": {
@@ -342,6 +427,12 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 			removedDepositIDs: set.Set[ids.ID]{
 				depositTxID1: struct{}{},
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+				}
+			},
 			expectedNextUnlockTime: deposit1Endtime,
 		},
 	}
@@ -349,9 +440,11 @@ func TestGetNextToUnlockDepositTime(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			nextUnlockTime, err := tt.caminoState(ctrl).GetNextToUnlockDepositTime(tt.removedDepositIDs)
+			caminoState := tt.caminoState(ctrl)
+			nextUnlockTime, err := caminoState.GetNextToUnlockDepositTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedNextUnlockTime, nextUnlockTime)
+			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
 		})
 	}
 }
@@ -369,12 +462,16 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 	tests := map[string]struct {
 		caminoState            func(c *gomock.Controller) *caminoState
 		removedDepositIDs      set.Set[ids.ID]
+		expectedCaminoState    func(*caminoState) *caminoState
 		expectedNextUnlockTime time.Time
 		expectedNextUnlockIDs  []ids.ID
 		expectedErr            error
 	}{
 		"Fail: no deposits": {
 			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{}
 			},
 			expectedNextUnlockTime: mockable.MaxTime,
@@ -396,12 +493,25 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
 				}
 			},
-			removedDepositIDs:      set.Set[ids.ID]{depositTxID1: struct{}{}},
+			removedDepositIDs: set.Set[ids.ID]{depositTxID1: struct{}{}},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositIDsByEndtimeDB:    actualCaminoState.depositIDsByEndtimeDB,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
 			expectedNextUnlockTime: mockable.MaxTime,
 			expectedErr:            database.ErrNotFound,
 		},
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					depositsNextToUnlockTime: &deposit1Endtime,
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
@@ -434,6 +544,13 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 				depositTxID1: struct{}{},
 				depositTxID2: struct{}{},
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositIDsByEndtimeDB:    actualCaminoState.depositIDsByEndtimeDB,
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1},
+				}
+			},
 			expectedNextUnlockTime: deposit31.EndTime(),
 			expectedNextUnlockIDs:  []ids.ID{depositTxID31, depositTxID32},
 		},
@@ -447,6 +564,12 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 			removedDepositIDs: set.Set[ids.ID]{
 				depositTxID1: struct{}{},
 			},
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					depositsNextToUnlockTime: &deposit1Endtime,
+					depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
+				}
+			},
 			expectedNextUnlockTime: deposit1Endtime,
 			expectedNextUnlockIDs:  []ids.ID{depositTxID2},
 		},
@@ -455,10 +578,12 @@ func TestGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			nextUnlockIDs, nextUnlockTime, err := tt.caminoState(ctrl).GetNextToUnlockDepositIDsAndTime(tt.removedDepositIDs)
+			caminoState := tt.caminoState(ctrl)
+			nextUnlockIDs, nextUnlockTime, err := caminoState.GetNextToUnlockDepositIDsAndTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedNextUnlockTime, nextUnlockTime)
 			require.Equal(t, tt.expectedNextUnlockIDs, nextUnlockIDs)
+			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
 		})
 	}
 }
@@ -479,10 +604,10 @@ func TestWriteDeposits(t *testing.T) {
 
 	tests := map[string]struct {
 		caminoState         func(*gomock.Controller) *caminoState
-		expectedCaminoState func(database.Database, database.Database) *caminoState
+		expectedCaminoState func(*caminoState) *caminoState
 		expectedErr         error
 	}{
-		"Fail: db errored on modifiedDeposits Put": {
+		"Fail: db errored on modified deposit Put": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositsDB := database.NewMockDatabase(c)
 				depositsDB.EXPECT().Put(depositTxID1[:], deposit1Bytes).Return(testError)
@@ -495,17 +620,17 @@ func TestWriteDeposits(t *testing.T) {
 					depositsDB: depositsDB,
 				}
 			},
-			expectedCaminoState: func(depositsDB, depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{},
 					},
-					depositsDB: depositsDB,
+					depositsDB: actualCaminoState.depositsDB,
 				}
 			},
 			expectedErr: testError,
 		},
-		"Fail: db errored on addedDeposits Put": {
+		"Fail: db errored on added deposit Put": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositsDB := database.NewMockDatabase(c)
 				depositsDB.EXPECT().Put(depositTxID1[:], deposit1Bytes).Return(testError)
@@ -518,17 +643,17 @@ func TestWriteDeposits(t *testing.T) {
 					depositsDB: depositsDB,
 				}
 			},
-			expectedCaminoState: func(depositsDB, depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{},
 					},
-					depositsDB: depositsDB,
+					depositsDB: actualCaminoState.depositsDB,
 				}
 			},
 			expectedErr: testError,
 		},
-		"Fail: db errored on removedDeposits Put": {
+		"Fail: db errored on removed deposit Delete": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositsDB := database.NewMockDatabase(c)
 				depositsDB.EXPECT().Delete(depositTxID1[:]).Return(testError)
@@ -541,12 +666,12 @@ func TestWriteDeposits(t *testing.T) {
 					depositsDB: depositsDB,
 				}
 			},
-			expectedCaminoState: func(depositsDB, depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{},
 					},
-					depositsDB: depositsDB,
+					depositsDB: actualCaminoState.depositsDB,
 				}
 			},
 			expectedErr: testError,
@@ -576,10 +701,10 @@ func TestWriteDeposits(t *testing.T) {
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID2, depositTxID3},
 				}
 			},
-			expectedCaminoState: func(depositsDB, depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					depositIDsByEndtimeDB: depositIDsByEndtimeDB,
-					depositsDB:            depositsDB,
+					depositIDsByEndtimeDB: actualCaminoState.depositIDsByEndtimeDB,
+					depositsDB:            actualCaminoState.depositsDB,
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{},
 					},
@@ -619,10 +744,10 @@ func TestWriteDeposits(t *testing.T) {
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID2},
 				}
 			},
-			expectedCaminoState: func(depositsDB, depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					depositIDsByEndtimeDB: depositIDsByEndtimeDB,
-					depositsDB:            depositsDB,
+					depositIDsByEndtimeDB: actualCaminoState.depositIDsByEndtimeDB,
+					depositsDB:            actualCaminoState.depositsDB,
 					caminoDiff: &caminoDiff{
 						modifiedDeposits: map[ids.ID]*depositDiff{},
 					},
@@ -638,11 +763,7 @@ func TestWriteDeposits(t *testing.T) {
 			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeDeposits(), tt.expectedErr)
-			expectedCaminoState := tt.expectedCaminoState(
-				actualCaminoState.depositsDB,
-				actualCaminoState.depositIDsByEndtimeDB,
-			)
-			require.Equal(t, expectedCaminoState, actualCaminoState)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }
@@ -657,7 +778,7 @@ func TestLoadDeposits(t *testing.T) {
 
 	tests := map[string]struct {
 		caminoState         func(*gomock.Controller) *caminoState
-		expectedCaminoState func(database.Database) *caminoState
+		expectedCaminoState func(*caminoState) *caminoState
 		expectedErr         error
 	}{
 		"OK": {
@@ -673,10 +794,10 @@ func TestLoadDeposits(t *testing.T) {
 				depositIDsByEndtimeDB.EXPECT().NewIterator().Return(depositsIterator)
 				return &caminoState{depositIDsByEndtimeDB: depositIDsByEndtimeDB}
 			},
-			expectedCaminoState: func(depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				nextTime := deposit1.EndTime()
 				return &caminoState{
-					depositIDsByEndtimeDB:    depositIDsByEndtimeDB,
+					depositIDsByEndtimeDB:    actualCaminoState.depositIDsByEndtimeDB,
 					depositsNextToUnlockTime: &nextTime,
 					depositsNextToUnlockIDs:  []ids.ID{depositTxID1, depositTxID2},
 				}
@@ -692,9 +813,9 @@ func TestLoadDeposits(t *testing.T) {
 				depositIDsByEndtimeDB.EXPECT().NewIterator().Return(depositsIterator)
 				return &caminoState{depositIDsByEndtimeDB: depositIDsByEndtimeDB}
 			},
-			expectedCaminoState: func(depositIDsByEndtimeDB database.Database) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					depositIDsByEndtimeDB: depositIDsByEndtimeDB,
+					depositIDsByEndtimeDB: actualCaminoState.depositIDsByEndtimeDB,
 				}
 			},
 		},
@@ -706,7 +827,7 @@ func TestLoadDeposits(t *testing.T) {
 			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.loadDeposits(), tt.expectedErr)
-			require.Equal(t, tt.expectedCaminoState(actualCaminoState.depositIDsByEndtimeDB), actualCaminoState)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }

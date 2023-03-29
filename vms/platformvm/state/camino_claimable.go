@@ -20,6 +20,7 @@ type Claimable struct {
 
 func (cs *caminoState) SetClaimable(ownerID ids.ID, claimable *Claimable) {
 	cs.caminoDiff.modifiedClaimables[ownerID] = claimable
+	cs.claimablesCache.Evict(ownerID)
 }
 
 func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
@@ -30,8 +31,18 @@ func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 		return claimable, nil
 	}
 
-	claimableBytes, err := cs.claimableDB.Get(ownerID[:])
-	if err != nil {
+	if claimableIntf, ok := cs.claimablesCache.Get(ownerID); ok {
+		if claimableIntf == nil {
+			return nil, database.ErrNotFound
+		}
+		return claimableIntf.(*Claimable), nil
+	}
+
+	claimableBytes, err := cs.claimablesDB.Get(ownerID[:])
+	if err == database.ErrNotFound {
+		cs.claimablesCache.Put(ownerID, nil)
+		return nil, err
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -39,6 +50,8 @@ func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 	if _, err := blocks.GenesisCodec.Unmarshal(claimableBytes, claimable); err != nil {
 		return nil, err
 	}
+
+	cs.claimablesCache.Put(ownerID, claimable)
 
 	return claimable, nil
 }
@@ -51,20 +64,12 @@ func (cs *caminoState) GetNotDistributedValidatorReward() (uint64, error) {
 	if cs.modifiedNotDistributedValidatorReward != nil {
 		return *cs.modifiedNotDistributedValidatorReward, nil
 	}
-
-	notDistributedValidatorReward, err := database.GetUInt64(cs.caminoDB, notDistributedValidatorRewardKey)
-	switch err {
-	case nil:
-		return notDistributedValidatorReward, nil
-	case database.ErrNotFound:
-		return 0, nil
-	default:
-		return 0, err
-	}
+	return cs.notDistributedValidatorReward, nil
 }
 
 func (cs *caminoState) writeClaimableAndValidatorRewards() error {
-	if cs.modifiedNotDistributedValidatorReward != nil {
+	if cs.modifiedNotDistributedValidatorReward != nil &&
+		*cs.modifiedNotDistributedValidatorReward != cs.notDistributedValidatorReward {
 		if err := database.PutUInt64(
 			cs.caminoDB,
 			notDistributedValidatorRewardKey,
@@ -72,12 +77,14 @@ func (cs *caminoState) writeClaimableAndValidatorRewards() error {
 		); err != nil {
 			return fmt.Errorf("failed to write notDistributedValidatorReward: %w", err)
 		}
+		cs.notDistributedValidatorReward = *cs.modifiedNotDistributedValidatorReward
 	}
+	cs.modifiedNotDistributedValidatorReward = nil
 
 	for key, claimable := range cs.modifiedClaimables {
 		delete(cs.modifiedClaimables, key)
 		if claimable == nil {
-			if err := cs.claimableDB.Delete(key[:]); err != nil {
+			if err := cs.claimablesDB.Delete(key[:]); err != nil {
 				return err
 			}
 		} else {
@@ -85,11 +92,22 @@ func (cs *caminoState) writeClaimableAndValidatorRewards() error {
 			if err != nil {
 				return fmt.Errorf("failed to serialize claimable: %w", err)
 			}
-			if err := cs.claimableDB.Put(key[:], claimableBytes); err != nil {
+			if err := cs.claimablesDB.Put(key[:], claimableBytes); err != nil {
 				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+func (cs *caminoState) loadValidatorRewards() error {
+	notDistributedValidatorReward, err := database.GetUInt64(cs.caminoDB, notDistributedValidatorRewardKey)
+	if err == database.ErrNotFound {
+		notDistributedValidatorReward = 0
+	} else if err != nil {
+		return err
+	}
+	cs.notDistributedValidatorReward = notDistributedValidatorReward
 	return nil
 }

@@ -32,23 +32,24 @@ import (
 )
 
 const (
-	addressStateCacheSize          = 1024
-	depositsCacheSize              = 1024
-	consortiumMemberNodesCacheSize = 1024
-	msigOwnersCacheSize            = 16_384
+	addressStateCacheSize = 1024
+	depositsCacheSize     = 1024
+	shortLinksCacheSize   = 1024
+	msigOwnersCacheSize   = 16_384
+	claimablesCacheSize   = 1024
 )
 
 var (
 	_ CaminoState = (*caminoState)(nil)
 
-	caminoPrefix                = []byte("camino")
-	addressStatePrefix          = []byte("addressState")
-	depositOffersPrefix         = []byte("depositOffers")
-	depositsPrefix              = []byte("deposits")
-	depositIDsByEndtimePrefix   = []byte("depositIDsByEndtime")
-	multisigOwnersPrefix        = []byte("multisigOwners")
-	consortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
-	claimablesPrefix            = []byte("claimables")
+	caminoPrefix              = []byte("camino")
+	addressStatePrefix        = []byte("addressState")
+	depositOffersPrefix       = []byte("depositOffers")
+	depositsPrefix            = []byte("deposits")
+	depositIDsByEndtimePrefix = []byte("depositIDsByEndtime")
+	multisigOwnersPrefix      = []byte("multisigOwners")
+	shortLinksPrefix          = []byte("shortLinks")
+	claimablesPrefix          = []byte("claimables")
 
 	// Used for prefixing the validatorsDB
 	deferredPrefix = []byte("deferred")
@@ -170,9 +171,8 @@ type caminoState struct {
 	addressStateDB    database.Database
 
 	// Deposit offers
-	depositOffers     map[ids.ID]*deposit.Offer
-	depositOffersList linkeddb.LinkedDB
-	depositOffersDB   database.Database
+	depositOffers   map[ids.ID]*deposit.Offer
+	depositOffersDB database.Database
 
 	// Deposits
 	depositsNextToUnlockTime *time.Time
@@ -185,12 +185,14 @@ type caminoState struct {
 	multisigOwnersCache cache.Cacher
 	multisigOwnersDB    database.Database
 
-	// shortIDs link
+	// ShortIDs link
 	shortLinksCache cache.Cacher
 	shortLinksDB    database.Database
 
-	//  Claimable & rewards
-	claimableDB database.Database
+	//  Claimables
+	notDistributedValidatorReward uint64
+	claimablesDB                  database.Database
+	claimablesCache               cache.Cacher
 }
 
 func newCaminoDiff() *caminoDiff {
@@ -223,17 +225,14 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 		return nil, err
 	}
 
-	consortiumMemberNodesCache, err := metercacher.New(
-		"consortium_member_nodes_cache",
+	shortLinksCache, err := metercacher.New(
+		"short_links_cache",
 		metricsReg,
-		&cache.LRU{Size: consortiumMemberNodesCacheSize},
+		&cache.LRU{Size: shortLinksCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
-	deferredValidatorsDB := prefixdb.New(deferredPrefix, validatorsDB)
 
 	multisigOwnersCache, err := metercacher.New(
 		"msig_owners_cache",
@@ -243,15 +242,26 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 	if err != nil {
 		return nil, err
 	}
+
+	claimablesCache, err := metercacher.New(
+		"claimables_cache",
+		metricsReg,
+		&cache.LRU{Size: claimablesCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	deferredValidatorsDB := prefixdb.New(deferredPrefix, validatorsDB)
+
 	return &caminoState{
 		// Address State
 		addressStateDB:    prefixdb.New(addressStatePrefix, baseDB),
 		addressStateCache: addressStateCache,
 
 		// Deposit offers
-		depositOffers:     make(map[ids.ID]*deposit.Offer),
-		depositOffersDB:   depositOffersDB,
-		depositOffersList: linkeddb.NewDefault(depositOffersDB),
+		depositOffers:   make(map[ids.ID]*deposit.Offer),
+		depositOffersDB: prefixdb.New(depositOffersPrefix, baseDB),
 
 		// Deposits
 		depositsCache:         depositsCache,
@@ -262,12 +272,13 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 		multisigOwnersCache: multisigOwnersCache,
 		multisigOwnersDB:    prefixdb.New(multisigOwnersPrefix, baseDB),
 
-		// Consortium member nodes
-		shortLinksCache: consortiumMemberNodesCache,
-		shortLinksDB:    prefixdb.New(consortiumMemberNodesPrefix, baseDB),
+		// Short links
+		shortLinksCache: shortLinksCache,
+		shortLinksDB:    prefixdb.New(shortLinksPrefix, baseDB),
 
 		//  Claimable & rewards
-		claimableDB: prefixdb.New(claimablesPrefix, baseDB),
+		claimablesCache: claimablesCache,
+		claimablesDB:    prefixdb.New(claimablesPrefix, baseDB),
 
 		// Deferred Stakers
 		deferredStakers:       newBaseStakers(),
@@ -480,6 +491,7 @@ func (cs *caminoState) Load(s *state) error {
 	errs.Add(
 		cs.loadDepositOffers(),
 		cs.loadDeposits(),
+		cs.loadValidatorRewards(),
 		cs.loadDeferredValidators(s),
 	)
 	return errs.Err
@@ -513,9 +525,10 @@ func (cs *caminoState) Close() error {
 		cs.addressStateDB.Close(),
 		cs.depositOffersDB.Close(),
 		cs.depositsDB.Close(),
+		cs.depositIDsByEndtimeDB.Close(),
 		cs.multisigOwnersDB.Close(),
 		cs.shortLinksDB.Close(),
-		cs.claimableDB.Close(),
+		cs.claimablesDB.Close(),
 		cs.deferredValidatorsDB.Close(),
 	)
 	return errs.Err

@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -1152,6 +1155,102 @@ func TestDiffGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedNextUnlockTime, nextUnlockTime)
 			require.Equal(t, tt.expectedNextUnlockIDs, nextUnlockIDs)
+		})
+	}
+}
+
+func TestDiffLockedUTXOs(t *testing.T) {
+	parentStateID := ids.GenerateTestID()
+	bondTxID := ids.ID{0, 1}
+	owner := secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{{1}}}
+	assetID := ids.ID{}
+	lockTxIDs := set.Set[ids.ID]{bondTxID: struct{}{}}
+	addresses := set.Set[ids.ShortID]{owner.Addrs[0]: struct{}{}}
+	lockState := locked.StateBonded
+
+	parentUTXO1 := generateTestUTXO(ids.ID{1}, assetID, 1, owner, ids.Empty, bondTxID)
+	parentUTXO2 := generateTestUTXO(ids.ID{2}, assetID, 1, owner, ids.Empty, bondTxID)
+	parentUTXO3 := generateTestUTXO(ids.ID{3}, assetID, 1, owner, ids.Empty, bondTxID)
+	parentUTXO4 := generateTestUTXO(ids.ID{4}, assetID, 1, owner, ids.Empty, bondTxID)
+	parentUTXO5 := generateTestUTXO(ids.ID{5}, assetID, 1, owner, ids.Empty, bondTxID)
+	addedUTXO1 := generateTestUTXO(ids.ID{6}, assetID, 1, owner, ids.Empty, bondTxID)
+	addedUTXO2 := generateTestUTXO(ids.ID{7}, assetID, 1, owner, ids.Empty, bondTxID)
+	addedUTXO3 := generateTestUTXO(ids.ID{8}, assetID, 1, owner, ids.Empty, ids.Empty)
+	addedUTXO4 := generateTestUTXO(ids.ID{9}, assetID, 1, owner, ids.Empty, ids.Empty)
+	removedUTXO1 := generateTestUTXO(ids.ID{10}, assetID, 1, owner, ids.Empty, ids.Empty)
+	removedUTXO2 := generateTestUTXO(ids.ID{11}, assetID, 1, owner, ids.Empty, ids.Empty)
+	parentUTXOs := []*avax.UTXO{parentUTXO1, parentUTXO2, parentUTXO3, parentUTXO4, parentUTXO5}
+
+	tests := map[string]struct {
+		diff          func(*testing.T, *gomock.Controller) *diff
+		expectedUTXOs []*avax.UTXO
+		expectedErr   error
+	}{
+		"OK": {
+			diff: func(t *testing.T, c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().LockedUTXOs(lockTxIDs, addresses, lockState).Return(parentUTXOs, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					modifiedUTXOs: map[ids.ID]*utxoModification{
+						addedUTXO3.InputID():   {utxoID: addedUTXO3.InputID(), utxo: addedUTXO3},
+						addedUTXO4.InputID():   {utxoID: addedUTXO4.InputID(), utxo: addedUTXO4},
+						removedUTXO1.InputID(): {utxoID: removedUTXO1.InputID()},
+						removedUTXO2.InputID(): {utxoID: removedUTXO2.InputID()},
+					},
+				}
+			},
+			expectedUTXOs: parentUTXOs,
+		},
+		"OK: some utxos removed, some modified, some added": {
+			diff: func(t *testing.T, c *gomock.Controller) *diff {
+				parentState := NewMockChain(c)
+				parentState.EXPECT().LockedUTXOs(lockTxIDs, addresses, lockState).Return(parentUTXOs, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					modifiedUTXOs: map[ids.ID]*utxoModification{
+						parentUTXO1.InputID(): {utxoID: parentUTXO1.InputID()},
+						parentUTXO2.InputID(): {utxoID: parentUTXO2.InputID()},
+						parentUTXO3.InputID(): {utxoID: parentUTXO3.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO3.UTXOID}},
+						parentUTXO4.InputID(): {utxoID: parentUTXO4.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO4.UTXOID}},
+						addedUTXO1.InputID():  {utxoID: addedUTXO1.InputID(), utxo: addedUTXO1},
+						addedUTXO2.InputID():  {utxoID: addedUTXO2.InputID(), utxo: addedUTXO2},
+					},
+				}
+			},
+			expectedUTXOs: []*avax.UTXO{
+				{UTXOID: parentUTXO3.UTXOID},
+				{UTXOID: parentUTXO4.UTXOID},
+				parentUTXOs[4],
+				addedUTXO1, addedUTXO2,
+			},
+		},
+		"OK: all utxos removed": {
+			diff: func(t *testing.T, c *gomock.Controller) *diff {
+				modifiedUTXOs := map[ids.ID]*utxoModification{}
+				for i := 0; i < len(parentUTXOs); i++ {
+					modifiedUTXOs[parentUTXOs[i].InputID()] = &utxoModification{utxoID: parentUTXOs[i].InputID()}
+				}
+				parentState := NewMockChain(c)
+				parentState.EXPECT().LockedUTXOs(lockTxIDs, addresses, lockState).Return(parentUTXOs, nil)
+				return &diff{
+					stateVersions: newMockStateVersions(c, parentStateID, parentState),
+					parentID:      parentStateID,
+					modifiedUTXOs: modifiedUTXOs,
+				}
+			},
+			expectedUTXOs: []*avax.UTXO{},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			utxos, err := tt.diff(t, ctrl).LockedUTXOs(lockTxIDs, addresses, locked.StateBonded)
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.ElementsMatch(t, tt.expectedUTXOs, utxos)
 		})
 	}
 }

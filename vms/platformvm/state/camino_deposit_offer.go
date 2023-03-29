@@ -51,7 +51,7 @@ func (cs *caminoState) GetAllDepositOffers() ([]*deposit.Offer, error) {
 }
 
 func (cs *caminoState) loadDepositOffers() error {
-	depositOffersIt := cs.depositOffersList.NewIterator()
+	depositOffersIt := cs.depositOffersDB.NewIterator()
 	defer depositOffersIt.Release()
 	for depositOffersIt.Next() {
 		depositOfferIDBytes := depositOffersIt.Key()
@@ -69,20 +69,30 @@ func (cs *caminoState) loadDepositOffers() error {
 		cs.depositOffers[depositOfferID] = depositOffer
 	}
 
+	if err := depositOffersIt.Error(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (cs *caminoState) writeDepositOffers() error {
 	for offerID, offer := range cs.modifiedDepositOffers {
 		delete(cs.modifiedDepositOffers, offerID)
-
-		offerBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, offer)
-		if err != nil {
-			return fmt.Errorf("failed to serialize deposit offer: %w", err)
-		}
-
-		if err := cs.depositOffersList.Put(offerID[:], offerBytes); err != nil {
-			return err
+		if offer == nil {
+			if err := cs.depositOffersDB.Delete(offerID[:]); err != nil {
+				return err
+			}
+			delete(cs.depositOffers, offerID)
+		} else {
+			offerBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, offer)
+			if err != nil {
+				return fmt.Errorf("failed to serialize deposit offer: %w", err)
+			}
+			if err := cs.depositOffersDB.Put(offerID[:], offerBytes); err != nil {
+				return err
+			}
+			cs.depositOffers[offerID] = offer
 		}
 	}
 	return nil
