@@ -31,7 +31,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
@@ -81,10 +80,6 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 	// Configure any stateful precompiles that should go into effect during this block.
 	p.config.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time), block, statedb)
 
-	// Mutate the block and state according to any hard-fork specs
-	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
-		misc.ApplyDAOHardFork(statedb)
-	}
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
 	// Iterate over and process the individual transactions
