@@ -30,6 +30,15 @@ type stakersStorageModel struct {
 	pendingDelegators map[subnetNodeKey](map[ids.ID]*state.Staker) // <subnetID, nodeID> -> (txID -> Staker)
 }
 
+func newStakersStorageModel() *stakersStorageModel {
+	return &stakersStorageModel{
+		currentValidators: make(map[subnetNodeKey]*state.Staker),
+		currentDelegators: make(map[subnetNodeKey]map[ids.ID]*state.Staker),
+		pendingValidators: make(map[subnetNodeKey]*state.Staker),
+		pendingDelegators: make(map[subnetNodeKey]map[ids.ID]*state.Staker),
+	}
+}
+
 func (m *stakersStorageModel) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
 	return getValidator(subnetID, nodeID, m.currentValidators)
 }
@@ -121,7 +130,13 @@ func putDelegator(staker *state.Staker, domain map[subnetNodeKey]map[ids.ID]*sta
 		subnetID: staker.SubnetID,
 		nodeID:   staker.NodeID,
 	}
-	domain[key][staker.TxID] = staker
+
+	ls, found := domain[key]
+	if !found {
+		ls = make(map[ids.ID]*state.Staker)
+		domain[key] = ls
+	}
+	ls[staker.TxID] = staker
 }
 
 func (m *stakersStorageModel) DeleteCurrentDelegator(staker *state.Staker) {
