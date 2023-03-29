@@ -347,20 +347,32 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	// Make sure we've received an incoming message within the threshold
 	now := n.peerConfig.Clock.Time()
 
-	lastMsgReceivedAt := time.Unix(atomic.LoadInt64(&n.peerConfig.LastReceived), 0)
-	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
-	wasMsgReceivedRecently := timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
-	healthy = healthy && wasMsgReceivedRecently
-	details[TimeSinceLastMsgReceivedKey] = timeSinceLastMsgReceived.String()
-	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
+	lastMsgReceivedAt, msgReceived := n.getLastReceived()
+	wasMsgReceivedRecently := false
+	timeSinceLastMsgReceived := time.Duration(0)
+	if !msgReceived {
+		healthy = false
+	} else {
+		timeSinceLastMsgReceived = now.Sub(lastMsgReceivedAt)
+		wasMsgReceivedRecently = timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
+		healthy = healthy && wasMsgReceivedRecently
+		details[TimeSinceLastMsgReceivedKey] = timeSinceLastMsgReceived.String()
+		n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
+	}
 
 	// Make sure we've sent an outgoing message within the threshold
-	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.peerConfig.LastSent), 0)
-	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
-	wasMsgSentRecently := timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
-	healthy = healthy && wasMsgSentRecently
-	details[TimeSinceLastMsgSentKey] = timeSinceLastMsgSent.String()
-	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
+	lastMsgSentAt, msgSent := n.getLastSent()
+	wasMsgSentRecently := false
+	timeSinceLastMsgSent := time.Duration(0)
+	if !msgSent {
+		healthy = false
+	} else {
+		timeSinceLastMsgSent = now.Sub(lastMsgSentAt)
+		wasMsgSentRecently = timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
+		healthy = healthy && wasMsgSentRecently
+		details[TimeSinceLastMsgSentKey] = timeSinceLastMsgSent.String()
+		n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
+	}
 
 	// Make sure the message send failed rate isn't too high
 	isMsgFailRate := sendFailRate <= n.config.HealthConfig.MaxSendFailRate
@@ -381,10 +393,18 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 		errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
 	}
 	if !wasMsgReceivedRecently {
-		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+		if !msgReceived {
+			errorReasons = append(errorReasons, "no messages received from network")
+		} else {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
+		}
 	}
 	if !wasMsgSentRecently {
-		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+		if !msgSent {
+			errorReasons = append(errorReasons, "no messages sent to network")
+		} else {
+			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
+		}
 	}
 	if !isMsgFailRate {
 		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
@@ -1417,4 +1437,20 @@ func (n *network) gossipPeerLists() {
 	for _, p := range peers {
 		p.StartSendPeerList()
 	}
+}
+
+func (n *network) getLastReceived() (time.Time, bool) {
+	lastReceived := atomic.LoadInt64(&n.peerConfig.LastReceived)
+	if lastReceived == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(lastReceived, 0), true
+}
+
+func (n *network) getLastSent() (time.Time, bool) {
+	lastSent := atomic.LoadInt64(&n.peerConfig.LastSent)
+	if lastSent == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(lastSent, 0), true
 }
