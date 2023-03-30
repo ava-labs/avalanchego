@@ -148,15 +148,6 @@ func newValidatorState() validatorState {
 	}
 }
 
-func (m *metadata) trackUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
-	updatedSubnetMetadata, ok := m.updatedMetadata[vdrID]
-	if !ok {
-		updatedSubnetMetadata = set.Set[ids.ID]{}
-		m.updatedMetadata[vdrID] = updatedSubnetMetadata
-	}
-	updatedSubnetMetadata.Add(subnetID)
-}
-
 func (m *metadata) LoadValidatorMetadata(
 	vdrID ids.NodeID,
 	subnetID ids.ID,
@@ -194,7 +185,7 @@ func (m *metadata) SetUptime(
 	metadata.UpDuration = upDuration
 	metadata.lastUpdated = lastUpdated
 
-	m.trackUpdatedMetadata(vdrID, subnetID)
+	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil
 }
 
@@ -220,7 +211,7 @@ func (m *metadata) SetDelegateeReward(
 	}
 	metadata.PotentialDelegateeReward = amount
 
-	m.trackUpdatedMetadata(vdrID, subnetID)
+	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil
 }
 
@@ -262,4 +253,13 @@ func (m *metadata) WriteValidatorMetadata(
 		delete(m.updatedMetadata, vdrID)
 	}
 	return nil
+}
+
+func (m *metadata) addUpdatedMetadata(vdrID ids.NodeID, subnetID ids.ID) {
+	updatedSubnetMetadata, ok := m.updatedMetadata[vdrID]
+	if !ok {
+		updatedSubnetMetadata = set.Set[ids.ID]{}
+		m.updatedMetadata[vdrID] = updatedSubnetMetadata
+	}
+	updatedSubnetMetadata.Add(subnetID)
 }
