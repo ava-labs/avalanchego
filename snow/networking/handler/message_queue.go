@@ -240,25 +240,25 @@ func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) {
 	}
 
 	var (
-		queue  *nodeMessageQueue
-		ok     bool
-		nodeID = msg.NodeID()
+		nodeQueue *nodeMessageQueue
+		ok        bool
+		nodeID    = msg.NodeID()
 	)
 
 	// Get this node's message queue.
 	// If one doesn't exist, create it and assign it to highest priority bucket.
-	if queue, ok = m.nodeMap[nodeID]; !ok {
-		queue = newNodeMessageQueue(nodeID)
-		m.utilizatonBuckets[0].addNodeMessageQueue(queue)
-		m.nodeMap[nodeID] = queue
+	if nodeQueue, ok = m.nodeMap[nodeID]; !ok {
+		nodeQueue = newNodeMessageQueue(nodeID)
+		m.utilizatonBuckets[0].addNodeMessageQueue(nodeQueue)
+		m.nodeMap[nodeID] = nodeQueue
 	}
 
 	// Add the message to the queue
-	queue.push(ctx, msg)
+	nodeQueue.push(ctx, msg)
 	m.numProcessing++
 
 	// ensure this node's queue is in the correct bucket based on utilization
-	m.updateNodePriority(queue)
+	m.updateNodePriority(nodeQueue)
 
 	// Update metrics
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeMap)))
