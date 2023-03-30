@@ -217,7 +217,6 @@ func TestQueue_RoundRobin(t *testing.T) {
 	require.True(ok)
 	require.Equal(ctx4, ctx)
 	require.Equal(msg4, gotMsg4)
-
 }
 
 func TestMultilevelQueue_UpdateNodePriority(t *testing.T) {
