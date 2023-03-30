@@ -348,31 +348,27 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	now := n.peerConfig.Clock.Time()
 
 	lastMsgReceivedAt, msgReceived := n.getLastReceived()
-	wasMsgReceivedRecently := false
+	wasMsgReceivedRecently := msgReceived
 	timeSinceLastMsgReceived := time.Duration(0)
-	if !msgReceived {
-		healthy = false
-	} else {
+	if msgReceived {
 		timeSinceLastMsgReceived = now.Sub(lastMsgReceivedAt)
 		wasMsgReceivedRecently = timeSinceLastMsgReceived <= n.config.HealthConfig.MaxTimeSinceMsgReceived
-		healthy = healthy && wasMsgReceivedRecently
 		details[TimeSinceLastMsgReceivedKey] = timeSinceLastMsgReceived.String()
 		n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 	}
+	healthy = healthy && wasMsgReceivedRecently
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt, msgSent := n.getLastSent()
-	wasMsgSentRecently := false
+	wasMsgSentRecently := msgSent
 	timeSinceLastMsgSent := time.Duration(0)
-	if !msgSent {
-		healthy = false
-	} else {
+	if msgSent {
 		timeSinceLastMsgSent = now.Sub(lastMsgSentAt)
 		wasMsgSentRecently = timeSinceLastMsgSent <= n.config.HealthConfig.MaxTimeSinceMsgSent
-		healthy = healthy && wasMsgSentRecently
 		details[TimeSinceLastMsgSentKey] = timeSinceLastMsgSent.String()
 		n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 	}
+	healthy = healthy && wasMsgSentRecently
 
 	// Make sure the message send failed rate isn't too high
 	isMsgFailRate := sendFailRate <= n.config.HealthConfig.MaxSendFailRate
@@ -392,20 +388,17 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	if !isConnected {
 		errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
 	}
-	if !wasMsgReceivedRecently {
-		if !msgReceived {
-			errorReasons = append(errorReasons, "no messages received from network")
-		} else {
-			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
-		}
+	if !msgReceived {
+		errorReasons = append(errorReasons, "no messages received from network")
+	} else if !wasMsgReceivedRecently {
+		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network received in %s > %s", timeSinceLastMsgReceived, n.config.HealthConfig.MaxTimeSinceMsgReceived))
 	}
-	if !wasMsgSentRecently {
-		if !msgSent {
-			errorReasons = append(errorReasons, "no messages sent to network")
-		} else {
-			errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
-		}
+	if !msgSent {
+		errorReasons = append(errorReasons, "no messages sent to network")
+	} else if !wasMsgSentRecently {
+		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
 	}
+
 	if !isMsgFailRate {
 		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
 	}
