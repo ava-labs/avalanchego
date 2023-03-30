@@ -233,6 +233,11 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			// store delegators
 			for _, del := range dels {
 				cpy := del
+
+				// it's fine deleting unknown delegator
+				store.DeleteCurrentDelegator(&cpy)
+
+				// finally store the delegator
 				store.PutCurrentDelegator(&cpy)
 			}
 
@@ -340,6 +345,11 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			// store delegators
 			for _, del := range dels {
 				cpy := del
+
+				// it's fine deleting unknown delegator
+				store.DeletePendingDelegator(&cpy)
+
+				// finally store the delegator
 				store.PutPendingDelegator(&cpy)
 			}
 
