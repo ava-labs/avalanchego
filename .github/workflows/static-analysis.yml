@@ -1,11 +1,7 @@
 name: Static analysis
 on:
   push:
-    tags-ignore:
-      - "*" # Ignores all tags
-    branches-ignore:
-      - master
-      - dev
+  pull_request:
 
 jobs:
   run_static_analysis:

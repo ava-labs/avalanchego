@@ -1,13 +1,13 @@
 name: Publish Docker Image
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "*"
     branches:
       - master
       - dev
-  workflow_dispatch:
 
 jobs:
   publish_docker_image:

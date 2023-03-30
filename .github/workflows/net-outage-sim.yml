@@ -1,11 +1,11 @@
 name: network-outage-simulation
 
 on:
+  workflow_dispatch:
   schedule:
     # * is a special character in YAML so you have to quote this string
     # Run every day at 7 AM. (The database backup is created around 5 AM.)
     - cron: "0 7 * * *"
-  workflow_dispatch:
 
 jobs:
   run_sim:

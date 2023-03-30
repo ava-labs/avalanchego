@@ -7,6 +7,7 @@ on:
     branches-ignore:
       - master
       - dev
+  pull_request:
 
 jobs:
   run_kurtosis_tests:

@@ -4,6 +4,7 @@ name: Build on supported platforms
 
 on:
   push:
+  pull_request:
 
 permissions:
   contents: write
