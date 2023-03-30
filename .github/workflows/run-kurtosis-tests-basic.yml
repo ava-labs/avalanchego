@@ -1,7 +1,12 @@
 name: Kurtosis Tests Basic
 
 on:
-  pull_request:
+  push:
+    tags-ignore:
+      - "*" # Ignores all tags
+    branches-ignore:
+      - master
+      - dev
 
 jobs:
   run_kurtosis_tests:
