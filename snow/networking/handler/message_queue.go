@@ -74,7 +74,7 @@ type MessageQueue interface {
 // Not safe for concurrent use.
 type nodeMessageQueue struct {
 	// Messages from this node waiting to be handled
-	messages buffer.Deque[Message]
+	messages buffer.Deque[*msgAndContext]
 
 	// The node that this queue is associated with
 	nodeID ids.NodeID
@@ -85,21 +85,24 @@ type nodeMessageQueue struct {
 
 func newNodeMessageQueue(nodeID ids.NodeID) *nodeMessageQueue {
 	return &nodeMessageQueue{
-		messages: buffer.NewUnboundedDeque[Message](initialMessageQueueSize),
+		messages: buffer.NewUnboundedDeque[*msgAndContext](initialMessageQueueSize),
 		nodeID:   nodeID,
 	}
 }
 
-func (n *nodeMessageQueue) push(_ context.Context, msg Message) { // TODO use context
-	n.messages.PushRight(msg)
+func (n *nodeMessageQueue) push(ctx context.Context, msg Message) {
+	n.messages.PushRight(&msgAndContext{
+		msg: msg,
+		ctx: ctx,
+	})
 }
 
 // Returns the next message in the queue.
 // Returns false iff there are no more messages after this one.
 // Invariant: There is at least 1 message in the queue.
 func (n *nodeMessageQueue) pop() (context.Context, Message, bool) {
-	msg, _ := n.messages.PopLeft()
-	return context.Background(), msg, n.messages.Len() > 0 // TODO return actual context
+	msgAndCtx, _ := n.messages.PopLeft()
+	return msgAndCtx.ctx, msgAndCtx.msg, n.messages.Len() > 0
 }
 
 // A group of node message queues that share a priority.
@@ -391,8 +394,8 @@ func (m *multilevelMessageQueue) Shutdown() {
 
 	// Remove all the current messages from the queue
 	for nodeID, nodeQueue := range m.nodeMap {
-		for msg, ok := nodeQueue.messages.PopLeft(); ok; msg, ok = nodeQueue.messages.PopLeft() {
-			msg.OnFinishedHandling()
+		for msgAndCtx, ok := nodeQueue.messages.PopLeft(); ok; msgAndCtx, ok = nodeQueue.messages.PopLeft() {
+			msgAndCtx.msg.OnFinishedHandling()
 		}
 		m.nodeMap[nodeID] = nil
 	}
@@ -409,4 +412,9 @@ func (m *multilevelMessageQueue) Shutdown() {
 	// Mark the queue as closed
 	m.closed = true
 	m.cond.Broadcast()
+}
+
+type msgAndContext struct {
+	msg Message
+	ctx context.Context
 }
