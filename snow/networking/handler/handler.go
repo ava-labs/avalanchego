@@ -904,8 +904,7 @@ func (h *handler) popUnexpiredMsg(
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		// ctx, msg, ok := queue.Pop()
-		msg, ok := queue.Pop() // TODO remove and uncomment line above
+		ctx, msg, ok := queue.Pop()
 		if !ok {
 			return nil, Message{}, false
 		}
@@ -917,8 +916,7 @@ func (h *handler) popUnexpiredMsg(
 				zap.Stringer("nodeID", msg.NodeID()),
 				zap.Stringer("messageOp", msg.Op()),
 			)
-			// span := trace.SpanFromContext(ctx)
-			span := trace.SpanFromContext(context.Background()) // TODO remove and uncomment line above
+			span := trace.SpanFromContext(ctx)
 			span.AddEvent("dropping message", trace.WithAttributes(
 				attribute.String("reason", "timeout"),
 			))
@@ -927,7 +925,7 @@ func (h *handler) popUnexpiredMsg(
 			continue
 		}
 
-		return context.Background(), msg, true // TODO use ctx from above
+		return ctx, msg, true
 	}
 }
 

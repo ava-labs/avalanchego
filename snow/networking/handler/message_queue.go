@@ -56,7 +56,7 @@ type MessageQueue interface {
 	//
 	// If there are no available messages, this function will block until a
 	// message becomes available or the queue is [Shutdown].
-	Pop() (Message, bool)
+	Pop() (context.Context, Message, bool)
 
 	// Returns the number of messages currently on the queue
 	Len() int
@@ -94,9 +94,9 @@ func (n *nodeMessageQueue) push(_ context.Context, msg Message) { // TODO use co
 // Returns the next message in the queue.
 // Returns false iff there are no more messages after this one.
 // Invariant: There is at least 1 message in the queue.
-func (n *nodeMessageQueue) pop() (Message, bool) {
+func (n *nodeMessageQueue) pop() (context.Context, Message, bool) {
 	msg, _ := n.messages.PopLeft()
-	return msg, n.messages.Len() > 0
+	return context.Background(), msg, n.messages.Len() > 0 // TODO return actual context
 }
 
 // A group of node message queues that share a priority.
@@ -270,13 +270,13 @@ func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) { // TOD
 
 // the multilevelMessageQueue cycles through the different utilization buckets,
 // pulling more messages from lower utilization buckets
-func (m *multilevelMessageQueue) Pop() (Message, bool) {
+func (m *multilevelMessageQueue) Pop() (context.Context, Message, bool) {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
 	for {
 		if m.closed {
-			return Message{}, false
+			return context.Background(), Message{}, false
 		}
 		if m.numProcessing != 0 {
 			break
@@ -312,7 +312,7 @@ func (m *multilevelMessageQueue) Pop() (Message, bool) {
 	}
 
 	// Note that [queue] is guaranteed to have at least 1 element.
-	msg, hasMoreMessages := queue.pop()
+	ctx, msg, hasMoreMessages := queue.pop()
 	m.numProcessing--
 
 	// If there are more messages in the queue, update the node's utilization bucket.
@@ -333,7 +333,7 @@ func (m *multilevelMessageQueue) Pop() (Message, bool) {
 		// This should never happen.
 		m.log.Warn("unknown message op", zap.Stringer("op", msg.Op()))
 	}
-	return msg, true
+	return ctx, msg, true
 }
 
 // Update the node's bucket based on its recent CPU utilization.
