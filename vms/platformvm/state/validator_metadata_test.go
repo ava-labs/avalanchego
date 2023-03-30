@@ -119,3 +119,57 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.True(subnetDB.Has(testUptimeReward.txID[:]))
 }
+
+func TestValidatorDelegateeRewards(t *testing.T) {
+	require := require.New(t)
+	state := newValidatorState()
+
+	// get non-existent delegatee reward
+	nodeID := ids.GenerateTestNodeID()
+	subnetID := ids.GenerateTestID()
+	_, err := state.GetDelegateeReward(subnetID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// set non-existent delegatee reward
+	err = state.SetDelegateeReward(subnetID, nodeID, 100000)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	testMetadata := &validatorMetadata{
+		PotentialDelegateeReward: 100000,
+	}
+	// load delegatee reward
+	state.LoadValidatorMetadata(nodeID, subnetID, testMetadata)
+
+	// get delegatee reward
+	delegateeReward, err := state.GetDelegateeReward(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(testMetadata.PotentialDelegateeReward, delegateeReward)
+
+	// set delegatee reward
+	newDelegateeReward := testMetadata.PotentialDelegateeReward + 100000
+	err = state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward)
+	require.NoError(err)
+
+	// get new delegatee reward
+	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(newDelegateeReward, delegateeReward)
+
+	// load delegatee reward changes
+	newTestMetadata := &validatorMetadata{
+		PotentialDelegateeReward: testMetadata.PotentialDelegateeReward + 100000,
+	}
+	state.LoadValidatorMetadata(nodeID, subnetID, newTestMetadata)
+
+	// get new delegatee reward
+	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(newTestMetadata.PotentialDelegateeReward, delegateeReward)
+
+	// delete delegatee reward
+	state.DeleteValidatorMetadata(nodeID, subnetID)
+
+	// get deleted delegatee reward
+	_, _, err = state.GetUptime(nodeID, subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+}
