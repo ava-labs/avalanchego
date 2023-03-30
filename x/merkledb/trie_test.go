@@ -1238,6 +1238,10 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 		err := newTrie.CommitToDB(context.Background())
 		require.NoError(err)
 	}()
+
+	newView, err := newTrie.NewView()
+	require.NoError(err)
+	require.NotNil(newView)
 }
 
 func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
