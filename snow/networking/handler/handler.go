@@ -92,6 +92,10 @@ type handler struct {
 	// Tracks cpu/disk usage caused by each peer.
 	resourceTracker tracker.ResourceTracker
 
+	// Tracks how much cpu/disk a peer should use.
+	// TODO set this field
+	targeter tracker.Targeter
+
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -121,6 +125,7 @@ func New(
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
 	resourceTracker tracker.ResourceTracker,
+	targeter tracker.Targeter,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 ) (Handler, error) {
@@ -135,6 +140,7 @@ func New(
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
+		targeter:         targeter,
 		subnetConnector:  subnetConnector,
 		subnetAllower:    subnet,
 	}
@@ -146,11 +152,16 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	// TODO remove line below
+	// h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.targeter, "handler", h.ctx.Registerer, message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	// TODO remove line below
+	// h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.targeter, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
@@ -724,7 +735,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	}
 }
 
-func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
+func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage) {
 	h.asyncMessagePool.Send(func() {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
@@ -737,7 +748,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 }
 
 // Any returned error is treated as fatal
-func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
+func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
@@ -894,7 +905,8 @@ func (h *handler) popUnexpiredMsg(
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		ctx, msg, ok := queue.Pop()
+		// ctx, msg, ok := queue.Pop()
+		msg, ok := queue.Pop() // TODO remove and uncomment line above
 		if !ok {
 			return nil, Message{}, false
 		}
@@ -906,7 +918,8 @@ func (h *handler) popUnexpiredMsg(
 				zap.Stringer("nodeID", msg.NodeID()),
 				zap.Stringer("messageOp", msg.Op()),
 			)
-			span := trace.SpanFromContext(ctx)
+			// span := trace.SpanFromContext(ctx)
+			span := trace.SpanFromContext(context.Background()) // TODO remove and uncomment line above
 			span.AddEvent("dropping message", trace.WithAttributes(
 				attribute.String("reason", "timeout"),
 			))
@@ -915,7 +928,7 @@ func (h *handler) popUnexpiredMsg(
 			continue
 		}
 
-		return ctx, msg, true
+		return context.Background(), msg, true // TODO use ctx from above
 	}
 }
 

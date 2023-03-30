@@ -5,22 +5,34 @@ package handler
 
 import (
 	"context"
+	"math"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ MessageQueue = (*messageQueue)(nil)
+// If a node's CPU utilization ratio is off by less than [allowedTargetDelta],
+// it stays within the same utilization bucket.
+const allowedTargetDelta = 0.05
+
+var (
+	_ MessageQueue = &multilevelMessageQueue{}
+
+	// Determines the probability with which we pop from a given bucket first.
+	// TODO are these values appropriate?
+	// TODO make this configurable
+	bucketWeights = []uint64{8, 7, 6, 5, 4}
+)
 
 // Message defines individual messages that have been parsed from the network
 // and are now pending execution from the chain.
@@ -37,13 +49,14 @@ type MessageQueue interface {
 	//
 	// If called after [Shutdown], the message will immediately be marked as
 	// having been handled.
-	Push(context.Context, Message)
+	Push(context.Context, Message) // TODO use context
 
-	// Remove and return a message and its context.
+	// Get and remove a message.
+	// Returns false if the MessageQueue is closed.
 	//
 	// If there are no available messages, this function will block until a
 	// message becomes available or the queue is [Shutdown].
-	Pop() (context.Context, Message, bool)
+	Pop() (Message, bool)
 
 	// Returns the number of messages currently on the queue
 	Len() int
@@ -52,47 +65,166 @@ type MessageQueue interface {
 	Shutdown()
 }
 
-// TODO: Use a better data structure for this.
-// We can do something better than pushing to the back of a queue. A multi-level
-// queue?
-type messageQueue struct {
+// The queue of messages waiting to be handled from a node.
+// Not safe for concurrent use.
+type nodeMessageQueue struct {
+	// Messages from this node waiting to be handled
+	messages buffer.Deque[Message]
+
+	// The node that this queue is associated with
+	nodeID ids.NodeID
+
+	// The bucket this node belongs to
+	bucket *utilizationBucket
+}
+
+func newNodeMessageQueue(nodeID ids.NodeID) *nodeMessageQueue {
+	return &nodeMessageQueue{
+		// Note that 32 was chosen arbitrarily.
+		// This is just a hint and can be any value.
+		messages: buffer.NewUnboundedDeque[Message](32),
+		nodeID:   nodeID,
+	}
+}
+
+func (n *nodeMessageQueue) push(_ context.Context, msg Message) { // TODO use context
+	n.messages.PushRight(msg)
+}
+
+// Returns the next message in the queue.
+// Returns false iff there are no more messages after this one.
+// Invariant: There is at least 1 message in the queue.
+func (n *nodeMessageQueue) pop() (Message, bool) {
+	msg, _ := n.messages.PopLeft()
+	return msg, n.messages.Len() > 0
+}
+
+// A group of node message queues that share a priority.
+// Within this bucket, each node's message queue is read from in turn.
+// Not safe for concurrent use.
+type utilizationBucket struct {
+	// Invariant: each queue in this list has >= 1 message.
+	nodeQueues []*nodeMessageQueue
+	// Node ID --> Index of the node in [nodeQueues]
+	nodeToIndex map[ids.NodeID]int
+	// the index of the node to read from next. Changes after each read.
+	// Invariant: Always in [0, len(nodeQueues)-1]
+	currentNodeIndex int
+	// Index of this bucket within a list of buckets.
+	index int
+}
+
+func newUtilizationBucket(index int) *utilizationBucket {
+	return &utilizationBucket{
+		index:       index,
+		nodeQueues:  make([]*nodeMessageQueue, 0),
+		nodeToIndex: make(map[ids.NodeID]int),
+	}
+}
+
+// Assumes [queue] has >= 1 message to honor [u.nodeQueues] invariant.
+func (u *utilizationBucket) addNodeMessageQueue(queue *nodeMessageQueue) {
+	u.nodeQueues = append(u.nodeQueues, queue)
+	queue.bucket = u
+	u.nodeToIndex[queue.nodeID] = len(u.nodeQueues) - 1
+}
+
+// Assumes [nodeID]'s queue is in this bucket.
+func (u *utilizationBucket) removeNodeMessageQueue(nodeID ids.NodeID) {
+	currentIndex := u.nodeToIndex[nodeID]
+	lastIndex := len(u.nodeQueues) - 1 // note [lastIndex] >= 0
+
+	// swap the last node into the current node's slot, then shrink the list
+	u.nodeQueues[currentIndex] = u.nodeQueues[lastIndex]
+	u.nodeToIndex[u.nodeQueues[lastIndex].nodeID] = currentIndex
+	u.nodeQueues[lastIndex] = nil
+	u.nodeQueues = u.nodeQueues[:lastIndex]
+
+	delete(u.nodeToIndex, nodeID)
+
+	// reset the currentIndex if it's now out of bounds
+	if u.currentNodeIndex >= len(u.nodeQueues) {
+		u.currentNodeIndex = 0
+	}
+}
+
+// Returns the message queue we should read from next.
+func (u *utilizationBucket) getNextQueue() *nodeMessageQueue {
+	queue := u.nodeQueues[u.currentNodeIndex]
+
+	// move on to the next queue, cycling if the end of the list is reached
+	u.currentNodeIndex++
+	u.currentNodeIndex %= len(u.nodeQueues)
+	return queue
+}
+
+// Splits nodes' queues into buckets based on node cpu utilization.
+// Spends less time on messages from buckets with higher utilization.
+// A node's bucket is updated when messages are pushed or popped from that node's queue.
+type multilevelMessageQueue struct {
 	// Useful for faking time in tests
 	clock   mockable.Clock
-	metrics messageQueueMetrics
+	metrics *messageQueueMetrics
 
 	log logging.Logger
-	// Validator set for the chain associated with this
-	vdrs validators.Set
+
 	// Tracks CPU utilization of each node
 	cpuTracker tracker.Tracker
 
-	cond   *sync.Cond
+	// Calculates CPU target for each node
+	cpuTargeter tracker.Targeter
+
+	cond *sync.Cond
+
+	// We sample from this to determine which bucket to
+	// try to pop from first.
+	sampler sampler.WeightedWithoutReplacement
+
 	closed bool
-	// Node ID --> Messages this node has in [msgs]
-	nodeToUnprocessedMsgs map[ids.NodeID]int
-	// Unprocessed messages
-	msgAndCtxs []*msgAndContext
+	// Node ID --> Queue of messages from that node
+	nodeMap map[ids.NodeID]*nodeMessageQueue
+	// Highest --> Lowest priority buckets.
+	// Length must be > 0.
+	utilizatonBuckets []*utilizationBucket
+	// Total number of messages waiting to be handled.
+	numProcessing int
 }
 
 func NewMessageQueue(
 	log logging.Logger,
-	vdrs validators.Set,
 	cpuTracker tracker.Tracker,
+	cpuTargeter tracker.Targeter,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
-	m := &messageQueue{
-		log:                   log,
-		vdrs:                  vdrs,
-		cpuTracker:            cpuTracker,
-		cond:                  sync.NewCond(&sync.Mutex{}),
-		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
+	sampler := sampler.NewBestWeightedWithoutReplacement(1)
+	if err := sampler.Initialize(bucketWeights); err != nil {
+		return nil, err
 	}
-	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
+
+	metrics, err := newMessageQueueMetrics(metricsNamespace, metricsRegisterer, ops)
+	if err != nil {
+		return nil, err
+	}
+	m := &multilevelMessageQueue{
+		log:               log,
+		metrics:           metrics,
+		cpuTracker:        cpuTracker,
+		cpuTargeter:       cpuTargeter,
+		cond:              sync.NewCond(&sync.Mutex{}),
+		nodeMap:           make(map[ids.NodeID]*nodeMessageQueue),
+		utilizatonBuckets: make([]*utilizationBucket, len(bucketWeights)),
+		sampler:           sampler,
+	}
+	for level := 0; level < len(bucketWeights); level++ {
+		m.utilizatonBuckets[level] = newUtilizationBucket(level)
+	}
+
+	return m, nil
 }
 
-func (m *messageQueue) Push(ctx context.Context, msg Message) {
+func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) { // TODO use context
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
@@ -101,97 +233,171 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 		return
 	}
 
+	var (
+		queue  *nodeMessageQueue
+		ok     bool
+		nodeID = msg.NodeID()
+	)
+
+	// Get this node's message queue.
+	// If one doesn't exist, create it and assign it to highest priority bucket.
+	if queue, ok = m.nodeMap[nodeID]; !ok {
+		queue = newNodeMessageQueue(nodeID)
+		m.utilizatonBuckets[0].addNodeMessageQueue(queue)
+		m.nodeMap[nodeID] = queue
+	}
+
 	// Add the message to the queue
-	m.msgAndCtxs = append(m.msgAndCtxs, &msgAndContext{
-		msg: msg,
-		ctx: ctx,
-	})
-	m.nodeToUnprocessedMsgs[msg.NodeID()]++
+	queue.push(ctx, msg)
+	m.numProcessing++
+
+	// ensure this node's queue is in the correct bucket based on utilization
+	m.updateNodePriority(queue)
 
 	// Update metrics
-	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
+	m.metrics.nodesWithMessages.Set(float64(len(m.nodeMap)))
 	m.metrics.len.Inc()
-	m.metrics.ops[msg.Op()].Inc()
+	if opMetric, ok := m.metrics.ops[msg.Op()]; ok {
+		opMetric.Inc()
+	} else {
+		// This should never happen.
+		m.log.Warn("unknown message op", zap.Stringer("op", msg.Op()))
+	}
 
-	// Signal a waiting thread
+	// Signal that there is a new message to handle.
 	m.cond.Signal()
 }
 
-// FIFO, but skip over messages whose senders whose messages have caused us to
-// use excessive CPU recently.
-func (m *messageQueue) Pop() (context.Context, Message, bool) {
+// the multilevelMessageQueue cycles through the different utilization buckets,
+// pulling more messages from lower utilization buckets
+func (m *multilevelMessageQueue) Pop() (Message, bool) {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
 	for {
 		if m.closed {
-			return nil, Message{}, false
+			return Message{}, false
 		}
-		if len(m.msgAndCtxs) != 0 {
+		if m.numProcessing != 0 {
 			break
 		}
+
+		// there aren't any messages ready so wait for new messages
 		m.cond.Wait()
 	}
 
-	n := len(m.msgAndCtxs)
-	i := 0
-	for {
-		if i == n {
-			m.log.Debug("canPop is false for all unprocessed messages",
-				zap.Int("numMessages", n),
-			)
+	// Cycle over the buckets until one with available messages is found.
+	// The above for loop guarantees there is at least one queue with messages,
+	// and therefore that the loop below will always terminate.
+	var queue *nodeMessageQueue
+	// Randomly sample the bucket weights to determine which queue to pop from next.
+	tryFirst, _ := m.sampler.Sample(1)
+	popFromIndex := tryFirst[0]
+	for queue == nil {
+		if len(m.utilizatonBuckets[popFromIndex].nodeQueues) > 0 {
+			queue = m.utilizatonBuckets[popFromIndex].getNextQueue()
+			break
 		}
 
-		var (
-			msgAndCtx = m.msgAndCtxs[0]
-			msg       = msgAndCtx.msg
-			ctx       = msgAndCtx.ctx
-			nodeID    = msg.NodeID()
-		)
-		m.msgAndCtxs[0] = nil
-
-		// See if it's OK to process [msg] next
-		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
-			if cap(m.msgAndCtxs) == 1 {
-				m.msgAndCtxs = nil // Give back memory if possible
-			} else {
-				m.msgAndCtxs = m.msgAndCtxs[1:]
-			}
-			m.nodeToUnprocessedMsgs[nodeID]--
-			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
-				delete(m.nodeToUnprocessedMsgs, nodeID)
-			}
-			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
-			m.metrics.len.Dec()
-			m.metrics.ops[msg.Op()].Dec()
-			return ctx, msg, true
+		// There were no messages in this bucket. Try the next one.
+		// We do this rather than re-sample to avoid the case where we
+		// repeatedly sample and inspect empty buckets.
+		// Note that we now move to a higher priority bucket and not a lower one
+		// (unless we're already at the highest priority bucket).
+		popFromIndex--
+		if popFromIndex < 0 {
+			// Wrap around
+			popFromIndex = len(m.utilizatonBuckets) - 1
 		}
-		// [msg.nodeID] is causing excessive CPU usage.
-		// Push [msg] to back of [m.msgs] and handle it later.
-		m.msgAndCtxs = append(m.msgAndCtxs, msgAndCtx)
-		m.msgAndCtxs = m.msgAndCtxs[1:]
-		i++
-		m.metrics.numExcessiveCPU.Inc()
+	}
+
+	// Note that [queue] is guaranteed to have at least 1 element.
+	msg, hasMoreMessages := queue.pop()
+	m.numProcessing--
+
+	// If there are more messages in the queue, update the node's utilization bucket.
+	// Otherwise remove the node's queue from consideration.
+	if hasMoreMessages {
+		m.updateNodePriority(queue)
+	} else {
+		delete(m.nodeMap, queue.nodeID)
+		queue.bucket.removeNodeMessageQueue(queue.nodeID)
+	}
+
+	// update metrics
+	m.metrics.nodesWithMessages.Set(float64(len(m.nodeMap)))
+	m.metrics.len.Dec()
+	if opMetric, ok := m.metrics.ops[msg.Op()]; ok {
+		opMetric.Dec()
+	} else {
+		// This should never happen.
+		m.log.Warn("unknown message op", zap.Stringer("op", msg.Op()))
+	}
+	return msg, true
+}
+
+// Update the node's bucket based on its recent CPU utilization.
+// Assumes [queue] has >= 1 messages.
+func (m *multilevelMessageQueue) updateNodePriority(queue *nodeMessageQueue) {
+	var (
+		newBucketIndex   = queue.bucket.index
+		nodeID           = queue.nodeID
+		utilization      = m.cpuTracker.Usage(nodeID, m.clock.Time())
+		targetUsage      = m.cpuTargeter.TargetUsage(nodeID)
+		utilizationRatio float64
+	)
+	if targetUsage > 0 {
+		utilizationRatio = utilization / targetUsage
+	} else {
+		// If the target usage is 0 then this node is considered to be
+		// using too much CPU.
+		utilizationRatio = math.MaxFloat64
+	}
+
+	// shift the node's bucket based on the ratio of current utilization vs target utilization
+	if utilizationRatio > 1+allowedTargetDelta {
+		// Utilization is too high. Deprioritize this bucket.
+		// Ensure that the new bucket isn't lower priority than the lowest priority bucket.
+		if newBucketIndex < len(m.utilizatonBuckets)-1 {
+			newBucketIndex++
+		}
+	} else if utilizationRatio < 1-allowedTargetDelta {
+		// Utilization is too low. Prioritize this bucket.
+		// Ensure that the new bucket isn't higher priority than the highest priority bucket.
+		if newBucketIndex > 0 {
+			newBucketIndex--
+		}
+	}
+
+	if queue.bucket.index != newBucketIndex {
+		queue.bucket.removeNodeMessageQueue(nodeID)
+		m.utilizatonBuckets[newBucketIndex].addNodeMessageQueue(queue)
 	}
 }
 
-func (m *messageQueue) Len() int {
+func (m *multilevelMessageQueue) Len() int {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
-	return len(m.msgAndCtxs)
+	return m.numProcessing
 }
 
-func (m *messageQueue) Shutdown() {
+func (m *multilevelMessageQueue) Shutdown() {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
 	// Remove all the current messages from the queue
-	for _, msg := range m.msgAndCtxs {
-		msg.msg.OnFinishedHandling()
+	for nodeID, nodeQueue := range m.nodeMap {
+		for msg, ok := nodeQueue.messages.PopLeft(); ok; msg, ok = nodeQueue.messages.PopLeft() {
+			msg.OnFinishedHandling()
+		}
+		m.nodeMap[nodeID] = nil
 	}
-	m.msgAndCtxs = nil
-	m.nodeToUnprocessedMsgs = nil
+
+	// clean up memory
+	for utilizationLevel := range m.utilizatonBuckets {
+		m.utilizatonBuckets[utilizationLevel] = nil
+	}
 
 	// Update metrics
 	m.metrics.nodesWithMessages.Set(0)
@@ -200,39 +406,4 @@ func (m *messageQueue) Shutdown() {
 	// Mark the queue as closed
 	m.closed = true
 	m.cond.Broadcast()
-}
-
-// canPop will return true for at least one message in [m.msgs]
-func (m *messageQueue) canPop(msg message.InboundMessage) bool {
-	// Always pop connected and disconnected messages.
-	if op := msg.Op(); op == message.ConnectedOp || op == message.DisconnectedOp || op == message.ConnectedSubnetOp {
-		return true
-	}
-
-	// If the deadline to handle [msg] has passed, always pop it.
-	// It will be dropped immediately.
-	if expiration := msg.Expiration(); m.clock.Time().After(expiration) {
-		return true
-	}
-	// Every node has some allowed CPU allocation depending on
-	// the number of nodes with unprocessed messages.
-	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
-	nodeID := msg.NodeID()
-	weight := m.vdrs.GetWeight(nodeID)
-	// The sum of validator weights should never be 0, but handle
-	// that case for completeness here to avoid divide by 0.
-	portionWeight := float64(0)
-	totalVdrsWeight := m.vdrs.Weight()
-	if totalVdrsWeight != 0 {
-		portionWeight = float64(weight) / float64(totalVdrsWeight)
-	}
-	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
-	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
-	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
-	return recentCPUUsage <= maxCPU
-}
-
-type msgAndContext struct {
-	msg Message
-	ctx context.Context
 }

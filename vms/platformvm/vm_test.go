@@ -1822,12 +1822,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	targeter := timetracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
 		msgChan,
 		time.Hour,
 		cpuTracker,
+		targeter,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
