@@ -383,5 +383,4 @@ func TestMessageQueuePopBlocking(t *testing.T) {
 		5*time.Second,
 		100*time.Millisecond,
 	)
-
 }
