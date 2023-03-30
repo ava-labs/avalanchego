@@ -492,6 +492,7 @@ func (p *peer) writeMessages() {
 	mySignedIP, err := p.IPSigner.GetSignedIP()
 	if err != nil {
 		p.Log.Error("failed to get signed IP",
+			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		return
@@ -509,6 +510,7 @@ func (p *peer) writeMessages() {
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.VersionOp),
+			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		return
@@ -654,6 +656,7 @@ func (p *peer) sendNetworkMessages() {
 			if err != nil {
 				p.Log.Error("failed to create message",
 					zap.Stringer("messageOp", message.PingOp),
+					zap.Stringer("nodeID", p.id),
 					zap.Error(err),
 				)
 				return
@@ -672,7 +675,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePing(m)
 		msg.OnFinishedHandling()
 		return
-	// Deprecated, remove this in the future.
+	// Deprecated, TODO remove this in the future.
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
@@ -746,6 +749,7 @@ func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PingOp),
+			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		return nil, err
@@ -780,7 +784,7 @@ func (p *peer) handleNewPing(msg *p2p.Ping) {
 	}
 }
 
-// Deprecated: This function is deprecated and will be removed in the future.
+// // Deprecated, TODO remove this in the future.
 func (p *peer) handleOldPing(*p2p.Ping) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
