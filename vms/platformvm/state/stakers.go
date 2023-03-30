@@ -297,6 +297,7 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
+	delete(s.deletedStakers, staker.TxID)
 }
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {

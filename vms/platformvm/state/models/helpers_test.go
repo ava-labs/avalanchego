@@ -29,6 +29,8 @@ import (
 )
 
 var (
+	_ state.Versions = (*versionsHolder)(nil)
+
 	xChainID    = ids.Empty.Prefix(0)
 	cChainID    = ids.Empty.Prefix(1)
 	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
@@ -42,6 +44,14 @@ var (
 
 	testNetworkID = 10 // To be used in tests
 )
+
+type versionsHolder struct {
+	baseState state.State
+}
+
+func (h *versionsHolder) GetState(blkID ids.ID) (state.Chain, bool) {
+	return h.baseState, blkID == h.baseState.GetLastAccepted()
+}
 
 func buildChainState() (state.State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
