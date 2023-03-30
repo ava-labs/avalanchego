@@ -100,7 +100,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
-	properties.Property("EndTime never before StartTime", prop.ForAll(
+	properties.Property("subnetID and nodeID set as specified", prop.ForAll(
 		func(s state.Staker) string {
 			if s.SubnetID != subnetID {
 				return fmt.Sprintf("unexpected subnetID, expected %v, got %v",
