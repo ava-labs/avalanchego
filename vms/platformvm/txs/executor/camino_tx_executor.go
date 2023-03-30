@@ -740,7 +740,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 					ValidatorReward: claimable.ValidatorReward,
 				}
 
-				newClaimable.DepositReward, err = math.Add64(claimable.DepositReward, remainingReward)
+				newClaimable.ExpiredDepositReward, err = math.Add64(claimable.ExpiredDepositReward, remainingReward)
 				if err != nil {
 					return err
 				}
@@ -918,23 +918,27 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		}
 
 		amountToClaim := tx.ClaimedAmounts[i]
-
 		newClaimableValidatorReward := claimable.ValidatorReward
-		if amountToClaim > newClaimableValidatorReward {
-			amountToClaim -= newClaimableValidatorReward
-			newClaimableValidatorReward = 0
-		} else {
-			newClaimableValidatorReward -= amountToClaim
-			amountToClaim = 0
+		newClaimableExpiredDepositReward := claimable.ExpiredDepositReward
+
+		if tx.ClaimType&txs.ClaimTypeValidatorReward != 0 {
+			if amountToClaim > newClaimableValidatorReward {
+				amountToClaim -= newClaimableValidatorReward
+				newClaimableValidatorReward = 0
+			} else {
+				newClaimableValidatorReward -= amountToClaim
+				amountToClaim = 0
+			}
 		}
 
-		newClaimableDepositReward := claimable.DepositReward
-		if amountToClaim > newClaimableDepositReward {
-			amountToClaim -= newClaimableDepositReward
-			newClaimableDepositReward = 0
-		} else {
-			newClaimableDepositReward -= amountToClaim
-			amountToClaim = 0
+		if tx.ClaimType&txs.ClaimTypeExpiredDepositReward != 0 {
+			if amountToClaim > newClaimableExpiredDepositReward {
+				amountToClaim -= newClaimableExpiredDepositReward
+				newClaimableExpiredDepositReward = 0
+			} else {
+				newClaimableExpiredDepositReward -= amountToClaim
+				amountToClaim = 0
+			}
 		}
 
 		if amountToClaim > 0 {
@@ -968,15 +972,15 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		e.State.AddUTXO(utxo)
 		e.State.AddRewardUTXO(txID, utxo)
 
-		var newClaimabe *state.Claimable
-		if newClaimableDepositReward != 0 || newClaimableValidatorReward != 0 {
-			newClaimabe = &state.Claimable{
-				Owner:           claimable.Owner,
-				ValidatorReward: newClaimableValidatorReward,
-				DepositReward:   newClaimableDepositReward,
+		var newClaimable *state.Claimable
+		if newClaimableExpiredDepositReward != 0 || newClaimableValidatorReward != 0 {
+			newClaimable = &state.Claimable{
+				Owner:                claimable.Owner,
+				ValidatorReward:      newClaimableValidatorReward,
+				ExpiredDepositReward: newClaimableExpiredDepositReward,
 			}
 		}
-		e.State.SetClaimable(ownerID, newClaimabe)
+		e.State.SetClaimable(ownerID, newClaimable)
 	}
 
 	// Consuming / producing fee utxos
@@ -1256,7 +1260,7 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 			}
 			if claimable != nil {
 				newClaimable.ValidatorReward = claimable.ValidatorReward
-				newClaimable.DepositReward = claimable.DepositReward
+				newClaimable.ExpiredDepositReward = claimable.ExpiredDepositReward
 			}
 
 			newClaimable.ValidatorReward, err = math.Add64(newClaimable.ValidatorReward, addedReward)

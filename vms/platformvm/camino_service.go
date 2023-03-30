@@ -482,6 +482,7 @@ type ClaimArgs struct {
 	DepositTxIDs    []ids.ID            `json:"depositTxIDs"`
 	ClaimableOwners []platformapi.Owner `json:"claimableOwners"`
 	AmountToClaim   []uint64            `json:"amountToClaim"`
+	ClaimType       txs.ClaimType       `json:"claimType"`
 	ClaimTo         platformapi.Owner   `json:"claimTo"`
 	Change          platformapi.Owner   `json:"change"`
 }
@@ -523,6 +524,7 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		args.DepositTxIDs,
 		claimableOwnerIDs,
 		args.AmountToClaim,
+		args.ClaimType,
 		claimTo,
 		privKeys,
 		change,
@@ -602,7 +604,7 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 	}
 
 	response.ValidatorRewards = claimable.ValidatorReward
-	response.ExpiredDepositRewards = claimable.DepositReward
+	response.ExpiredDepositRewards = claimable.ExpiredDepositReward
 
 	return nil
 }

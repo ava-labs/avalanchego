@@ -74,6 +74,7 @@ type CaminoTxBuilder interface {
 		depositTxIDs []ids.ID,
 		claimableOwnerIDs []ids.ID,
 		amountToClaim []uint64,
+		claimType txs.ClaimType,
 		claimTo *secp256k1fx.OutputOwners,
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
@@ -389,6 +390,7 @@ func (b *caminoBuilder) NewClaimTx(
 	depositTxIDs []ids.ID,
 	claimableOwnerIDs []ids.ID,
 	amountToClaim []uint64,
+	claimType txs.ClaimType,
 	claimTo *secp256k1fx.OutputOwners,
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
@@ -451,6 +453,7 @@ func (b *caminoBuilder) NewClaimTx(
 		DepositTxIDs:      depositTxIDs,
 		ClaimableOwnerIDs: claimableOwnerIDs,
 		ClaimedAmounts:    amountToClaim,
+		ClaimType:         claimType,
 		ClaimTo:           claimTo,
 	}
 

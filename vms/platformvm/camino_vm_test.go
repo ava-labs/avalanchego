@@ -520,8 +520,8 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	claimable, err := vm.state.GetClaimable(ownerID)
 	require.NoError(err)
 	require.Equal(&state.Claimable{
-		Owner:         &depositOwner,
-		DepositReward: deposit.TotalReward(depositOffer),
+		Owner:                &depositOwner,
+		ExpiredDepositReward: deposit.TotalReward(depositOffer),
 	}, claimable)
 	require.Equal(getUnlockedBalance(t, vm.state, depositOwnerAddr), depositOffer.MinAmount)
 	require.Equal(deposit.EndTime(), vm.state.GetTimestamp())

@@ -58,11 +58,22 @@ func TestClaimTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: errNonUniqueDepositTxID,
 		},
+		"Wrong claim type": {
+			tx: &ClaimTx{
+				BaseTx:            baseTx,
+				ClaimTo:           &owner1,
+				ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
+				ClaimedAmounts:    []uint64{1},
+				ClaimType:         ClaimTypeAll + 1,
+			},
+			expectedErr: errWrongClaimType,
+		},
 		"Not unique ownerIDs": {
 			tx: &ClaimTx{
 				BaseTx:            baseTx,
 				ClaimableOwnerIDs: []ids.ID{claimableOwnerID, claimableOwnerID},
 				ClaimedAmounts:    []uint64{1, 1},
+				ClaimType:         ClaimTypeAll,
 			},
 			expectedErr: errNonUniqueOwnerID,
 		},
@@ -101,12 +112,31 @@ func TestClaimTxSyntacticVerify(t *testing.T) {
 				ClaimTo:      &owner1,
 			},
 		},
-		"OK with claimables": {
+		"OK with claimables (all)": {
 			tx: &ClaimTx{
 				BaseTx:            baseTx,
 				ClaimTo:           &owner1,
 				ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
 				ClaimedAmounts:    []uint64{20},
+				ClaimType:         ClaimTypeAll,
+			},
+		},
+		"OK with claimables (expired deposit reward)": {
+			tx: &ClaimTx{
+				BaseTx:            baseTx,
+				ClaimTo:           &owner1,
+				ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
+				ClaimedAmounts:    []uint64{20},
+				ClaimType:         ClaimTypeExpiredDepositReward,
+			},
+		},
+		"OK with claimables (validator reward)": {
+			tx: &ClaimTx{
+				BaseTx:            baseTx,
+				ClaimTo:           &owner1,
+				ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
+				ClaimedAmounts:    []uint64{20},
+				ClaimType:         ClaimTypeValidatorReward,
 			},
 		},
 		"OK with claimables and deposits": {
@@ -116,6 +146,7 @@ func TestClaimTxSyntacticVerify(t *testing.T) {
 				ClaimTo:           &owner1,
 				ClaimableOwnerIDs: []ids.ID{claimableOwnerID},
 				ClaimedAmounts:    []uint64{20},
+				ClaimType:         ClaimTypeAll,
 			},
 		},
 	}

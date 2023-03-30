@@ -21,7 +21,14 @@ var (
 	errNonUniqueDepositTxID   = errors.New("non-unique deposit tx id")
 	errNonUniqueOwnerID       = errors.New("non-unique owner id")
 	errWrongClaimedAmount     = errors.New("zero claimed amount or amounts len doesn't match ownerIDs len")
+	errWrongClaimType         = errors.New("wrong claim type")
+
+	ClaimTypeValidatorReward      ClaimType = 0b01
+	ClaimTypeExpiredDepositReward ClaimType = 0b10
+	ClaimTypeAll                  ClaimType = 0b11
 )
+
+type ClaimType uint64
 
 // ClaimTx is an unsigned ClaimTx
 type ClaimTx struct {
@@ -34,6 +41,8 @@ type ClaimTx struct {
 	ClaimableOwnerIDs []ids.ID `serialize:"true" json:"claimableOwnerIDs"`
 	// How much tokens will be claimed for corresponding claimableOwnerIDs
 	ClaimedAmounts []uint64 `serialize:"true" json:"claimedAmounts"`
+	// Bitfield defining which type of claimables will be claimed
+	ClaimType ClaimType `serialize:"true" json:"claimType"`
 	// Reward and claimables outputs will be minted to this owner, unless all of its fields has zero-values.
 	// If it is empty, deposit rewards will be minted for depositTx.RewardsOwner
 	// and claimables will be minted for claimable owners.
@@ -59,6 +68,8 @@ func (tx *ClaimTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNoDepositsOrClaimables
 	case len(tx.ClaimableOwnerIDs) != len(tx.ClaimedAmounts):
 		return errWrongClaimedAmount
+	case len(tx.ClaimableOwnerIDs) != 0 && (tx.ClaimType == 0 || tx.ClaimType > ClaimTypeAll):
+		return errWrongClaimType
 	}
 
 	uniqueIDs := set.NewSet[ids.ID](len(tx.DepositTxIDs))

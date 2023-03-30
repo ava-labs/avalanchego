@@ -13,9 +13,9 @@ import (
 )
 
 type Claimable struct {
-	Owner           *secp256k1fx.OutputOwners `serialize:"true"`
-	ValidatorReward uint64                    `serialize:"true"`
-	DepositReward   uint64                    `serialize:"true"`
+	Owner                *secp256k1fx.OutputOwners `serialize:"true"`
+	ValidatorReward      uint64                    `serialize:"true"`
+	ExpiredDepositReward uint64                    `serialize:"true"`
 }
 
 func (cs *caminoState) SetClaimable(ownerID ids.ID, claimable *Claimable) {

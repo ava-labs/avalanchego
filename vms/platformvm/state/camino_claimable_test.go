@@ -121,9 +121,9 @@ func TestGetClaimable(t *testing.T) {
 func TestSetClaimable(t *testing.T) {
 	ownerID := ids.GenerateTestID()
 	claimable := &Claimable{
-		Owner:           &secp256k1fx.OutputOwners{},
-		ValidatorReward: 1,
-		DepositReward:   1,
+		Owner:                &secp256k1fx.OutputOwners{},
+		ValidatorReward:      1,
+		ExpiredDepositReward: 1,
 	}
 
 	tests := map[string]struct {
@@ -235,7 +235,7 @@ func TestWriteClaimableAndValidatorRewards(t *testing.T) {
 	testError := errors.New("test error")
 	claimableOwnerID1 := ids.ID{1}
 	claimableOwnerID2 := ids.ID{2}
-	claimable1 := &Claimable{Owner: &secp256k1fx.OutputOwners{}, ValidatorReward: 1, DepositReward: 2}
+	claimable1 := &Claimable{Owner: &secp256k1fx.OutputOwners{}, ValidatorReward: 1, ExpiredDepositReward: 2}
 	claimableBytes1, err := blocks.GenesisCodec.Marshal(blocks.Version, claimable1)
 	require.NoError(t, err)
 
