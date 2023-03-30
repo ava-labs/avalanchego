@@ -217,9 +217,30 @@ fn test_one_element_proof() -> Result<(), DataStoreError> {
 
     let proof = merkle.prove(key)?;
     assert!(!proof.0.is_empty());
+    assert!(proof.0.len() == 1);
 
-    let verify_proof = merkle.verify_proof(key, &proof)?;
-    assert!(verify_proof.is_some());
+    let val = merkle.verify_proof(key, &proof)?;
+    assert!(val.is_some());
+    assert!(compare(val.unwrap().as_ref(), "v".as_ref()).is_eq());
+
+    Ok(())
+}
+
+#[test]
+fn test_proof() -> Result<(), DataStoreError> {
+    let set = generate_random_data(500);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+    let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
+
+    for (i, key) in keys.iter().enumerate() {
+        let proof = merkle.prove(key)?;
+        assert!(!proof.0.is_empty());
+        let val = merkle.verify_proof(key, &proof)?;
+        assert!(val.is_some());
+        assert!(compare(val.unwrap().as_ref(), vals[i].as_ref()).is_eq());
+    }
 
     Ok(())
 }
@@ -269,38 +290,40 @@ fn test_proof_end_with_branch() -> Result<(), DataStoreError> {
 }
 
 #[test]
-#[allow(unused_must_use)]
-fn test_bad_proof() {
-    let items = vec![
-        ("do", "verb"),
-        ("doe", "reindeer"),
-        ("dog", "puppy"),
-        ("doge", "coin"),
-        ("horse", "stallion"),
-        ("ddd", "ok"),
-    ];
-    let merkle = merkle_build_test(items, 0x10000, 0x10000);
-    let key = "ddd";
+fn test_bad_proof() -> Result<(), DataStoreError> {
+    let set = generate_random_data(800);
+    let mut items = Vec::from_iter(set.iter());
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+    let (keys, _): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
 
-    let proof = merkle.as_ref().unwrap().prove(key);
-    assert!(!proof.as_ref().unwrap().0.is_empty());
+    for (_, key) in keys.iter().enumerate() {
+        let mut proof = merkle.prove(key)?;
+        assert!(!proof.0.is_empty());
 
-    // Delete an entry from the generated proofs.
-    let new_proof = Proof(proof.unwrap().0.drain().take(1).collect());
-    merkle.unwrap().verify_proof(key, &new_proof).is_err();
+        // Delete an entry from the generated proofs.
+        let len = proof.0.len();
+        let new_proof = Proof(proof.0.drain().take(len - 1).collect());
+        assert!(merkle.verify_proof(key, &new_proof).is_err());
+    }
+
+    Ok(())
 }
 
 #[test]
+// Tests that missing keys can also be proven. The test explicitly uses a single
+// entry trie and checks for missing keys both before and after the single entry.
 fn test_missing_key_proof() -> Result<(), DataStoreError> {
     let items = vec![("k", "v")];
     let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
-    let key = "x";
+    for key in vec!["a", "j", "l", "z"] {
+        let proof = merkle.prove(key)?;
+        assert!(!proof.0.is_empty());
+        assert!(proof.0.len() == 1);
 
-    let proof = merkle.prove(key)?;
-    assert!(!proof.0.is_empty());
-
-    let verify_proof = merkle.verify_proof(key, &proof)?;
-    assert!(verify_proof.is_none());
+        let val = merkle.verify_proof(key, &proof)?;
+        assert!(val.is_none());
+    }
 
     Ok(())
 }
