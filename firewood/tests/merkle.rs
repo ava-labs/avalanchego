@@ -353,6 +353,10 @@ fn test_range_proof() -> Result<(), ProofError> {
         let start = rand::thread_rng().gen_range(0..items.len());
         let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
 
+        if end <= start {
+            continue;
+        }
+
         let mut proof = merkle.prove(items[start].0)?;
         assert!(!proof.0.is_empty());
         let end_proof = merkle.prove(items[end - 1].0)?;
@@ -383,6 +387,10 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let start = rand::thread_rng().gen_range(0..items.len());
         let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
+
+        if end <= start {
+            continue;
+        }
 
         let mut proof = merkle.prove(items[start].0)?;
         assert!(!proof.0.is_empty());
@@ -462,6 +470,10 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let start = rand::thread_rng().gen_range(0..items.len());
         let end = rand::thread_rng().gen_range(0..items.len() - start) + start - 1;
+
+        if end <= start {
+            continue;
+        }
 
         // Short circuit if the decreased key is same with the previous key
         let first = decrease_key(&items[start].0);
