@@ -9,25 +9,23 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const (
-	defaultLeafRequestLimit = 1024
-	maxTokenWaitTime        = 5 * time.Second
+	defaultRequestKeyLimit = 1024
 )
 
 var (
 	token                         = struct{}{}
 	ErrAlreadyStarted             = errors.New("cannot start a StateSyncManager that has already been started")
 	ErrAlreadyClosed              = errors.New("StateSyncManager is closed")
-	ErrNotEnoughBytes             = errors.New("less bytes read than the specified length")
 	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
 	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
@@ -276,7 +274,8 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			EndingRoot:   rootID,
 			Start:        workItem.start,
 			End:          workItem.end,
-			Limit:        defaultLeafRequestLimit,
+			KeyLimit:     defaultRequestKeyLimit,
+			BytesLimit:   constants.DefaultMaxMessageSize,
 		},
 		m.config.SyncDB,
 	)
@@ -329,10 +328,11 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&RangeProofRequest{
-			Root:  rootID,
-			Start: workItem.start,
-			End:   workItem.end,
-			Limit: defaultLeafRequestLimit,
+			Root:       rootID,
+			Start:      workItem.start,
+			End:        workItem.end,
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: constants.DefaultMaxMessageSize,
 		},
 	)
 	if err != nil {

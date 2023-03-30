@@ -97,25 +97,30 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	}
 
 	// [lastStartRootChange] is the latest appearance of [startRoot]
-	// which came before [lastEndRootChange].
-	var lastStartRootChange *changeSummaryAndIndex
-	th.history.DescendLessOrEqual(
-		lastEndRootChange,
-		func(item *changeSummaryAndIndex) bool {
-			if item == lastEndRootChange {
-				return true // Skip first iteration
-			}
-			if item.rootID == startRoot {
-				lastStartRootChange = item
-				return false
-			}
-			return true
-		},
-	)
-
-	// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
-	if lastStartRootChange == nil {
+	lastStartRootChange, ok := th.lastChanges[startRoot]
+	if !ok {
 		return nil, ErrStartRootNotFound
+	}
+
+	// if lastStartRootChange is after the lastEndRootChange, then attempt to find an entry that comes before lastEndRootChange
+	if lastStartRootChange.index > lastEndRootChange.index {
+		th.history.DescendLessOrEqual(
+			lastEndRootChange,
+			func(item *changeSummaryAndIndex) bool {
+				if item == lastEndRootChange {
+					return true // Skip first iteration
+				}
+				if item.rootID == startRoot {
+					lastStartRootChange = item
+					return false
+				}
+				return true
+			},
+		)
+		// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
+		if lastStartRootChange == nil {
+			return nil, ErrStartRootNotFound
+		}
 	}
 
 	// Keep changes sorted so the largest can be removed in order to stay within the maxLength limit.
