@@ -730,7 +730,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	}
 }
 
-func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage) {
+func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 	h.asyncMessagePool.Send(func() {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
@@ -743,7 +743,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage
 }
 
 // Any returned error is treated as fatal
-func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
+func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
