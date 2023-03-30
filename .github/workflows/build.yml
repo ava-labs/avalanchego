@@ -4,6 +4,11 @@ name: Build on supported platforms
 
 on:
   push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
   pull_request:
 
 permissions:

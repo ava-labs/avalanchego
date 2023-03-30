@@ -2,6 +2,11 @@ name: Build + Unit Tests
 
 on:
   push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
   pull_request:
 
 jobs:

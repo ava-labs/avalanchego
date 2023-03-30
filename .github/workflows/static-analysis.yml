@@ -1,6 +1,11 @@
 name: Static analysis
 on:
   push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
   pull_request:
 
 jobs:

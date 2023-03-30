@@ -3,7 +3,7 @@ name: Test upgrade
 on:
   push:
     tags:
-      - "*" # Push events to every tag
+      - "*"
     branches:
       - master
       - dev
