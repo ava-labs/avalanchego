@@ -325,6 +325,9 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			return ""
 		},
 		stakerGenerator(currentValidator, &subnetID, &nodeID),
+
+		// TODO ABENEGIA: make sure txIDs are unique in slice.
+		// They are unlikely to be equal, but still should be fixed.
 		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
 	))
 
@@ -457,6 +460,9 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			return ""
 		},
 		stakerGenerator(currentValidator, &subnetID, &nodeID),
+
+		// TODO ABENEGIA: make sure txIDs are unique in slice.
+		// They are unlikely to be equal, but still should be fixed.
 		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
 	))
 
