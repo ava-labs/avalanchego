@@ -257,7 +257,7 @@ func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) {
 	nodeQueue.push(ctx, msg)
 	m.numProcessing++
 
-	// ensure this node's queue is in the correct bucket based on utilization
+	// Ensure this node's queue is in the correct bucket based on utilization
 	m.updateNodePriority(nodeQueue)
 
 	// Update metrics
