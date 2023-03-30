@@ -1181,7 +1181,6 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	require.Empty(view1.childViews)
 }
 
-
 func Test_Trie_ConcurrentReadWrite(t *testing.T) {
 	require := require.New(t)
 
@@ -1205,7 +1204,7 @@ func Test_Trie_ConcurrentReadWrite(t *testing.T) {
 		func() bool {
 			value, err := newTrie.GetValue(context.Background(), []byte("key"))
 
-			if err != nil {
+			if err == database.ErrNotFound {
 				return false
 			}
 
@@ -1239,10 +1238,6 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 		err := newTrie.CommitToDB(context.Background())
 		require.NoError(err)
 	}()
-
-	newView, err := newTrie.NewView()
-	require.NoError(err)
-	require.NotNil(newView)
 }
 
 func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
@@ -1267,9 +1262,9 @@ func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
 		require.NoError(err)
 	}()
 
-	rootId, err := newTrie.GetMerkleRoot(context.Background())
+	rootID, err := newTrie.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NotNil(rootId)
+	require.NotNil(rootID)
 }
 
 func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
@@ -1288,25 +1283,25 @@ func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Insert(context.Background(),[]byte("key2"), []byte("value2"))
+		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
 		require.NoError(err)
 	}()
 
 	require.Eventually(
 		func() bool {
 			proof, err := newTrie.GetProof(context.Background(), []byte("key2"))
-
-			if err != nil {
-				return false
-			}
-
 			require.NoError(err)
 			require.NotNil(proof)
+
+			if proof.Value.value == nil {
+				// this is an exclusion proof since the value is nil
+				// return false to keep waiting for Insert to complete.
+				return false
+			}
 			require.Equal([]byte("value2"), proof.Value.value)
 
 			err = newTrie.CommitToDB(context.Background())
 			require.NoError(err)
-
 			return true
 		},
 		time.Second,
@@ -1323,7 +1318,7 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 
 	newTrie, err := trie.NewView()
 	require.NoError(err)
-	err = newTrie.Insert(context.Background(),[]byte("key1"), []byte("value1"))
+	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value1"))
 	require.NoError(err)
 
 	var wg sync.WaitGroup
@@ -1332,9 +1327,9 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Insert(context.Background(),[]byte("key2"), []byte("value2"))
+		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
 		require.NoError(err)
-		err = newTrie.Insert(context.Background(),[]byte("key3"), []byte("value3"))
+		err = newTrie.Insert(context.Background(), []byte("key3"), []byte("value3"))
 		require.NoError(err)
 	}()
 
@@ -1345,11 +1340,12 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 			require.NotNil(rangeProof)
 
 			if len(rangeProof.KeyValues) < 3 {
+				// Wait for the other goroutine to finish inserting
 				return false
 			}
 
 			// Make sure we have exactly 3 KeyValues
-			require.Equal(len(rangeProof.KeyValues), 3)
+			require.Len(rangeProof.KeyValues, 3)
 			return true
 		},
 		time.Second,
