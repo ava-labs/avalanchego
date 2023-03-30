@@ -1010,7 +1010,7 @@
         "avaxAddr": "X-columbus1xw2kqx2xzqsvnuecz2yw6fwpt87k48s277n30m",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": false,
+          "consortiumMember": true,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -1186,7 +1186,7 @@
         "avaxAddr": "X-columbus10jsl9f669s9dn6zpxjgerv57pmhnaup5tuefuw",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": false,
+          "consortiumMember": true,
           "kycVerified": true
         },
         "platformAllocations": [
