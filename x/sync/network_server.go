@@ -214,7 +214,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				currentBytes = len(changeProof.DeletedKeys[deleteKeyIndex]) + binary.MaxVarintLen64
 				deleteKeyIndex++
 			} else if changeKeyIndex < len(changeProof.KeyValues) {
-				currentBytes = len(changeProof.KeyValues[changeKeyIndex].Key) + len(changeProof.KeyValues[changeKeyIndex].Value) + binary.MaxVarintLen64
+				currentBytes = len(changeProof.KeyValues[changeKeyIndex].Key) + len(changeProof.KeyValues[changeKeyIndex].Value) + 2*binary.MaxVarintLen64
 				changeKeyIndex++
 			}
 
@@ -315,7 +315,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		// shrink more if the early keys are extremely large
 		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
 			nextKV := rangeProof.KeyValues[keyIndex]
-			kvEstBytes := len(nextKV.Key) + len(nextKV.Value) + binary.MaxVarintLen64
+			kvEstBytes := len(nextKV.Key) + len(nextKV.Value) + 2*binary.MaxVarintLen64
 
 			if bytesEstimate+kvEstBytes > bytesLimit {
 				// adding the current KV would put the size over the limit

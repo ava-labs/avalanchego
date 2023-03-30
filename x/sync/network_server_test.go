@@ -28,7 +28,6 @@ func Test_Server_GetRangeProof(t *testing.T) {
 
 	tests := map[string]struct {
 		request             *RangeProofRequest
-		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
 		expectedResponseLen int
 		nodeID              ids.NodeID
@@ -94,12 +93,12 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			var proofResult *merkledb.RangeProof
 			sender.EXPECT().SendAppResponse(
 				gomock.Any(), // ctx
-				gomock.Any(),
+				gomock.Any(), // nodeID
 				gomock.Any(), // requestID
 				gomock.Any(), // responseBytes
 			).DoAndReturn(
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-					// deserialize the response so we can modify it if needed.
+					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
 						var err error
 						proofResult = &merkledb.RangeProof{}
@@ -127,7 +126,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 
 			bytes, err := merkledb.Codec.EncodeRangeProof(Version, proofResult)
 			require.NoError(err)
-			require.Less(len(bytes), int(test.request.BytesLimit))
+			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 		})
 	}
 }
@@ -170,7 +169,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		require.NoError(it.Error())
 		it.Release()
 
-		view.CommitToDB(context.Background())
+		require.NoError(view.CommitToDB(context.Background()))
 	}
 
 	endRoot, err := trieDB.GetMerkleRoot(context.Background())
@@ -249,12 +248,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			var proofResult *merkledb.ChangeProof
 			sender.EXPECT().SendAppResponse(
 				gomock.Any(), // ctx
-				gomock.Any(),
+				gomock.Any(), // nodeID
 				gomock.Any(), // requestID
 				gomock.Any(), // responseBytes
 			).DoAndReturn(
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-					// deserialize the response so we can modify it if needed.
+					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
 						var err error
 						proofResult = &merkledb.ChangeProof{}
@@ -282,7 +281,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			bytes, err := merkledb.Codec.EncodeChangeProof(Version, proofResult)
 			require.NoError(err)
-			require.Less(len(bytes), int(test.request.BytesLimit))
+			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 		})
 	}
 }
