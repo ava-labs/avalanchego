@@ -54,7 +54,7 @@ type MessageQueue interface {
 	//
 	// If called after [Shutdown], the message will immediately be marked as
 	// having been handled.
-	Push(context.Context, Message) // TODO use context
+	Push(context.Context, Message)
 
 	// Get and remove a message.
 	// Returns false if the MessageQueue is closed.
@@ -230,7 +230,7 @@ func NewMessageQueue(
 	return m, nil
 }
 
-func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) { // TODO use context
+func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 

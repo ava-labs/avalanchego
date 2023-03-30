@@ -151,14 +151,10 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	// TODO remove line below
-	// h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
 	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.cpuTargeter, "handler", h.ctx.Registerer, message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	// TODO remove line below
-	// h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
 	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.cpuTargeter, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
 
 	if err != nil {
