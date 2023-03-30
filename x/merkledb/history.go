@@ -118,7 +118,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 			},
 		)
 		// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
-		if lastStartRootChange == nil {
+		if lastStartRootChange.index > lastEndRootChange.index {
 			return nil, ErrStartRootNotFound
 		}
 	}
