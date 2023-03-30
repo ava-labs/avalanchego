@@ -121,7 +121,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(nil, nil, nil),
+		stakerGenerator(anyPriority, nil, nil),
 	))
 
 	properties.Property("some pending validator ops", prop.ForAll(
@@ -189,12 +189,10 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(nil, nil, nil),
+		stakerGenerator(anyPriority, nil, nil),
 	))
 
 	var (
-		valPrio  = currentValidator
-		delPrio  = currentDelegator
 		subnetID = ids.GenerateTestID()
 		nodeID   = ids.GenerateTestNodeID()
 	)
@@ -326,8 +324,8 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(&valPrio, &subnetID, &nodeID),
-		gen.SliceOfN(20, stakerGenerator(&delPrio, &subnetID, &nodeID)),
+		stakerGenerator(currentValidator, &subnetID, &nodeID),
+		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
 	))
 
 	properties.Property("some pending delegators ops", prop.ForAll(
@@ -458,8 +456,8 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(&valPrio, &subnetID, &nodeID),
-		gen.SliceOfN(20, stakerGenerator(&delPrio, &subnetID, &nodeID)),
+		stakerGenerator(currentValidator, &subnetID, &nodeID),
+		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
 	))
 
 	return properties
