@@ -6,6 +6,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -276,4 +277,111 @@ func TestMultilevelQueue_UpdateNodePriority(t *testing.T) {
 	cpuTracker.EXPECT().Usage(nodeID, gomock.Any()).Return(float64(0)).Times(1)
 	queue.updateNodePriority(nodeQueue)
 	require.Len(queue.utilizatonBuckets[0].nodeQueues, 1)
+}
+
+// Test that Pop blocks until a message is pushed or the queue is shutdown.
+func TestMessageQueuePopBlocking(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(0)).AnyTimes()
+	cpuTracker := tracker.NewMockTracker(ctrl)
+	cpuTracker.EXPECT().Usage(gomock.Any(), gomock.Any()).Return(float64(0)).AnyTimes()
+	q, err := NewMessageQueue(
+		logging.NoLog{},
+		cpuTracker,
+		cpuTargeter,
+		"",
+		prometheus.NewRegistry(),
+		message.SynchronousOps,
+	)
+	require.NoError(err)
+
+	// Create a message to push
+	innerMsg := message.NewMockInboundMessage(ctrl)
+	innerMsg.EXPECT().NodeID().Return(ids.GenerateTestNodeID()).AnyTimes()
+	innerMsg.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	ctx := context.Background()
+	msg := Message{
+		InboundMessage: innerMsg,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
+
+	// Wait for the message to be popped in a goroutine
+	popReturned := make(chan struct{})
+	go func() {
+		gotCtx, gotMsg, ok := q.Pop()
+		require.True(ok)
+		require.Equal(ctx, gotCtx)
+		require.Equal(msg, gotMsg)
+		close(popReturned)
+	}()
+
+	// Make sure Pop doesn't return before the message is pushed
+	require.Never(func() bool {
+		select {
+		case <-popReturned:
+			return true
+		default:
+			return false
+		}
+	},
+		time.Second,
+		100*time.Millisecond,
+	)
+
+	// Push the message
+	q.Push(ctx, msg)
+
+	// Make sure Pop returns after the message is pushed
+	require.Eventually(func() bool {
+		select {
+		case <-popReturned:
+			return true
+		default:
+			return false
+		}
+	},
+		5*time.Second,
+		100*time.Millisecond,
+	)
+
+	require.Equal(0, q.Len())
+
+	// Similar to above, but test that Pop returns when the queue is shutdown.
+	popReturned = make(chan struct{})
+	go func() {
+		_, _, ok := q.Pop()
+		require.False(ok)
+		close(popReturned)
+	}()
+
+	require.Never(func() bool {
+		select {
+		case <-popReturned:
+			return true
+		default:
+			return false
+		}
+	},
+		time.Second,
+		100*time.Millisecond,
+	)
+
+	q.Shutdown()
+
+	require.Eventually(func() bool {
+		select {
+		case <-popReturned:
+			return true
+		default:
+			return false
+		}
+	},
+		5*time.Second,
+		100*time.Millisecond,
+	)
+
 }
