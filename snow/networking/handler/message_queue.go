@@ -21,9 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// If a node's CPU utilization ratio is off by less than [allowedTargetDelta],
-// it stays within the same utilization bucket.
-const allowedTargetDelta = 0.05
+const (
+	// If a node's CPU utilization ratio is off by less than [allowedTargetDelta],
+	// it stays within the same utilization bucket.
+	allowedTargetDelta = 0.05
+
+	// This is just a hint and can be any value.
+	initialMessageQueueSize = 32
+)
 
 var (
 	_ MessageQueue = &multilevelMessageQueue{}
@@ -80,9 +85,7 @@ type nodeMessageQueue struct {
 
 func newNodeMessageQueue(nodeID ids.NodeID) *nodeMessageQueue {
 	return &nodeMessageQueue{
-		// Note that 32 was chosen arbitrarily.
-		// This is just a hint and can be any value.
-		messages: buffer.NewUnboundedDeque[Message](32),
+		messages: buffer.NewUnboundedDeque[Message](initialMessageQueueSize),
 		nodeID:   nodeID,
 	}
 }
