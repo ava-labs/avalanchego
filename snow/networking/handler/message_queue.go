@@ -140,7 +140,7 @@ func (u *utilizationBucket) removeNodeMessageQueue(nodeID ids.NodeID) {
 	currentIndex := u.nodeToIndex[nodeID]
 	lastIndex := len(u.nodeQueues) - 1 // note [lastIndex] >= 0
 
-	// swap the last node into the current node's slot, then shrink the list
+	// Swap the last node into the current node's slot, then shrink the list
 	u.nodeQueues[currentIndex] = u.nodeQueues[lastIndex]
 	u.nodeToIndex[u.nodeQueues[lastIndex].nodeID] = currentIndex
 	u.nodeQueues[lastIndex] = nil
@@ -148,7 +148,7 @@ func (u *utilizationBucket) removeNodeMessageQueue(nodeID ids.NodeID) {
 
 	delete(u.nodeToIndex, nodeID)
 
-	// reset the currentIndex if it's now out of bounds
+	// Reset [currentNodeIndex] if it's now out of bounds.
 	if u.currentNodeIndex >= len(u.nodeQueues) {
 		u.currentNodeIndex = 0
 	}
@@ -158,7 +158,8 @@ func (u *utilizationBucket) removeNodeMessageQueue(nodeID ids.NodeID) {
 func (u *utilizationBucket) getNextQueue() *nodeMessageQueue {
 	queue := u.nodeQueues[u.currentNodeIndex]
 
-	// move on to the next queue, cycling if the end of the list is reached
+	// Next time we get a message from this bucket, get it from the next node.
+	// Wrap around if we're at the end of the list.
 	u.currentNodeIndex++
 	u.currentNodeIndex %= len(u.nodeQueues)
 	return queue
@@ -312,7 +313,7 @@ func (m *multilevelMessageQueue) Pop() (context.Context, Message, bool) {
 		// (unless we're already at the highest priority bucket).
 		popFromIndex--
 		if popFromIndex < 0 {
-			// Wrap around
+			// Wrap around to lowest priority bucket.
 			popFromIndex = len(m.utilizatonBuckets) - 1
 		}
 	}
@@ -352,6 +353,7 @@ func (m *multilevelMessageQueue) updateNodePriority(queue *nodeMessageQueue) {
 		targetUsage      = m.cpuTargeter.TargetUsage(nodeID)
 		utilizationRatio float64
 	)
+
 	if targetUsage > 0 {
 		utilizationRatio = utilization / targetUsage
 	} else {
@@ -400,7 +402,7 @@ func (m *multilevelMessageQueue) Shutdown() {
 		m.nodeMap[nodeID] = nil
 	}
 
-	// clean up memory
+	// Clean up memory
 	for utilizationLevel := range m.utilizatonBuckets {
 		m.utilizatonBuckets[utilizationLevel] = nil
 	}
