@@ -20,72 +20,74 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// func TestQueue_FIFO(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+// Test that when there's only messages from a single node,
+// they're handled FIFO.
+func TestQueue_FIFO(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	require := require.New(t)
-// 	cpuTracker := tracker.NewMockTracker(ctrl)
-// 	vdrs := validators.NewSet()
-// 	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-// 	require.NoError(vdrs.AddWeight(vdr1ID, 1))
-// 	require.NoError(vdrs.AddWeight(vdr2ID, 1))
-// 	targeter := tracker.NewMockTargeter(ctrl)
-// 	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
-// 	cpuTracker.EXPECT().Usage(gomock.Any(), gomock.Any()).Return(float64(1)).AnyTimes()
-// 	mIntf, err := NewMessageQueue(logging.NoLog{}, cpuTracker, targeter, "", prometheus.NewRegistry(), message.SynchronousOps)
-// 	require.NoError(err)
-// 	u := mIntf.(*multilevelMessageQueue)
-// 	currentTime := time.Now()
-// 	u.clock.Set(currentTime)
+	cpuTracker := tracker.NewMockTracker(ctrl)
+	cpuTracker.EXPECT().Usage(gomock.Any(), gomock.Any()).Return(float64(1)).AnyTimes()
 
-// 	mc, err := message.NewCreator(prometheus.NewRegistry(), "dummyNamespace", true, 10*time.Second)
-// 	require.NoError(err)
+	vdr1ID := ids.GenerateTestNodeID()
+	targeter := tracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+	q, err := NewMessageQueue(logging.NoLog{}, cpuTracker, targeter, "", prometheus.NewRegistry(), message.SynchronousOps)
+	require.NoError(err)
 
-// 	mc.SetTime(currentTime)
-// 	msg1 := mc.InboundPut(
-// 		ids.Empty,
-// 		0,
-// 		nil,
-// 		vdr1ID,
-// 	)
-// 	msg2 := mc.InboundPut(
-// 		ids.Empty,
-// 		0,
-// 		nil,
-// 		vdr1ID,
-// 	)
-// 	msg3 := mc.InboundPut(ids.Empty,
-// 		0,
-// 		nil,
-// 		vdr1ID,
-// 	)
+	innerMsg1 := message.NewMockInboundMessage(ctrl)
+	innerMsg1.EXPECT().NodeID().Return(vdr1ID).AnyTimes()
+	innerMsg1.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	msg1 := Message{
+		InboundMessage: innerMsg1,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
+	innerMsg2 := message.NewMockInboundMessage(ctrl)
+	innerMsg2.EXPECT().NodeID().Return(vdr1ID).AnyTimes()
+	innerMsg2.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	msg2 := Message{
+		InboundMessage: innerMsg2,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
+	innerMsg3 := message.NewMockInboundMessage(ctrl)
+	innerMsg3.EXPECT().NodeID().Return(vdr1ID).AnyTimes()
+	innerMsg3.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	msg3 := Message{
+		InboundMessage: innerMsg3,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
 
-// 	u.Push(msg1)
-// 	require.EqualValues(1, u.Len())
+	ctx1, ctx2, ctx3 := context.Background(), context.Background(), context.Background()
 
-// 	u.Push(msg2)
-// 	require.EqualValues(2, u.Len())
+	q.Push(ctx1, msg1)
+	require.EqualValues(1, q.Len())
 
-// 	u.Push(msg3)
-// 	require.EqualValues(3, u.Len())
+	q.Push(ctx2, msg2)
+	require.EqualValues(2, q.Len())
 
-// 	// from a single node, it should be FIFO
-// 	gotMsg1, ok := u.Pop()
-// 	require.True(ok)
-// 	require.EqualValues(msg1, gotMsg1)
-// 	require.EqualValues(2, u.Len())
+	q.Push(ctx3, msg3)
+	require.EqualValues(3, q.Len())
 
-// 	gotMsg2, ok := u.Pop()
-// 	require.True(ok)
-// 	require.EqualValues(msg2, gotMsg2)
-// 	require.EqualValues(1, u.Len())
+	// All messages from a single node so it should be FIFO
+	ctx, gotMsg1, ok := q.Pop()
+	require.True(ok)
+	require.Equal(ctx1, ctx)
+	require.EqualValues(msg1, gotMsg1)
+	require.EqualValues(2, q.Len())
 
-// 	gotMsg3, ok := u.Pop()
-// 	require.True(ok)
-// 	require.EqualValues(msg3, gotMsg3)
-// 	require.EqualValues(0, u.Len())
-// }
+	ctx, gotMsg2, ok := q.Pop()
+	require.True(ok)
+	require.Equal(ctx2, ctx)
+	require.EqualValues(msg2, gotMsg2)
+	require.EqualValues(1, q.Len())
+
+	ctx, gotMsg3, ok := q.Pop()
+	require.True(ok)
+	require.Equal(ctx3, ctx)
+	require.EqualValues(msg3, gotMsg3)
+	require.EqualValues(0, q.Len())
+}
 
 // func TestQueue_Multiple_Buckets(t *testing.T) {
 // 	require := require.New(t)
