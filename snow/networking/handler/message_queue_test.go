@@ -89,62 +89,64 @@ func TestQueue_FIFO(t *testing.T) {
 	require.EqualValues(0, q.Len())
 }
 
-// func TestQueue_Multiple_Buckets(t *testing.T) {
-// 	require := require.New(t)
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestQueue_Multiple_Buckets(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	// There are 2 nodes.
-// 	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+	// There are 2 nodes.
+	vdr1ID, vdr2ID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 
-// 	// Both nodes have target usage of 1.
-// 	targeter := tracker.NewMockTargeter(ctrl)
-// 	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+	// Both nodes have target usage of 1.
+	targeter := tracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
 
-// 	// [vdr1ID] has a usage above the target usage.
-// 	// [vdr2ID] has a usage below the target usage.
-// 	cpuTracker := tracker.NewMockTracker(ctrl)
-// 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(float64(2)).AnyTimes()
-// 	cpuTracker.EXPECT().Usage(vdr2ID, gomock.Any()).Return(float64(0)).AnyTimes()
-// 	mIntf, err := NewMessageQueue(logging.NoLog{}, cpuTracker, targeter, "", prometheus.NewRegistry(), message.SynchronousOps)
-// 	require.NoError(err)
-// 	u := mIntf.(*multilevelMessageQueue)
-// 	currentTime := time.Now()
-// 	u.clock.Set(currentTime)
+	// [vdr1ID] has a usage above the target usage.
+	// [vdr2ID] has a usage below the target usage.
+	cpuTracker := tracker.NewMockTracker(ctrl)
+	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(float64(2)).AnyTimes()
+	cpuTracker.EXPECT().Usage(vdr2ID, gomock.Any()).Return(float64(0)).AnyTimes()
+	q, err := NewMessageQueue(logging.NoLog{}, cpuTracker, targeter, "", prometheus.NewRegistry(), message.SynchronousOps)
+	require.NoError(err)
 
-// 	// Append one message from each node.
-// 	mc, err := message.NewCreator(prometheus.NewRegistry(), "dummyNamespace", true, 10*time.Second)
-// 	require.NoError(err)
-// 	mc.SetTime(currentTime)
+	// Add one message from each node.
+	innerMsg1 := message.NewMockInboundMessage(ctrl)
+	innerMsg1.EXPECT().NodeID().Return(vdr1ID).AnyTimes()
+	innerMsg1.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	msg1 := Message{
+		InboundMessage: innerMsg1,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
+	innerMsg2 := message.NewMockInboundMessage(ctrl)
+	innerMsg2.EXPECT().NodeID().Return(vdr2ID).AnyTimes()
+	innerMsg2.EXPECT().Op().Return(message.PutOp).AnyTimes()
+	msg2 := Message{
+		InboundMessage: innerMsg2,
+		EngineType:     p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+	}
+	msgs := []message.InboundMessage{msg1, msg2}
 
-// 	msg1 := mc.InboundPut(
-// 		ids.Empty,
-// 		1,
-// 		nil,
-// 		vdr1ID,
-// 	)
-// 	msg2 := mc.InboundPut(
-// 		ids.Empty,
-// 		2,
-// 		nil,
-// 		vdr2ID,
-// 	)
-// 	msgs := []message.InboundMessage{msg1, msg2}
+	ctx1, ctx2 := context.Background(), context.Background()
 
-// 	u.Push(msg1)
-// 	u.Push(msg2)
+	q.Push(ctx1, msg1)
+	q.Push(ctx2, msg2)
 
-// 	// Make sure we get both messages.
-// 	gotMsg1, ok := u.Pop()
-// 	require.True(ok)
-// 	require.Contains(msgs, gotMsg1)
+	// Make sure we get both messages.
+	// Note that we're not guaranteed to get them in the order we pushed them.
+	ctx, gotMsg1, ok := q.Pop()
+	require.True(ok)
+	require.Equal(ctx1, ctx)
+	require.Contains(msgs, gotMsg1)
+	require.Equal(1, q.Len())
 
-// 	gotMsg2, ok := u.Pop()
-// 	require.True(ok)
-// 	require.Contains(msgs, gotMsg2)
+	ctx, gotMsg2, ok := q.Pop()
+	require.True(ok)
+	require.Equal(ctx2, ctx)
+	require.Contains(msgs, gotMsg2)
+	require.Equal(0, q.Len())
 
-// 	require.NotEqual(gotMsg1, gotMsg2)
-// }
+	require.NotEqual(gotMsg1, gotMsg2)
+}
 
 func TestQueue_RoundRobin(t *testing.T) {
 	require := require.New(t)
