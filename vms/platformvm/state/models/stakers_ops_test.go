@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
@@ -328,7 +329,17 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 		// TODO ABENEGIA: make sure txIDs are unique in slice.
 		// They are unlikely to be equal, but still should be fixed.
-		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
+		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID)).
+			SuchThat(func(v interface{}) bool {
+				stakersList := v.([]state.Staker)
+				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
+				for _, staker := range stakersList {
+					uniqueTxIDs.Add(staker.TxID)
+				}
+
+				// make sure TxIDs are unique, at least among delegators
+				return len(stakersList) == uniqueTxIDs.Len()
+			}),
 	))
 
 	properties.Property("some pending delegators ops", prop.ForAll(
@@ -460,10 +471,17 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			return ""
 		},
 		stakerGenerator(currentValidator, &subnetID, &nodeID),
+		gen.SliceOfN(10, stakerGenerator(pendingDelegator, &subnetID, &nodeID)).
+			SuchThat(func(v interface{}) bool {
+				stakersList := v.([]state.Staker)
+				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
+				for _, staker := range stakersList {
+					uniqueTxIDs.Add(staker.TxID)
+				}
 
-		// TODO ABENEGIA: make sure txIDs are unique in slice.
-		// They are unlikely to be equal, but still should be fixed.
-		gen.SliceOfN(20, stakerGenerator(currentDelegator, &subnetID, &nodeID)),
+				// make sure TxIDs are unique, at least among delegators
+				return len(stakersList) == uniqueTxIDs.Len()
+			}),
 	))
 
 	return properties
