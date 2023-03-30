@@ -241,26 +241,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 				store.PutCurrentDelegator(&cpy)
 			}
 
-			// check delegators - version 1
-			delIt, err := store.GetCurrentDelegatorIterator(subnetID, nodeID)
-			if err != nil {
-				return fmt.Sprintf("unexpected failure in current delegators iterator creation, error %v", err)
-			}
-			for delIt.Next() {
-				found := false
-				for _, del := range dels {
-					if reflect.DeepEqual(*delIt.Value(), del) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Sprintf("found extra delegator %v", delIt.Value())
-				}
-			}
-			delIt.Release()
-
-			// check delegators - version 2
+			// check no missing delegators by subnetID, nodeID
 			for _, del := range dels {
 				found := false
 				delIt, err := store.GetCurrentDelegatorIterator(subnetID, nodeID)
@@ -280,7 +261,46 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 				}
 			}
 
-			// delege delegators
+			// check no extra delegator by subnetID, nodeID
+			delIt, err := store.GetCurrentDelegatorIterator(subnetID, nodeID)
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in current delegators iterator creation, error %v", err)
+			}
+			for delIt.Next() {
+				found := false
+				for _, del := range dels {
+					if reflect.DeepEqual(*delIt.Value(), del) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Sprintf("found extra delegator %v", delIt.Value())
+				}
+			}
+			delIt.Release()
+
+			// check no missing delegators if whole staker set
+			for _, del := range dels {
+				found := false
+				fullDelIt, err := store.GetCurrentStakerIterator()
+				if err != nil {
+					return fmt.Sprintf("unexpected failure in current delegators iterator creation, error %v", err)
+				}
+				for fullDelIt.Next() {
+					if reflect.DeepEqual(*fullDelIt.Value(), del) {
+						found = true
+						break
+					}
+				}
+				fullDelIt.Release()
+
+				if !found {
+					return fmt.Sprintf("missing delegator %v", del)
+				}
+			}
+
+			// delete delegators
 			for _, del := range dels {
 				cpy := del
 				store.DeleteCurrentDelegator(&cpy)
@@ -353,26 +373,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 				store.PutPendingDelegator(&cpy)
 			}
 
-			// check delegators - version 1
-			delIt, err := store.GetPendingDelegatorIterator(subnetID, nodeID)
-			if err != nil {
-				return fmt.Sprintf("unexpected failure in pending delegators iterator creation, error %v", err)
-			}
-			for delIt.Next() {
-				found := false
-				for _, del := range dels {
-					if reflect.DeepEqual(*delIt.Value(), del) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Sprintf("found extra delegator %v", delIt.Value())
-				}
-			}
-			delIt.Release()
-
-			// check delegators - version 2
+			// check no missing delegators by subnetID, nodeID
 			for _, del := range dels {
 				found := false
 				delIt, err := store.GetPendingDelegatorIterator(subnetID, nodeID)
@@ -392,7 +393,46 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 				}
 			}
 
-			// delege delegators
+			// check no extra delegators by subnetID, nodeID
+			delIt, err := store.GetPendingDelegatorIterator(subnetID, nodeID)
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in pending delegators iterator creation, error %v", err)
+			}
+			for delIt.Next() {
+				found := false
+				for _, del := range dels {
+					if reflect.DeepEqual(*delIt.Value(), del) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Sprintf("found extra delegator %v", delIt.Value())
+				}
+			}
+			delIt.Release()
+
+			// check no missing delegators if whole staker set
+			for _, del := range dels {
+				found := false
+				fullDelIt, err := store.GetPendingStakerIterator()
+				if err != nil {
+					return fmt.Sprintf("unexpected failure in current delegators iterator creation, error %v", err)
+				}
+				for fullDelIt.Next() {
+					if reflect.DeepEqual(*fullDelIt.Value(), del) {
+						found = true
+						break
+					}
+				}
+				fullDelIt.Release()
+
+				if !found {
+					return fmt.Sprintf("missing delegator %v", del)
+				}
+			}
+
+			// delete delegators
 			for _, del := range dels {
 				cpy := del
 				store.DeletePendingDelegator(&cpy)
