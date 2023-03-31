@@ -496,6 +496,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NotEqual(vdrStaker.TxID, delStaker.TxID)
 
 	numVdrStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
+
+	// check for validator reward here
 	vdrRewardUTXOID := &avax.UTXOID{
 		TxID:        vdrTx.ID(),
 		OutputIndex: numVdrStakeUTXOs + 1,
@@ -508,16 +510,30 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.Equal(vdrRewardAmt, castUTXO.Amt, "expected validator to be rewarded")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
-	vdrDelRewardUTXOID := &avax.UTXOID{
+	// check for validator's batched delegator rewards here
+	onCommitVdrDelRewardUTXOID := &avax.UTXOID{
 		TxID:        vdrTx.ID(),
 		OutputIndex: numVdrStakeUTXOs + 2,
 	}
 
-	utxo, err = onCommitState.GetUTXO(vdrDelRewardUTXOID.InputID())
+	utxo, err = onCommitState.GetUTXO(onCommitVdrDelRewardUTXOID.InputID())
 	require.NoError(err)
 	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
 	require.True(ok)
-	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accured delegator rewards")
+	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
+	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
+
+	// aborted validator tx should still distribute accrued delegator rewards
+	onAbortVdrDelRewardUTXOID := &avax.UTXOID{
+		TxID:        vdrTx.ID(),
+		OutputIndex: numVdrStakeUTXOs + 1,
+	}
+
+	utxo, err = onAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
+	require.NoError(err)
+	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
+	require.True(ok)
+	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
 	_, err = onCommitState.GetUTXO(preCortinaVdrRewardUTXOID.InputID())
@@ -662,6 +678,20 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
+
+	// aborted validator tx should still distribute accrued delegator rewards
+	numVdrStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
+	onAbortVdrDelRewardUTXOID := &avax.UTXOID{
+		TxID:        vdrTx.ID(),
+		OutputIndex: numVdrStakeUTXOs + 1,
+	}
+
+	utxo, err := vdrOnAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
+	require.NoError(err)
+	castUTXO, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	require.True(ok)
+	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
+	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
 	// Commit Delegator Diff
 	require.NoError(delOnCommitState.Apply(env.state))
