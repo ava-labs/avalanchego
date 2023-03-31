@@ -45,9 +45,9 @@ type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
 	Tx *txs.Tx
+	// Invariant: Both [OnCommitState] and [OnAbortState] are
+	// identical when passed into this struct.
 	// [OnCommitState] is the state used for validation.
-	// In practice, both [OnCommitState] and [onAbortState] are
-	// identical when passed into this struct, so we could use either.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
 	OnCommitState state.Diff
@@ -425,7 +425,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			if !ok {
 				return errInvalidState
 			}
-			utxo := &avax.UTXO{
+
+			onCommitUtxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(outputs) + len(stake) + offset),
@@ -433,43 +434,21 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Asset: stakeAsset,
 				Out:   out,
 			}
+			e.OnCommitState.AddUTXO(onCommitUtxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, onCommitUtxo)
 
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-		}
-
-		// there is no [offset] for the accrued delegatee rewards if the vdr tx is aborted
-		delegateeReward, err = e.OnAbortState.GetDelegateeReward(
-			stakerToRemove.SubnetID,
-			stakerToRemove.NodeID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
-		}
-
-		if delegateeReward > 0 {
-			delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-			utxo := &avax.UTXO{
+			onAbortUtxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
+					TxID: tx.TxID,
+					// there is no [offset] for the accrued delegatee rewards if the vdr tx is aborted
 					OutputIndex: uint32(len(outputs) + len(stake)),
 				},
 				Asset: stakeAsset,
 				Out:   out,
 			}
-
-			e.OnAbortState.AddUTXO(utxo)
-			e.OnAbortState.AddRewardUTXO(tx.TxID, utxo)
+			e.OnAbortState.AddUTXO(onAbortUtxo)
+			e.OnAbortState.AddRewardUTXO(tx.TxID, onAbortUtxo)
 		}
-
 		// Invariant: A [txs.DelegatorTx] does not also implement the
 		//            [txs.ValidatorTx] interface.
 	case txs.DelegatorTx:
