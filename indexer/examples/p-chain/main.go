@@ -12,13 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 // This example program continuously polls for the next P-Chain block
 // and prints the ID of the block and its transactions.
 func main() {
 	var (
-		uri              = fmt.Sprintf("%s/ext/index/P/block", "https://indexer-demo.avax.network")
+		uri              = fmt.Sprintf("%s/ext/index/P/block", primary.LocalAPIURI)
 		client           = indexer.NewClient(uri)
 		ctx              = context.Background()
 		nextIndex uint64 = 2_000_000
