@@ -1607,7 +1607,13 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
+				// TODO: Remove once we want to write the new disk format
+				prevMetadata := preDelegateeRewardMetadata{
+					UpDuration:      metadata.UpDuration,
+					LastUpdated:     metadata.LastUpdated,
+					PotentialReward: metadata.PotentialReward,
+				}
+				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prevMetadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
