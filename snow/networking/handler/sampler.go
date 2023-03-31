@@ -18,6 +18,7 @@ var (
 	errOutOfRange     = errors.New("out of range")
 	errWeightTooLarge = errors.New("total weight > math.MaxInt64")
 	errNoWeights      = errors.New("weights sum to 0")
+	errZeroWeight     = errors.New("weight can't be 0")
 )
 
 type weightedWithoutReplacementSampler interface {
@@ -46,6 +47,9 @@ func (s *weightedSampler) initialize(weights []uint64) error {
 	totalWeight := uint64(0)
 	cumulativeWeights := make([]uint64, len(weights))
 	for i, weight := range weights {
+		if weight == 0 {
+			return errZeroWeight
+		}
 		if math.MaxInt64-totalWeight < weight {
 			return errWeightTooLarge
 		}
