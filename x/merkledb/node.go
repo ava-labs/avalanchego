@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -175,15 +175,17 @@ func (n *node) removeChild(child *node) {
 // nodeBytes is intentionally not included because it can cause a race.
 // nodes being evicted by the cache can write nodeBytes,
 // so reading them during the cloning would be a data race.
+// Note: value isn't cloned because it is never edited, only overwritten
+// if this ever changes, value will need to be copied as well
 func (n *node) clone() *node {
 	return &node{
 		id:  n.id,
 		key: n.key,
 		dbNode: dbNode{
-			value:    Clone(n.value),
+			value:    n.value,
 			children: maps.Clone(n.children),
 		},
-		valueDigest: Clone(n.valueDigest),
+		valueDigest: n.valueDigest,
 	}
 }
 

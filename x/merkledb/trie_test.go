@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -52,6 +52,51 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 		return closestNode.value.value, nil
 	}
 	return nil, nil
+}
+
+func Test_GetValue_Safety(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	trieView, err := db.NewView()
+	require.NoError(err)
+
+	require.NoError(trieView.Insert(context.Background(), []byte{0}, []byte{0}))
+	trieVal, err := trieView.GetValue(context.Background(), []byte{0})
+	require.NoError(err)
+	require.Equal([]byte{0}, trieVal)
+	trieVal[0] = 1
+
+	// should still be []byte{0} after edit
+	trieVal, err = trieView.GetValue(context.Background(), []byte{0})
+	require.NoError(err)
+	require.Equal([]byte{0}, trieVal)
+}
+
+func Test_GetValues_Safety(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	trieView, err := db.NewView()
+	require.NoError(err)
+
+	require.NoError(trieView.Insert(context.Background(), []byte{0}, []byte{0}))
+	trieVals, errs := trieView.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+	require.Equal([]byte{0}, trieVals[0])
+	trieVals[0][0] = 1
+	require.Equal([]byte{1}, trieVals[0])
+
+	// should still be []byte{0} after edit
+	trieVals, errs = trieView.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(errs, 1)
+	require.NoError(errs[0])
+	require.Equal([]byte{0}, trieVals[0])
 }
 
 func TestTrieViewGetPathTo(t *testing.T) {

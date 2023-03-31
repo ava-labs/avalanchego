@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -90,9 +90,15 @@ var (
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
 		Parameters: snowball.Parameters{
-			K:                       v.GetInt(SnowSampleSizeKey),
-			Alpha:                   v.GetInt(SnowQuorumSizeKey),
-			BetaVirtuous:            v.GetInt(SnowVirtuousCommitThresholdKey),
+			K:     v.GetInt(SnowSampleSizeKey),
+			Alpha: v.GetInt(SnowQuorumSizeKey),
+			// During the X-chain linearization we require BetaVirtuous and
+			// BetaRogue to be equal. Therefore we use the more conservative
+			// BetaRogue value for both BetaVirtuous and BetaRogue.
+			//
+			// TODO: After the X-chain linearization use the
+			// SnowVirtuousCommitThresholdKey as before.
+			BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
 			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
 			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
 			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
