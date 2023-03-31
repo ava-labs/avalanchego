@@ -1205,7 +1205,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
-					{Key: []byte{0}}},
+					{Key: []byte{0}},
+				},
 			},
 			start:       nil,
 			end:         nil,
@@ -1217,7 +1218,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: true,
 				StartProof:        []ProofNode{{}},
 				KeyChanges: []KeyChange{
-					{Key: []byte{0}}},
+					{Key: []byte{0}},
+				},
 			},
 			start:       []byte{1},
 			end:         nil,
@@ -1229,7 +1231,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: true,
 				EndProof:          []ProofNode{{}},
 				KeyChanges: []KeyChange{
-					{Key: []byte{2}}},
+					{Key: []byte{2}},
+				},
 			},
 			start:       nil,
 			end:         []byte{1},
@@ -1279,7 +1282,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
-					{Key: []byte{1, 2}, Value: Some([]byte{0})}},
+					{Key: []byte{1, 2}, Value: Some([]byte{0})},
+				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{2}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
@@ -1294,7 +1298,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
-					{Key: []byte{1, 2, 3}}},
+					{Key: []byte{1, 2, 3}},
+				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{1}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
