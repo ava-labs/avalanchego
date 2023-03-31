@@ -5,6 +5,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -185,7 +185,7 @@ type multilevelMessageQueue struct {
 
 	// We sample from this to determine which bucket to
 	// try to pop from first.
-	sampler sampler.WeightedWithoutReplacement
+	sampler weightedWithoutReplacementSampler
 
 	closed bool
 	// Node ID --> Queue of messages from that node
@@ -205,14 +205,10 @@ func NewMessageQueue(
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
-	sampler := sampler.NewBestWeightedWithoutReplacement(1)
-	if err := sampler.Initialize(bucketWeights); err != nil {
-		return nil, err
-	}
 
 	metrics, err := newMessageQueueMetrics(metricsNamespace, metricsRegisterer, ops)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create message queue metrics: %w", err)
 	}
 	m := &multilevelMessageQueue{
 		log:               log,
@@ -222,7 +218,10 @@ func NewMessageQueue(
 		cond:              sync.NewCond(&sync.Mutex{}),
 		nodeMap:           make(map[ids.NodeID]*nodeMessageQueue),
 		utilizatonBuckets: make([]*utilizationBucket, len(bucketWeights)),
-		sampler:           sampler,
+		sampler:           &weightedSampler{},
+	}
+	if err := m.sampler.initialize(bucketWeights); err != nil {
+		return nil, fmt.Errorf("failed to initialize sampler: %w", err)
 	}
 	for level := 0; level < len(bucketWeights); level++ {
 		m.utilizatonBuckets[level] = newUtilizationBucket(level)
@@ -297,25 +296,15 @@ func (m *multilevelMessageQueue) Pop() (context.Context, Message, bool) {
 	// The above for loop guarantees there is at least one queue with messages,
 	// and therefore that the loop below will always terminate.
 	var queue *nodeMessageQueue
-	// Randomly sample the bucket weights to determine which queue to pop from next.
-	tryFirst, _ := m.sampler.Sample(1)
-	popFromIndex := tryFirst[0]
-	for queue == nil {
-		if len(m.utilizatonBuckets[popFromIndex].nodeQueues) > 0 {
-			queue = m.utilizatonBuckets[popFromIndex].getNextQueue()
+	// Sample to find which order to check buckets for messages.
+	bucketIndices, _ := m.sampler.sample(len(m.utilizatonBuckets))
+	for i := 0; i < len(bucketIndices); i++ {
+		bucket := m.utilizatonBuckets[bucketIndices[i]]
+		if len(bucket.nodeQueues) > 0 {
+			queue = bucket.getNextQueue()
 			break
 		}
-
 		// There were no messages in this bucket. Try the next one.
-		// We do this rather than re-sample to avoid the case where we
-		// repeatedly sample and inspect empty buckets.
-		// Note that we now move to a higher priority bucket and not a lower one
-		// (unless we're already at the highest priority bucket).
-		popFromIndex--
-		if popFromIndex < 0 {
-			// Wrap around to lowest priority bucket.
-			popFromIndex = len(m.utilizatonBuckets) - 1
-		}
 	}
 
 	// Note that [queue] is guaranteed to have at least 1 element.
