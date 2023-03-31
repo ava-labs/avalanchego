@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snow
@@ -7,16 +7,18 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
 	_ Acceptor = noOpAcceptor{}
-	_ Acceptor = &AcceptorTracker{}
+	_ Acceptor = (*AcceptorTracker)(nil)
 	_ Acceptor = acceptorWrapper{}
 
-	_ AcceptorGroup = &acceptorGroup{}
+	_ AcceptorGroup = (*acceptorGroup)(nil)
 )
 
 // Acceptor is implemented when a struct is monitoring if a message is accepted
@@ -32,7 +34,9 @@ type Acceptor interface {
 
 type noOpAcceptor struct{}
 
-func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error { return nil }
+func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error {
+	return nil
+}
 
 // AcceptorTracker tracks the dispatched accept events by its ID and counts.
 // Useful for testing.
@@ -47,7 +51,7 @@ func NewAcceptorTracker() *AcceptorTracker {
 	}
 }
 
-func (a *AcceptorTracker) Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
+func (a *AcceptorTracker) Accept(_ *ConsensusContext, containerID ids.ID, _ []byte) error {
 	a.lock.Lock()
 	a.accepted[containerID]++
 	a.lock.Unlock()
@@ -104,7 +108,12 @@ func (a *acceptorGroup) Accept(ctx *ConsensusContext, containerID ids.ID, contai
 
 	for acceptorName, acceptor := range a.acceptors[ctx.ChainID] {
 		if err := acceptor.Accept(ctx, containerID, container); err != nil {
-			a.log.Error("acceptor %s on chain %s erred while accepting %s: %s", acceptorName, ctx.ChainID, containerID, err)
+			a.log.Error("failed accepting container",
+				zap.String("acceptorName", acceptorName),
+				zap.Stringer("chainID", ctx.ChainID),
+				zap.Stringer("containerID", containerID),
+				zap.Error(err),
+			)
 			if acceptor.dieOnError {
 				return fmt.Errorf("acceptor %s on chain %s erred while accepting %s: %w", acceptorName, ctx.ChainID, containerID, err)
 			}

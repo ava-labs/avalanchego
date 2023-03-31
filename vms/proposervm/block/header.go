@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -22,7 +22,18 @@ type statelessHeader struct {
 	bytes []byte
 }
 
-func (h *statelessHeader) ChainID() ids.ID  { return h.Chain }
-func (h *statelessHeader) ParentID() ids.ID { return h.Parent }
-func (h *statelessHeader) BodyID() ids.ID   { return h.Body }
-func (h *statelessHeader) Bytes() []byte    { return h.bytes }
+func (h *statelessHeader) ChainID() ids.ID {
+	return h.Chain
+}
+
+func (h *statelessHeader) ParentID() ids.ID {
+	return h.Parent
+}
+
+func (h *statelessHeader) BodyID() ids.ID {
+	return h.Body
+}
+
+func (h *statelessHeader) Bytes() []byte {
+	return h.bytes
+}

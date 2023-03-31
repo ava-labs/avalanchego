@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package choices
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -22,12 +24,12 @@ type Decidable interface {
 	// Accept this element.
 	//
 	// This element will be accepted by every correct node in the network.
-	Accept() error
+	Accept(context.Context) error
 
 	// Reject this element.
 	//
 	// This element will not be accepted by any correct node in the network.
-	Reject() error
+	Reject(context.Context) error
 
 	// Status returns this element's current status.
 	//
@@ -36,5 +38,7 @@ type Decidable interface {
 	// ID, Rejected should be returned. If the contents of this element are
 	// unknown, then Unknown should be returned. Otherwise, Processing should be
 	// returned.
+	//
+	// TODO: Consider allowing Status to return an error.
 	Status() Status
 }

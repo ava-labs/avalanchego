@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -28,7 +28,7 @@ func ExampleStartTestPeer() {
 		ctx,
 		peerIP,
 		constants.LocalID,
-		router.InboundHandlerFunc(func(msg message.InboundMessage) {
+		router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 			fmt.Printf("handling %s\n", msg.Op())
 		}),
 	)

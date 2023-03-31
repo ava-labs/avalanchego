@@ -4,14 +4,33 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+print_usage() {
+  printf "Usage: build_avalanche [OPTIONS]
+
+  Build avalanchego
+
+  Options:
+
+    -r  Build with race detector
+"
+}
+
+race=''
+while getopts 'r' flag; do
+  case "${flag}" in
+    r) race='-race' ;;
+    *) print_usage
+      exit 1 ;;
+  esac
+done
+
 # Changes to the minimum golang version must also be replicated in
-# scripts/ansible/roles/golang_base/defaults/main.yml
 # scripts/build_avalanche.sh (here)
 # scripts/local.Dockerfile
 # Dockerfile
 # README.md
 # go.mod
-go_version_minimum="1.17.9"
+go_version_minimum="1.19.6"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
@@ -36,16 +55,9 @@ fi
 
 # Avalanchego root folder
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-# Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-# Build with rocksdb allowed only if the environment variable ROCKSDBALLOWED is set
-if [ -z ${ROCKSDBALLOWED+x} ]; then
-    echo "Building AvalancheGo..."
-    go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
-else
-    echo "Building AvalancheGo with rocksdb enabled..."
-    go build -tags rocksdballowed -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
-fi
+build_args="$race"
+echo "Building AvalancheGo..."
+go build $build_args -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go

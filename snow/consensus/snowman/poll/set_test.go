@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -6,11 +6,12 @@ package poll
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -55,42 +56,42 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 2)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr3, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	assert.Len(t, results, 0)       // expect 2 to not have finished because 1 is still pending
+	require.Len(t, results, 0)      // expect 2 to not have finished because 1 is still pending
 
 	results = s.Vote(1, vdr2, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
-	assert.Len(t, results, 2)
-	assert.Equal(t, vtx1, results[0].List()[0])
-	assert.Equal(t, vtx2, results[1].List()[0])
+	require.Len(t, results, 2)
+	require.Equal(t, vtx1, results[0].List()[0])
+	require.Equal(t, vtx2, results[1].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
@@ -108,42 +109,42 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 2)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr3, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr2, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
-	assert.Len(t, results, 1)       // because 1 is the oldest
-	assert.Equal(t, vtx1, results[0].List()[0])
+	require.Len(t, results, 1)      // because 1 is the oldest
+	require.Equal(t, vtx1, results[0].List()[0])
 
 	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	assert.Len(t, results, 1)       // because 2 is the oldest now
-	assert.Equal(t, vtx2, results[0].List()[0])
+	require.Len(t, results, 1)      // because 2 is the oldest now
+	require.Equal(t, vtx2, results[0].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
@@ -161,21 +162,21 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.NodeIDBag{}
+	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 3)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 3)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -184,35 +185,35 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vtx2 := ids.ID{2}
 	vtx3 := ids.ID{3}
 
-	var results []ids.Bag
+	var results []bag.Bag[ids.ID]
 
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
 	results = s.Vote(2, vdr3, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr1, vtx2)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
 	results = s.Vote(3, vdr2, vtx3)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr3, vtx3)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr1, vtx3)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
 	results = s.Vote(1, vdr1, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr2, vtx1)
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr3, vtx1)
-	assert.Len(t, results, 3)
-	assert.Equal(t, vtx1, results[0].List()[0])
-	assert.Equal(t, vtx2, results[1].List()[0])
-	assert.Equal(t, vtx3, results[2].List()[0])
+	require.Len(t, results, 3)
+	require.Equal(t, vtx1, results[0].List()[0])
+	require.Equal(t, vtx2, results[1].List()[0])
+	require.Equal(t, vtx3, results[2].List()[0])
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
@@ -227,7 +228,7 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -245,11 +246,11 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 		t.Fatalf("Should only have one active poll")
 	} else if results := s.Vote(1, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results = s.Vote(0, vdr1, vtxID); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results = s.Vote(0, vdr1, vtxID); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results = s.Vote(0, vdr2, vtxID); len(results) == 0 {
+	} else if results := s.Vote(0, vdr2, vtxID); len(results) == 0 {
 		t.Fatalf("Should have finished the")
 	} else if len(results) != 1 {
 		t.Fatalf("Wrong number of results returned")
@@ -272,7 +273,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	vdr1 := ids.NodeID{1}
 	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -290,11 +291,11 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 		t.Fatalf("Should only have one active poll")
 	} else if results := s.Drop(1, vdr1); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results = s.Drop(0, vdr1); len(results) > 0 {
+	} else if results := s.Drop(0, vdr1); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results = s.Drop(0, vdr1); len(results) > 0 {
+	} else if results := s.Drop(0, vdr1); len(results) > 0 {
 		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results = s.Drop(0, vdr2); len(results) == 0 {
+	} else if results := s.Drop(0, vdr2); len(results) == 0 {
 		t.Fatalf("Should have finished the")
 	} else if list := results[0].List(); len(list) != 0 {
 		t.Fatalf("Wrong number of vertices returned")
@@ -310,13 +311,13 @@ func TestSetString(t *testing.T) {
 
 	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := ids.NodeIDBag{}
+	vdrs := bag.Bag[ids.NodeID]{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag: (Size = 1)
-            ID[NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
+            NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
         received Bag: (Size = 0)`
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")

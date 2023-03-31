@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
 
 import (
+	"context"
 	"errors"
 	"path"
 	"reflect"
@@ -13,12 +14,14 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -29,7 +32,6 @@ type testFunc func(*testing.T, Factory)
 var (
 	testFuncs = []testFunc{
 		MetricsTest,
-		ParamsTest,
 		IssuedTest,
 		LeftoverInputTest,
 		LowerConfidenceTest,
@@ -44,6 +46,7 @@ var (
 		AcceptingDependencyTest,
 		AcceptingSlowDependencyTest,
 		RejectingDependencyTest,
+		RejectMultipleTimesTest,
 		VacuouslyAcceptedTest,
 		ConflictsTest,
 		VirtuousDependsOnRogueTest,
@@ -56,9 +59,11 @@ var (
 	}
 
 	Red, Green, Blue, Alpha *TestTx
+
+	errTest = errors.New("non-nil error")
 )
 
-//  R - G - B - A
+// R - G - B - A
 func Setup() {
 	Red = &TestTx{}
 	Green = &TestTx{}
@@ -77,25 +82,25 @@ func Setup() {
 		color.BytesV = []byte{byte(i)}
 	}
 
-	X := ids.Empty.Prefix(4)
-	Y := ids.Empty.Prefix(5)
-	Z := ids.Empty.Prefix(6)
+	x := ids.Empty.Prefix(4)
+	y := ids.Empty.Prefix(5)
+	z := ids.Empty.Prefix(6)
 
-	Red.InputIDsV = append(Red.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, Y)
+	Red.InputIDsV = append(Red.InputIDsV, x)
+	Green.InputIDsV = append(Green.InputIDsV, x)
+	Green.InputIDsV = append(Green.InputIDsV, y)
 
-	Blue.InputIDsV = append(Blue.InputIDsV, Y)
-	Blue.InputIDsV = append(Blue.InputIDsV, Z)
+	Blue.InputIDsV = append(Blue.InputIDsV, y)
+	Blue.InputIDsV = append(Blue.InputIDsV, z)
 
-	Alpha.InputIDsV = append(Alpha.InputIDsV, Z)
+	Alpha.InputIDsV = append(Alpha.InputIDsV, z)
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		Red.Verify(),
-		Green.Verify(),
-		Blue.Verify(),
-		Alpha.Verify(),
+		Red.Verify(context.Background()),
+		Green.Verify(context.Background()),
+		Blue.Verify(context.Background()),
+		Alpha.Verify(context.Background()),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -128,7 +133,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
 		}))
 		if err != nil {
@@ -148,7 +153,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
 		}))
 		if err != nil {
@@ -168,7 +173,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
 		}))
 		if err != nil {
@@ -178,35 +183,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		if err := graph.Initialize(ctx, params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
-	}
-}
-
-func ParamsTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		K:                     2,
-		Alpha:                 2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if p := graph.Parameters(); p.K != params.K {
-		t.Fatalf("Wrong K parameter")
-	} else if p := graph.Parameters(); p.Alpha != params.Alpha {
-		t.Fatalf("Wrong Alpha parameter")
-	} else if p := graph.Parameters(); p.BetaVirtuous != params.BetaVirtuous {
-		t.Fatalf("Wrong Beta1 parameter")
-	} else if p := graph.Parameters(); p.BetaRogue != params.BetaRogue {
-		t.Fatalf("Wrong Beta2 parameter")
 	}
 }
 
@@ -230,13 +206,13 @@ func IssuedTest(t *testing.T, factory Factory) {
 
 	if issued := graph.Issued(Red); issued {
 		t.Fatalf("Haven't issued anything yet.")
-	} else if err := graph.Add(Red); err != nil {
+	} else if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	} else if issued := graph.Issued(Red); !issued {
 		t.Fatalf("Have already issued.")
 	}
 
-	_ = Blue.Accept()
+	_ = Blue.Accept(context.Background())
 
 	if issued := graph.Issued(Blue); !issued {
 		t.Fatalf("Have already accepted.")
@@ -261,9 +237,9 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(Green); err != nil {
+	} else if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,10 +253,10 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if updated, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -317,13 +293,13 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Blue); err != nil {
+	if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	}
 
@@ -337,10 +313,10 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if updated, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -375,16 +351,16 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Alpha); err != nil {
+	if err := graph.Add(context.Background(), Alpha); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Blue); err != nil {
+	if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	}
 
@@ -400,10 +376,10 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
-	if updated, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -438,10 +414,10 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Alpha); err != nil {
+	if err := graph.Add(context.Background(), Alpha); err != nil {
 		t.Fatal(err)
 	}
 
@@ -457,11 +433,11 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	ra := ids.Bag{}
+	ra := bag.Bag[ids.ID]{}
 	ra.SetThreshold(2)
 	ra.AddCount(Red.ID(), 2)
 	ra.AddCount(Alpha.ID(), 2)
-	if updated, err := graph.RecordPoll(ra); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), ra); err != nil {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
@@ -473,7 +449,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference. Expected %s", Alpha.ID())
 	} else if graph.Finalized() {
 		t.Fatalf("Finalized too early")
-	} else if updated, err := graph.RecordPoll(ra); err != nil {
+	} else if updated, err := graph.RecordPoll(context.Background(), ra); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -502,13 +478,13 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	} else if virtuous := graph.Virtuous(); virtuous.Len() != 1 {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(Red.ID()) {
 		t.Fatalf("Wrong virtuous. Expected %s", Red.ID())
-	} else if err := graph.Add(Alpha); err != nil {
+	} else if err := graph.Add(context.Background(), Alpha); err != nil {
 		t.Fatal(err)
 	} else if virtuous := graph.Virtuous(); virtuous.Len() != 2 {
 		t.Fatalf("Wrong number of virtuous.")
@@ -516,13 +492,13 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous. Expected %s", Red.ID())
 	} else if !virtuous.Contains(Alpha.ID()) {
 		t.Fatalf("Wrong virtuous. Expected %s", Alpha.ID())
-	} else if err := graph.Add(Green); err != nil {
+	} else if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	} else if virtuous := graph.Virtuous(); virtuous.Len() != 1 {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(Alpha.ID()) {
 		t.Fatalf("Wrong virtuous. Expected %s", Alpha.ID())
-	} else if err := graph.Add(Blue); err != nil {
+	} else if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	} else if virtuous := graph.Virtuous(); virtuous.Len() != 0 {
 		t.Fatalf("Wrong number of virtuous.")
@@ -557,7 +533,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should be virtuous")
 	}
 
-	err := graph.Add(Red)
+	err := graph.Add(context.Background(), Red)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -571,7 +547,7 @@ func IsVirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Should be virtuous")
 	}
 
-	err = graph.Add(Green)
+	err = graph.Add(context.Background(), Green)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -604,11 +580,11 @@ func QuiesceTest(t *testing.T, factory Factory) {
 
 	if !graph.Quiesce() {
 		t.Fatalf("Should quiesce")
-	} else if err := graph.Add(Red); err != nil {
+	} else if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	} else if graph.Quiesce() {
 		t.Fatalf("Shouldn't quiesce")
-	} else if err := graph.Add(Green); err != nil {
+	} else if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	} else if !graph.Quiesce() {
 		t.Fatalf("Should quiesce")
@@ -630,7 +606,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 	ctx := snow.DefaultConsensusContextTest()
 	reg := prometheus.NewRegistry()
-	ctx.Registerer = reg
+	ctx.AvalancheRegisterer = reg
 	err := graph.Initialize(ctx, params)
 	if err != nil {
 		t.Fatal(err)
@@ -694,7 +670,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		InputIDsV:     []ids.ID{ids.GenerateTestID()},
 		DependenciesV: []Tx{tx1, tx2, tx3, tx4},
 		HasWhitelistV: true,
-		WhitelistV: ids.Set{
+		WhitelistV: set.Set[ids.ID]{
 			tx1.IDV: struct{}{},
 			tx2.IDV: struct{}{},
 			tx3.IDV: struct{}{},
@@ -719,7 +695,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		InputIDsV:     []ids.ID{ids.GenerateTestID()},
 		DependenciesV: []Tx{tx1, tx2, tx6},
 		HasWhitelistV: true,
-		WhitelistV: ids.Set{
+		WhitelistV: set.Set[ids.ID]{
 			tx1.IDV: struct{}{},
 			tx2.IDV: struct{}{},
 			tx6.IDV: struct{}{},
@@ -729,27 +705,27 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 
 	txs := []*TestTx{tx1, tx2, tx3, tx4, stx5, tx6, stx7}
 	for _, tx := range txs {
-		if err := graph.Add(tx); err != nil {
+		if err := graph.Add(context.Background(), tx); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// check if stop vertex has been issued but not accepted
 	mss := gatherCounterGauge(t, reg)
-	assert.Equal(t, 5., mss["rogue_tx_processing"])
-	assert.Equal(t, 2., mss["virtuous_tx_processing"])
-	assert.Equal(t, 0., mss["whitelist_tx_accepted_count"])
-	assert.Equal(t, 2., mss["whitelist_tx_processing"])
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 2., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
 
 	vset1 := graph.Virtuous()
-	if !vset1.Equals(ids.Set{
+	if !vset1.Equals(set.Set[ids.ID]{
 		tx1.IDV: struct{}{},
 		tx2.IDV: struct{}{},
 	}) {
 		t.Fatalf("unexpected virtuous %v", vset1)
 	}
 	pset1 := graph.Preferences()
-	if !pset1.Equals(ids.Set{
+	if !pset1.Equals(set.Set[ids.ID]{
 		tx1.IDV:  struct{}{},
 		tx2.IDV:  struct{}{},
 		tx3.IDV:  struct{}{},
@@ -762,11 +738,11 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		t.Fatal("unexpected Finalized")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(tx1.ID(), 2)
 
-	updated, err := graph.RecordPoll(r)
+	updated, err := graph.RecordPoll(context.Background(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -775,13 +751,13 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 
 	vset2 := graph.Virtuous()
-	if !vset2.Equals(ids.Set{
+	if !vset2.Equals(set.Set[ids.ID]{
 		tx2.IDV: struct{}{},
 	}) {
 		t.Fatalf("unexpected virtuous %v", vset2)
 	}
 	pset2 := graph.Preferences()
-	if !pset2.Equals(ids.Set{
+	if !pset2.Equals(set.Set[ids.ID]{
 		tx2.IDV:  struct{}{},
 		tx3.IDV:  struct{}{},
 		tx4.IDV:  struct{}{},
@@ -791,10 +767,10 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 
 	mss = gatherCounterGauge(t, reg)
-	assert.Equal(t, 5., mss["rogue_tx_processing"])
-	assert.Equal(t, 1., mss["virtuous_tx_processing"])
-	assert.Equal(t, 0., mss["whitelist_tx_accepted_count"])
-	assert.Equal(t, 2., mss["whitelist_tx_processing"])
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 1., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
@@ -859,7 +835,7 @@ func AddWhitelistedVirtuousTest(t *testing.T, factory Factory) {
 
 	txs := []*TestTx{tx0, tx1}
 	for _, tx := range txs {
-		if err := graph.Add(tx); err != nil {
+		if err := graph.Add(context.Background(), tx); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -895,7 +871,7 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 	for i := range txIDs {
 		txIDs[i] = ids.GenerateTestID()
 	}
-	allTxIDs := ids.NewSet(n)
+	allTxIDs := set.NewSet[ids.ID](n)
 	allTxIDs.Add(txIDs...)
 
 	// each spending each other
@@ -912,12 +888,12 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 			WhitelistV:    nil,
 		}
 		allTxs[i] = tx
-		if err := graph.Add(tx); err != nil {
+		if err := graph.Add(context.Background(), tx); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	whitelist := ids.NewSet(1)
+	whitelist := set.NewSet[ids.ID](1)
 	whitelist.Add(ids.GenerateTestID())
 
 	// make whitelist transaction that conflicts with tx outside of its
@@ -934,7 +910,7 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 		WhitelistV:    whitelist,
 		WhitelistErrV: nil,
 	}
-	if err := graph.Add(wlTx); err != nil {
+	if err := graph.Add(context.Background(), wlTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -981,13 +957,13 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1007,9 +983,9 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	g := ids.Bag{}
+	g := bag.Bag[ids.ID]{}
 	g.Add(Green.ID())
-	if updated, err := graph.RecordPoll(g); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), g); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1031,9 +1007,9 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	rp := ids.Bag{}
+	rp := bag.Bag[ids.ID]{}
 	rp.Add(Red.ID(), purple.ID())
-	if updated, err := graph.RecordPoll(rp); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), rp); err != nil {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
@@ -1055,9 +1031,9 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.Add(Red.ID())
-	if updated, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1083,12 +1059,12 @@ type singleAcceptTx struct {
 	accepted bool
 }
 
-func (tx *singleAcceptTx) Accept() error {
+func (tx *singleAcceptTx) Accept(ctx context.Context) error {
 	if tx.accepted {
 		tx.t.Fatalf("accept called multiple times")
 	}
 	tx.accepted = true
-	return tx.Tx.Accept()
+	return tx.Tx.Accept(ctx)
 }
 
 func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
@@ -1123,13 +1099,13 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1149,9 +1125,9 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	g := ids.Bag{}
+	g := bag.Bag[ids.ID]{}
 	g.Add(Green.ID())
-	if updated, err := graph.RecordPoll(g); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), g); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1173,9 +1149,9 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	p := ids.Bag{}
+	p := bag.Bag[ids.ID]{}
 	p.Add(purple.ID())
-	if updated, err := graph.RecordPoll(p); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), p); err != nil {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
@@ -1197,9 +1173,9 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	rp := ids.Bag{}
+	rp := bag.Bag[ids.ID]{}
 	rp.Add(Red.ID(), purple.ID())
-	if updated, err := graph.RecordPoll(rp); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), rp); err != nil {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
@@ -1221,9 +1197,9 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.Add(Red.ID())
-	if updated, err := graph.RecordPoll(r); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1269,16 +1245,16 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Blue); err != nil {
+	if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1300,9 +1276,9 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	gp := ids.Bag{}
+	gp := bag.Bag[ids.ID]{}
 	gp.Add(Green.ID(), purple.ID())
-	if updated, err := graph.RecordPoll(gp); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), gp); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1326,7 +1302,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	if updated, err := graph.RecordPoll(gp); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), gp); err != nil {
 		t.Fatal(err)
 	} else if !updated {
 		t.Fatalf("Should have updated the frontiers")
@@ -1345,6 +1321,74 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 	case purple.Status() != choices.Rejected:
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Rejected)
 	}
+}
+
+func RejectMultipleTimesTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	purple := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []Tx{Green},
+		InputIDsV:     []ids.ID{ids.Empty.Prefix(8)},
+	}
+	yellow := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(9),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{ids.Empty.Prefix(8)},
+	}
+
+	graph := factory.New()
+
+	params := sbcon.Parameters{
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(graph.Initialize(snow.DefaultConsensusContextTest(), params))
+	require.NoError(graph.Add(context.Background(), Red))
+	require.NoError(graph.Add(context.Background(), yellow))
+	require.NoError(graph.Add(context.Background(), Green))
+	require.NoError(graph.Add(context.Background(), purple))
+
+	prefs := graph.Preferences()
+	require.Len(prefs, 2)
+	require.Contains(prefs, Red.ID())
+	require.Contains(prefs, yellow.ID())
+
+	y := bag.Bag[ids.ID]{}
+	y.Add(yellow.ID())
+
+	updated, err := graph.RecordPoll(context.Background(), y)
+	require.NoError(err)
+	require.True(updated)
+	require.Equal(choices.Processing, Red.Status())
+	require.Equal(choices.Accepted, yellow.Status())
+	require.Equal(choices.Processing, Green.Status())
+	require.Equal(choices.Rejected, purple.Status())
+
+	r := bag.Bag[ids.ID]{}
+	r.Add(Red.ID())
+
+	// Accepting Red rejects Green which was a dependency of purple. This
+	// results in purple being rejected for a second time.
+	updated, err = graph.RecordPoll(context.Background(), r)
+	require.NoError(err)
+	require.True(updated)
+	require.True(graph.Finalized())
+	require.Equal(choices.Accepted, Red.Status())
+	require.Equal(choices.Accepted, yellow.Status())
+	require.Equal(choices.Rejected, Green.Status())
+	require.Equal(choices.Rejected, purple.Status())
 }
 
 func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
@@ -1370,7 +1414,7 @@ func VacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	} else if prefs := graph.Preferences(); prefs.Len() != 0 {
 		t.Fatalf("Wrong number of preferences.")
@@ -1415,13 +1459,13 @@ func ConflictsTest(t *testing.T, factory Factory) {
 		InputIDsV: []ids.ID{conflictInputID},
 	}
 
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
 	} else if !orangeConflicts.Contains(purple.IDV) {
 		t.Fatalf("Conflicts does not contain the right transaction")
-	} else if err := graph.Add(orange); err != nil {
+	} else if err := graph.Add(context.Background(), orange); err != nil {
 		t.Fatal(err)
 	} else if orangeConflicts := graph.Conflicts(orange); orangeConflicts.Len() != 1 {
 		t.Fatalf("Wrong number of conflicts")
@@ -1472,18 +1516,18 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 
 	virtuous.InputIDsV = append(virtuous.InputIDsV, input2)
 
-	if err := graph.Add(rogue1); err != nil {
+	if err := graph.Add(context.Background(), rogue1); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(rogue2); err != nil {
+	} else if err := graph.Add(context.Background(), rogue2); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(virtuous); err != nil {
+	} else if err := graph.Add(context.Background(), virtuous); err != nil {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(rogue1.ID())
 	votes.Add(virtuous.ID())
-	if updated, err := graph.RecordPoll(votes); err != nil {
+	if updated, err := graph.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if updated {
 		t.Fatalf("Shouldn't have updated the frontiers")
@@ -1503,7 +1547,7 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 
@@ -1522,7 +1566,7 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(purple); err == nil {
+	if err := graph.Add(context.Background(), purple); err == nil {
 		t.Fatalf("Should have errored on acceptance")
 	}
 }
@@ -1532,7 +1576,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
@@ -1552,13 +1596,13 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
-	if _, err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on accepting an invalid tx")
 	}
 }
@@ -1566,20 +1610,20 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	X := ids.Empty.Prefix(4)
+	x := ids.Empty.Prefix(4)
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple.InputIDsV = append(purple.InputIDsV, x)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink.InputIDsV = append(pink.InputIDsV, x)
 
 	params := sbcon.Parameters{
 		K:                     1,
@@ -1596,15 +1640,15 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(purple); err != nil {
+	if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(pink); err != nil {
+	} else if err := graph.Add(context.Background(), pink); err != nil {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
-	if _, err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
 }
@@ -1612,20 +1656,20 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	X := ids.Empty.Prefix(4)
+	x := ids.Empty.Prefix(4)
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple.InputIDsV = append(purple.InputIDsV, x)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink.InputIDsV = append(pink.InputIDsV, x)
 
 	params := sbcon.Parameters{
 		K:                     1,
@@ -1642,15 +1686,15 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(pink); err != nil {
+	if err := graph.Add(context.Background(), pink); err != nil {
 		t.Fatal(err)
-	} else if err := graph.Add(purple); err != nil {
+	} else if err := graph.Add(context.Background(), purple); err != nil {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
-	if _, err := graph.RecordPoll(votes); err == nil {
+	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
 	}
 }
@@ -1669,37 +1713,37 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	err = graph.Add(Red)
-	assert.NoError(t, err)
+	err = graph.Add(context.Background(), Red)
+	require.NoError(t, err)
 
-	err = graph.Add(Green)
-	assert.NoError(t, err)
+	err = graph.Add(context.Background(), Green)
+	require.NoError(t, err)
 
-	redVotes := ids.Bag{}
+	redVotes := bag.Bag[ids.ID]{}
 	redVotes.Add(Red.ID())
-	changed, err := graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.False(t, changed, "shouldn't have accepted the red tx")
+	changed, err := graph.RecordPoll(context.Background(), redVotes)
+	require.NoError(t, err)
+	require.False(t, changed, "shouldn't have accepted the red tx")
 
-	changed, err = graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the red tx")
+	changed, err = graph.RecordPoll(context.Background(), redVotes)
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the red tx")
 
-	assert.Equal(t, choices.Accepted, Red.Status())
-	assert.Equal(t, choices.Rejected, Green.Status())
+	require.Equal(t, choices.Accepted, Red.Status())
+	require.Equal(t, choices.Rejected, Green.Status())
 
-	err = graph.Add(Blue)
-	assert.NoError(t, err)
+	err = graph.Add(context.Background(), Blue)
+	require.NoError(t, err)
 
-	blueVotes := ids.Bag{}
+	blueVotes := bag.Bag[ids.ID]{}
 	blueVotes.Add(Blue.ID())
-	changed, err = graph.RecordPoll(blueVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the blue tx")
+	changed, err = graph.RecordPoll(context.Background(), blueVotes)
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the blue tx")
 
-	assert.Equal(t, choices.Accepted, Blue.Status())
+	require.Equal(t, choices.Accepted, Blue.Status())
 }
 
 func RemoveVirtuousTest(t *testing.T, factory Factory) {
@@ -1716,19 +1760,19 @@ func RemoveVirtuousTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	err = graph.Add(Red)
-	assert.NoError(t, err)
+	err = graph.Add(context.Background(), Red)
+	require.NoError(t, err)
 
 	virtuous := graph.Virtuous()
-	assert.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
+	require.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
 
-	err = graph.Remove(Red.ID())
-	assert.NoError(t, err)
+	err = graph.Remove(context.Background(), Red.ID())
+	require.NoError(t, err)
 
 	virtuous = graph.Virtuous()
-	assert.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
+	require.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {
@@ -1749,16 +1793,16 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatal(err)
 	}
 
-	if err := graph.Add(Red); err != nil {
+	if err := graph.Add(context.Background(), Red); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Green); err != nil {
+	if err := graph.Add(context.Background(), Green); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Blue); err != nil {
+	if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	}
-	if err := graph.Add(Alpha); err != nil {
+	if err := graph.Add(context.Background(), Alpha); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1772,15 +1816,15 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	rb := ids.Bag{}
+	rb := bag.Bag[ids.ID]{}
 	rb.SetThreshold(2)
 	rb.AddCount(Red.ID(), 2)
 	rb.AddCount(Blue.ID(), 2)
-	if changed, err := graph.RecordPoll(rb); err != nil {
+	if changed, err := graph.RecordPoll(context.Background(), rb); err != nil {
 		t.Fatal(err)
 	} else if !changed {
 		t.Fatalf("Should have caused the frontiers to recalculate")
-	} else if err := graph.Add(Blue); err != nil {
+	} else if err := graph.Add(context.Background(), Blue); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1808,11 +1852,11 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	ga := ids.Bag{}
+	ga := bag.Bag[ids.ID]{}
 	ga.SetThreshold(2)
 	ga.AddCount(Green.ID(), 2)
 	ga.AddCount(Alpha.ID(), 2)
-	if changed, err := graph.RecordPoll(ga); err != nil {
+	if changed, err := graph.RecordPoll(context.Background(), ga); err != nil {
 		t.Fatal(err)
 	} else if changed {
 		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
@@ -1842,8 +1886,8 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	empty := ids.Bag{}
-	if changed, err := graph.RecordPoll(empty); err != nil {
+	empty := bag.Bag[ids.ID]{}
+	if changed, err := graph.RecordPoll(context.Background(), empty); err != nil {
 		t.Fatal(err)
 	} else if changed {
 		t.Fatalf("Shouldn't have caused the frontiers to recalculate")
@@ -1873,7 +1917,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	if changed, err := graph.RecordPoll(ga); err != nil {
+	if changed, err := graph.RecordPoll(context.Background(), ga); err != nil {
 		t.Fatal(err)
 	} else if !changed {
 		t.Fatalf("Should have caused the frontiers to recalculate")
@@ -1903,7 +1947,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	if changed, err := graph.RecordPoll(ga); err != nil {
+	if changed, err := graph.RecordPoll(context.Background(), ga); err != nil {
 		t.Fatal(err)
 	} else if !changed {
 		t.Fatalf("Should have caused the frontiers to recalculate")
@@ -1932,7 +1976,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("%s should have been rejected", Blue.ID())
 	}
 
-	if changed, err := graph.RecordPoll(rb); err != nil {
+	if changed, err := graph.RecordPoll(context.Background(), rb); err != nil {
 		t.Fatal(err)
 	} else if changed {
 		t.Fatalf("Shouldn't have caused the frontiers to recalculate")

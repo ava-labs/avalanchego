@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	_ SignedBlock = &statelessBlock{}
+	_ SignedBlock = (*statelessBlock)(nil)
 
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
-	errMissingProposer    = errors.New("expected proposer but one was provided")
+	errMissingProposer    = errors.New("expected proposer but none was provided")
 )
 
 type Block interface {
@@ -58,10 +59,21 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID       { return b.id }
-func (b *statelessBlock) ParentID() ids.ID { return b.StatelessBlock.ParentID }
-func (b *statelessBlock) Block() []byte    { return b.StatelessBlock.Block }
-func (b *statelessBlock) Bytes() []byte    { return b.bytes }
+func (b *statelessBlock) ID() ids.ID {
+	return b.id
+}
+
+func (b *statelessBlock) ParentID() ids.ID {
+	return b.StatelessBlock.ParentID
+}
+
+func (b *statelessBlock) Block() []byte {
+	return b.StatelessBlock.Block
+}
+
+func (b *statelessBlock) Bytes() []byte {
+	return b.bytes
+}
 
 func (b *statelessBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
@@ -82,14 +94,27 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	if err != nil {
 		return err
 	}
+
+	if err := staking.VerifyCertificate(cert); err != nil {
+		return err
+	}
+
 	b.cert = cert
 	b.proposer = ids.NodeIDFromCert(cert)
 	return nil
 }
 
-func (b *statelessBlock) PChainHeight() uint64 { return b.StatelessBlock.PChainHeight }
-func (b *statelessBlock) Timestamp() time.Time { return b.timestamp }
-func (b *statelessBlock) Proposer() ids.NodeID { return b.proposer }
+func (b *statelessBlock) PChainHeight() uint64 {
+	return b.StatelessBlock.PChainHeight
+}
+
+func (b *statelessBlock) Timestamp() time.Time {
+	return b.timestamp
+}
+
+func (b *statelessBlock) Proposer() ids.NodeID {
+	return b.proposer
+}
 
 func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	if !shouldHaveProposer {

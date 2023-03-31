@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ BinarySlush = &binarySlush{}
+var _ BinarySlush = (*binarySlush)(nil)
 
 // binarySlush is the implementation of a binary slush instance
 type binarySlush struct {
@@ -17,10 +17,18 @@ type binarySlush struct {
 	preference int
 }
 
-func (sl *binarySlush) Initialize(choice int) { sl.preference = choice }
+func (sl *binarySlush) Initialize(choice int) {
+	sl.preference = choice
+}
 
-func (sl *binarySlush) Preference() int { return sl.preference }
+func (sl *binarySlush) Preference() int {
+	return sl.preference
+}
 
-func (sl *binarySlush) RecordSuccessfulPoll(choice int) { sl.preference = choice }
+func (sl *binarySlush) RecordSuccessfulPoll(choice int) {
+	sl.preference = choice
+}
 
-func (sl *binarySlush) String() string { return fmt.Sprintf("SL(Preference = %d)", sl.preference) }
+func (sl *binarySlush) String() string {
+	return fmt.Sprintf("SL(Preference = %d)", sl.preference)
+}

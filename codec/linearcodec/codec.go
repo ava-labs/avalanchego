@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linearcodec
@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	_ Codec              = &linearCodec{}
-	_ codec.Codec        = &linearCodec{}
-	_ codec.Registry     = &linearCodec{}
-	_ codec.GeneralCodec = &linearCodec{}
+	_ Codec              = (*linearCodec)(nil)
+	_ codec.Codec        = (*linearCodec)(nil)
+	_ codec.Registry     = (*linearCodec)(nil)
+	_ codec.GeneralCodec = (*linearCodec)(nil)
 )
 
 // Codec marshals and unmarshals
@@ -55,7 +55,9 @@ func New(tagNames []string, maxSliceLen uint32) Codec {
 }
 
 // NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+}
 
 // NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
 func NewCustomMaxLength(maxSliceLen uint32) Codec {
@@ -84,6 +86,11 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil
+}
+
+func (*linearCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.IntLen
 }
 
 func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {

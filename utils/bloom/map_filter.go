@@ -1,21 +1,21 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bloom
 
 import (
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type mapFilter struct {
 	lock   sync.RWMutex
-	values map[string]struct{}
+	values set.Set[string]
 }
 
 func NewMap() Filter {
-	return &mapFilter{
-		values: make(map[string]struct{}),
-	}
+	return &mapFilter{}
 }
 
 func (m *mapFilter) Add(bl ...[]byte) {
@@ -23,7 +23,7 @@ func (m *mapFilter) Add(bl ...[]byte) {
 	defer m.lock.Unlock()
 
 	for _, b := range bl {
-		m.values[string(b)] = struct{}{}
+		m.values.Add(string(b))
 	}
 }
 
@@ -31,6 +31,5 @@ func (m *mapFilter) Check(b []byte) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	_, exists := m.values[string(b)]
-	return exists
+	return m.values.Contains(string(b))
 }

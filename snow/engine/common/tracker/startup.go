@@ -1,16 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Startup = &startup{}
+var _ Startup = (*startup)(nil)
 
 type Startup interface {
 	Peers
@@ -34,11 +36,11 @@ func NewStartup(peers Peers, startupWeight uint64) Startup {
 	}
 }
 
-func (s *startup) OnValidatorAdded(nodeID ids.NodeID, weight uint64) {
+func (s *startup) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.Peers.OnValidatorAdded(nodeID, weight)
+	s.Peers.OnValidatorAdded(nodeID, pk, txID, weight)
 	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
@@ -50,11 +52,11 @@ func (s *startup) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeig
 	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 
-func (s *startup) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (s *startup) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if err := s.Peers.Connected(nodeID, nodeVersion); err != nil {
+	if err := s.Peers.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
 

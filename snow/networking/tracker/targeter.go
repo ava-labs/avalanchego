@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-var _ Targeter = &targeter{}
+var _ Targeter = (*targeter)(nil)
 
 type Targeter interface {
 	// Returns the target usage of the given node.
@@ -60,7 +60,7 @@ func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	baseAlloc = math.Min(baseAlloc, t.maxNonVdrNodeUsage)
 
 	// This node gets a stake-weighted portion of the validator allocation.
-	weight, _ := t.vdrs.GetWeight(nodeID)
+	weight := t.vdrs.GetWeight(nodeID)
 	vdrAlloc := t.vdrAlloc * float64(weight) / float64(t.vdrs.Weight())
 	return vdrAlloc + baseAlloc
 }

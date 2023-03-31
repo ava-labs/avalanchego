@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -405,7 +405,8 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 
 				// deleted user details should be available to create user again.
-				if err = s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}); err != nil {
+				err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+				if err != nil {
 					t.Fatalf("failed to create user: %v", err)
 				}
 			}

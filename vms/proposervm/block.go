@@ -1,11 +1,15 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -13,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 const (
@@ -43,15 +49,15 @@ type Block interface {
 	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance of outer
 	// and inner blocks.
 	acceptOuterBlk() error
-	acceptInnerBlk() error
+	acceptInnerBlk(context.Context) error
 
-	verifyPreForkChild(child *preForkBlock) error
-	verifyPostForkChild(child *postForkBlock) error
-	verifyPostForkOption(child *postForkOption) error
+	verifyPreForkChild(ctx context.Context, child *preForkBlock) error
+	verifyPostForkChild(ctx context.Context, child *postForkBlock) error
+	verifyPostForkOption(ctx context.Context, child *postForkOption) error
 
-	buildChild() (Block, error)
+	buildChild(context.Context) (Block, error)
 
-	pChainHeight() (uint64, error)
+	pChainHeight(context.Context) (uint64, error)
 }
 
 type PostForkBlock interface {
@@ -84,8 +90,13 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
-func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
-	if err := verifyIsNotOracleBlock(p.innerBlk); err != nil {
+func (p *postForkCommonComponents) Verify(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	child *postForkBlock,
+) error {
+	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
 		return err
 	}
 
@@ -114,10 +125,13 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 	// been synced up to this point yet.
 	if p.vm.consensusState == snow.NormalOp {
 		childID := child.ID()
-		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
+		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
-			p.vm.ctx.Log.Error("failed to get current P-Chain height while processing %s: %s",
-				childID, err)
+			p.vm.ctx.Log.Error("block verification failed",
+				zap.String("reason", "failed to get current P-Chain height"),
+				zap.Stringer("blkID", childID),
+				zap.Error(err),
+			)
 			return err
 		}
 		if childPChainHeight > currentPChainHeight {
@@ -126,7 +140,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 
 		childHeight := child.Height()
 		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID)
 		if err != nil {
 			return err
 		}
@@ -142,15 +156,26 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 			return err
 		}
 
-		p.vm.ctx.Log.Debug("verified post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v",
-			childID, parentTimestamp, minDelay, childTimestamp)
+		p.vm.ctx.Log.Debug("verified post-fork block",
+			zap.Stringer("blkID", childID),
+			zap.Time("parentTimestamp", parentTimestamp),
+			zap.Duration("minDelay", minDelay),
+			zap.Time("blockTimestamp", childTimestamp),
+		)
 	}
 
-	return p.vm.verifyAndRecordInnerBlk(child)
+	return p.vm.verifyAndRecordInnerBlk(
+		ctx,
+		&smblock.Context{
+			PChainHeight: parentPChainHeight,
+		},
+		child,
+	)
 }
 
 // Return the child (a *postForkBlock) of this block
 func (p *postForkCommonComponents) buildChild(
+	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
@@ -163,7 +188,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the parent's P-Chain height
-	pChainHeight, err := p.vm.optimalPChainHeight(parentPChainHeight)
+	pChainHeight, err := p.vm.optimalPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +197,7 @@ func (p *postForkCommonComponents) buildChild(
 	if delay < proposer.MaxDelay {
 		parentHeight := p.innerBlk.Height()
 		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(parentHeight+1, parentPChainHeight, proposerID)
+		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			return nil, err
 		}
@@ -182,8 +207,11 @@ func (p *postForkCommonComponents) buildChild(
 			// by having previously notified the consensus engine to attempt to
 			// build a block on top of a block that is no longer the preferred
 			// block.
-			p.vm.ctx.Log.Debug("build block dropped; parent timestamp %s, expected delay %s, block timestamp %s",
-				parentTimestamp, minDelay, newTimestamp)
+			p.vm.ctx.Log.Debug("build block dropped",
+				zap.Time("parentTimestamp", parentTimestamp),
+				zap.Duration("minDelay", minDelay),
+				zap.Time("blockTimestamp", newTimestamp),
+			)
 
 			// In case the inner VM only issued one pendingTxs message, we
 			// should attempt to re-handle that once it is our turn to build the
@@ -193,7 +221,14 @@ func (p *postForkCommonComponents) buildChild(
 		}
 	}
 
-	innerBlock, err := p.vm.ChainVM.BuildBlock()
+	var innerBlock snowman.Block
+	if p.vm.blockBuilderVM != nil {
+		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
+			PChainHeight: parentPChainHeight,
+		})
+	} else {
+		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -207,22 +242,19 @@ func (p *postForkCommonComponents) buildChild(
 			pChainHeight,
 			innerBlock.Bytes(),
 		)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		statelessChild, err = block.Build(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.ctx.StakingCertLeaf,
+			p.vm.stakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
+			p.vm.stakingLeafSigner,
 		)
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	child := &postForkBlock{
@@ -234,8 +266,13 @@ func (p *postForkCommonComponents) buildChild(
 		},
 	}
 
-	p.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
-		child.ID(), parentTimestamp, newTimestamp)
+	p.vm.ctx.Log.Info("built block",
+		zap.Stringer("blkID", child.ID()),
+		zap.Stringer("innerBlkID", innerBlock.ID()),
+		zap.Uint64("height", child.Height()),
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Time("blockTimestamp", newTimestamp),
+	)
 	return child, nil
 }
 
@@ -247,24 +284,30 @@ func (p *postForkCommonComponents) setInnerBlk(innerBlk snowman.Block) {
 	p.innerBlk = innerBlk
 }
 
-func verifyIsOracleBlock(b snowman.Block) error {
+func verifyIsOracleBlock(ctx context.Context, b snowman.Block) error {
 	oracle, ok := b.(snowman.OracleBlock)
 	if !ok {
-		return errUnexpectedBlockType
+		return fmt.Errorf(
+			"%w: expected block %s to be a snowman.OracleBlock but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	}
-	_, err := oracle.Options()
+	_, err := oracle.Options(ctx)
 	return err
 }
 
-func verifyIsNotOracleBlock(b snowman.Block) error {
+func verifyIsNotOracleBlock(ctx context.Context, b snowman.Block) error {
 	oracle, ok := b.(snowman.OracleBlock)
 	if !ok {
 		return nil
 	}
-	_, err := oracle.Options()
+	_, err := oracle.Options(ctx)
 	switch err {
 	case nil:
-		return errUnexpectedBlockType
+		return fmt.Errorf(
+			"%w: expected block %s not to be an oracle block but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	case snowman.ErrNotOracle:
 		return nil
 	default:

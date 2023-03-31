@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metric
@@ -68,7 +68,7 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 	}, errs.Err
 }
 
-func (apr *apiInterceptor) InterceptRequest(i *rpc.RequestInfo) *http.Request {
+func (*apiInterceptor) InterceptRequest(i *rpc.RequestInfo) *http.Request {
 	ctx := i.Request.Context()
 	ctx = context.WithValue(ctx, requestTimestampKey, time.Now())
 	return i.Request.WithContext(ctx)

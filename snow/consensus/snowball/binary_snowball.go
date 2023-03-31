@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ BinarySnowball = &binarySnowball{}
+var _ BinarySnowball = (*binarySnowball)(nil)
 
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {

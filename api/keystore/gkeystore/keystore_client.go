@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gkeystore
@@ -16,7 +16,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
-var _ keystore.BlockchainKeystore = &Client{}
+var _ keystore.BlockchainKeystore = (*Client)(nil)
 
 // Client is a snow.Keystore that talks over RPC.
 type Client struct {

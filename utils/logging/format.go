@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -31,7 +31,7 @@ var (
 		CallerKey:      "caller",
 		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
-		EncodeDuration: zapcore.MillisDurationEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 	jsonEncoderConfig zapcore.EncoderConfig
@@ -43,6 +43,7 @@ func init() {
 	jsonEncoderConfig = defaultEncoderConfig
 	jsonEncoderConfig.EncodeLevel = jsonLevelEncoder
 	jsonEncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	jsonEncoderConfig.EncodeDuration = zapcore.NanosDurationEncoder
 }
 
 // Highlight mode to apply to displayed logs

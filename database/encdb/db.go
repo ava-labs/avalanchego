@@ -1,20 +1,21 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package encdb
 
 import (
+	"context"
 	"crypto/cipher"
 	"crypto/rand"
 	"sync"
 
 	"golang.org/x/crypto/chacha20poly1305"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/nodb"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -23,9 +24,9 @@ const (
 )
 
 var (
-	_ database.Database = &Database{}
-	_ database.Batch    = &batch{}
-	_ database.Iterator = &iterator{}
+	_ database.Database = (*Database)(nil)
+	_ database.Batch    = (*batch)(nil)
+	_ database.Iterator = (*iterator)(nil)
 )
 
 // Database encrypts all values that are provided
@@ -34,6 +35,7 @@ type Database struct {
 	codec  codec.Manager
 	cipher cipher.AEAD
 	db     database.Database
+	closed bool
 }
 
 // New returns a new encrypted database
@@ -56,7 +58,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return false, database.ErrClosed
 	}
 	return db.db.Has(key)
@@ -66,7 +68,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 	encVal, err := db.db.Get(key)
@@ -80,7 +82,7 @@ func (db *Database) Put(key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -95,7 +97,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 	return db.db.Delete(key)
@@ -124,8 +126,10 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
-		return &nodb.Iterator{Err: database.ErrClosed}
+	if db.closed {
+		return &database.IteratorError{
+			Err: database.ErrClosed,
+		}
 	}
 	return &iterator{
 		Iterator: db.db.NewIteratorWithStartAndPrefix(start, prefix),
@@ -137,7 +141,7 @@ func (db *Database) Compact(start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 	return db.db.Compact(start, limit)
@@ -147,10 +151,10 @@ func (db *Database) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
-	db.db = nil
+	db.closed = true
 	return nil
 }
 
@@ -158,34 +162,31 @@ func (db *Database) isClosed() bool {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.db == nil
+	return db.closed
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
-	return db.db.HealthCheck()
-}
-
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
+	return db.db.HealthCheck(ctx)
 }
 
 type batch struct {
 	database.Batch
 
-	db     *Database
-	writes []keyValue
+	db  *Database
+	ops []database.BatchOp
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:   slices.Clone(key),
+		Value: slices.Clone(value),
+	})
 	encValue, err := b.db.encrypt(value)
 	if err != nil {
 		return err
@@ -194,7 +195,10 @@ func (b *batch) Put(key, value []byte) error {
 }
 
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
+	b.ops = append(b.ops, database.BatchOp{
+		Key:    slices.Clone(key),
+		Delete: true,
+	})
 	return b.Batch.Delete(key)
 }
 
@@ -202,7 +206,7 @@ func (b *batch) Write() error {
 	b.db.lock.Lock()
 	defer b.db.lock.Unlock()
 
-	if b.db.db == nil {
+	if b.db.closed {
 		return database.ErrClosed
 	}
 
@@ -211,22 +215,22 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
+	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
+		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
-		b.writes = b.writes[:0]
+		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()
 }
 
 // Replay replays the batch contents.
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			if err := w.Delete(keyvalue.key); err != nil {
+	for _, op := range b.ops {
+		if op.Delete {
+			if err := w.Delete(op.Key); err != nil {
 				return err
 			}
-		} else if err := w.Put(keyvalue.key, keyvalue.value); err != nil {
+		} else if err := w.Put(op.Key, op.Value); err != nil {
 			return err
 		}
 	}
@@ -274,9 +278,13 @@ func (it *iterator) Error() error {
 	return it.Iterator.Error()
 }
 
-func (it *iterator) Key() []byte { return it.key }
+func (it *iterator) Key() []byte {
+	return it.key
+}
 
-func (it *iterator) Value() []byte { return it.val }
+func (it *iterator) Value() []byte {
+	return it.val
+}
 
 type encryptedValue struct {
 	Ciphertext []byte `serialize:"true"`

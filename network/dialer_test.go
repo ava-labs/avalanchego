@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -15,7 +15,7 @@ import (
 var (
 	errRefused = errors.New("connection refused")
 
-	_ dialer.Dialer = &testDialer{}
+	_ dialer.Dialer = (*testDialer)(nil)
 )
 
 type testDialer struct {

@@ -1,15 +1,17 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tree
 
 import (
+	"context"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -21,7 +23,7 @@ var (
 )
 
 func TestAcceptSingleBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	block := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -34,20 +36,20 @@ func TestAcceptSingleBlock(t *testing.T) {
 	tr := New()
 
 	_, contains := tr.Get(block)
-	assert.False(contains)
+	require.False(contains)
 
 	tr.Add(block)
 
 	_, contains = tr.Get(block)
-	assert.True(contains)
+	require.True(contains)
 
-	err := tr.Accept(block)
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, block.Status())
+	err := tr.Accept(context.Background(), block)
+	require.NoError(err)
+	require.Equal(choices.Accepted, block.Status())
 }
 
 func TestAcceptBlockConflict(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	blockToAccept := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -71,19 +73,19 @@ func TestAcceptBlockConflict(t *testing.T) {
 	tr.Add(blockToReject)
 
 	_, contains := tr.Get(blockToAccept)
-	assert.True(contains)
+	require.True(contains)
 
 	_, contains = tr.Get(blockToReject)
-	assert.True(contains)
+	require.True(contains)
 
-	err := tr.Accept(blockToAccept)
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, blockToAccept.Status())
-	assert.Equal(choices.Rejected, blockToReject.Status())
+	err := tr.Accept(context.Background(), blockToAccept)
+	require.NoError(err)
+	require.Equal(choices.Accepted, blockToAccept.Status())
+	require.Equal(choices.Rejected, blockToReject.Status())
 }
 
 func TestAcceptChainConflict(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	blockToAccept := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -116,17 +118,17 @@ func TestAcceptChainConflict(t *testing.T) {
 	tr.Add(blockToRejectChild)
 
 	_, contains := tr.Get(blockToAccept)
-	assert.True(contains)
+	require.True(contains)
 
 	_, contains = tr.Get(blockToReject)
-	assert.True(contains)
+	require.True(contains)
 
 	_, contains = tr.Get(blockToRejectChild)
-	assert.True(contains)
+	require.True(contains)
 
-	err := tr.Accept(blockToAccept)
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, blockToAccept.Status())
-	assert.Equal(choices.Rejected, blockToReject.Status())
-	assert.Equal(choices.Rejected, blockToRejectChild.Status())
+	err := tr.Accept(context.Background(), blockToAccept)
+	require.NoError(err)
+	require.Equal(choices.Accepted, blockToAccept.Status())
+	require.Equal(choices.Rejected, blockToReject.Status())
+	require.Equal(choices.Rejected, blockToRejectChild.Status())
 }

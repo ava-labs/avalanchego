@@ -1,7 +1,15 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/set"
+)
 
 // Op is an opcode
 type Op byte
@@ -9,93 +17,86 @@ type Op byte
 // Types of messages that may be sent between nodes
 // Note: If you add a new parseable Op below, you must also add it to ops
 // (declared below)
-//
-// "_" are used in places where old message types were defined that are no
-// longer supported. When new messages are introduced these values are typically
-// safe to reuse.
 const (
 	// Handshake:
-	_ Op = iota // Used to be a GetVersion message
-	_           // Used to be a Version message
-	_           // Used to be a GetPeerList message
-	Pong
-	Ping
-	_ // Used to be a Pong message
+	PingOp Op = iota
+	PongOp
+	VersionOp
+	PeerListOp
+	PeerListAckOp
+	// State sync:
+	GetStateSummaryFrontierOp
+	GetStateSummaryFrontierFailedOp
+	StateSummaryFrontierOp
+	GetAcceptedStateSummaryOp
+	GetAcceptedStateSummaryFailedOp
+	AcceptedStateSummaryOp
 	// Bootstrapping:
-	GetAcceptedFrontier
-	AcceptedFrontier
-	GetAccepted
-	Accepted
-	GetAncestors
-	Ancestors
+	GetAcceptedFrontierOp
+	GetAcceptedFrontierFailedOp
+	AcceptedFrontierOp
+	GetAcceptedOp
+	GetAcceptedFailedOp
+	AcceptedOp
+	GetAncestorsOp
+	GetAncestorsFailedOp
+	AncestorsOp
 	// Consensus:
-	Get
-	Put
-	PushQuery
-	PullQuery
-	Chits
-	// Handshake / peer gossiping
-	_ // Used to be a Version message
-	PeerList
-	Version
-	// Application level:
-	AppRequest
-	AppResponse
-	AppGossip
-	// State sync
-	GetStateSummaryFrontier
-	StateSummaryFrontier
-	GetAcceptedStateSummary
-	AcceptedStateSummary
-	// linearize dag
-	ChitsV2
-
-	// Internal messages (External messages should be added above these):
-	GetAcceptedFrontierFailed
-	GetAcceptedFailed
-	GetAncestorsFailed
-	GetFailed
-	QueryFailed
-	AppRequestFailed
-	Timeout
-	Connected
-	Disconnected
-	Notify
-	GossipRequest
-	GetStateSummaryFrontierFailed
-	GetAcceptedStateSummaryFailed
+	GetOp
+	GetFailedOp
+	PutOp
+	PushQueryOp
+	PullQueryOp
+	QueryFailedOp
+	ChitsOp
+	// Application:
+	AppRequestOp
+	AppRequestFailedOp
+	AppResponseOp
+	AppGossipOp
+	// Cross chain:
+	CrossChainAppRequestOp
+	CrossChainAppRequestFailedOp
+	CrossChainAppResponseOp
+	// Internal:
+	ConnectedOp
+	ConnectedSubnetOp
+	DisconnectedOp
+	NotifyOp
+	GossipRequestOp
+	TimeoutOp
 )
 
 var (
 	HandshakeOps = []Op{
-		Version,
-		PeerList,
-		Ping,
-		Pong,
+		PingOp,
+		PongOp,
+		VersionOp,
+		PeerListOp,
+		PeerListAckOp,
 	}
 
 	// List of all consensus request message types
 	ConsensusRequestOps = []Op{
-		GetAcceptedFrontier,
-		GetAccepted,
-		GetAncestors,
-		Get,
-		PushQuery,
-		PullQuery,
-		AppRequest,
-		GetStateSummaryFrontier,
-		GetAcceptedStateSummary,
+		GetStateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp,
+		GetAcceptedFrontierOp,
+		GetAcceptedOp,
+		GetAncestorsOp,
+		GetOp,
+		PushQueryOp,
+		PullQueryOp,
+		AppRequestOp,
 	}
 	ConsensusResponseOps = []Op{
-		AcceptedFrontier,
-		Accepted,
-		Ancestors,
-		Put,
-		Chits,
-		ChitsV2,
-		AppResponse,
-		StateSummaryFrontier,
-		AcceptedStateSummary,
+		StateSummaryFrontierOp,
+		AcceptedStateSummaryOp,
+		AcceptedFrontierOp,
+		AcceptedOp,
+		AncestorsOp,
+		PutOp,
+		ChitsOp,
+		AppResponseOp,
 	}
 	// AppGossip is the only message that is sent unrequested without the
 	// expectation of a response
@@ -103,244 +104,305 @@ var (
 		ConsensusRequestOps,
 		append(
 			ConsensusResponseOps,
-			AppGossip,
+			AppGossipOp,
 		)...,
 	)
 	ConsensusInternalOps = []Op{
-		GetAcceptedFrontierFailed,
-		GetAcceptedFailed,
-		GetAncestorsFailed,
-		GetFailed,
-		QueryFailed,
-		AppRequestFailed,
-		Timeout,
-		Connected,
-		Disconnected,
-		Notify,
-		GossipRequest,
-		GetStateSummaryFrontierFailed,
-		GetAcceptedStateSummaryFailed,
+		GetStateSummaryFrontierFailedOp,
+		GetAcceptedStateSummaryFailedOp,
+		GetAcceptedFrontierFailedOp,
+		GetAcceptedFailedOp,
+		GetAncestorsFailedOp,
+		GetFailedOp,
+		QueryFailedOp,
+		AppRequestFailedOp,
+		CrossChainAppRequestOp,
+		CrossChainAppRequestFailedOp,
+		CrossChainAppResponseOp,
+		ConnectedOp,
+		ConnectedSubnetOp,
+		DisconnectedOp,
+		NotifyOp,
+		GossipRequestOp,
+		TimeoutOp,
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
 	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
 
 	SynchronousOps = []Op{
-		GetAcceptedFrontier,
-		AcceptedFrontier,
-		GetAccepted,
-		Accepted,
-		GetAncestors,
-		Ancestors,
-		Get,
-		Put,
-		PushQuery,
-		PullQuery,
-		Chits,
-		ChitsV2,
-		GetAcceptedFrontierFailed,
-		GetAcceptedFailed,
-		GetAncestorsFailed,
-		GetFailed,
-		QueryFailed,
-		Connected,
-		Disconnected,
-
 		// State sync
-		GetStateSummaryFrontier,
-		StateSummaryFrontier,
-		GetAcceptedStateSummary,
-		AcceptedStateSummary,
-		GetStateSummaryFrontierFailed,
-		GetAcceptedStateSummaryFailed,
+		GetStateSummaryFrontierOp,
+		GetStateSummaryFrontierFailedOp,
+		StateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp,
+		GetAcceptedStateSummaryFailedOp,
+		AcceptedStateSummaryOp,
+		// Bootstrapping
+		GetAcceptedFrontierOp,
+		GetAcceptedFrontierFailedOp,
+		AcceptedFrontierOp,
+		GetAcceptedOp,
+		GetAcceptedFailedOp,
+		AcceptedOp,
+		GetAncestorsOp,
+		GetAncestorsFailedOp,
+		AncestorsOp,
+		// Consensus
+		GetOp,
+		GetFailedOp,
+		PutOp,
+		PushQueryOp,
+		PullQueryOp,
+		QueryFailedOp,
+		ChitsOp,
+		// Internal
+		ConnectedOp,
+		ConnectedSubnetOp,
+		DisconnectedOp,
 	}
 
 	AsynchronousOps = []Op{
-		AppRequest,
-		AppGossip,
-		AppRequestFailed,
-		AppResponse,
+		// Application
+		AppRequestOp,
+		AppRequestFailedOp,
+		AppGossipOp,
+		AppResponseOp,
+		// Cross chain
+		CrossChainAppRequestOp,
+		CrossChainAppRequestFailedOp,
+		CrossChainAppResponseOp,
 	}
 
-	RequestToResponseOps = map[Op]Op{
-		GetAcceptedFrontier:     AcceptedFrontier,
-		GetAccepted:             Accepted,
-		GetAncestors:            Ancestors,
-		Get:                     Put,
-		PushQuery:               Chits,
-		PullQuery:               Chits,
-		AppRequest:              AppResponse,
-		GetStateSummaryFrontier: StateSummaryFrontier,
-		GetAcceptedStateSummary: AcceptedStateSummary,
-	}
-	ResponseToFailedOps = map[Op]Op{
-		AcceptedFrontier:     GetAcceptedFrontierFailed,
-		Accepted:             GetAcceptedFailed,
-		Ancestors:            GetAncestorsFailed,
-		Put:                  GetFailed,
-		Chits:                QueryFailed,
-		ChitsV2:              QueryFailed,
-		AppResponse:          AppRequestFailed,
-		StateSummaryFrontier: GetStateSummaryFrontierFailed,
-		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
-	}
 	FailedToResponseOps = map[Op]Op{
-		GetAcceptedFrontierFailed: AcceptedFrontier,
-		GetAcceptedFailed:         Accepted,
-		GetAncestorsFailed:        Ancestors,
-		GetFailed:                 Put,
-
-		// "ChitV2" response failure also uses "Chits"
-		QueryFailed: Chits,
-
-		AppRequestFailed:              AppResponse,
-		GetStateSummaryFrontierFailed: StateSummaryFrontier,
-		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
+		GetStateSummaryFrontierFailedOp: StateSummaryFrontierOp,
+		GetAcceptedStateSummaryFailedOp: AcceptedStateSummaryOp,
+		GetAcceptedFrontierFailedOp:     AcceptedFrontierOp,
+		GetAcceptedFailedOp:             AcceptedOp,
+		GetAncestorsFailedOp:            AncestorsOp,
+		GetFailedOp:                     PutOp,
+		QueryFailedOp:                   ChitsOp,
+		AppRequestFailedOp:              AppResponseOp,
+		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
 	}
-	UnrequestedOps = map[Op]struct{}{
-		GetAcceptedFrontier:     {},
-		GetAccepted:             {},
-		GetAncestors:            {},
-		Get:                     {},
-		PushQuery:               {},
-		PullQuery:               {},
-		AppRequest:              {},
-		AppGossip:               {},
-		GetStateSummaryFrontier: {},
-		GetAcceptedStateSummary: {},
+	UnrequestedOps = set.Set[Op]{
+		GetAcceptedFrontierOp:     {},
+		GetAcceptedOp:             {},
+		GetAncestorsOp:            {},
+		GetOp:                     {},
+		PushQueryOp:               {},
+		PullQueryOp:               {},
+		AppRequestOp:              {},
+		AppGossipOp:               {},
+		CrossChainAppRequestOp:    {},
+		GetStateSummaryFrontierOp: {},
+		GetAcceptedStateSummaryOp: {},
 	}
 
-	// Defines the messages that can be sent/received with this network
-	messages = map[Op][]Field{
-		// Handshake:
-		// TODO: remove NodeID from the Version message
-		Version:  {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
-		PeerList: {Peers},
-		Ping:     {},
-		Pong:     {Uptime},
-		// Bootstrapping:
-		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
-		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
-		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
-		Accepted:            {ChainID, RequestID, ContainerIDs},
-		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
-		Ancestors:           {ChainID, RequestID, MultiContainerBytes},
-		// Consensus:
-		Get:       {ChainID, RequestID, Deadline, ContainerID},
-		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
-		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
-		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
-		Chits:     {ChainID, RequestID, ContainerIDs},
-
-		// ChitV2 is used for transition from DAG to linear chain
-		// First "ContainerIDs" field represents the votes from the existing DAG
-		// Second "ContainerID" field represents the vote from newly instantiated snowman chain
-		// The message sender should populate both, and the message handler should choose "one"
-		// depending on the consensus engine it's running at the time.
-		//
-		// TODO: define a new chit message v3 with container ID as a single value
-		//       once DAG is linearized
-		ChitsV2: {ChainID, RequestID, ContainerIDs, ContainerID},
-
-		// Application level:
-		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
-		AppResponse: {ChainID, RequestID, AppBytes},
-		AppGossip:   {ChainID, AppBytes},
-		// State Sync
-		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
-		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
-		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, SummaryHeights},
-		AcceptedStateSummary:    {ChainID, RequestID, SummaryIDs},
-	}
+	errUnknownMessageType = errors.New("unknown message type")
 )
-
-func (op Op) Compressible() bool {
-	switch op {
-	case PeerList, Put, Ancestors, PushQuery,
-		AppRequest, AppResponse, AppGossip,
-		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
-		return true
-	default:
-		return false
-	}
-}
 
 func (op Op) String() string {
 	switch op {
-	case Version:
-		return "version"
-	case PeerList:
-		return "peerlist"
-	case Ping:
+	// Handshake
+	case PingOp:
 		return "ping"
-	case Pong:
+	case PongOp:
 		return "pong"
-	case GetAcceptedFrontier:
-		return "get_accepted_frontier"
-	case AcceptedFrontier:
-		return "accepted_frontier"
-	case GetAccepted:
-		return "get_accepted"
-	case Accepted:
-		return "accepted"
-	case Get:
-		return "get"
-	case GetAncestors:
-		return "get_ancestors"
-	case Put:
-		return "put"
-	case Ancestors:
-		return "ancestors"
-	case PushQuery:
-		return "push_query"
-	case PullQuery:
-		return "pull_query"
-	case Chits:
-		return "chits"
-	case ChitsV2:
-		return "chits_v2"
-	case AppRequest:
-		return "app_request"
-	case AppResponse:
-		return "app_response"
-	case AppGossip:
-		return "app_gossip"
-	case GetStateSummaryFrontier:
+	case VersionOp:
+		return "version"
+	case PeerListOp:
+		return "peerlist"
+	case PeerListAckOp:
+		return "peerlist_ack"
+	// State sync
+	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
-	case StateSummaryFrontier:
-		return "state_summary_frontier"
-	case GetAcceptedStateSummary:
-		return "get_accepted_state_summary"
-	case AcceptedStateSummary:
-		return "accepted_state_summary"
-
-	case GetAcceptedFrontierFailed:
-		return "get_accepted_frontier_failed"
-	case GetAcceptedFailed:
-		return "get_accepted_failed"
-	case GetAncestorsFailed:
-		return "get_ancestors_failed"
-	case GetFailed:
-		return "get_failed"
-	case QueryFailed:
-		return "query_failed"
-	case AppRequestFailed:
-		return "app_request_failed"
-	case GetStateSummaryFrontierFailed:
+	case GetStateSummaryFrontierFailedOp:
 		return "get_state_summary_frontier_failed"
-	case GetAcceptedStateSummaryFailed:
+	case StateSummaryFrontierOp:
+		return "state_summary_frontier"
+	case GetAcceptedStateSummaryOp:
+		return "get_accepted_state_summary"
+	case GetAcceptedStateSummaryFailedOp:
 		return "get_accepted_state_summary_failed"
-	case Timeout:
-		return "timeout"
-	case Connected:
+	case AcceptedStateSummaryOp:
+		return "accepted_state_summary"
+	// Bootstrapping
+	case GetAcceptedFrontierOp:
+		return "get_accepted_frontier"
+	case GetAcceptedFrontierFailedOp:
+		return "get_accepted_frontier_failed"
+	case AcceptedFrontierOp:
+		return "accepted_frontier"
+	case GetAcceptedOp:
+		return "get_accepted"
+	case GetAcceptedFailedOp:
+		return "get_accepted_failed"
+	case AcceptedOp:
+		return "accepted"
+	case GetAncestorsOp:
+		return "get_ancestors"
+	case GetAncestorsFailedOp:
+		return "get_ancestors_failed"
+	case AncestorsOp:
+		return "ancestors"
+	// Consensus
+	case GetOp:
+		return "get"
+	case GetFailedOp:
+		return "get_failed"
+	case PutOp:
+		return "put"
+	case PushQueryOp:
+		return "push_query"
+	case PullQueryOp:
+		return "pull_query"
+	case QueryFailedOp:
+		return "query_failed"
+	case ChitsOp:
+		return "chits"
+	// Application
+	case AppRequestOp:
+		return "app_request"
+	case AppRequestFailedOp:
+		return "app_request_failed"
+	case AppResponseOp:
+		return "app_response"
+	case AppGossipOp:
+		return "app_gossip"
+	// Cross chain
+	case CrossChainAppRequestOp:
+		return "cross_chain_app_request"
+	case CrossChainAppRequestFailedOp:
+		return "cross_chain_app_request_failed"
+	case CrossChainAppResponseOp:
+		return "cross_chain_app_response"
+		// Internal
+	case ConnectedOp:
 		return "connected"
-	case Disconnected:
+	case ConnectedSubnetOp:
+		return "connected_subnet"
+	case DisconnectedOp:
 		return "disconnected"
-	case Notify:
+	case NotifyOp:
 		return "notify"
-	case GossipRequest:
+	case GossipRequestOp:
 		return "gossip_request"
+	case TimeoutOp:
+		return "timeout"
 	default:
-		return "Unknown Op"
+		return "unknown"
+	}
+}
+
+func Unwrap(m *p2p.Message) (interface{}, error) {
+	switch msg := m.GetMessage().(type) {
+	// Handshake:
+	case *p2p.Message_Ping:
+		return msg.Ping, nil
+	case *p2p.Message_Pong:
+		return msg.Pong, nil
+	case *p2p.Message_Version:
+		return msg.Version, nil
+	case *p2p.Message_PeerList:
+		return msg.PeerList, nil
+	case *p2p.Message_PeerListAck:
+		return msg.PeerListAck, nil
+	// State sync:
+	case *p2p.Message_GetStateSummaryFrontier:
+		return msg.GetStateSummaryFrontier, nil
+	case *p2p.Message_StateSummaryFrontier_:
+		return msg.StateSummaryFrontier_, nil
+	case *p2p.Message_GetAcceptedStateSummary:
+		return msg.GetAcceptedStateSummary, nil
+	case *p2p.Message_AcceptedStateSummary_:
+		return msg.AcceptedStateSummary_, nil
+	// Bootstrapping:
+	case *p2p.Message_GetAcceptedFrontier:
+		return msg.GetAcceptedFrontier, nil
+	case *p2p.Message_AcceptedFrontier_:
+		return msg.AcceptedFrontier_, nil
+	case *p2p.Message_GetAccepted:
+		return msg.GetAccepted, nil
+	case *p2p.Message_Accepted_:
+		return msg.Accepted_, nil
+	case *p2p.Message_GetAncestors:
+		return msg.GetAncestors, nil
+	case *p2p.Message_Ancestors_:
+		return msg.Ancestors_, nil
+	// Consensus:
+	case *p2p.Message_Get:
+		return msg.Get, nil
+	case *p2p.Message_Put:
+		return msg.Put, nil
+	case *p2p.Message_PushQuery:
+		return msg.PushQuery, nil
+	case *p2p.Message_PullQuery:
+		return msg.PullQuery, nil
+	case *p2p.Message_Chits:
+		return msg.Chits, nil
+	// Application:
+	case *p2p.Message_AppRequest:
+		return msg.AppRequest, nil
+	case *p2p.Message_AppResponse:
+		return msg.AppResponse, nil
+	case *p2p.Message_AppGossip:
+		return msg.AppGossip, nil
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
+	}
+}
+
+func ToOp(m *p2p.Message) (Op, error) {
+	switch msg := m.GetMessage().(type) {
+	case *p2p.Message_Ping:
+		return PingOp, nil
+	case *p2p.Message_Pong:
+		return PongOp, nil
+	case *p2p.Message_Version:
+		return VersionOp, nil
+	case *p2p.Message_PeerList:
+		return PeerListOp, nil
+	case *p2p.Message_PeerListAck:
+		return PeerListAckOp, nil
+	case *p2p.Message_GetStateSummaryFrontier:
+		return GetStateSummaryFrontierOp, nil
+	case *p2p.Message_StateSummaryFrontier_:
+		return StateSummaryFrontierOp, nil
+	case *p2p.Message_GetAcceptedStateSummary:
+		return GetAcceptedStateSummaryOp, nil
+	case *p2p.Message_AcceptedStateSummary_:
+		return AcceptedStateSummaryOp, nil
+	case *p2p.Message_GetAcceptedFrontier:
+		return GetAcceptedFrontierOp, nil
+	case *p2p.Message_AcceptedFrontier_:
+		return AcceptedFrontierOp, nil
+	case *p2p.Message_GetAccepted:
+		return GetAcceptedOp, nil
+	case *p2p.Message_Accepted_:
+		return AcceptedOp, nil
+	case *p2p.Message_GetAncestors:
+		return GetAncestorsOp, nil
+	case *p2p.Message_Ancestors_:
+		return AncestorsOp, nil
+	case *p2p.Message_Get:
+		return GetOp, nil
+	case *p2p.Message_Put:
+		return PutOp, nil
+	case *p2p.Message_PushQuery:
+		return PushQueryOp, nil
+	case *p2p.Message_PullQuery:
+		return PullQueryOp, nil
+	case *p2p.Message_Chits:
+		return ChitsOp, nil
+	case *p2p.Message_AppRequest:
+		return AppRequestOp, nil
+	case *p2p.Message_AppResponse:
+		return AppResponseOp, nil
+	case *p2p.Message_AppGossip:
+		return AppGossipOp, nil
+	default:
+		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}
 }

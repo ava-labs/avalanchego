@@ -1,38 +1,43 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vms
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
 	ErrNotFound = errors.New("not found")
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 // A Factory creates new instances of a VM
 type Factory interface {
-	New(*snow.Context) (interface{}, error)
+	New(logging.Logger) (interface{}, error)
 }
 
 // Manager tracks a collection of VM factories, their aliases, and their
 // versions.
 // It has the following functionality:
-//   1) Register a VM factory. To register a VM is to associate its ID with a
-//		VMFactory which, when New() is called upon it, creates a new instance of
-//      that VM.
-//	 2) Get a VM factory. Given the ID of a VM that has been registered, return
-//      the factory that the ID is associated with.
-//   3) Manage the aliases of VMs
-//   3) Manage the versions of VMs
+//
+//  1. Register a VM factory. To register a VM is to associate its ID with a
+//     VMFactory which, when New() is called upon it, creates a new instance of
+//     that VM.
+//  2. Get a VM factory. Given the ID of a VM that has been registered, return
+//     the factory that the ID is associated with.
+//  3. Manage the aliases of VMs
+//  4. Manage the versions of VMs
 type Manager interface {
 	ids.Aliaser
 
@@ -42,7 +47,7 @@ type Manager interface {
 
 	// Map [vmID] to [factory]. [factory] creates new instances of the vm whose
 	// ID is [vmID]
-	RegisterFactory(vmID ids.ID, factory Factory) error
+	RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error
 
 	// ListFactories returns all the IDs that have had factories registered.
 	ListFactories() ([]ids.ID, error)
@@ -57,6 +62,10 @@ type manager struct {
 	// alias of the VM. That is, [vmID].String() is an alias for [vmID].
 	ids.Aliaser
 
+	log logging.Logger
+
+	lock sync.RWMutex
+
 	// Key: A VM's ID
 	// Value: A factory that creates new instances of that VM
 	factories map[ids.ID]Factory
@@ -67,22 +76,29 @@ type manager struct {
 }
 
 // NewManager returns an instance of a VM manager
-func NewManager() Manager {
+func NewManager(log logging.Logger, aliaser ids.Aliaser) Manager {
 	return &manager{
-		Aliaser:   ids.NewAliaser(),
+		Aliaser:   aliaser,
+		log:       log,
 		factories: make(map[ids.ID]Factory),
 		versions:  make(map[ids.ID]string),
 	}
 }
 
 func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if factory, ok := m.factories[vmID]; ok {
 		return factory, nil
 	}
 	return nil, fmt.Errorf("%q was %w", vmID, ErrNotFound)
 }
 
-func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
+func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if _, exists := m.factories[vmID]; exists {
 		return fmt.Errorf("%q was already registered as a vm", vmID)
 	}
@@ -92,7 +108,7 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 
 	m.factories[vmID] = factory
 
-	vm, err := factory.New(nil)
+	vm, err := factory.New(m.log)
 	if err != nil {
 		return err
 	}
@@ -102,26 +118,28 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 		return nil
 	}
 
-	version, err := commonVM.Version()
+	version, err := commonVM.Version(ctx)
 	if err != nil {
 		// Drop the shutdown error to surface the original error
-		_ = commonVM.Shutdown()
+		_ = commonVM.Shutdown(ctx)
 		return err
 	}
 
 	m.versions[vmID] = version
-	return commonVM.Shutdown()
+	return commonVM.Shutdown(ctx)
 }
 
 func (m *manager) ListFactories() ([]ids.ID, error) {
-	vmIDs := make([]ids.ID, 0, len(m.factories))
-	for vmID := range m.factories {
-		vmIDs = append(vmIDs, vmID)
-	}
-	return vmIDs, nil
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return maps.Keys(m.factories), nil
 }
 
 func (m *manager) Versions() (map[string]string, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	versions := make(map[string]string, len(m.versions))
 	for vmID, version := range m.versions {
 		alias, err := m.PrimaryAlias(vmID)

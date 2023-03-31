@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -16,7 +16,7 @@ import (
 var (
 	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 
-	_ Weighted = &weightedBest{}
+	_ Weighted = (*weightedBest)(nil)
 )
 
 // Sampling is performed by using another implementation of the Weighted

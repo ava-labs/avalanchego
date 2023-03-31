@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package reflectcodec
@@ -18,7 +18,7 @@ const (
 	TagValue = "true"
 )
 
-var _ StructFielder = &structFielder{}
+var _ StructFielder = (*structFielder)(nil)
 
 type FieldDesc struct {
 	Index       int

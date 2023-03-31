@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Wallet = &walletWithOptions{}
+var _ Wallet = (*walletWithOptions)(nil)
 
 func NewWalletWithOptions(
 	wallet Wallet,

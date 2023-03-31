@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -16,4 +16,6 @@ type Uniform interface {
 }
 
 // NewUniform returns a new sampler
-func NewUniform() Uniform { return &uniformReplacer{} }
+func NewUniform() Uniform {
+	return &uniformReplacer{}
+}

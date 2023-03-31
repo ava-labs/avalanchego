@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package database
@@ -12,12 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var errWrongSize = errors.New("value has unexpected size")
-
 const (
+	Uint64Size = 8 // bytes
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.
 	kvPairOverhead = 8 // bytes
 )
+
+var errWrongSize = errors.New("value has unexpected size")
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
@@ -49,13 +50,13 @@ func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 }
 
 func PackUInt64(val uint64) []byte {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, Uint64Size)
 	binary.BigEndian.PutUint64(bytes, val)
 	return bytes
 }
 
 func ParseUInt64(b []byte) (uint64, error) {
-	if len(b) != 8 {
+	if len(b) != Uint64Size {
 		return 0, errWrongSize
 	}
 	return binary.BigEndian.Uint64(b), nil

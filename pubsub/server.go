@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
@@ -10,7 +10,10 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -50,7 +53,9 @@ type errorMsg struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin: func(*http.Request) bool {
+		return true
+	},
 }
 
 // Server maintains the set of active clients and sends messages to the clients.
@@ -58,15 +63,15 @@ type Server struct {
 	log  logging.Logger
 	lock sync.RWMutex
 	// conns a list of all our connections
-	conns map[*connection]struct{}
+	conns set.Set[*connection]
 	// subscribedConnections the connections that have activated subscriptions
 	subscribedConnections *connections
 }
 
-func New(networkID uint32, log logging.Logger) *Server {
+// Deprecated: The pubsub server is deprecated.
+func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
-		conns:                 make(map[*connection]struct{}),
 		subscribedConnections: newConnections(),
 	}
 }
@@ -74,7 +79,9 @@ func New(networkID uint32, log logging.Logger) *Server {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.log.Debug("Failed to upgrade %s", err)
+		s.log.Debug("failed to upgrade",
+			zap.Error(err),
+		)
 		return
 	}
 	conn := &connection{
@@ -105,7 +112,7 @@ func (s *Server) addConnection(conn *connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.conns[conn] = struct{}{}
+	s.conns.Add(conn)
 
 	go conn.writePump()
 	go conn.readPump()
@@ -117,5 +124,5 @@ func (s *Server) removeConnection(conn *connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	delete(s.conns, conn)
+	s.conns.Remove(conn)
 }

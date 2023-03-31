@@ -1,172 +1,298 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
 
 import (
 	"fmt"
-	"strings"
-	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	_ InboundMessage  = &inboundMessage{}
-	_ OutboundMessage = &outboundMessage{}
+	_ InboundMessage  = (*inboundMessage)(nil)
+	_ OutboundMessage = (*outboundMessage)(nil)
 )
 
-// InboundMessage represents a set of fields for an inbound message that can be serialized into a byte stream
+// InboundMessage represents a set of fields for an inbound message
 type InboundMessage interface {
-	fmt.Stringer
-
-	BytesSavedCompression() int
-	Op() Op
-	Get(Field) interface{}
+	// NodeID returns the ID of the node that sent this message
 	NodeID() ids.NodeID
-	ExpirationTime() time.Time
+	// Op returns the op that describes this message type
+	Op() Op
+	// Message returns the message that was sent
+	Message() any
+	// Expiration returns the time that the sender will have already timed out
+	// this request
+	Expiration() time.Time
+	// OnFinishedHandling must be called one time when this message has been
+	// handled by the message handler
 	OnFinishedHandling()
+	// BytesSavedCompression returns the number of bytes that this message saved
+	// due to being compressed
+	BytesSavedCompression() int
 }
 
 type inboundMessage struct {
-	op                    Op
-	bytesSavedCompression int
-	fields                map[Field]interface{}
 	nodeID                ids.NodeID
-	expirationTime        time.Time
+	op                    Op
+	message               any
+	expiration            time.Time
 	onFinishedHandling    func()
+	bytesSavedCompression int
 }
 
-// Op returns the value of the specified operation in this message
-func (inMsg *inboundMessage) Op() Op { return inMsg.op }
+func (m *inboundMessage) NodeID() ids.NodeID {
+	return m.nodeID
+}
 
-// BytesSavedCompression returns the number of bytes this message saved due to
-// compression. That is, the number of bytes we did not receive over the
-// network due to the message being compressed. 0 for messages that were not
-// compressed.
-func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSavedCompression }
+func (m *inboundMessage) Op() Op {
+	return m.op
+}
 
-// Field returns the value of the specified field in this message
-func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
+func (m *inboundMessage) Message() any {
+	return m.message
+}
 
-// NodeID returns the node that the msg was sent by.
-func (inMsg *inboundMessage) NodeID() ids.NodeID { return inMsg.nodeID }
+func (m *inboundMessage) Expiration() time.Time {
+	return m.expiration
+}
 
-// ExpirationTime returns the time this message doesn't need to be responded to.
-// A zero time means message does not expire.
-func (inMsg *inboundMessage) ExpirationTime() time.Time { return inMsg.expirationTime }
-
-// OnFinishedHandling is the function to be called once inboundMessage is
-// complete.
-func (inMsg *inboundMessage) OnFinishedHandling() {
-	if inMsg.onFinishedHandling != nil {
-		inMsg.onFinishedHandling()
+func (m *inboundMessage) OnFinishedHandling() {
+	if m.onFinishedHandling != nil {
+		m.onFinishedHandling()
 	}
 }
 
-func (inMsg *inboundMessage) String() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
-	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
-		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
-	}
-	if !inMsg.expirationTime.IsZero() {
-		sb.WriteString(fmt.Sprintf(", Deadline: %d", inMsg.expirationTime.Unix()))
-	}
-	switch inMsg.op {
-	case GetAccepted, Accepted, Chits, AcceptedFrontier:
-		sb.WriteString(fmt.Sprintf(", NumContainerIDs: %d)", len(inMsg.fields[ContainerIDs].([][]byte))))
-	case Get, GetAncestors, Put, PushQuery, PullQuery:
-		sb.WriteString(fmt.Sprintf(", ContainerID: 0x%x)", inMsg.fields[ContainerID].([]byte)))
-	case Ancestors:
-		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(inMsg.fields[MultiContainerBytes].([][]byte))))
-	case Notify:
-		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
-	case AppRequest, AppResponse, AppGossip:
-		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(inMsg.fields[AppBytes].([]byte))))
-	default:
-		sb.WriteString(")")
-	}
-
-	return sb.String()
+func (m *inboundMessage) BytesSavedCompression() int {
+	return m.bytesSavedCompression
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
 // be serialized into a byte stream
 type OutboundMessage interface {
-	BytesSavedCompression() int
-	Bytes() []byte
-	Op() Op
+	// BypassThrottling returns true if we should send this message, regardless
+	// of any outbound message throttling
 	BypassThrottling() bool
-
-	AddRef()
-	DecRef()
+	// Op returns the op that describes this message type
+	Op() Op
+	// Bytes returns the bytes that will be sent
+	Bytes() []byte
+	// BytesSavedCompression returns the number of bytes that this message saved
+	// due to being compressed
+	BytesSavedCompression() int
 }
 
 type outboundMessage struct {
+	bypassThrottling      bool
+	op                    Op
 	bytes                 []byte
 	bytesSavedCompression int
-	op                    Op
-	bypassThrottling      bool
-
-	refLock sync.Mutex
-	refs    int
-	c       *codec
 }
 
-// Op returns the value of the specified operation in this message
-func (outMsg *outboundMessage) Op() Op { return outMsg.op }
-
-// Bytes returns this message in bytes
-func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
-
-// BytesSavedCompression returns the number of bytes this message saved due to
-// compression. That is, the number of bytes we did not send over the
-// network due to the message being compressed. 0 for messages that were not
-// compressed.
-func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }
-
-func (outMsg *outboundMessage) AddRef() {
-	outMsg.refLock.Lock()
-	defer outMsg.refLock.Unlock()
-
-	outMsg.refs++
+func (m *outboundMessage) BypassThrottling() bool {
+	return m.bypassThrottling
 }
 
-// Once the reference count of this message goes to 0, the byte slice should not
-// be inspected.
-func (outMsg *outboundMessage) DecRef() {
-	outMsg.refLock.Lock()
-	defer outMsg.refLock.Unlock()
+func (m *outboundMessage) Op() Op {
+	return m.op
+}
 
-	outMsg.refs--
-	if outMsg.refs == 0 {
-		outMsg.c.byteSlicePool.Put(outMsg.bytes)
+func (m *outboundMessage) Bytes() []byte {
+	return m.bytes
+}
+
+func (m *outboundMessage) BytesSavedCompression() int {
+	return m.bytesSavedCompression
+}
+
+// TODO: add other compression algorithms with extended interface
+type msgBuilder struct {
+	gzipCompressor compression.Compressor
+
+	compressTimeMetrics   map[Op]metric.Averager
+	decompressTimeMetrics map[Op]metric.Averager
+
+	maxMessageTimeout time.Duration
+}
+
+func newMsgBuilder(
+	namespace string,
+	metrics prometheus.Registerer,
+	maxMessageTimeout time.Duration,
+) (*msgBuilder, error) {
+	cpr, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
+	if err != nil {
+		return nil, err
 	}
-}
 
-// BypassThrottling when attempting to send this message
-func (outMsg *outboundMessage) BypassThrottling() bool { return outMsg.bypassThrottling }
+	mb := &msgBuilder{
+		gzipCompressor: cpr,
 
-type TestMsg struct {
-	op               Op
-	bytes            []byte
-	bypassThrottling bool
-}
+		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
+		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
-func NewTestMsg(op Op, bytes []byte, bypassThrottling bool) *TestMsg {
-	return &TestMsg{
-		op:               op,
-		bytes:            bytes,
-		bypassThrottling: bypassThrottling,
+		maxMessageTimeout: maxMessageTimeout,
 	}
+
+	errs := wrappers.Errs{}
+	for _, op := range ExternalOps {
+		mb.compressTimeMetrics[op] = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("%s_compress_time", op),
+			fmt.Sprintf("time (in ns) to compress %s messages", op),
+			metrics,
+			&errs,
+		)
+		mb.decompressTimeMetrics[op] = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("%s_decompress_time", op),
+			fmt.Sprintf("time (in ns) to decompress %s messages", op),
+			metrics,
+			&errs,
+		)
+	}
+	return mb, errs.Err
 }
 
-func (m *TestMsg) Op() Op                   { return m.op }
-func (*TestMsg) Get(Field) interface{}      { return nil }
-func (m *TestMsg) Bytes() []byte            { return m.bytes }
-func (*TestMsg) BytesSavedCompression() int { return 0 }
-func (*TestMsg) AddRef()                    {}
-func (*TestMsg) DecRef()                    {}
-func (m *TestMsg) BypassThrottling() bool   { return m.bypassThrottling }
+func (mb *msgBuilder) marshal(
+	uncompressedMsg *p2p.Message,
+	gzipCompress bool,
+) ([]byte, int, time.Duration, error) {
+	uncompressedMsgBytes, err := proto.Marshal(uncompressedMsg)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	if !gzipCompress {
+		return uncompressedMsgBytes, 0, 0, nil
+	}
+
+	// If compression is enabled, we marshal twice:
+	// 1. the original message
+	// 2. the message with compressed bytes
+	//
+	// This recursive packing allows us to avoid an extra compression on/off
+	// field in the message.
+	startTime := time.Now()
+	compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	compressedMsg := p2p.Message{
+		Message: &p2p.Message_CompressedGzip{
+			CompressedGzip: compressedBytes,
+		},
+	}
+	compressedMsgBytes, err := proto.Marshal(&compressedMsg)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	compressTook := time.Since(startTime)
+
+	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
+	return compressedMsgBytes, bytesSaved, compressTook, nil
+}
+
+func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, bool, int, time.Duration, error) {
+	m := new(p2p.Message)
+	if err := proto.Unmarshal(b, m); err != nil {
+		return nil, false, 0, 0, err
+	}
+
+	compressed := m.GetCompressedGzip()
+	if len(compressed) == 0 {
+		// The message wasn't compressed
+		return m, false, 0, 0, nil
+	}
+
+	startTime := time.Now()
+	decompressed, err := mb.gzipCompressor.Decompress(compressed)
+	if err != nil {
+		return nil, true, 0, 0, err
+	}
+
+	if err := proto.Unmarshal(decompressed, m); err != nil {
+		return nil, true, 0, 0, err
+	}
+	decompressTook := time.Since(startTime)
+
+	bytesSavedCompression := len(decompressed) - len(compressed)
+	return m, true, bytesSavedCompression, decompressTook, nil
+}
+
+func (mb *msgBuilder) createOutbound(m *p2p.Message, gzipCompress bool, bypassThrottling bool) (*outboundMessage, error) {
+	b, saved, compressTook, err := mb.marshal(m, gzipCompress)
+	if err != nil {
+		return nil, err
+	}
+
+	op, err := ToOp(m)
+	if err != nil {
+		return nil, err
+	}
+
+	if gzipCompress {
+		mb.compressTimeMetrics[op].Observe(float64(compressTook))
+	}
+
+	return &outboundMessage{
+		bypassThrottling:      bypassThrottling,
+		op:                    op,
+		bytes:                 b,
+		bytesSavedCompression: saved,
+	}, nil
+}
+
+func (mb *msgBuilder) parseInbound(
+	bytes []byte,
+	nodeID ids.NodeID,
+	onFinishedHandling func(),
+) (*inboundMessage, error) {
+	m, wasCompressed, bytesSavedCompression, decompressTook, err := mb.unmarshal(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	op, err := ToOp(m)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := Unwrap(m)
+	if err != nil {
+		return nil, err
+	}
+
+	if wasCompressed {
+		mb.decompressTimeMetrics[op].Observe(float64(decompressTook))
+	}
+
+	expiration := mockable.MaxTime
+	if deadline, ok := GetDeadline(msg); ok {
+		deadline = math.Min(deadline, mb.maxMessageTimeout)
+		expiration = time.Now().Add(deadline)
+	}
+
+	return &inboundMessage{
+		nodeID:                nodeID,
+		op:                    op,
+		message:               msg,
+		expiration:            expiration,
+		onFinishedHandling:    onFinishedHandling,
+		bytesSavedCompression: bytesSavedCompression,
+	}, nil
+}

@@ -10,7 +10,7 @@ avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
 # Define avalanche-testing and avalanche-byzantine versions to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
-avalanchego_byzantine_image="avaplatform/avalanche-byzantine:update-avalanchego-v1.7.0"
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
 
 # Fetch the images
 # If Docker Credentials are not available fail
@@ -21,9 +21,6 @@ fi
 
 # Avalanche root directory
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
-
-# Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
 
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
@@ -45,7 +42,7 @@ docker pull $avalanchego_byzantine_image
 git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current avalanchego
-source "$AVALANCHE_PATH"/scripts/build_image.sh
+source "$AVALANCHE_PATH"/scripts/build_image.sh -r
 
 # Target built version to use in avalanche-testing
 avalanche_image="$avalanchego_dockerhub_repo:$current_branch"
@@ -71,4 +68,4 @@ custom_params_json="{
 bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
     --custom-params "${custom_params_json}" \
     ${1+"${@}"} \
-    "${avalanche_testing_image}" 
+    "${avalanche_testing_image}"

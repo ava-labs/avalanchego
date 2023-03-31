@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package socket
@@ -18,7 +18,7 @@ func TestSocketSendAndReceive(t *testing.T) {
 
 	// Create socket and client; wait for client to connect
 	socket := NewSocket(socketName, nil)
-	socket.accept, connCh = newTestAcceptFn()
+	socket.accept, connCh = newTestAcceptFn(t)
 	if err := socket.Listen(); err != nil {
 		t.Fatal("Failed to listen on socket:", err.Error())
 	}
@@ -47,24 +47,24 @@ func TestSocketSendAndReceive(t *testing.T) {
 
 	// Test max message size
 	client.SetMaxMessageSize(msgLen)
-	if _, err = client.Recv(); err != nil {
+	if _, err := client.Recv(); err != nil {
 		t.Fatal("Failed to receive from socket:", err.Error())
 	}
 	client.SetMaxMessageSize(msgLen - 1)
-	if _, err = client.Recv(); err != ErrMessageTooLarge {
+	if _, err := client.Recv(); err != ErrMessageTooLarge {
 		t.Fatal("Should have received message too large error, got:", err)
 	}
 }
 
 // newTestAcceptFn creates a new acceptFn and a channel that receives all new
 // connections
-func newTestAcceptFn() (acceptFn, chan net.Conn) {
+func newTestAcceptFn(t *testing.T) (acceptFn, chan net.Conn) {
 	connCh := make(chan net.Conn)
 
 	return func(s *Socket, l net.Listener) {
 		conn, err := l.Accept()
 		if err != nil {
-			s.log.Error("socket accept error: %s", err.Error())
+			t.Error(err)
 		}
 
 		s.connLock.Lock()

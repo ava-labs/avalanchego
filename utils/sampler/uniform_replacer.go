@@ -1,10 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
 
 import (
 	"math"
+
+	"golang.org/x/exp/maps"
 )
 
 type defaultMap map[uint64]uint64
@@ -71,9 +73,7 @@ func (s *uniformReplacer) ClearSeed() {
 }
 
 func (s *uniformReplacer) Reset() {
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	maps.Clear(s.drawn)
 	s.drawsCount = 0
 }
 

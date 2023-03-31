@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -20,16 +20,27 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
 	WalletClient
+	// GetBlock returns the block with the given id.
+	GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetBlockByHeight returns the block at the given [height].
+	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+	// GetHeight returns the height of the last accepted block.
+	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// GetTxStatus returns the status of [txID]
+	//
+	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
+	// used instead to determine if the tx was accepted.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
 	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
 	// Note: ConfirmTx will block until either the context is done or the client
 	//       returns a decided status.
+	// TODO: Move this function off of the Client interface into a utility
+	// function.
 	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
@@ -59,10 +70,17 @@ type Client interface {
 	GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error)
 	// GetBalance returns the balance of [assetID] held by [addr].
 	// If [includePartial], balance includes partial owned (i.e. in a multisig) funds.
+	//
+	// Deprecated: GetUTXOs should be used instead.
 	GetBalance(ctx context.Context, addr ids.ShortID, assetID string, includePartial bool, options ...rpc.Option) (*GetBalanceReply, error)
 	// GetAllBalances returns all asset balances for [addr]
+	//
+	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
 	// CreateAsset creates a new asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -76,6 +94,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateFixedCapAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -88,6 +109,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateVariableCapAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -100,6 +124,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateNFTAsset creates a new NFT asset and returns its assetID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	CreateNFTAsset(
 		ctx context.Context,
 		user api.UserPass,
@@ -111,14 +138,25 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateAddress creates a new address controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns all addresses on this chain controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// ExportKey returns the private key corresponding to [addr] controlled by [user]
-	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error)
+	//
+	// Deprecated: Keys should no longer be stored on the node.
+	ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error)
 	// ImportKey imports [privateKey] to [user]
-	ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
+	//
+	// Deprecated: Keys should no longer be stored on the node.
+	ImportKey(ctx context.Context, user api.UserPass, privateKey *secp256k1.PrivateKey, options ...rpc.Option) (ids.ShortID, error)
 	// Mint [amount] of [assetID] to be owned by [to]
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Mint(
 		ctx context.Context,
 		user api.UserPass,
@@ -130,6 +168,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendNFT sends an NFT and returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	SendNFT(
 		ctx context.Context,
 		user api.UserPass,
@@ -141,6 +182,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	MintNFT(
 		ctx context.Context,
 		user api.UserPass,
@@ -153,9 +197,15 @@ type Client interface {
 	) (ids.ID, error)
 	// Import sends an import transaction to import funds from [sourceChain] and
 	// returns the ID of the newly created transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) // Export sends an asset from this chain to the P/C-Chain.
 	// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 	// Returns the ID of the newly created atomic transaction
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Export(
 		ctx context.Context,
 		user api.UserPass,
@@ -183,8 +233,40 @@ func NewClient(uri, chain string) Client {
 		chain,
 	)
 	return &client{
-		requester: rpc.NewEndpointRequester(path, "avm"),
+		requester: rpc.NewEndpointRequester(path),
 	}
+}
+
+func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "avm.getBlock", &api.GetBlockArgs{
+		BlockID:  blkID,
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "avm.getBlockByHeight", &api.GetBlockByHeightArgs{
+		Height:   height,
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+	res := &api.GetHeightResponse{}
+	err := c.requester.SendRequest(ctx, "avm.getHeight", struct{}{}, res, options...)
+	return uint64(res.Height), err
 }
 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
@@ -193,7 +275,7 @@ func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Opt
 		return ids.ID{}, err
 	}
 	res := &api.JSONTxID{}
-	err = c.requester.SendRequest(ctx, "issueTx", &api.FormattedTx{
+	err = c.requester.SendRequest(ctx, "avm.issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
 	}, res, options...)
@@ -201,12 +283,12 @@ func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Opt
 }
 
 func (c *client) IssueStopVertex(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "issueStopVertex", &struct{}{}, &struct{}{}, options...)
+	return c.requester.SendRequest(ctx, "avm.issueStopVertex", &struct{}{}, &struct{}{}, options...)
 }
 
 func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error) {
 	res := &GetTxStatusReply{}
-	err := c.requester.SendRequest(ctx, "getTxStatus", &api.JSONTxID{
+	err := c.requester.SendRequest(ctx, "avm.getTxStatus", &api.JSONTxID{
 		TxID: txID,
 	}, res, options...)
 	return res.Status, err
@@ -234,7 +316,7 @@ func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration,
 
 func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedTx{}
-	err := c.requester.SendRequest(ctx, "getTx", &api.GetTxArgs{
+	err := c.requester.SendRequest(ctx, "avm.getTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, res, options...)
@@ -270,7 +352,7 @@ func (c *client) GetAtomicUTXOs(
 	options ...rpc.Option,
 ) ([][]byte, ids.ShortID, ids.ID, error) {
 	res := &api.GetUTXOsReply{}
-	err := c.requester.SendRequest(ctx, "getUTXOs", &api.GetUTXOsArgs{
+	err := c.requester.SendRequest(ctx, "avm.getUTXOs", &api.GetUTXOsArgs{
 		Addresses:   ids.ShortIDsToStrings(addrs),
 		SourceChain: sourceChain,
 		Limit:       cjson.Uint32(limit),
@@ -302,7 +384,7 @@ func (c *client) GetAtomicUTXOs(
 
 func (c *client) GetAssetDescription(ctx context.Context, assetID string, options ...rpc.Option) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
-	err := c.requester.SendRequest(ctx, "getAssetDescription", &GetAssetDescriptionArgs{
+	err := c.requester.SendRequest(ctx, "avm.getAssetDescription", &GetAssetDescriptionArgs{
 		AssetID: assetID,
 	}, res, options...)
 	return res, err
@@ -316,7 +398,7 @@ func (c *client) GetBalance(
 	options ...rpc.Option,
 ) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
-	err := c.requester.SendRequest(ctx, "getBalance", &GetBalanceArgs{
+	err := c.requester.SendRequest(ctx, "avm.getBalance", &GetBalanceArgs{
 		Address:        addr.String(),
 		AssetID:        assetID,
 		IncludePartial: includePartial,
@@ -331,7 +413,7 @@ func (c *client) GetAllBalances(
 	options ...rpc.Option,
 ) ([]Balance, error) {
 	res := &GetAllBalancesReply{}
-	err := c.requester.SendRequest(ctx, "getAllBalances", &GetAllBalancesArgs{
+	err := c.requester.SendRequest(ctx, "avm.getAllBalances", &GetAllBalancesArgs{
 		JSONAddress:    api.JSONAddress{Address: addr.String()},
 		IncludePartial: includePartial,
 	}, res, options...)
@@ -377,7 +459,7 @@ func (c *client) CreateAsset(
 			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
 		}
 	}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	err := c.requester.SendRequest(ctx, "avm.createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -411,7 +493,7 @@ func (c *client) CreateFixedCapAsset(
 			Address: clientHolder.Address.String(),
 		}
 	}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	err := c.requester.SendRequest(ctx, "avm.createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -444,7 +526,7 @@ func (c *client) CreateVariableCapAsset(
 			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
 		}
 	}
-	err := c.requester.SendRequest(ctx, "createAsset", &CreateAssetArgs{
+	err := c.requester.SendRequest(ctx, "avm.createAsset", &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -476,7 +558,7 @@ func (c *client) CreateNFTAsset(
 			Minters:   ids.ShortIDsToStrings(clientMinter.Minters),
 		}
 	}
-	err := c.requester.SendRequest(ctx, "createNFTAsset", &CreateNFTAssetArgs{
+	err := c.requester.SendRequest(ctx, "avm.createNFTAsset", &CreateNFTAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -491,7 +573,7 @@ func (c *client) CreateNFTAsset(
 
 func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
-	err := c.requester.SendRequest(ctx, "createAddress", &user, res, options...)
+	err := c.requester.SendRequest(ctx, "avm.createAddress", &user, res, options...)
 	if err != nil {
 		return ids.ShortID{}, err
 	}
@@ -500,25 +582,25 @@ func (c *client) CreateAddress(ctx context.Context, user api.UserPass, options .
 
 func (c *client) ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error) {
 	res := &api.JSONAddresses{}
-	err := c.requester.SendRequest(ctx, "listAddresses", &user, res, options...)
+	err := c.requester.SendRequest(ctx, "avm.listAddresses", &user, res, options...)
 	if err != nil {
 		return nil, err
 	}
 	return address.ParseToIDs(res.Addresses)
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, addr ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error) {
 	res := &ExportKeyReply{}
-	err := c.requester.SendRequest(ctx, "exportKey", &ExportKeyArgs{
+	err := c.requester.SendRequest(ctx, "avm.exportKey", &ExportKeyArgs{
 		UserPass: user,
 		Address:  addr.String(),
 	}, res, options...)
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *secp256k1.PrivateKey, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
-	err := c.requester.SendRequest(ctx, "importKey", &ImportKeyArgs{
+	err := c.requester.SendRequest(ctx, "avm.importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
 	}, res, options...)
@@ -540,7 +622,7 @@ func (c *client) Send(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "send", &SendArgs{
+	err := c.requester.SendRequest(ctx, "avm.send", &SendArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -574,7 +656,7 @@ func (c *client) SendMultiple(
 			To:      clientOutput.To.String(),
 		}
 	}
-	err := c.requester.SendRequest(ctx, "sendMultiple", &SendMultipleArgs{
+	err := c.requester.SendRequest(ctx, "avm.sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -597,7 +679,7 @@ func (c *client) Mint(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "mint", &MintArgs{
+	err := c.requester.SendRequest(ctx, "avm.mint", &MintArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -621,7 +703,7 @@ func (c *client) SendNFT(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "sendNFT", &SendNFTArgs{
+	err := c.requester.SendRequest(ctx, "avm.sendNFT", &SendNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -649,7 +731,7 @@ func (c *client) MintNFT(
 		return ids.ID{}, err
 	}
 	res := &api.JSONTxID{}
-	err = c.requester.SendRequest(ctx, "mintNFT", &MintNFTArgs{
+	err = c.requester.SendRequest(ctx, "avm.mintNFT", &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},
@@ -665,7 +747,7 @@ func (c *client) MintNFT(
 
 func (c *client) Import(ctx context.Context, user api.UserPass, to ids.ShortID, sourceChain string, options ...rpc.Option) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "import", &ImportArgs{
+	err := c.requester.SendRequest(ctx, "avm.import", &ImportArgs{
 		UserPass:    user,
 		To:          to.String(),
 		SourceChain: sourceChain,
@@ -685,7 +767,7 @@ func (c *client) Export(
 	options ...rpc.Option,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest(ctx, "export", &ExportArgs{
+	err := c.requester.SendRequest(ctx, "avm.export", &ExportArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: ids.ShortIDsToStrings(from)},

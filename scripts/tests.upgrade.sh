@@ -3,7 +3,7 @@ set -e
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.upgrade.sh 1.7.4 ./build/avalanchego
+# ./scripts/tests.upgrade.sh 1.7.16 ./build/avalanchego
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -54,12 +54,11 @@ find /tmp/avalanchego-v${VERSION}
 #################################
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
-# TODO: migrate to upstream avalanche-network-runner
-NETWORK_RUNNER_VERSION=1.0.6
+NETWORK_RUNNER_VERSION=1.3.5-rc.0
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
-DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
+DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 if [[ ${GOOS} == "darwin" ]]; then
-  DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz
+  DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_darwin_amd64.tar.gz"
 fi
 
 rm -f ${DOWNLOAD_PATH}
@@ -75,7 +74,7 @@ tar xzvf ${DOWNLOAD_PATH} -C /tmp
 #################################
 echo "building upgrade.test"
 # to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.0.0
+go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.1.4
 ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
 ./tests/upgrade/upgrade.test --help
 
@@ -86,7 +85,7 @@ echo "launch avalanche-network-runner in the background"
 server \
 --log-level debug \
 --port=":12340" \
---grpc-gateway-port=":12341" 2> /dev/null &
+--disable-grpc-gateway &
 PID=${!}
 
 #################################
@@ -96,10 +95,14 @@ echo "running upgrade tests against the local cluster with ${NEW_BINARY}"
 --ginkgo.v \
 --log-level debug \
 --network-runner-grpc-endpoint="0.0.0.0:12340" \
---avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
---avalanchego-path-to-upgrade=${NEW_BINARY} || EXIT_CODE=$?
+--network-runner-avalanchego-path=/tmp/avalanchego-v${VERSION}/avalanchego \
+--network-runner-avalanchego-path-to-upgrade=${NEW_BINARY} \
+--network-runner-avalanchego-log-level="WARN" || EXIT_CODE=$?
 
-kill ${PID}
+# "e2e.test" already terminates the cluster
+# just in case tests are aborted, manually terminate them again
+pkill -P ${PID} || true
+kill -2 ${PID}
 
 if [[ ${EXIT_CODE} -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"

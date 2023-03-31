@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -19,7 +19,7 @@ import (
 var (
 	errNotAccepted = errors.New("not accepted")
 
-	_ Wallet = &wallet{}
+	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {
@@ -165,9 +165,13 @@ type wallet struct {
 	client  avm.Client
 }
 
-func (w *wallet) Builder() Builder { return w.builder }
+func (w *wallet) Builder() Builder {
+	return w.builder
+}
 
-func (w *wallet) Signer() Signer { return w.signer }
+func (w *wallet) Signer() Signer {
+	return w.signer
+}
 
 func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,

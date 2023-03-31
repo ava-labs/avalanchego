@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -8,78 +8,95 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockClient struct {
-	reply  APIHealthReply
+	reply  APIReply
 	err    error
 	onCall func()
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, replyIntf interface{}, options ...rpc.Option) error {
-	reply := replyIntf.(*APIHealthReply)
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, replyIntf interface{}, _ ...rpc.Option) error {
+	reply := replyIntf.(*APIReply)
 	*reply = mc.reply
 	mc.onCall()
 	return mc.err
 }
 
 func TestNewClient(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	c := NewClient("")
-	assert.NotNil(c)
+	require.NotNil(c)
 }
 
 func TestClient(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	mc := &mockClient{
-		reply: APIHealthReply{
+		reply: APIReply{
 			Healthy: true,
 		},
 		err:    nil,
 		onCall: func() {},
 	}
-	c := client{
+	c := &client{
 		requester: mc,
 	}
 
 	{
 		readiness, err := c.Readiness(context.Background())
-		assert.NoError(err)
-		assert.True(readiness.Healthy)
+		require.NoError(err)
+		require.True(readiness.Healthy)
 	}
 
 	{
 		health, err := c.Health(context.Background())
-		assert.NoError(err)
-		assert.True(health.Healthy)
+		require.NoError(err)
+		require.True(health.Healthy)
 	}
 
 	{
 		liveness, err := c.Liveness(context.Background())
-		assert.NoError(err)
-		assert.True(liveness.Healthy)
+		require.NoError(err)
+		require.True(liveness.Healthy)
 	}
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		healthy, err := c.AwaitHealthy(ctx, time.Second)
+		healthy, err := AwaitHealthy(ctx, c, time.Second)
 		cancel()
-		assert.NoError(err)
-		assert.True(healthy)
+		require.NoError(err)
+		require.True(healthy)
+	}
+
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		healthy, err := AwaitReady(ctx, c, time.Second)
+		cancel()
+		require.NoError(err)
+		require.True(healthy)
 	}
 
 	mc.reply.Healthy = false
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
-		healthy, err := c.AwaitHealthy(ctx, time.Microsecond)
+		healthy, err := AwaitHealthy(ctx, c, time.Microsecond)
 		cancel()
-		assert.Error(err)
-		assert.False(healthy)
+		require.Error(err)
+		require.False(healthy)
+	}
+
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
+		healthy, err := AwaitReady(ctx, c, time.Microsecond)
+		cancel()
+		require.Error(err)
+		require.False(healthy)
 	}
 
 	mc.onCall = func() {
@@ -87,8 +104,15 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		healthy, err := c.AwaitHealthy(context.Background(), time.Microsecond)
-		assert.NoError(err)
-		assert.True(healthy)
+		healthy, err := AwaitHealthy(context.Background(), c, time.Microsecond)
+		require.NoError(err)
+		require.True(healthy)
+	}
+
+	mc.reply.Healthy = false
+	{
+		healthy, err := AwaitReady(context.Background(), c, time.Microsecond)
+		require.NoError(err)
+		require.True(healthy)
 	}
 }

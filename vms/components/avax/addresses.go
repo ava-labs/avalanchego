@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -10,9 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ AddressManager = &addressManager{}
+var _ AddressManager = (*addressManager)(nil)
 
 type AddressManager interface {
 	// ParseLocalAddress takes in an address for this chain and produces the ID
@@ -96,8 +97,8 @@ func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string
 	return address.Format(chainIDAlias, hrp, addr.Bytes())
 }
 
-func ParseLocalAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
-	addrs := make(ids.ShortSet, len(addrStrs))
+func ParseLocalAddresses(a AddressManager, addrStrs []string) (set.Set[ids.ShortID], error) {
+	addrs := make(set.Set[ids.ShortID], len(addrStrs))
 	for _, addrStr := range addrStrs {
 		addr, err := a.ParseLocalAddress(addrStr)
 		if err != nil {
@@ -125,8 +126,8 @@ func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) 
 }
 
 // ParseServiceAddress get addresses IDs from addresses strings, being them either localized or not
-func ParseServiceAddresses(a AddressManager, addrStrs []string) (ids.ShortSet, error) {
-	addrs := ids.NewShortSet(len(addrStrs))
+func ParseServiceAddresses(a AddressManager, addrStrs []string) (set.Set[ids.ShortID], error) {
+	addrs := set.NewSet[ids.ShortID](len(addrStrs))
 	for _, addrStr := range addrStrs {
 		addr, err := ParseServiceAddress(a, addrStr)
 		if err != nil {

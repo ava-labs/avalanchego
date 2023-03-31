@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package messenger
@@ -15,7 +15,7 @@ import (
 var (
 	errFullQueue = errors.New("full message queue")
 
-	_ messengerpb.MessengerServer = &Server{}
+	_ messengerpb.MessengerServer = (*Server)(nil)
 )
 
 // Server is a messenger that is managed over RPC.

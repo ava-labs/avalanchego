@@ -1,13 +1,19 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
 
 import (
+	"context"
+
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // issuer issues [vtx] into consensus after its dependencies are met.
@@ -15,34 +21,34 @@ type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
 	issued, abandoned bool
-	vtxDeps, txDeps   ids.Set
+	vtxDeps, txDeps   set.Set[ids.ID]
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
-func (i *issuer) FulfillVtx(id ids.ID) {
+func (i *issuer) FulfillVtx(ctx context.Context, id ids.ID) {
 	i.vtxDeps.Remove(id)
-	i.Update()
+	i.Update(ctx)
 }
 
 // Register that a transaction we were waiting on has been issued to consensus.
-func (i *issuer) FulfillTx(id ids.ID) {
+func (i *issuer) FulfillTx(ctx context.Context, id ids.ID) {
 	i.txDeps.Remove(id)
-	i.Update()
+	i.Update(ctx)
 }
 
 // Abandon this attempt to issue
-func (i *issuer) Abandon() {
+func (i *issuer) Abandon(ctx context.Context) {
 	if !i.abandoned {
 		vtxID := i.vtx.ID()
 		i.t.pending.Remove(vtxID)
 		i.abandoned = true
-		i.t.vtxBlocked.Abandon(vtxID) // Inform vertices waiting on this vtx that it won't be issued
+		i.t.vtxBlocked.Abandon(ctx, vtxID) // Inform vertices waiting on this vtx that it won't be issued
 		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 	}
 }
 
 // Issue the poll when all dependencies are met
-func (i *issuer) Update() {
+func (i *issuer) Update(ctx context.Context) {
 	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
@@ -53,35 +59,45 @@ func (i *issuer) Update() {
 	i.issued = true
 
 	// check stop vertex validity
-	err := i.vtx.Verify()
+	err := i.vtx.Verify(ctx)
 	if err != nil {
 		if i.vtx.HasWhitelist() {
 			// do not update "i.t.errs" since it's only used for critical errors
 			// which will cause chain shutdown in the engine
 			// (see "handleSyncMsg" and "handleChanMsg")
-			i.t.Ctx.Log.Debug("stop vertex %q failed verification due to %q; abandoned", vtxID, err)
+			i.t.Ctx.Log.Debug("stop vertex verification failed",
+				zap.Stringer("vtxID", vtxID),
+				zap.Error(err),
+			)
 			i.t.metrics.whitelistVtxIssueFailure.Inc()
 		} else {
-			i.t.Ctx.Log.Debug("vertex %q failed verification due to %q; abandoned", vtxID, err)
+			i.t.Ctx.Log.Debug("vertex verification failed",
+				zap.Stringer("vtxID", vtxID),
+				zap.Error(err),
+			)
 		}
 
-		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.vtxBlocked.Abandon(ctx, vtxID)
 		return
 	}
 
 	i.t.pending.Remove(vtxID) // Remove from set of vertices waiting to be issued.
 
 	// Make sure the transactions in this vertex are valid
-	txs, err := i.vtx.Txs()
+	txs, err := i.vtx.Txs(ctx)
 	if err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 	validTxs := make([]snowstorm.Tx, 0, len(txs))
 	for _, tx := range txs {
-		if err := tx.Verify(); err != nil {
-			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
-			i.t.txBlocked.Abandon(tx.ID())
+		if err := tx.Verify(ctx); err != nil {
+			txID := tx.ID()
+			i.t.Ctx.Log.Debug("transaction verification failed",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
+			i.t.txBlocked.Abandon(ctx, txID)
 		} else {
 			validTxs = append(validTxs, tx)
 		}
@@ -90,34 +106,39 @@ func (i *issuer) Update() {
 	// Some of the transactions weren't valid. Abandon this vertex.
 	// Take the valid transactions and issue a new vertex with them.
 	if len(validTxs) != len(txs) {
-		i.t.Ctx.Log.Debug("Abandoning %s due to failed transaction verification", vtxID)
-		if _, err := i.t.batch(validTxs, batchOption{}); err != nil {
+		i.t.Ctx.Log.Debug("abandoning vertex",
+			zap.String("reason", "transaction verification failed"),
+			zap.Stringer("vtxID", vtxID),
+		)
+		if _, err := i.t.batch(ctx, validTxs, batchOption{}); err != nil {
 			i.t.errs.Add(err)
 		}
-		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.vtxBlocked.Abandon(ctx, vtxID)
 		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 		return
 	}
 
-	i.t.Ctx.Log.Verbo("Adding vertex to consensus:\n%s", i.vtx)
+	i.t.Ctx.Log.Verbo("adding vertex to consensus",
+		zap.Stringer("vtxID", vtxID),
+	)
 
 	// Add this vertex to consensus.
-	if err := i.t.Consensus.Add(i.vtx); err != nil {
+	if err := i.t.Consensus.Add(ctx, i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 
 	// Issue a poll for this vertex.
-	p := i.t.Consensus.Parameters()
-	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
+	vdrIDs, err := i.t.Validators.Sample(i.t.Params.K) // Validators to sample
 	if err != nil {
-		i.t.Ctx.Log.Error("Query for %s was dropped due to an insufficient number of validators", vtxID)
+		i.t.Ctx.Log.Error("dropped query",
+			zap.String("reason", "insufficient number of validators"),
+			zap.Stringer("vtxID", vtxID),
+		)
 	}
 
-	vdrBag := ids.NodeIDBag{} // Validators to sample repr. as a set
-	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
-	}
+	vdrBag := bag.Bag[ids.NodeID]{} // Validators to sample repr. as a set
+	vdrBag.Add(vdrIDs...)
 
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {
@@ -126,6 +147,7 @@ func (i *issuer) Update() {
 			numPushTo = i.t.Params.MixedQueryNumPushNonVdr
 		}
 		common.SendMixedQuery(
+			ctx,
 			i.t.Sender,
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
 			numPushTo,
@@ -136,32 +158,56 @@ func (i *issuer) Update() {
 	}
 
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.
-	i.t.vtxBlocked.Fulfill(vtxID)
+	i.t.vtxBlocked.Fulfill(ctx, vtxID)
 	for _, tx := range txs {
-		i.t.txBlocked.Fulfill(tx.ID())
+		i.t.txBlocked.Fulfill(ctx, tx.ID())
 	}
 	i.t.metrics.blockerTxs.Set(float64(i.t.txBlocked.Len()))
 	i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 
 	if i.vtx.HasWhitelist() {
-		i.t.Ctx.Log.Info("successfully issued stop vertex %s", vtxID)
+		i.t.Ctx.Log.Info("successfully issued stop vertex",
+			zap.Stringer("vtxID", vtxID),
+		)
 		i.t.metrics.whitelistVtxIssueSuccess.Inc()
 	}
 
 	// Issue a repoll
-	i.t.repoll()
+	i.t.repoll(ctx)
 }
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set { return vi.i.vtxDeps }
-func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
-func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
-func (vi *vtxIssuer) Update()               { vi.i.Update() }
+func (vi *vtxIssuer) Dependencies() set.Set[ids.ID] {
+	return vi.i.vtxDeps
+}
+
+func (vi *vtxIssuer) Fulfill(ctx context.Context, id ids.ID) {
+	vi.i.FulfillVtx(ctx, id)
+}
+
+func (vi *vtxIssuer) Abandon(ctx context.Context, _ ids.ID) {
+	vi.i.Abandon(ctx)
+}
+
+func (vi *vtxIssuer) Update(ctx context.Context) {
+	vi.i.Update(ctx)
+}
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set { return ti.i.txDeps }
-func (ti *txIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTx(id) }
-func (ti *txIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
-func (ti *txIssuer) Update()               { ti.i.Update() }
+func (ti *txIssuer) Dependencies() set.Set[ids.ID] {
+	return ti.i.txDeps
+}
+
+func (ti *txIssuer) Fulfill(ctx context.Context, id ids.ID) {
+	ti.i.FulfillTx(ctx, id)
+}
+
+func (ti *txIssuer) Abandon(ctx context.Context, _ ids.ID) {
+	ti.i.Abandon(ctx)
+}
+
+func (ti *txIssuer) Update(ctx context.Context) {
+	ti.i.Update(ctx)
+}

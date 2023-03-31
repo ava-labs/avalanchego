@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -11,18 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 type Backend struct {
-	Config        *config.Config
-	Ctx           *snow.Context
-	Clk           *mockable.Clock
-	Fx            fx.Fx
-	FlowChecker   utxo.Verifier
-	Uptimes       uptime.Manager
-	Rewards       reward.Calculator
-	Bootstrapped  *utils.AtomicBool
-	StateVersions state.Versions
+	Config       *config.Config
+	Ctx          *snow.Context
+	Clk          *mockable.Clock
+	Fx           fx.Fx
+	FlowChecker  utxo.Verifier
+	Uptimes      uptime.Manager
+	Rewards      reward.Calculator
+	Bootstrapped *utils.Atomic[bool]
 }

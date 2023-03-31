@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -23,6 +22,8 @@ var (
 	Empty = ID{}
 
 	errMissingQuotes = errors.New("first and last characters should be quotes")
+
+	_ utils.Sortable[ID] = ID{}
 )
 
 // ID wraps a 32 byte hash used as an identifier
@@ -116,7 +117,9 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
+func (id ID) Hex() string {
+	return hex.EncodeToString(id[:])
+}
 
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
@@ -129,18 +132,6 @@ func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-type sortIDData []ID
-
-func (ids sortIDData) Less(i, j int) bool {
-	return bytes.Compare(
-		ids[i][:],
-		ids[j][:]) == -1
+func (id ID) Less(other ID) bool {
+	return bytes.Compare(id[:], other[:]) < 0
 }
-func (ids sortIDData) Len() int      { return len(ids) }
-func (ids sortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }
-
-// SortIDs sorts the ids lexicographically
-func SortIDs(ids []ID) { sort.Sort(sortIDData(ids)) }
-
-// IsSortedAndUniqueIDs returns true if the ids are sorted and unique
-func IsSortedAndUniqueIDs(ids []ID) bool { return utils.IsSortedAndUnique(sortIDData(ids)) }

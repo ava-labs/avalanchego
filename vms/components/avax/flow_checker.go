@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errInsufficientFunds = errors.New("insufficient funds")
+var ErrInsufficientFunds = errors.New("insufficient funds")
 
 type FlowChecker struct {
 	consumed, produced map[ids.ID]uint64
@@ -25,9 +25,13 @@ func NewFlowChecker() *FlowChecker {
 	}
 }
 
-func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) { fc.add(fc.consumed, assetID, amount) }
+func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) {
+	fc.add(fc.consumed, assetID, amount)
+}
 
-func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) { fc.add(fc.produced, assetID, amount) }
+func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) {
+	fc.add(fc.produced, assetID, amount)
+}
 
 func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint64) {
 	var err error
@@ -40,7 +44,7 @@ func (fc *FlowChecker) Verify() error {
 		for assetID, producedAssetAmount := range fc.produced {
 			consumedAssetAmount := fc.consumed[assetID]
 			if producedAssetAmount > consumedAssetAmount {
-				fc.errs.Add(errInsufficientFunds)
+				fc.errs.Add(ErrInsufficientFunds)
 				break
 			}
 		}

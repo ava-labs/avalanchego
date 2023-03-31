@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timeout
@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ Manager = &manager{}
+var _ Manager = (*manager)(nil)
 
 // Manages timeouts for requests sent to peers.
 type Manager interface {
@@ -37,8 +38,8 @@ type Manager interface {
 	RegisterRequest(
 		nodeID ids.NodeID,
 		chainID ids.ID,
-		op message.Op,
-		requestID ids.ID,
+		measureLatency bool,
+		requestID ids.RequestID,
 		timeoutHandler func(),
 	)
 	// Registers that we would have sent a request to a validator but they
@@ -54,13 +55,13 @@ type Manager interface {
 	RegisterResponse(
 		nodeID ids.NodeID,
 		chainID ids.ID,
-		requestID ids.ID,
+		requestID ids.RequestID,
 		op message.Op,
 		latency time.Duration,
 	)
 	// Mark that we no longer expect a response to this request we sent.
 	// Does not modify the timeout.
-	RemoveRequest(requestID ids.ID)
+	RemoveRequest(requestID ids.RequestID)
 }
 
 func NewManager(
@@ -119,8 +120,8 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 func (m *manager) RegisterRequest(
 	nodeID ids.NodeID,
 	chainID ids.ID,
-	op message.Op,
-	requestID ids.ID,
+	measureLatency bool,
+	requestID ids.RequestID,
 	timeoutHandler func(),
 ) {
 	newTimeoutHandler := func() {
@@ -128,7 +129,7 @@ func (m *manager) RegisterRequest(
 		m.benchlistMgr.RegisterFailure(chainID, nodeID)
 		timeoutHandler()
 	}
-	m.tm.Put(requestID, op, newTimeoutHandler)
+	m.tm.Put(requestID, measureLatency, newTimeoutHandler)
 }
 
 // RegisterResponse registers that we received a response from [nodeID]
@@ -136,7 +137,7 @@ func (m *manager) RegisterRequest(
 func (m *manager) RegisterResponse(
 	nodeID ids.NodeID,
 	chainID ids.ID,
-	requestID ids.ID,
+	requestID ids.RequestID,
 	op message.Op,
 	latency time.Duration,
 ) {
@@ -145,7 +146,7 @@ func (m *manager) RegisterResponse(
 	m.tm.Remove(requestID)
 }
 
-func (m *manager) RemoveRequest(requestID ids.ID) {
+func (m *manager) RemoveRequest(requestID ids.RequestID) {
 	m.tm.Remove(requestID)
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -8,13 +8,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
+
+var errTest = errors.New("non-nil error")
 
 // SuccessResponseTest defines the expected result of an API call that returns SuccessResponse
 type SuccessResponseTest struct {
@@ -28,7 +30,7 @@ func GetSuccessResponseTests() []SuccessResponseTest {
 			Err: nil,
 		},
 		{
-			Err: errors.New("Non-nil error"),
+			Err: errTest,
 		},
 	}
 }
@@ -46,7 +48,7 @@ func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
 	}
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, reply interface{}, _ ...rpc.Option) error {
 	if mc.err != nil {
 		return mc.err
 	}
@@ -177,16 +179,16 @@ func TestGetChainAliases(t *testing.T) {
 		}, nil)}
 
 		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
-		assert.NoError(t, err)
-		assert.ElementsMatch(t, expectedReply, reply)
+		require.NoError(t, err)
+		require.ElementsMatch(t, expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
+		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errTest)}
 
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
 
-		assert.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -222,17 +224,17 @@ func TestReloadInstalledVMs(t *testing.T) {
 		}, nil)}
 
 		loadedVMs, failedVMs, err := mockClient.LoadVMs(context.Background())
-		assert.NoError(t, err)
-		assert.Equal(t, expectedNewVMs, loadedVMs)
-		assert.Equal(t, expectedFailedVMs, failedVMs)
+		require.NoError(t, err)
+		require.Equal(t, expectedNewVMs, loadedVMs)
+		require.Equal(t, expectedFailedVMs, failedVMs)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errors.New("some error"))}
+		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errTest)}
 
 		_, _, err := mockClient.LoadVMs(context.Background())
 
-		assert.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -276,10 +278,10 @@ func TestSetLoggerLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, err)}
 			err = mockClient.SetLoggerLevel(
@@ -289,9 +291,9 @@ func TestSetLoggerLevel(t *testing.T) {
 				tt.displayLevel,
 			)
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 			} else {
-				assert.NoError(err)
+				require.NoError(err)
 			}
 		})
 	}
@@ -325,10 +327,10 @@ func TestGetLoggerLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(&GetLoggerLevelReply{LoggerLevels: tt.serviceResponse}, err)}
 			res, err := mockClient.GetLoggerLevel(
@@ -336,11 +338,11 @@ func TestGetLoggerLevel(t *testing.T) {
 				tt.loggerName,
 			)
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues(tt.serviceResponse, res)
+			require.NoError(err)
+			require.EqualValues(tt.serviceResponse, res)
 		})
 	}
 }
@@ -369,19 +371,19 @@ func TestGetConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
-				err = errors.New("some error")
+				err = errTest
 			}
 			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
 			res, err := mockClient.GetConfig(context.Background())
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues("response", res)
+			require.NoError(err)
+			require.EqualValues("response", res)
 		})
 	}
 }

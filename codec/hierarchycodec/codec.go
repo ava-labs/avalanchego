@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package hierarchycodec
@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	_ Codec              = &hierarchyCodec{}
-	_ codec.Codec        = &hierarchyCodec{}
-	_ codec.Registry     = &hierarchyCodec{}
-	_ codec.GeneralCodec = &hierarchyCodec{}
+	_ Codec              = (*hierarchyCodec)(nil)
+	_ codec.Codec        = (*hierarchyCodec)(nil)
+	_ codec.Registry     = (*hierarchyCodec)(nil)
+	_ codec.GeneralCodec = (*hierarchyCodec)(nil)
 )
 
 // Codec marshals and unmarshals
@@ -62,7 +62,9 @@ func New(tagNames []string, maxSliceLen uint32) Codec {
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+}
 
 // SkipRegistrations some number of type IDs
 func (c *hierarchyCodec) SkipRegistrations(num int) {
@@ -99,6 +101,11 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 	c.typeIDToType[valTypeID] = valType
 	c.typeToTypeID[valType] = valTypeID
 	return nil
+}
+
+func (*hierarchyCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.ShortLen + wrappers.ShortLen
 }
 
 func (c *hierarchyCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {

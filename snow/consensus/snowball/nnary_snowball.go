@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowball = &nnarySnowball{}
+var _ NnarySnowball = (*nnarySnowball)(nil)
 
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {

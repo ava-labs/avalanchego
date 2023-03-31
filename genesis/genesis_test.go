@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "embed"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -27,6 +28,10 @@ var (
 	invalidGenesisConfigJSON = []byte(`{
 		"networkID": 9999}}}}
 	}`)
+
+	genesisStakingCfg = &StakingConfig{
+		MaxStakeDuration: 365 * 24 * time.Hour,
+	}
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -68,7 +73,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.Allocations = []Allocation{}
 				return &thisConfig
 			}(),
-			err: "initial supply must be > 0",
+			err: errNoSupply.Error(),
 		},
 		"no initial stakers": {
 			networkID: 12345,
@@ -77,7 +82,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakers = []Staker{}
 				return &thisConfig
 			}(),
-			err: "initial stakers must be > 0",
+			err: errNoStakers.Error(),
 		},
 		"invalid initial stake duration": {
 			networkID: 12345,
@@ -86,7 +91,16 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakeDuration = 0
 				return &thisConfig
 			}(),
-			err: "initial stake duration must be > 0",
+			err: errNoStakeDuration.Error(),
+		},
+		"too large initial stake duration": {
+			networkID: 12345,
+			config: func() *Config {
+				thisConfig := LocalConfig
+				thisConfig.InitialStakeDuration = uint64(genesisStakingCfg.MaxStakeDuration+time.Second) / uint64(time.Second)
+				return &thisConfig
+			}(),
+			err: errStakeDurationTooHigh.Error(),
 		},
 		"invalid stake offset": {
 			networkID: 12345,
@@ -104,7 +118,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.InitialStakedFunds = []ids.ShortID(nil)
 				return &thisConfig
 			}(),
-			err: "initial staked funds cannot be empty",
+			err: errNoInitiallyStakedFunds.Error(),
 		},
 		"duplicate initial staked funds": {
 			networkID: 12345,
@@ -131,7 +145,7 @@ func TestValidateConfig(t *testing.T) {
 				thisConfig.CChainGenesis = ""
 				return &thisConfig
 			}(),
-			err: "C-Chain genesis cannot be empty",
+			err: errNoCChainGenesis.Error(),
 		},
 		"empty message": {
 			networkID: 12345,
@@ -145,15 +159,15 @@ func TestValidateConfig(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
-			err := validateConfig(test.networkID, test.config)
+			err := validateConfig(test.networkID, test.config, genesisStakingCfg)
 			if len(test.err) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.err)
+				require.Error(err)
+				require.Contains(err.Error(), test.err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 		})
 	}
 }
@@ -217,30 +231,30 @@ func TestGenesisFromFile(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// test loading of genesis from file
 
-			assert := assert.New(t)
+			require := require.New(t)
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = filepath.Join(t.TempDir(), "config.json")
-				assert.NoError(perms.WriteFile(customFile, test.customConfig, perms.ReadWrite))
+				require.NoError(perms.WriteFile(customFile, test.customConfig, perms.ReadWrite))
 			}
 
 			if len(test.missingFilepath) > 0 {
 				customFile = test.missingFilepath
 			}
 
-			genesisBytes, _, err := FromFile(test.networkID, customFile)
+			genesisBytes, _, err := FromFile(test.networkID, customFile, genesisStakingCfg)
 			if len(test.err) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.err)
+				require.Error(err)
+				require.Contains(err.Error(), test.err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
-			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
+			require.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
 			_, err = genesis.Parse(genesisBytes)
-			assert.NoError(err)
+			require.NoError(err)
 		})
 	}
 }
@@ -294,7 +308,7 @@ func TestGenesisFromFlag(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// test loading of genesis content from flag/env-var
 
-			assert := assert.New(t)
+			require := require.New(t)
 			var genBytes []byte
 			if len(test.customConfig) == 0 {
 				// try loading a default config
@@ -302,13 +316,13 @@ func TestGenesisFromFlag(t *testing.T) {
 				switch test.networkID {
 				case constants.MainnetID:
 					genBytes, err = json.Marshal(&MainnetConfig)
-					assert.NoError(err)
+					require.NoError(err)
 				case constants.TestnetID:
 					genBytes, err = json.Marshal(&FujiConfig)
-					assert.NoError(err)
+					require.NoError(err)
 				case constants.LocalID:
 					genBytes, err = json.Marshal(&LocalConfig)
-					assert.NoError(err)
+					require.NoError(err)
 				default:
 					genBytes = make([]byte, 0)
 				}
@@ -317,19 +331,51 @@ func TestGenesisFromFlag(t *testing.T) {
 			}
 			content := base64.StdEncoding.EncodeToString(genBytes)
 
-			genesisBytes, _, err := FromFlag(test.networkID, content)
+			genesisBytes, _, err := FromFlag(test.networkID, content, genesisStakingCfg)
 			if len(test.err) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.err)
+				require.Error(err)
+				require.Contains(err.Error(), test.err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 
 			genesisHash := fmt.Sprintf("%x", hashing.ComputeHash256(genesisBytes))
-			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
+			require.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
 			_, err = genesis.Parse(genesisBytes)
-			assert.NoError(err)
+			require.NoError(err)
+		})
+	}
+}
+
+func TestGenesis(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		expectedID string
+	}{
+		{
+			networkID:  constants.MainnetID,
+			expectedID: "UUvXi6j7QhVvgpbKM89MP5HdrxKm9CaJeHc187TsDNf8nZdLk",
+		},
+		{
+			networkID:  constants.FujiID,
+			expectedID: "MSj6o9TpezwsQx4Tv7SHqpVvCbJ8of1ikjsqPZ1bKRjc9zBy3",
+		},
+		{
+			networkID:  constants.LocalID,
+			expectedID: "hBbtNFKLpjuKti32L5bnfZ2vspABkN268t8FincYhQWnWLHxw",
+		},
+	}
+	for _, test := range tests {
+		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			require := require.New(t)
+
+			config := GetConfig(test.networkID)
+			genesisBytes, _, err := FromConfig(config)
+			require.NoError(err)
+
+			var genesisID ids.ID = hashing.ComputeHash256Array(genesisBytes)
+			require.Equal(test.expectedID, genesisID.String())
 		})
 	}
 }
@@ -391,16 +437,16 @@ func TestVMGenesis(t *testing.T) {
 				vmTest.vmID,
 			)
 			t.Run(name, func(t *testing.T) {
-				assert := assert.New(t)
+				require := require.New(t)
 
 				config := GetConfig(test.networkID)
 				genesisBytes, _, err := FromConfig(config)
-				assert.NoError(err)
+				require.NoError(err)
 
 				genesisTx, err := VMGenesis(genesisBytes, vmTest.vmID)
-				assert.NoError(err)
+				require.NoError(err)
 
-				assert.Equal(
+				require.Equal(
 					vmTest.expectedID,
 					genesisTx.ID().String(),
 					"%s genesisID with networkID %d mismatch",
@@ -433,13 +479,13 @@ func TestAVAXAssetID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			config := GetConfig(test.networkID)
 			_, avaxAssetID, err := FromConfig(config)
-			assert.NoError(err)
+			require.NoError(err)
 
-			assert.Equal(
+			require.Equal(
 				test.expectedID,
 				avaxAssetID.String(),
 				"AVAX assetID with networkID %d mismatch",

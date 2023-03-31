@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package resource
@@ -10,8 +10,14 @@ var NoUsage User = noUsage{}
 
 type noUsage struct{}
 
-func (noUsage) CPUUsage() float64 { return 0 }
+func (noUsage) CPUUsage() float64 {
+	return 0
+}
 
-func (noUsage) DiskUsage() (float64, float64) { return 0, 0 }
+func (noUsage) DiskUsage() (float64, float64) {
+	return 0, 0
+}
 
-func (noUsage) AvailableDiskBytes() uint64 { return math.MaxUint64 }
+func (noUsage) AvailableDiskBytes() uint64 {
+	return math.MaxUint64
+}

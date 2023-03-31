@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -9,9 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ AtomicUTXOManager = &atomicUTXOManager{}
+var _ AtomicUTXOManager = (*atomicUTXOManager)(nil)
 
 type AtomicUTXOManager interface {
 	// GetAtomicUTXOs returns exported UTXOs such that at least one of the
@@ -26,7 +27,7 @@ type AtomicUTXOManager interface {
 	// * Any error that may have occurred upstream.
 	GetAtomicUTXOs(
 		chainID ids.ID,
-		addrs ids.ShortSet,
+		addrs set.Set[ids.ShortID],
 		startAddr ids.ShortID,
 		startUTXOID ids.ID,
 		limit int,
@@ -47,7 +48,7 @@ func NewAtomicUTXOManager(sm atomic.SharedMemory, codec codec.Manager) AtomicUTX
 
 func (a *atomicUTXOManager) GetAtomicUTXOs(
 	chainID ids.ID,
-	addrs ids.ShortSet,
+	addrs set.Set[ids.ShortID],
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,

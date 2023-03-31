@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versiondb
@@ -15,6 +15,13 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		baseDB := memdb.New()
 		test(t, New(baseDB))
+	}
+}
+
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		baseDB := memdb.New()
+		test(f, New(baseDB))
 	}
 }
 
@@ -379,7 +386,7 @@ func BenchmarkInterface(b *testing.B) {
 			baseDB := memdb.New()
 			db := New(baseDB)
 			bench(b, db, "versiondb", keys, values)
-			db.Close()
+			_ = db.Close()
 		}
 	}
 }

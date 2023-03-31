@@ -1,19 +1,25 @@
 name: build-amd64-debian-packages
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to include in artifact name'
+        required: true
   push:
     tags:
       - "*"
 
 jobs:
-  build-bionic-amd64-package:
-    runs-on: ubuntu-18.04
+  build-jammy-amd64-package:
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.9" # The Go version to download (if necessary) and use.
+          go-version: '~1.19.6'
+          check-latest: true
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -22,12 +28,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli
-
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
-        shell: bash
+          sudo apt -y install awscli
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -36,22 +37,49 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+        shell: bash
+
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "bionic"
+          RELEASE: "jammy"
+
+      - name: Save as Github artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: jammy
+          path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
+
+      - name: Cleanup
+        run: |
+          rm -rf ./build
+          rm -rf /tmp/avalanchego
 
   build-focal-amd64-package:
     runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.9" # The Go version to download (if necessary) and use.
+          go-version: '~1.19.6'
+          check-latest: true
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -60,11 +88,20 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli
+          sudo apt -y install awscli
 
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
         shell: bash
 
       - name: Configure AWS credentials
@@ -77,58 +114,19 @@ jobs:
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
           RELEASE: "focal"
 
-  deploy-to-integration:
-    needs: build-focal-amd64-package
-    runs-on: [self-hosted, linux, deploy]
-    steps:
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
-        shell: bash
-
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Save as Github artifact
+        uses: actions/upload-artifact@v3
         with:
-          path: master
+          name: focal
+          path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
-      - name: Checkout devops repo
-        uses: actions/checkout@v3
-        with:
-          repository: ava-labs/devops
-          token: ${{ secrets.AVALANCHE_PAT }}
-
-      - name: Run Ansible
+      - name: Cleanup
         run: |
-          export ANSIBLE_HOST_KEY_CHECKING=False
-          if [[ ${{ secrets.DEPLOY }} == "true" ]]
-          then
-            echo "The deployment is enabled.  Deploying $TAG to integration"
-            ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/update-from-s3-and-restart.yml -e release_ver=$TAG
-            #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
-            #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
-          else
-            echo 'The deployment is not set to "true".  Skipping deployment.'
-          fi
-        env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
-
-  deploy-to-tmpnet:
-    needs: build-focal-amd64-package
-    runs-on: [ubuntu-20.04]
-    steps:
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
-      - name: deploy tmpnet
-        uses: benc-uk/workflow-dispatch@v1.1
-        with:
-          workflow: Deployment tmpnet
-          repo: ava-labs/devops
-          token: ${{ secrets.DEVOPS_SNOWBOT_PAT }}
-          ref: main
-          inputs: '{ "version": "${{ steps.get_version.outputs.VERSION }}" }'
+          rm -rf ./build
+          rm -rf /tmp/avalanchego

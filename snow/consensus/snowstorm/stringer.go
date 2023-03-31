@@ -1,17 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
 
 import (
-	"bytes"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
+
+var _ utils.Sortable[*snowballNode] = (*snowballNode)(nil)
 
 type snowballNode struct {
 	txID               ids.ID
@@ -26,23 +27,15 @@ func (sb *snowballNode) String() string {
 		sb.confidence)
 }
 
-type sortSnowballNodeData []*snowballNode
-
-func (sb sortSnowballNodeData) Less(i, j int) bool {
-	return bytes.Compare(sb[i].txID[:], sb[j].txID[:]) == -1
-}
-func (sb sortSnowballNodeData) Len() int      { return len(sb) }
-func (sb sortSnowballNodeData) Swap(i, j int) { sb[j], sb[i] = sb[i], sb[j] }
-
-func sortSnowballNodes(nodes []*snowballNode) {
-	sort.Sort(sortSnowballNodeData(nodes))
+func (sb *snowballNode) Less(other *snowballNode) bool {
+	return sb.txID.Less(other.txID)
 }
 
 // consensusString converts a list of snowball nodes into a human-readable
 // string.
 func consensusString(nodes []*snowballNode) string {
 	// Sort the nodes so that the string representation is canonical
-	sortSnowballNodes(nodes)
+	utils.Sort(nodes)
 
 	sb := strings.Builder{}
 	sb.WriteString("DG(")

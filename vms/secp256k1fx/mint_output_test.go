@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -6,20 +6,48 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestMintOutputVerifyNil(t *testing.T) {
-	assert := assert.New(t)
-	out := (*MintOutput)(nil)
-	assert.ErrorIs(out.Verify(), errNilOutput)
-}
+func TestMintOutputVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		out         *MintOutput
+		expectedErr error
+	}{
+		{
+			name:        "nil",
+			out:         nil,
+			expectedErr: errNilOutput,
+		},
+		{
+			name: "invalid output owners",
+			out: &MintOutput{
+				OutputOwners: OutputOwners{
+					Threshold: 2,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			},
+			expectedErr: errOutputUnspendable,
+		},
+		{
+			name: "passes verification",
+			out: &MintOutput{
+				OutputOwners: OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			},
+			expectedErr: nil,
+		},
+	}
 
-func TestMintOutputState(t *testing.T) {
-	assert := assert.New(t)
-	intf := interface{}(&MintOutput{})
-	_, ok := intf.(verify.State)
-	assert.True(ok)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.ErrorIs(t, tt.out.Verify(), tt.expectedErr)
+			require.ErrorIs(t, tt.out.VerifyState(), tt.expectedErr)
+		})
+	}
 }

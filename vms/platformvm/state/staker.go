@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -10,11 +10,11 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ btree.Item = &Staker{}
+var _ btree.LessFunc[*Staker] = (*Staker).Less
 
 // StakerIterator defines an interface for iterating over a set of stakers.
 type StakerIterator interface {
@@ -33,9 +33,11 @@ type StakerIterator interface {
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
+// Invariant: Staker's size is bounded to prevent OOM DoS attacks.
 type Staker struct {
 	TxID            ids.ID
 	NodeID          ids.NodeID
+	PublicKey       *bls.PublicKey
 	SubnetID        ids.ID
 	Weight          uint64
 	StartTime       time.Time
@@ -53,20 +55,17 @@ type Staker struct {
 	// are grouped together. The ordering of these groups is documented in
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
-	Priority Priority
+	Priority txs.Priority
 }
 
 // A *Staker is considered to be less than another *Staker when:
-// 1. If its NextTime is before the other's.
-// 2. If the NextTimes are the same, the *Staker with the lesser priority is the
-//    lesser one.
-// 3. If the priorities are also the same, the one with the lesser txID is
-//    lesser.
 //
-// Invariant: [thanIntf] is a *Staker.
-func (s *Staker) Less(thanIntf btree.Item) bool {
-	than := thanIntf.(*Staker)
-
+//  1. If its NextTime is before the other's.
+//  2. If the NextTimes are the same, the *Staker with the lesser priority is the
+//     lesser one.
+//  3. If the priorities are also the same, the one with the lesser txID is
+//     lesser.
+func (s *Staker) Less(than *Staker) bool {
 	if s.NextTime.Before(than.NextTime) {
 		return true
 	}
@@ -84,24 +83,41 @@ func (s *Staker) Less(thanIntf btree.Item) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewPrimaryNetworkStaker(txID ids.ID, vdr *validator.Validator) *Staker {
-	return &Staker{
-		TxID:      txID,
-		NodeID:    vdr.ID(),
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    vdr.Weight(),
-		StartTime: vdr.StartTime(),
-		EndTime:   vdr.EndTime(),
+func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {
+	publicKey, _, err := staker.PublicKey()
+	if err != nil {
+		return nil, err
 	}
+	endTime := staker.EndTime()
+	return &Staker{
+		TxID:            txID,
+		NodeID:          staker.NodeID(),
+		PublicKey:       publicKey,
+		SubnetID:        staker.SubnetID(),
+		Weight:          staker.Weight(),
+		StartTime:       staker.StartTime(),
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        staker.CurrentPriority(),
+	}, nil
 }
 
-func NewSubnetStaker(txID ids.ID, vdr *validator.SubnetValidator) *Staker {
+func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
+	publicKey, _, err := staker.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	startTime := staker.StartTime()
 	return &Staker{
 		TxID:      txID,
-		NodeID:    vdr.ID(),
-		SubnetID:  vdr.SubnetID(),
-		Weight:    vdr.Weight(),
-		StartTime: vdr.StartTime(),
-		EndTime:   vdr.EndTime(),
-	}
+		NodeID:    staker.NodeID(),
+		PublicKey: publicKey,
+		SubnetID:  staker.SubnetID(),
+		Weight:    staker.Weight(),
+		StartTime: startTime,
+		EndTime:   staker.EndTime(),
+		NextTime:  startTime,
+		Priority:  staker.PendingPriority(),
+	}, nil
 }

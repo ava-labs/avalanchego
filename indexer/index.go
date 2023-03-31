@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -35,7 +37,7 @@ var (
 	errNoneAccepted        = errors.New("no containers have been accepted")
 	errNumToFetchZero      = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
 
-	_ Index = &index{}
+	_ Index = (*index)(nil)
 )
 
 // Index indexes containers in their order of acceptance
@@ -96,14 +98,18 @@ func newIndex(
 	nextAcceptedIndex, err := database.GetUInt64(i.vDB, nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
-		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+		i.log.Info("created new index",
+			zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		)
 		return i, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
 	i.nextAcceptedIndex = nextAcceptedIndex
-	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+	i.log.Info("created new index",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+	)
 	return i, nil
 }
 
@@ -132,14 +138,19 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	// Make sure we don't index the same container twice in that event.
 	_, err := i.containerToIndex.Get(containerID[:])
 	if err == nil {
-		ctx.Log.Debug("not indexing already accepted container %s", containerID)
+		ctx.Log.Debug("not indexing already accepted container",
+			zap.Stringer("containerID", containerID),
+		)
 		return nil
 	}
 	if err != database.ErrNotFound {
 		return fmt.Errorf("couldn't get whether %s is accepted: %w", containerID, err)
 	}
 
-	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
+	ctx.Log.Debug("indexing container",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		zap.Stringer("containerID", containerID),
+	)
 	// Persist index --> Container
 	nextAcceptedIndexBytes := database.PackUInt64(i.nextAcceptedIndex)
 	bytes, err := i.codec.Marshal(codecVersion, Container{
@@ -195,11 +206,13 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 	containerBytes, err := i.indexToContainer.Get(indexBytes)
 	if err != nil {
-		i.log.Error("couldn't read container from database: %s", err)
+		i.log.Error("couldn't read container from database",
+			zap.Error(err),
+		)
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
 	var container Container
-	if _, err = i.codec.Unmarshal(containerBytes, &container); err != nil {
+	if _, err := i.codec.Unmarshal(containerBytes, &container); err != nil {
 		return Container{}, fmt.Errorf("couldn't unmarshal container: %w", err)
 	}
 	return container, nil
@@ -228,7 +241,7 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 	}
 
 	// Calculate the last index we will fetch
-	lastIndex := math.Min64(startIndex+numToFetch-1, lastAcceptedIndex)
+	lastIndex := math.Min(startIndex+numToFetch-1, lastAcceptedIndex)
 	// [lastIndex] is always >= [startIndex] so this is safe.
 	// [numToFetch] is limited to [MaxFetchedByRange] so [containers] is bounded in size.
 	containers := make([]Container, int(lastIndex)-int(startIndex)+1)
@@ -280,9 +293,10 @@ func (i *index) GetLastAccepted() (Container, error) {
 
 // Assumes i.lock is held
 // Returns:
-// 1) The index of the most recently accepted transaction,
-//    or 0 if no transactions have been accepted
-// 2) Whether at least 1 transaction has been accepted
+//
+//  1. The index of the most recently accepted transaction, or 0 if no
+//     transactions have been accepted
+//  2. Whether at least 1 transaction has been accepted
 func (i *index) lastAcceptedIndex() (uint64, bool) {
 	return i.nextAcceptedIndex - 1, i.nextAcceptedIndex != 0
 }

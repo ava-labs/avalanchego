@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txheap
@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Heap = &txHeap{}
+var _ Heap = (*txHeap)(nil)
 
 type Heap interface {
 	Add(tx *txs.Tx)
@@ -41,7 +41,9 @@ func (h *txHeap) initialize(self heap.Interface) {
 	h.txIDToIndex = make(map[ids.ID]int)
 }
 
-func (h *txHeap) Add(tx *txs.Tx) { heap.Push(h.self, tx) }
+func (h *txHeap) Add(tx *txs.Tx) {
+	heap.Push(h.self, tx)
+}
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
 	index, exists := h.txIDToIndex[txID]
@@ -67,11 +69,17 @@ func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
 	return heap.Remove(h.self, index).(*txs.Tx)
 }
 
-func (h *txHeap) Peek() *txs.Tx { return h.txs[0].tx }
+func (h *txHeap) Peek() *txs.Tx {
+	return h.txs[0].tx
+}
 
-func (h *txHeap) RemoveTop() *txs.Tx { return heap.Pop(h.self).(*txs.Tx) }
+func (h *txHeap) RemoveTop() *txs.Tx {
+	return heap.Pop(h.self).(*txs.Tx)
+}
 
-func (h *txHeap) Len() int { return len(h.txs) }
+func (h *txHeap) Len() int {
+	return len(h.txs)
+}
 
 func (h *txHeap) Swap(i, j int) {
 	// The follow "i"s and "j"s are intentionally swapped to perform the actual
@@ -111,6 +119,7 @@ func (h *txHeap) Push(x interface{}) {
 func (h *txHeap) Pop() interface{} {
 	newLen := len(h.txs) - 1
 	htx := h.txs[newLen]
+	h.txs[newLen] = nil
 	h.txs = h.txs[:newLen]
 
 	tx := htx.tx

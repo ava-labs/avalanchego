@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,17 +13,19 @@ import (
 )
 
 func (vm *blockVM) GetAncestors(
+	ctx context.Context,
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	ancestors, err := vm.bVM.GetAncestors(
+	ancestors, err := vm.batchedVM.GetAncestors(
+		ctx,
 		blkID,
 		maxBlocksNum,
 		maxBlocksSize,
@@ -33,13 +36,13 @@ func (vm *blockVM) GetAncestors(
 	return ancestors, err
 }
 
-func (vm *blockVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	if vm.bVM == nil {
+func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blocks, err := vm.bVM.BatchedParseBlock(blks)
+	blocks, err := vm.batchedVM.BatchedParseBlock(ctx, blks)
 	end := vm.clock.Time()
 	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
 

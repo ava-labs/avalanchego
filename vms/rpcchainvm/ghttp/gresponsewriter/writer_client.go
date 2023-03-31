@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gresponsewriter
@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	_ http.ResponseWriter = &Client{}
-	_ http.Flusher        = &Client{}
-	_ http.Hijacker       = &Client{}
+	_ http.ResponseWriter = (*Client)(nil)
+	_ http.Flusher        = (*Client)(nil)
+	_ http.Hijacker       = (*Client)(nil)
 )
 
 // Client is an http.ResponseWriter that talks over RPC.
@@ -42,7 +42,9 @@ func NewClient(header http.Header, client responsewriterpb.WriterClient) *Client
 	}
 }
 
-func (c *Client) Header() http.Header { return c.header }
+func (c *Client) Header() http.Header {
+	return c.header
+}
 
 func (c *Client) Write(payload []byte) (int, error) {
 	req := &responsewriterpb.WriteRequest{
@@ -87,8 +89,13 @@ type addr struct {
 	str     string
 }
 
-func (a *addr) Network() string { return a.network }
-func (a *addr) String() string  { return a.str }
+func (a *addr) Network() string {
+	return a.network
+}
+
+func (a *addr) String() string {
+	return a.str
+}
 
 func (c *Client) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	resp, err := c.client.Hijack(context.Background(), &emptypb.Empty{})

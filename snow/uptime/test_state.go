@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package uptime
@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ State = &TestState{}
+var _ State = (*TestState)(nil)
 
 type uptime struct {
 	upDuration  time.Duration
@@ -21,33 +21,38 @@ type uptime struct {
 type TestState struct {
 	dbReadError  error
 	dbWriteError error
-	nodes        map[ids.NodeID]*uptime
+	nodes        map[ids.NodeID]map[ids.ID]*uptime
 }
 
 func NewTestState() *TestState {
 	return &TestState{
-		nodes: make(map[ids.NodeID]*uptime),
+		nodes: make(map[ids.NodeID]map[ids.ID]*uptime),
 	}
 }
 
-func (s *TestState) AddNode(nodeID ids.NodeID, startTime time.Time) {
+func (s *TestState) AddNode(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) {
+	subnetUptimes, ok := s.nodes[nodeID]
+	if !ok {
+		subnetUptimes = make(map[ids.ID]*uptime)
+		s.nodes[nodeID] = subnetUptimes
+	}
 	st := time.Unix(startTime.Unix(), 0)
-	s.nodes[nodeID] = &uptime{
+	subnetUptimes[subnetID] = &uptime{
 		lastUpdated: st,
 		startTime:   st,
 	}
 }
 
-func (s *TestState) GetUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
-	up, exists := s.nodes[nodeID]
+func (s *TestState) GetUptime(nodeID ids.NodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
+	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return 0, time.Time{}, database.ErrNotFound
 	}
 	return up.upDuration, up.lastUpdated, s.dbReadError
 }
 
-func (s *TestState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error {
-	up, exists := s.nodes[nodeID]
+func (s *TestState) SetUptime(nodeID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
+	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return database.ErrNotFound
 	}
@@ -56,8 +61,8 @@ func (s *TestState) SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastU
 	return s.dbWriteError
 }
 
-func (s *TestState) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	up, exists := s.nodes[nodeID]
+func (s *TestState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
+	up, exists := s.nodes[nodeID][subnetID]
 	if !exists {
 		return time.Time{}, database.ErrNotFound
 	}

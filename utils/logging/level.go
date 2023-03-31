@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -22,9 +22,7 @@ const (
 	Error
 	Fatal
 	Off
-)
 
-const (
 	fatalStr   = "FATAL"
 	errorStr   = "ERROR"
 	warnStr    = "WARN"

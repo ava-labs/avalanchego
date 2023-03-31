@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -7,54 +7,55 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dto "github.com/prometheus/client_model/go"
 )
 
+var errTest = errors.New("non-nil error")
+
 func TestOptionalGathererEmptyGather(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewOptionalGatherer()
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Empty(mfs)
+	require.NoError(err)
+	require.Empty(mfs)
 }
 
 func TestOptionalGathererDuplicated(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewOptionalGatherer()
 	og := NewOptionalGatherer()
 
 	err := g.Register(og)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = g.Register(og)
-	assert.Equal(errDuplicatedRegister, err)
+	require.Equal(errDuplicatedRegister, err)
 }
 
 func TestOptionalGathererAddedError(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewOptionalGatherer()
 
-	expected := errors.New(":(")
 	tg := &testGatherer{
-		err: expected,
+		err: errTest,
 	}
 
 	err := g.Register(tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.Equal(expected, err)
-	assert.Empty(mfs)
+	require.ErrorIs(err, errTest)
+	require.Empty(mfs)
 }
 
 func TestMultiGathererAdded(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewOptionalGatherer()
 
@@ -65,10 +66,10 @@ func TestMultiGathererAdded(t *testing.T) {
 	}
 
 	err := g.Register(tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Len(mfs, 1)
-	assert.Equal(&hello, mfs[0].Name)
+	require.NoError(err)
+	require.Len(mfs, 1)
+	require.Equal(&hello, mfs[0].Name)
 }

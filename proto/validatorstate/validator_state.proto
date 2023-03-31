@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package validatorstate;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/validatorstate";
+
+service ValidatorState {
+  // GetMinimumHeight returns the minimum height of the blocks in the optimal
+  // proposal window.
+  rpc GetMinimumHeight(google.protobuf.Empty) returns (GetMinimumHeightResponse);
+  // GetCurrentHeight returns the current height of the P-chain.
+  rpc GetCurrentHeight(google.protobuf.Empty) returns (GetCurrentHeightResponse);
+  // GetSubnetID returns the subnetID of the provided chain.
+  rpc GetSubnetID(GetSubnetIDRequest) returns (GetSubnetIDResponse);
+  // GetValidatorSet returns the weights of the nodeIDs for the provided
+  // subnet at the requested P-chain height.
+  rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
+}
+
+message GetMinimumHeightResponse {
+  uint64 height = 1;
+}
+
+message GetCurrentHeightResponse {
+  uint64 height = 1;
+}
+
+message GetSubnetIDRequest {
+  bytes chain_id = 1;
+}
+
+message GetSubnetIDResponse {
+  bytes subnet_id = 1;
+}
+
+message GetValidatorSetRequest {
+  uint64 height = 1;
+  bytes subnet_id = 2;
+}
+
+message Validator {
+  bytes node_id = 1;
+  uint64 weight = 2;
+  bytes public_key = 3;
+}
+
+message GetValidatorSetResponse {
+  repeated Validator validators = 1;
+}

@@ -1,20 +1,22 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/ava-labs/avalanchego/utils/set"
+)
 
 type connections struct {
 	lock      sync.RWMutex
-	conns     map[*connection]struct{}
+	conns     set.Set[*connection]
 	connsList []Filter
 }
 
 func newConnections() *connections {
-	return &connections{
-		conns: make(map[*connection]struct{}),
-	}
+	return &connections{}
 }
 
 func (c *connections) Conns() []Filter {
@@ -28,7 +30,7 @@ func (c *connections) Remove(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	delete(c.conns, conn)
+	c.conns.Remove(conn)
 	c.createConnsList()
 }
 
@@ -36,7 +38,7 @@ func (c *connections) Add(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.conns[conn] = struct{}{}
+	c.conns.Add(conn)
 	c.createConnsList()
 }
 

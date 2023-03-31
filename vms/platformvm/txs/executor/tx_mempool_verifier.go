@@ -1,37 +1,45 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = &MempoolTxVerifier{}
+var _ txs.Visitor = (*MempoolTxVerifier)(nil)
 
 type MempoolTxVerifier struct {
 	*Backend
-	ParentID ids.ID
-	Tx       *txs.Tx
+	ParentID      ids.ID
+	StateVersions state.Versions
+	Tx            *txs.Tx
 }
 
-func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
-func (*MempoolTxVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
+func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return errWrongTxType
+}
+
+func (*MempoolTxVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return errWrongTxType
+}
 
 func (v *MempoolTxVerifier) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -50,40 +58,88 @@ func (v *MempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
 	return v.standardTx(tx)
 }
 
-func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
-	startTime := tx.StartTime()
-	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
-	if startTime.After(maxLocalStartTime) {
-		return errFutureStakeTime
-	}
+func (v *MempoolTxVerifier) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return v.standardTx(tx)
+}
 
-	executor := ProposalTxExecutor{
-		Backend:  v.Backend,
-		ParentID: v.ParentID,
-		Tx:       v.Tx,
-	}
-	err := tx.Visit(&executor)
-	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
-	// issued before this transaction is issued.
-	if errors.Is(err, errFutureStakeTime) {
-		return nil
-	}
-	return err
+func (v *MempoolTxVerifier) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
-	state, err := state.NewDiff(
-		v.ParentID,
-		v.StateVersions,
-	)
+	baseState, err := v.standardBaseState()
 	if err != nil {
 		return err
 	}
 
 	executor := StandardTxExecutor{
 		Backend: v.Backend,
-		State:   state,
+		State:   baseState,
 		Tx:      v.Tx,
 	}
-	return tx.Visit(&executor)
+	err = tx.Visit(&executor)
+	// We ignore [errFutureStakeTime] here because the time will be advanced
+	// when this transaction is issued.
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
+	return err
+}
+
+// Upon Banff activation, txs are not verified against current chain time
+// but against the block timestamp. [baseTime] calculates
+// the right timestamp to be used to mempool tx verification
+func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
+	state, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return nil, err
+	}
+
+	nextBlkTime, err := v.nextBlockTime(state)
+	if err != nil {
+		return nil, err
+	}
+
+	if !v.Backend.Config.IsBanffActivated(nextBlkTime) {
+		// next tx would be included into an Apricot block
+		// so we verify it against current chain state
+		return state, nil
+	}
+
+	// next tx would be included into a Banff block
+	// so we verify it against duly updated chain state
+	changes, err := AdvanceTimeTo(v.Backend, state, nextBlkTime)
+	if err != nil {
+		return nil, err
+	}
+	changes.Apply(state)
+	state.SetTimestamp(nextBlkTime)
+
+	return state, nil
+}
+
+func (v *MempoolTxVerifier) nextBlockTime(state state.Diff) (time.Time, error) {
+	var (
+		parentTime  = state.GetTimestamp()
+		nextBlkTime = v.Clk.Time()
+	)
+	if parentTime.After(nextBlkTime) {
+		nextBlkTime = parentTime
+	}
+	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+	if !nextBlkTime.Before(nextStakerChangeTime) {
+		nextBlkTime = nextStakerChangeTime
+	}
+	return nextBlkTime, nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -13,7 +13,7 @@ var (
 	errNilUTXO   = errors.New("nil utxo is not valid")
 	errEmptyUTXO = errors.New("empty utxo is not valid")
 
-	_ verify.Verifiable = &UTXO{}
+	_ verify.Verifiable = (*UTXO)(nil)
 )
 
 type UTXO struct {

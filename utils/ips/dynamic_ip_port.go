@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ips
@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-var _ DynamicIPPort = &dynamicIPPort{}
+var _ DynamicIPPort = (*dynamicIPPort)(nil)
 
 // An IPPort that can change.
 // Safe for use by multiple goroutines.

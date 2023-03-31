@@ -1,5 +1,5 @@
 version: v1
-name: buf.build/ava-labs/avalanchego
+name: buf.build/ava-labs/avalanche
 build:
   excludes:
     # for golang we handle prometheus as a buf dep so we exclude it from generate, this proto

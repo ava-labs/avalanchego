@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ UnarySnowflake = &unarySnowflake{}
+var _ UnarySnowflake = (*unarySnowflake)(nil)
 
 // unarySnowflake is the implementation of a unary snowflake instance
 type unarySnowflake struct {
@@ -24,16 +24,22 @@ type unarySnowflake struct {
 	finalized bool
 }
 
-func (sf *unarySnowflake) Initialize(beta int) { sf.beta = beta }
+func (sf *unarySnowflake) Initialize(beta int) {
+	sf.beta = beta
+}
 
 func (sf *unarySnowflake) RecordSuccessfulPoll() {
 	sf.confidence++
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
-func (sf *unarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
+func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
+	sf.confidence = 0
+}
 
-func (sf *unarySnowflake) Finalized() bool { return sf.finalized }
+func (sf *unarySnowflake) Finalized() bool {
+	return sf.finalized
+}
 
 func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
 	return &binarySnowflake{

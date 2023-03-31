@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //go:build freebsd
@@ -48,7 +48,10 @@ func Set(max uint64, log logging.Logger) error {
 	}
 
 	if rLimit.Cur < DefaultFDLimit {
-		log.Warn("fd-limit: (%d) is less than recommended: (%d) and could result in reduced performance", rLimit.Cur, DefaultFDLimit)
+		log.Warn("fd-limit is less than recommended and could result in reduced performance",
+			zap.Uint64("currentLimit", rLimit.Cur),
+			zap.Uint64("recommendedLimit", DefaultFDLimit),
+		)
 	}
 
 	return nil

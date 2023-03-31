@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package profiler
@@ -82,9 +82,15 @@ func (p *continuousProfiler) stop() error {
 
 func (p *continuousProfiler) rotate() error {
 	g := errgroup.Group{}
-	g.Go(func() error { return rotate(p.profiler.cpuProfileName, p.maxNumFiles) })
-	g.Go(func() error { return rotate(p.profiler.memProfileName, p.maxNumFiles) })
-	g.Go(func() error { return rotate(p.profiler.lockProfileName, p.maxNumFiles) })
+	g.Go(func() error {
+		return rotate(p.profiler.cpuProfileName, p.maxNumFiles)
+	})
+	g.Go(func() error {
+		return rotate(p.profiler.memProfileName, p.maxNumFiles)
+	})
+	g.Go(func() error {
+		return rotate(p.profiler.lockProfileName, p.maxNumFiles)
+	})
 	return g.Wait()
 }
 

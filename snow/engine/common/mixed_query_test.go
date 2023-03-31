@@ -1,14 +1,17 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/golang/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestSendMixedQuery(t *testing.T) {
@@ -29,12 +32,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -48,13 +52,14 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.NodeIDSet{vdr1: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
-					ids.NodeIDSet{vdr2: struct{}{}, vdr3: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
@@ -67,12 +72,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -87,12 +93,13 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
+					gomock.Any(),
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(0)
 				s.EXPECT().SendPullQuery(
-					ids.NodeIDSet{vdr1: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
@@ -105,12 +112,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					gomock.Any(),
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -128,6 +136,7 @@ func TestSendMixedQuery(t *testing.T) {
 			func(t *testing.T) {
 				sender := tt.senderF()
 				SendMixedQuery(
+					context.Background(),
 					sender,
 					tt.vdrs,
 					tt.numPushTo,

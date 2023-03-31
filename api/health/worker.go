@@ -1,15 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -59,16 +62,16 @@ func (w *worker) RegisterCheck(name string, checker Checker) error {
 }
 
 func (w *worker) RegisterMonotonicCheck(name string, checker Checker) error {
-	var result utils.AtomicInterface
-	return w.RegisterCheck(name, CheckerFunc(func() (interface{}, error) {
-		details := result.GetValue()
+	var result utils.Atomic[any]
+	return w.RegisterCheck(name, CheckerFunc(func(ctx context.Context) (any, error) {
+		details := result.Get()
 		if details != nil {
 			return details, nil
 		}
 
-		details, err := checker.HealthCheck()
+		details, err := checker.HealthCheck(ctx)
 		if err == nil {
-			result.SetValue(details)
+			result.Set(details)
 		}
 		return details, err
 	}))
@@ -87,17 +90,18 @@ func (w *worker) Results() (map[string]Result, bool) {
 	return results, healthy
 }
 
-func (w *worker) Start(freq time.Duration) {
+func (w *worker) Start(ctx context.Context, freq time.Duration) {
 	w.startOnce.Do(func() {
+		detachedCtx := utils.Detach(ctx)
 		go func() {
 			ticker := time.NewTicker(freq)
 			defer ticker.Stop()
 
-			w.runChecks()
+			w.runChecks(detachedCtx)
 			for {
 				select {
 				case <-ticker.C:
-					w.runChecks()
+					w.runChecks(detachedCtx)
 				case <-w.closer:
 					return
 				}
@@ -112,27 +116,24 @@ func (w *worker) Stop() {
 	})
 }
 
-func (w *worker) runChecks() {
+func (w *worker) runChecks(ctx context.Context) {
 	w.checksLock.RLock()
 	// Copy the [w.checks] map to collect the checks that we will be running
 	// during this iteration. If [w.checks] is modified during this iteration of
 	// [runChecks], then the added check will not be run until the next
 	// iteration.
-	checks := make(map[string]Checker, len(w.checks))
-	for name, checker := range w.checks {
-		checks[name] = checker
-	}
+	checks := maps.Clone(w.checks)
 	w.checksLock.RUnlock()
 
 	var wg sync.WaitGroup
 	wg.Add(len(checks))
 	for name, check := range checks {
-		go w.runCheck(&wg, name, check)
+		go w.runCheck(ctx, &wg, name, check)
 	}
 	wg.Wait()
 }
 
-func (w *worker) runCheck(wg *sync.WaitGroup, name string, check Checker) {
+func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check Checker) {
 	defer wg.Done()
 
 	start := time.Now()
@@ -140,7 +141,7 @@ func (w *worker) runCheck(wg *sync.WaitGroup, name string, check Checker) {
 	// To avoid any deadlocks when [RegisterCheck] is called with a lock
 	// that is grabbed by [check.HealthCheck], we ensure that no locks
 	// are held when [check.HealthCheck] is called.
-	details, err := check.HealthCheck()
+	details, err := check.HealthCheck(ctx)
 	end := time.Now()
 
 	result := Result{

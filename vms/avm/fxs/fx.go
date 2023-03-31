@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fxs
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	_ Fx = &secp256k1fx.Fx{}
-	_ Fx = &nftfx.Fx{}
-	_ Fx = &propertyfx.Fx{}
+	_ Fx = (*secp256k1fx.Fx)(nil)
+	_ Fx = (*nftfx.Fx)(nil)
+	_ Fx = (*propertyfx.Fx)(nil)
 )
 
 type ParsedFx struct {

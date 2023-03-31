@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package auth
@@ -14,13 +14,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -53,7 +54,7 @@ var (
 	errNoEndpoints                 = errors.New("must name at least one endpoint")
 	errTooManyEndpoints            = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
 
-	_ Auth = &auth{}
+	_ Auth = (*auth)(nil)
 )
 
 type Auth interface {
@@ -99,14 +100,13 @@ type auth struct {
 	// Can be changed via API call.
 	password password.Hash
 	// Set of token IDs that have been revoked
-	revoked map[string]struct{}
+	revoked set.Set[string]
 }
 
 func New(log logging.Logger, endpoint, pw string) (Auth, error) {
 	a := &auth{
 		log:      log,
 		endpoint: endpoint,
-		revoked:  make(map[string]struct{}),
 	}
 	return a, a.password.Set(pw)
 }
@@ -116,7 +116,6 @@ func NewFromHash(log logging.Logger, endpoint string, pw password.Hash) Auth {
 		log:      log,
 		endpoint: endpoint,
 		password: pw,
-		revoked:  make(map[string]struct{}),
 	}
 }
 
@@ -149,12 +148,12 @@ func (a *auth) NewToken(pw string, duration time.Duration, endpoints []string) (
 	if _, err := rand.Read(idBytes[:]); err != nil {
 		return "", fmt.Errorf("failed to generate the unique token ID due to %w", err)
 	}
-	id := base64.URLEncoding.EncodeToString(idBytes[:])
+	id := base64.RawURLEncoding.EncodeToString(idBytes[:])
 
 	claims := endpointClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: a.clock.Time().Add(duration).Unix(),
-			Id:        id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(a.clock.Time().Add(duration)),
+			ID:        id,
 		},
 	}
 	if canAccessAll {
@@ -196,7 +195,7 @@ func (a *auth) RevokeToken(tokenStr, pw string) error {
 	if !ok {
 		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
 	}
-	a.revoked[claims.Id] = struct{}{}
+	a.revoked.Add(claims.ID)
 	return nil
 }
 
@@ -217,7 +216,7 @@ func (a *auth) AuthenticateToken(tokenStr, url string) error {
 		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
 	}
 
-	_, revoked := a.revoked[claims.Id]
+	_, revoked := a.revoked[claims.ID]
 	if revoked {
 		return errTokenRevoked
 	}
@@ -250,7 +249,7 @@ func (a *auth) ChangePassword(oldPW, newPW string) error {
 
 	// All the revoked tokens are now invalid; no need to mark specifically as
 	// revoked.
-	a.revoked = make(map[string]struct{})
+	a.revoked.Clear()
 	return nil
 }
 

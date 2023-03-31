@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -14,7 +14,7 @@ import (
 var (
 	errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
 
-	_ Uniform = &uniformBest{}
+	_ Uniform = (*uniformBest)(nil)
 )
 
 // Sampling is performed by using another implementation of the Uniform

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -15,7 +15,7 @@ import (
 var (
 	errDuplicatedRegister = errors.New("duplicated register")
 
-	_ OptionalGatherer = &optionalGatherer{}
+	_ OptionalGatherer = (*optionalGatherer)(nil)
 )
 
 // OptionalGatherer extends the Gatherer interface by allowing the optional

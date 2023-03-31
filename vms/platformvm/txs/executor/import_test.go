@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -21,106 +21,140 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, shutdownEnvironment(env))
 	}()
 
 	type test struct {
 		description   string
 		sourceChainID ids.ID
 		sharedMemory  atomic.SharedMemory
-		sourceKeys    []*crypto.PrivateKeySECP256K1R
+		sourceKeys    []*secp256k1.PrivateKey
 		timestamp     time.Time
 		shouldErr     bool
 		shouldVerify  bool
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	sourceKeyIntf, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	sourceKey := sourceKeyIntf.(*crypto.PrivateKeySECP256K1R)
+	factory := secp256k1.Factory{}
+	sourceKey, err := factory.NewPrivateKey()
+	require.NoError(t, err)
 
 	cnt := new(byte)
 
 	// Returns a shared memory where GetDatabase returns a database
 	// where [recipientKey] has a balance of [amt]
-	fundedSharedMemory := func(peerChain ids.ID, amt uint64) atomic.SharedMemory {
+	fundedSharedMemory := func(peerChain ids.ID, assets map[ids.ID]uint64) atomic.SharedMemory {
 		*cnt++
 		m := atomic.NewMemory(prefixdb.New([]byte{*cnt}, env.baseDB))
 
 		sm := m.NewSharedMemory(env.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(peerChain)
 
-		// #nosec G404
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
-			},
-			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amt,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
-					Threshold: 1,
+		for assetID, amt := range assets {
+			// #nosec G404
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.GenerateTestID(),
+					OutputIndex: rand.Uint32(),
+				},
+				Asset: avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amt,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+						Threshold: 1,
+					},
+				},
+			}
+			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+			require.NoError(t, err)
+
+			inputID := utxo.InputID()
+			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+				env.ctx.ChainID: {
+					PutRequests: []*atomic.Element{
+						{
+							Key:   inputID[:],
+							Value: utxoBytes,
+							Traits: [][]byte{
+								sourceKey.PublicKey().Address().Bytes(),
+							},
+						},
+					},
 				},
 			},
-		}
-		utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
-		inputID := utxo.InputID()
-		if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				sourceKey.PublicKey().Address().Bytes(),
-			},
-		}}}}); err != nil {
-			t.Fatal(err)
+			)
+			require.NoError(t, err)
 		}
 
 		return sm
 	}
 
+	customAssetID := ids.GenerateTestID()
+
 	tests := []test{
 		{
 			description:   "can't pay fee",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee-1),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			shouldErr:     true,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee - 1,
+				},
+			),
+			sourceKeys: []*secp256k1.PrivateKey{sourceKey},
+			shouldErr:  true,
 		},
 		{
 			description:   "can barely pay fee",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory:  fundedSharedMemory(env.ctx.XChainID, env.config.TxFee),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			shouldErr:     false,
-			shouldVerify:  true,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+				},
+			),
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
+			shouldErr:    false,
+			shouldVerify: true,
 		},
 		{
 			description:   "attempting to import from C-chain",
 			sourceChainID: cChainID,
-			sharedMemory:  fundedSharedMemory(cChainID, env.config.TxFee),
-			sourceKeys:    []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:     env.config.ApricotPhase5Time,
-			shouldErr:     false,
-			shouldVerify:  true,
+			sharedMemory: fundedSharedMemory(
+				cChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+				},
+			),
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
+			timestamp:    env.config.ApricotPhase5Time,
+			shouldErr:    false,
+			shouldVerify: true,
+		},
+		{
+			description:   "attempting to import non-avax from X-chain",
+			sourceChainID: env.ctx.XChainID,
+			sharedMemory: fundedSharedMemory(
+				env.ctx.XChainID,
+				map[ids.ID]uint64{
+					env.ctx.AVAXAssetID: env.config.TxFee,
+					customAssetID:       1,
+				},
+			),
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
+			timestamp:    env.config.BanffTime,
+			shouldErr:    false,
+			shouldVerify: true,
 		},
 	}
 
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			env.msm.SharedMemory = tt.sharedMemory
 			tx, err := env.txBuilder.NewImportTx(
@@ -130,14 +164,14 @@ func TestNewImportTx(t *testing.T) {
 				ids.ShortEmpty,
 			)
 			if tt.shouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 
 			unsignedTx := tx.Unsigned.(*txs.ImportTx)
-			assert.NotEmpty(unsignedTx.ImportedInputs)
-			assert.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
+			require.NotEmpty(unsignedTx.ImportedInputs)
+			require.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
 
 			totalIn := uint64(0)
 			for _, in := range unsignedTx.Ins {
@@ -151,26 +185,27 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			assert.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
+			require.Equal(env.config.TxFee, totalIn-totalOut)
 
-			fakedState, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-			assert.NoError(err)
+			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(err)
 
 			fakedState.SetTimestamp(tt.timestamp)
 
 			fakedParent := ids.GenerateTestID()
-			env.backend.StateVersions.SetState(fakedParent, fakedState)
+			env.SetState(fakedParent, fakedState)
 
 			verifier := MempoolTxVerifier{
-				Backend:  &env.backend,
-				ParentID: fakedParent,
-				Tx:       tx,
+				Backend:       &env.backend,
+				ParentID:      fakedParent,
+				StateVersions: env,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
-				assert.NoError(err)
+				require.NoError(err)
 			} else {
-				assert.Error(err)
+				require.Error(err)
 			}
 		})
 	}

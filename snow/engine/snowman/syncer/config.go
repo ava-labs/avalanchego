@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -49,7 +49,8 @@ func NewConfig(
 	if len(stateSyncerIDs) != 0 {
 		stateSyncBeacons = validators.NewSet()
 		for _, peerID := range stateSyncerIDs {
-			if err := stateSyncBeacons.AddWeight(peerID, 1); err != nil {
+			// Invariant: We never use the TxID or BLS keys populated here.
+			if err := stateSyncBeacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 				return Config{}, err
 			}
 		}

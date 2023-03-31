@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -9,13 +9,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ UnsignedTx             = &ImportTx{}
-	_ secp256k1fx.UnsignedTx = &ImportTx{}
+	_ UnsignedTx = (*ImportTx)(nil)
 
 	errNoImportInputs = errors.New("tx has no imported inputs")
 )
@@ -42,15 +43,15 @@ func (tx *ImportTx) InitCtx(ctx *snow.Context) {
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
-func (tx *ImportTx) InputUTXOs() ids.Set {
-	set := ids.NewSet(len(tx.ImportedInputs))
+func (tx *ImportTx) InputUTXOs() set.Set[ids.ID] {
+	set := set.NewSet[ids.ID](len(tx.ImportedInputs))
 	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
 	return set
 }
 
-func (tx *ImportTx) InputIDs() ids.Set {
+func (tx *ImportTx) InputIDs() set.Set[ids.ID] {
 	inputs := tx.BaseTx.InputIDs()
 	atomicInputs := tx.InputUTXOs()
 	inputs.Union(atomicInputs)
@@ -77,7 +78,7 @@ func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 			return fmt.Errorf("input failed verification: %w", err)
 		}
 	}
-	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
+	if !utils.IsSortedAndUniqueSortable(tx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 

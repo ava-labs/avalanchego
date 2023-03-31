@@ -1,191 +1,142 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
 
 import (
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"errors"
+	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// Field that may be packed into a message
-type Field uint32
+var (
+	errMissingField = errors.New("message missing field")
 
-// Fields that may be packed. These values are not sent over the wire.
-const (
-	VersionStr          Field = iota // Used in handshake
-	NetworkID                        // Used in handshake
-	NodeID                           // TODO: remove NodeID. Used in handshake
-	MyTime                           // Used in handshake
-	IP                               // Used in handshake
-	ChainID                          // Used for dispatching
-	RequestID                        // Used for all messages
-	Deadline                         // Used for request messages
-	ContainerID                      // Used for querying
-	ContainerBytes                   // Used for gossiping
-	ContainerIDs                     // Used for querying
-	MultiContainerBytes              // Used in Ancestors
-	SigBytes                         // Used in handshake / peer gossiping
-	VersionTime                      // Used in handshake / peer gossiping
-	Peers                            // Used in peer gossiping
-	TrackedSubnets                   // Used in handshake / peer gossiping
-	AppBytes                         // Used at application level
-	VMMessage                        // Used internally
-	Uptime                           // Used for Pong
-	SummaryBytes                     // Used for state sync
-	SummaryHeights                   // Used for state sync
-	SummaryIDs                       // Used for state sync
-	VersionStruct                    // Used internally
+	_ chainIDGetter = (*p2p.GetStateSummaryFrontier)(nil)
+	_ chainIDGetter = (*p2p.StateSummaryFrontier)(nil)
+	_ chainIDGetter = (*p2p.GetAcceptedStateSummary)(nil)
+	_ chainIDGetter = (*p2p.AcceptedStateSummary)(nil)
+	_ chainIDGetter = (*p2p.GetAcceptedFrontier)(nil)
+	_ chainIDGetter = (*p2p.AcceptedFrontier)(nil)
+	_ chainIDGetter = (*p2p.GetAccepted)(nil)
+	_ chainIDGetter = (*p2p.Accepted)(nil)
+	_ chainIDGetter = (*p2p.GetAncestors)(nil)
+	_ chainIDGetter = (*p2p.Ancestors)(nil)
+	_ chainIDGetter = (*p2p.Get)(nil)
+	_ chainIDGetter = (*p2p.Put)(nil)
+	_ chainIDGetter = (*p2p.PushQuery)(nil)
+	_ chainIDGetter = (*p2p.PullQuery)(nil)
+	_ chainIDGetter = (*p2p.Chits)(nil)
+	_ chainIDGetter = (*p2p.AppRequest)(nil)
+	_ chainIDGetter = (*p2p.AppResponse)(nil)
+	_ chainIDGetter = (*p2p.AppGossip)(nil)
+
+	_ requestIDGetter = (*p2p.GetStateSummaryFrontier)(nil)
+	_ requestIDGetter = (*p2p.StateSummaryFrontier)(nil)
+	_ requestIDGetter = (*p2p.GetAcceptedStateSummary)(nil)
+	_ requestIDGetter = (*p2p.AcceptedStateSummary)(nil)
+	_ requestIDGetter = (*p2p.GetAcceptedFrontier)(nil)
+	_ requestIDGetter = (*p2p.AcceptedFrontier)(nil)
+	_ requestIDGetter = (*p2p.GetAccepted)(nil)
+	_ requestIDGetter = (*p2p.Accepted)(nil)
+	_ requestIDGetter = (*p2p.GetAncestors)(nil)
+	_ requestIDGetter = (*p2p.Ancestors)(nil)
+	_ requestIDGetter = (*p2p.Get)(nil)
+	_ requestIDGetter = (*p2p.Put)(nil)
+	_ requestIDGetter = (*p2p.PushQuery)(nil)
+	_ requestIDGetter = (*p2p.PullQuery)(nil)
+	_ requestIDGetter = (*p2p.Chits)(nil)
+	_ requestIDGetter = (*p2p.AppRequest)(nil)
+	_ requestIDGetter = (*p2p.AppResponse)(nil)
+
+	_ engineTypeGetter = (*p2p.GetAcceptedFrontier)(nil)
+	_ engineTypeGetter = (*p2p.GetAccepted)(nil)
+	_ engineTypeGetter = (*p2p.GetAncestors)(nil)
+	_ engineTypeGetter = (*p2p.Get)(nil)
+	_ engineTypeGetter = (*p2p.Put)(nil)
+	_ engineTypeGetter = (*p2p.PushQuery)(nil)
+	_ engineTypeGetter = (*p2p.PullQuery)(nil)
+
+	_ deadlineGetter = (*p2p.GetStateSummaryFrontier)(nil)
+	_ deadlineGetter = (*p2p.GetAcceptedStateSummary)(nil)
+	_ deadlineGetter = (*p2p.GetAcceptedFrontier)(nil)
+	_ deadlineGetter = (*p2p.GetAccepted)(nil)
+	_ deadlineGetter = (*p2p.GetAncestors)(nil)
+	_ deadlineGetter = (*p2p.Get)(nil)
+	_ deadlineGetter = (*p2p.PushQuery)(nil)
+	_ deadlineGetter = (*p2p.PullQuery)(nil)
+	_ deadlineGetter = (*p2p.AppRequest)(nil)
 )
 
-// Packer returns the packer function that can be used to pack this field.
-func (f Field) Packer() func(*wrappers.Packer, interface{}) {
-	switch f {
-	case VersionStr:
-		return wrappers.TryPackStr
-	case NetworkID:
-		return wrappers.TryPackInt
-	case NodeID:
-		return wrappers.TryPackInt
-	case MyTime:
-		return wrappers.TryPackLong
-	case IP:
-		return wrappers.TryPackIP
-	case ChainID: // TODO: This will be shortened to use a modified varint spec
-		return wrappers.TryPackHash
-	case RequestID:
-		return wrappers.TryPackInt
-	case Deadline:
-		return wrappers.TryPackLong
-	case ContainerID:
-		return wrappers.TryPackHash
-	case ContainerBytes:
-		return wrappers.TryPackBytes
-	case ContainerIDs:
-		return wrappers.TryPackHashes
-	case MultiContainerBytes:
-		return wrappers.TryPack2DBytes
-	case AppBytes:
-		return wrappers.TryPackBytes
-	case SigBytes:
-		return wrappers.TryPackBytes
-	case VersionTime:
-		return wrappers.TryPackLong
-	case Peers:
-		return wrappers.TryPackClaimedIPPortList
-	case TrackedSubnets:
-		return wrappers.TryPackHashes
-	case Uptime:
-		return wrappers.TryPackByte
-	case SummaryBytes:
-		return wrappers.TryPackBytes
-	case SummaryHeights:
-		return wrappers.TryPackUint64Slice
-	case SummaryIDs:
-		return wrappers.TryPackHashes
-	default:
-		return nil
-	}
+type chainIDGetter interface {
+	GetChainId() []byte
 }
 
-// Unpacker returns the unpacker function that can be used to unpack this field.
-func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
-	switch f {
-	case VersionStr:
-		return wrappers.TryUnpackStr
-	case NetworkID:
-		return wrappers.TryUnpackInt
-	case NodeID:
-		return wrappers.TryUnpackInt
-	case MyTime:
-		return wrappers.TryUnpackLong
-	case IP:
-		return wrappers.TryUnpackIP
-	case ChainID: // TODO: This will be shortened to use a modified varint spec
-		return wrappers.TryUnpackHash
-	case RequestID:
-		return wrappers.TryUnpackInt
-	case Deadline:
-		return wrappers.TryUnpackLong
-	case ContainerID:
-		return wrappers.TryUnpackHash
-	case ContainerBytes:
-		return wrappers.TryUnpackBytes
-	case ContainerIDs:
-		return wrappers.TryUnpackHashes
-	case MultiContainerBytes:
-		return wrappers.TryUnpack2DBytes
-	case AppBytes:
-		return wrappers.TryUnpackBytes
-	case SigBytes:
-		return wrappers.TryUnpackBytes
-	case VersionTime:
-		return wrappers.TryUnpackLong
-	case Peers:
-		return wrappers.TryUnpackClaimedIPPortList
-	case TrackedSubnets:
-		return wrappers.TryUnpackHashes
-	case Uptime:
-		return wrappers.TryUnpackByte
-	case SummaryBytes:
-		return wrappers.TryUnpackBytes
-	case SummaryHeights:
-		return wrappers.TryUnpackUint64Slice
-	case SummaryIDs:
-		return wrappers.TryUnpackHashes
-	default:
-		return nil
+func GetChainID(m any) (ids.ID, error) {
+	msg, ok := m.(chainIDGetter)
+	if !ok {
+		return ids.Empty, errMissingField
 	}
+	chainIDBytes := msg.GetChainId()
+	return ids.ToID(chainIDBytes)
 }
 
-func (f Field) String() string {
-	switch f {
-	case VersionStr:
-		return "VersionStr"
-	case NetworkID:
-		return "NetworkID"
-	case NodeID:
-		return "NodeID"
-	case MyTime:
-		return "MyTime"
-	case IP:
-		return "IP"
-	case ChainID:
-		return "ChainID"
-	case RequestID:
-		return "RequestID"
-	case Deadline:
-		return "Deadline"
-	case ContainerID:
-		return "ContainerID"
-	case ContainerBytes:
-		return "Container Bytes"
-	case ContainerIDs:
-		return "Container IDs"
-	case MultiContainerBytes:
-		return "MultiContainerBytes"
-	case AppBytes:
-		return "AppBytes"
-	case SigBytes:
-		return "SigBytes"
-	case VersionTime:
-		return "VersionTime"
-	case Peers:
-		return "Peers"
-	case TrackedSubnets:
-		return "TrackedSubnets"
-	case VMMessage:
-		return "VMMessage"
-	case Uptime:
-		return "Uptime"
-	case SummaryBytes:
-		return "Summary"
-	case SummaryHeights:
-		return "SummaryHeights"
-	case SummaryIDs:
-		return "SummaryIDs"
-	case VersionStruct:
-		return "VersionStruct"
-	default:
-		return "Unknown Field"
+type sourceChainIDGetter interface {
+	GetSourceChainID() ids.ID
+}
+
+func GetSourceChainID(m any) (ids.ID, error) {
+	msg, ok := m.(sourceChainIDGetter)
+	if !ok {
+		return GetChainID(m)
 	}
+	return msg.GetSourceChainID(), nil
+}
+
+type requestIDGetter interface {
+	GetRequestId() uint32
+}
+
+func GetRequestID(m any) (uint32, bool) {
+	if msg, ok := m.(requestIDGetter); ok {
+		requestID := msg.GetRequestId()
+		return requestID, true
+	}
+
+	// AppGossip is the only message currently not containing a requestID
+	// Here we assign the requestID already in use for gossiped containers
+	// to allow a uniform handling of all messages
+	if _, ok := m.(*p2p.AppGossip); ok {
+		return constants.GossipMsgRequestID, true
+	}
+
+	return 0, false
+}
+
+type engineTypeGetter interface {
+	GetEngineType() p2p.EngineType
+}
+
+func GetEngineType(m any) (p2p.EngineType, bool) {
+	msg, ok := m.(engineTypeGetter)
+	if !ok {
+		return p2p.EngineType_ENGINE_TYPE_UNSPECIFIED, false
+	}
+	return msg.GetEngineType(), true
+}
+
+type deadlineGetter interface {
+	GetDeadline() uint64
+}
+
+func GetDeadline(m any) (time.Duration, bool) {
+	msg, ok := m.(deadlineGetter)
+	if !ok {
+		return 0, false
+	}
+	deadline := msg.GetDeadline()
+	return time.Duration(deadline), true
 }

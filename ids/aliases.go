@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -48,8 +48,8 @@ func (a *aliaser) Lookup(alias string) (ID, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	if ID, ok := a.dealias[alias]; ok {
-		return ID, nil
+	if id, ok := a.dealias[alias]; ok {
+		return id, nil
 	}
 	return ID{}, fmt.Errorf("there is no ID with alias %s", alias)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -15,8 +15,8 @@ import (
 var (
 	errNoCert = errors.New("tls handshake finished with no peer certificate")
 
-	_ Upgrader = &tlsServerUpgrader{}
-	_ Upgrader = &tlsClientUpgrader{}
+	_ Upgrader = (*tlsServerUpgrader)(nil)
+	_ Upgrader = (*tlsClientUpgrader)(nil)
 )
 
 type Upgrader interface {

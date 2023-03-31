@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -16,10 +16,12 @@ import (
 )
 
 var (
-	errNilInitialState  = errors.New("nil initial state is not valid")
-	errNilFxOutput      = errors.New("nil feature extension output is not valid")
-	errOutputsNotSorted = errors.New("outputs not sorted")
-	errUnknownFx        = errors.New("unknown feature extension")
+	ErrNilInitialState  = errors.New("nil initial state is not valid")
+	ErrNilFxOutput      = errors.New("nil feature extension output is not valid")
+	ErrOutputsNotSorted = errors.New("outputs not sorted")
+	ErrUnknownFx        = errors.New("unknown feature extension")
+
+	_ utils.Sortable[*InitialState] = (*InitialState)(nil)
 )
 
 type InitialState struct {
@@ -37,27 +39,33 @@ func (is *InitialState) InitCtx(ctx *snow.Context) {
 func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	switch {
 	case is == nil:
-		return errNilInitialState
+		return ErrNilInitialState
 	case is.FxIndex >= uint32(numFxs):
-		return errUnknownFx
+		return ErrUnknownFx
 	}
 
 	for _, out := range is.Outs {
 		if out == nil {
-			return errNilFxOutput
+			return ErrNilFxOutput
 		}
 		if err := out.Verify(); err != nil {
 			return err
 		}
 	}
 	if !isSortedState(is.Outs, c) {
-		return errOutputsNotSorted
+		return ErrOutputsNotSorted
 	}
 
 	return nil
 }
 
-func (is *InitialState) Sort(c codec.Manager) { sortState(is.Outs, c) }
+func (is *InitialState) Less(other *InitialState) bool {
+	return is.FxIndex < other.FxIndex
+}
+
+func (is *InitialState) Sort(c codec.Manager) {
+	sortState(is.Outs, c)
+}
 
 type innerSortState struct {
 	vers  []verify.State
@@ -78,8 +86,15 @@ func (vers *innerSortState) Less(i, j int) bool {
 	}
 	return bytes.Compare(iBytes, jBytes) == -1
 }
-func (vers *innerSortState) Len() int      { return len(vers.vers) }
-func (vers *innerSortState) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], v[j] }
+
+func (vers *innerSortState) Len() int {
+	return len(vers.vers)
+}
+
+func (vers *innerSortState) Swap(i, j int) {
+	v := vers.vers
+	v[j], v[i] = v[i], v[j]
+}
 
 func sortState(vers []verify.State, c codec.Manager) {
 	sort.Sort(&innerSortState{vers: vers, codec: c})
@@ -87,15 +102,4 @@ func sortState(vers []verify.State, c codec.Manager) {
 
 func isSortedState(vers []verify.State, c codec.Manager) bool {
 	return sort.IsSorted(&innerSortState{vers: vers, codec: c})
-}
-
-type innerSortInitialState []*InitialState
-
-func (iss innerSortInitialState) Less(i, j int) bool { return iss[i].FxIndex < iss[j].FxIndex }
-func (iss innerSortInitialState) Len() int           { return len(iss) }
-func (iss innerSortInitialState) Swap(i, j int)      { iss[j], iss[i] = iss[i], iss[j] }
-
-func SortInitialStates(iss []*InitialState) { sort.Sort(innerSortInitialState(iss)) }
-func IsSortedAndUniqueInitialStates(iss []*InitialState) bool {
-	return utils.IsSortedAndUnique(innerSortInitialState(iss))
 }

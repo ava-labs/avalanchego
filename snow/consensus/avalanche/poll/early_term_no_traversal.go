@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -7,11 +7,14 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
+
+	sets "github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	_ Factory = &earlyTermNoTraversalFactory{}
-	_ Poll    = &earlyTermNoTraversalPoll{}
+	_ Factory = (*earlyTermNoTraversalFactory)(nil)
+	_ Poll    = (*earlyTermNoTraversalPoll)(nil)
 )
 
 type earlyTermNoTraversalFactory struct {
@@ -24,7 +27,7 @@ func NewEarlyTermNoTraversalFactory(alpha int) Factory {
 	return &earlyTermNoTraversalFactory{alpha: alpha}
 }
 
-func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
+func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 	return &earlyTermNoTraversalPoll{
 		polled: vdrs,
 		alpha:  f.alpha,
@@ -35,8 +38,8 @@ func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
 // the result of the poll. However, does not terminate tightly with this bound.
 // It terminates as quickly as it can without performing any DAG traversals.
 type earlyTermNoTraversalPoll struct {
-	votes  ids.UniqueBag
-	polled ids.NodeIDBag
+	votes  bag.UniqueBag[ids.ID]
+	polled bag.Bag[ids.NodeID]
 	alpha  int
 }
 
@@ -70,7 +73,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	// votes will be applied to a single shared ancestor. In this case, the poll
 	// can terminate early, iff there are not enough pending votes for this
 	// ancestor to receive alpha votes.
-	partialVotes := ids.BitSet(0)
+	partialVotes := sets.Bits64(0)
 	for _, vote := range p.votes.List() {
 		if voters := p.votes.GetSet(vote); voters.Len() < p.alpha {
 			partialVotes.Union(voters)
@@ -80,7 +83,9 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 }
 
 // Result returns the result of this poll
-func (p *earlyTermNoTraversalPoll) Result() ids.UniqueBag { return p.votes }
+func (p *earlyTermNoTraversalPoll) Result() bag.UniqueBag[ids.ID] {
+	return p.votes
+}
 
 func (p *earlyTermNoTraversalPoll) PrefixedString(prefix string) string {
 	return fmt.Sprintf(
@@ -91,4 +96,6 @@ func (p *earlyTermNoTraversalPoll) PrefixedString(prefix string) string {
 	)
 }
 
-func (p *earlyTermNoTraversalPoll) String() string { return p.PrefixedString("") }
+func (p *earlyTermNoTraversalPoll) String() string {
+	return p.PrefixedString("")
+}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -22,11 +22,11 @@ import (
 
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	env := newEnvironment()
+	require := require.New(t)
+	env := newEnvironment( /*postBanff*/ true)
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -35,20 +35,16 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
@@ -56,18 +52,16 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	if err == nil {
-		t.Fatal("should have erred because a sig is missing")
-	}
+	require.Error(err, "should have erred because a sig is missing")
 }
 
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	env := newEnvironment()
+	require := require.New(t)
+	env := newEnvironment( /*postBanff*/ true)
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -76,31 +70,23 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	// Generate new, random key to sign tx with
-	factory := crypto.FactorySECP256K1R{}
+	factory := secp256k1.Factory{}
 	key, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	// Replace a valid signature with one from another key
 	sig, err := key.SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
@@ -108,19 +94,17 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	if err == nil {
-		t.Fatal("should have failed verification because a sig is invalid")
-	}
+	require.Error(err, "should have failed verification because a sig is invalid")
 }
 
 // Ensure Execute fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	env := newEnvironment()
+	require := require.New(t)
+	env := newEnvironment( /*postBanff*/ true)
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -129,19 +113,15 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
@@ -149,18 +129,16 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	if err == nil {
-		t.Fatal("should have failed because subnet doesn't exist")
-	}
+	require.Error(err, "should have failed because subnet doesn't exist")
 }
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	env := newEnvironment()
+	require := require.New(t)
+	env := newEnvironment( /*postBanff*/ true)
+	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	tx, err := env.txBuilder.NewCreateChainTx(
@@ -169,17 +147,13 @@ func TestCreateChainTxValid(t *testing.T) {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
@@ -187,9 +161,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	if err != nil {
-		t.Fatalf("expected tx to pass verification but got error: %v", err)
-	}
+	require.NoError(err)
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
@@ -221,21 +193,19 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
-			env := newEnvironment()
+			env := newEnvironment( /*postBanff*/ true)
 			env.config.ApricotPhase3Time = ap3Time
 
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
-			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
-			assert.NoError(err)
+			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
+			require.NoError(err)
 
 			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
-			assert.NoError(err)
+			require.NoError(err)
 
 			signers = append(signers, subnetSigners)
 
@@ -254,10 +224,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			}
 			tx := &txs.Tx{Unsigned: utx}
 			err = tx.Sign(txs.Codec, signers)
-			assert.NoError(err)
+			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-			assert.NoError(err)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
 
@@ -267,7 +237,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			assert.Equal(test.expectsError, err != nil)
+			require.Equal(test.expectsError, err != nil)
 		})
 	}
 }

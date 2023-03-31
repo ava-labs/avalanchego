@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -19,10 +19,15 @@ var (
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
 		TxFeeConfig: TxFeeConfig{
-			TxFee:                 units.MilliAvax,
-			CreateAssetTxFee:      10 * units.MilliAvax,
-			CreateSubnetTxFee:     100 * units.MilliAvax,
-			CreateBlockchainTxFee: 100 * units.MilliAvax,
+			TxFee:                         units.MilliAvax,
+			CreateAssetTxFee:              10 * units.MilliAvax,
+			CreateSubnetTxFee:             100 * units.MilliAvax,
+			TransformSubnetTxFee:          1 * units.Avax,
+			CreateBlockchainTxFee:         100 * units.MilliAvax,
+			AddPrimaryNetworkValidatorFee: 0,
+			AddPrimaryNetworkDelegatorFee: 0,
+			AddSubnetValidatorFee:         units.MilliAvax,
+			AddSubnetDelegatorFee:         units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%

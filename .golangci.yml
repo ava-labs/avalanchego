@@ -4,6 +4,7 @@ run:
   # skip auto-generated files.
   skip-files:
     - ".*\\.pb\\.go$"
+    - ".*mock.*"
 
 issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
@@ -16,7 +17,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - depguard
     - errcheck
     - exportloopref
@@ -25,35 +25,79 @@ linters:
     - gofmt
     - gofumpt
     - goimports
-    - revive
+    - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
     - misspell
     - nakedret
+    - noctx
     - nolintlint
     - prealloc
+    - revive
+    - staticcheck
     - stylecheck
+    - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
-    - unconvert
     - whitespace
-    - staticcheck
-    # - structcheck
-    # - lll
-    # - gomnd
-    # - goprintffuncname
-    # - interfacer
-    # - typecheck
+    # - errorlint (TODO: re-enable in go1.20 migration)
     # - goerr113
-    # - noctx
+    # - gomnd
+    # - lll
 
 linters-settings:
+  errorlint:
+    # Check for plain type assertions and type switches.
+    asserts: false
+    # Check for plain error comparisons.
+    comparison: false
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+      - name: bool-literal-in-expr
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+      - name: early-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
+      - name: string-format
+        disabled: false
+        arguments:
+        - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+      - name: struct-tag
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
+      - name: unexported-naming
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
+      - name: unhandled-error
+        disabled: false
+        arguments:
+          - "fmt\\.Fprint"
+          - "fmt\\.Fprintf"
+          - "fmt\\.Print"
+          - "fmt\\.Printf"
+          - "fmt\\.Println"
+          - "math/rand\\.Read"
+          - "strings\\.Builder\\.WriteString"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
+      - name: unused-parameter
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
+      - name: unused-receiver
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+      - name: useless-break
+        disabled: false
   staticcheck:
-    go: "1.17"
+    go: "1.19"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"
@@ -67,4 +111,5 @@ linters-settings:
     list-type: blacklist
     packages-with-error-message:
       - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
+      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
     include-go-root: true

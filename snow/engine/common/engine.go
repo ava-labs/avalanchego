@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -20,7 +21,7 @@ type Engine interface {
 	Context() *snow.ConsensusContext
 
 	// Start engine operations from given request ID
-	Start(startReqID uint32) error
+	Start(ctx context.Context, startReqID uint32) error
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
@@ -66,7 +67,7 @@ type GetStateSummaryFrontierHandler interface {
 	//
 	// This engine should respond with an StateSummaryFrontier message with the
 	// same requestID, and the engine's current state summary frontier.
-	GetStateSummaryFrontier(validatorID ids.NodeID, requestID uint32) error
+	GetStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // StateSummaryFrontierHandler defines how a consensus engine reacts to a state
@@ -79,7 +80,7 @@ type StateSummaryFrontierHandler interface {
 	// this message is in response to a GetStateSummaryFrontier message, is
 	// utilizing a unique requestID, or that the summary bytes are from a valid
 	// state summary.
-	StateSummaryFrontier(validatorID ids.NodeID, requestID uint32, summary []byte) error
+	StateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) error
 
 	// Notify this engine that a get state summary frontier request it issued
 	// has failed.
@@ -91,7 +92,7 @@ type StateSummaryFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetStateSummaryFrontier message.
-	GetStateSummaryFrontierFailed(validatorID ids.NodeID, requestID uint32) error
+	GetStateSummaryFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedStateSummaryHandler defines how a consensus engine reacts to a get
@@ -108,7 +109,7 @@ type GetAcceptedStateSummaryHandler interface {
 	// This engine should respond with an AcceptedStateSummary message with the
 	// same requestID, and the subset of the state summaries that this node has
 	// locally available.
-	GetAcceptedStateSummary(validatorID ids.NodeID, requestID uint32, keys []uint64) error
+	GetAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, keys []uint64) error
 }
 
 // AcceptedStateSummaryHandler defines how a consensus engine reacts to an
@@ -121,7 +122,7 @@ type AcceptedStateSummaryHandler interface {
 	// this message is in response to a GetAcceptedStateSummary message,
 	// is utilizing a unique requestID, or that the summaryIDs are a subset of the
 	// state summaries requested by key from a GetAcceptedStateSummary message.
-	AcceptedStateSummary(validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
+	AcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
 
 	// Notify this engine that a get accepted state summary request it issued has
 	// failed.
@@ -133,7 +134,7 @@ type AcceptedStateSummaryHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedStateSummary message.
-	GetAcceptedStateSummaryFailed(validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedStateSummaryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedFrontierHandler defines how a consensus engine reacts to a get
@@ -150,7 +151,7 @@ type GetAcceptedFrontierHandler interface {
 	//
 	// This engine should respond with an AcceptedFrontier message with the same
 	// requestID, and the engine's current accepted frontier.
-	GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // AcceptedFrontierHandler defines how a consensus engine reacts to accepted
@@ -163,6 +164,7 @@ type AcceptedFrontierHandler interface {
 	// utilizing a unique requestID, or that the containerIDs from a valid
 	// frontier.
 	AcceptedFrontier(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
@@ -178,7 +180,7 @@ type AcceptedFrontierHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAcceptedFrontier message.
-	GetAcceptedFrontierFailed(validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFrontierFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAcceptedHandler defines how a consensus engine reacts to a get accepted
@@ -194,6 +196,7 @@ type GetAcceptedHandler interface {
 	// requestID, and the subset of the containerIDs that this node has decided
 	// are accepted.
 	GetAccepted(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
@@ -211,6 +214,7 @@ type AcceptedHandler interface {
 	// unique requestID, or that the containerIDs are a subset of the
 	// containerIDs from a GetAccepted message.
 	Accepted(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containerIDs []ids.ID,
@@ -225,7 +229,7 @@ type AcceptedHandler interface {
 	//
 	// The validatorID, and requestID, are assumed to be the same as those sent
 	// in the GetAccepted message.
-	GetAcceptedFailed(validatorID ids.NodeID, requestID uint32) error
+	GetAcceptedFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetAncestorsHandler defines how a consensus engine reacts to a get ancestors
@@ -247,7 +251,7 @@ type GetAncestorsHandler interface {
 	// If this engine doesn't have some ancestors, it should reply with its best
 	// effort attempt at getting them. If this engine doesn't have [containerID]
 	// it can ignore this message.
-	GetAncestors(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetAncestors(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
 }
 
 // AncestorsHandler defines how a consensus engine reacts to bootstrapping
@@ -269,6 +273,7 @@ type AncestorsHandler interface {
 	// message, that this message has a unique requestID or that any of the
 	// containers in [containers] are valid.
 	Ancestors(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containers [][]byte,
@@ -283,7 +288,7 @@ type AncestorsHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the GetAncestors message.
-	GetAncestorsFailed(validatorID ids.NodeID, requestID uint32) error
+	GetAncestorsFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // GetHandler defines how a consensus engine reacts to get message from another
@@ -302,7 +307,7 @@ type GetHandler interface {
 	// This engine should respond with a Put message with the same requestID if
 	// the container was locally available. Otherwise, the message can be safely
 	// dropped.
-	Get(validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
+	Get(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) error
 }
 
 // PutHandler defines how a consensus engine reacts to put messages from other
@@ -313,6 +318,7 @@ type PutHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is utilizing a unique requestID.
 	Put(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		container []byte,
@@ -326,7 +332,7 @@ type PutHandler interface {
 	//
 	// The validatorID and requestID are assumed to be the same as those sent in
 	// the Get message.
-	GetFailed(validatorID ids.NodeID, requestID uint32) error
+	GetFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
 // QueryHandler defines how a consensus engine reacts to query messages from
@@ -344,6 +350,7 @@ type QueryHandler interface {
 	// preferences in a Chits message. The Chits message should have the same
 	// requestID that was passed in here.
 	PullQuery(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
@@ -364,6 +371,7 @@ type QueryHandler interface {
 	// in a Chits message. The Chits message should have the same requestID that
 	// was passed in here.
 	PushQuery(
+		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
 		container []byte,
@@ -378,18 +386,13 @@ type ChitsHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a PullQuery or a PushQuery message.
 	// However, the validatorID is assumed to be authenticated.
-	Chits(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
-
-	// Notify this engine of the specified validators preferences.
-	//
-	// This function can be called by any validator. It is not safe to assume
-	// this message is in response to a PullQuery or a PushQuery message.
-	// However, the validatorID is assumed to be authenticated.
-	//
-	// The new ChitsV2 could be sent from a node that implements "ChitsV2"
-	// sender with linearized DAG, while the older nodes may not have
-	// implemented such, thus fallback.
-	ChitsV2(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error
+	Chits(
+		ctx context.Context,
+		validatorID ids.NodeID,
+		requestID uint32,
+		preferredContainerIDs []ids.ID,
+		acceptedContainerIDs []ids.ID,
+	) error
 
 	// Notify this engine that a query it issued has failed.
 	//
@@ -400,12 +403,14 @@ type ChitsHandler interface {
 	//
 	// The validatorID and the requestID are assumed to be the same as those
 	// sent in the Query message.
-	QueryFailed(validatorID ids.NodeID, requestID uint32) error
+	QueryFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error
 }
 
-// AppHandler defines how a consensus engine reacts to app specific messages.
+// NetworkAppHandler defines how a consensus engine reacts to app specific
+// messages from the network.
+//
 // Functions only return fatal errors.
-type AppHandler interface {
+type NetworkAppHandler interface {
 	// Notify this engine of a request for data from [nodeID].
 	//
 	// The meaning of [request], and what should be sent in response to it, is
@@ -417,7 +422,7 @@ type AppHandler interface {
 	// This node should typically send an AppResponse to [nodeID] in response to
 	// a valid message using the same request ID before the deadline. However,
 	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
+	AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
@@ -429,7 +434,7 @@ type AppHandler interface {
 	// * This engine sent a request to [nodeID] with ID [requestID].
 	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(nodeID ids.NodeID, requestID uint32) error
+	AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -448,7 +453,7 @@ type AppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another AppRequest, or it may give
 	// up trying to get the requested information.
-	AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
+	AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error
 
 	// Notify this engine of a gossip message from [nodeID].
 	//
@@ -460,7 +465,73 @@ type AppHandler interface {
 	//
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(nodeID ids.NodeID, msg []byte) error
+	AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+}
+
+// CrossChainAppHandler defines how a consensus engine reacts to cross-chain app
+// specific messages.
+//
+// Functions only return fatal errors.
+type CrossChainAppHandler interface {
+	// CrossChainAppRequest Notify this engine of a request for data from
+	// [chainID].
+	//
+	// The meaning of [request], and what should be sent in response to it, is
+	// application (VM) specific.
+	//
+	// Guarantees surrounding the request are specific to the implementation of
+	// the requesting VM. For example, the request may or may not be guaranteed
+	// to be well-formed/valid depending on the implementation of the requesting
+	// VM.
+	//
+	// This node should typically send a CrossChainAppResponse to [chainID] in
+	// response to a valid message using the same request ID before the
+	// deadline. However, the VM may arbitrarily choose to not send a response
+	// to this request.
+	CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
+	// CrossChainAppRequestFailed notifies this engine that a
+	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// [requestID] failed.
+	//
+	// This may be because the request timed out or because the message couldn't
+	// be sent to [chainID].
+	//
+	// It is guaranteed that:
+	// * This engine sent a request to [chainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// called.
+	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// called.
+	CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error
+	// CrossChainAppResponse notifies this engine of a response to the
+	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// [requestID].
+	//
+	// The meaning of [response] is application (VM) specific.
+	//
+	// It is guaranteed that:
+	// * This engine sent a request to [chainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// called.
+	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// called.
+	//
+	// Guarantees surrounding the response are specific to the implementation of
+	// the responding VM. For example, the response may or may not be guaranteed
+	// to be well-formed/valid depending on the implementation of the requesting
+	// VM.
+	//
+	// If [response] is invalid or not the expected response, the VM chooses how
+	// to react. For example, the VM may send another CrossChainAppRequest, or
+	// it may give up trying to get the requested information.
+	CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error
+}
+
+// AppHandler defines how a consensus engine reacts to app specific messages.
+// Functions only return fatal errors.
+type AppHandler interface {
+	NetworkAppHandler
+	CrossChainAppHandler
 }
 
 // InternalHandler defines how this consensus engine reacts to messages from
@@ -471,23 +542,24 @@ type InternalHandler interface {
 	validators.Connector
 
 	// Notify this engine that a registered timeout has fired.
-	Timeout() error
+	Timeout(context.Context) error
 
 	// Gossip to the network a container on the accepted frontier
-	Gossip() error
+	Gossip(context.Context) error
 
 	// Halt this engine.
 	//
 	// This function will be called before the environment starts exiting. This
-	// function is slightly special, in that it does not expect the chain's
-	// context lock to be held before calling this function.
-	Halt()
+	// function is special, in that it does not expect the chain's context lock
+	// to be held before calling this function. This function also does not
+	// require the engine to have been started.
+	Halt(context.Context)
 
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.
-	Shutdown() error
+	Shutdown(context.Context) error
 
 	// Notify this engine of a message from the virtual machine.
-	Notify(Message) error
+	Notify(context.Context, Message) error
 }

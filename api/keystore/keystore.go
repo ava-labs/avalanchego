@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -34,7 +34,7 @@ var (
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
 
-	_ Keystore = &keystore{}
+	_ Keystore = (*keystore)(nil)
 )
 
 type Keystore interface {
@@ -242,12 +242,12 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	defer it.Release()
 
 	for it.Next() {
-		if err = dataBatch.Delete(it.Key()); err != nil {
+		if err := dataBatch.Delete(it.Key()); err != nil {
 			return err
 		}
 	}
 
-	if err = it.Error(); err != nil {
+	if err := it.Error(); err != nil {
 		return err
 	}
 

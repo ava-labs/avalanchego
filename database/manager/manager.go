@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package manager
@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -30,7 +29,7 @@ var (
 	errNoDBs                 = errors.New("no dbs given")
 )
 
-var _ Manager = &manager{}
+var _ Manager = (*manager)(nil)
 
 type Manager interface {
 	// Current returns the database with the current database version.
@@ -72,29 +71,6 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
-}
-
-// NewRocksDB creates a database manager of rocksDBs at [filePath] by creating a
-// database instance from each directory with a version <= [currentVersion]. If
-// [includePreviousVersions], opens previous database versions and includes them
-// in the returned Manager.
-func NewRocksDB(
-	dbDirPath string,
-	dbConfig []byte,
-	log logging.Logger,
-	currentVersion *version.Semantic,
-	namespace string,
-	reg prometheus.Registerer,
-) (Manager, error) {
-	return new(
-		rocksdb.New,
-		dbDirPath,
-		dbConfig,
-		log,
-		currentVersion,
-		namespace,
-		reg,
-	)
 }
 
 // NewLevelDB creates a database manager of levelDBs at [filePath] by creating a
@@ -204,7 +180,7 @@ func new(
 
 		return filepath.SkipDir
 	})
-	SortDescending(manager.databases)
+	utils.Sort(manager.databases)
 
 	// If an error occurred walking [dbDirPath] close the
 	// database manager and return the original error here.
@@ -234,8 +210,8 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	if len(dbs) == 0 {
 		return nil, errNoDBs
 	}
-	SortDescending(dbs)
-	sortedAndUnique := utils.IsSortedAndUnique(innerSortDescendingVersionedDBs(dbs))
+	utils.Sort(dbs)
+	sortedAndUnique := utils.IsSortedAndUniqueSortable(dbs)
 	if !sortedAndUnique {
 		return nil, errNonSortedAndUniqueDBs
 	}
@@ -244,7 +220,9 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	}, nil
 }
 
-func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
+func (m *manager) Current() *VersionedDatabase {
+	return m.databases[0]
+}
 
 func (m *manager) Previous() (*VersionedDatabase, bool) {
 	if len(m.databases) < 2 {
@@ -253,7 +231,9 @@ func (m *manager) Previous() (*VersionedDatabase, bool) {
 	return m.databases[1], true
 }
 
-func (m *manager) GetDatabases() []*VersionedDatabase { return m.databases }
+func (m *manager) GetDatabases() []*VersionedDatabase {
+	return m.databases
+}
 
 func (m *manager) Close() error {
 	errs := wrappers.Errs{}

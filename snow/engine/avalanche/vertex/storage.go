@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
@@ -12,9 +14,9 @@ import (
 // engine.
 type Storage interface {
 	// Get a vertex by its hash from storage.
-	GetVtx(vtxID ids.ID) (avalanche.Vertex, error)
+	GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Vertex, error)
 	// Edge returns a list of accepted vertex IDs with no accepted children.
-	Edge() (vtxIDs []ids.ID)
+	Edge(ctx context.Context) (vtxIDs []ids.ID)
 	// Returns "true" if accepted frontier ("Edge") is stop vertex.
-	StopVertexAccepted() (bool, error)
+	StopVertexAccepted(ctx context.Context) (bool, error)
 }

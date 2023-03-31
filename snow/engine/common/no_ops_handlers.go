@@ -1,26 +1,30 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
 import (
+	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
-	_ StateSummaryFrontierHandler = &noOpStateSummaryFrontierHandler{}
-	_ AcceptedStateSummaryHandler = &noOpAcceptedStateSummaryHandler{}
-	_ AcceptedFrontierHandler     = &noOpAcceptedFrontierHandler{}
-	_ AcceptedHandler             = &noOpAcceptedHandler{}
-	_ AncestorsHandler            = &noOpAncestorsHandler{}
-	_ PutHandler                  = &noOpPutHandler{}
-	_ QueryHandler                = &noOpQueryHandler{}
-	_ ChitsHandler                = &noOpChitsHandler{}
-	_ AppHandler                  = &noOpAppHandler{}
+	_ StateSummaryFrontierHandler = (*noOpStateSummaryFrontierHandler)(nil)
+	_ AcceptedStateSummaryHandler = (*noOpAcceptedStateSummaryHandler)(nil)
+	_ AcceptedFrontierHandler     = (*noOpAcceptedFrontierHandler)(nil)
+	_ AcceptedHandler             = (*noOpAcceptedHandler)(nil)
+	_ AncestorsHandler            = (*noOpAncestorsHandler)(nil)
+	_ PutHandler                  = (*noOpPutHandler)(nil)
+	_ QueryHandler                = (*noOpQueryHandler)(nil)
+	_ ChitsHandler                = (*noOpChitsHandler)(nil)
+	_ AppHandler                  = (*noOpAppHandler)(nil)
 )
 
 type noOpStateSummaryFrontierHandler struct {
@@ -31,13 +35,23 @@ func NewNoOpStateSummaryFrontierHandler(log logging.Logger) StateSummaryFrontier
 	return &noOpStateSummaryFrontierHandler{log: log}
 }
 
-func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(validatorID ids.NodeID, requestID uint32, summary []byte) error {
-	nop.log.Debug("StateSummaryFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetStateSummaryFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetStateSummaryFrontierFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -49,13 +63,23 @@ func NewNoOpAcceptedStateSummaryHandler(log logging.Logger) AcceptedStateSummary
 	return &noOpAcceptedStateSummaryHandler{log: log}
 }
 
-func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
-	nop.log.Debug("AcceptedStateSummary(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetAcceptedStateSummaryFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedStateSummaryFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -67,13 +91,23 @@ func NewNoOpAcceptedFrontierHandler(log logging.Logger) AcceptedFrontierHandler 
 	return &noOpAcceptedFrontierHandler{log: log}
 }
 
-func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	nop.log.Debug("AcceptedFrontier(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AcceptedFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetAcceptedFrontierFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedFrontierFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -85,13 +119,23 @@ func NewNoOpAcceptedHandler(log logging.Logger) AcceptedHandler {
 	return &noOpAcceptedHandler{log: log}
 }
 
-func (nop *noOpAcceptedHandler) Accepted(validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	nop.log.Debug("Accepted(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedHandler) Accepted(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AcceptedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAcceptedHandler) GetAcceptedFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetAcceptedFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAcceptedHandler) GetAcceptedFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -103,13 +147,23 @@ func NewNoOpAncestorsHandler(log logging.Logger) AncestorsHandler {
 	return &noOpAncestorsHandler{log: log}
 }
 
-func (nop *noOpAncestorsHandler) Ancestors(validatorID ids.NodeID, requestID uint32, containers [][]byte) error {
-	nop.log.Debug("Ancestors(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAncestorsHandler) Ancestors(_ context.Context, nodeID ids.NodeID, requestID uint32, _ [][]byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AncestorsOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAncestorsHandler) GetAncestorsFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetAncestorsFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpAncestorsHandler) GetAncestorsFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAncestorsFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -121,17 +175,32 @@ func NewNoOpPutHandler(log logging.Logger) PutHandler {
 	return &noOpPutHandler{log: log}
 }
 
-func (nop *noOpPutHandler) Put(vdr ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (nop *noOpPutHandler) Put(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
 	if requestID == constants.GossipMsgRequestID {
-		nop.log.Verbo("Gossip Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+		nop.log.Verbo("dropping request",
+			zap.String("reason", "unhandled by this gear"),
+			zap.Stringer("messageOp", message.PutOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 	} else {
-		nop.log.Debug("Put(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+		nop.log.Debug("dropping request",
+			zap.String("reason", "unhandled by this gear"),
+			zap.Stringer("messageOp", message.PutOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 	}
 	return nil
 }
 
-func (nop *noOpPutHandler) GetFailed(validatorID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("GetFailed(%s, %d) unhandled by this gear. Dropped.", validatorID, requestID)
+func (nop *noOpPutHandler) GetFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -143,13 +212,23 @@ func NewNoOpQueryHandler(log logging.Logger) QueryHandler {
 	return &noOpQueryHandler{log: log}
 }
 
-func (nop *noOpQueryHandler) PullQuery(vdr ids.NodeID, requestID uint32, blkID ids.ID) error {
-	nop.log.Debug("PullQuery(%s, %d, %s) unhandled by this gear. Dropped.", vdr, requestID, blkID)
+func (nop *noOpQueryHandler) PullQuery(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.PullQueryOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpQueryHandler) PushQuery(vdr ids.NodeID, requestID uint32, blkBytes []byte) error {
-	nop.log.Debug("PushQuery(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func (nop *noOpQueryHandler) PushQuery(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.PushQueryOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -161,18 +240,23 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 	return &noOpChitsHandler{log: log}
 }
 
-func (nop *noOpChitsHandler) Chits(vdr ids.NodeID, requestID uint32, _ []ids.ID) error {
-	nop.log.Debug("Chits(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, _, _ []ids.ID) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.ChitsOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpChitsHandler) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, _ ids.ID) error {
-	nop.log.Debug("ChitsV2(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
-	return nil
-}
-
-func (nop *noOpChitsHandler) QueryFailed(vdr ids.NodeID, requestID uint32) error {
-	nop.log.Debug("QueryFailed(%s, %d) unhandled by this gear. Dropped.", vdr, requestID)
+func (nop *noOpChitsHandler) QueryFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.QueryFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -184,22 +268,71 @@ func NewNoOpAppHandler(log logging.Logger) AppHandler {
 	return &noOpAppHandler{log: log}
 }
 
-func (nop *noOpAppHandler) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	nop.log.Debug("AppRequest(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func (nop *noOpAppHandler) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, _ time.Time, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppRequestOp),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
-	nop.log.Debug("AppRequestFailed(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func (nop *noOpAppHandler) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppRequestFailedOp),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
-	nop.log.Debug("AppResponse(%s, %d) unhandled by this gear. Dropped.", nodeID, requestID)
+func (nop *noOpAppHandler) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppResponseOp),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppGossip(nodeID ids.NodeID, msg []byte) error {
-	nop.log.Debug("AppGossip(%s) unhandled by this gear. Dropped.", nodeID)
+func (nop *noOpAppHandler) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, _ time.Time, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AppRequestOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAppHandler) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AppRequestFailedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAppHandler) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AppResponseOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAppHandler) AppGossip(_ context.Context, nodeID ids.NodeID, _ []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.AppGossipOp),
+		zap.Stringer("nodeID", nodeID),
+	)
 	return nil
 }

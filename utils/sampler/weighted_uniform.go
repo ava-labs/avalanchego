@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -13,7 +13,7 @@ import (
 var (
 	errWeightsTooLarge = errors.New("total weight is too large")
 
-	_ Weighted = &weightedUniform{}
+	_ Weighted = (*weightedUniform)(nil)
 )
 
 // Sampling is performed by indexing into the array to find the correct index.

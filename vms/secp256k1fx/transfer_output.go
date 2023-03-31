@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	_ verify.State = &OutputOwners{}
+	_ verify.State = (*OutputOwners)(nil)
 
-	errNoValueOutput = errors.New("output has no value")
+	ErrNoValueOutput = errors.New("output has no value")
 )
 
 type TransferOutput struct {
@@ -24,7 +24,7 @@ type TransferOutput struct {
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct
 // into a JSON readable format
-// If OutputOwners cannot be serialised then this will return error
+// If OutputOwners cannot be serialized then this will return error
 func (out *TransferOutput) MarshalJSON() ([]byte, error) {
 	result, err := out.OutputOwners.Fields()
 	if err != nil {
@@ -36,19 +36,25 @@ func (out *TransferOutput) MarshalJSON() ([]byte, error) {
 }
 
 // Amount returns the quantity of the asset this output consumes
-func (out *TransferOutput) Amount() uint64 { return out.Amt }
+func (out *TransferOutput) Amount() uint64 {
+	return out.Amt
+}
 
 func (out *TransferOutput) Verify() error {
 	switch {
 	case out == nil:
 		return errNilOutput
 	case out.Amt == 0:
-		return errNoValueOutput
+		return ErrNoValueOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
 }
 
-func (out *TransferOutput) VerifyState() error { return out.Verify() }
+func (out *TransferOutput) VerifyState() error {
+	return out.Verify()
+}
 
-func (out *TransferOutput) Owners() interface{} { return &out.OutputOwners }
+func (out *TransferOutput) Owners() interface{} {
+	return &out.OutputOwners
+}

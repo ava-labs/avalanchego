@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package beacon
@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ Set = &set{}
+	_ Set = (*set)(nil)
 
 	errDuplicateID = errors.New("duplicated ID")
 	errDuplicateIP = errors.New("duplicated IP")
@@ -99,7 +99,9 @@ func (s *set) RemoveByIP(ip ips.IPPort) error {
 	return s.RemoveByID(idToRemove)
 }
 
-func (s *set) Len() int { return len(s.beacons) }
+func (s *set) Len() int {
+	return len(s.beacons)
+}
 
 func (s *set) IDsArg() string {
 	sb := strings.Builder{}

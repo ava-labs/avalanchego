@@ -1,20 +1,15 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
 
 import (
-	"errors"
 	"net"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-var (
-	errClosed = errors.New("closed")
-
-	_ net.Listener = &testListener{}
-)
+var _ net.Listener = (*testListener)(nil)
 
 type testListener struct {
 	ip      ips.IPPort

@@ -1,27 +1,28 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
 
 import (
+	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestServiceResponses(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	s := &Service{
 		log:    logging.NoLog{},
@@ -29,46 +30,46 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Readiness(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
-		assert.Len(reply.Checks, 1)
-		assert.Contains(reply.Checks, "check")
-		assert.Equal(notYetRunResult, reply.Checks["check"])
-		assert.False(reply.Healthy)
+		require.Len(reply.Checks, 1)
+		require.Contains(reply.Checks, "check")
+		require.Equal(notYetRunResult, reply.Checks["check"])
+		require.False(reply.Healthy)
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Health(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
-		assert.Len(reply.Checks, 1)
-		assert.Contains(reply.Checks, "check")
-		assert.Equal(notYetRunResult, reply.Checks["check"])
-		assert.False(reply.Healthy)
+		require.Len(reply.Checks, 1)
+		require.Contains(reply.Checks, "check")
+		require.Equal(notYetRunResult, reply.Checks["check"])
+		require.False(reply.Healthy)
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Liveness(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
-		assert.Len(reply.Checks, 1)
-		assert.Contains(reply.Checks, "check")
-		assert.Equal(notYetRunResult, reply.Checks["check"])
-		assert.False(reply.Healthy)
+		require.Len(reply.Checks, 1)
+		require.Contains(reply.Checks, "check")
+		require.Equal(notYetRunResult, reply.Checks["check"])
+		require.False(reply.Healthy)
 	}
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
 	awaitReadiness(h)
@@ -76,38 +77,38 @@ func TestServiceResponses(t *testing.T) {
 	awaitLiveness(h, true)
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Readiness(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
 		result := reply.Checks["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(reply.Healthy)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(reply.Healthy)
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Health(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
 		result := reply.Checks["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(reply.Healthy)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(reply.Healthy)
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Liveness(nil, nil, &reply)
-		assert.NoError(err)
+		require.NoError(err)
 
 		result := reply.Checks["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(reply.Healthy)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(reply.Healthy)
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -17,7 +17,7 @@ import (
 
 var (
 	txBytes  = []byte{0, 1, 2, 3, 4, 5}
-	sigBytes = [crypto.SECP256K1RSigLen]byte{
+	sigBytes = [secp256k1.SignatureLen]byte{
 		0x0e, 0x33, 0x4e, 0xbc, 0x67, 0xa7, 0x3f, 0xe8,
 		0x24, 0x33, 0xac, 0xa3, 0x47, 0x88, 0xa6, 0x3d,
 		0x58, 0xe5, 0x8e, 0xf0, 0x3a, 0xd5, 0x84, 0xf1,
@@ -61,7 +61,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -71,7 +71,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -99,14 +99,14 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
 		t.Fatal(err)
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -134,7 +134,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -144,7 +144,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -166,7 +166,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -199,7 +199,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -209,7 +209,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -231,7 +231,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -241,7 +241,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -270,7 +270,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -280,7 +280,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -309,7 +309,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -319,7 +319,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -361,7 +361,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -371,7 +371,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -403,7 +403,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -413,7 +413,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -452,7 +452,7 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -462,7 +462,7 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -504,7 +504,7 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -514,7 +514,7 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -556,7 +556,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -566,7 +566,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -574,7 +574,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 		GroupID: 1,
 		Payload: []byte{2},
 		OutputOwners: secp256k1fx.OutputOwners{
-			Locktime:  vm.CLK.Unix() + 1,
+			Locktime:  vm.Clk.Unix() + 1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				addr,
@@ -609,7 +609,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
@@ -619,7 +619,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		UnsignedBytes: txBytes,
 	}
 	cred := &Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
+		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
 		},
 	}}
@@ -646,7 +646,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 		Log:   logging.NoLog{},
 	}
 	date := time.Date(2019, time.January, 19, 16, 25, 17, 3, time.UTC)
-	vm.CLK.Set(date)
+	vm.Clk.Set(date)
 
 	fx := Fx{}
 	if err := fx.Initialize(&vm); err != nil {
