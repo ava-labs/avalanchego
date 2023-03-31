@@ -69,3 +69,68 @@ This pattern is safe because the `Database` is locked, so no data under the view
 To prevent deadlocks, `trieView` and `Database` never acquire the `lock` of any descendant views that are built atop it.
 That is, locking is always done from a view down to the underlying `Database`, never the other way around.
 The `validityTrackingLock` goes the opposite way.  Views can validityTrackingLock their children, but not their ancestors. Because of this, any function that takes the `validityTrackingLock` should avoid taking the `lock` as this will likely trigger a deadlock.  Keeping `lock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.  
+
+
+
+
+## Expectations, Invariants, Constraints
+
+### Database
+
+1) There is only one instance of MerkleDB with a reference
+2) The database only writes intermediate nodes, nodes without a value, when they leave the cache or during shutdown
+3) If the database does not properly shut down, it will detect that and ensure that the trie is in a good state (currently by rebuilding it)
+4) If an error occurs during any operation, the database should not be in a corrupted state, except for the case of missing intermediate nodes which should be handled by startup logic.
+
+
+### TrieViews
+
+1) Applying the same set of changes to a single view or a chain of views should always result in the same merkle root
+2) The order of inserts/removes should not affect the final structure or merkle root of the trie. This will be true only when all keys are unique / not conflicting as delete(k) followed by insert(k,v) will give a different result than insert(k,v) followed by delete(k).
+3) Invalidation
+  1) Invalidated views should only return an invalidated error on all calls
+  2) Any calls made to the view concurrently with it being invalidated should return the correct value or an invalidated error
+  3) All children views should be invalidated **before** any changes are made to a view
+  4) Invalidation occurs from parents towards descendants, never the reverse
+
+### Nodes
+
+1) Any nodes in the trie have a value or multiple child nodes [except root currently]
+2) No two nodes share the same key
+3) The value array of a node is only ever read or overwritten, never edited directly
+  1) The value array is copied anytime it can leave the library to ensure the no edit constraint
+4) The key of a node never changes
+
+### Proof
+
+1) Two proof types, inclusion and exclusion
+  1) Inclusion Proofs
+    1) Contains all nodes from root to the node containing the requested key
+    2) The value included with the proof should be equal to or have a hash consistent with the value in the node with the matching key
+  2) Exclusion Proofs
+    1) Contains all nodes from root to the existing node with the largest matching prefix as well as one additional node that has that largest prefix + the next nibble. This extra node proves that the request key cannot be part of the trie.
+    2) Has no value included with the proof
+2) If all key/values associated with nodes of a valid proof are inserted into an empty trie, as well as setting the hashed ids of all nodes within the proof nodes, this will result in a trie with the expected merkle root
+3) Proof nodes are sent in ascending key order, starting at root and ending at queried key
+
+### Range Proof
+
+1) If all key/values associated with a valid proof are inserted into an empty trie, as well as setting the hashed ids of all sibling nodes with keys outside the proof's range, will result in a trie with the expected merkle root
+2) Key/values are sent in ascending order
+3) Start Proof
+  1) Non-nil if a start key was provided. Caveat: Any nodes that are in both the start proof and end proof are deleted from the start proof, since they are duplicates
+  2) If the start key is an inclusion proof, it should be a proof of the smallest returned key in the key/values list
+4) End Proof
+  1) If any key/values are returned, the end proof is an inclusion proof for the largest returned key in the key/values list.  If no keys are returned, it is an exclusion proof of the requested end key
+  2) Should always begin with the merkle trie's root node
+
+### Change Proof
+
+1) During Verify(), if the passed db is not already consistent with the merkle trie with root equal to start root for keys in the range [start, end], it should fail to verify
+2) Key are sent in ascending order in both key/values list and deleted keys list
+3) Start Proof
+  1) Non-nil if a start key was provided. Caveat: Any nodes that are in both the start proof and end proof are deleted from the start proof, since they are duplicates
+  2) If the start key is an inclusion proof, it should be a proof of the smallest returned key in the key/values list
+4) End Proof
+  1) If any key/values are returned, the end proof is an inclusion proof for the largest returned key in the key/values list.  If no keys are returned, it is an exclusion proof of the requested end key
+  2) Should always begin with the merkle trie's root node
