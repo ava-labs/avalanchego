@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -40,7 +38,6 @@ type weightedWithoutReplacementSampler interface {
 type weightedSampler struct {
 	weights           []uint64
 	cumulativeWeights []uint64
-	drawn             set.Set[int]
 	totalWeight       uint64
 }
 
@@ -61,6 +58,7 @@ func (s *weightedSampler) initialize(weights []uint64) error {
 		totalWeight += weight
 		cumulativeWeights[i] = totalWeight
 	}
+	// Don't set until we know the weights are valid.
 	s.totalWeight = totalWeight
 	s.cumulativeWeights = cumulativeWeights
 	s.weights = weights
@@ -81,13 +79,11 @@ func (s *weightedSampler) sample(n int) ([]int, error) {
 	for i := 0; i < n; i++ {
 		weight := rand.Int63n(int64(currentTotalWeight)) // #nosec G404
 		drawn := findIndex(uint64(weight), cumulativeWeights)
-		s.drawn.Add(drawn)
 		result[i] = drawn
 		drawnWeight := s.weights[drawn]
 
 		// Update the cumulative weights to reflect that we drew [drawn].
 		currentTotalWeight -= drawnWeight
-
 		for j := drawn; j < len(cumulativeWeights); j++ {
 			cumulativeWeights[j] -= drawnWeight
 		}

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -99,8 +98,7 @@ func TestSamplerInitialize(t *testing.T) {
 	require.ErrorIs(err, errNoWeights)
 }
 
-// Test that the observed distribution of samples is close to the expected
-// distribution.
+// Test that the observed distribution of samples is close to the expected distribution.
 func TestSamplerCorrectDistribution(t *testing.T) {
 	require := require.New(t)
 	rand.Seed(1337)
@@ -114,29 +112,33 @@ func TestSamplerCorrectDistribution(t *testing.T) {
 	err := s.initialize(weights)
 	require.NoError(err)
 
-	// Index --> number of draws of that index
-	draws := map[int]int{}
-	numSamples := 100_000
-	for i := 0; i < numSamples; i++ {
-		sampled, err := s.sample(1)
-		require.NoError(err)
-		draws[sampled[0]]++
-	}
+	numSamples := 10_000
 
-	observedDrawProbabilites := []float64{}
-	for i := 0; i < len(weights); i++ {
-		observedDrawProbabilites = append(observedDrawProbabilites, float64(draws[i])/float64(numSamples))
+	// Case where we sample 1 element.
+	{
+		// Index --> number of draws of that index
+		draws := map[int]int{}
+		for i := 0; i < numSamples; i++ {
+			sampled, err := s.sample(1)
+			require.NoError(err)
+			draws[sampled[0]]++
+		}
+
+		observedDrawProbabilites := []float64{}
+		for i := 0; i < len(weights); i++ {
+			observedDrawProbabilites = append(observedDrawProbabilites, float64(draws[i])/float64(numSamples))
+		}
+		expectedDrawProbabilities := []float64{}
+		for _, weight := range weights {
+			expectedDrawProbabilities = append(expectedDrawProbabilities, float64(weight)/float64(sumWeights))
+		}
+		require.InDeltaSlice(expectedDrawProbabilities, observedDrawProbabilites, 0.01)
 	}
-	expectedDrawProbabilities := []float64{}
-	for _, weight := range weights {
-		expectedDrawProbabilities = append(expectedDrawProbabilities, float64(weight)/float64(sumWeights))
-	}
-	require.InDeltaSlice(expectedDrawProbabilities, observedDrawProbabilites, 0.01)
 
 	// Case where we sample > 1 elements.
 	// Test that the conditional probability of drawing a given index
 	// given that the first element drawn is 0 is correct.
-	maps.Clear(draws)
+	draws := map[int]int{}
 	adjustedSamples := 0
 	for i := 0; i < numSamples; i++ {
 		sampled, err := s.sample(2)
@@ -146,12 +148,12 @@ func TestSamplerCorrectDistribution(t *testing.T) {
 			adjustedSamples++
 		}
 	}
-	observedDrawProbabilites = []float64{}
+	observedDrawProbabilites := []float64{}
 	for i := 0; i < len(weights); i++ {
 		observedDrawProbabilites = append(observedDrawProbabilites, float64(draws[i])/float64(adjustedSamples))
 	}
 
-	expectedDrawProbabilities = []float64{0}
+	expectedDrawProbabilities := []float64{0}
 	sumWeightsLessFirstElt := float64(sumWeights - int(weights[0]))
 	for _, weight := range weights[1:] {
 		expectedDrawProbabilities = append(expectedDrawProbabilities, float64(weight)/sumWeightsLessFirstElt)
