@@ -441,7 +441,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			onAbortUtxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID: tx.TxID,
-					// there is no [offset] if the vdr tx is aborted
+					// Note: There is no [offset] if the RewardValidatorTx is
+					// aborted, because the validator reward is not awarded.
 					OutputIndex: uint32(len(outputs) + len(stake)),
 				},
 				Asset: stakeAsset,
