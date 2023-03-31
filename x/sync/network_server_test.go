@@ -177,7 +177,6 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 	tests := map[string]struct {
 		request             *ChangeProofRequest
-		modifyResponse      func(proof *merkledb.ChangeProof)
 		expectedErr         error
 		expectedResponseLen int
 		nodeID              ids.NodeID
