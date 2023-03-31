@@ -46,7 +46,7 @@ type ProposalTxExecutor struct {
 	*Backend
 	Tx *txs.Tx
 	// Invariant: Both [OnCommitState] and [OnAbortState] are
-	// identical when passed into this struct.
+	//            identical when passed into this struct.
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -440,7 +440,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			onAbortUtxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID: tx.TxID,
-					// there is no [offset] for the accrued delegatee rewards if the vdr tx is aborted
+					// there is no [offset] if the vdr tx is aborted
 					OutputIndex: uint32(len(outputs) + len(stake)),
 				},
 				Asset: stakeAsset,
