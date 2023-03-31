@@ -21,47 +21,85 @@ var (
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
+	_ commands.Command = (*applyBottomDiffCommand)(nil)
 )
 
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
+
+	// to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1680269995295922009)
+	// properties := gopter.NewProperties(parameters)
+
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
 	properties.TestingRun(t)
 }
 
 type sysUnderTest struct {
-	baseState         state.State
-	blkIDsByHeight    []ids.ID
-	blkIDToChainState map[ids.ID]state.Chain
+	diffBlkIDSeed uint64
+	baseState     state.State
+	sortedDiffIDs []ids.ID
+	diffsMap      map[ids.ID]state.Diff
 }
 
 func newSysUnderTest(baseState state.State) *sysUnderTest {
-	baseBlkID := baseState.GetLastAccepted()
 	sys := &sysUnderTest{
-		baseState:         baseState,
-		blkIDToChainState: map[ids.ID]state.Chain{},
-		blkIDsByHeight:    []ids.ID{baseBlkID},
+		baseState:     baseState,
+		diffsMap:      map[ids.ID]state.Diff{},
+		sortedDiffIDs: []ids.ID{},
 	}
 	return sys
 }
 
 func (s *sysUnderTest) GetState(blkID ids.ID) (state.Chain, bool) {
-	if state, found := s.blkIDToChainState[blkID]; found {
+	if state, found := s.diffsMap[blkID]; found {
 		return state, found
 	}
 	return s.baseState, blkID == s.baseState.GetLastAccepted()
 }
 
 func (s *sysUnderTest) addDiffOnTop() {
-	seed := uint64(len(s.blkIDsByHeight))
-	newTopBlkID := ids.Empty.Prefix(atomic.AddUint64(&seed, 1))
-	topBlkID := s.blkIDsByHeight[len(s.blkIDsByHeight)-1]
+	newTopBlkID := ids.Empty.Prefix(atomic.AddUint64(&s.diffBlkIDSeed, 1))
+	var topBlkID ids.ID
+	if len(s.sortedDiffIDs) == 0 {
+		topBlkID = s.baseState.GetLastAccepted()
+	} else {
+		topBlkID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
+	}
 	newTopDiff, err := state.NewDiff(topBlkID, s)
 	if err != nil {
 		panic(err)
 	}
-	s.blkIDsByHeight = append(s.blkIDsByHeight, newTopBlkID)
-	s.blkIDToChainState[newTopBlkID] = newTopDiff
+	s.sortedDiffIDs = append(s.sortedDiffIDs, newTopBlkID)
+	s.diffsMap[newTopBlkID] = newTopDiff
+}
+
+// getTopChainState returns top diff or baseState
+func (s *sysUnderTest) getTopChainState() state.Chain {
+	var topChainStateID ids.ID
+	if len(s.sortedDiffIDs) != 0 {
+		topChainStateID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
+	} else {
+		topChainStateID = s.baseState.GetLastAccepted()
+	}
+
+	topChainState, _ := s.GetState(topChainStateID)
+	return topChainState
+}
+
+// flushBottomDiff returns bottom diff if available
+func (s *sysUnderTest) flushBottomDiff() {
+	if len(s.sortedDiffIDs) == 0 {
+		return
+	}
+	bottomDiffID := s.sortedDiffIDs[0]
+	diffToApply := s.diffsMap[bottomDiffID]
+
+	diffToApply.Apply(s.baseState)
+	s.baseState.SetLastAccepted(bottomDiffID)
+
+	s.sortedDiffIDs = s.sortedDiffIDs[1:]
+	delete(s.diffsMap, bottomDiffID)
 }
 
 // stakersCommands creates/destroy the system under test and generates
@@ -118,8 +156,8 @@ var stakersCommands = &commands.ProtoCommands{
 			// genPutCurrentDelegatorCommand,
 			// genDeleteCurrentDelegatorCommand,
 
-			// genApplyBottomDiffCommand,
 			genAddTopDiffCommand,
+			genApplyBottomDiffCommand,
 			// genCommitBottomStateCommand,
 		)
 	},
@@ -131,9 +169,8 @@ type putCurrentValidatorCommand state.Staker
 func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	staker := (*state.Staker)(v)
 	sys := sut.(*sysUnderTest)
-	topBlkID := sys.blkIDsByHeight[len(sys.blkIDsByHeight)-1]
-	topDiff, _ := sys.GetState(topBlkID)
-	topDiff.PutCurrentValidator(staker)
+	topChainState := sys.getTopChainState()
+	topChainState.PutCurrentValidator(staker)
 	return sys
 }
 
@@ -176,8 +213,7 @@ type deleteCurrentValidatorCommand state.Staker
 func (v *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	staker := (*state.Staker)(v)
 	sys := sut.(*sysUnderTest)
-	topBlkID := sys.blkIDsByHeight[len(sys.blkIDsByHeight)-1]
-	topDiff, _ := sys.GetState(topBlkID)
+	topDiff := sys.getTopChainState()
 	topDiff.DeleteCurrentValidator(staker)
 	return sys // returns sys to allow comparison with state in PostCondition
 }
@@ -253,10 +289,47 @@ var genAddTopDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
 	},
 )
 
+// applyBottomDiffCommand section
+type applyBottomDiffCommand struct{}
+
+func (*applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+	sys.flushBottomDiff()
+	return sys
+}
+
+func (*applyBottomDiffCommand) NextState(cmdState commands.State) commands.State {
+	return cmdState // model has no diffs
+}
+
+func (*applyBottomDiffCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
+	if checkSystemAndModelContent(model, sys) {
+		return &gopter.PropResult{Status: gopter.PropTrue}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropFalse}
+}
+
+func (*applyBottomDiffCommand) String() string {
+	return "ApplyBottomDiffCommand"
+}
+
+var genApplyBottomDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
+	func(state.Staker) commands.Command {
+		return &applyBottomDiffCommand{}
+	},
+)
+
 func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) bool {
 	// top view content must always match model content
-	topBlkID := sys.blkIDsByHeight[len(sys.blkIDsByHeight)-1]
-	topDiff, _ := sys.GetState(topBlkID)
+	topDiff := sys.getTopChainState()
 
 	modelIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
