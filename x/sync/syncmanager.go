@@ -266,7 +266,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	if workItem.LocalRootID == rootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, workItem, workItem.end, rootID, nil)
+		m.completeWorkItem(ctx, workItem, rootID, nil)
 		return
 	}
 
@@ -300,27 +300,15 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		m.enqueueWork(workItem)
 		return
 	}
-
-	largestHandledKey := workItem.end
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
 		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
 			m.setError(err)
 			return
 		}
-
-		if len(changeproof.KeyValues) > 0 {
-			largestHandledKey = changeproof.KeyValues[len(changeproof.KeyValues)-1].Key
-		}
-		if len(changeproof.DeletedKeys) > 0 {
-			lastDeletedKey := changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1]
-			if bytes.Compare(lastDeletedKey, largestHandledKey) == 1 {
-				largestHandledKey = lastDeletedKey
-			}
-		}
 	}
 
-	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeproof.EndProof)
+	m.completeWorkItem(ctx, workItem, rootID, changeproof.EndProof)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -347,18 +335,15 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	largestHandledKey := workItem.end
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
-
-		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
-	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
+	m.completeWorkItem(ctx, workItem, rootID, proof.EndProof)
 }
 
 // Attempt to find what key to query next based on the differences between
@@ -542,23 +527,27 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
-	// if the last key is equal to the end, then the full range is completed
-	if !bytes.Equal(largestHandledKey, workItem.end) {
-		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
-		if err != nil {
-			m.setError(err)
-			return
-		}
+func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+	largestHandledKey := workItem.end
 
-		largestHandledKey = workItem.end
+	if proofOfLargestKey != nil {
+		proofKey := proofOfLargestKey[len(proofOfLargestKey)-1].KeyPath.Value
 
-		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey != nil {
-			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
-			largestHandledKey = nextStartKey
+		// if the proven key is smaller than the end, attempt to find the key between them that to query next
+		if workItem.end == nil || bytes.Compare(proofKey, workItem.end) < 0 {
+			// find the next key to start querying by comparing the proofs for the last completed key
+			nextStartKey, err := m.findNextKey(ctx, proofKey, workItem.end, proofOfLargestKey)
+			if err != nil {
+				m.setError(err)
+				return
+			}
+
+			// nextStartKey being nil indicates that the entire range has been completed
+			if nextStartKey != nil {
+				// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
+				m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
+				largestHandledKey = nextStartKey
+			}
 		}
 	}
 
