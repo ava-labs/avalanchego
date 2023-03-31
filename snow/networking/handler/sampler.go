@@ -38,12 +38,17 @@ type weightedWithoutReplacementSampler interface {
 
 // weightedSampler is a weighted sampler without replacement
 type weightedSampler struct {
+	weights           []uint64
 	cumulativeWeights []uint64
 	drawn             set.Set[int]
 	totalWeight       uint64
 }
 
 func (s *weightedSampler) initialize(weights []uint64) error {
+	if len(weights) == 0 {
+		return errNoWeights
+	}
+
 	totalWeight := uint64(0)
 	cumulativeWeights := make([]uint64, len(weights))
 	for i, weight := range weights {
@@ -56,11 +61,9 @@ func (s *weightedSampler) initialize(weights []uint64) error {
 		totalWeight += weight
 		cumulativeWeights[i] = totalWeight
 	}
-	if totalWeight == 0 {
-		return errNoWeights
-	}
 	s.totalWeight = totalWeight
 	s.cumulativeWeights = cumulativeWeights
+	s.weights = weights
 	return nil
 }
 
@@ -69,45 +72,46 @@ func (s *weightedSampler) sample(n int) ([]int, error) {
 		return nil, fmt.Errorf("%w: %d < %d", errOutOfRange, len(s.cumulativeWeights), n)
 	}
 
+	// These are copied so they can be modified without affecting the sampler.
+	currentTotalWeight := s.totalWeight
+	cumulativeWeights := make([]uint64, len(s.cumulativeWeights))
+	copy(cumulativeWeights, s.cumulativeWeights)
+
 	result := make([]int, n)
 	for i := 0; i < n; i++ {
-		for {
-			weight := rand.Int63n(int64(s.totalWeight)) // #nosec G404
-			drawn := findIndex(uint64(weight), s.cumulativeWeights)
-			if !s.drawn.Contains(drawn) {
-				result[i] = drawn
-				s.drawn.Add(drawn)
-				break
-			}
-			// We already drew [drawn] -- try again until we
-			// draw something we haven't drawn yet.
+		weight := rand.Int63n(int64(currentTotalWeight)) // #nosec G404
+		drawn := findIndex(uint64(weight), cumulativeWeights)
+		s.drawn.Add(drawn)
+		result[i] = drawn
+		drawnWeight := s.weights[drawn]
+
+		// Update the cumulative weights to reflect that we drew [drawn].
+		currentTotalWeight -= drawnWeight
+
+		for j := drawn; j < len(cumulativeWeights); j++ {
+			cumulativeWeights[j] -= drawnWeight
 		}
 	}
-	s.drawn.Clear()
 	return result, nil
 }
 
-// Returns the index of the smallest value in [cumulativeWeights]
-// that is greater than or equal to [weight].
+// Returns the index of the first instance of the smallest value
+// in [cumulativeWeights] that is greater than [weight].
 // Assumes that [cumulativeWeights] is sorted in ascending order.
-// Assumes [weight] <= cumulativeWeights[len(cumulativeWeights)-1].
+// Assumes [weight] < cumulativeWeights[len(cumulativeWeights)-1].
 func findIndex(weight uint64, cumulativeWeights []uint64) int {
 	low := 0                           // Lowest possible candidate index.
 	high := len(cumulativeWeights) - 1 // Highest possible candidate index.
 	for {
 		index := (low + high) / 2
-		if weight > cumulativeWeights[index] {
-			// The index we're looking for must be greater than [index].
+		if cumulativeWeights[index] <= weight {
 			low = index + 1
 			continue
 		}
 
-		if index == 0 || weight > cumulativeWeights[index-1] {
-			// Either there is no index before [index], so this is the smallest one
-			// meeting the condition, or the value at the previous index is less than [weight].
+		if index == 0 || cumulativeWeights[index-1] <= weight {
 			return index
 		}
-		// The index we're looking for must be less than [index].
 		high = index - 1
 	}
 }
