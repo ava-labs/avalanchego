@@ -1268,7 +1268,7 @@ func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
 
 	rootID, err := newTrie.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NotNil(rootID)
+	require.NotZero(rootID)
 }
 
 func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
