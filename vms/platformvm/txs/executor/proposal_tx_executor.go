@@ -353,7 +353,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
-	rewardAmount := stakerToRemove.PotentialReward
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
@@ -381,9 +380,9 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		offset := 0
 
 		// Provide the reward here
-		if rewardAmount > 0 {
+		if stakerToRemove.PotentialReward > 0 {
 			validationRewardsOwner := uStakerTx.ValidationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(rewardAmount, validationRewardsOwner)
+			outIntf, err := e.Fx.CreateOutput(stakerToRemove.PotentialReward, validationRewardsOwner)
 			if err != nil {
 				return fmt.Errorf("failed to create output: %w", err)
 			}
@@ -407,7 +406,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			offset++
 		}
 
-		// Provide the accrued delegatee rewards from successful delegations.
+		// Provide the accrued delegatee rewards from successful delegations here.
 		delegateeReward, err := e.OnCommitState.GetDelegateeReward(
 			stakerToRemove.SubnetID,
 			stakerToRemove.NodeID,
@@ -439,9 +438,36 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
-		rewardAmount, err = math.Add64(rewardAmount, delegateeReward)
+		// there is no [offset] for the accrued delegatee rewards if the vdr tx is aborted
+		delegateeReward, err = e.OnAbortState.GetDelegateeReward(
+			stakerToRemove.SubnetID,
+			stakerToRemove.NodeID,
+		)
 		if err != nil {
-			return fmt.Errorf("failed to calculate total reward amount: %w", err)
+			return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+		}
+
+		if delegateeReward > 0 {
+			delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
+			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+			if err != nil {
+				return fmt.Errorf("failed to create output: %w", err)
+			}
+			out, ok := outIntf.(verify.State)
+			if !ok {
+				return errInvalidState
+			}
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(outputs) + len(stake)),
+				},
+				Asset: stakeAsset,
+				Out:   out,
+			}
+
+			e.OnAbortState.AddUTXO(utxo)
+			e.OnAbortState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		// Invariant: A [txs.DelegatorTx] does not also implement the
@@ -503,13 +529,13 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
 		validatorShares := vdrTx.Shares()
-		delegatorShares := reward.PercentDenominator - uint64(validatorShares)          // parentTx.Shares <= reward.PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (rewardAmount / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
+		delegatorShares := reward.PercentDenominator - uint64(validatorShares)                            // parentTx.Shares <= reward.PercentDenominator so no underflow
+		delegatorReward := delegatorShares * (stakerToRemove.PotentialReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := math.Mul64(delegatorShares, rewardAmount); err == nil {
+		if optimisticReward, err := math.Mul64(delegatorShares, stakerToRemove.PotentialReward); err == nil {
 			delegatorReward = optimisticReward / reward.PercentDenominator
 		}
-		delegateeReward := rewardAmount - delegatorReward // delegatorReward <= reward so no underflow
+		delegateeReward := stakerToRemove.PotentialReward - delegatorReward // delegatorReward <= reward so no underflow
 
 		offset := 0
 
@@ -602,7 +628,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if err != nil {
 		return err
 	}
-	newSupply, err := math.Sub(currentSupply, rewardAmount)
+	newSupply, err := math.Sub(currentSupply, stakerToRemove.PotentialReward)
 	if err != nil {
 		return err
 	}
