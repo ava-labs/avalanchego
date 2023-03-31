@@ -45,11 +45,12 @@ type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
 	Tx *txs.Tx
-	// Invariant: Both [OnCommitState] and [OnAbortState] are
-	//            identical when passed into this struct.
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
+	//
+	// Invariant: Both [OnCommitState] and [OnAbortState] represent the same
+	//            state when provided to this struct.
 	OnCommitState state.Diff
 	// [OnAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
