@@ -72,6 +72,10 @@ func putValidator(staker *state.Staker, domain map[subnetNodeKey]*state.Staker) 
 		subnetID: staker.SubnetID,
 		nodeID:   staker.NodeID,
 	}
+
+	// overwrite validator even if already exist. In prod code,
+	// it's up to block verification to check that we do not overwrite
+	// a validator existing on state or lower diffs.
 	domain[key] = staker
 }
 

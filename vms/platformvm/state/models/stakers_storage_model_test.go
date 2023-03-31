@@ -22,6 +22,7 @@ var (
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
+	_ commands.Command = (*commitBottomStateCommand)(nil)
 )
 
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
@@ -158,7 +159,7 @@ var stakersCommands = &commands.ProtoCommands{
 
 			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
-			// genCommitBottomStateCommand,
+			genCommitBottomStateCommand,
 		)
 	},
 }
@@ -324,6 +325,47 @@ func (*applyBottomDiffCommand) String() string {
 var genApplyBottomDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
 	func(state.Staker) commands.Command {
 		return &applyBottomDiffCommand{}
+	},
+)
+
+// commitBottomStateCommand section
+type commitBottomStateCommand struct{}
+
+func (*commitBottomStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+	err := sys.baseState.Commit()
+	if err != nil {
+		panic(err)
+	}
+	return sys
+}
+
+func (*commitBottomStateCommand) NextState(cmdState commands.State) commands.State {
+	return cmdState // model has no diffs
+}
+
+func (*commitBottomStateCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
+	if checkSystemAndModelContent(model, sys) {
+		return &gopter.PropResult{Status: gopter.PropTrue}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropFalse}
+}
+
+func (*commitBottomStateCommand) String() string {
+	return "CommitBottomStateCommand"
+}
+
+var genCommitBottomStateCommand = stakerGenerator(anyPriority, nil, nil).Map(
+	func(state.Staker) commands.Command {
+		return &commitBottomStateCommand{}
 	},
 )
 
