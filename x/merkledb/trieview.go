@@ -488,7 +488,7 @@ func (t *trieView) GetRangeProof(
 
 // CommitToDB commits changes from this trie to the underlying DB.
 func (t *trieView) CommitToDB(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.Commit")
+	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
 	defer span.End()
 
 	t.db.commitLock.Lock()

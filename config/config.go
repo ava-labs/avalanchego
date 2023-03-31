@@ -61,6 +61,7 @@ const (
 )
 
 var (
+	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	deprecatedKeys = map[string]string{}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
