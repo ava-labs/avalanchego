@@ -37,47 +37,39 @@ type weightedWithoutReplacementSampler interface {
 
 // weightedSampler is a weighted sampler without replacement
 type weightedSampler struct {
-	weights     []uint64
-	elts        []int
-	drawn       set.Set[int]
-	totalWeight uint64
+	cumulativeWeights []uint64
+	drawn             set.Set[int]
+	totalWeight       uint64
 }
 
 func (s *weightedSampler) initialize(weights []uint64) error {
 	totalWeight := uint64(0)
-	for _, weight := range weights {
+	cumulativeWeights := make([]uint64, len(weights))
+	for i, weight := range weights {
 		if math.MaxInt64-totalWeight < weight {
 			return errWeightTooLarge
 		}
 		totalWeight += weight
+		cumulativeWeights[i] = totalWeight
 	}
 	if totalWeight == 0 {
 		return errNoWeights
 	}
 	s.totalWeight = totalWeight
-	s.weights = weights
-
-	s.elts = make([]int, totalWeight)
-	offset := 0
-	for i, weight := range weights {
-		for j := uint64(0); j < weight; j++ {
-			s.elts[offset] = i
-			offset++
-		}
-	}
+	s.cumulativeWeights = cumulativeWeights
 	return nil
 }
 
 func (s *weightedSampler) sample(n int) ([]int, error) {
-	if len(s.weights) < n {
-		return nil, fmt.Errorf("%w: %d < %d", errOutOfRange, len(s.weights), n)
+	if len(s.cumulativeWeights) < n {
+		return nil, fmt.Errorf("%w: %d < %d", errOutOfRange, len(s.cumulativeWeights), n)
 	}
 
 	result := make([]int, n)
 	for i := 0; i < n; i++ {
 		for {
-			index := rand.Int63n(int64(len(s.elts)))
-			drawn := s.elts[index]
+			weight := rand.Int63n(int64(s.totalWeight)) // #nosec G404
+			drawn := findIndex(uint64(weight), s.cumulativeWeights)
 			if !s.drawn.Contains(drawn) {
 				result[i] = drawn
 				s.drawn.Add(drawn)
@@ -89,4 +81,29 @@ func (s *weightedSampler) sample(n int) ([]int, error) {
 	}
 	s.drawn.Clear()
 	return result, nil
+}
+
+// Returns the index of the smallest value in [cumulativeWeights]
+// that is greater than or equal to [weight].
+// Assumes that [cumulativeWeights] is sorted in ascending order.
+// Assumes [weight] <= cumulativeWeights[len(cumulativeWeights)-1].
+func findIndex(weight uint64, cumulativeWeights []uint64) int {
+	low := 0                           // Lowest possible candidate index.
+	high := len(cumulativeWeights) - 1 // Highest possible candidate index.
+	for {
+		index := (low + high) / 2
+		if weight > cumulativeWeights[index] {
+			// The index we're looking for must be greater than [index].
+			low = index + 1
+			continue
+		}
+
+		if index == 0 || weight > cumulativeWeights[index-1] {
+			// Either there is no index before [index], so this is the smallest one
+			// meeting the condition, or the value at the previous index is less than [weight].
+			return index
+		}
+		// The index we're looking for must be less than [index].
+		high = index - 1
+	}
 }

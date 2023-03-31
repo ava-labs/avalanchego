@@ -205,7 +205,6 @@ func NewMessageQueue(
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
-
 	metrics, err := newMessageQueueMetrics(metricsNamespace, metricsRegisterer, ops)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create message queue metrics: %w", err)
