@@ -28,6 +28,7 @@ type ReadOnlyTrie interface {
 
 	// GetMerkleRoot returns the merkle root of the Trie
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
+	GetAltMerkleRoot(ctx context.Context) (ids.ID, error)
 
 	// get an editable copy of the node with the given key path
 	getEditableNode(key path) (*node, error)

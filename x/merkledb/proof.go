@@ -659,7 +659,13 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (hasLowerBound && childPath.Compare(startPath) < 0) ||
 				(hasUpperBound && childPath.Compare(endPath) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+				n.addChildWithoutNode(
+					index,
+					compressedPath,
+					childID,
+					n.children[index].altID,
+					n.children[index].isValueNode,
+				) // TODO: is this correct?
 			}
 		}
 	}

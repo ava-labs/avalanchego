@@ -5,9 +5,11 @@ package merkledb
 
 import (
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -31,12 +33,15 @@ type dbNode struct {
 type child struct {
 	compressedPath path
 	id             ids.ID
+	altID          []byte
+	isValueNode    bool
 }
 
 // node holds additional information on top of the dbNode that makes calulcations easier to do
 type node struct {
 	dbNode
 	id          ids.ID
+	altID       []byte
 	key         path
 	nodeBytes   []byte
 	valueDigest Maybe[[]byte]
@@ -118,6 +123,16 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 
 	metrics.HashCalculated()
 	n.id = hashing.ComputeHash256Array(bytes)
+
+	return n.calculateAltID() // calculate the altID at the same time
+}
+
+func (n *node) calculateAltID() error {
+	encbuf := rlp.NewEncoderBuffer(nil)
+	n.encodeRLP(encbuf)
+	bytes := encbuf.ToBytes()
+
+	n.altID = valueOrHash(bytes)
 	return nil
 }
 
@@ -144,15 +159,19 @@ func (n *node) addChild(child *node) {
 		child.key[len(n.key)],
 		child.key[len(n.key)+1:],
 		child.id,
+		child.altID,
+		child.isValueNode(),
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID) {
+func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, childAltID []byte, isValueNode bool) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
 		id:             childID,
+		altID:          childAltID,
+		isValueNode:    isValueNode,
 	}
 }
 
@@ -179,8 +198,9 @@ func (n *node) removeChild(child *node) {
 // if this ever changes, value will need to be copied as well
 func (n *node) clone() *node {
 	return &node{
-		id:  n.id,
-		key: n.key,
+		id:    n.id,
+		altID: slices.Clone(n.altID),
+		key:   n.key,
 		dbNode: dbNode{
 			value:    n.value,
 			children: maps.Clone(n.children),

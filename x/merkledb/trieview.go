@@ -713,6 +713,18 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return t.getMerkleRoot(ctx)
 }
 
+func (t *trieView) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	// Calculate the root for the trie, this will update the Alt root as well.
+	if _, err := t.getMerkleRoot(ctx); err != nil {
+		return ids.Empty, err
+	}
+
+	return bytesToAltID(t.root.altID), nil
+}
+
 // Returns the ID of the root node of this trie.
 // Assumes [t.lock] is held.
 func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -1242,6 +1254,8 @@ func (t *trieView) insertIntoTrie(
 		existingChildKey[len(branchNode.key)],
 		existingChildKey[len(branchNode.key)+1:],
 		existingChildEntry.id,
+		existingChildEntry.altID,
+		existingChildEntry.isValueNode,
 	)
 
 	return nodeWithValue, t.recordNodeChange(branchNode)
