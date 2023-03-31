@@ -141,7 +141,7 @@ A node will not [report healthy](https://docs.avax.network/build/avalanchego-api
 
 Improvements that reduce the amount of time it takes to bootstrap are under development.
 
-The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node, will decrease the amount of time bootstrapping takes.
+The bottleneck during bootstrapping is typically database IO. Using a more powerful CPU or increasing the database IOPS on the computer running a node will decrease the amount of time bootstrapping takes.
 
 ## Generating Code
 
