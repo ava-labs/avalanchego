@@ -83,8 +83,8 @@ func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db
 
 		// Ensure the response does not contain more than the requested number of leaves
 		// and the start and end roots match the requested roots.
-		if len(changeProof.KeyValues)+len(changeProof.DeletedKeys) > int(req.Limit) {
-			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(changeProof.KeyValues), req.Limit)
+		if len(changeProof.KeyChanges) > int(req.Limit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(changeProof.KeyChanges), req.Limit)
 		}
 
 		if err := changeProof.Verify(ctx, db, req.Start, req.End, req.EndingRoot); err != nil {
