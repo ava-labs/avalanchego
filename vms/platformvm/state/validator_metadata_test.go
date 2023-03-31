@@ -173,3 +173,131 @@ func TestValidatorDelegateeRewards(t *testing.T) {
 	_, _, err = state.GetUptime(nodeID, subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
+
+func TestParseValidatorMetadata(t *testing.T) {
+	type test struct {
+		name      string
+		bytes     []byte
+		expected  *validatorMetadata
+		shouldErr bool
+	}
+	tests := []test{
+		{
+			name:  "nil",
+			bytes: nil,
+			expected: &validatorMetadata{
+				lastUpdated: time.Unix(0, 0),
+			},
+			shouldErr: false,
+		},
+		{
+			name:  "nil",
+			bytes: []byte{},
+			expected: &validatorMetadata{
+				lastUpdated: time.Unix(0, 0),
+			},
+			shouldErr: false,
+		},
+		{
+			name: "potential reward only",
+			bytes: []byte{
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+			},
+			expected: &validatorMetadata{
+				PotentialReward: 100000,
+				lastUpdated:     time.Unix(0, 0),
+			},
+			shouldErr: false,
+		},
+		{
+			name: "uptime + potential reward",
+			bytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+			},
+			expected: &validatorMetadata{
+				UpDuration:      time.Duration(6000000),
+				LastUpdated:     900000,
+				PotentialReward: 100000,
+				lastUpdated:     time.Unix(900000, 0),
+			},
+			shouldErr: false,
+		},
+		{
+			name: "uptime + potential reward + potential delegatee reward",
+			bytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+				// potential delegatee reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
+			},
+			expected: &validatorMetadata{
+				UpDuration:               time.Duration(6000000),
+				LastUpdated:              900000,
+				PotentialReward:          100000,
+				PotentialDelegateeReward: 20000,
+				lastUpdated:              time.Unix(900000, 0),
+			},
+			shouldErr: false,
+		},
+		{
+			name: "invalid codec version",
+			bytes: []byte{
+				// codec version
+				0x00, 0x01,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+				// potential delegatee reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
+			},
+			expected:  nil,
+			shouldErr: true,
+		},
+		{
+			name: "short byte len",
+			bytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// up duration
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
+				// last updated
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
+				// potential reward
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
+				// potential delegatee reward
+				0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
+			},
+			expected:  nil,
+			shouldErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			var metadata validatorMetadata
+			err := parseValidatorMetadata(tt.bytes, &metadata)
+			if tt.shouldErr {
+				require.Error(err)
+			} else {
+				require.NoError(err)
+				require.Equal(tt.expected, &metadata)
+			}
+		})
+	}
+}
