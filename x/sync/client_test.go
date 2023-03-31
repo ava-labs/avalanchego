@@ -5,11 +5,12 @@ package sync
 
 import (
 	"context"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/database/memdb"
 
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -381,7 +382,7 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-
+	require.NoError(err)
 	verificationDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
@@ -391,7 +392,7 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-
+	require.NoError(err)
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
