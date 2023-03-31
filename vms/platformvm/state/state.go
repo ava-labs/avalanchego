@@ -159,13 +159,13 @@ type stateBlk struct {
  * | |-. current
  * | | |-. validator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | |-. delegator
  * | | | '-. list
  * | | |   '-- txID -> potential reward
  * | | |-. subnetValidator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward or potential reward or nil
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> potential reward
