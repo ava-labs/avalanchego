@@ -19,10 +19,10 @@ import (
 // and prints the ID of the block and its transactions.
 func main() {
 	var (
-		uri              = fmt.Sprintf("%s/ext/index/P/block", primary.LocalAPIURI)
-		client           = indexer.NewClient(uri)
-		ctx              = context.Background()
-		nextIndex uint64 = 2_000_000
+		uri       = fmt.Sprintf("%s/ext/index/P/block", primary.LocalAPIURI)
+		client    = indexer.NewClient(uri)
+		ctx       = context.Background()
+		nextIndex uint64
 	)
 	for {
 		container, err := client.GetContainerByIndex(ctx, nextIndex)
