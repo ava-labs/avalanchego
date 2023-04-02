@@ -63,6 +63,7 @@ const (
 )
 
 var (
+	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	deprecatedKeys = map[string]string{
 		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
 	}
