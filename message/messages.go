@@ -268,11 +268,11 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 
 	// Figure out what compression type, if any, was used to compress the message.
 	var (
-		compressionType compression.Type
-		compressor      compression.Compressor
-		compressedBytes []byte
-		gzipCompressed  = m.GetCompressedGzip()
-		zstdCompressed  = m.GetCompressedZstd()
+		opToDecompressTimeMetrics map[Op]metric.Averager
+		compressor                compression.Compressor
+		compressedBytes           []byte
+		gzipCompressed            = m.GetCompressedGzip()
+		zstdCompressed            = m.GetCompressedZstd()
 	)
 	switch {
 	case len(gzipCompressed) == 0 && len(zstdCompressed) == 0:
@@ -285,11 +285,11 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	case len(gzipCompressed) > 0 && len(zstdCompressed) > 0:
 		return nil, 0, 0, errMultipleCompressionTypes
 	case len(gzipCompressed) > 0:
-		compressionType = compression.TypeGzip
+		opToDecompressTimeMetrics = mb.gzipDecompressTimeMetrics
 		compressor = mb.gzipCompressor
 		compressedBytes = gzipCompressed
 	case len(zstdCompressed) > 0:
-		compressionType = compression.TypeZstd
+		opToDecompressTimeMetrics = mb.zstdDecompressTimeMetrics
 		compressor = mb.zstdCompressor
 		compressedBytes = zstdCompressed
 	}
@@ -312,11 +312,9 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	switch compressionType {
-	case compression.TypeGzip:
-		mb.gzipDecompressTimeMetrics[op].Observe(float64(decompressTook))
-	case compression.TypeZstd:
-		mb.zstdDecompressTimeMetrics[op].Observe(float64(decompressTook))
+	if decompressTimeMetric, ok := opToDecompressTimeMetrics[op]; ok {
+		// This case should always execute, but check just in case.
+		decompressTimeMetric.Observe(float64(decompressTook))
 	}
 
 	return m, bytesSavedCompression, op, nil
