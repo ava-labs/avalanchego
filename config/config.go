@@ -341,10 +341,7 @@ func getNetworkConfig(
 		}
 	}
 
-	cortinaTime, ok := version.CortinaTimes[networkID]
-	if !ok {
-		cortinaTime = version.CortinaDefaultTime
-	}
+	cortinaTime := version.GetCortinaTime(networkID)
 	if compressionType == compression.TypeZstd && !time.Now().After(cortinaTime) {
 		// TODO remove after cortina upgrade
 		return network.Config{}, errZstdNotSupported

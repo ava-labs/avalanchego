@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 var _ Creator = (*creator)(nil)

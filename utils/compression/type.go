@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -46,13 +46,13 @@ func TypeFromString(s string) (Type, error) {
 
 func (t Type) MarshalJSON() ([]byte, error) {
 	var b strings.Builder
-	if _, err := b.WriteString("\""); err != nil {
+	if _, err := b.WriteString(`"`); err != nil {
 		return nil, err
 	}
 	if _, err := b.WriteString(t.String()); err != nil {
 		return nil, err
 	}
-	if _, err := b.WriteString("\""); err != nil {
+	if _, err := b.WriteString(`"`); err != nil {
 		return nil, err
 	}
 	return []byte(b.String()), nil

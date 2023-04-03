@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -30,19 +30,19 @@ func TestTypeMarshalJSON(t *testing.T) {
 	tests := []test{
 		{
 			Type:     TypeNone,
-			expected: "\"none\"",
+			expected: `"none"`,
 		},
 		{
 			Type:     TypeGzip,
-			expected: "\"gzip\"",
+			expected: `"gzip"`,
 		},
 		{
 			Type:     TypeZstd,
-			expected: "\"zstd\"",
+			expected: `"zstd"`,
 		},
 		{
 			Type:     Type(0),
-			expected: "\"unknown\"",
+			expected: `"unknown"`,
 		},
 	}
 
