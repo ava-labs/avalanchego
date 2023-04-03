@@ -189,18 +189,18 @@ func (dg *Directed) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	// check for long running transactions
-	timeReqRunning := dg.Latency.MeasureAndGetOldestDuration()
-	isProcessingTime := timeReqRunning <= dg.params.MaxItemProcessingTime
-	healthy = healthy && isProcessingTime
-	details["longestRunningTransaction"] = timeReqRunning.String()
+	oldestProcessingDuration := dg.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= dg.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningTransaction"] = oldestProcessingDuration.String()
 
 	if !healthy {
 		var errorReasons []string
 		if !isOutstandingTxs {
 			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding transactions %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems))
 		}
-		if !isProcessingTime {
-			errorReasons = append(errorReasons, fmt.Sprintf("transaction processing time %s > %s", timeReqRunning, dg.params.MaxItemProcessingTime))
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("transaction processing time %s > %s", oldestProcessingDuration, dg.params.MaxItemProcessingTime))
 		}
 		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
