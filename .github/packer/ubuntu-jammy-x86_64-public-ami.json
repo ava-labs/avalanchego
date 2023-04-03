@@ -1,6 +1,6 @@
 {
   "variables": {
-    "version": "jammy-222.04",
+    "version": "jammy-22.04",
     "tag": "{{env `TAG`}}",
     "skip_create_ami": "{{env `SKIP_CREATE_AMI`}}"
   },
