@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
+
 func TestCompressDecompress(t *testing.T) {
 	for _, compressionType := range []Type{TypeNone, TypeGzip, TypeZstd} {
 		t.Run(compressionType.String(), func(t *testing.T) {
@@ -32,10 +34,10 @@ func TestCompressDecompress(t *testing.T) {
 				compressor = &noCompressor{}
 			case TypeGzip:
 				var err error
-				compressor, err = NewGzipCompressor(2 * units.MiB) // Max message size. Can't import due to cycle.
+				compressor, err = NewGzipCompressor(maxMessageSize)
 				require.NoError(t, err)
 			case TypeZstd:
-				compressor = NewZstdCompressor()
+				compressor = NewZstdCompressor(maxMessageSize)
 			default:
 				t.Fatal("Unknown compression type")
 			}
@@ -74,14 +76,14 @@ func TestCompressDecompress(t *testing.T) {
 }
 
 func TestGzipSizeLimiting(t *testing.T) {
-	data := make([]byte, 3*units.MiB)
-	compressor, err := NewGzipCompressor(2 * units.MiB)
+	compressor, err := NewGzipCompressor(maxMessageSize)
 	require.NoError(t, err)
 
+	data := make([]byte, maxMessageSize+1)
 	_, err = compressor.Compress(data) // should be too large
 	require.Error(t, err)
 
-	compressor2, err := NewGzipCompressor(4 * units.MiB)
+	compressor2, err := NewGzipCompressor(2 * maxMessageSize)
 	require.NoError(t, err)
 
 	dataCompressed, err := compressor2.Compress(data)
@@ -113,10 +115,10 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 	switch compressionType {
 	case TypeGzip:
 		var err error
-		compressor, err = NewGzipCompressor(2 * units.MiB) // Max message size. Can't import due to cycle.
+		compressor, err = NewGzipCompressor(maxMessageSize)
 		require.NoError(f, err)
 	case TypeZstd:
-		compressor = NewZstdCompressor()
+		compressor = NewZstdCompressor(maxMessageSize)
 	default:
 		f.Fatal("Unknown compression type")
 	}
@@ -124,8 +126,9 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
-		if len(data) > 2*units.MiB && compressionType == TypeGzip {
-			t.SkipNow()
+		if len(data) > 2*units.MiB {
+			_, err := compressor.Compress(data)
+			require.Error(err)
 		}
 
 		compressed, err := compressor.Compress(data)

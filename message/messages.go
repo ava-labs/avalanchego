@@ -150,7 +150,7 @@ func newMsgBuilder(
 		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
-		zstdCompressor:            compression.NewZstdCompressor(),
+		zstdCompressor:            compression.NewZstdCompressor(constants.DefaultMaxMessageSize),
 		zstdCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		zstdDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
