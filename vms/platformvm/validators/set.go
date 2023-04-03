@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -79,7 +80,11 @@ type set struct {
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
-	// Maps caches for each subnet that is currently tracked.
+	// cachesMux protects addition of a new subnet cache to caches
+	// so that [GetValidatorSet] can be carried out with RLock only
+	cachesMux sync.Mutex
+
+	// [caches] Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
 	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
@@ -105,6 +110,8 @@ type set struct {
 // If [UseCurrentHeight] is true, we will always return the last accepted block
 // height as the minimum. This is used to trigger the proposervm on recently
 // created subnets before [recentlyAcceptedWindowTTL].
+//
+// GetMinimumHeight assumes ctx.RLock() is hold
 func (vs *set) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if vs.cfg.UseCurrentHeight {
 		return vs.GetCurrentHeight(ctx)
@@ -129,6 +136,7 @@ func (vs *set) GetMinimumHeight(ctx context.Context) (uint64, error) {
 }
 
 // GetCurrentHeight returns the height of the last accepted block
+// GetCurrentHeight assumes ctx.RLock() is hold
 func (vs *set) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := vs.state.GetLastAccepted()
 	lastAccepted, _, err := vs.state.GetStatelessBlock(lastAcceptedID)
@@ -140,15 +148,10 @@ func (vs *set) GetCurrentHeight(context.Context) (uint64, error) {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
+//
+// GetValidatorSet assumes ctx.RLock() is hold
 func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache, exists := vs.caches[subnetID]
-	if !exists {
-		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
-		// Only cache tracked subnets
-		if subnetID == constants.PrimaryNetworkID || vs.cfg.TrackedSubnets.Contains(subnetID) {
-			vs.caches[subnetID] = validatorSetsCache
-		}
-	}
+	validatorSetsCache := vs.getCache(subnetID)
 
 	if validatorSet, ok := validatorSetsCache.Get(height); ok {
 		vs.metrics.IncValidatorSetsCached()
@@ -300,4 +303,21 @@ func (vs *set) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
 
 func (vs *set) Track(blkID ids.ID) {
 	vs.recentlyAccepted.Add(blkID)
+}
+
+// getCache returns cache associated with subnetID. It creates it
+// if not available. Lock guard ensures validators.State methods
+// can be accessed with read lock.
+func (vs *set) getCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+	vs.cachesMux.Lock()
+	defer vs.cachesMux.Unlock()
+	validatorSetsCache, exists := vs.caches[subnetID]
+	if !exists {
+		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
+		// Only cache whitelisted subnets
+		if subnetID == constants.PrimaryNetworkID || vs.cfg.TrackedSubnets.Contains(subnetID) {
+			vs.caches[subnetID] = validatorSetsCache
+		}
+	}
+	return validatorSetsCache
 }

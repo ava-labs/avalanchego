@@ -35,11 +35,11 @@ type State interface {
 }
 
 type lockedState struct {
-	lock sync.Locker
+	lock *sync.RWMutex // ctx.Lock of the vm providing validators sets
 	s    State
 }
 
-func NewLockedState(lock sync.Locker, s State) State {
+func NewLockedState(lock *sync.RWMutex, s State) State {
 	return &lockedState{
 		lock: lock,
 		s:    s,
@@ -47,15 +47,15 @@ func NewLockedState(lock sync.Locker, s State) State {
 }
 
 func (s *lockedState) GetMinimumHeight(ctx context.Context) (uint64, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.s.GetMinimumHeight(ctx)
 }
 
 func (s *lockedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.s.GetCurrentHeight(ctx)
 }
@@ -72,8 +72,8 @@ func (s *lockedState) GetValidatorSet(
 	height uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*GetValidatorOutput, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.s.GetValidatorSet(ctx, height, subnetID)
 }
