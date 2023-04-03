@@ -6,6 +6,7 @@ package snowstorm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -182,12 +183,26 @@ func (dg *Directed) Finalized() bool {
 func (dg *Directed) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingTxs := dg.Latency.NumProcessing()
 	isOutstandingTxs := numOutstandingTxs <= dg.params.MaxOutstandingItems
+	healthy := isOutstandingTxs
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	if !isOutstandingTxs {
-		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems)
-		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", errorReason)
+
+	// check for long running transactions
+	oldestProcessingDuration := dg.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= dg.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningTransaction"] = oldestProcessingDuration.String()
+
+	if !healthy {
+		var errorReasons []string
+		if !isOutstandingTxs {
+			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding transactions %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems))
+		}
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("transaction processing time %s > %s", oldestProcessingDuration, dg.params.MaxItemProcessingTime))
+		}
+		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
