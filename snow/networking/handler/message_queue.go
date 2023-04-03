@@ -97,7 +97,7 @@ func (n *nodeMessageQueue) push(ctx context.Context, msg Message) {
 	})
 }
 
-// Returns the next message in the queue.
+// Returns the next message in the queue along with its context.
 // Returns false iff there are no more messages after this one.
 // Invariant: There is at least 1 message in the queue.
 func (n *nodeMessageQueue) pop() (context.Context, Message, bool) {
@@ -106,15 +106,15 @@ func (n *nodeMessageQueue) pop() (context.Context, Message, bool) {
 }
 
 // A group of node message queues that share a priority.
-// Within this bucket, each node's message queue is read from in turn.
+// Within this bucket, each node's message queue is read from in round robin.
 // Not safe for concurrent use.
 type utilizationBucket struct {
 	// Invariant: each queue in this list has >= 1 message.
 	nodeQueues []*nodeMessageQueue
 	// Node ID --> Index of the node in [nodeQueues]
 	nodeToIndex map[ids.NodeID]int
-	// the index of the node to read from next. Changes after each read.
-	// Invariant: Always in [0, len(nodeQueues)-1]
+	// Index of the node to read from next. Changes after each read.
+	// Invariant: 0 <= currentNodeIndex <= len(nodeQueues)-1.
 	currentNodeIndex int
 	// Index of this bucket within a list of buckets.
 	index int
@@ -138,7 +138,8 @@ func (u *utilizationBucket) addNodeMessageQueue(queue *nodeMessageQueue) {
 // Assumes [nodeID]'s queue is in this bucket.
 func (u *utilizationBucket) removeNodeMessageQueue(nodeID ids.NodeID) {
 	currentIndex := u.nodeToIndex[nodeID]
-	lastIndex := len(u.nodeQueues) - 1 // note [lastIndex] >= 0
+	// note [lastIndex] >= 0 since [nodeID] is in [u.nodeQueues].
+	lastIndex := len(u.nodeQueues) - 1
 
 	// Swap the last node into the current node's slot, then shrink the list
 	u.nodeQueues[currentIndex] = u.nodeQueues[lastIndex]
@@ -165,8 +166,8 @@ func (u *utilizationBucket) getNextQueue() *nodeMessageQueue {
 	return queue
 }
 
-// Splits nodes' queues into buckets based on node cpu utilization.
-// Spends less time on messages from buckets with higher utilization.
+// Splits node message queues into buckets based on node cpu utilization.
+// Spends less time on messages from buckets with higher cpu utilization.
 // A node's bucket is updated when messages are pushed or popped from that node's queue.
 type multilevelMessageQueue struct {
 	// Useful for faking time in tests
@@ -205,7 +206,11 @@ func NewMessageQueue(
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
-	metrics, err := newMessageQueueMetrics(metricsNamespace, metricsRegisterer, ops)
+	metrics, err := newMessageQueueMetrics(
+		metricsNamespace,
+		metricsRegisterer,
+		ops,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create message queue metrics: %w", err)
 	}
@@ -249,6 +254,7 @@ func (m *multilevelMessageQueue) Push(ctx context.Context, msg Message) {
 	if nodeQueue, ok = m.nodeMap[nodeID]; !ok {
 		nodeQueue = newNodeMessageQueue(nodeID)
 		m.utilizatonBuckets[0].addNodeMessageQueue(nodeQueue)
+		m.metrics.bucketLengths.WithLabelValues(fmt.Sprintf("%d", 0)).Inc()
 		m.nodeMap[nodeID] = nodeQueue
 	}
 
@@ -293,7 +299,7 @@ func (m *multilevelMessageQueue) Pop() (context.Context, Message, bool) {
 
 	// Cycle over the buckets until one with available messages is found.
 	// The above for loop guarantees there is at least one queue with messages,
-	// and therefore that the loop below will always terminate.
+	// and therefore that the loop below will always terminate with a non-nil [queue].
 	var queue *nodeMessageQueue
 	// Sample to find which order to check buckets for messages.
 	bucketIndices, _ := m.sampler.sample(len(m.utilizatonBuckets))
@@ -317,6 +323,7 @@ func (m *multilevelMessageQueue) Pop() (context.Context, Message, bool) {
 	} else {
 		delete(m.nodeMap, queue.nodeID)
 		queue.bucket.removeNodeMessageQueue(queue.nodeID)
+		m.metrics.bucketLengths.WithLabelValues(fmt.Sprintf("%d", queue.bucket.index)).Dec()
 	}
 
 	// update metrics
@@ -367,7 +374,9 @@ func (m *multilevelMessageQueue) updateNodePriority(queue *nodeMessageQueue) {
 
 	if queue.bucket.index != newBucketIndex {
 		queue.bucket.removeNodeMessageQueue(nodeID)
+		m.metrics.bucketLengths.WithLabelValues(fmt.Sprintf("%d", queue.bucket.index)).Dec()
 		m.utilizatonBuckets[newBucketIndex].addNodeMessageQueue(queue)
+		m.metrics.bucketLengths.WithLabelValues(fmt.Sprintf("%d", newBucketIndex)).Inc()
 	}
 }
 

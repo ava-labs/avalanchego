@@ -17,6 +17,7 @@ type messageQueueMetrics struct {
 	len               prometheus.Gauge
 	nodesWithMessages prometheus.Gauge
 	numExcessiveCPU   prometheus.Counter
+	bucketLengths     *prometheus.GaugeVec
 }
 
 func newMessageQueueMetrics(
@@ -41,6 +42,14 @@ func newMessageQueueMetrics(
 			Name:      "excessive_cpu",
 			Help:      "Times we deferred handling a message from a node because the node was using excessive CPU",
 		}),
+		bucketLengths: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "bucket_length",
+				Help:      "Number of nodes in each bucket",
+			},
+			[]string{"bucket_index"},
+		),
 		ops: make(map[message.Op]prometheus.Gauge, len(ops)),
 	}
 
@@ -49,6 +58,7 @@ func newMessageQueueMetrics(
 		metricsRegisterer.Register(m.len),
 		metricsRegisterer.Register(m.nodesWithMessages),
 		metricsRegisterer.Register(m.numExcessiveCPU),
+		metricsRegisterer.Register(m.bucketLengths),
 	)
 
 	for _, op := range ops {
