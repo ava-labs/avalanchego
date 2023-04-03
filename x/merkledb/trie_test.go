@@ -7,7 +7,9 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -1177,4 +1179,180 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	require.True(view2.invalidated)
 	require.True(view3.invalidated)
 	require.Empty(view1.childViews)
+}
+
+func Test_Trie_ConcurrentReadWrite(t *testing.T) {
+	require := require.New(t)
+
+	trie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(trie)
+	newTrie, err := trie.NewView()
+	require.NoError(err)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := newTrie.Insert(context.Background(), []byte("key"), []byte("value"))
+		require.NoError(err)
+	}()
+
+	require.Eventually(
+		func() bool {
+			value, err := newTrie.GetValue(context.Background(), []byte("key"))
+
+			if err == database.ErrNotFound {
+				return false
+			}
+
+			require.NoError(err)
+			require.Equal([]byte("value"), value)
+			return true
+		},
+		time.Second,
+		time.Millisecond,
+	)
+}
+
+func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
+	require := require.New(t)
+
+	trie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(trie)
+
+	newTrie, err := trie.NewView()
+	require.NoError(err)
+	err = newTrie.Insert(context.Background(), []byte("key"), []byte("value0"))
+	require.NoError(err)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := newTrie.CommitToDB(context.Background())
+		require.NoError(err)
+	}()
+
+	newView, err := newTrie.NewView()
+	require.NoError(err)
+	require.NotNil(newView)
+}
+
+func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
+	require := require.New(t)
+
+	trie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(trie)
+
+	newTrie, err := trie.NewView()
+	require.NoError(err)
+	err = newTrie.Insert(context.Background(), []byte("key"), []byte("value0"))
+	require.NoError(err)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := newTrie.Remove(context.Background(), []byte("key"))
+		require.NoError(err)
+	}()
+
+	rootID, err := newTrie.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.NotZero(rootID)
+}
+
+func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
+	require := require.New(t)
+
+	trie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(trie)
+
+	newTrie, err := trie.NewView()
+	require.NoError(err)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
+		require.NoError(err)
+	}()
+
+	require.Eventually(
+		func() bool {
+			proof, err := newTrie.GetProof(context.Background(), []byte("key2"))
+			require.NoError(err)
+			require.NotNil(proof)
+
+			if proof.Value.value == nil {
+				// this is an exclusion proof since the value is nil
+				// return false to keep waiting for Insert to complete.
+				return false
+			}
+			require.Equal([]byte("value2"), proof.Value.value)
+
+			err = newTrie.CommitToDB(context.Background())
+			require.NoError(err)
+			return true
+		},
+		time.Second,
+		time.Millisecond,
+	)
+}
+
+func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
+	require := require.New(t)
+
+	trie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(trie)
+
+	newTrie, err := trie.NewView()
+	require.NoError(err)
+	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value1"))
+	require.NoError(err)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
+		require.NoError(err)
+		err = newTrie.Insert(context.Background(), []byte("key3"), []byte("value3"))
+		require.NoError(err)
+	}()
+
+	require.Eventually(
+		func() bool {
+			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 3)
+			require.NoError(err)
+			require.NotNil(rangeProof)
+
+			if len(rangeProof.KeyValues) < 3 {
+				// Wait for the other goroutine to finish inserting
+				return false
+			}
+
+			// Make sure we have exactly 3 KeyValues
+			require.Len(rangeProof.KeyValues, 3)
+			return true
+		},
+		time.Second,
+		time.Millisecond,
+	)
 }
