@@ -297,6 +297,12 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 		"outstandingVertices": numOutstandingVtx,
 	}
 
+	// check for long running vertices
+	oldestProcessingDuration := ta.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= ta.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningVertex"] = oldestProcessingDuration.String()
+
 	snowstormReport, err := ta.cg.HealthCheck(ctx)
 	healthy = healthy && err == nil
 	details["snowstorm"] = snowstormReport
@@ -305,6 +311,9 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 		var errorReasons []string
 		if isOutstandingVtx {
 			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems))
+		}
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("vertex processing time %s > %s", oldestProcessingDuration, ta.params.MaxItemProcessingTime))
 		}
 		if err != nil {
 			errorReasons = append(errorReasons, err.Error())
