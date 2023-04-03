@@ -8,13 +8,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 var _ blocks.Visitor = (*acceptor)(nil)
@@ -24,9 +23,9 @@ var _ blocks.Visitor = (*acceptor)(nil)
 // being shutdown.
 type acceptor struct {
 	*backend
-	metrics          metrics.Metrics
-	recentlyAccepted window.Window[ids.ID]
-	bootstrapped     *utils.Atomic[bool]
+	metrics      metrics.Metrics
+	validators   validators.Set
+	bootstrapped *utils.Atomic[bool]
 }
 
 func (a *acceptor) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
@@ -305,6 +304,6 @@ func (a *acceptor) commonAccept(b blocks.Block) error {
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
-	a.recentlyAccepted.Add(blkID)
+	a.validators.Track(blkID)
 	return nil
 }

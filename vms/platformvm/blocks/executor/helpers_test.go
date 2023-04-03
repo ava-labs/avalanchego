@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -54,16 +53,15 @@ import (
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 const (
 	pending stakerStatus = iota
 	current
 
-	testNetworkID                 = 10 // To be used in tests
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 10000
 )
 
 var (
@@ -190,13 +188,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
 	res.sender = &common.SenderTest{T: t}
 
 	metrics := metrics.Noop
@@ -213,7 +204,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.state,
 			res.backend,
-			window,
+			&pvalidators.TestSet{},
 		)
 		addSubnet(res)
 	} else {
@@ -222,7 +213,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.mockedState,
 			res.backend,
-			window,
+			&pvalidators.TestSet{},
 		)
 		// we do not add any subnet to state, since we can mock
 		// whatever we need

@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -2396,7 +2397,7 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 
 	vdrs, ok := s.vm.Validators.Get(args.SubnetID)
 	if !ok {
-		return errMissingValidatorSet
+		return validators.ErrMissingValidatorSet
 	}
 	weight := json.Uint64(vdrs.Weight())
 	reply.Weight = weight
