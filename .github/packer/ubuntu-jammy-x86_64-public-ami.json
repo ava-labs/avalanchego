@@ -1,13 +1,15 @@
 {
   "variables": {
     "version": "jammy-222.04",
-    "tag": "{{env `TAG`}}"
+    "tag": "{{env `TAG`}}",
+    "skip_create_ami": "{{env `SKIP_CREATE_AMI`}}"
   },
   "builders": [
     {
       "type": "amazon-ebs",
       "region": "us-east-1",
-      "ami_name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag }}-{{timestamp}}",
+      "skip_create_ami": "{{ user `skip_create_ami` }}",
+      "ami_name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{timestamp}}",
       "source_ami_filter": {
         "filters": {
           "virtualization-type": "hvm",
@@ -24,7 +26,7 @@
       "instance_type": "t2.micro",
       "ami_groups": "all",
       "tags": {
-        "Name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag }}-{{ isotime | clean_resource_name }}",
+        "Name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{ isotime | clean_resource_name }}",
         "Release": "{{ user `version` }}",
         "Base_AMI_Name": "{{ .SourceAMIName }}"
       }
