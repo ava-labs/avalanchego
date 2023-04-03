@@ -1117,6 +1117,8 @@ func (s *state) loadCurrentValidators() error {
 		metadataBytes := validatorIt.Value()
 		metadata := &validatorMetadata{
 			txID: txID,
+			// Note: we don't provide [LastUpdated] here because we expect it to
+			// always be present on disk.
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
