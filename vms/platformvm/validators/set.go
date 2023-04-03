@@ -36,12 +36,18 @@ var (
 )
 
 // P-chain must be able to provide information about validators active
-// at different heights. [Set] interface encapsulates all the machinery
+// at different heights. [QueribleSet] interface encapsulates all the machinery
 // to achieve this.
-type Set interface {
+type QueribleSet interface {
 	validators.State
 
 	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
+}
+
+// Set interface adds to QueribleSet the ability to blocks IDs
+// to serve GetMinimumHeight
+type Set interface {
+	QueribleSet
 	Track(blkID ids.ID)
 }
 

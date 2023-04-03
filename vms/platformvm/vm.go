@@ -62,7 +62,7 @@ var (
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	pvalidators.Set
+	pvalidators.QueribleSet
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
@@ -139,7 +139,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.Set = pvalidators.NewSet(vm.Config, vm.state, vm.metrics, vm.clock)
+	validatorsSet := pvalidators.NewSet(vm.Config, vm.state, vm.metrics, vm.clock)
+	vm.QueribleSet = validatorsSet
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
@@ -178,7 +179,7 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
-		vm.Set,
+		validatorsSet,
 	)
 	vm.Builder = blockbuilder.New(
 		mempool,
