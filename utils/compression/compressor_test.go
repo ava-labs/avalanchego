@@ -93,6 +93,22 @@ func TestGzipSizeLimiting(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestZstdSizeLimiting(t *testing.T) {
+	compressor := NewZstdCompressor(maxMessageSize)
+
+	data := make([]byte, maxMessageSize+1)
+	_, err := compressor.Compress(data) // should be too large
+	require.Error(t, err)
+
+	compressor2 := NewZstdCompressor(2 * maxMessageSize)
+
+	dataCompressed, err := compressor2.Compress(data)
+	require.NoError(t, err)
+
+	_, err = compressor.Decompress(dataCompressed) // should be too large
+	require.Error(t, err)
+}
+
 // Attempts to create gzip compressor with math.MaxInt64
 // which leads to undefined decompress behavior due to integer overflow
 // in limit reader creation.
