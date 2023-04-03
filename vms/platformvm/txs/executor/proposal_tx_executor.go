@@ -557,10 +557,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 					return fmt.Errorf("failed to get delegatee reward: %w", err)
 				}
 
-				newDelegateeReward, err := math.Add64(previousDelegateeReward, delegateeReward)
-				if err != nil {
-					return fmt.Errorf("delegatee reward overflowed: %w", err)
-				}
+				// Invariant: The rewards calculator can never return a
+				//            [potentialReward] that would overflow the
+				//            accumulated rewards.
+				newDelegateeReward := previousDelegateeReward + delegateeReward
+
 				// For any validators starting after [CortinaTime], we defer rewarding the
 				// [delegateeReward] until their staking period is over.
 				err = e.OnCommitState.SetDelegateeReward(
