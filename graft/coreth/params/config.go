@@ -102,7 +102,7 @@ var (
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC).Unix()),
 		BanffBlockTimestamp:             big.NewInt(time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC).Unix()),
-		// TODO add Cortina timestamp
+		CortinaBlockTimestamp:           big.NewInt(time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC).Unix()),
 		// TODO Add DUpgrade timestamp
 	}
 
