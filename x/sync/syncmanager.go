@@ -10,17 +10,15 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-const (
-	defaultRequestKeyLimit = 1024
-)
+const defaultRequestKeyLimit = 1024
 
 var (
 	token                         = struct{}{}
