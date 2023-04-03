@@ -57,6 +57,18 @@ func TestCompressDecompress(t *testing.T) {
 			dataDecompressed, err = compressor.Decompress(dataCompressed)
 			require.NoError(t, err)
 			require.EqualValues(t, data, dataDecompressed)
+
+			maxMessage := make([]byte, 2*units.MiB) // Max message size. Can't import due to cycle.
+			_, err = rand.Read(maxMessage)          // #nosec G404
+			require.NoError(t, err)
+
+			maxMessageCompressed, err := compressor.Compress(maxMessage)
+			require.NoError(t, err)
+
+			maxMessageDecompressed, err := compressor.Decompress(maxMessageCompressed)
+			require.NoError(t, err)
+
+			require.EqualValues(t, maxMessage, maxMessageDecompressed)
 		})
 	}
 }
