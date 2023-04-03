@@ -93,10 +93,10 @@ func (s *NetworkServer) AppRequest(
 		return nil
 	}
 
-	handleCtx, cancel := context.WithDeadline(ctx, bufferedDeadline)
+	ctx, cancel := context.WithDeadline(ctx, bufferedDeadline)
 	defer cancel()
 
-	err := req.Handle(handleCtx, nodeID, requestID, s)
+	err := req.Handle(ctx, nodeID, requestID, s)
 	if err != nil && !isTimeout(err) {
 		// log unexpected errors instead of returning them, since they are fatal.
 		s.log.Warn(
