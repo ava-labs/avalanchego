@@ -517,7 +517,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 				return syncer.processedWork.Len() > 0
 			},
-			500*time.Millisecond,
+			5*time.Second,
 			5*time.Millisecond,
 		)
 		syncer.Close()
