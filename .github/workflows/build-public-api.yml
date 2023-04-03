@@ -28,7 +28,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli python3-pip packer boto3
+          sudo apt-get -y install packer
 
       - name: Get the tag
         id: get_tag
