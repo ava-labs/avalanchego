@@ -2,8 +2,10 @@ name: build-public-ami
 
 on:
   push:
-    tags:
-      - "*"
+#    tags:
+#      - "*"
+    branches:
+      - "INFRA-2318"
   workflow_dispatch:
     inputs:
       tag:
@@ -26,11 +28,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli python3-pip packer
-
-      - name: Install python packer
-        run: |
-          pip install python-packer boto3
+          sudo apt-get -y install awscli python3-pip packer boto3
 
       - name: Get the tag
         id: get_tag
@@ -54,6 +52,7 @@ jobs:
         run: |
           ./.github/workflows/update-ami.py
         env:
-          TAG: ${{ env.TAG }}
+#          TAG: ${{ env.TAG }}
+          TAG: "v1.9.14"
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}
