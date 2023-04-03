@@ -4,13 +4,13 @@
 package config
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -50,12 +50,21 @@ var (
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
 )
 
-func addProcessFlags(fs *flag.FlagSet) {
+func deprecateFlags(fs *pflag.FlagSet) error {
+	for key, message := range deprecatedKeys {
+		if err := fs.MarkDeprecated(key, message); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
 }
 
-func addNodeFlags(fs *flag.FlagSet) {
+func addNodeFlags(fs *pflag.FlagSet) {
 	// Home directory
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
@@ -367,10 +376,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
-func BuildFlagSet() *flag.FlagSet {
-	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
-	// and then putting those into a *plag.FlagSet
-	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
+func BuildFlagSet() *pflag.FlagSet {
+	fs := pflag.NewFlagSet(constants.AppName, pflag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)
 	return fs
