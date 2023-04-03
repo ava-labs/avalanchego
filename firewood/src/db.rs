@@ -872,16 +872,12 @@ impl<'a> WriteBatch<'a> {
 
     /// Remove an item from the generic key-value storage. `val` will be set to the value that is
     /// removed from the storage if it exists.
-    pub fn kv_remove<K: AsRef<[u8]>>(
-        mut self,
-        key: K,
-        val: &mut Option<Vec<u8>>,
-    ) -> Result<Self, DBError> {
+    pub fn kv_remove<K: AsRef<[u8]>>(mut self, key: K) -> Result<(Self, Option<Vec<u8>>), DBError> {
         let (header, merkle, _) = self.m.latest.borrow_split();
-        *val = merkle
+        let old_value = merkle
             .remove(key, header.kv_root)
             .map_err(DBError::Merkle)?;
-        Ok(self)
+        Ok((self, old_value))
     }
 
     fn change_account(

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
@@ -31,18 +31,13 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    let mut account: Option<Vec<u8>> = None;
-    let x = match db
+    if let Ok((wb, _)) = db
         .new_writebatch()
-        .kv_remove(opts.key.clone(), &mut account)
+        .kv_remove(opts.key.clone())
+        .map_err(Error::msg)
     {
-        Ok(wb) => {
-            wb.commit();
-            println!("{}", opts.key);
-
-            Ok(())
-        }
-        Err(_) => Err(anyhow!("error deleting key")),
-    };
-    x
+        wb.commit()
+    }
+    println!("key {} deleted successfully", opts.key);
+    Ok(())
 }

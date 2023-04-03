@@ -123,14 +123,14 @@ fn fwdctl_delete_successful() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("year"));
 
-    // Delete key
+    // Delete key -- prints raw data of deleted value
     Command::cargo_bin(PRG)?
         .arg("delete")
         .args(["year"])
         .args(["--db", FIREWOOD_TEST_DB_NAME])
         .assert()
         .success()
-        .stdout(predicate::str::contains("year"));
+        .stdout(predicate::str::contains("key year deleted successfully"));
 
     fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
