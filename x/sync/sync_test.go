@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 var _ Client = &mockClient{}
