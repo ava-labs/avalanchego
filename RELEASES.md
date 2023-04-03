@@ -1,5 +1,43 @@
 # Release Notes
 
+## [v1.10.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+[This upgrade](https://medium.com/avalancheavax/cortina-x-chain-linearization-a1d9305553f6) linearizes the X-chain, introduces delegation batching to the P-chain, and increases the maximum block size on the C-chain.
+
+The changes in the upgrade go into effect at 11 AM EST, April 6th 2023 on the Fuji testnet. After Fuji is updated and verified, a mainnet compatible release will be published.
+
+**All Fuji nodes should upgrade before 11 AM EST, April 6th 2023.**
+
+The supported plugin version is `25`.
+
+### What's Changed
+
+- Add CODEOWNERS for the x/ package by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1260
+- Feature Spec Template by @richardpringle in https://github.com/ava-labs/avalanchego/pull/1258
+- Standardize CI triggers by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1265
+- special case no sent/received message in network health check by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1263
+- Fix bug template by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1268
+- Replace `flags` usage with `pflags` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1270
+- Fixed grammatical errors in `README.md` by @krakxn in https://github.com/ava-labs/avalanchego/pull/1102
+- Add tests for race conditions in merkledb by @kyl27 in https://github.com/ava-labs/avalanchego/pull/1256
+- Add P-chain indexer API example by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1271
+- use `require` in `snow/choices` tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1279
+- use `require` in `utils/wrappers` tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1280
+- add support for tracking delegatee rewards to validator metadata by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1273
+- defer delegatee rewards until end of validator staking period by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1262
+
+### New Contributors
+
+- @richardpringle made their first contribution in https://github.com/ava-labs/avalanchego/pull/1258
+- @ceyonur made their first contribution in https://github.com/ava-labs/avalanchego/pull/1263
+- @krakxn made their first contribution in https://github.com/ava-labs/avalanchego/pull/1102
+- @kyl27 made their first contribution in https://github.com/ava-labs/avalanchego/pull/1256
+- @dhrubabasu made their first contribution in https://github.com/ava-labs/avalanchego/pull/1279
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.9.16...v1.10.0-fuji
+
 ## [v1.9.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.16)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
