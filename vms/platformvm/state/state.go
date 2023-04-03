@@ -566,6 +566,10 @@ func (s *state) PutCurrentValidator(staker *Staker) {
 	s.currentStakers.PutValidator(staker)
 }
 
+func (s *state) UpdateCurrentValidator(staker *Staker) error {
+	return s.currentStakers.UpdateValidator(staker)
+}
+
 func (s *state) DeleteCurrentValidator(staker *Staker) {
 	s.currentStakers.DeleteValidator(staker)
 }

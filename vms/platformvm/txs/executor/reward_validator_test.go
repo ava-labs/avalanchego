@@ -113,7 +113,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	txExecutor.OnCommitState.Apply(env.state)
+	require.NoError(txExecutor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -207,7 +207,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	txExecutor.OnAbortState.Apply(env.state)
+	require.NoError(txExecutor.OnAbortState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -316,7 +316,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	txExecutor.OnCommitState.Apply(env.state)
+	require.NoError(txExecutor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -435,7 +435,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	txExecutor.OnAbortState.Apply(env.state)
+	require.NoError(txExecutor.OnAbortState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 

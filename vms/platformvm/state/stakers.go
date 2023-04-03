@@ -4,11 +4,16 @@
 package state
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 )
+
+var ErrUpdatingDeletedStaker = errors.New("trying to update deleted staker")
 
 type Stakers interface {
 	CurrentStakers
@@ -26,6 +31,12 @@ type CurrentStakers interface {
 	//
 	// Invariant: [staker] is not currently a CurrentValidator
 	PutCurrentValidator(staker *Staker)
+
+	// UpdateCurrentValidator updates the [staker] describing a validator to the
+	// staker set.
+	//
+	// Invariant: [staker] is a non deleted CurrentValidator
+	UpdateCurrentValidator(staker *Staker) error
 
 	// DeleteCurrentValidator removes the [staker] describing a validator from
 	// the staker set.
@@ -132,6 +143,31 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validatorDiff.validator = staker
 
 	v.stakers.ReplaceOrInsert(staker)
+}
+
+func (v *baseStakers) UpdateValidator(staker *Staker) error {
+	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.validator == nil {
+		return fmt.Errorf("%w, subnetID %v, nodeID %v",
+			ErrUpdatingDeletedStaker,
+			staker.SubnetID,
+			staker.NodeID,
+		)
+	}
+	prevStaker := validator.validator
+
+	// Explicitly remove prevStaker from stakers tree. This is because stakers tree
+	// identify stakers via stakers.Less function, so stakers with updated start or end time
+	// would be treated as a different staker and not replaced by ReplaceOrInsert call.
+	v.stakers.Delete(prevStaker)
+	v.stakers.ReplaceOrInsert(staker)
+
+	validator.validator = staker
+
+	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	validatorDiff.validatorStatus = updated
+	validatorDiff.validator = staker
+	return nil
 }
 
 func (v *baseStakers) DeleteValidator(staker *Staker) {
@@ -244,7 +280,10 @@ func (v *baseStakers) getOrCreateValidatorDiff(subnetID ids.ID, nodeID ids.NodeI
 type diffStakers struct {
 	// subnetID --> nodeID --> diff for that validator
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
+
+	// addedStakers, deletedStakers and updatedStaker must not overlap
 	addedStakers   *btree.BTreeG[*Staker]
+	updatedStakers map[ids.ID]*Staker
 	deletedStakers map[ids.ID]*Staker
 }
 
@@ -274,10 +313,12 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, unmodified
 	}
 
-	if validatorDiff.validatorStatus == added {
-		return validatorDiff.validator, added
+	switch status := validatorDiff.validatorStatus; status {
+	case added, updated:
+		return validatorDiff.validator, status
+	default:
+		return nil, status
 	}
-	return nil, validatorDiff.validatorStatus
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) {
@@ -290,6 +331,40 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
 	delete(s.deletedStakers, staker.TxID)
+	delete(s.updatedStakers, staker.TxID)
+}
+
+// UpdateValidator assumes that previous version of staker
+// has been pulled up into this diff or that it was just inserted
+func (s *diffStakers) UpdateValidator(staker *Staker) error {
+	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	switch validatorDiff.validatorStatus {
+	case added:
+		// validator was added and is being immediately updated.
+		// We mark it as added
+		prevStaker := validatorDiff.validator
+		s.addedStakers.Delete(prevStaker)
+
+		validatorDiff.validator = staker // status should stay added
+		s.addedStakers.ReplaceOrInsert(staker)
+
+	case deleted:
+		return fmt.Errorf("%w, subnetID %v, nodeID %v",
+			ErrUpdatingDeletedStaker,
+			staker.SubnetID,
+			staker.NodeID,
+		)
+
+	default: // already updated or unmodified
+		validatorDiff.validator = staker
+		validatorDiff.validatorStatus = updated
+
+		if s.updatedStakers == nil {
+			s.updatedStakers = make(map[ids.ID]*Staker)
+		}
+		s.updatedStakers[staker.TxID] = staker
+	}
+	return nil
 }
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
@@ -307,6 +382,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 			s.deletedStakers = make(map[ids.ID]*Staker)
 		}
 		s.deletedStakers[staker.TxID] = staker
+		delete(s.updatedStakers, staker.TxID) // deleted and updated Stakers must not overlap
 	}
 }
 
@@ -332,6 +408,7 @@ func (s *diffStakers) GetDelegatorIterator(
 			addedDelegatorIterator,
 		),
 		deletedDelegators,
+		nil,
 	)
 }
 
@@ -370,6 +447,7 @@ func (s *diffStakers) GetStakerIterator(parentIterator StakerIterator) StakerIte
 			NewTreeIterator(s.addedStakers),
 		),
 		s.deletedStakers,
+		s.updatedStakers,
 	)
 }
 

@@ -63,6 +63,19 @@ func (m *stakersStorageModel) PutCurrentValidator(staker *state.Staker) {
 	putValidator(staker, m.currentValidators)
 }
 
+func (m *stakersStorageModel) UpdateCurrentValidator(staker *state.Staker) error {
+	key := subnetNodeKey{
+		subnetID: staker.SubnetID,
+		nodeID:   staker.NodeID,
+	}
+	if _, found := m.currentValidators[key]; !found {
+		return state.ErrUpdatingDeletedStaker
+	}
+
+	m.currentValidators[key] = staker
+	return nil
+}
+
 func (m *stakersStorageModel) PutPendingValidator(staker *state.Staker) {
 	putValidator(staker, m.pendingValidators)
 }

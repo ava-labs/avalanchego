@@ -6,6 +6,7 @@ package state
 const (
 	unmodified diffValidatorStatus = iota
 	added
+	updated
 	deleted
 )
 

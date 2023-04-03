@@ -57,7 +57,7 @@ func TestSimpleStakersOperations(t *testing.T) {
 func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
-	properties.Property("some current validator ops", prop.ForAll(
+	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(s state.Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
@@ -125,7 +125,72 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 		stakerGenerator(anyPriority, nil, nil),
 	))
 
-	properties.Property("some pending validator ops", prop.ForAll(
+	properties.Property("update current validators", prop.ForAll(
+		func(s state.Staker) string {
+			// insert staker s first, then update StartTime/EndTime and update the staker
+			store, err := storeCreatorF()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			store.PutCurrentValidator(&s)
+			retrievedStaker, err := store.GetCurrentValidator(s.SubnetID, s.NodeID)
+			if err != nil {
+				return fmt.Sprintf("expected no error, got %v", err)
+			}
+			if !reflect.DeepEqual(&s, retrievedStaker) {
+				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
+			}
+
+			currIT, err := store.GetCurrentStakerIterator()
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+			}
+			if !currIT.Next() {
+				return errNonEmptyIteratorExpected.Error()
+			}
+			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
+				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
+			}
+			currIT.Release()
+
+			// update staker times as expected. We copy the updated staker
+			// to avoid in-place modification of stakers already stored in store,
+			// as it must be done in prod code.
+			updatedStaker := s
+			state.RotateStakerTimesInPlace(&updatedStaker)
+
+			err = store.UpdateCurrentValidator(&updatedStaker)
+			if err != nil {
+				return fmt.Sprintf("expected no error in updating, got %v", err)
+			}
+
+			// show that queries return updated staker, not original one
+			retrievedStaker, err = store.GetCurrentValidator(updatedStaker.SubnetID, updatedStaker.NodeID)
+			if err != nil {
+				return fmt.Sprintf("expected no error, got %v", err)
+			}
+			if !reflect.DeepEqual(&updatedStaker, retrievedStaker) {
+				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
+			}
+
+			currIT, err = store.GetCurrentStakerIterator()
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+			}
+			if !currIT.Next() {
+				return errNonEmptyIteratorExpected.Error()
+			}
+			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
+				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
+			}
+			currIT.Release()
+			return ""
+		},
+		stakerGenerator(currentValidator, nil, nil),
+	))
+
+	properties.Property("add, delete and query pending validators", prop.ForAll(
 		func(s state.Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
@@ -197,7 +262,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 		subnetID = ids.GenerateTestID()
 		nodeID   = ids.GenerateTestNodeID()
 	)
-	properties.Property("some current delegators ops", prop.ForAll(
+	properties.Property("add, delete and query current delegators", prop.ForAll(
 		func(val state.Staker, dels []state.Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
@@ -342,7 +407,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			}),
 	))
 
-	properties.Property("some pending delegators ops", prop.ForAll(
+	properties.Property("add, delete and query pending delegators", prop.ForAll(
 		func(val state.Staker, dels []state.Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {

@@ -231,7 +231,10 @@ func addSubnet(env *environment) {
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(env.state)
+	err = stateDiff.Apply(env.state)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func defaultState(

@@ -114,9 +114,11 @@ func (mr *MockDiffMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // Apply mocks base method.
-func (m *MockDiff) Apply(arg0 State) {
+func (m *MockDiff) Apply(arg0 State) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Apply", arg0)
+	ret := m.ctrl.Call(m, "Apply", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Apply indicates an expected call of Apply.
@@ -465,4 +467,18 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
+}
+
+// UpdateCurrentValidator mocks base method.
+func (m *MockDiff) UpdateCurrentValidator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockDiffMockRecorder) UpdateCurrentValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockDiff)(nil).UpdateCurrentValidator), arg0)
 }

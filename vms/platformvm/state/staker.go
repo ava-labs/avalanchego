@@ -121,3 +121,18 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 		Priority:  staker.PendingPriority(),
 	}, nil
 }
+
+func RotateStakerTimesInPlace(s *Staker) {
+	var (
+		currEndTime = s.EndTime
+		duration    = s.EndTime.Sub(s.StartTime)
+	)
+
+	s.StartTime = currEndTime
+	s.EndTime = currEndTime.Add(duration)
+	if s.NextTime == currEndTime {
+		s.NextTime = s.EndTime
+	} else {
+		s.NextTime = s.StartTime
+	}
+}

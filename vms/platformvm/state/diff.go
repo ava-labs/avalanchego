@@ -24,7 +24,7 @@ var (
 type Diff interface {
 	Chain
 
-	Apply(State)
+	Apply(State) error
 }
 
 type diff struct {
@@ -107,7 +107,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	switch status {
-	case added:
+	case added, updated:
 		return newValidator, nil
 	case deleted:
 		return nil, database.ErrNotFound
@@ -123,6 +123,10 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 
 func (d *diff) PutCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.PutValidator(staker)
+}
+
+func (d *diff) UpdateCurrentValidator(staker *Staker) error {
+	return d.currentStakerDiffs.UpdateValidator(staker)
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
@@ -430,7 +434,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 	}
 }
 
-func (d *diff) Apply(baseState State) {
+func (d *diff) Apply(baseState State) error {
 	baseState.SetTimestamp(d.timestamp)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
@@ -440,6 +444,11 @@ func (d *diff) Apply(baseState State) {
 			switch validatorDiff.validatorStatus {
 			case added:
 				baseState.PutCurrentValidator(validatorDiff.validator)
+			case updated:
+				err := baseState.UpdateCurrentValidator(validatorDiff.validator)
+				if err != nil {
+					return err
+				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
@@ -501,4 +510,5 @@ func (d *diff) Apply(baseState State) {
 			baseState.DeleteUTXO(utxoID)
 		}
 	}
+	return nil
 }

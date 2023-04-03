@@ -570,6 +570,20 @@ func (mr *MockStateMockRecorder) PutCurrentValidator(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutCurrentValidator", reflect.TypeOf((*MockState)(nil).PutCurrentValidator), arg0)
 }
 
+// UpdateCurrentValidator mocks base method.
+func (m *MockState) UpdateCurrentValidator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockStateMockRecorder) UpdateCurrentValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockChain)(nil).UpdateCurrentValidator), arg0)
+}
+
 // PutPendingDelegator mocks base method.
 func (m *MockState) PutPendingDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()

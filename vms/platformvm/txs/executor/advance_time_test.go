@@ -73,7 +73,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	require.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
 
 	// Test VM validators
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 	require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, nodeID))
@@ -412,7 +412,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				}
 				require.NoError(tx.Unsigned.Visit(&executor))
 
-				executor.OnCommitState.Apply(env.state)
+				require.NoError(executor.OnCommitState.Apply(env.state))
 			}
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
@@ -538,7 +538,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 	require.False(validators.Contains(env.config.Validators, subnetID, subnetVdr2NodeID))
@@ -610,7 +610,7 @@ func TestTrackedSubnet(t *testing.T) {
 			err = tx.Unsigned.Visit(&executor)
 			require.NoError(err)
 
-			executor.OnCommitState.Apply(env.state)
+			require.NoError(executor.OnCommitState.Apply(env.state))
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
 			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
@@ -659,7 +659,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	err = tx.Unsigned.Visit(&executor)
 	require.NoError(err)
 
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -718,7 +718,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	err = tx.Unsigned.Visit(&executor)
 	require.NoError(err)
 
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -762,7 +762,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	err = tx.Unsigned.Visit(&executor)
 	require.NoError(err)
 
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -816,7 +816,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	err = tx.Unsigned.Visit(&executor)
 	require.NoError(err)
 
-	executor.OnCommitState.Apply(env.state)
+	require.NoError(executor.OnCommitState.Apply(env.state))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
