@@ -8,14 +8,15 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"github.com/golang/mock/gomock"
-
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Server_GetRangeProof(t *testing.T) {

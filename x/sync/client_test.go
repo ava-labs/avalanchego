@@ -10,21 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
-
-	"github.com/ava-labs/avalanchego/x/merkledb"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
-
 	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 func sendRangeRequest(
