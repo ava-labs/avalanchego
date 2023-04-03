@@ -10,10 +10,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/avalanchego/x/merkledb"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/grpc/codes"
@@ -21,7 +17,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 // Maximum number of key-value pairs to return in a proof.
@@ -30,8 +28,9 @@ import (
 const maxKeyValuesLimit = 1024
 
 var (
-	_                         Handler = (*NetworkServer)(nil)
-	ErrMinProofSizeIsTooLarge         = errors.New("cannot generate any proof within the requested limit")
+	_ Handler = (*NetworkServer)(nil)
+
+	ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
 )
 
 type NetworkServer struct {
