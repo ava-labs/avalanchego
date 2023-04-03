@@ -1,5 +1,5 @@
 use firewood::db::{DBConfig, WALConfig, DB};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fs::remove_dir_all, path::Path};
 
 macro_rules! kv_dump {
     ($e: ident) => {{
@@ -84,5 +84,78 @@ fn test_revisions() {
             }
         }
         println!("i = {i}");
+    }
+}
+
+#[test]
+fn create_db_issue_proof() {
+    let cfg = DBConfig::builder()
+        .meta_ncached_pages(1024)
+        .meta_ncached_files(128)
+        .payload_ncached_pages(1024)
+        .payload_ncached_files(128)
+        .payload_file_nbit(16)
+        .payload_regn_nbit(16)
+        .wal(
+            WALConfig::builder()
+                .file_nbit(15)
+                .block_nbit(8)
+                .max_revisions(10)
+                .build(),
+        );
+
+    let db = DB::new("test_db_proof", &cfg.truncate(true).build()).unwrap();
+
+    let mut wb = db.new_writebatch();
+
+    let items = vec![
+        ("d", "verb"),
+        ("do", "verb"),
+        ("doe", "reindeer"),
+        ("e", "coin"),
+    ];
+
+    for (k, v) in items {
+        wb = wb.kv_insert(k.as_bytes(), v.as_bytes().to_vec()).unwrap();
+    }
+    wb.commit();
+
+    // Add second commit due to API restrictions
+    let mut wb = db.new_writebatch();
+    for (k, v) in Vec::from([("x", "two")]).iter() {
+        wb = wb
+            .kv_insert(k.to_string().as_bytes(), v.as_bytes().to_vec())
+            .unwrap();
+    }
+    wb.commit();
+
+    let rev = db.get_revision(1, None).unwrap();
+    let key = "doe".as_bytes();
+    let root_hash = rev.kv_root_hash();
+
+    match rev.prove(key) {
+        Ok(proof) => {
+            let verification = proof.verify_proof(key, *root_hash.unwrap()).unwrap();
+            assert!(verification.is_some());
+        }
+        Err(e) => {
+            panic!("Error: {}", e);
+        }
+    }
+
+    let missing_key = "dog".as_bytes();
+    // The proof for the missing key will return the path to the missing key
+    if let Err(e) = rev.prove(missing_key) {
+        println!("Error: {}", e);
+        // TODO do type assertion on error
+    }
+
+    fwdctl_delete_db("test_db_proof");
+}
+
+// Removes the firewood database on disk
+fn fwdctl_delete_db<P: AsRef<Path>>(path: P) {
+    if let Err(e) = remove_dir_all(path) {
+        eprintln!("failed to delete testing dir: {e}");
     }
 }
