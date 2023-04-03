@@ -1255,7 +1255,7 @@ func (t *trieView) insertIntoTrie(
 		existingChildKey[len(branchNode.key)+1:],
 		existingChildEntry.id,
 		existingChildEntry.altID,
-		existingChildEntry.isValueNode,
+		existingChildEntry.valueNode,
 	)
 
 	return nodeWithValue, t.recordNodeChange(branchNode)

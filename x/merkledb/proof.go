@@ -664,7 +664,7 @@ func addPathInfo(
 					compressedPath,
 					childID,
 					n.children[index].altID,
-					n.children[index].isValueNode,
+					n.children[index].valueNode,
 				) // TODO: is this correct?
 			}
 		}

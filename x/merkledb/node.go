@@ -34,7 +34,7 @@ type child struct {
 	compressedPath path
 	id             ids.ID
 	altID          []byte
-	isValueNode    bool
+	valueNode      []byte
 }
 
 // node holds additional information on top of the dbNode that makes calulcations easier to do
@@ -155,23 +155,27 @@ func (n *node) setValueDigest() {
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(child *node) {
+	var valueNode []byte
+	if child.isValueNode() {
+		valueNode = child.value.value
+	}
 	n.addChildWithoutNode(
 		child.key[len(n.key)],
 		child.key[len(n.key)+1:],
 		child.id,
 		child.altID,
-		child.isValueNode(),
+		valueNode,
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, childAltID []byte, isValueNode bool) {
+func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, childAltID []byte, valueNode []byte) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
 		id:             childID,
 		altID:          childAltID,
-		isValueNode:    isValueNode,
+		valueNode:      valueNode,
 	}
 }
 

@@ -4,9 +4,12 @@
 package merkledb
 
 import (
+	"fmt"
 	"io"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,4 +69,14 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 		_, err = parseNode(newPath([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
+}
+
+func TestHashData(t *testing.T) {
+	data := []byte("test")
+	result := hashData(data)
+	fmt.Println(result)
+
+	var resultExisting ids.ID
+	resultExisting = hashing.ComputeHash256Array(data)
+	fmt.Println(resultExisting)
 }

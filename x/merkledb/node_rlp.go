@@ -22,7 +22,7 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		// the case where there is no value corresponds to an empty trie
 		// the case with a value correspond to value nodes in ethereum representation.
 		if !n.value.IsNothing() {
-			w.Write(valueOrHash(n.value.Value()))
+			w.Write(n.value.Value())
 		} else {
 			w.Write(rlp.EmptyString)
 		}
@@ -36,7 +36,7 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		for idx, child := range n.children {
 			compressedPath := append([]byte{idx}, child.compressedPath.Bytes()...)
 			// altID will contain either the hash or the RLP encoded value if < 32 bytes
-			bytes := shortNodeIfNeeded(compressedPath, child.altID, child.isValueNode)
+			bytes := shortNodeIfNeeded(compressedPath, child.altID, child.valueNode)
 			w.Write(bytes)
 			break // should only be 1 iteration
 		}
@@ -49,28 +49,31 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		for i := byte(0); i < 16; i++ {
 			if child, ok := n.children[i]; ok {
 				// altID will contain either the hash or the RLP encoded value if < 32 bytes
-				bytes := shortNodeIfNeeded(child.compressedPath.Bytes(), child.altID, child.isValueNode)
-				w.Write(valueOrHash(bytes))
+				bytes := shortNodeIfNeeded(child.compressedPath.Bytes(), child.altID, child.valueNode)
+				w.Write(bytes)
+				fmt.Println("full-node-encoding", i, common.Bytes2Hex(bytes))
 			} else {
 				w.Write(rlp.EmptyString)
 			}
 		}
 
 		if !n.value.IsNothing() {
-			w.WriteBytes(valueOrHash(n.value.Value()))
+			w.WriteBytes(n.value.Value())
 		} else {
 			w.Write(rlp.EmptyString)
 		}
 		w.ListEnd(offset)
+
+		fmt.Println("full-node-encoding", common.Bytes2Hex(w.ToBytes()))
 		return
 	}
 
 	panic("unexpected case")
 }
 
-func shortNodeIfNeeded(compressedKey []byte, val []byte, isValueNode bool) []byte {
+func shortNodeIfNeeded(compressedKey []byte, val []byte, valueNode []byte) []byte {
 	w := rlp.NewEncoderBuffer(nil)
-	shortNodeIfNeededWriter(w, compressedKey, val, isValueNode)
+	shortNodeIfNeededWriter(w, compressedKey, val, valueNode)
 
 	bytes := w.ToBytes()
 	fmt.Println(
@@ -80,14 +83,15 @@ func shortNodeIfNeeded(compressedKey []byte, val []byte, isValueNode bool) []byt
 	return bytes
 }
 
-func shortNodeIfNeededWriter(w rlp.EncoderBuffer, compressedKey []byte, val []byte, isValueNode bool) {
+func shortNodeIfNeededWriter(w rlp.EncoderBuffer, compressedKey []byte, val []byte, valueNode []byte) {
+	isValueNode := len(valueNode) > 0
 	if isValueNode {
 		compressedKey = append(compressedKey, 0x10)
 	}
 
 	if len(compressedKey) == 0 {
 		fmt.Println("shortNodeIfNeeded: compressedKey is empty", common.Bytes2Hex(val))
-		w.Write(val)
+		w.WriteBytes(val)
 		return
 	}
 
@@ -95,7 +99,9 @@ func shortNodeIfNeededWriter(w rlp.EncoderBuffer, compressedKey []byte, val []by
 
 	compactKey := hexToCompact(compressedKey)
 	w.WriteBytes(compactKey)
-	if len(val) > 0 {
+	if isValueNode {
+		w.WriteBytes(valueNode)
+	} else if len(val) > 0 {
 		w.WriteBytes(val)
 	} else {
 		w.Write(rlp.EmptyString)
