@@ -690,7 +690,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
-	service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000)
+	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
 	require.NoError(service.vm.state.Commit())
 
 	// Call getValidators
