@@ -39,13 +39,14 @@ type ClientOwner struct {
 // over client
 type ClientPermissionlessValidator struct {
 	ClientStaker
-	ValidationRewardOwner *ClientOwner
-	DelegationRewardOwner *ClientOwner
-	PotentialReward       *uint64
-	DelegationFee         float32
-	Uptime                *float32
-	Connected             *bool
-	Signer                *signer.ProofOfPossession
+	ValidationRewardOwner  *ClientOwner
+	DelegationRewardOwner  *ClientOwner
+	PotentialReward        *uint64
+	AccruedDelegateeReward *uint64
+	DelegationFee          float32
+	Uptime                 *float32
+	Connected              *bool
+	Signer                 *signer.ProofOfPossession
 	// The delegators delegating to this validator
 	DelegatorCount  *uint64
 	DelegatorWeight *uint64

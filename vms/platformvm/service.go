@@ -823,11 +823,11 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 		potentialReward := json.Uint64(currentStaker.PotentialReward)
 
-		potentialDelegateeReward, err := s.vm.state.GetDelegateeReward(currentStaker.SubnetID, currentStaker.NodeID)
+		delegateeReward, err := s.vm.state.GetDelegateeReward(currentStaker.SubnetID, currentStaker.NodeID)
 		if err != nil {
-			potentialDelegateeReward = 0
+			return err
 		}
-		jsonPotentialDelegateeReward := json.Uint64(potentialDelegateeReward)
+		jsonDelegateeReward := json.Uint64(delegateeReward)
 
 		switch currentStaker.Priority {
 		case txs.PrimaryNetworkValidatorCurrentPriority, txs.SubnetPermissionlessValidatorCurrentPriority:
@@ -865,16 +865,16 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			}
 
 			vdr := platformapi.PermissionlessValidator{
-				Staker:                   apiStaker,
-				Uptime:                   uptime,
-				Connected:                connected,
-				PotentialReward:          &potentialReward,
-				PotentialDelegateeReward: &jsonPotentialDelegateeReward,
-				RewardOwner:              validationRewardOwner,
-				ValidationRewardOwner:    validationRewardOwner,
-				DelegationRewardOwner:    delegationRewardOwner,
-				DelegationFee:            delegationFee,
-				Signer:                   attr.proofOfPossession,
+				Staker:                 apiStaker,
+				Uptime:                 uptime,
+				Connected:              connected,
+				PotentialReward:        &potentialReward,
+				AccruedDelegateeReward: &jsonDelegateeReward,
+				RewardOwner:            validationRewardOwner,
+				ValidationRewardOwner:  validationRewardOwner,
+				DelegationRewardOwner:  delegationRewardOwner,
+				DelegationFee:          delegationFee,
+				Signer:                 attr.proofOfPossession,
 			}
 			reply.Validators = append(reply.Validators, vdr)
 
