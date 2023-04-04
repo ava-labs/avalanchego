@@ -275,8 +275,6 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 		zstdCompressed            = m.GetCompressedZstd()
 	)
 	switch {
-	case len(gzipCompressed) > 0 && len(zstdCompressed) > 0:
-		return nil, 0, 0, errMultipleCompressionTypes
 	case len(gzipCompressed) > 0:
 		opToDecompressTimeMetrics = mb.gzipDecompressTimeMetrics
 		compressor = mb.gzipCompressor
