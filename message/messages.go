@@ -26,8 +26,7 @@ var (
 	_ InboundMessage  = (*inboundMessage)(nil)
 	_ OutboundMessage = (*outboundMessage)(nil)
 
-	errMultipleCompressionTypes = errors.New("message is compressed with multiple compression types")
-	errUnknownCompressionType   = errors.New("message is compressed with an unknown compression type")
+	errUnknownCompressionType = errors.New("message is compressed with an unknown compression type")
 )
 
 // InboundMessage represents a set of fields for an inbound message
