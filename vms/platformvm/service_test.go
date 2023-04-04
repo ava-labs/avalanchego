@@ -703,7 +703,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}
-		require.Equal(uint64(100000), uint64(*vdr.PotentialDelegateeReward))
+		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
 	}
 }
 
