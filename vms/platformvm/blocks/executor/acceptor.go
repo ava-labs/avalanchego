@@ -148,7 +148,9 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
-	blkState.onAcceptState.Apply(a.state)
+	if err := blkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()
@@ -232,7 +234,9 @@ func (a *acceptor) optionBlock(b, parent blocks.Block) error {
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
 	}
-	blkState.onAcceptState.Apply(a.state)
+	if err := blkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
 	return a.state.Commit()
 }
 
@@ -270,7 +274,9 @@ func (a *acceptor) standardBlock(b blocks.Block) error {
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
-	blkState.onAcceptState.Apply(a.state)
+	if err := blkState.onAcceptState.Apply(a.state); err != nil {
+		return err
+	}
 
 	defer a.state.Abort()
 	batch, err := a.state.CommitBatch()

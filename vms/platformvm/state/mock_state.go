@@ -320,6 +320,21 @@ func (mr *MockStateMockRecorder) GetCurrentValidator(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockState)(nil).GetCurrentValidator), arg0, arg1)
 }
 
+// GetDelegateeReward mocks base method.
+func (m *MockState) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDelegateeReward", arg0, arg1)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDelegateeReward indicates an expected call of GetDelegateeReward.
+func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -604,6 +619,20 @@ func (m *MockState) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 func (mr *MockStateMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockState)(nil).SetCurrentSupply), arg0, arg1)
+}
+
+// SetDelegateeReward mocks base method.
+func (m *MockState) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDelegateeReward", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetDelegateeReward indicates an expected call of SetDelegateeReward.
+func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
 // SetHeight mocks base method.

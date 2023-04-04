@@ -33,6 +33,14 @@ type CurrentStakers interface {
 	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker)
 
+	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
+	// [subnetID] to [amount].
+	SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error
+
+	// GetDelegateeReward returns the accrued delegation rewards for [nodeID] on
+	// [subnetID].
+	GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error)
+
 	// GetCurrentDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
 	// removal from current staker set.
