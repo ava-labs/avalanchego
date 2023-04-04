@@ -21,7 +21,6 @@ func NewZstdCompressor(maxSize int64) Compressor {
 
 type zstdCompressor struct {
 	maxSize int64
-	reader  bytes.Reader
 }
 
 func (z *zstdCompressor) Compress(msg []byte) ([]byte, error) {
@@ -32,8 +31,7 @@ func (z *zstdCompressor) Compress(msg []byte) ([]byte, error) {
 }
 
 func (z *zstdCompressor) Decompress(msg []byte) ([]byte, error) {
-	z.reader.Reset(msg)
-	reader := zstd.NewReader(&z.reader)
+	reader := zstd.NewReader(bytes.NewReader(msg))
 	defer reader.Close()
 
 	// We allow [io.LimitReader] to read up to [z.maxSize + 1] bytes, so that if
