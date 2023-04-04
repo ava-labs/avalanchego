@@ -285,10 +285,7 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	default:
 		// The message wasn't compressed
 		op, err := ToOp(m)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		return m, 0, op, nil
+		return m, 0, op, err
 	}
 
 	startTime := time.Now()
