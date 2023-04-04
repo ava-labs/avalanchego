@@ -212,9 +212,9 @@ func (mb *msgBuilder) marshal(
 	// This recursive packing allows us to avoid an extra compression on/off
 	// field in the message.
 	var (
-		startTime                 = time.Now()
-		compressedMsg             p2p.Message
-		opToDecompressTimeMetrics map[Op]metric.Averager
+		startTime               = time.Now()
+		compressedMsg           p2p.Message
+		opToCompressTimeMetrics map[Op]metric.Averager
 	)
 	switch compressionType {
 	case compression.TypeNone:
@@ -229,7 +229,7 @@ func (mb *msgBuilder) marshal(
 				CompressedGzip: compressedBytes,
 			},
 		}
-		opToDecompressTimeMetrics = mb.gzipDecompressTimeMetrics
+		opToCompressTimeMetrics = mb.gzipCompressTimeMetrics
 	case compression.TypeZstd:
 		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
@@ -240,7 +240,7 @@ func (mb *msgBuilder) marshal(
 				CompressedZstd: compressedBytes,
 			},
 		}
-		opToDecompressTimeMetrics = mb.zstdDecompressTimeMetrics
+		opToCompressTimeMetrics = mb.zstdCompressTimeMetrics
 	default:
 		return nil, 0, 0, errUnknownCompressionType
 	}
@@ -251,9 +251,9 @@ func (mb *msgBuilder) marshal(
 	}
 	compressTook := time.Since(startTime)
 
-	if decompressTimeMetric, ok := opToDecompressTimeMetrics[op]; ok {
+	if compressTimeMetric, ok := opToCompressTimeMetrics[op]; ok {
 		// This case should always execute, but check just in case.
-		decompressTimeMetric.Observe(float64(compressTook))
+		compressTimeMetric.Observe(float64(compressTook))
 	}
 
 	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
