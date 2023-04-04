@@ -5,6 +5,7 @@ use std::io::{Cursor, Write};
 use std::rc::Rc;
 use std::thread::JoinHandle;
 
+use bytemuck::{cast_slice, AnyBitPattern};
 use parking_lot::{Mutex, MutexGuard};
 use primitive_types::U256;
 use shale::{compact::CompactSpaceHeader, MemStore, MummyItem, MummyObj, ObjPtr, SpaceID};
@@ -56,6 +57,7 @@ impl Error for DBError {}
 /// correct parameters are used when the DB is opened later (the parameters here will override the
 /// parameters in [DBConfig] if the DB already exists).
 #[repr(C)]
+#[derive(Debug, Clone, Copy, AnyBitPattern)]
 struct DBParams {
     magic: [u8; 16],
     meta_file_nbit: u64,
@@ -464,7 +466,7 @@ impl DB {
         nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DBError::System)?;
         drop(file0);
         let mut offset = header_bytes.len() as u64;
-        let header = unsafe { std::mem::transmute::<_, DBParams>(header_bytes) };
+        let header: DBParams = cast_slice(&header_bytes)[0];
 
         // setup disk buffer
         let cached = Universe {
