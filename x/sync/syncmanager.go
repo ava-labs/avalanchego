@@ -310,7 +310,11 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		}
 
 		if len(changeproof.KeyChanges) > 0 {
-			largestHandledKey = changeproof.KeyChanges[len(changeproof.KeyChanges)-1].Key
+			lastChange := changeproof.KeyChanges[len(changeproof.KeyChanges)-1]
+			// TODO: Handle finding the next key for deletions
+			if !lastChange.Value.IsNothing() {
+				largestHandledKey = lastChange.Key
+			}
 		}
 	}
 
