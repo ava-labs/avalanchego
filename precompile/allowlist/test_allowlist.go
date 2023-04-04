@@ -4,12 +4,10 @@
 package allowlist
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
-	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,23 +19,6 @@ var (
 	TestEnabledAddr = common.HexToAddress("0x0000000000000000000000000000000000000022")
 	TestNoRoleAddr  = common.HexToAddress("0x0000000000000000000000000000000000000033")
 )
-
-// mkConfigWithAllowList creates a new config with the correct type for [module]
-// by marshalling [cfg] to JSON and then unmarshalling it into the config.
-func mkConfigWithAllowList(module modules.Module, cfg *AllowListConfig) precompileconfig.Config {
-	jsonBytes, err := json.Marshal(cfg)
-	if err != nil {
-		panic(err)
-	}
-
-	moduleCfg := module.MakeConfig()
-	err = json.Unmarshal(jsonBytes, moduleCfg)
-	if err != nil {
-		panic(err)
-	}
-
-	return moduleCfg
-}
 
 func AllowListTests(module modules.Module) map[string]testutils.PrecompileTest {
 	contractAddress := module.Address

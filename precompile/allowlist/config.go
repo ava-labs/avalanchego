@@ -58,7 +58,7 @@ func (c *AllowListConfig) Verify() error {
 	// check for duplicates in enabled list
 	for _, enabledAddr := range c.EnabledAddresses {
 		if _, ok := addressMap[enabledAddr]; ok {
-			return fmt.Errorf("duplicate address %s in enabled list", enabledAddr)
+			return fmt.Errorf("duplicate address in enabled list: %s", enabledAddr)
 		}
 		addressMap[enabledAddr] = EnabledRole
 	}
@@ -67,9 +67,9 @@ func (c *AllowListConfig) Verify() error {
 	for _, adminAddr := range c.AdminAddresses {
 		if role, ok := addressMap[adminAddr]; ok {
 			if role == AdminRole {
-				return fmt.Errorf("duplicate address %s in admin list", adminAddr)
+				return fmt.Errorf("duplicate address in admin list: %s", adminAddr)
 			} else {
-				return fmt.Errorf("cannot set address %s as both admin and enabled", adminAddr)
+				return fmt.Errorf("cannot set address as both admin and enabled: %s", adminAddr)
 			}
 		}
 		addressMap[adminAddr] = AdminRole

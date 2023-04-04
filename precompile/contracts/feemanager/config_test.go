@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 )
 
 var validFeeConfig = commontype.FeeConfig{
@@ -27,106 +28,61 @@ var validFeeConfig = commontype.FeeConfig{
 }
 
 func TestVerifyFeeManagerConfig(t *testing.T) {
-	admins := []common.Address{{1}}
+	admins := []common.Address{allowlist.TestAdminAddr}
 	invalidFeeConfig := validFeeConfig
 	invalidFeeConfig.GasLimit = big.NewInt(0)
-	tests := []struct {
-		name          string
-		config        precompileconfig.Config
-		ExpectedError string
-	}{
-		{
-			name:          "invalid allow list config in fee manager allowlist",
-			config:        NewConfig(big.NewInt(3), admins, admins, nil),
-			ExpectedError: "cannot set address",
-		},
-		{
-			name:          "invalid initial fee manager config",
-			config:        NewConfig(big.NewInt(3), admins, nil, &invalidFeeConfig),
+	tests := map[string]testutils.ConfigVerifyTest{
+		"invalid initial fee manager config": {
+			Config:        NewConfig(big.NewInt(3), admins, nil, &invalidFeeConfig),
 			ExpectedError: "gasLimit = 0 cannot be less than or equal to 0",
 		},
-		{
-			name:          "nil initial fee manager config",
-			config:        NewConfig(big.NewInt(3), admins, nil, &commontype.FeeConfig{}),
+		"nil initial fee manager config": {
+			Config:        NewConfig(big.NewInt(3), admins, nil, &commontype.FeeConfig{}),
 			ExpectedError: "gasLimit cannot be nil",
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			err := tt.config.Verify()
-			if tt.ExpectedError == "" {
-				require.NoError(err)
-			} else {
-				require.ErrorContains(err, tt.ExpectedError)
-			}
-		})
-	}
+	allowlist.VerifyPrecompileWithAllowListTests(t, Module, tests)
 }
 
 func TestEqualFeeManagerConfig(t *testing.T) {
-	admins := []common.Address{{1}}
-	enableds := []common.Address{{2}}
-	tests := []struct {
-		name     string
-		config   precompileconfig.Config
-		other    precompileconfig.Config
-		expected bool
-	}{
-		{
-			name:     "non-nil config and nil other",
-			config:   NewConfig(big.NewInt(3), admins, enableds, nil),
-			other:    nil,
-			expected: false,
+	admins := []common.Address{allowlist.TestAdminAddr}
+	enableds := []common.Address{allowlist.TestEnabledAddr}
+	tests := map[string]testutils.ConfigEqualTest{
+		"non-nil config and nil other": {
+			Config:   NewConfig(big.NewInt(3), admins, enableds, nil),
+			Other:    nil,
+			Expected: false,
 		},
-		{
-			name:     "different type",
-			config:   NewConfig(big.NewInt(3), admins, enableds, nil),
-			other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
-			expected: false,
+		"different type": {
+			Config:   NewConfig(big.NewInt(3), admins, enableds, nil),
+			Other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
+			Expected: false,
 		},
-		{
-			name:     "different timestamp",
-			config:   NewConfig(big.NewInt(3), admins, nil, nil),
-			other:    NewConfig(big.NewInt(4), admins, nil, nil),
-			expected: false,
+		"different timestamp": {
+			Config:   NewConfig(big.NewInt(3), admins, nil, nil),
+			Other:    NewConfig(big.NewInt(4), admins, nil, nil),
+			Expected: false,
 		},
-		{
-			name:     "different enabled",
-			config:   NewConfig(big.NewInt(3), admins, nil, nil),
-			other:    NewConfig(big.NewInt(3), admins, enableds, nil),
-			expected: false,
+		"non-nil initial config and nil initial config": {
+			Config:   NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
+			Other:    NewConfig(big.NewInt(3), admins, nil, nil),
+			Expected: false,
 		},
-		{
-			name:     "non-nil initial config and nil initial config",
-			config:   NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
-			other:    NewConfig(big.NewInt(3), admins, nil, nil),
-			expected: false,
-		},
-		{
-			name:   "different initial config",
-			config: NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
-			other: NewConfig(big.NewInt(3), admins, nil,
+		"different initial config": {
+			Config: NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
+			Other: NewConfig(big.NewInt(3), admins, nil,
 				func() *commontype.FeeConfig {
 					c := validFeeConfig
 					c.GasLimit = big.NewInt(123)
 					return &c
 				}()),
-			expected: false,
+			Expected: false,
 		},
-		{
-			name:     "same config",
-			config:   NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
-			other:    NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
-			expected: true,
+		"same config": {
+			Config:   NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
+			Other:    NewConfig(big.NewInt(3), admins, nil, &validFeeConfig),
+			Expected: true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			require.Equal(tt.expected, tt.config.Equal(tt.other))
-		})
-	}
+	allowlist.EqualPrecompileWithAllowListTests(t, Module, tests)
 }

@@ -22,14 +22,18 @@ var (
 )
 
 type dummyConfig struct {
-	*AllowListConfig
+	AllowListConfig
 }
 
 func (d *dummyConfig) Key() string         { return "dummy" }
 func (d *dummyConfig) Timestamp() *big.Int { return common.Big0 }
 func (d *dummyConfig) IsDisabled() bool    { return false }
-func (d *dummyConfig) Equal(other precompileconfig.Config) bool {
-	return d.AllowListConfig.Equal(other.(*dummyConfig).AllowListConfig)
+func (d *dummyConfig) Equal(cfg precompileconfig.Config) bool {
+	other, ok := (cfg).(*dummyConfig)
+	if !ok {
+		return false
+	}
+	return d.AllowListConfig.Equal(&other.AllowListConfig)
 }
 
 type dummyConfigurator struct{}
