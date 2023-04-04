@@ -8,6 +8,8 @@ use std::{path::Path, thread};
 
 use tokio::sync::{mpsc, oneshot};
 
+use crate::api::Revision;
+use crate::db::DBRevConfig;
 use crate::{
     api,
     db::{DBConfig, DBError},
@@ -16,7 +18,7 @@ use crate::{
 use async_trait::async_trait;
 
 use super::server::FirewoodService;
-use super::{BatchHandle, BatchRequest, Request};
+use super::{BatchHandle, BatchRequest, Request, RevRequest, RevisionHandle};
 
 /// A `Connection` represents a connection to the thread running firewood
 /// The type specified is how you want to refer to your key values; this is
@@ -244,57 +246,68 @@ impl api::WriteBatch for BatchHandle {
     }
 }
 
+impl super::RevisionHandle {
+    pub async fn close(self) {
+        let _ = self
+            .sender
+            .send(Request::RevRequest(RevRequest::Drop { handle: self.id }))
+            .await;
+    }
+}
+
 #[async_trait]
-impl crate::api::DB<BatchHandle> for Connection
-where
-    tokio::sync::mpsc::Sender<Request>: From<tokio::sync::mpsc::Sender<Request>>,
-{
+impl Revision for super::RevisionHandle {
     async fn kv_root_hash(&self) -> Result<merkle::Hash, DBError> {
         let (send, recv) = oneshot::channel();
-        let msg = Request::RootHash { respond_to: send };
-        let _ = self.sender.as_ref().unwrap().send(msg).await;
+        let msg = Request::RevRequest(RevRequest::RootHash {
+            handle: self.id,
+            respond_to: send,
+        });
+        let _ = self.sender.send(msg).await;
         recv.await.expect("Actor task has been killed")
     }
 
     async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DBError> {
         let (send, recv) = oneshot::channel();
-        let _ = Request::Get {
+        let _ = Request::RevRequest(RevRequest::Get {
+            handle: self.id,
             key: key.as_ref().to_vec(),
             respond_to: send,
-        };
+        });
         recv.await.expect("Actor task has been killed")
     }
 
-    async fn kv_dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DBError> {
-        unimplemented!();
-    }
-
-    async fn new_writebatch(&self) -> BatchHandle {
+    async fn prove<K: AsRef<[u8]> + Send + Sync>(
+        &self,
+        key: K,
+    ) -> Result<crate::proof::Proof, merkle::MerkleError> {
         let (send, recv) = oneshot::channel();
-        let msg = Request::NewBatch { respond_to: send };
-        self.sender
-            .as_ref()
-            .unwrap()
-            .send(msg)
-            .await
-            .expect("channel failed");
-        let id = recv.await;
-        let id = id.unwrap();
-        BatchHandle {
-            sender: self.sender.as_ref().unwrap().clone(),
-            id,
-        }
+        let msg = Request::RevRequest(RevRequest::Prove {
+            handle: self.id,
+            key: key.as_ref().to_vec(),
+            respond_to: send,
+        });
+        self.sender.send(msg).await.expect("channel failed");
+        recv.await.expect("channel failed")
     }
 
+    async fn verify_range_proof<K: AsRef<[u8]> + Send + Sync>(
+        &self,
+        _proof: crate::proof::Proof,
+        _first_key: K,
+        _last_key: K,
+        _keys: Vec<K>,
+        _values: Vec<K>,
+    ) {
+        todo!()
+    }
     async fn root_hash(&self) -> Result<merkle::Hash, DBError> {
         let (send, recv) = oneshot::channel();
-        let msg = Request::RootHash { respond_to: send };
-        self.sender
-            .as_ref()
-            .unwrap()
-            .send(msg)
-            .await
-            .expect("channel failed");
+        let msg = Request::RevRequest(RevRequest::RootHash {
+            handle: self.id,
+            respond_to: send,
+        });
+        self.sender.send(msg).await.expect("channel failed");
         recv.await.expect("channel failed")
     }
 
@@ -310,6 +323,10 @@ where
         todo!()
     }
 
+    async fn kv_dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DBError> {
+        unimplemented!();
+    }
+
     async fn get_balance<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
@@ -318,24 +335,6 @@ where
     }
 
     async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, _key: K) -> Result<Vec<u8>, DBError> {
-        todo!()
-    }
-
-    async fn prove<K: AsRef<[u8]> + Send + Sync>(
-        &self,
-        _key: K,
-    ) -> Result<crate::proof::Proof, merkle::MerkleError> {
-        todo!()
-    }
-
-    async fn verify_range_proof<K: AsRef<[u8]> + Send + Sync>(
-        &self,
-        _proof: crate::proof::Proof,
-        _first_key: K,
-        _last_key: K,
-        _keys: Vec<K>,
-        _values: Vec<K>,
-    ) {
         todo!()
     }
 
@@ -353,9 +352,48 @@ where
     ) -> Result<Vec<u8>, DBError> {
         todo!()
     }
+}
 
-    async fn exist<K: AsRef<[u8]> + Send + Sync>(&self, _key: K) -> Result<bool, DBError> {
-        todo!()
+#[async_trait]
+impl crate::api::DB<BatchHandle, RevisionHandle> for Connection
+where
+    tokio::sync::mpsc::Sender<Request>: From<tokio::sync::mpsc::Sender<Request>>,
+{
+    async fn new_writebatch(&self) -> BatchHandle {
+        let (send, recv) = oneshot::channel();
+        let msg = Request::NewBatch { respond_to: send };
+        self.sender
+            .as_ref()
+            .unwrap()
+            .send(msg)
+            .await
+            .expect("channel failed");
+        let id = recv.await;
+        let id = id.unwrap();
+        BatchHandle {
+            sender: self.sender.as_ref().unwrap().clone(),
+            id,
+        }
+    }
+
+    async fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<RevisionHandle> {
+        let (send, recv) = oneshot::channel();
+        let msg = Request::NewRevision {
+            nback,
+            cfg,
+            respond_to: send,
+        };
+        self.sender
+            .as_ref()
+            .unwrap()
+            .send(msg)
+            .await
+            .expect("channel failed");
+        let id = recv.await.unwrap();
+        id.map(|id| RevisionHandle {
+            sender: self.sender.as_ref().unwrap().clone(),
+            id,
+        })
     }
 }
 
@@ -367,7 +405,7 @@ mod test {
     use super::*;
     #[tokio::test]
     async fn sender_api() {
-        let key = "key".as_bytes();
+        let key = b"key";
         // test using a subdirectory of CARGO_TARGET_DIR which is
         // cleaned up on `cargo clean`
         let tmpdb = [
@@ -377,19 +415,30 @@ mod test {
         let tmpdb = tmpdb.into_iter().collect::<PathBuf>();
         let conn = Connection::new(tmpdb, db_config());
         let batch = conn.new_writebatch().await;
-        let batch = batch.kv_insert(key, "val".as_bytes()).await.unwrap();
-        let batch = batch.set_code(key, "code".as_bytes()).await.unwrap();
-        let batch = batch.set_nonce(key, 42).await.unwrap();
-        let batch = batch
-            .set_state(key, "subkey".as_bytes(), "state".as_bytes())
-            .await
-            .unwrap();
-        let batch = batch.create_account(key).await.unwrap();
-        let batch = batch.no_root_hash().await;
+        let batch = batch.kv_insert(key, b"val").await.unwrap();
+        {
+            let batch = batch.set_code(key, b"code").await.unwrap();
+            let batch = batch.set_nonce(key, 42).await.unwrap();
+            let batch = batch.set_state(key, b"subkey", b"state").await.unwrap();
+            let batch = batch.create_account(key).await.unwrap();
+            let batch = batch.no_root_hash().await;
+        }
         let (batch, oldvalue) = batch.kv_remove(key).await.unwrap();
-        assert_eq!(oldvalue, Some("val".as_bytes().to_vec()));
+        assert_eq!(oldvalue, Some(b"val".to_vec()));
         batch.commit().await;
-        assert_ne!(conn.root_hash().await.unwrap(), merkle::Hash([0; 32]));
+        let batch = conn.new_writebatch().await;
+        let batch = batch.kv_insert(b"k2", b"val").await.unwrap();
+        batch.commit().await;
+
+        assert_ne!(
+            conn.get_revision(1, None)
+                .await
+                .unwrap()
+                .root_hash()
+                .await
+                .unwrap(),
+            merkle::Hash([0; 32])
+        );
     }
 
     fn db_config() -> DBConfig {

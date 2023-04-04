@@ -1,14 +1,25 @@
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{db::DBError, merkle};
+use crate::{
+    db::{DBError, DBRevConfig},
+    merkle::{self, MerkleError},
+    proof::Proof,
+};
 
 mod client;
 mod server;
 
 pub type BatchId = u32;
+pub type RevId = u32;
 
 #[derive(Debug)]
 pub struct BatchHandle {
+    sender: mpsc::Sender<Request>,
+    id: u32,
+}
+
+#[derive(Debug)]
+pub struct RevisionHandle {
     sender: mpsc::Sender<Request>,
     id: u32,
 }
@@ -19,14 +30,14 @@ pub enum Request {
     NewBatch {
         respond_to: oneshot::Sender<BatchId>,
     },
-    RootHash {
-        respond_to: oneshot::Sender<Result<merkle::Hash, DBError>>,
+    NewRevision {
+        nback: usize,
+        cfg: Option<DBRevConfig>,
+        respond_to: oneshot::Sender<Option<RevId>>,
     },
-    Get {
-        key: Vec<u8>,
-        respond_to: oneshot::Sender<Result<Vec<u8>, DBError>>,
-    },
+
     BatchRequest(BatchRequest),
+    RevRequest(RevRequest),
 }
 
 type OwnedKey = Vec<u8>;
@@ -82,5 +93,26 @@ pub enum BatchRequest {
     NoRootHash {
         handle: BatchId,
         respond_to: oneshot::Sender<()>,
+    },
+}
+
+#[derive(Debug)]
+pub enum RevRequest {
+    Get {
+        handle: RevId,
+        key: OwnedKey,
+        respond_to: oneshot::Sender<Result<Vec<u8>, DBError>>,
+    },
+    Prove {
+        handle: RevId,
+        key: OwnedKey,
+        respond_to: oneshot::Sender<Result<Proof, MerkleError>>,
+    },
+    RootHash {
+        handle: RevId,
+        respond_to: oneshot::Sender<Result<merkle::Hash, DBError>>,
+    },
+    Drop {
+        handle: RevId,
     },
 }
