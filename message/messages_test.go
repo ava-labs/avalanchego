@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func TestMessage(t *testing.T) {
@@ -51,7 +52,7 @@ func TestMessage(t *testing.T) {
 		desc             string
 		op               Op
 		msg              *p2p.Message
-		gzipCompress     bool
+		compressionType  compression.Type
 		bypassThrottling bool
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
@@ -63,7 +64,7 @@ func TestMessage(t *testing.T) {
 					Ping: &p2p.Ping{},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -77,7 +78,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -97,7 +98,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -118,7 +119,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -140,12 +141,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "peer_list message with compression",
+			desc: "peer_list message with gzip compression",
 			op:   PeerListOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_PeerList{
@@ -162,7 +163,29 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "peer_list message with zstd compression",
+			op:   PeerListOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_PeerList{
+					PeerList: &p2p.PeerList{
+						ClaimedIpPorts: []*p2p.ClaimedIpPort{
+							{
+								X509Certificate: testTLSCert.Certificate[0],
+								IpAddr:          []byte(net.IPv6zero),
+								IpPort:          9651,
+								Timestamp:       uint64(nowUnix),
+								Signature:       compressibleContainers[0],
+							},
+						},
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -181,7 +204,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: false,
 			bytesSaved:       false,
 		},
@@ -197,7 +220,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -213,12 +236,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "state_summary_frontier message with compression",
+			desc: "state_summary_frontier message with gzip compression",
 			op:   StateSummaryFrontierOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_StateSummaryFrontier_{
@@ -229,7 +252,23 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "state_summary_frontier message with zstd compression",
+			op:   StateSummaryFrontierOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_StateSummaryFrontier_{
+					StateSummaryFrontier_: &p2p.StateSummaryFrontier{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Summary:   compressibleContainers[0],
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -246,12 +285,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "get_accepted_state_summary message with compression",
+			desc: "get_accepted_state_summary message with gzip compression",
 			op:   GetAcceptedStateSummaryOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_GetAcceptedStateSummary{
@@ -263,9 +302,26 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
 			bypassThrottling: true,
 			bytesSaved:       false,
+		},
+		{
+			desc: "get_accepted_state_summary message with zstd compression",
+			op:   GetAcceptedStateSummaryOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_GetAcceptedStateSummary{
+					GetAcceptedStateSummary: &p2p.GetAcceptedStateSummary{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						Heights:   []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
+			bypassThrottling: true,
+			bytesSaved:       true,
 		},
 		{
 			desc: "accepted_state_summary message with no compression",
@@ -279,12 +335,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "accepted_state_summary message with compression",
+			desc: "accepted_state_summary message with gzip compression",
 			op:   AcceptedStateSummaryOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_AcceptedStateSummary_{
@@ -295,7 +351,23 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "accepted_state_summary message with zstd compression",
+			op:   AcceptedStateSummaryOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_AcceptedStateSummary_{
+					AcceptedStateSummary_: &p2p.AcceptedStateSummary{
+						ChainId:    testID[:],
+						RequestId:  1,
+						SummaryIds: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -312,7 +384,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -328,7 +400,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -346,7 +418,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -362,7 +434,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -380,7 +452,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -396,12 +468,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "ancestors message with compression",
+			desc: "ancestors message with gzip compression",
 			op:   AncestorsOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_Ancestors_{
@@ -412,7 +484,23 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "ancestors message with zstd compression",
+			op:   AncestorsOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ancestors_{
+					Ancestors_: &p2p.Ancestors{
+						ChainId:    testID[:],
+						RequestId:  12345,
+						Containers: compressibleContainers,
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -430,7 +518,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -447,12 +535,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "put message with compression",
+			desc: "put message with gzip compression",
 			op:   PutOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_Put{
@@ -464,7 +552,24 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "put message with zstd compression",
+			op:   PutOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_Put{
+					Put: &p2p.Put{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Container:  compressibleContainers[0],
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -482,12 +587,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "push_query message with compression",
+			desc: "push_query message with gzip compression",
 			op:   PushQueryOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_PushQuery{
@@ -500,7 +605,25 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "push_query message with zstd compression",
+			op:   PushQueryOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_PushQuery{
+					PushQuery: &p2p.PushQuery{
+						ChainId:    testID[:],
+						RequestId:  1,
+						Deadline:   1,
+						Container:  compressibleContainers[0],
+						EngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -518,7 +641,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -534,7 +657,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
@@ -551,12 +674,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "app_request message with compression",
+			desc: "app_request message with gzip compression",
 			op:   AppRequestOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_AppRequest{
@@ -568,7 +691,24 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "app_request message with zstd compression",
+			op:   AppRequestOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppRequest{
+					AppRequest: &p2p.AppRequest{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -584,12 +724,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "app_response message with compression",
+			desc: "app_response message with gzip compression",
 			op:   AppResponseOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_AppResponse{
@@ -600,7 +740,23 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "app_response message with zstd compression",
+			op:   AppResponseOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppResponse{
+					AppResponse: &p2p.AppResponse{
+						ChainId:   testID[:],
+						RequestId: 1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -615,12 +771,12 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
 		{
-			desc: "app_gossip message with compression",
+			desc: "app_gossip message with gzip compression",
 			op:   AppGossipOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_AppGossip{
@@ -630,7 +786,22 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     true,
+			compressionType:  compression.TypeGzip,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "app_gossip message with zstd compression",
+			op:   AppGossipOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_AppGossip{
+					AppGossip: &p2p.AppGossip{
+						ChainId:  testID[:],
+						AppBytes: compressibleContainers[0],
+					},
+				},
+			},
+			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
 			bytesSaved:       true,
 		},
@@ -638,7 +809,7 @@ func TestMessage(t *testing.T) {
 
 	for _, tv := range tests {
 		require.True(t.Run(tv.desc, func(t2 *testing.T) {
-			encodedMsg, err := mb.createOutbound(tv.msg, tv.gzipCompress, tv.bypassThrottling)
+			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
 			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())

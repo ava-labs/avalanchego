@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 var (
@@ -70,7 +71,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if useBuilder {
-			_, err = codec.createOutbound(&msg, false, false)
+			_, err = codec.createOutbound(&msg, compression.TypeNone, false)
 		} else {
 			_, err = proto.Marshal(&msg)
 		}

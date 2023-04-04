@@ -72,7 +72,7 @@ func StartTestPeer(
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		"",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	if err != nil {

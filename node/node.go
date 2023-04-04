@@ -1305,7 +1305,7 @@ func (n *Node) Initialize(
 	n.msgCreator, err = message.NewCreator(
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionEnabled,
+		constants.DefaultNetworkCompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {

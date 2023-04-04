@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 var _ Creator = (*creator)(nil)
@@ -25,7 +27,7 @@ type creator struct {
 func NewCreator(
 	metrics prometheus.Registerer,
 	parentNamespace string,
-	compressionEnabled bool,
+	compressionType compression.Type,
 	maxMessageTimeout time.Duration,
 ) (Creator, error) {
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)
@@ -39,7 +41,7 @@ func NewCreator(
 	}
 
 	return &creator{
-		OutboundMsgBuilder: newOutboundBuilder(compressionEnabled, builder),
+		OutboundMsgBuilder: newOutboundBuilder(compressionType, builder),
 		InboundMsgBuilder:  newInboundBuilder(builder),
 	}, nil
 }
