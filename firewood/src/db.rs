@@ -741,6 +741,13 @@ impl DB {
     }
 
     /// Get a handle that grants the access to some historical state of the entire DB.
+    ///
+    /// Note: There must be at least two committed batches in order for this function to return an older 'Revision',
+    /// other than the latest state.
+    ///
+    /// The latest revision (nback) starts from 1, which is one behind the current state.
+    /// If nback equals 0, or is above the configured maximum number of revisions, this function returns None.
+    /// It also returns None in the case where the nback is larger than the number of revisions available.
     pub fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<Revision> {
         let mut inner = self.inner.lock();
 
