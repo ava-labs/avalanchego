@@ -4,12 +4,14 @@
 package compression
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -96,4 +98,49 @@ func FuzzGzipCompressor(f *testing.F) {
 
 		require.Equal(data, decompressed)
 	})
+}
+
+func BenchmarkGzipCompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+	}
+	for _, size := range sizes {
+		bytes := utils.RandomBytes(size)
+		compressor, err := NewGzipCompressor(2 * units.MiB)
+		require.NoError(b, err)
+
+		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_, err := compressor.Compress(bytes)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+func BenchmarkGzipDecompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+	}
+	for _, size := range sizes {
+		bytes := utils.RandomBytes(size)
+		compressor, err := NewGzipCompressor(2 * units.MiB)
+		require.NoError(b, err)
+
+		compressedBytes, err := compressor.Compress(bytes)
+		require.NoError(b, err)
+
+		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_, err := compressor.Decompress(compressedBytes)
+				require.NoError(b, err)
+			}
+		})
+	}
 }
