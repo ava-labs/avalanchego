@@ -139,17 +139,21 @@ func newMsgBuilder(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
-	cpr, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
+	gzipCompressor, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
+	if err != nil {
+		return nil, err
+	}
+	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
 	if err != nil {
 		return nil, err
 	}
 
 	mb := &msgBuilder{
-		gzipCompressor:            cpr,
+		gzipCompressor:            gzipCompressor,
 		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 
-		zstdCompressor:            compression.NewZstdCompressor(constants.DefaultMaxMessageSize),
+		zstdCompressor:            zstdCompressor,
 		zstdCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		zstdDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
 

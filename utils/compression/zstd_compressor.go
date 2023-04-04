@@ -7,16 +7,25 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/DataDog/zstd"
 )
 
 var _ Compressor = (*zstdCompressor)(nil)
 
-func NewZstdCompressor(maxSize int64) Compressor {
+func NewZstdCompressor(maxSize int64) (Compressor, error) {
+	if maxSize == math.MaxInt64 {
+		// "Decompress" creates "io.LimitReader" with max size + 1:
+		// if the max size + 1 overflows, "io.LimitReader" reads nothing
+		// returning 0 byte for the decompress call
+		// require max size < math.MaxInt64 to prevent int64 overflows
+		return nil, ErrInvalidMaxSizeCompressor
+	}
+
 	return &zstdCompressor{
 		maxSize: maxSize,
-	}
+	}, nil
 }
 
 type zstdCompressor struct {

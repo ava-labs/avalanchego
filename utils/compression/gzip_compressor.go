@@ -18,9 +18,9 @@ import (
 var (
 	_ Compressor = (*gzipCompressor)(nil)
 
-	ErrInvalidMaxSizeGzipCompressor = errors.New("invalid gzip compressor max size")
-	ErrDecompressedMsgTooLarge      = errors.New("decompressed msg too large")
-	ErrMsgTooLarge                  = errors.New("msg too large to be compressed")
+	ErrInvalidMaxSizeCompressor = errors.New("invalid gzip compressor max size")
+	ErrDecompressedMsgTooLarge  = errors.New("decompressed msg too large")
+	ErrMsgTooLarge              = errors.New("msg too large to be compressed")
 )
 
 type gzipCompressor struct {
@@ -90,7 +90,7 @@ func NewGzipCompressor(maxSize int64) (Compressor, error) {
 		// if the max size + 1 overflows, "io.LimitReader" reads nothing
 		// returning 0 byte for the decompress call
 		// require max size <math.MaxInt64 to prevent int64 overflows
-		return nil, ErrInvalidMaxSizeGzipCompressor
+		return nil, ErrInvalidMaxSizeCompressor
 	}
 
 	var buf bytes.Buffer
