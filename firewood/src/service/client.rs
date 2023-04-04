@@ -102,6 +102,7 @@ impl api::WriteBatch for BatchHandle {
         };
     }
 
+    #[cfg(feature = "eth")]
     async fn set_balance<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
@@ -124,6 +125,7 @@ impl api::WriteBatch for BatchHandle {
         };
     }
 
+    #[cfg(feature = "eth")]
     async fn set_code<K, V>(self, key: K, code: V) -> Result<Self, DBError>
     where
         K: AsRef<[u8]> + Send + Sync,
@@ -146,6 +148,7 @@ impl api::WriteBatch for BatchHandle {
         };
     }
 
+    #[cfg(feature = "eth")]
     async fn set_nonce<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
@@ -191,7 +194,7 @@ impl api::WriteBatch for BatchHandle {
             Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
-
+    #[cfg(feature = "eth")]
     async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DBError> {
         let (send, recv) = oneshot::channel();
         let _ = self
@@ -209,6 +212,7 @@ impl api::WriteBatch for BatchHandle {
         };
     }
 
+    #[cfg(feature = "eth")]
     async fn delete_account<K: AsRef<[u8]> + Send + Sync>(
         self,
         _key: K,
@@ -277,6 +281,7 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("Actor task has been killed")
     }
 
+    #[cfg(feature = "proof")]
     async fn prove<K: AsRef<[u8]> + Send + Sync>(
         &self,
         key: K,
@@ -291,6 +296,7 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("channel failed")
     }
 
+    #[cfg(feature = "proof")]
     async fn verify_range_proof<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _proof: crate::proof::Proof,
@@ -315,6 +321,7 @@ impl Revision for super::RevisionHandle {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     async fn dump_account<W: std::io::Write + Send + Sync, K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
@@ -327,6 +334,7 @@ impl Revision for super::RevisionHandle {
         unimplemented!();
     }
 
+    #[cfg(feature = "eth")]
     async fn get_balance<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
@@ -334,10 +342,12 @@ impl Revision for super::RevisionHandle {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, _key: K) -> Result<Vec<u8>, DBError> {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     async fn get_nonce<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
@@ -345,6 +355,7 @@ impl Revision for super::RevisionHandle {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     async fn get_state<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
@@ -416,6 +427,7 @@ mod test {
         let conn = Connection::new(tmpdb, db_config());
         let batch = conn.new_writebatch().await;
         let batch = batch.kv_insert(key, b"val").await.unwrap();
+        #[cfg(feature = "eth")]
         {
             let batch = batch.set_code(key, b"code").await.unwrap();
             let batch = batch.set_nonce(key, 42).await.unwrap();
