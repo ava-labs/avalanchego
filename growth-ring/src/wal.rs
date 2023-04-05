@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use bytemuck::{cast_slice, AnyBitPattern};
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     stream::StreamExt,
@@ -86,6 +87,7 @@ fn counter_lt(a: u32, b: u32) -> bool {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, AnyBitPattern)]
 struct Header {
     /// all preceding files (<fid) could be removed if not yet
     recover_fid: u64,
@@ -261,7 +263,7 @@ impl<F: WALStore> WALFilePool<F> {
     async fn read_header(&self) -> Result<Header, ()> {
         let bytes = self.header_file.read(0, HEADER_SIZE).await?.unwrap();
         let bytes: [u8; HEADER_SIZE] = (&*bytes).try_into().unwrap();
-        let header = unsafe { std::mem::transmute::<_, Header>(bytes) };
+        let header: Header = cast_slice(&bytes)[0];
         Ok(header)
     }
 

@@ -20,6 +20,7 @@ async-trait = "0.1.57"
 futures = "0.3.24"
 nix = "0.26.2"
 libc = "0.2.133"
+bytemuck = "1.13.1"
 
 [dev-dependencies]
 hex = "0.4.3"
