@@ -59,6 +59,7 @@ where
         nonce: u64,
     ) -> Result<Self, DBError>;
     /// Set the state value indexed by `sub_key` in the account indexed by `key`.
+    #[cfg(feature = "eth")]
     async fn set_state<
         K: AsRef<[u8]> + Send + Sync,
         SK: AsRef<[u8]> + Send + Sync,

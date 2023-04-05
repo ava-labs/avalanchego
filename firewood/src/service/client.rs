@@ -171,6 +171,7 @@ impl api::WriteBatch for BatchHandle {
         };
     }
 
+    #[cfg(feature = "eth")]
     async fn set_state<K, SK, S>(self, key: K, sub_key: SK, state: S) -> Result<Self, DBError>
     where
         K: AsRef<[u8]> + Send + Sync,

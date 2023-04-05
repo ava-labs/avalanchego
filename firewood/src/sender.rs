@@ -25,26 +25,32 @@ impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn get_account(&self, key: K) -> Result<crate::account::Account, crate::db::DBError> {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn dump_account<W: std::io::Write>(&self, key: K, writer: W) -> Result<(), crate::db::DBError> {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn get_balance(&self, key: K) -> Result<primitive_types::U256, crate::db::DBError> {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn get_code(&self, key: K) -> Result<Vec<u8>, crate::db::DBError> {
         todo!()
     }
 
+    #[cfg(feature = "proof")]
     fn prove(&self, key: K) -> Result<crate::proof::Proof, crate::merkle::MerkleError> {
         todo!()
     }
 
+    #[cfg(feature = "proof")]
     fn verify_range_proof(
         &self,
         proof: crate::proof::Proof,
@@ -56,10 +62,12 @@ impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn get_nonce(&self, key: K) -> Result<crate::api::Nonce, crate::db::DBError> {
         todo!()
     }
 
+    #[cfg(feature = "eth")]
     fn get_state(&self, key: K, sub_key: K) -> Result<Vec<u8>, crate::db::DBError> {
         todo!()
     }

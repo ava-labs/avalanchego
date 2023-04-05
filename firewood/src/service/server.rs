@@ -5,10 +5,7 @@ use std::{
 };
 use tokio::sync::mpsc::Receiver;
 
-use crate::{
-    db::{DBConfig, DBError, DB},
-    merkle::MerkleError,
-};
+use crate::db::{DBConfig, DBError, DB};
 
 use super::{BatchId, BatchRequest, Request, RevId};
 
@@ -79,6 +76,7 @@ impl FirewoodService {
                         let msg = rev.kv_get(key);
                         let _ = respond_to.send(msg.map_or(Err(DBError::KeyNotFound), Ok));
                     }
+                    #[cfg(feature = "proof")]
                     super::RevRequest::Prove {
                         handle,
                         key,
@@ -135,6 +133,7 @@ impl FirewoodService {
                         };
                         respond_to.send(resp).unwrap();
                     }
+                    #[cfg(feature = "eth")]
                     BatchRequest::SetBalance {
                         handle,
                         key,
@@ -151,6 +150,7 @@ impl FirewoodService {
                         };
                         respond_to.send(resp).unwrap();
                     }
+                    #[cfg(feature = "eth")]
                     BatchRequest::SetCode {
                         handle,
                         key,
@@ -167,6 +167,7 @@ impl FirewoodService {
                         };
                         respond_to.send(resp).unwrap();
                     }
+                    #[cfg(feature = "eth")]
                     BatchRequest::SetNonce {
                         handle,
                         key,
@@ -183,6 +184,7 @@ impl FirewoodService {
                         };
                         respond_to.send(resp).unwrap();
                     }
+                    #[cfg(feature = "eth")]
                     BatchRequest::SetState {
                         handle,
                         key,
@@ -200,6 +202,7 @@ impl FirewoodService {
                         };
                         respond_to.send(resp).unwrap();
                     }
+                    #[cfg(feature = "eth")]
                     BatchRequest::CreateAccount {
                         handle,
                         key,
