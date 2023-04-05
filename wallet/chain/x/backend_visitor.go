@@ -28,7 +28,7 @@ func (*backendVisitor) CreateAssetTx(*txs.CreateAssetTx) error {
 	return nil
 }
 
-func (b *backendVisitor) OperationTx(*txs.OperationTx) error {
+func (*backendVisitor) OperationTx(*txs.OperationTx) error {
 	return nil
 }
 
