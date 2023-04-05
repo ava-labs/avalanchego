@@ -5,18 +5,18 @@ package compression
 
 import (
 	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
 
 var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
-	TypeNone: func(int64) (Compressor, error) { //nolint
+	TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
 		return NewNoCompressor(), nil
 	},
 	TypeGzip: NewGzipCompressor,
@@ -26,15 +26,8 @@ var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
 func TestCompressDecompress(t *testing.T) {
 	for compressionType, newCompressorFunc := range newCompressorFuncs {
 		t.Run(compressionType.String(), func(t *testing.T) {
-			data := make([]byte, 4096)
-			for i := 0; i < len(data); i++ {
-				data[i] = byte(rand.Intn(256)) // #nosec G404
-			}
-
-			data2 := make([]byte, 4096)
-			for i := 0; i < len(data); i++ {
-				data2[i] = byte(rand.Intn(256)) // #nosec G404
-			}
+			data := utils.RandomBytes(4096)
+			data2 := utils.RandomBytes(4096)
 
 			compressor, err := newCompressorFunc(maxMessageSize)
 			require.NoError(t, err)
@@ -57,10 +50,7 @@ func TestCompressDecompress(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, data, dataDecompressed)
 
-			maxMessage := make([]byte, maxMessageSize) // Max message size. Can't import due to cycle.
-			_, err = rand.Read(maxMessage)             // #nosec G404
-			require.NoError(t, err)
-
+			maxMessage := utils.RandomBytes(maxMessageSize)
 			maxMessageCompressed, err := compressor.Compress(maxMessage)
 			require.NoError(t, err)
 
