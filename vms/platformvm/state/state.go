@@ -1611,11 +1611,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			nodeID := nodeID
 
 			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorStatus == deleted,
+				Decrease: validatorDiff.validator.status == deleted,
 			}
-			switch validatorDiff.validatorStatus {
+			switch validatorDiff.validator.status {
 			case added:
-				staker := validatorDiff.validator
+				staker := validatorDiff.validator.staker
 				weightDiff.Amount = staker.Weight
 
 				// The validator is being added.
@@ -1639,7 +1639,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 				s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
 			case deleted:
-				staker := validatorDiff.validator
+				staker := validatorDiff.validator.staker
 				weightDiff.Amount = staker.Weight
 
 				// Invariant: Only the Primary Network contains non-nil
@@ -1698,8 +1698,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if weightDiff.Decrease {
 				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
-				if validatorDiff.validatorStatus == added {
-					staker := validatorDiff.validator
+				if validatorDiff.validator.status == added {
+					staker := validatorDiff.validator.staker
 					err = validators.Add(
 						s.cfg.Validators,
 						subnetID,
@@ -1796,14 +1796,14 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	switch validatorDiff.validatorStatus {
+	switch validatorDiff.validator.status {
 	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
+		err := pendingValidatorList.Put(validatorDiff.validator.staker.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+		err := pendingValidatorList.Delete(validatorDiff.validator.staker.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
