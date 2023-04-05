@@ -488,11 +488,13 @@ func (s *diffStakers) GetDelegatorIterator(
 	var (
 		addedDelegatorIterator = EmptyIterator
 		deletedDelegators      map[ids.ID]*Staker
+		updatedDelegators      map[ids.ID]*Staker
 	)
 	if subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]; ok {
 		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
 			addedDelegatorIterator = NewTreeIterator(validatorDiff.addedDelegators)
 			deletedDelegators = validatorDiff.deletedDelegators
+			updatedDelegators = validatorDiff.updatedDelegators
 		}
 	}
 
@@ -502,7 +504,7 @@ func (s *diffStakers) GetDelegatorIterator(
 			addedDelegatorIterator,
 		),
 		deletedDelegators,
-		nil,
+		updatedDelegators,
 	)
 }
 
@@ -542,13 +544,16 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 	case added:
 		// delegator was added and is being immediately updated.
 		// We mark it as added
+		validatorDiff.addedDelegators.Delete(prevStaker.staker)
+		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
+
 		s.addedStakers.Delete(prevStaker.staker)
+		s.addedStakers.ReplaceOrInsert(staker)
 
 		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 			staker: staker,
 			status: added,
 		}
-		s.addedStakers.ReplaceOrInsert(staker)
 
 	case deleted:
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
@@ -562,6 +567,7 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 			staker: staker,
 			status: updated,
 		}
+		validatorDiff.updatedDelegators[staker.TxID] = staker
 
 		if s.updatedStakers == nil {
 			s.updatedStakers = make(map[ids.ID]*Staker)

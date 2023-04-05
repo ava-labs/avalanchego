@@ -5,6 +5,7 @@ package models
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -22,6 +23,7 @@ var (
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*updateCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
+	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
 	_ commands.Command = (*commitBottomStateCommand)(nil)
@@ -31,7 +33,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1680626949838165860)
+	// parameters := gopter.DefaultTestParametersWithSeed(1680772732335585950)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -149,9 +151,11 @@ var stakersCommands = &commands.ProtoCommands{
 	},
 	// TODO ABENEGIA: using gen.Const(newStakersStorageModel()) would not recreated model
 	// among calls. Hence just use a dummy generated with sole purpose of recreating model
-	InitialStateGen: gen.IntRange(1, 2).Map(func(int) *stakersStorageModel {
-		return newStakersStorageModel()
-	}),
+	InitialStateGen: gen.IntRange(1, 2).Map(
+		func(int) *stakersStorageModel {
+			return newStakersStorageModel()
+		},
+	),
 
 	InitialPreConditionFunc: func(state commands.State) bool {
 		return true // nothing to do for now
@@ -161,8 +165,10 @@ var stakersCommands = &commands.ProtoCommands{
 			genPutCurrentValidatorCommand,
 			genUpdateCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
-			// genPutCurrentDelegatorCommand,
-			// genDeleteCurrentDelegatorCommand,
+
+			genPutCurrentDelegatorCommand,
+			// // genUpdateCurrentDelegatorCommand,
+			// // genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
@@ -209,7 +215,7 @@ func (v *putCurrentValidatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentValidatorCommand = stakerGenerator(anyPriority, nil, nil).Map(
+var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
 	func(staker state.Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
@@ -333,7 +339,7 @@ func (*updateCurrentValidatorCommand) String() string {
 	return "UpdateCurrentValidator"
 }
 
-var genUpdateCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil).Map(
+var genUpdateCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
 	func(state.Staker) commands.Command {
 		return &updateCurrentValidatorCommand{}
 	},
@@ -376,9 +382,134 @@ func (v *deleteCurrentValidatorCommand) String() string {
 	return fmt.Sprintf("DeleteCurrentValidator(subnetID: %v, nodeID: %v, txID: %v)", v.SubnetID, v.NodeID, v.TxID)
 }
 
-var genDeleteCurrentValidatorCommand = stakerGenerator(anyPriority, nil, nil).Map(
+var genDeleteCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
 	func(staker state.Staker) commands.Command {
 		cmd := (*deleteCurrentValidatorCommand)(&staker)
+		return cmd
+	},
+)
+
+// PutCurrentValidator section
+type putCurrentDelegatorCommand state.Staker
+
+func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	candidateDelegator := (*state.Staker)(v)
+	sys := sut.(*sysUnderTest)
+	err := addCurrentDelegatorInSystem(sys, candidateDelegator)
+	if err != nil {
+		panic(err)
+	}
+	return sys
+}
+
+func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *state.Staker) error {
+	// 1. check if there is a current validator, already inserted. If not return
+	// 2. Update candidateDelegator attributes to make it delegator of selected validator
+	// 3. Add delegator to picked validator
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a current validator. If not, nothing to do
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return nil // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	// 2. Add a delegator to it
+	delegator := candidateDelegator
+	delegator.SubnetID = validator.SubnetID
+	delegator.NodeID = validator.NodeID
+
+	chain.PutCurrentDelegator(delegator)
+	return nil
+}
+
+func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	candidateDelegator := (*state.Staker)(v)
+	model := cmdState.(*stakersStorageModel)
+	err := addCurrentDelegatorInModel(model, candidateDelegator)
+	if err != nil {
+		panic(err)
+	}
+	return cmdState
+}
+
+func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *state.Staker) error {
+	// 1. check if there is a current validator, already inserted. If not return
+	// 2. Update candidateDelegator attributes to make it delegator of selected validator
+	// 3. Add delegator to picked validator
+
+	// 1. check if there is a current validator. If not, nothing to do
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return nil // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	// 2. Add a delegator to it
+	delegator := candidateDelegator
+	delegator.SubnetID = validator.SubnetID
+	delegator.NodeID = validator.NodeID
+
+	model.PutCurrentDelegator(delegator)
+	return nil
+}
+
+func (*putCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
+	if checkSystemAndModelContent(model, sys) {
+		return &gopter.PropResult{Status: gopter.PropTrue}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropFalse}
+}
+
+func (v *putCurrentDelegatorCommand) String() string {
+	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+}
+
+var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
+	func(staker state.Staker) commands.Command {
+		cmd := (*putCurrentDelegatorCommand)(&staker)
 		return cmd
 	},
 )
@@ -415,8 +546,8 @@ func (*addTopDiffCommand) String() string {
 	return "AddTopDiffCommand"
 }
 
-var genAddTopDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &addTopDiffCommand{}
 	},
 )
@@ -453,8 +584,8 @@ func (*applyBottomDiffCommand) String() string {
 	return "ApplyBottomDiffCommand"
 }
 
-var genApplyBottomDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &applyBottomDiffCommand{}
 	},
 )
@@ -494,8 +625,8 @@ func (*commitBottomStateCommand) String() string {
 	return "CommitBottomStateCommand"
 }
 
-var genCommitBottomStateCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &commitBottomStateCommand{}
 	},
 )

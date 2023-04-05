@@ -6,6 +6,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -56,6 +57,10 @@ func TestSimpleStakersOperations(t *testing.T) {
 
 func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
+
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1680768987256536967)
+	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(s state.Staker) string {
@@ -122,7 +127,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("update current validators", prop.ForAll(
@@ -187,7 +192,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			currIT.Release()
 			return ""
 		},
-		stakerGenerator(currentValidator, nil, nil),
+		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("add, delete and query pending validators", prop.ForAll(
@@ -255,7 +260,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	var (
@@ -390,8 +395,95 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(currentValidator, &subnetID, &nodeID),
-		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID)).
+		stakerGenerator(currentValidator, &subnetID, &nodeID, math.MaxUint64),
+		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID, math.MaxUint64)).
+			SuchThat(func(v interface{}) bool {
+				stakersList := v.([]state.Staker)
+				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
+				for _, staker := range stakersList {
+					uniqueTxIDs.Add(staker.TxID)
+				}
+
+				// make sure TxIDs are unique, at least among delegators.
+				return len(stakersList) == uniqueTxIDs.Len()
+			}),
+	))
+
+	properties.Property("update current delegator", prop.ForAll(
+		func(dels []state.Staker) string {
+			// insert staker s first, then update StartTime/EndTime and update the staker
+			store, err := storeCreatorF()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			// store delegators
+			for _, del := range dels {
+				cpy := del
+				store.PutCurrentDelegator(&cpy)
+			}
+
+			// update delegators
+			for _, del := range dels {
+				// update staker times as expected. We copy the updated staker
+				// to avoid in-place modification of stakers already stored in store,
+				// as it must be done in prod code.
+				updatedStaker := del
+				state.RotateStakerTimesInPlace(&updatedStaker)
+
+				err = store.UpdateCurrentDelegator(&updatedStaker)
+				if err != nil {
+					return fmt.Sprintf("expected no error in updating, got %v", err)
+				}
+
+				// check query returns updated staker - version 1
+				delIt, err := store.GetCurrentDelegatorIterator(updatedStaker.SubnetID, updatedStaker.NodeID)
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+
+				found := false
+				for delIt.Next() {
+					del := delIt.Value()
+					if del.TxID != updatedStaker.TxID {
+						continue
+					}
+					found = true
+					if !reflect.DeepEqual(&updatedStaker, del) {
+						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedStaker, del)
+					}
+					break
+				}
+				if !found {
+					return fmt.Sprintf("could not find updated staker %v", &updatedStaker)
+				}
+				delIt.Release()
+
+				// check query returns updated staker - version 2
+				stakerIt, err := store.GetCurrentStakerIterator()
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+				found = false
+				for stakerIt.Next() {
+					del := stakerIt.Value()
+					if del.TxID != updatedStaker.TxID {
+						continue
+					}
+					found = true
+					if !reflect.DeepEqual(&updatedStaker, del) {
+						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedStaker, del)
+					}
+					break
+				}
+				if !found {
+					return fmt.Sprintf("could not find updated staker %v", &updatedStaker)
+				}
+				stakerIt.Release()
+			}
+			return ""
+		},
+		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID, math.MaxUint64)).
 			SuchThat(func(v interface{}) bool {
 				stakersList := v.([]state.Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
@@ -532,8 +624,8 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(currentValidator, &subnetID, &nodeID),
-		gen.SliceOfN(10, stakerGenerator(pendingDelegator, &subnetID, &nodeID)).
+		stakerGenerator(currentValidator, &subnetID, &nodeID, math.MaxUint64),
+		gen.SliceOfN(10, stakerGenerator(pendingDelegator, &subnetID, &nodeID, math.MaxUint64)).
 			SuchThat(func(v interface{}) bool {
 				stakersList := v.([]state.Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))

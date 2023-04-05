@@ -5,6 +5,7 @@ package models
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -20,7 +21,12 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
-func stakerGenerator(prio priorityType, subnet *ids.ID, nodeID *ids.NodeID) gopter.Gen {
+func stakerGenerator(
+	prio priorityType,
+	subnet *ids.ID,
+	nodeID *ids.NodeID,
+	maxWeight uint64, // helps avoiding overflowS in delegator tests
+) gopter.Gen {
 	return genStakerTimeData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
 			macro := v.(stakerTimeData)
@@ -39,7 +45,7 @@ func stakerGenerator(prio priorityType, subnet *ids.ID, nodeID *ids.NodeID) gopt
 				"NodeID":          genStakerNodeID,
 				"PublicKey":       genBlsKey,
 				"SubnetID":        genStakerSubnetID,
-				"Weight":          gen.UInt64(),
+				"Weight":          gen.UInt64Range(0, maxWeight),
 				"StartTime":       gen.Const(macro.StartTime),
 				"EndTime":         gen.Const(macro.EndTime),
 				"PotentialReward": gen.UInt64(),
@@ -62,7 +68,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("NextTime coherent with priority", prop.ForAll(
@@ -95,7 +101,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return fmt.Sprintf("priority %v unhandled in test", p)
 			}
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	subnetID := ids.GenerateTestID()
@@ -112,7 +118,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, &subnetID, &nodeID),
+		stakerGenerator(anyPriority, &subnetID, &nodeID, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
