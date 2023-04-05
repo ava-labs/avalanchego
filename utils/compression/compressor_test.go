@@ -4,8 +4,13 @@
 package compression
 
 import (
+	"bytes"
+	"compress/gzip"
 	"math"
+	"runtime"
 	"testing"
+
+	"github.com/DataDog/zstd"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +26,74 @@ var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
 	},
 	TypeGzip: NewGzipCompressor,
 	TypeZstd: NewZstdCompressor,
+}
+
+func TestDecompressGzipBomb(t *testing.T) {
+	var (
+		buf               bytes.Buffer
+		gzipWriter        = gzip.NewWriter(&buf)
+		totalWrittenBytes uint64
+		data              = make([]byte, units.MiB)
+	)
+	for buf.Len() < 2*units.MiB {
+		n, err := gzipWriter.Write(data)
+		require.NoError(t, err)
+		totalWrittenBytes += uint64(n)
+	}
+	require.NoError(t, gzipWriter.Close())
+
+	compressor, err := NewGzipCompressor(maxMessageSize)
+	require.NoError(t, err)
+
+	compressedBytes := buf.Bytes()
+
+	var (
+		beforeDecompressionStats runtime.MemStats
+		afterDecompressionStats  runtime.MemStats
+	)
+
+	runtime.ReadMemStats(&beforeDecompressionStats)
+	_, err = compressor.Decompress(compressedBytes)
+	runtime.ReadMemStats(&afterDecompressionStats)
+
+	require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
+
+	bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+	require.Less(t, bytesAllocatedDuringDecompression, totalWrittenBytes)
+}
+
+func TestDecompressZstdBomb(t *testing.T) {
+	var (
+		buf               bytes.Buffer
+		zstdWriter        = zstd.NewWriter(&buf)
+		totalWrittenBytes uint64
+		data              = make([]byte, units.MiB)
+	)
+	for buf.Len() < 2*units.MiB {
+		n, err := zstdWriter.Write(data)
+		require.NoError(t, err)
+		totalWrittenBytes += uint64(n)
+	}
+	require.NoError(t, zstdWriter.Close())
+
+	compressor, err := NewZstdCompressor(maxMessageSize)
+	require.NoError(t, err)
+
+	compressedBytes := buf.Bytes()
+
+	var (
+		beforeDecompressionStats runtime.MemStats
+		afterDecompressionStats  runtime.MemStats
+	)
+
+	runtime.ReadMemStats(&beforeDecompressionStats)
+	_, err = compressor.Decompress(compressedBytes)
+	runtime.ReadMemStats(&afterDecompressionStats)
+
+	require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
+
+	bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+	require.Less(t, bytesAllocatedDuringDecompression, totalWrittenBytes)
 }
 
 func TestCompressDecompress(t *testing.T) {
