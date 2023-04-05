@@ -35,7 +35,7 @@ func TestDecompressGzipBomb(t *testing.T) {
 		totalWrittenBytes uint64
 		data              = make([]byte, units.MiB)
 	)
-	for buf.Len() < 2*units.MiB {
+	for buf.Len() < maxMessageSize {
 		n, err := gzipWriter.Write(data)
 		require.NoError(t, err)
 		totalWrittenBytes += uint64(n)
@@ -69,7 +69,7 @@ func TestDecompressZstdBomb(t *testing.T) {
 		totalWrittenBytes uint64
 		data              = make([]byte, units.MiB)
 	)
-	for buf.Len() < 2*units.MiB {
+	for buf.Len() < maxMessageSize {
 		n, err := zstdWriter.Write(data)
 		require.NoError(t, err)
 		totalWrittenBytes += uint64(n)
