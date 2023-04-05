@@ -71,6 +71,7 @@ func TestTimeout(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
@@ -342,6 +343,7 @@ func TestReliableMessages(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,
@@ -489,6 +491,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
 		constants.DefaultNetworkCompressionType,

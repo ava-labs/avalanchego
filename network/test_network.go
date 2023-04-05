@@ -79,6 +79,7 @@ func NewTestNetwork(
 ) (Network, error) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"",
 		constants.DefaultNetworkCompressionType,
