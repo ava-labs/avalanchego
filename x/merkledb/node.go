@@ -132,7 +132,7 @@ func (n *node) calculateAltID() error {
 	n.encodeRLP(encbuf)
 	bytes := encbuf.ToBytes()
 
-	n.altID = valueOrHash(bytes)
+	n.altID = bytes
 	return nil
 }
 

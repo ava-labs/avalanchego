@@ -722,7 +722,7 @@ func (t *trieView) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	return bytesToAltID(t.root.altID), nil
+	return rlpToAltID(t.root.altID), nil
 }
 
 // Returns the ID of the root node of this trie.

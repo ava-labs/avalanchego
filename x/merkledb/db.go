@@ -374,11 +374,11 @@ func (db *Database) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return db.getMerkleRoot(), nil
 }
 
-func (db *Database) GetAltMerkleRoot(ctx context.Context) (ids.ID, error) {
+func (db *Database) GetAltMerkleRoot(_ context.Context) (ids.ID, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	return bytesToAltID(db.root.altID), nil
+	return rlpToAltID(db.root.altID), nil
 }
 
 // Returns the ID of the root node of the merkle trie.

@@ -4,10 +4,7 @@
 package merkledb
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 )
@@ -22,9 +19,9 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		// the case where there is no value corresponds to an empty trie
 		// the case with a value correspond to value nodes in ethereum representation.
 		if !n.value.IsNothing() {
-			w.Write(n.value.Value())
+			w.WriteBytes(n.value.Value())
 		} else {
-			w.Write(rlp.EmptyString)
+			_, _ = w.Write(rlp.EmptyString)
 		}
 		return
 	}
@@ -35,9 +32,8 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 	if len(n.children) == 1 && n.value.IsNothing() {
 		for idx, child := range n.children {
 			compressedPath := append([]byte{idx}, child.compressedPath.Bytes()...)
-			// altID will contain either the hash or the RLP encoded value if < 32 bytes
-			bytes := shortNodeIfNeeded(compressedPath, child.altID, child.valueNode)
-			w.Write(bytes)
+			rlp := shortNodeIfNeeded(compressedPath, child.altID, child.valueNode)
+			_, _ = w.Write(rlp)
 			break // should only be 1 iteration
 		}
 		return
@@ -48,73 +44,71 @@ func (n *node) encodeRLP(w rlp.EncoderBuffer) {
 		offset := w.List()
 		for i := byte(0); i < 16; i++ {
 			if child, ok := n.children[i]; ok {
-				// altID will contain either the hash or the RLP encoded value if < 32 bytes
-				bytes := shortNodeIfNeeded(child.compressedPath.Bytes(), child.altID, child.valueNode)
-				w.Write(bytes)
-				fmt.Println("full-node-encoding", i, common.Bytes2Hex(bytes))
+				// w2 := rlp.NewEncoderBuffer(nil)
+				rlp := shortNodeIfNeeded(child.compressedPath.Bytes(), child.altID, child.valueNode)
+				hashNodeIfNeeded(w, rlp)
+				// hashNodeIfNeeded(w2, rlp)
+				// fmt.Println("full-node-encoding", i, common.Bytes2Hex(w2.ToBytes()))
 			} else {
-				w.Write(rlp.EmptyString)
+				_, _ = w.Write(rlp.EmptyString)
 			}
 		}
 
 		if !n.value.IsNothing() {
 			w.WriteBytes(n.value.Value())
 		} else {
-			w.Write(rlp.EmptyString)
+			_, _ = w.Write(rlp.EmptyString)
 		}
 		w.ListEnd(offset)
 
-		fmt.Println("full-node-encoding", common.Bytes2Hex(w.ToBytes()))
+		// fmt.Println("full-node-encoding", common.Bytes2Hex(w.ToBytes()))
 		return
 	}
 
 	panic("unexpected case")
 }
 
-func shortNodeIfNeeded(compressedKey []byte, val []byte, valueNode []byte) []byte {
-	w := rlp.NewEncoderBuffer(nil)
-	shortNodeIfNeededWriter(w, compressedKey, val, valueNode)
-
-	bytes := w.ToBytes()
-	fmt.Println(
-		"shortNodeIfNeeded: bytes",
-		common.Bytes2Hex(bytes),
-	)
-	return bytes
+func hashNodeIfNeeded(w rlp.EncoderBuffer, val []byte) {
+	if len(val) < 32 {
+		_, _ = w.Write(val)
+		return
+	}
+	w.WriteBytes(hashData(val))
 }
 
-func shortNodeIfNeededWriter(w rlp.EncoderBuffer, compressedKey []byte, val []byte, valueNode []byte) {
+func shortNodeIfNeeded(compressedKey []byte, val []byte, valueNode []byte) []byte {
 	isValueNode := len(valueNode) > 0
 	if isValueNode {
 		compressedKey = append(compressedKey, 0x10)
 	}
 
 	if len(compressedKey) == 0 {
-		fmt.Println("shortNodeIfNeeded: compressedKey is empty", common.Bytes2Hex(val))
-		w.WriteBytes(val)
-		return
+		return val
 	}
 
+	w := rlp.NewEncoderBuffer(nil)
+	shortNodeIfNeededWriter(w, compressedKey, val, valueNode)
+
+	bytes := w.ToBytes()
+	// fmt.Println("shortNodeIfNeeded: bytes", common.Bytes2Hex(bytes))
+	return bytes
+}
+
+func shortNodeIfNeededWriter(w rlp.EncoderBuffer, compressedKey []byte, val []byte, valueNode []byte) {
 	offset := w.List()
 
 	compactKey := hexToCompact(compressedKey)
 	w.WriteBytes(compactKey)
-	if isValueNode {
+	switch {
+	case len(valueNode) > 0:
 		w.WriteBytes(valueNode)
-	} else if len(val) > 0 {
-		w.WriteBytes(val)
-	} else {
-		w.Write(rlp.EmptyString)
+	case len(val) > 0:
+		hashNodeIfNeeded(w, val)
+	default:
+		_, _ = w.Write(rlp.EmptyString)
 	}
 	w.ListEnd(offset)
-	fmt.Println("shortNodeIfNeeded: compactKey", common.Bytes2Hex(compactKey), "val", common.Bytes2Hex(val))
-}
-
-func valueOrHash(value []byte) []byte {
-	if len(value) < 32 {
-		return value
-	}
-	return hashData(value)
+	// fmt.Println("shortNodeIfNeeded: compactKey", common.Bytes2Hex(compactKey), "val", common.Bytes2Hex(val))
 }
 
 func hashData(data []byte) []byte {
@@ -155,12 +149,10 @@ func hasTerm(s []byte) bool {
 	return len(s) > 0 && s[len(s)-1] == 16
 }
 
-func bytesToAltID(b []byte) ids.ID {
+func rlpToAltID(b []byte) ids.ID {
 	var result ids.ID
-	if len(b) < 32 {
-		b = hashData(b)
-	}
+	hash := hashData(b)
 
-	copy(result[:], b)
+	copy(result[:], hash[:])
 	return result
 }
