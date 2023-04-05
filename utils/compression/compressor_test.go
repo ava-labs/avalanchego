@@ -157,92 +157,58 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 	})
 }
 
-func BenchmarkGzipCompress(b *testing.B) {
+func BenchmarkCompress(b *testing.B) {
 	sizes := []int{
 		0,
 		256,
 		units.KiB,
 		units.MiB,
+		maxMessageSize,
 	}
-	for _, size := range sizes {
-		bytes := utils.RandomBytes(size)
-		compressor, err := NewGzipCompressor(2 * units.MiB)
-		require.NoError(b, err)
-
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := compressor.Compress(bytes)
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
 				require.NoError(b, err)
-			}
-		})
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Compress(bytes)
+					require.NoError(b, err)
+				}
+			})
+		}
 	}
 }
 
-func BenchmarkGzipDecompress(b *testing.B) {
+func BenchmarkDecompress(b *testing.B) {
 	sizes := []int{
 		0,
 		256,
 		units.KiB,
 		units.MiB,
+		maxMessageSize,
 	}
-	for _, size := range sizes {
-		bytes := utils.RandomBytes(size)
-		compressor, err := NewGzipCompressor(2 * units.MiB)
-		require.NoError(b, err)
-
-		compressedBytes, err := compressor.Compress(bytes)
-		require.NoError(b, err)
-
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := compressor.Decompress(compressedBytes)
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
 				require.NoError(b, err)
-			}
-		})
-	}
-}
 
-func BenchmarkZstdCompress(b *testing.B) {
-	sizes := []int{
-		0,
-		256,
-		units.KiB,
-		units.MiB,
-	}
-	for _, size := range sizes {
-		bytes := utils.RandomBytes(size)
-		compressor, err := NewZstdCompressor(2 * units.MiB)
-		require.NoError(b, err)
-
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := compressor.Compress(bytes)
+				compressedBytes, err := compressor.Compress(bytes)
 				require.NoError(b, err)
-			}
-		})
-	}
-}
 
-func BenchmarkZstdDecompress(b *testing.B) {
-	sizes := []int{
-		0,
-		256,
-		units.KiB,
-		units.MiB,
-	}
-	for _, size := range sizes {
-		bytes := utils.RandomBytes(size)
-		compressor, err := NewZstdCompressor(2 * units.MiB)
-		require.NoError(b, err)
-
-		compressedBytes, err := compressor.Compress(bytes)
-		require.NoError(b, err)
-
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				_, err := compressor.Decompress(compressedBytes)
-				require.NoError(b, err)
-			}
-		})
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Decompress(compressedBytes)
+					require.NoError(b, err)
+				}
+			})
+		}
 	}
 }
