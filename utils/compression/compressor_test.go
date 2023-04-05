@@ -17,8 +17,20 @@ import (
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
 
+var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
+	TypeNone: func(int64) (Compressor, error) {
+		return NewNoCompressor(), nil
+	},
+	TypeGzip: func(maxSize int64) (Compressor, error) {
+		return NewGzipCompressor(maxSize)
+	},
+	TypeZstd: func(maxSize int64) (Compressor, error) {
+		return NewZstdCompressor(maxSize)
+	},
+}
+
 func TestCompressDecompress(t *testing.T) {
-	for _, compressionType := range []Type{TypeNone, TypeGzip, TypeZstd} {
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
 		t.Run(compressionType.String(), func(t *testing.T) {
 			data := make([]byte, 4096)
 			for i := 0; i < len(data); i++ {
@@ -30,23 +42,8 @@ func TestCompressDecompress(t *testing.T) {
 				data2[i] = byte(rand.Intn(256)) // #nosec G404
 			}
 
-			var (
-				compressor Compressor
-				err        error
-			)
-			switch compressionType {
-			case TypeNone:
-				compressor = &noCompressor{}
-			case TypeGzip:
-				var err error
-				compressor, err = NewGzipCompressor(maxMessageSize)
-				require.NoError(t, err)
-			case TypeZstd:
-				compressor, err = NewZstdCompressor(maxMessageSize)
-				require.NoError(t, err)
-			default:
-				require.FailNow(t, "Unknown compression type")
-			}
+			compressor, err := newCompressorFunc(maxMessageSize)
+			require.NoError(t, err)
 
 			dataCompressed, err := compressor.Compress(data)
 			require.NoError(t, err)
@@ -81,14 +78,12 @@ func TestCompressDecompress(t *testing.T) {
 	}
 }
 
-func TestGzipSizeLimiting(t *testing.T) {
-	compressorFuncs := map[string]func(int64) (Compressor, error){
-		"gzip": NewGzipCompressor,
-		"zstd": NewZstdCompressor,
-	}
-
-	for name, compressorFunc := range compressorFuncs {
-		t.Run(name, func(t *testing.T) {
+func TestSizeLimiting(t *testing.T) {
+	for compressionType, compressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		t.Run(compressionType.String(), func(t *testing.T) {
 			compressor, err := compressorFunc(maxMessageSize)
 			require.NoError(t, err)
 
@@ -108,17 +103,15 @@ func TestGzipSizeLimiting(t *testing.T) {
 	}
 }
 
-// Attempts to create gzip compressor with math.MaxInt64
+// Attempts to create a compressor with math.MaxInt64
 // which leads to undefined decompress behavior due to integer overflow
 // in limit reader creation.
 func TestNewCompressorWithInvalidLimit(t *testing.T) {
-	compressorFuncs := map[string]func(int64) (Compressor, error){
-		"gzip": NewGzipCompressor,
-		"zstd": NewZstdCompressor,
-	}
-
-	for name, compressorFunc := range compressorFuncs {
-		t.Run(name, func(t *testing.T) {
+	for compressionType, compressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		t.Run(compressionType.String(), func(t *testing.T) {
 			require := require.New(t)
 			_, err := compressorFunc(math.MaxInt64)
 			require.ErrorIs(err, ErrInvalidMaxSizeCompressor)

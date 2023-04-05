@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"google.golang.org/protobuf/proto"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -123,6 +125,8 @@ func (m *outboundMessage) BytesSavedCompression() int {
 
 // TODO: add other compression algorithms with extended interface
 type msgBuilder struct {
+	log logging.Logger
+
 	gzipCompressor            compression.Compressor
 	gzipCompressTimeMetrics   map[Op]metric.Averager
 	gzipDecompressTimeMetrics map[Op]metric.Averager
@@ -135,6 +139,7 @@ type msgBuilder struct {
 }
 
 func newMsgBuilder(
+	log logging.Logger,
 	namespace string,
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
@@ -149,6 +154,8 @@ func newMsgBuilder(
 	}
 
 	mb := &msgBuilder{
+		log: log,
+
 		gzipCompressor:            gzipCompressor,
 		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
@@ -255,8 +262,13 @@ func (mb *msgBuilder) marshal(
 	compressTook := time.Since(startTime)
 
 	if compressTimeMetric, ok := opToCompressTimeMetrics[op]; ok {
-		// This case should always execute, but check just in case.
 		compressTimeMetric.Observe(float64(compressTook))
+	} else {
+		// Should never happen
+		mb.log.Warn("no compression metric found for op",
+			zap.Stringer("op", op),
+			zap.Stringer("compressionType", compressionType),
+		)
 	}
 
 	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
@@ -311,8 +323,10 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 		return nil, 0, 0, err
 	}
 	if decompressTimeMetric, ok := opToDecompressTimeMetrics[op]; ok {
-		// This case should always execute, but check just in case.
 		decompressTimeMetric.Observe(float64(decompressTook))
+	} else {
+		// Should never happen
+		mb.log.Warn("no decompression metric found for op", zap.Stringer("op", op))
 	}
 
 	return m, bytesSavedCompression, op, nil

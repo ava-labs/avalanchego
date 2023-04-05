@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ Creator = (*creator)(nil)
@@ -25,6 +26,7 @@ type creator struct {
 }
 
 func NewCreator(
+	log logging.Logger,
 	metrics prometheus.Registerer,
 	parentNamespace string,
 	compressionType compression.Type,
@@ -32,6 +34,7 @@ func NewCreator(
 ) (Creator, error) {
 	namespace := fmt.Sprintf("%s_codec", parentNamespace)
 	builder, err := newMsgBuilder(
+		log,
 		namespace,
 		metrics,
 		maxMessageTimeout,
