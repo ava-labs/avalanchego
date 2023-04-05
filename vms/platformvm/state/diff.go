@@ -151,6 +151,10 @@ func (d *diff) PutCurrentDelegator(staker *Staker) {
 	d.currentStakerDiffs.PutDelegator(staker)
 }
 
+func (d *diff) UpdateCurrentDelegator(staker *Staker) error {
+	return d.currentStakerDiffs.UpdateDelegator(staker)
+}
+
 func (d *diff) DeleteCurrentDelegator(staker *Staker) {
 	d.currentStakerDiffs.DeleteDelegator(staker)
 }

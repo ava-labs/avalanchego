@@ -582,6 +582,10 @@ func (s *state) PutCurrentDelegator(staker *Staker) {
 	s.currentStakers.PutDelegator(staker)
 }
 
+func (s *state) UpdateCurrentDelegator(staker *Staker) error {
+	return s.currentStakers.UpdateDelegator(staker)
+}
+
 func (s *state) DeleteCurrentDelegator(staker *Staker) {
 	s.currentStakers.DeleteDelegator(staker)
 }

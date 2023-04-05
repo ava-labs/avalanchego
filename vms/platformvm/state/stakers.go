@@ -55,6 +55,12 @@ type CurrentStakers interface {
 	// Invariant: [staker] is not currently a CurrentDelegator
 	PutCurrentDelegator(staker *Staker)
 
+	// UpdateCurrentDelegator updates the [staker] describing a delegator to the
+	// staker set.
+	//
+	// Invariant: [staker] is a non deleted CurrentDelegator
+	UpdateCurrentDelegator(staker *Staker) error
+
 	// DeleteCurrentDelegator removes the [staker] describing a delegator from
 	// the staker set.
 	//
@@ -143,6 +149,10 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validatorDiff.validator = staker
 
 	v.stakers.ReplaceOrInsert(staker)
+}
+
+func (*baseStakers) UpdateDelegator(*Staker) error {
+	return errors.New("not yet implemented")
 }
 
 func (v *baseStakers) UpdateValidator(staker *Staker) error {
@@ -332,6 +342,10 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 	s.addedStakers.ReplaceOrInsert(staker)
 	delete(s.deletedStakers, staker.TxID)
 	delete(s.updatedStakers, staker.TxID)
+}
+
+func (*diffStakers) UpdateDelegator(*Staker) error {
+	return errors.New("not yet implemented")
 }
 
 // UpdateValidator assumes that previous version of staker

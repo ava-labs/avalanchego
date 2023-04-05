@@ -469,6 +469,20 @@ func (mr *MockDiffMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
 }
 
+// UpdateCurrentDelegator mocks base method.
+func (m *MockDiff) UpdateCurrentDelegator(arg0 *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentDelegator", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentDelegator indicates an expected call of UpdateCurrentDelegator.
+func (mr *MockDiffMockRecorder) UpdateCurrentDelegator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentDelegator", reflect.TypeOf((*MockDiff)(nil).UpdateCurrentDelegator), arg0)
+}
+
 // UpdateCurrentValidator mocks base method.
 func (m *MockDiff) UpdateCurrentValidator(arg0 *Staker) error {
 	m.ctrl.T.Helper()
