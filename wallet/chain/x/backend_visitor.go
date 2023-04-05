@@ -33,8 +33,8 @@ func (*backendVisitor) OperationTx(*txs.OperationTx) error {
 }
 
 func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
-	for _, input := range tx.ImportedIns {
-		utxoID := input.UTXOID.InputID()
+	for _, in := range tx.ImportedIns {
+		utxoID := in.UTXOID.InputID()
 		if err := b.b.RemoveUTXO(b.ctx, tx.SourceChain, utxoID); err != nil {
 			return err
 		}
