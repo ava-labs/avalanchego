@@ -327,7 +327,9 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 		decompressTimeMetric.Observe(float64(decompressTook))
 	} else {
 		// Should never happen
-		mb.log.Warn("no decompression metric found for op", zap.Stringer("op", op))
+		mb.log.Warn("no decompression metric found for op",
+			zap.Stringer("op", op),
+		)
 	}
 
 	return m, bytesSavedCompression, op, nil
