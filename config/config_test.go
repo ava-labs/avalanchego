@@ -604,10 +604,8 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()
-	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
-	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()
-	if err := v.BindPFlags(pflag.CommandLine); err != nil {
+	if err := v.BindPFlags(fs); err != nil {
 		log.Fatal(err)
 	}
 	return v
