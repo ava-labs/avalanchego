@@ -47,7 +47,6 @@ const (
 	defaultPopulateMissingTriesParallelism            = 1024
 	defaultStateSyncServerTrieCache                   = 64 // MB
 	defaultAcceptedCacheSize                          = 32 // blocks
-	defaultWarpAPIEnabled                             = true
 
 	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
 	// should be ahead of local last accepted to perform state sync.
@@ -225,7 +224,6 @@ func (c *Config) SetDefaults() {
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
-	c.WarpAPIEnabled = defaultWarpAPIEnabled
 
 	c.TxPoolJournal = core.DefaultTxPoolConfig.Journal
 	c.TxPoolRejournal = Duration{core.DefaultTxPoolConfig.Rejournal}

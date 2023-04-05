@@ -202,12 +202,6 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 
 // VerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
-	if proposerVMBlockCtx != nil {
-		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
-	} else {
-		log.Debug("Verifying block without context", "block", b.ID(), "height", b.Height())
-	}
-
 	return b.verify(&precompileconfig.ProposerPredicateContext{
 		PrecompilePredicateContext: precompileconfig.PrecompilePredicateContext{
 			SnowCtx: b.vm.ctx,
@@ -220,6 +214,11 @@ func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block
 // Enforces that the predicates are valid within [predicateContext].
 // Writes the block details to disk and the state to the trie manager iff writes=true.
 func (b *Block) verify(predicateContext *precompileconfig.ProposerPredicateContext, writes bool) error {
+	if predicateContext.ProposerVMBlockCtx != nil {
+		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
+	} else {
+		log.Debug("Verifying block without context", "block", b.ID(), "height", b.Height())
+	}
 	if err := b.syntacticVerify(); err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
