@@ -40,7 +40,7 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if _, err := gzipWriter.Write(msg); err != nil {
 		return nil, err
 	}
-	if err := gzipWriter.Flush(); err != nil {
+	if err := gzipWriter.Close(); err != nil {
 		return nil, err
 	}
 	return writeBuffer.Bytes(), nil
