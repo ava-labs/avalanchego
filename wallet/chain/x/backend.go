@@ -47,11 +47,10 @@ func NewBackend(ctx Context, chainID ids.ID, utxos ChainUTXOs) Backend {
 }
 
 func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
-	txID := tx.ID()
 	err := tx.Unsigned.Visit(&backendVisitor{
 		b:    b,
 		ctx:  ctx,
-		txID: txID,
+		txID: tx.ID(),
 	})
 	if err != nil {
 		return err
