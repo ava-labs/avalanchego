@@ -47,10 +47,13 @@ func TestAltRootSimple(t *testing.T) {
 }
 
 func genMap(nKeys int) map[string]string {
-	keyLen := 32
-	valLen := 40
+	maxKeyLen := 64
+	maxValLen := 1024
 	kvs := make(map[string]string, nKeys)
 	for len(kvs) < nKeys {
+		keyLen := rand.Intn(maxKeyLen) + 1 //nolint:gosec
+		valLen := rand.Intn(maxValLen) + 1 //nolint:gosec
+
 		key := utils.RandomBytes(keyLen)
 		val := utils.RandomBytes(valLen)
 
@@ -60,8 +63,8 @@ func genMap(nKeys int) map[string]string {
 }
 
 func TestAltRootRandom(t *testing.T) {
-	maxNumKeys := 1 << 10
-	for i := 0; i < 10; i++ {
+	maxNumKeys := 2048
+	for i := 0; i < 20; i++ {
 		numKeys := rand.Intn(maxNumKeys) //nolint:gosec
 		name := fmt.Sprintf("case %d", i)
 		rand.Seed(int64(i))
