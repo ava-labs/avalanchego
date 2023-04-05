@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sync"
 )
 
 var (
@@ -21,7 +22,8 @@ var (
 )
 
 type gzipCompressor struct {
-	maxSize int64
+	maxSize        int64
+	gzipWriterPool sync.Pool
 }
 
 // Compress [msg] and returns the compressed bytes.
@@ -31,11 +33,14 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	}
 
 	var writeBuffer bytes.Buffer
-	gzipWriter := gzip.NewWriter(&writeBuffer)
+	gzipWriter := g.gzipWriterPool.Get().(*gzip.Writer)
+	gzipWriter.Reset(&writeBuffer)
+	defer g.gzipWriterPool.Put(gzipWriter)
+
 	if _, err := gzipWriter.Write(msg); err != nil {
 		return nil, err
 	}
-	if err := gzipWriter.Close(); err != nil {
+	if err := gzipWriter.Flush(); err != nil {
 		return nil, err
 	}
 	return writeBuffer.Bytes(), nil
@@ -76,5 +81,10 @@ func NewGzipCompressor(maxSize int64) (Compressor, error) {
 
 	return &gzipCompressor{
 		maxSize: maxSize,
+		gzipWriterPool: sync.Pool{
+			New: func() interface{} {
+				return gzip.NewWriter(nil)
+			},
+		},
 	}, nil
 }
