@@ -8,6 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,9 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 )
 
 // AVAX asset ID in tests

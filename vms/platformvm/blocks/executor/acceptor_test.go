@@ -23,9 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
@@ -62,7 +61,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			state: s,
 		},
 		metrics:    metrics.Noop,
-		validators: &pvalidators.TestSet{},
+		validators: &validators.TestSet{},
 	}
 
 	err = acceptor.ApricotProposalBlock(blk)
@@ -99,7 +98,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: &pvalidators.TestSet{},
+		validators: &validators.TestSet{},
 	}
 
 	blk, err := blocks.NewApricotAtomicBlock(
@@ -180,7 +179,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: &pvalidators.TestSet{},
+		validators: &validators.TestSet{},
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
@@ -271,7 +270,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   &pvalidators.TestSet{},
+		validators:   &validators.TestSet{},
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -357,7 +356,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   &pvalidators.TestSet{},
+		validators:   &validators.TestSet{},
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
