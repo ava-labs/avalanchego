@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 		metrics,
 		res.state,
 		&res.backend,
-		&pvalidators.TestSet{},
+		pvalidators.TestSet,
 	)
 
 	res.Builder = New(

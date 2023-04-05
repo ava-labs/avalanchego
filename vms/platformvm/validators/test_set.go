@@ -10,28 +10,27 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-var _ validators.State = (*TestSet)(nil)
+var TestSet Set = testSet{}
 
-type TestSet struct{}
+type testSet struct{}
 
-func (*TestSet) GetMinimumHeight(_ context.Context) (uint64, error) {
+func (testSet) GetMinimumHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (*TestSet) GetCurrentHeight(_ context.Context) (uint64, error) {
+func (testSet) GetCurrentHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (*TestSet) GetSubnetID(_ context.Context, _ ids.ID) (ids.ID, error) {
+func (testSet) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
 
-func (*TestSet) GetValidatorSet(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+func (testSet) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	return nil, nil
 }
 
-func (*TestSet) GetValidatorIDs(_ ids.ID) ([]ids.NodeID, bool) {
+func (testSet) GetValidatorIDs(ids.ID) ([]ids.NodeID, bool) {
 	return nil, false
 }
-
-func (*TestSet) Track(_ ids.ID) {}
+func (testSet) Track(ids.ID) {}
