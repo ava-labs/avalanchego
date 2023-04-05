@@ -152,7 +152,6 @@ func hasTerm(s []byte) bool {
 func rlpToAltID(b []byte) ids.ID {
 	var result ids.ID
 	hash := hashData(b)
-
-	copy(result[:], hash[:])
+	copy(result[:], hash)
 	return result
 }
