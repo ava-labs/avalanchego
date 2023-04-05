@@ -257,6 +257,7 @@ func updateStakerInSystem(sys *sysUnderTest) error {
 	if !found {
 		return nil // no current validator to update
 	}
+	stakerIt.Release()
 
 	// 2. Add diff layer on top
 	sys.addDiffOnTop()
@@ -305,6 +306,7 @@ func updateStakerInModel(model *stakersStorageModel) error {
 	if !found {
 		return nil // no current validator to update
 	}
+	stakerIt.Release()
 
 	updatedStaker := *staker
 	state.RotateStakerTimesInPlace(&updatedStaker)
