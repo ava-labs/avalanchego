@@ -35,7 +35,7 @@ pub struct FirewoodService {}
 
 impl FirewoodService {
     pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DBConfig) -> Self {
-        let db = DB::new(&owned_path.to_string_lossy(), &cfg).unwrap();
+        let db = DB::new(owned_path, &cfg).unwrap();
         let mut active_batch: Option<crate::db::WriteBatch> = None;
         let mut revs = HashMap::<RevId, crate::db::Revision>::new();
         let lastid = AtomicU32::new(0);

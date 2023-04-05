@@ -259,7 +259,7 @@ pub fn run(opts: &Options) -> Result<()> {
     let db_config = initialize_db_config(opts);
     log::debug!("database configuration parameters: \n{:?}\n", db_config);
 
-    match DB::new(opts.name.as_ref(), &db_config) {
+    match DB::new::<&str>(opts.name.as_ref(), &db_config) {
         Ok(_) => {
             println!("created firewood database in {:?}", opts.name);
             Ok(())

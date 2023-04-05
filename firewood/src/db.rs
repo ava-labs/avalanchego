@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt;
 use std::io::{Cursor, Write};
+use std::path::Path;
 use std::rc::Rc;
 use std::thread::JoinHandle;
 
@@ -419,10 +420,10 @@ pub struct DB {
 
 impl DB {
     /// Open a database.
-    pub fn new(db_path: &str, cfg: &DBConfig) -> Result<Self, DBError> {
+    pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DBConfig) -> Result<Self, DBError> {
         // TODO: make sure all fds are released at the end
         if cfg.truncate {
-            let _ = std::fs::remove_dir_all(db_path);
+            let _ = std::fs::remove_dir_all(db_path.as_ref());
         }
         let (db_fd, reset) = file::open_dir(db_path, cfg.truncate).map_err(DBError::System)?;
 

@@ -1,6 +1,7 @@
 // Copied from CedrusDB
 
 pub(crate) use std::os::unix::io::RawFd as Fd;
+use std::path::Path;
 
 use growthring::oflags;
 use nix::errno::Errno;
@@ -83,12 +84,12 @@ pub fn touch_dir(dirname: &str, rootfd: Fd) -> Result<Fd, Errno> {
     openat(rootfd, dirname, oflags(), Mode::empty())
 }
 
-pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
+pub fn open_dir<P: AsRef<Path>>(path: P, truncate: bool) -> Result<(Fd, bool), nix::Error> {
     let mut reset_header = truncate;
     if truncate {
-        let _ = std::fs::remove_dir_all(path);
+        let _ = std::fs::remove_dir_all(path.as_ref());
     }
-    match mkdir(path, Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR) {
+    match mkdir(path.as_ref(), Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IXUSR) {
         Err(e) => {
             if truncate {
                 return Err(e);
@@ -100,7 +101,7 @@ pub fn open_dir(path: &str, truncate: bool) -> Result<(Fd, bool), nix::Error> {
         }
     }
     Ok((
-        match open(path, oflags(), Mode::empty()) {
+        match open(path.as_ref(), oflags(), Mode::empty()) {
             Ok(fd) => fd,
             Err(e) => return Err(e),
         },
