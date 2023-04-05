@@ -59,8 +59,8 @@ func TestCompressDecompress(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, data, dataDecompressed)
 
-			maxMessage := make([]byte, 2*units.MiB) // Max message size. Can't import due to cycle.
-			_, err = rand.Read(maxMessage)          // #nosec G404
+			maxMessage := make([]byte, maxMessageSize) // Max message size. Can't import due to cycle.
+			_, err = rand.Read(maxMessage)             // #nosec G404
 			require.NoError(t, err)
 
 			maxMessageCompressed, err := compressor.Compress(maxMessage)
@@ -142,7 +142,7 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
-		if len(data) > 2*units.MiB {
+		if len(data) > maxMessageSize {
 			_, err := compressor.Compress(data)
 			require.Error(err)
 		}
