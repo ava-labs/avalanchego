@@ -17,7 +17,7 @@ import (
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
 
 var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
-	TypeNone: func(int64) (Compressor, error) { //nolint
+	TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
 		return NewNoCompressor(), nil
 	},
 	TypeGzip: NewGzipCompressor,
