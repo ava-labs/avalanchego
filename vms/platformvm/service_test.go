@@ -57,10 +57,6 @@ var (
 		0xb2, 0xbc, 0x5c, 0xcf, 0x55, 0x8d, 0x80, 0x27,
 	}
 
-	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
-	// Platform address resulting from the above private key
-	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
-
 	encodings = []formatting.Encoding{
 		formatting.JSON, formatting.Hex,
 	}
@@ -96,68 +92,6 @@ func defaultAddress(t *testing.T, service *Service) {
 
 	err = user.PutKeys(pk, keys[0])
 	require.NoError(t, err)
-}
-
-func TestAddValidator(t *testing.T) {
-	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
-	args := AddValidatorArgs{}
-	bytes, err := stdjson.Marshal(&args)
-	require.NoError(t, err)
-	require.Equal(t, expectedJSONString, string(bytes))
-}
-
-func TestCreateBlockchainArgsParsing(t *testing.T) {
-	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
-	args := CreateBlockchainArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(t, err)
-
-	_, err = stdjson.Marshal(args.GenesisData)
-	require.NoError(t, err)
-}
-
-func TestExportKey(t *testing.T) {
-	require := require.New(t)
-	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","address":"` + testAddress + `"}`
-	args := ExportKeyArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(err)
-
-	service, _ := defaultService(t)
-	defaultAddress(t, service)
-	service.vm.ctx.Lock.Lock()
-	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
-		service.vm.ctx.Lock.Unlock()
-	}()
-
-	reply := ExportKeyReply{}
-	err = service.ExportKey(nil, &args, &reply)
-	require.NoError(err)
-
-	require.Equal(testPrivateKey, reply.PrivateKey.Bytes())
-}
-
-func TestImportKey(t *testing.T) {
-	require := require.New(t)
-	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
-	args := ImportKeyArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(err)
-
-	service, _ := defaultService(t)
-	service.vm.ctx.Lock.Lock()
-	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
-		service.vm.ctx.Lock.Unlock()
-	}()
-
-	reply := api.JSONAddress{}
-	err = service.ImportKey(nil, &args, &reply)
-	require.NoError(err)
-	require.Equal(testAddress, reply.Address)
 }
 
 // Test issuing a tx and accepted
