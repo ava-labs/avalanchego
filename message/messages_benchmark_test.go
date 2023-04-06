@@ -17,6 +17,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -62,7 +64,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 
 	useBuilder := os.Getenv("USE_BUILDER") != ""
 
-	codec, err := newMsgBuilder("", prometheus.NewRegistry(), 10*time.Second)
+	codec, err := newMsgBuilder(logging.NoLog{}, "", prometheus.NewRegistry(), 10*time.Second)
 	require.NoError(err)
 
 	b.Logf("proto length %d-byte (use builder %v)", msgLen, useBuilder)
@@ -70,7 +72,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if useBuilder {
-			_, err = codec.createOutbound(&msg, false, false)
+			_, err = codec.createOutbound(&msg, compression.TypeNone, false)
 		} else {
 			_, err = proto.Marshal(&msg)
 		}
@@ -119,7 +121,7 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	require.NoError(err)
 
 	useBuilder := os.Getenv("USE_BUILDER") != ""
-	codec, err := newMsgBuilder("", prometheus.NewRegistry(), 10*time.Second)
+	codec, err := newMsgBuilder(logging.NoLog{}, "", prometheus.NewRegistry(), 10*time.Second)
 	require.NoError(err)
 
 	b.StartTimer()
