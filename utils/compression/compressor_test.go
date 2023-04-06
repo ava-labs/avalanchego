@@ -4,13 +4,11 @@
 package compression
 
 import (
-	"bytes"
-	"compress/gzip"
 	"math"
 	"runtime"
 	"testing"
 
-	"github.com/DataDog/zstd"
+	_ "embed"
 
 	"github.com/stretchr/testify/require"
 
@@ -20,80 +18,49 @@ import (
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
 
-var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
-	TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
-		return NewNoCompressor(), nil
-	},
-	TypeGzip: NewGzipCompressor,
-	TypeZstd: NewZstdCompressor,
-}
-
-func TestDecompressGzipBomb(t *testing.T) {
-	var (
-		buf               bytes.Buffer
-		gzipWriter        = gzip.NewWriter(&buf)
-		totalWrittenBytes uint64
-		data              = make([]byte, units.MiB)
-	)
-	for buf.Len() < maxMessageSize {
-		n, err := gzipWriter.Write(data)
-		require.NoError(t, err)
-		totalWrittenBytes += uint64(n)
+var (
+	newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
+		TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
+			return NewNoCompressor(), nil
+		},
+		TypeGzip: NewGzipCompressor,
+		TypeZstd: NewZstdCompressor,
 	}
-	require.NoError(t, gzipWriter.Close())
 
-	compressor, err := NewGzipCompressor(maxMessageSize)
-	require.NoError(t, err)
+	//go:embed gzip_zip_bomb.bin
+	gzipZipBomb []byte
 
-	compressedBytes := buf.Bytes()
+	//go:embed zstd_zip_bomb.bin
+	zstdZipBomb []byte
 
-	var (
-		beforeDecompressionStats runtime.MemStats
-		afterDecompressionStats  runtime.MemStats
-	)
-
-	runtime.ReadMemStats(&beforeDecompressionStats)
-	_, err = compressor.Decompress(compressedBytes)
-	runtime.ReadMemStats(&afterDecompressionStats)
-
-	require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
-
-	bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
-	require.Less(t, bytesAllocatedDuringDecompression, totalWrittenBytes)
-}
-
-func TestDecompressZstdBomb(t *testing.T) {
-	var (
-		buf               bytes.Buffer
-		zstdWriter        = zstd.NewWriter(&buf)
-		totalWrittenBytes uint64
-		data              = make([]byte, units.MiB)
-	)
-	for buf.Len() < maxMessageSize {
-		n, err := zstdWriter.Write(data)
-		require.NoError(t, err)
-		totalWrittenBytes += uint64(n)
+	zipBombs = map[Type][]byte{
+		TypeGzip: gzipZipBomb,
+		TypeZstd: zstdZipBomb,
 	}
-	require.NoError(t, zstdWriter.Close())
+)
 
-	compressor, err := NewZstdCompressor(maxMessageSize)
-	require.NoError(t, err)
+func TestDecompressZipBombs(t *testing.T) {
+	for compressionType, zipBomb := range zipBombs {
+		newCompressorFunc := newCompressorFuncs[compressionType]
 
-	compressedBytes := buf.Bytes()
+		t.Run(compressionType.String(), func(t *testing.T) {
+			compressor, err := newCompressorFunc(maxMessageSize)
+			require.NoError(t, err)
 
-	var (
-		beforeDecompressionStats runtime.MemStats
-		afterDecompressionStats  runtime.MemStats
-	)
+			var (
+				beforeDecompressionStats runtime.MemStats
+				afterDecompressionStats  runtime.MemStats
+			)
+			runtime.ReadMemStats(&beforeDecompressionStats)
+			_, err = compressor.Decompress(zipBomb)
+			runtime.ReadMemStats(&afterDecompressionStats)
 
-	runtime.ReadMemStats(&beforeDecompressionStats)
-	_, err = compressor.Decompress(compressedBytes)
-	runtime.ReadMemStats(&afterDecompressionStats)
+			require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
 
-	require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
-
-	bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
-	require.Less(t, bytesAllocatedDuringDecompression, totalWrittenBytes)
+			bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+			require.Less(t, bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
+		})
+	}
 }
 
 func TestCompressDecompress(t *testing.T) {
