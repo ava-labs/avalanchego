@@ -4,6 +4,7 @@
 package compression
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -143,4 +144,60 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 
 		require.Equal(data, decompressed)
 	})
+}
+
+func BenchmarkCompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+		maxMessageSize,
+	}
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
+				require.NoError(b, err)
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Compress(bytes)
+					require.NoError(b, err)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkDecompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+		maxMessageSize,
+	}
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
+				require.NoError(b, err)
+
+				compressedBytes, err := compressor.Compress(bytes)
+				require.NoError(b, err)
+
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Decompress(compressedBytes)
+					require.NoError(b, err)
+				}
+			})
+		}
+	}
 }
