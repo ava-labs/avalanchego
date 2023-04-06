@@ -273,3 +273,79 @@ func TestDeadlockRegression(t *testing.T) {
 
 	awaitHealthy(h, true)
 }
+
+func TestTags(t *testing.T) {
+	require := require.New(t)
+
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
+		return "", nil
+	})
+
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check1", check)
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check2", check, "tag1")
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check3", check, "tag2")
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check4", check, "tag1", "tag2")
+	require.NoError(err)
+
+	// default checks
+	{
+		healthResult, health := h.Health()
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check1")
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.False(health)
+
+		healthResult, health = h.Health("tag1")
+		require.Len(healthResult, 2)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.False(health)
+	}
+
+	h.Start(context.Background(), checkFreq)
+	defer h.Stop()
+
+	awaitHealthy(h, true)
+
+	{
+		healthResult, health := h.Health()
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check1")
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1")
+		require.Len(healthResult, 2)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.True(health)
+	}
+
+	// now we'll add a new failing check
+	{
+		err = h.RegisterHealthCheck("check5", check, "tag1")
+		require.NoError(err)
+
+		healthResult, health := h.Health("tag1")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("tag2")
+		require.Len(healthResult, 2)
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.True(health)
+	}
+}

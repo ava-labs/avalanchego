@@ -44,6 +44,11 @@ func (s *Service) Health(_ *http.Request, args *HealthArgs, reply *APIReply) err
 		zap.String("method", "health"),
 	)
 
+	if args == nil || len(args.SubnetIDs) == 0 {
+		reply.Checks, reply.Healthy = s.health.Health()
+		return nil
+	}
+
 	// convert subnetIDs to string tags
 	tags := make([]string, len(args.SubnetIDs))
 	for i, subnetID := range args.SubnetIDs {
