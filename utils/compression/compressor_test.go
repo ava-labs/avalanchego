@@ -6,7 +6,10 @@ package compression
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"testing"
+
+	_ "embed"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,12 +19,54 @@ import (
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
 
-var newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
-	TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
-		return NewNoCompressor(), nil
-	},
-	TypeGzip: NewGzipCompressor,
-	TypeZstd: NewZstdCompressor,
+var (
+	newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
+		TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
+			return NewNoCompressor(), nil
+		},
+		TypeGzip: NewGzipCompressor,
+		TypeZstd: NewZstdCompressor,
+	}
+
+	//go:embed gzip_zip_bomb.bin
+	gzipZipBomb []byte
+
+	//go:embed zstd_zip_bomb.bin
+	zstdZipBomb []byte
+
+	zipBombs = map[Type][]byte{
+		TypeGzip: gzipZipBomb,
+		TypeZstd: zstdZipBomb,
+	}
+)
+
+func TestDecompressZipBombs(t *testing.T) {
+	for compressionType, zipBomb := range zipBombs {
+		// Make sure that the hardcoded zip bomb would be a valid message.
+		require.Less(t, len(zipBomb), maxMessageSize)
+
+		newCompressorFunc := newCompressorFuncs[compressionType]
+
+		t.Run(compressionType.String(), func(t *testing.T) {
+			compressor, err := newCompressorFunc(maxMessageSize)
+			require.NoError(t, err)
+
+			var (
+				beforeDecompressionStats runtime.MemStats
+				afterDecompressionStats  runtime.MemStats
+			)
+			runtime.ReadMemStats(&beforeDecompressionStats)
+			_, err = compressor.Decompress(zipBomb)
+			runtime.ReadMemStats(&afterDecompressionStats)
+
+			require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
+
+			// Make sure that we didn't allocate significantly more memory than
+			// the max message size.
+			bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+			require.Less(t, bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
+		})
+	}
 }
 
 func TestCompressDecompress(t *testing.T) {
