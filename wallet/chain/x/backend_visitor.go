@@ -39,7 +39,6 @@ func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -61,6 +60,5 @@ func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
 			return err
 		}
 	}
-
 	return nil
 }
