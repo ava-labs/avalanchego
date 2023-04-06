@@ -21,28 +21,28 @@ type msigAlias struct {
 }
 
 func (cs *caminoState) SetMultisigAlias(ma *multisig.AliasWithNonce) {
-	cs.modifiedMultisigOwners[ma.ID] = ma
-	cs.multisigOwnersCache.Evict(ma.ID)
+	cs.modifiedMultisigAliases[ma.ID] = ma
+	cs.multisigAliasesCache.Evict(ma.ID)
 }
 
 func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.AliasWithNonce, error) {
-	if owner, exist := cs.modifiedMultisigOwners[id]; exist {
+	if owner, exist := cs.modifiedMultisigAliases[id]; exist {
 		if owner == nil {
 			return nil, database.ErrNotFound
 		}
 		return owner, nil
 	}
 
-	if alias, exist := cs.multisigOwnersCache.Get(id); exist {
+	if alias, exist := cs.multisigAliasesCache.Get(id); exist {
 		if alias == nil {
 			return nil, database.ErrNotFound
 		}
 		return alias.(*multisig.AliasWithNonce), nil
 	}
 
-	maBytes, err := cs.multisigOwnersDB.Get(id[:])
+	maBytes, err := cs.multisigAliasesDB.Get(id[:])
 	if err == database.ErrNotFound {
-		cs.multisigOwnersCache.Put(id, nil)
+		cs.multisigAliasesCache.Put(id, nil)
 		return nil, err
 	} else if err != nil {
 		return nil, err
@@ -53,21 +53,24 @@ func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.AliasWithNonc
 		return nil, err
 	}
 
-	return &multisig.AliasWithNonce{
+	msigAlias := &multisig.AliasWithNonce{
 		Alias: multisig.Alias{
 			ID:     id,
 			Memo:   dbMultisigAlias.Memo,
 			Owners: dbMultisigAlias.Owners,
 		},
 		Nonce: dbMultisigAlias.Nonce,
-	}, nil
+	}
+
+	cs.multisigAliasesCache.Put(id, msigAlias)
+	return msigAlias, nil
 }
 
-func (cs *caminoState) writeMultisigOwners() error {
-	for key, alias := range cs.modifiedMultisigOwners {
-		delete(cs.modifiedMultisigOwners, key)
+func (cs *caminoState) writeMultisigAliases() error {
+	for key, alias := range cs.modifiedMultisigAliases {
+		delete(cs.modifiedMultisigAliases, key)
 		if alias == nil {
-			if err := cs.multisigOwnersDB.Delete(key[:]); err != nil {
+			if err := cs.multisigAliasesDB.Delete(key[:]); err != nil {
 				return err
 			}
 		} else {
@@ -80,7 +83,7 @@ func (cs *caminoState) writeMultisigOwners() error {
 			if err != nil {
 				return fmt.Errorf("failed to serialize multisig alias: %w", err)
 			}
-			if err := cs.multisigOwnersDB.Put(key[:], aliasBytes); err != nil {
+			if err := cs.multisigAliasesDB.Put(key[:], aliasBytes); err != nil {
 				return err
 			}
 		}

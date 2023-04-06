@@ -269,11 +269,11 @@ func (d *diff) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID
 }
 
 func (d *diff) SetMultisigAlias(owner *multisig.AliasWithNonce) {
-	d.caminoDiff.modifiedMultisigOwners[owner.ID] = owner
+	d.caminoDiff.modifiedMultisigAliases[owner.ID] = owner
 }
 
 func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.AliasWithNonce, error) {
-	if msigOwner, ok := d.caminoDiff.modifiedMultisigOwners[alias]; ok {
+	if msigOwner, ok := d.caminoDiff.modifiedMultisigAliases[alias]; ok {
 		if msigOwner == nil {
 			return nil, database.ErrNotFound
 		}
@@ -411,7 +411,7 @@ func (d *diff) ApplyCaminoState(baseState State) {
 		}
 	}
 
-	for _, v := range d.caminoDiff.modifiedMultisigOwners {
+	for _, v := range d.caminoDiff.modifiedMultisigAliases {
 		baseState.SetMultisigAlias(v)
 	}
 

@@ -29,18 +29,18 @@ var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
 type Offer struct {
 	ID ids.ID `json:"id"`
 
-	InterestRateNominator   uint64              `serialize:"true" json:"interestRateNominator"`
-	Start                   uint64              `serialize:"true" json:"start"`
-	End                     uint64              `serialize:"true" json:"end"`
-	MinAmount               uint64              `serialize:"true" json:"minAmount"`
-	TotalMaxAmount          uint64              `serialize:"true" json:"totalMaxAmount"`
-	DepositedAmount         uint64              `serialize:"true" json:"depositedAmount"`
-	MinDuration             uint32              `serialize:"true" json:"minDuration"`
-	MaxDuration             uint32              `serialize:"true" json:"maxDuration"`
-	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`
-	NoRewardsPeriodDuration uint32              `serialize:"true" json:"noRewardsPeriodDuration"`
-	Memo                    types.JSONByteSlice `serialize:"true" json:"memo"`
-	Flags                   uint64              `serialize:"true" json:"flags"`
+	InterestRateNominator   uint64              `serialize:"true" json:"interestRateNominator"`   // deposit.Amount * (interestRateNominator / interestRateDenominator) == reward for deposit with 1 year duration
+	Start                   uint64              `serialize:"true" json:"start"`                   // Unix time in seconds, when this offer becomes active (can be used to create new deposits)
+	End                     uint64              `serialize:"true" json:"end"`                     // Unix time in seconds, when this offer becomes inactive (can't be used to create new deposits)
+	MinAmount               uint64              `serialize:"true" json:"minAmount"`               // Minimum amount that can be deposited with this offer
+	TotalMaxAmount          uint64              `serialize:"true" json:"totalMaxAmount"`          // Maximum amount that can be deposited with this offer in total (across all deposits)
+	DepositedAmount         uint64              `serialize:"true" json:"depositedAmount"`         // Amount that was already deposited with this offer
+	MinDuration             uint32              `serialize:"true" json:"minDuration"`             // Minimum duration of deposit created with this offer
+	MaxDuration             uint32              `serialize:"true" json:"maxDuration"`             // Maximum duration of deposit created with this offer
+	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`    // Duration of period during which tokens deposited with this offer will be unlocked. The unlock period starts at the end of deposit minus unlockPeriodDuration
+	NoRewardsPeriodDuration uint32              `serialize:"true" json:"noRewardsPeriodDuration"` // Duration of period during which rewards won't be accumulated. No rewards period starts at the end of deposit minus unlockPeriodDuration
+	Memo                    types.JSONByteSlice `serialize:"true" json:"memo"`                    // Arbitrary offer memo
+	Flags                   uint64              `serialize:"true" json:"flags"`                   // Bitfield with flags
 }
 
 // Sets offer id from its bytes hash
@@ -112,12 +112,12 @@ func (o *Offer) Verify() error {
 }
 
 type Deposit struct {
-	DepositOfferID      ids.ID `serialize:"true"`
-	UnlockedAmount      uint64 `serialize:"true"`
-	ClaimedRewardAmount uint64 `serialize:"true"`
-	Start               uint64 `serialize:"true"`
-	Duration            uint32 `serialize:"true"`
-	Amount              uint64 `serialize:"true"`
+	DepositOfferID      ids.ID `serialize:"true"` // ID of deposit offer that was used to create this deposit
+	UnlockedAmount      uint64 `serialize:"true"` // How many tokens have already been unlocked from this deposit
+	ClaimedRewardAmount uint64 `serialize:"true"` // How many reward tokens have already been claimed for this deposit
+	Start               uint64 `serialize:"true"` // Timestamp of time, when this deposit was created
+	Duration            uint32 `serialize:"true"` // Duration of this deposit in seconds
+	Amount              uint64 `serialize:"true"` // How many tokens were locked with this deposit
 }
 
 func (deposit *Deposit) StartTime() time.Time {

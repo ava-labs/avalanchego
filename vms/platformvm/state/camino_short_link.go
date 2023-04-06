@@ -44,11 +44,17 @@ func (cs *caminoState) GetShortIDLink(id ids.ShortID, key ShortLinkKey) (ids.Sho
 	}
 
 	if addr, ok := cs.shortLinksCache.Get(linkKey); ok {
+		if addr == nil {
+			return ids.ShortEmpty, database.ErrNotFound
+		}
 		return addr.(ids.ShortID), nil
 	}
 
 	addrBytes, err := cs.shortLinksDB.Get(linkKey[:])
-	if err != nil {
+	if err == database.ErrNotFound {
+		cs.shortLinksCache.Put(linkKey, nil)
+		return ids.ShortEmpty, err
+	} else if err != nil {
 		return ids.ShortEmpty, err
 	}
 

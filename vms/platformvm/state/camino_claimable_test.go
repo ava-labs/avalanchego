@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -24,10 +24,11 @@ func TestGetClaimable(t *testing.T) {
 	testError := errors.New("test error")
 
 	tests := map[string]struct {
-		caminoState       func(*gomock.Controller) *caminoState
-		claimableOwnerID  ids.ID
-		expectedClaimable *Claimable
-		expectedErr       error
+		caminoState         func(*gomock.Controller) *caminoState
+		claimableOwnerID    ids.ID
+		expectedCaminoState func(*caminoState) *caminoState
+		expectedClaimable   *Claimable
+		expectedErr         error
 	}{
 		"Fail: claimable removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -38,7 +39,14 @@ func TestGetClaimable(t *testing.T) {
 				}
 			},
 			claimableOwnerID: claimableOwnerID,
-			expectedErr:      database.ErrNotFound,
+			expectedCaminoState: func(*caminoState) *caminoState {
+				return &caminoState{
+					caminoDiff: &caminoDiff{
+						modifiedClaimables: map[ids.ID]*Claimable{claimableOwnerID: nil},
+					},
+				}
+			},
+			expectedErr: database.ErrNotFound,
 		},
 		"Fail: claimable in cache, but removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -50,7 +58,36 @@ func TestGetClaimable(t *testing.T) {
 				}
 			},
 			claimableOwnerID: claimableOwnerID,
-			expectedErr:      database.ErrNotFound,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		"Fail: not found in db": {
+			caminoState: func(c *gomock.Controller) *caminoState {
+				cache := cache.NewMockCacher(c)
+				cache.EXPECT().Get(claimableOwnerID).Return(nil, false)
+				cache.EXPECT().Put(claimableOwnerID, nil)
+				db := database.NewMockDatabase(c)
+				db.EXPECT().Get(claimableOwnerID[:]).Return(nil, database.ErrNotFound)
+				return &caminoState{
+					claimablesDB:    db,
+					claimablesCache: cache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
+			claimableOwnerID: claimableOwnerID,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesDB:    actualCaminoState.claimablesDB,
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
+			expectedErr: database.ErrNotFound,
 		},
 		"OK: claimable added/modified": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -60,7 +97,15 @@ func TestGetClaimable(t *testing.T) {
 					},
 				}
 			},
-			claimableOwnerID:  claimableOwnerID,
+			claimableOwnerID: claimableOwnerID,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff: &caminoDiff{
+						modifiedClaimables: map[ids.ID]*Claimable{claimableOwnerID: claimable},
+					},
+				}
+			},
 			expectedClaimable: claimable,
 		},
 		"OK: claimable in cache": {
@@ -72,7 +117,13 @@ func TestGetClaimable(t *testing.T) {
 					caminoDiff:      &caminoDiff{},
 				}
 			},
-			claimableOwnerID:  claimableOwnerID,
+			claimableOwnerID: claimableOwnerID,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
 			expectedClaimable: claimable,
 		},
 		"OK: claimable in db": {
@@ -88,7 +139,14 @@ func TestGetClaimable(t *testing.T) {
 					caminoDiff:      &caminoDiff{},
 				}
 			},
-			claimableOwnerID:  claimableOwnerID,
+			claimableOwnerID: claimableOwnerID,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesDB:    actualCaminoState.claimablesDB,
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
 			expectedClaimable: claimable,
 		},
 		"Fail: db error": {
@@ -104,16 +162,25 @@ func TestGetClaimable(t *testing.T) {
 				}
 			},
 			claimableOwnerID: claimableOwnerID,
-			expectedErr:      testError,
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
+				return &caminoState{
+					claimablesDB:    actualCaminoState.claimablesDB,
+					claimablesCache: actualCaminoState.claimablesCache,
+					caminoDiff:      &caminoDiff{},
+				}
+			},
+			expectedErr: testError,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			claimable, err := tt.caminoState(ctrl).GetClaimable(tt.claimableOwnerID)
+			actualCaminoState := tt.caminoState(ctrl)
+			claimable, err := actualCaminoState.GetClaimable(tt.claimableOwnerID)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedClaimable, claimable)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }
@@ -130,7 +197,7 @@ func TestSetClaimable(t *testing.T) {
 		caminoState         func(*gomock.Controller) *caminoState
 		claimableOwnerID    ids.ID
 		claimable           *Claimable
-		expectedCaminoState func(cache.Cacher) *caminoState
+		expectedCaminoState func(*caminoState) *caminoState
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
@@ -143,9 +210,9 @@ func TestSetClaimable(t *testing.T) {
 			},
 			claimableOwnerID: ownerID,
 			claimable:        claimable,
-			expectedCaminoState: func(claimablesCache cache.Cacher) *caminoState {
+			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
-					claimablesCache: claimablesCache,
+					claimablesCache: actualCaminoState.claimablesCache,
 					caminoDiff: &caminoDiff{
 						modifiedClaimables: map[ids.ID]*Claimable{ownerID: claimable},
 					},
@@ -159,7 +226,7 @@ func TestSetClaimable(t *testing.T) {
 			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			caminoState.SetClaimable(tt.claimableOwnerID, tt.claimable)
-			require.Equal(t, tt.expectedCaminoState(caminoState.claimablesCache), caminoState)
+			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
 		})
 	}
 }
@@ -196,10 +263,17 @@ func TestSetNotDistributedValidatorReward(t *testing.T) {
 func TestGetNotDistributedValidatorReward(t *testing.T) {
 	tests := map[string]struct {
 		caminoState                           func(c *gomock.Controller) *caminoState
+		expectedCaminoState                   func(*caminoState) *caminoState
 		expectedNotDistributedValidatorReward uint64
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
+				return &caminoState{
+					notDistributedValidatorReward: 11,
+					caminoDiff:                    &caminoDiff{},
+				}
+			},
+			expectedCaminoState: func(*caminoState) *caminoState {
 				return &caminoState{
 					notDistributedValidatorReward: 11,
 					caminoDiff:                    &caminoDiff{},
@@ -217,6 +291,15 @@ func TestGetNotDistributedValidatorReward(t *testing.T) {
 					},
 				}
 			},
+			expectedCaminoState: func(*caminoState) *caminoState {
+				modifiedReward := uint64(15)
+				return &caminoState{
+					notDistributedValidatorReward: 11,
+					caminoDiff: &caminoDiff{
+						modifiedNotDistributedValidatorReward: &modifiedReward,
+					},
+				}
+			},
 			expectedNotDistributedValidatorReward: 15,
 		},
 	}
@@ -224,9 +307,11 @@ func TestGetNotDistributedValidatorReward(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			notDistributedValidatorReward, err := tt.caminoState(ctrl).GetNotDistributedValidatorReward()
+			actualCaminoState := tt.caminoState(ctrl)
+			notDistributedValidatorReward, err := actualCaminoState.GetNotDistributedValidatorReward()
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNotDistributedValidatorReward, notDistributedValidatorReward)
+			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
 		})
 	}
 }

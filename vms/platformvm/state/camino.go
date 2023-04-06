@@ -147,7 +147,7 @@ type caminoDiff struct {
 	modifiedAddressStates                 map[ids.ShortID]uint64
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*depositDiff
-	modifiedMultisigOwners                map[ids.ShortID]*multisig.AliasWithNonce
+	modifiedMultisigAliases               map[ids.ShortID]*multisig.AliasWithNonce
 	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
 	modifiedNotDistributedValidatorReward *uint64
@@ -182,8 +182,8 @@ type caminoState struct {
 	depositIDsByEndtimeDB    database.Database
 
 	// MSIG aliases
-	multisigOwnersCache cache.Cacher
-	multisigOwnersDB    database.Database
+	multisigAliasesCache cache.Cacher
+	multisigAliasesDB    database.Database
 
 	// ShortIDs link
 	shortLinksCache cache.Cacher
@@ -197,12 +197,12 @@ type caminoState struct {
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:  make(map[ids.ShortID]uint64),
-		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:       make(map[ids.ID]*depositDiff),
-		modifiedMultisigOwners: make(map[ids.ShortID]*multisig.AliasWithNonce),
-		modifiedShortLinks:     make(map[ids.ID]*ids.ShortID),
-		modifiedClaimables:     make(map[ids.ID]*Claimable),
+		modifiedAddressStates:   make(map[ids.ShortID]uint64),
+		modifiedDepositOffers:   make(map[ids.ID]*deposit.Offer),
+		modifiedDeposits:        make(map[ids.ID]*depositDiff),
+		modifiedMultisigAliases: make(map[ids.ShortID]*multisig.AliasWithNonce),
+		modifiedShortLinks:      make(map[ids.ID]*ids.ShortID),
+		modifiedClaimables:      make(map[ids.ID]*Claimable),
 	}
 }
 
@@ -269,8 +269,8 @@ func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheu
 		depositIDsByEndtimeDB: prefixdb.New(depositIDsByEndtimePrefix, baseDB),
 
 		// Multisig Owners
-		multisigOwnersCache: multisigOwnersCache,
-		multisigOwnersDB:    prefixdb.New(multisigOwnersPrefix, baseDB),
+		multisigAliasesCache: multisigOwnersCache,
+		multisigAliasesDB:    prefixdb.New(multisigOwnersPrefix, baseDB),
 
 		// Short links
 		shortLinksCache: shortLinksCache,
@@ -510,7 +510,7 @@ func (cs *caminoState) Write() error {
 		cs.writeAddressStates(),
 		cs.writeDepositOffers(),
 		cs.writeDeposits(),
-		cs.writeMultisigOwners(),
+		cs.writeMultisigAliases(),
 		cs.writeShortLinks(),
 		cs.writeClaimableAndValidatorRewards(),
 		cs.writeDeferredStakers(),
@@ -526,7 +526,7 @@ func (cs *caminoState) Close() error {
 		cs.depositOffersDB.Close(),
 		cs.depositsDB.Close(),
 		cs.depositIDsByEndtimeDB.Close(),
-		cs.multisigOwnersDB.Close(),
+		cs.multisigAliasesDB.Close(),
 		cs.shortLinksDB.Close(),
 		cs.claimablesDB.Close(),
 		cs.deferredValidatorsDB.Close(),
