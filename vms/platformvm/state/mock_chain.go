@@ -402,10 +402,10 @@ func (mr *MockChainMockRecorder) GetDepositOffer(arg0 interface{}) *gomock.Call 
 }
 
 // GetMultisigAlias mocks base method.
-func (m *MockChain) GetMultisigAlias(arg0 ids.ShortID) (*multisig.Alias, error) {
+func (m *MockChain) GetMultisigAlias(arg0 ids.ShortID) (*multisig.AliasWithNonce, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMultisigAlias", arg0)
-	ret0, _ := ret[0].(*multisig.Alias)
+	ret0, _ := ret[0].(*multisig.AliasWithNonce)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -748,7 +748,7 @@ func (mr *MockChainMockRecorder) SetLastRewardImportTimestamp(arg0 interface{}) 
 }
 
 // SetMultisigAlias mocks base method.
-func (m *MockChain) SetMultisigAlias(arg0 *multisig.Alias) {
+func (m *MockChain) SetMultisigAlias(arg0 *multisig.AliasWithNonce) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetMultisigAlias", arg0)
 }

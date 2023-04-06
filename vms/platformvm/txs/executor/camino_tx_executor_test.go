@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -274,13 +275,15 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &msigAlias)
-				env.state.SetMultisigAlias(&multisig.Alias{
-					ID: msigAlias,
-					Owners: &secp256k1fx.OutputOwners{
-						Threshold: 2,
-						Addrs: []ids.ShortID{
-							caminoPreFundedKeys[0].Address(),
-							caminoPreFundedKeys[1].Address(),
+				env.state.SetMultisigAlias(&multisig.AliasWithNonce{
+					Alias: multisig.Alias{
+						ID: msigAlias,
+						Owners: &secp256k1fx.OutputOwners{
+							Threshold: 2,
+							Addrs: []ids.ShortID{
+								caminoPreFundedKeys[0].Address(),
+								caminoPreFundedKeys[1].Address(),
+							},
 						},
 					},
 				})
@@ -4627,6 +4630,143 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			stakerToRemove := stakerIterator.Value()
 			stakerIterator.Release()
 			require.Equal(t, stakerToRemove.NodeID, nodeID)
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
+	fakeMSigAlias := preFundedKeys[0].Address()
+	sourceKey := preFundedKeys[1]
+	nestedAlias := ids.ShortID{0, 0, 0, 1, 0xa}
+	aliasMemberOwners := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{sourceKey.Address()},
+	}
+	aliasDefinition := &multisig.AliasWithNonce{
+		Alias: multisig.Alias{
+			ID:     fakeMSigAlias,
+			Owners: &aliasMemberOwners,
+		},
+	}
+	nestedAliasDefinition := &multisig.AliasWithNonce{
+		Alias: multisig.Alias{
+			ID: nestedAlias,
+			Owners: &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{fakeMSigAlias, sourceKey.Address()},
+			},
+		},
+	}
+
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+		MultisigAliases:     []*multisig.Alias{&aliasDefinition.Alias, &nestedAliasDefinition.Alias},
+	}
+
+	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
+	env.ctx.Lock.Lock()
+	defer func() {
+		if err := shutdownCaminoEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	type test struct {
+		destinationChainID ids.ID
+		to                 ids.ShortID
+		expectedErr        error
+		expectedMsigAddrs  []ids.ShortID
+	}
+
+	tests := map[string]test{
+		"P->C export from msig wallet": {
+			destinationChainID: cChainID,
+			to:                 fakeMSigAlias,
+			expectedErr:        nil,
+			expectedMsigAddrs:  []ids.ShortID{fakeMSigAlias},
+		},
+		"P->C export simple account not multisig": {
+			destinationChainID: cChainID,
+			to:                 sourceKey.Address(),
+			expectedErr:        nil,
+			expectedMsigAddrs:  []ids.ShortID{},
+		},
+		"P->C export from nested msig wallet": {
+			destinationChainID: cChainID,
+			to:                 nestedAlias,
+			expectedErr:        nil,
+			expectedMsigAddrs:  []ids.ShortID{nestedAlias, fakeMSigAlias},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			tx, err := env.txBuilder.NewExportTx(
+				defaultBalance-defaultTxFee,
+				tt.destinationChainID,
+				tt.to,
+				preFundedKeys,
+				ids.ShortEmpty,
+			)
+			require.NoError(err)
+
+			fakedState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   fakedState,
+					Tx:      tx,
+				},
+			}
+			err = tx.Unsigned.Visit(&executor)
+			require.ErrorIs(err, tt.expectedErr)
+			if err != nil {
+				return
+			}
+
+			// Check atomic elts
+			ar, exists := executor.AtomicRequests[tt.destinationChainID]
+			require.True(exists)
+			require.Len(ar.PutRequests, 1)
+			req := ar.PutRequests[0]
+			require.Equal(req.Traits[0], tt.to.Bytes())
+
+			var (
+				utxo    avax.UTXO
+				aliases []verify.State
+			)
+
+			isMultisig := len(tt.expectedMsigAddrs) > 0
+			if isMultisig {
+				wrap := avax.UTXOWithMSig{}
+				_, err = txs.Codec.Unmarshal(req.Value, &wrap)
+				utxo = wrap.UTXO
+				aliases = wrap.Aliases
+				require.NoError(err)
+				require.NotNil(aliases)
+				require.True(len(aliases) > 0)
+			} else {
+				utxo = avax.UTXO{}
+				_, err = txs.Codec.Unmarshal(req.Value, &utxo)
+				require.NoError(err)
+			}
+
+			require.NotNil(utxo)
+			out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+			require.True(ok)
+			require.Equal(tt.to, out.OutputOwners.Addrs[0])
+
+			// Check aliases contain the Output owner
+			aliasIDs := make([]ids.ShortID, len(aliases))
+			for i, alias := range aliases {
+				aliasIDs[i] = alias.(*multisig.AliasWithNonce).ID
+			}
+			require.Equal(tt.expectedMsigAddrs, aliasIDs)
 		})
 	}
 }

@@ -426,10 +426,10 @@ func (mr *MockDiffMockRecorder) GetDepositOffer(arg0 interface{}) *gomock.Call {
 }
 
 // GetMultisigAlias mocks base method.
-func (m *MockDiff) GetMultisigAlias(arg0 ids.ShortID) (*multisig.Alias, error) {
+func (m *MockDiff) GetMultisigAlias(arg0 ids.ShortID) (*multisig.AliasWithNonce, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMultisigAlias", arg0)
-	ret0, _ := ret[0].(*multisig.Alias)
+	ret0, _ := ret[0].(*multisig.AliasWithNonce)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -759,7 +759,7 @@ func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock
 }
 
 // SetMultisigAlias mocks base method.
-func (m *MockDiff) SetMultisigAlias(arg0 *multisig.Alias) {
+func (m *MockDiff) SetMultisigAlias(arg0 *multisig.AliasWithNonce) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetMultisigAlias", arg0)
 }

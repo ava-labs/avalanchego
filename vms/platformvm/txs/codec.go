@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -118,6 +119,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&ClaimTx{}),
 		targetCodec.RegisterCustomType(&RewardsImportTx{}),
 		targetCodec.RegisterCustomType(&secp256k1fx.MultisigCredential{}),
+		targetCodec.RegisterCustomType(&multisig.AliasWithNonce{}),
 	)
 	return errs.Err
 }

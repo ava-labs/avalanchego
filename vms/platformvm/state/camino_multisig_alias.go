@@ -17,14 +17,15 @@ import (
 type msigAlias struct {
 	Memo   types.JSONByteSlice `serialize:"true"`
 	Owners verify.State        `serialize:"true"`
+	Nonce  uint64              `serialize:"true"`
 }
 
-func (cs *caminoState) SetMultisigAlias(ma *multisig.Alias) {
+func (cs *caminoState) SetMultisigAlias(ma *multisig.AliasWithNonce) {
 	cs.modifiedMultisigOwners[ma.ID] = ma
 	cs.multisigOwnersCache.Evict(ma.ID)
 }
 
-func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error) {
+func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.AliasWithNonce, error) {
 	if owner, exist := cs.modifiedMultisigOwners[id]; exist {
 		if owner == nil {
 			return nil, database.ErrNotFound
@@ -36,7 +37,7 @@ func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error)
 		if alias == nil {
 			return nil, database.ErrNotFound
 		}
-		return alias.(*multisig.Alias), nil
+		return alias.(*multisig.AliasWithNonce), nil
 	}
 
 	maBytes, err := cs.multisigOwnersDB.Get(id[:])
@@ -47,15 +48,18 @@ func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.Alias, error)
 		return nil, err
 	}
 
-	multisigAlias := &msigAlias{}
-	if _, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigAlias); err != nil {
+	dbMultisigAlias := &msigAlias{}
+	if _, err = blocks.GenesisCodec.Unmarshal(maBytes, dbMultisigAlias); err != nil {
 		return nil, err
 	}
 
-	return &multisig.Alias{
-		ID:     id,
-		Memo:   multisigAlias.Memo,
-		Owners: multisigAlias.Owners,
+	return &multisig.AliasWithNonce{
+		Alias: multisig.Alias{
+			ID:     id,
+			Memo:   dbMultisigAlias.Memo,
+			Owners: dbMultisigAlias.Owners,
+		},
+		Nonce: dbMultisigAlias.Nonce,
 	}, nil
 }
 
@@ -70,6 +74,7 @@ func (cs *caminoState) writeMultisigOwners() error {
 			multisigAlias := &msigAlias{
 				Memo:   alias.Memo,
 				Owners: alias.Owners,
+				Nonce:  alias.Nonce,
 			}
 			aliasBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, multisigAlias)
 			if err != nil {

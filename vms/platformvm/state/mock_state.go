@@ -487,10 +487,10 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 }
 
 // GetMultisigAlias mocks base method.
-func (m *MockState) GetMultisigAlias(arg0 ids.ShortID) (*multisig.Alias, error) {
+func (m *MockState) GetMultisigAlias(arg0 ids.ShortID) (*multisig.AliasWithNonce, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMultisigAlias", arg0)
-	ret0, _ := ret[0].(*multisig.Alias)
+	ret0, _ := ret[0].(*multisig.AliasWithNonce)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -923,7 +923,7 @@ func (mr *MockStateMockRecorder) SetLastAccepted(arg0 interface{}) *gomock.Call 
 }
 
 // SetMultisigAlias mocks base method.
-func (m *MockState) SetMultisigAlias(arg0 *multisig.Alias) {
+func (m *MockState) SetMultisigAlias(arg0 *multisig.AliasWithNonce) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetMultisigAlias", arg0)
 }

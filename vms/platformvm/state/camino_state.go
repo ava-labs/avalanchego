@@ -92,11 +92,11 @@ func (s *state) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.I
 	return s.caminoState.GetNextToUnlockDepositIDsAndTime(removedDepositIDs)
 }
 
-func (s *state) SetMultisigAlias(owner *multisig.Alias) {
+func (s *state) SetMultisigAlias(owner *multisig.AliasWithNonce) {
 	s.caminoState.SetMultisigAlias(owner)
 }
 
-func (s *state) GetMultisigAlias(alias ids.ShortID) (*multisig.Alias, error) {
+func (s *state) GetMultisigAlias(alias ids.ShortID) (*multisig.AliasWithNonce, error) {
 	return s.caminoState.GetMultisigAlias(alias)
 }
 

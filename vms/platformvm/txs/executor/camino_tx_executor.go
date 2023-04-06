@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -67,7 +68,6 @@ var (
 	errInputAmountMissmatch         = errors.New("utxo amount doesn't match input amount")
 	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
 	errWrongClaimedAmount           = errors.New("claiming more than was available to claim")
-	errMsigAlias                    = errors.New("can't use msig alias here")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -353,22 +353,72 @@ func (e *CaminoStandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	for _, output := range tx.ExportedOutputs {
+	if err := e.StandardTxExecutor.ExportTx(tx); err != nil {
+		return err
+	}
+
+	if err := e.wrapAtomicElementsForMultisig(tx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) wrapAtomicElementsForMultisig(tx *txs.ExportTx) error {
+	putReqs := e.AtomicRequests[tx.DestinationChain].PutRequests
+	if len(putReqs) != len(tx.ExportedOutputs) {
+		return errors.New("exported outputs count doesn't match put requests")
+	}
+
+	for i, output := range tx.ExportedOutputs {
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			return locked.ErrWrongOutType
 		}
-		for _, addr := range out.Addrs {
-			_, err := e.State.GetMultisigAlias(addr)
-			if err != nil && err != database.ErrNotFound {
-				return err
-			} else if err == nil {
-				return errMsigAlias
+
+		aliasInfs, err := e.Fx.CollectMultisigAliases(&out.OutputOwners, e.State)
+		if err != nil {
+			return err
+		}
+		if len(aliasInfs) == 0 {
+			// no need to wrap current UTXO
+			continue
+		}
+
+		req := putReqs[i]
+		var utxo avax.UTXO
+		_, err = txs.Codec.Unmarshal(req.Value, &utxo)
+		if err != nil {
+			return err
+		}
+
+		// wrap utxo with alias
+		aliases := make([]verify.State, len(aliasInfs))
+		for i, inf := range aliasInfs {
+			ali, ok := inf.(*multisig.AliasWithNonce)
+			if !ok {
+				return errors.New("wrong type, expected multisig.AliasWithNonce")
 			}
+			aliases[i] = ali
+		}
+
+		wrappedUtxo := &avax.UTXOWithMSig{
+			UTXO:    utxo,
+			Aliases: aliases,
+		}
+		bytes, err := txs.Codec.Marshal(txs.Version, wrappedUtxo)
+		if err != nil {
+			return err
+		}
+
+		putReqs[i] = &atomic.Element{
+			Key:    req.Key,
+			Value:  bytes,
+			Traits: req.Traits,
 		}
 	}
 
-	return e.StandardTxExecutor.ExportTx(tx)
+	return nil
 }
 
 func (e *CaminoStandardTxExecutor) ImportTx(tx *txs.ImportTx) error {

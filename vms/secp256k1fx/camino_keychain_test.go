@@ -20,12 +20,14 @@ type TestGetter struct {
 	threshold uint32
 }
 
-func (t *TestGetter) GetMultisigAlias(addr ids.ShortID) (*multisig.Alias, error) {
+func (t *TestGetter) GetMultisigAlias(addr ids.ShortID) (*multisig.AliasWithNonce, error) {
 	if addr == t.msig {
-		return &multisig.Alias{
-			Owners: &OutputOwners{
-				Threshold: t.threshold,
-				Addrs:     t.addresses,
+		return &multisig.AliasWithNonce{
+			Alias: multisig.Alias{
+				Owners: &OutputOwners{
+					Threshold: t.threshold,
+					Addrs:     t.addresses,
+				},
 			},
 		}, nil
 	}

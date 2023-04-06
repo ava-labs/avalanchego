@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -91,15 +92,19 @@ func (kc *Keychain) SpendMultiSig(
 	}
 }
 
-type TraverserOwnerFunc func(
+type TraverseOwnerFunc func(
 	addr ids.ShortID,
 	totalVisited,
 	totalVerified uint32,
 ) (bool, error)
 
+type TraverseAliasFunc func(
+	alias *multisig.AliasWithNonce,
+)
+
 // TraverseOwners traverses through owners, visits every address and callbacks in case a
 // non-multisig address is visited. Nested multisig alias are excluded from sigIndex concept.
-func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwnerFunc) (uint32, error) {
+func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverseOwnerFunc) (uint32, error) {
 	var addrVisited, addrVerified uint32
 
 	type stackItem struct {
@@ -184,4 +189,54 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverserOwner
 		}
 	}
 	return addrVerified, nil
+}
+
+func TraverseAliases(out *OutputOwners, msig AliasGetter, callback TraverseAliasFunc) error {
+	type stackItem struct {
+		index  int
+		owners *OutputOwners
+	}
+
+	cycleCheck := set.Set[ids.ShortID]{}
+	stack := []*stackItem{{owners: out}}
+	for len(stack) > 0 {
+	Stack:
+		// get head
+		currentStack := stack[len(stack)-1]
+		for currentStack.index < len(currentStack.owners.Addrs) {
+			// get the next address to check
+			addr := currentStack.owners.Addrs[currentStack.index]
+			currentStack.index++
+			// Is it a multi-sig address ?
+			alias, err := msig.GetMultisigAlias(addr)
+			switch err {
+			case nil: // multi-sig
+				if len(stack) > MaxSignatures {
+					return errTooManySignatures
+				}
+				if cycleCheck.Contains(addr) {
+					return errCyclicAliases
+				}
+				cycleCheck.Add(addr)
+
+				owners, ok := alias.Owners.(*OutputOwners)
+				if !ok {
+					return errWrongOwnerType
+				}
+				stack = append(stack, &stackItem{
+					owners: owners,
+				})
+				callback(alias)
+				goto Stack
+			case database.ErrNotFound: // non-multi-sig
+				// Normal address, nothing to do
+			default:
+				return err
+			}
+		}
+
+		// remove head
+		stack = stack[:len(stack)-1]
+	}
+	return nil
 }

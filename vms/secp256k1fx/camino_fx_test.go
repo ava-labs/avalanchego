@@ -121,13 +121,13 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{{Alias: multisig.Alias{
 					ID: aliasAddr1,
 					Owners: &OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{addr2, addr3},
 					},
-				}})
+				}}})
 				return msig
 			},
 		},
@@ -140,13 +140,13 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{{Alias: multisig.Alias{
 					ID: aliasAddr1,
 					Owners: &OutputOwners{
 						Threshold: 2,
 						Addrs:     []ids.ShortID{addr2, addr3},
 					},
-				}})
+				}}})
 				return msig
 			},
 		},
@@ -159,21 +159,21 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{
+					{Alias: multisig.Alias{
 						ID: aliasAddr1,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{aliasAddr2, addr3},
 						},
-					},
-					{
+					}},
+					{Alias: multisig.Alias{
 						ID: aliasAddr2,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{addr1, addr2},
 						},
-					},
+					}},
 				})
 				return msig
 			},
@@ -187,21 +187,21 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{
+					{Alias: multisig.Alias{
 						ID: aliasAddr1,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{aliasAddr2, addr3},
 						},
-					},
-					{
+					}},
+					{Alias: multisig.Alias{
 						ID: aliasAddr2,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{addr1, addr2},
 						},
-					},
+					}},
 				})
 				return msig
 			},
@@ -292,13 +292,13 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{{Alias: multisig.Alias{
 					ID: aliasAddr1,
 					Owners: &OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{addr2, addr3},
 					},
-				}})
+				}}})
 				return msig
 			},
 		},
@@ -310,13 +310,13 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{{Alias: multisig.Alias{
 					ID: aliasAddr1,
 					Owners: &OutputOwners{
 						Threshold: 2,
 						Addrs:     []ids.ShortID{addr2, addr3},
 					},
-				}})
+				}}})
 				return msig
 			},
 		},
@@ -328,21 +328,21 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{
+					{Alias: multisig.Alias{
 						ID: aliasAddr1,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{aliasAddr2, addr3},
 						},
-					},
-					{
+					}},
+					{Alias: multisig.Alias{
 						ID: aliasAddr2,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{addr1, addr2},
 						},
-					},
+					}},
 				})
 				return msig
 			},
@@ -355,21 +355,21 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{
+					{Alias: multisig.Alias{
 						ID: aliasAddr1,
 						Owners: &OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{aliasAddr2, addr3},
 						},
-					},
-					{
+					}},
+					{Alias: multisig.Alias{
 						ID: aliasAddr2,
 						Owners: &OutputOwners{
 							Threshold: 1,
 							Addrs:     []ids.ShortID{addr1, addr2},
 						},
-					},
+					}},
 				})
 				return msig
 			},
@@ -382,21 +382,21 @@ func TestVerifyMultisigUnorderedCredentials(t *testing.T) {
 			},
 			msig: func(c *gomock.Controller) AliasGetter {
 				msig := NewMockAliasGetter(c)
-				expectGetMultisigAliases(msig, []*multisig.Alias{
-					{
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{
+					{Alias: multisig.Alias{
 						ID: aliasAddr1,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{aliasAddr2, addr3},
 						},
-					},
-					{
+					}},
+					{Alias: multisig.Alias{
 						ID: aliasAddr2,
 						Owners: &OutputOwners{
 							Threshold: 2,
 							Addrs:     []ids.ShortID{addr1, addr2},
 						},
-					},
+					}},
 				})
 				return msig
 			},
@@ -454,6 +454,62 @@ func TestExtractFromAndSigners(t *testing.T) {
 	}
 }
 
+func TestCollectMultisigAliases(t *testing.T) {
+	_, addr1 := generateKey(t)
+	_, addr2 := generateKey(t)
+	_, addr3 := generateKey(t)
+	_, aliasAddr1 := generateKey(t)
+
+	noAliasesMsigGetter := func(c *gomock.Controller) AliasGetter {
+		msig := NewMockAliasGetter(c)
+		msig.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+		return msig
+	}
+
+	tests := map[string]struct {
+		owners          *OutputOwners
+		msig            func(c *gomock.Controller) AliasGetter
+		expectedAliases int
+		expectedError   error
+	}{
+		"OK: 2 addrs, no msig alias": {
+			owners: &OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr1, addr2},
+			},
+			msig: noAliasesMsigGetter,
+		},
+		"OK 1 msig alias": {
+			owners: &OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr1, aliasAddr1},
+			},
+			msig: func(c *gomock.Controller) AliasGetter {
+				msig := NewMockAliasGetter(c)
+				expectGetMultisigAliases(msig, []*multisig.AliasWithNonce{{Alias: multisig.Alias{
+					ID: aliasAddr1,
+					Owners: &OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr2, addr3},
+					},
+				}}})
+				return msig
+			},
+			expectedAliases: 1,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			aliases, err := collectMultisigAliases(tt.owners, tt.msig(ctrl))
+			require.ErrorIs(t, err, tt.expectedError)
+			require.Equal(t, len(aliases), tt.expectedAliases)
+		})
+	}
+}
+
 func defaultFx(t *testing.T) *Fx {
 	require := require.New(t)
 	vm := TestVM{
@@ -481,7 +537,7 @@ func generateKey(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID) {
 	return secpKey, secpKey.Address()
 }
 
-func expectGetMultisigAliases(msig *MockAliasGetter, aliases []*multisig.Alias) {
+func expectGetMultisigAliases(msig *MockAliasGetter, aliases []*multisig.AliasWithNonce) {
 	aliasesMatchers := []gomock.Matcher{}
 	for _, alias := range aliases {
 		aliasesMatchers = append(aliasesMatchers, gomock.Eq(alias.ID))

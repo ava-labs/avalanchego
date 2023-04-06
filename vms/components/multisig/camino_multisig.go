@@ -22,6 +22,13 @@ type Alias struct {
 	Owners verify.State        `serialize:"true" json:"owners"`
 }
 
+type AliasWithNonce struct {
+	Alias `serialize:"true" json:"alias"`
+
+	// Nonce reflects how many times the owners of this alias have changed
+	Nonce uint64 `serialize:"true" json:"nonce"`
+}
+
 func (ma *Alias) InitCtx(ctx *snow.Context) {
 	ma.Owners.InitCtx(ctx)
 }

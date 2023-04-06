@@ -624,9 +624,9 @@ func newCaminoEnvironmentWithMocks(
 	return env
 }
 
-func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.Alias) { //nolint:unparam
+func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) { //nolint:unparam
 	for i := range addrs {
-		var alias *multisig.Alias
+		var alias *multisig.AliasWithNonce
 		if len(aliases) > i {
 			alias = aliases[i]
 		}

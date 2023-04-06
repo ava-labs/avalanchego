@@ -29,7 +29,7 @@ type Owned interface {
 }
 
 type AliasGetter interface {
-	GetMultisigAlias(ids.ShortID) (*multisig.Alias, error)
+	GetMultisigAlias(ids.ShortID) (*multisig.AliasWithNonce, error)
 }
 
 type (
@@ -214,6 +214,19 @@ func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msi
 	return fx.verifyMultisigUnorderedCredentials(tx, cred, owners, msig)
 }
 
+func (*Fx) CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error) {
+	owners, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return nil, errWrongUTXOType
+	}
+	msig, ok := msigIntf.(AliasGetter)
+	if !ok {
+		return nil, errNotAliasGetter
+	}
+
+	return collectMultisigAliases(owners, msig)
+}
+
 func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred CredentialIntf, owners *OutputOwners, msig AliasGetter) error {
 	sigIdxs := cred.SignatureIndices()
 	if sigIdxs == nil {
@@ -276,6 +289,19 @@ func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, creds []verify.V
 	}
 
 	return nil
+}
+
+func collectMultisigAliases(owners *OutputOwners, msig AliasGetter) ([]interface{}, error) {
+	result := make([]interface{}, 0, len(owners.Addrs))
+
+	tf := func(alias *multisig.AliasWithNonce) {
+		result = append(result, alias)
+	}
+
+	if err := TraverseAliases(owners, msig, tf); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // ExtractFromAndSigners splits an array of PrivateKeys into `from` and `signers`

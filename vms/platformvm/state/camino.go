@@ -94,8 +94,8 @@ type CaminoDiff interface {
 
 	// Multisig Owners
 
-	GetMultisigAlias(ids.ShortID) (*multisig.Alias, error)
-	SetMultisigAlias(*multisig.Alias)
+	GetMultisigAlias(ids.ShortID) (*multisig.AliasWithNonce, error)
+	SetMultisigAlias(*multisig.AliasWithNonce)
 
 	// ShortIDsLink
 
@@ -147,7 +147,7 @@ type caminoDiff struct {
 	modifiedAddressStates                 map[ids.ShortID]uint64
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*depositDiff
-	modifiedMultisigOwners                map[ids.ShortID]*multisig.Alias
+	modifiedMultisigOwners                map[ids.ShortID]*multisig.AliasWithNonce
 	modifiedShortLinks                    map[ids.ID]*ids.ShortID
 	modifiedClaimables                    map[ids.ID]*Claimable
 	modifiedNotDistributedValidatorReward *uint64
@@ -200,7 +200,7 @@ func newCaminoDiff() *caminoDiff {
 		modifiedAddressStates:  make(map[ids.ShortID]uint64),
 		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
 		modifiedDeposits:       make(map[ids.ID]*depositDiff),
-		modifiedMultisigOwners: make(map[ids.ShortID]*multisig.Alias),
+		modifiedMultisigOwners: make(map[ids.ShortID]*multisig.AliasWithNonce),
 		modifiedShortLinks:     make(map[ids.ID]*ids.ShortID),
 		modifiedClaimables:     make(map[ids.ID]*Claimable),
 	}
@@ -365,7 +365,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding msig aliases
 
 	for _, multisigAlias := range g.Camino.MultisigAliases {
-		cs.SetMultisigAlias(multisigAlias)
+		cs.SetMultisigAlias(&multisig.AliasWithNonce{Alias: *multisigAlias})
 	}
 
 	// adding blocks (validators and deposits)

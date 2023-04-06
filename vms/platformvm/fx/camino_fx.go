@@ -11,8 +11,10 @@ import (
 type CaminoFx interface {
 	// Recovers signers addresses from [verifies] credentials for [utx] transaction
 	RecoverAddresses(utx secp256k1fx.UnsignedTx, verifies []verify.Verifiable) (secp256k1fx.RecoverMap, error)
+
 	// Verifies that Multisig aliases are on inputs are only used in supported hierarchy
 	VerifyMultisigOwner(outIntf, msigIntf interface{}) error
+
 	// VerifyMultisigTransfer verifies that the specified transaction can spend the
 	// provided utxo with no restrictions on the destination. If the transaction
 	// can't spend the output based on the input and credential, a non-nil error
@@ -26,4 +28,7 @@ type CaminoFx interface {
 	// VerifyMultisigUnorderedPermission returns nil if credential [credIntf] proves [ownerIntf].
 	// Multisig aliases supported. Signatures order and number doesn't matter.
 	VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msigIntf interface{}) error
+
+	// CollectMultisigAliases returns an array of OutputOwners part of the owner
+	CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error)
 }
