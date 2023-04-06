@@ -11,8 +11,6 @@ import (
 	"io"
 	"math"
 	"sync"
-
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -24,15 +22,8 @@ var (
 )
 
 type gzipCompressor struct {
-	maxSize int64
-
-	lock sync.Mutex
-
-	writeBuffer *bytes.Buffer
-	gzipWriter  *gzip.Writer
-
-	bytesReader *bytes.Reader
-	gzipReader  *gzip.Reader
+	maxSize        int64
+	gzipWriterPool sync.Pool
 }
 
 // Compress [msg] and returns the compressed bytes.
@@ -41,37 +32,32 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: (%d) > (%d)", ErrMsgTooLarge, len(msg), g.maxSize)
 	}
 
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	var writeBuffer bytes.Buffer
+	gzipWriter := g.gzipWriterPool.Get().(*gzip.Writer)
+	gzipWriter.Reset(&writeBuffer)
+	defer g.gzipWriterPool.Put(gzipWriter)
 
-	g.writeBuffer.Reset()
-	g.gzipWriter.Reset(g.writeBuffer)
-	if _, err := g.gzipWriter.Write(msg); err != nil {
+	if _, err := gzipWriter.Write(msg); err != nil {
 		return nil, err
 	}
-	if err := g.gzipWriter.Close(); err != nil {
+	if err := gzipWriter.Close(); err != nil {
 		return nil, err
 	}
-
-	compressed := g.writeBuffer.Bytes()
-	compressedCopy := slices.Clone(compressed)
-	return compressedCopy, nil
+	return writeBuffer.Bytes(), nil
 }
 
 // Decompress decompresses [msg].
 func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.bytesReader.Reset(msg)
-	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
+	bytesReader := bytes.NewReader(msg)
+	gzipReader, err := gzip.NewReader(bytesReader)
+	if err != nil {
 		return nil, err
 	}
 
 	// We allow [io.LimitReader] to read up to [g.maxSize + 1] bytes, so that if
 	// the decompressed payload is greater than the maximum size, this function
 	// will return the appropriate error instead of an incomplete byte slice.
-	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
+	limitedReader := io.LimitReader(gzipReader, g.maxSize+1)
 
 	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
@@ -80,7 +66,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if int64(len(decompressed)) > g.maxSize {
 		return nil, fmt.Errorf("%w: (%d) > (%d)", ErrDecompressedMsgTooLarge, len(decompressed), g.maxSize)
 	}
-	return decompressed, g.gzipReader.Close()
+	return decompressed, gzipReader.Close()
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
@@ -93,14 +79,12 @@ func NewGzipCompressor(maxSize int64) (Compressor, error) {
 		return nil, ErrInvalidMaxSizeCompressor
 	}
 
-	var buf bytes.Buffer
 	return &gzipCompressor{
 		maxSize: maxSize,
-
-		writeBuffer: &buf,
-		gzipWriter:  gzip.NewWriter(&buf),
-
-		bytesReader: &bytes.Reader{},
-		gzipReader:  &gzip.Reader{},
+		gzipWriterPool: sync.Pool{
+			New: func() interface{} {
+				return gzip.NewWriter(nil)
+			},
+		},
 	}, nil
 }
