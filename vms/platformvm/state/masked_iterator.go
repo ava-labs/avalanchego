@@ -6,14 +6,18 @@ package state
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"golang.org/x/exp/maps"
 )
 
 var _ StakerIterator = (*maskedIterator)(nil)
 
 type maskedIterator struct {
-	// TODO ABENEGIA: an inefficient implementation for now
-	sortedStakers []*Staker
-	idx           int
+	parentIterator StakerIterator
+	maskedStakers  map[ids.ID]*Staker
+	updatedStakers map[ids.ID]*Staker
+
+	nextStaker *Staker
+	nextInLine []*Staker
 }
 
 // NewMaskedIterator returns a new iterator that skips the stakers in
@@ -21,36 +25,66 @@ type maskedIterator struct {
 
 // Invariants
 // maskedStakers and updatedStakers do not overlap
-// updatedStakers are contained in parentIterator stakers
+// all updatedStakers are contained in parentIterator stakers
+// if parentStaker has an updated version, say updatedStaker, then parentStaker.Less(updatedStaker)
 
 func NewMaskedIterator(parentIterator StakerIterator, maskedStakers, updatedStakers map[ids.ID]*Staker) StakerIterator {
-	sortedStakers := make([]*Staker, 0)
+	nextInLine := maps.Values(updatedStakers)
+	utils.Sort(nextInLine)
 
-	for parentIterator.Next() {
-		staker := parentIterator.Value()
-		if _, ok := maskedStakers[staker.TxID]; ok {
-			continue // deleted element
-		}
-		if updated, ok := updatedStakers[staker.TxID]; ok {
-			staker = updated
-		}
-		sortedStakers = append(sortedStakers, staker)
-	}
-
-	utils.Sort(sortedStakers)
 	return &maskedIterator{
-		sortedStakers: sortedStakers,
-		idx:           -1,
+		parentIterator: parentIterator,
+		maskedStakers:  maskedStakers,
+		updatedStakers: updatedStakers,
+		nextStaker:     nil,
+		nextInLine:     nextInLine,
 	}
 }
 
 func (i *maskedIterator) Next() bool {
-	i.idx++
-	return i.idx < len(i.sortedStakers)
+	var nextParentStaker *Staker
+	for i.parentIterator.Next() {
+		staker := i.parentIterator.Value()
+		if _, ok := i.maskedStakers[staker.TxID]; ok {
+			continue
+		}
+		if _, ok := i.updatedStakers[staker.TxID]; ok {
+			continue
+		}
+		nextParentStaker = staker
+		break
+	}
+
+	switch {
+	case nextParentStaker == nil && len(i.nextInLine) == 0:
+		return false // done iteration
+	case nextParentStaker == nil && len(i.nextInLine) != 0:
+		i.nextStaker = i.nextInLine[0]
+		i.nextInLine = i.nextInLine[1:]
+		return true
+	case nextParentStaker != nil && len(i.nextInLine) == 0:
+		i.nextStaker = nextParentStaker
+		return true
+	default:
+		// nextParentStaker != nil && len(i.nextInLine) != 0
+		nextInLine := i.nextInLine[0]
+		if nextParentStaker.Less(nextInLine) {
+			i.nextStaker = nextParentStaker
+			return true
+		}
+
+		i.nextStaker = nextInLine
+		i.nextInLine = i.nextInLine[1:]
+		i.nextInLine = append(i.nextInLine, nextParentStaker)
+		utils.Sort(i.nextInLine)
+		return true
+	}
 }
 
 func (i *maskedIterator) Value() *Staker {
-	return i.sortedStakers[i.idx]
+	return i.nextStaker
 }
 
-func (*maskedIterator) Release() {}
+func (i *maskedIterator) Release() {
+	i.parentIterator.Release()
+}

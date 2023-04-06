@@ -151,7 +151,7 @@ var stakersCommands = &commands.ProtoCommands{
 			panic(err)
 		}
 	},
-	// TODO ABENEGIA: using gen.Const(newStakersStorageModel()) would not recreated model
+	// Note: using gen.Const(newStakersStorageModel()) would not recreated model
 	// among calls. Hence just use a dummy generated with sole purpose of recreating model
 	InitialStateGen: gen.IntRange(1, 2).Map(
 		func(int) *stakersStorageModel {
