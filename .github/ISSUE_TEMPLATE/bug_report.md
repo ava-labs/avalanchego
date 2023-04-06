@@ -31,4 +31,4 @@ Which OS you used to reveal the bug.
 **Additional context**
 Add any other context about the problem here.
 
-**To best protect the Avalanche community security bugs should be reported in accordance to our [Security Policy](/SECURITY.md)**
+**To best protect the Avalanche community security bugs should be reported in accordance to our [Security Policy](../security/policy)**
