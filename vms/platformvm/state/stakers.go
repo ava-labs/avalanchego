@@ -272,7 +272,7 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.addedDelegators.Has(prevDelegator) {
+	if validatorDiff.addedDelegators != nil && validatorDiff.addedDelegators.Has(prevDelegator) {
 		// updating a staker just added. Keep it as added
 		validatorDiff.addedDelegators.Delete(prevDelegator)
 		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
@@ -568,9 +568,16 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 		)
 
 	default: // already updated or unmodified
+		if validatorDiff.delegators == nil {
+			validatorDiff.delegators = make(map[ids.ID]stakerAndStatus)
+		}
 		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 			staker: staker,
 			status: updated,
+		}
+
+		if validatorDiff.updatedDelegators == nil {
+			validatorDiff.updatedDelegators = make(map[ids.ID]*Staker)
 		}
 		validatorDiff.updatedDelegators[staker.TxID] = staker
 

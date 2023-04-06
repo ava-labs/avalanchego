@@ -463,6 +463,13 @@ func (d *diff) Apply(baseState State) error {
 			}
 			addedDelegatorIterator.Release()
 
+			for _, delegator := range validatorDiff.updatedDelegators {
+				err := baseState.UpdateCurrentDelegator(delegator)
+				if err != nil {
+					return err
+				}
+			}
+
 			for _, delegator := range validatorDiff.deletedDelegators {
 				baseState.DeleteCurrentDelegator(delegator)
 			}
