@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -70,9 +71,10 @@ func TestTimeout(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -345,9 +347,10 @@ func TestReliableMessages(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -496,9 +499,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
