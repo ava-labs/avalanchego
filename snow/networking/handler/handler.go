@@ -445,20 +445,17 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			acquireLockTime   = lockAcquiredTime.Sub(startTime)
-			processingTime    = endTime.Sub(lockAcquiredTime)
-			handlingTime      = endTime.Sub(startTime)
+			processingTime    = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		messageHistograms.handlingTime.Observe(float64(handlingTime))
 		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if handlingTime > syncProcessingTimeWarnLimit && isNormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
-				zap.Duration("handlingTime", handlingTime),
 				zap.Duration("processingTime", processingTime),
 				zap.Duration("acquireLockTime", acquireLockTime),
 				zap.Stringer("nodeID", nodeID),
@@ -769,9 +766,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			messageHistograms = h.metrics.messages[op]
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		// Processing an async message does not grab a lock, so handling/processing
-		// times are identical and we skip observing [acquireLockTime].
-		messageHistograms.handlingTime.Observe(float64(endTime.Sub(startTime)))
+		// Processing an async message does not grab a lock, so we skip observing [acquireLockTime].
 		messageHistograms.processingTime.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling async message",
@@ -866,19 +861,16 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
 			acquireLockTime   = lockAcquiredTime.Sub(startTime)
-			processingTime    = endTime.Sub(lockAcquiredTime)
-			handlingTime      = endTime.Sub(startTime)
+			processingTime    = endTime.Sub(startTime)
 		)
-		messageHistograms.handlingTime.Observe(float64(handlingTime))
 		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),
 		)
-		if handlingTime > syncProcessingTimeWarnLimit && isNormalOp {
+		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling chan message took longer than expected",
-				zap.Duration("handlingTime", handlingTime),
 				zap.Duration("processingTime", processingTime),
 				zap.Duration("acquireLockTime", acquireLockTime),
 				zap.Stringer("messageOp", op),

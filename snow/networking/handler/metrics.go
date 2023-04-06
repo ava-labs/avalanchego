@@ -20,7 +20,6 @@ type metrics struct {
 }
 
 type messageProcessing struct {
-	handlingTime    metric.Averager
 	processingTime  metric.Averager
 	acquireLockTime metric.Averager
 }
@@ -47,17 +46,10 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	for _, op := range message.ConsensusOps {
 		opStr := op.String()
 		messageProcessing := &messageProcessing{
-			handlingTime: metric.NewAveragerWithErrs(
+			processingTime: metric.NewAveragerWithErrs(
 				namespace,
 				opStr,
 				fmt.Sprintf("time (in ns) of handling a %s", opStr),
-				reg,
-				&errs,
-			),
-			processingTime: metric.NewAveragerWithErrs(
-				namespace,
-				fmt.Sprintf("%s_processing", opStr),
-				fmt.Sprintf("time (in ns) of processing a %s", opStr),
 				reg,
 				&errs,
 			),
