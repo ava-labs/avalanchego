@@ -217,7 +217,7 @@ func (v *putCurrentValidatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
+var genPutCurrentValidatorCommand = state.StakerGenerator(state.CurrentValidator, nil, nil, math.MaxUint64).Map(
 	func(staker state.Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
@@ -550,7 +550,7 @@ func (v *putCurrentDelegatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
+var genPutCurrentDelegatorCommand = state.StakerGenerator(state.CurrentDelegator, nil, nil, 1000).Map(
 	func(staker state.Staker) commands.Command {
 		cmd := (*putCurrentDelegatorCommand)(&staker)
 		return cmd

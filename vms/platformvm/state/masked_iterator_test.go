@@ -74,3 +74,7 @@ func TestMaskedIterator(t *testing.T) {
 	it.Release()
 	require.False(it.Next())
 }
+
+// func TestMaskIteratorProperties(t *testing.T) {
+
+// }

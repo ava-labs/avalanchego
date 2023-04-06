@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
 	"fmt"
@@ -14,15 +14,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
 )
 
-func stakerGenerator(
-	prio priorityType,
+func StakerGenerator(
+	prio StakerGeneratorPriorityType,
 	subnet *ids.ID,
 	nodeID *ids.NodeID,
 	maxWeight uint64, // helps avoiding overflowS in delegator tests
@@ -40,7 +39,7 @@ func stakerGenerator(
 				genStakerNodeID = gen.Const(*nodeID)
 			}
 
-			return gen.Struct(reflect.TypeOf(state.Staker{}), map[string]gopter.Gen{
+			return gen.Struct(reflect.TypeOf(Staker{}), map[string]gopter.Gen{
 				"TxID":            genID,
 				"NodeID":          genStakerNodeID,
 				"PublicKey":       genBlsKey,
@@ -61,18 +60,18 @@ func TestGeneratedStakersValidity(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("EndTime never before StartTime", prop.ForAll(
-		func(s state.Staker) string {
+		func(s Staker) string {
 			if s.EndTime.Before(s.StartTime) {
 				return fmt.Sprintf("startTime %v not before endTime %v, staker %v",
 					s.StartTime, s.EndTime, s)
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
+		StakerGenerator(AnyPriority, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("NextTime coherent with priority", prop.ForAll(
-		func(s state.Staker) string {
+		func(s Staker) string {
 			switch p := s.Priority; p {
 			case txs.PrimaryNetworkDelegatorApricotPendingPriority,
 				txs.PrimaryNetworkDelegatorBanffPendingPriority,
@@ -101,13 +100,13 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return fmt.Sprintf("priority %v unhandled in test", p)
 			}
 		},
-		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
+		StakerGenerator(AnyPriority, nil, nil, math.MaxUint64),
 	))
 
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 	properties.Property("subnetID and nodeID set as specified", prop.ForAll(
-		func(s state.Staker) string {
+		func(s Staker) string {
 			if s.SubnetID != subnetID {
 				return fmt.Sprintf("unexpected subnetID, expected %v, got %v",
 					subnetID, s.SubnetID)
@@ -118,7 +117,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, &subnetID, &nodeID, math.MaxUint64),
+		StakerGenerator(AnyPriority, &subnetID, &nodeID, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
@@ -136,7 +135,7 @@ type stakerTimeData struct {
 	NextTime  time.Time
 }
 
-func genStakerTimeData(prio priorityType) gopter.Gen {
+func genStakerTimeData(prio StakerGeneratorPriorityType) gopter.Gen {
 	return genStakerMicroData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
 			micro := v.(stakerMicroData)
@@ -180,7 +179,7 @@ type stakerMicroData struct {
 }
 
 // genStakerMicroData is the helper to generate stakerMicroData
-func genStakerMicroData(prio priorityType) gopter.Gen {
+func genStakerMicroData(prio StakerGeneratorPriorityType) gopter.Gen {
 	return gen.Struct(reflect.TypeOf(&stakerMicroData{}), map[string]gopter.Gen{
 		"StartTime": gen.Time(),
 		"Duration":  gen.Int64Range(1, 365*24),
@@ -188,19 +187,19 @@ func genStakerMicroData(prio priorityType) gopter.Gen {
 	})
 }
 
-type priorityType uint8
+type StakerGeneratorPriorityType uint8
 
 const (
-	anyPriority priorityType = iota
-	currentValidator
-	currentDelegator
-	pendingValidator
-	pendingDelegator
+	AnyPriority StakerGeneratorPriorityType = iota
+	CurrentValidator
+	CurrentDelegator
+	PendingValidator
+	PendingDelegator
 )
 
-func genPriority(p priorityType) gopter.Gen {
+func genPriority(p StakerGeneratorPriorityType) gopter.Gen {
 	switch p {
-	case anyPriority:
+	case AnyPriority:
 		return gen.OneConstOf(
 			txs.PrimaryNetworkDelegatorApricotPendingPriority,
 			txs.PrimaryNetworkValidatorPendingPriority,
@@ -214,24 +213,24 @@ func genPriority(p priorityType) gopter.Gen {
 			txs.PrimaryNetworkDelegatorCurrentPriority,
 			txs.PrimaryNetworkValidatorCurrentPriority,
 		)
-	case currentValidator:
+	case CurrentValidator:
 		return gen.OneConstOf(
 			txs.SubnetPermissionedValidatorCurrentPriority,
 			txs.SubnetPermissionlessValidatorCurrentPriority,
 			txs.PrimaryNetworkValidatorCurrentPriority,
 		)
-	case currentDelegator:
+	case CurrentDelegator:
 		return gen.OneConstOf(
 			txs.SubnetPermissionlessDelegatorCurrentPriority,
 			txs.PrimaryNetworkDelegatorCurrentPriority,
 		)
-	case pendingValidator:
+	case PendingValidator:
 		return gen.OneConstOf(
 			txs.PrimaryNetworkValidatorPendingPriority,
 			txs.SubnetPermissionlessValidatorPendingPriority,
 			txs.SubnetPermissionedValidatorPendingPriority,
 		)
-	case pendingDelegator:
+	case PendingDelegator:
 		return gen.OneConstOf(
 			txs.PrimaryNetworkDelegatorApricotPendingPriority,
 			txs.PrimaryNetworkDelegatorBanffPendingPriority,

@@ -127,7 +127,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
+		state.StakerGenerator(state.AnyPriority, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("update current validators", prop.ForAll(
@@ -192,7 +192,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			currIT.Release()
 			return ""
 		},
-		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
+		state.StakerGenerator(state.CurrentValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("add, delete and query pending validators", prop.ForAll(
@@ -260,7 +260,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
+		state.StakerGenerator(state.AnyPriority, nil, nil, math.MaxUint64),
 	))
 
 	var (
@@ -395,8 +395,8 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(currentValidator, &subnetID, &nodeID, math.MaxUint64),
-		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID, math.MaxUint64)).
+		state.StakerGenerator(state.CurrentValidator, &subnetID, &nodeID, math.MaxUint64),
+		gen.SliceOfN(10, state.StakerGenerator(state.CurrentDelegator, &subnetID, &nodeID, math.MaxUint64)).
 			SuchThat(func(v interface{}) bool {
 				stakersList := v.([]state.Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
@@ -483,7 +483,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			}
 			return ""
 		},
-		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID, math.MaxUint64)).
+		gen.SliceOfN(10, state.StakerGenerator(state.CurrentDelegator, &subnetID, &nodeID, math.MaxUint64)).
 			SuchThat(func(v interface{}) bool {
 				stakersList := v.([]state.Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
@@ -624,8 +624,8 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 
 			return ""
 		},
-		stakerGenerator(currentValidator, &subnetID, &nodeID, math.MaxUint64),
-		gen.SliceOfN(10, stakerGenerator(pendingDelegator, &subnetID, &nodeID, math.MaxUint64)).
+		state.StakerGenerator(state.CurrentValidator, &subnetID, &nodeID, math.MaxUint64),
+		gen.SliceOfN(10, state.StakerGenerator(state.PendingDelegator, &subnetID, &nodeID, math.MaxUint64)).
 			SuchThat(func(v interface{}) bool {
 				stakersList := v.([]state.Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
