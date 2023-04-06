@@ -244,15 +244,15 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	sibling2, err := dbTrie.NewView()
 	require.NoError(t, err)
 
-	require.False(t, sibling1.(*trieView).isInvalid())
-	require.False(t, sibling2.(*trieView).isInvalid())
+	require.False(t, sibling1.(*trieView).invalidated.Get())
+	require.False(t, sibling2.(*trieView).invalidated.Get())
 
 	require.NoError(t, viewToCommit.Insert(context.Background(), []byte{0}, []byte{0}))
 	require.NoError(t, viewToCommit.CommitToDB(context.Background()))
 
-	require.True(t, sibling1.(*trieView).isInvalid())
-	require.True(t, sibling2.(*trieView).isInvalid())
-	require.False(t, viewToCommit.(*trieView).isInvalid())
+	require.True(t, sibling1.(*trieView).invalidated.Get())
+	require.True(t, sibling2.(*trieView).invalidated.Get())
+	require.False(t, viewToCommit.(*trieView).invalidated.Get())
 }
 
 func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
@@ -567,9 +567,9 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.Equal(view1Root, db.getMerkleRoot())
 
 	// Make sure view2 is invalid and view1 and view3 is valid.
-	require.False(view1.invalidated)
-	require.True(view2.invalidated)
-	require.False(view3.invalidated)
+	require.False(view1.invalidated.Get())
+	require.True(view2.invalidated.Get())
+	require.False(view3.invalidated.Get())
 
 	// Make sure view2 isn't tracked by the database.
 	require.NotContains(db.childViews, view2)
@@ -579,7 +579,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.Contains(db.childViews, view3)
 
 	// Make sure view3 is now a child of db.
-	require.Equal(db, view3.parentTrie)
+	require.Equal(db, view3.parentTrie.Get())
 }
 
 func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
@@ -607,18 +607,18 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	db.invalidateChildrenExcept(view1)
 
 	// Make sure view1 is valid and view2 and view3 are invalid.
-	require.False(view1.invalidated)
-	require.True(view2.invalidated)
-	require.True(view3.invalidated)
+	require.False(view1.invalidated.Get())
+	require.True(view2.invalidated.Get())
+	require.True(view3.invalidated.Get())
 	require.Contains(db.childViews, view1)
 	require.Len(db.childViews, 1)
 
 	db.invalidateChildrenExcept(nil)
 
 	// Make sure all views are invalid.
-	require.True(view1.invalidated)
-	require.True(view2.invalidated)
-	require.True(view3.invalidated)
+	require.True(view1.invalidated.Get())
+	require.True(view2.invalidated.Get())
+	require.True(view3.invalidated.Get())
 	require.Empty(db.childViews)
 
 	// Calling with an untracked view doesn't add the untracked view

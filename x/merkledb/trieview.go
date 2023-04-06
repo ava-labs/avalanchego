@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils"
 	"runtime"
 	"sync"
 
@@ -49,11 +50,11 @@ type trieView struct {
 	// Only use to lock current trieView or ancestors of the current trieView
 	lock sync.RWMutex
 
-	// Controls the trie's validity related fields.
-	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
+	// Controls the trie's childViews field
+	// Must be held while reading/writing [childViews].
 	// Only use to lock current trieView or descendants of the current trieView
-	// DO NOT grab the [lock] or [validityTrackingLock] of this trie or any ancestor trie while this is held.
-	validityTrackingLock sync.RWMutex
+	// DO NOT grab the [lock] or [childViewsLock] of this trie or any ancestor trie while this is held.
+	childViewsLock sync.RWMutex
 
 	// If true, this view has been invalidated and can't be used.
 	//
@@ -65,7 +66,7 @@ type trieView struct {
 	//
 	// *Code Accessing Ancestor State*
 	//
-	// if t.isInvalid() {
+	// if t.invalidated.Get() {
 	//     return ErrInvalid
 	//  }
 	// return [result]
@@ -73,15 +74,13 @@ type trieView struct {
 	// If the invalidated check passes, then we're guaranteed that no ancestor changes occurred
 	// during the code that accessed ancestor state and the result of that work is still valid
 	//
-	// [validityTrackingLock] must be held when reading/writing this field.
-	invalidated bool
+	invalidated utils.Atomic[bool]
 
 	// the uncommitted parent trie of this view
-	// [validityTrackingLock] must be held when reading/writing this field.
-	parentTrie TrieView
+	parentTrie utils.Atomic[TrieView]
 
 	// The valid children of this trie.
-	// [validityTrackingLock] must be held when reading/writing this field.
+	// [childViewsLock] must be held when reading/writing this field.
 	childViews []*trieView
 
 	// Changes made to this view.
@@ -129,12 +128,12 @@ func (t *trieView) NewPreallocatedView(
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
 	if t.committed {
-		return t.getParentTrie().NewPreallocatedView(estimatedChanges)
+		return t.parentTrie.Get().NewPreallocatedView(estimatedChanges)
 	}
 
 	newView, err := newTrieView(t.db, t, t.root.clone(), estimatedChanges)
@@ -142,12 +141,13 @@ func (t *trieView) NewPreallocatedView(
 		return nil, err
 	}
 
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	if t.invalidated {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
+
+	t.childViewsLock.Lock()
+	defer t.childViewsLock.Unlock()
+
 	t.childViews = append(t.childViews, newView)
 
 	return newView, nil
@@ -167,7 +167,7 @@ func newTrieView(
 	return &trieView{
 		root:                  root,
 		db:                    db,
-		parentTrie:            parentTrie,
+		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
@@ -193,7 +193,7 @@ func newTrieViewWithChanges(
 	return &trieView{
 		root:                  passedRootChange.after,
 		db:                    db,
-		parentTrie:            parentTrie,
+		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
@@ -204,7 +204,7 @@ func newTrieViewWithChanges(
 // Assumes [t.lock] is held.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	switch {
-	case t.isInvalid():
+	case t.invalidated.Get():
 		return ErrInvalid
 	case !t.needsRecalculation:
 		return nil
@@ -222,10 +222,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
 	// getting the Merkle root forces any unupdated nodes to recalculate their ids
-	if t.parentTrie != nil {
-		if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-			return err
-		}
+	if _, err := t.parentTrie.Get().GetMerkleRoot(ctx); err != nil {
+		return err
 	}
 
 	if err := t.applyChangedValuesToTrie(ctx); err != nil {
@@ -248,7 +246,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	t.changes.rootID = t.root.id
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -380,7 +378,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, err
 	}
 	proof.Path = append(proof.Path, childNode.asProofNode())
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 	return proof, nil
@@ -480,7 +478,7 @@ func (t *trieView) GetRangeProof(
 		}
 		result.EndProof = rootProof.Path
 	}
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 	return &result, nil
@@ -509,16 +507,16 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	defer span.End()
 
 	switch {
-	case t.isInvalid():
+	case t.invalidated.Get():
 		// don't apply changes to an invalid view
 		return ErrInvalid
 	case trieToCommit == nil:
 		// no changes to apply
 		return nil
-	case trieToCommit.getParentTrie() != t:
+	case trieToCommit.parentTrie.Get() != t:
 		// trieToCommit needs to be a child of t, otherwise the changes merge would not work
 		return ErrViewIsNotAChild
-	case trieToCommit.isInvalid():
+	case trieToCommit.invalidated.Get():
 		// don't apply changes from an invalid view
 		return ErrInvalid
 	}
@@ -568,7 +566,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 // CommitToParent commits the changes from this view to its parent Trie
 func (t *trieView) CommitToParent(ctx context.Context) error {
 	// if we are about to write to the db, then we to hold the commitLock
-	if t.getParentTrie() == t.db {
+	if t.parentTrie.Get() == t.db {
 		t.db.commitLock.Lock()
 		defer t.db.commitLock.Unlock()
 	}
@@ -585,7 +583,7 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
 	defer span.End()
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 	if t.committed {
@@ -598,10 +596,10 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 	}
 
 	// overwrite this view with changes from the incoming view
-	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
+	if err := t.parentTrie.Get().commitChanges(ctx, t); err != nil {
 		return err
 	}
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -628,80 +626,61 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	}
 
 	// now commit the parent trie to the db
-	return t.getParentTrie().commitToDB(ctx)
-}
-
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) isInvalid() bool {
-	t.validityTrackingLock.RLock()
-	defer t.validityTrackingLock.RUnlock()
-
-	return t.invalidated
+	return t.parentTrie.Get().commitToDB(ctx)
 }
 
 // Invalidates this view and all descendants.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) invalidate() {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
+	t.invalidated.Set(true)
 
-	t.invalidated = true
-
-	for _, childView := range t.childViews {
-		childView.invalidate()
-	}
-
-	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	t.invalidateChildren()
 }
 
 // Invalidates all children of this view.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) invalidateChildren() {
 	t.invalidateChildrenExcept(nil)
 }
 
 // moveChildViewsToView removes any child views from the trieToCommit and moves them to the current trie view
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
+	t.childViewsLock.Lock()
+	defer t.childViewsLock.Unlock()
 
-	trieToCommit.validityTrackingLock.Lock()
-	defer trieToCommit.validityTrackingLock.Unlock()
+	trieToCommit.childViewsLock.Lock()
+	defer trieToCommit.childViewsLock.Unlock()
 
 	for _, childView := range trieToCommit.childViews {
-		childView.updateParent(t)
+		childView.parentTrie.Set(t)
 		t.childViews = append(t.childViews, childView)
 	}
+
+	// clear trieToCommit's children
 	trieToCommit.childViews = make([]*trieView, 0, defaultPreallocationSize)
-}
-
-func (t *trieView) updateParent(newParent TrieView) {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	t.parentTrie = newParent
 }
 
 // Invalidates all children of this view except [exception].
 // [t.childViews] will only contain the exception after invalidation is complete.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) invalidateChildrenExcept(exception *trieView) {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
+	t.childViewsLock.Lock()
+	invalidChildrenViews := t.childViews
 
-	for _, childView := range t.childViews {
+	// after invalidating the children, they no longer need to be tracked
+	// except the exception view since it is still valid
+	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	if exception != nil {
+		t.childViews = append(t.childViews, exception)
+	}
+	t.childViewsLock.Unlock()
+
+	// invalidate all children views
+	for _, childView := range invalidChildrenViews {
 		if childView != exception {
 			childView.invalidate()
 		}
-	}
-
-	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
-
-	// add back in the exception view since it is still valid
-	if exception != nil {
-		t.childViews = append(t.childViews, exception)
 	}
 }
 
@@ -743,7 +722,7 @@ func (t *trieView) getKeyValues(
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -765,7 +744,7 @@ func (t *trieView) getKeyValues(
 		return bytes.Compare(a.Key, b.Key) == -1
 	})
 
-	baseKeyValues, err := t.getParentTrie().getKeyValues(
+	baseKeyValues, err := t.parentTrie.Get().getKeyValues(
 		start,
 		end,
 		maxLength,
@@ -849,7 +828,7 @@ func (t *trieView) getKeyValues(
 	}
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -891,7 +870,7 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 		defer t.lock.RUnlock()
 	}
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -905,13 +884,13 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key, true)
+	value, err := t.parentTrie.Get().getValue(key, true)
 	if err != nil {
 		return nil, err
 	}
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -927,12 +906,12 @@ func (t *trieView) Insert(_ context.Context, key []byte, value []byte) error {
 }
 
 // Assumes [t.lock] is held.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) insert(key []byte, value []byte) error {
 	if t.committed {
 		return ErrCommitted
 	}
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -946,7 +925,7 @@ func (t *trieView) insert(key []byte, value []byte) error {
 	}
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -962,13 +941,13 @@ func (t *trieView) Remove(_ context.Context, key []byte) error {
 }
 
 // Assumes [t.lock] is held.
-// Assumes [t.validityTrackingLock] isn't held.
+// Assumes [t.childViewsLock] isn't held.
 func (t *trieView) remove(key []byte) error {
 	if t.committed {
 		return ErrCommitted
 	}
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -980,7 +959,7 @@ func (t *trieView) remove(key []byte) error {
 	}
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return ErrInvalid
 	}
 
@@ -1131,7 +1110,7 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -1142,7 +1121,7 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 	}
 
 	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
+	if t.invalidated.Get() {
 		return nil, ErrInvalid
 	}
 
@@ -1273,7 +1252,7 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 		return nil
 	}
 
-	before, err := t.getParentTrie().getEditableNode(key)
+	before, err := t.parentTrie.Get().getEditableNode(key)
 	if err != nil {
 		if err != database.ErrNotFound {
 			return err
@@ -1307,7 +1286,7 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key, true)
+	before, err := t.parentTrie.Get().getValue(key, true)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)
@@ -1395,7 +1374,7 @@ func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key)
+	parentTrieNode, err := t.parentTrie.Get().getEditableNode(key)
 	if err != nil {
 		return nil, err
 	}
@@ -1406,11 +1385,4 @@ func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
 		parentTrieNode.id = id
 	}
 	return parentTrieNode, nil
-}
-
-// Get the parent trie of the view
-func (t *trieView) getParentTrie() TrieView {
-	t.validityTrackingLock.RLock()
-	defer t.validityTrackingLock.RUnlock()
-	return t.parentTrie
 }

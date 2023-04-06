@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"context"
+	"github.com/ava-labs/avalanchego/utils"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -552,10 +553,10 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	//  db
 
 	// Case: Committing to an invalid view
-	view1.invalidated = true
+	view1.invalidated.Set(true)
 	err = view1.commitChanges(context.Background(), &trieView{})
 	require.ErrorIs(err, ErrInvalid)
-	view1.invalidated = false // Reset
+	view1.invalidated.Set(false) // Reset
 
 	// Case: Committing a nil view is a no-op
 	oldRoot, err := view1.getMerkleRoot(context.Background())
@@ -570,10 +571,13 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	err = view1.commitChanges(context.Background(), &trieView{})
 	require.ErrorIs(err, ErrViewIsNotAChild)
 
+	atomicTrue := utils.Atomic[bool]{}
+	atomicTrue.Set(true)
+
 	// Case: Committing a view which is invalid
 	err = view1.commitChanges(context.Background(), &trieView{
-		parentTrie:  view1,
-		invalidated: true,
+		parentTrie:  utils.NewAtomic[TrieView](view1),
+		invalidated: atomicTrue,
 	})
 	require.ErrorIs(err, ErrInvalid)
 
@@ -617,10 +621,10 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	require.NoError(err)
 
 	// All siblings of view2 should be invalidated
-	require.True(view3.invalidated)
+	require.True(view3.invalidated.Get())
 
 	// Children of view2 are now children of view1
-	require.Equal(view1, view4.parentTrie)
+	require.Equal(view1, view4.parentTrie.Get())
 	require.Contains(view1.childViews, view4)
 
 	// Value changes from view2 are reflected in view1
@@ -715,16 +719,16 @@ func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {
 	childTrie3, err := trie.NewView()
 	require.NoError(t, err)
 
-	require.False(t, childTrie1.(*trieView).isInvalid())
-	require.False(t, childTrie2.(*trieView).isInvalid())
-	require.False(t, childTrie3.(*trieView).isInvalid())
+	require.False(t, childTrie1.(*trieView).invalidated.Get())
+	require.False(t, childTrie2.(*trieView).invalidated.Get())
+	require.False(t, childTrie3.(*trieView).invalidated.Get())
 
 	err = trie.Insert(context.Background(), []byte{0}, []byte{0})
 	require.NoError(t, err)
 
-	require.True(t, childTrie1.(*trieView).isInvalid())
-	require.True(t, childTrie2.(*trieView).isInvalid())
-	require.True(t, childTrie3.(*trieView).isInvalid())
+	require.True(t, childTrie1.(*trieView).invalidated.Get())
+	require.True(t, childTrie2.(*trieView).invalidated.Get())
+	require.True(t, childTrie3.(*trieView).invalidated.Get())
 }
 
 func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
@@ -743,15 +747,15 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	sibling2, err := baseView.NewView()
 	require.NoError(t, err)
 
-	require.False(t, sibling1.(*trieView).isInvalid())
-	require.False(t, sibling2.(*trieView).isInvalid())
+	require.False(t, sibling1.(*trieView).invalidated.Get())
+	require.False(t, sibling2.(*trieView).invalidated.Get())
 
 	require.NoError(t, viewToCommit.Insert(context.Background(), []byte{0}, []byte{0}))
 	require.NoError(t, viewToCommit.CommitToDB(context.Background()))
 
-	require.True(t, sibling1.(*trieView).isInvalid())
-	require.True(t, sibling2.(*trieView).isInvalid())
-	require.False(t, viewToCommit.(*trieView).isInvalid())
+	require.True(t, sibling1.(*trieView).invalidated.Get())
+	require.True(t, sibling2.(*trieView).invalidated.Get())
+	require.False(t, viewToCommit.(*trieView).invalidated.Get())
 }
 
 func Test_Trie_NodeCollapse(t *testing.T) {
@@ -917,7 +921,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 
 	require.Len(db.childViews, 1)
 	require.Contains(db.childViews, view1)
-	require.Equal(db, view1.parentTrie)
+	require.Equal(db, view1.parentTrie.Get())
 
 	err = view1.Insert(context.Background(), []byte{1}, []byte{1})
 	require.NoError(err)
@@ -932,7 +936,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 
 	require.Len(db.childViews, 1)
 	require.Contains(db.childViews, view1)
-	require.Equal(db, view1.parentTrie)
+	require.Equal(db, view1.parentTrie.Get())
 
 	// Create a new view on the committed view
 	view2Intf, err := view1.NewView()
@@ -946,7 +950,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//   |
 	//  db
 
-	require.Equal(db, view2.parentTrie)
+	require.Equal(db, view2.parentTrie.Get())
 	require.Contains(db.childViews, view1)
 	require.Contains(db.childViews, view2)
 	require.Len(db.childViews, 2)
@@ -970,7 +974,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//   |
 	//  db
 
-	require.Equal(view2, view3.parentTrie)
+	require.Equal(view2, view3.parentTrie.Get())
 	require.Contains(view2.childViews, view3)
 	require.Len(view2.childViews, 1)
 	require.Contains(db.childViews, view1)
@@ -990,21 +994,21 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	//  db
 
 	// Note that view2 being committed invalidates view1
-	require.True(view1.invalidated)
+	require.True(view1.invalidated.Get())
 	require.Contains(db.childViews, view2)
 	require.Contains(db.childViews, view3)
 	require.Len(db.childViews, 2)
-	require.Equal(db, view3.parentTrie)
+	require.Equal(db, view3.parentTrie.Get())
 
 	// Commit view3
 	err = view3.CommitToDB(context.Background())
 	require.NoError(err)
 
 	// view3 being committed invalidates view2
-	require.True(view2.invalidated)
+	require.True(view2.invalidated.Get())
 	require.Contains(db.childViews, view3)
 	require.Len(db.childViews, 1)
-	require.Equal(db, view3.parentTrie)
+	require.Equal(db, view3.parentTrie.Get())
 }
 
 func Test_TrieView_NewView(t *testing.T) {
@@ -1032,7 +1036,7 @@ func Test_TrieView_NewView(t *testing.T) {
 	//  db
 
 	// Assert view2's parent is view1
-	require.Equal(view1, view2.parentTrie)
+	require.Equal(view1, view2.parentTrie.Get())
 	require.Contains(view1.childViews, view2)
 	require.Len(view1.childViews, 1)
 
@@ -1055,12 +1059,13 @@ func Test_TrieView_NewView(t *testing.T) {
 	//  db
 
 	// Assert view3's parent is db
-	require.Equal(db, view3.parentTrie)
+	require.Equal(db, view3.parentTrie.Get())
 	require.Contains(db.childViews, view3)
 	require.NotContains(view1.childViews, view3)
 
 	// Assert that NewPreallocatedView on an invalid view fails
-	invalidView := &trieView{invalidated: true}
+	invalidView := &trieView{}
+	invalidView.invalidated.Set(true)
 	_, err = invalidView.NewView()
 	require.ErrorIs(err, ErrInvalid)
 }
@@ -1098,9 +1103,9 @@ func TestTrieViewInvalidate(t *testing.T) {
 	view1.invalidate()
 
 	require.Empty(view1.childViews)
-	require.True(view1.invalidated)
-	require.True(view2.invalidated)
-	require.True(view3.invalidated)
+	require.True(view1.invalidated.Get())
+	require.True(view2.invalidated.Get())
+	require.True(view3.invalidated.Get())
 }
 
 func TestTrieViewMoveChildViewsToView(t *testing.T) {
@@ -1137,7 +1142,7 @@ func TestTrieViewMoveChildViewsToView(t *testing.T) {
 
 	view1.moveChildViewsToView(view2)
 
-	require.Equal(view1, view3.parentTrie)
+	require.Equal(view1, view3.parentTrie.Get())
 	require.Contains(view1.childViews, view3)
 	require.Contains(view1.childViews, view2)
 	require.Len(view1.childViews, 2)
@@ -1168,13 +1173,13 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 
 	view1.invalidateChildrenExcept(view2)
 
-	require.False(view2.invalidated)
-	require.True(view3.invalidated)
+	require.False(view2.invalidated.Get())
+	require.True(view3.invalidated.Get())
 	require.Contains(view1.childViews, view2)
 	require.Len(view1.childViews, 1)
 
 	view1.invalidateChildrenExcept(nil)
-	require.True(view2.invalidated)
-	require.True(view3.invalidated)
+	require.True(view2.invalidated.Get())
+	require.True(view3.invalidated.Get())
 	require.Empty(view1.childViews)
 }

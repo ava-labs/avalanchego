@@ -735,7 +735,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	if trieToCommit == nil {
 		return nil
 	}
-	if trieToCommit.isInvalid() {
+	if trieToCommit.invalidated.Get() {
 		return ErrInvalid
 	}
 	changes := trieToCommit.changes
@@ -829,11 +829,11 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 // moveChildViewsToDB removes any child views from the trieToCommit and moves them to the db
 // assumes [db.lock] is held
 func (db *Database) moveChildViewsToDB(trieToCommit *trieView) {
-	trieToCommit.validityTrackingLock.Lock()
-	defer trieToCommit.validityTrackingLock.Unlock()
+	trieToCommit.childViewsLock.Lock()
+	defer trieToCommit.childViewsLock.Unlock()
 
 	for _, childView := range trieToCommit.childViews {
-		childView.updateParent(db)
+		childView.parentTrie.Set(db)
 		db.childViews = append(db.childViews, childView)
 	}
 	trieToCommit.childViews = make([]*trieView, 0, defaultPreallocationSize)
