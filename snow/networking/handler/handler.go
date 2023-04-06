@@ -423,6 +423,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
+		// Check if the chain is in normal operation at the start of message execution (may change during execution)
+		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("nodeID", nodeID),
@@ -435,23 +437,30 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
+	lockAcquiredTime := h.clock.Time()
 	defer func() {
 		h.ctx.Lock.Unlock()
 
 		var (
-			endTime        = h.clock.Time()
-			histogram      = h.metrics.messages[op]
-			processingTime = endTime.Sub(startTime)
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
+			acquireLockTime   = lockAcquiredTime.Sub(startTime)
+			processingTime    = endTime.Sub(lockAcquiredTime)
+			handlingTime      = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		histogram.Observe(float64(processingTime))
+		messageHistograms.handlingTime.Observe(float64(handlingTime))
+		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
+		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.State.Get().State == snow.NormalOp {
+		if handlingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
+				zap.Duration("handlingTime", handlingTime),
 				zap.Duration("processingTime", processingTime),
+				zap.Duration("acquireLockTime", acquireLockTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
 				zap.Any("message", body),
@@ -756,11 +765,14 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
-			endTime   = h.clock.Time()
-			histogram = h.metrics.messages[op]
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		histogram.Observe(float64(endTime.Sub(startTime)))
+		// Processing an async message does not grab a lock, so handling/processing
+		// times are identical and we skip observing [acquireLockTime].
+		messageHistograms.handlingTime.Observe(float64(endTime.Sub(startTime)))
+		messageHistograms.processingTime.Observe(float64(endTime.Sub(startTime)))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling async message",
 			zap.Stringer("messageOp", op),
@@ -835,6 +847,8 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
+		// Check if the chain is in normal operation at the start of message execution (may change during execution)
+		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("messageOp", op),
@@ -844,18 +858,33 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		zap.Any("message", body),
 	)
 	h.ctx.Lock.Lock()
+	lockAcquiredTime := h.clock.Time()
 	defer func() {
 		h.ctx.Lock.Unlock()
 
 		var (
-			endTime   = h.clock.Time()
-			histogram = h.metrics.messages[op]
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
+			acquireLockTime   = lockAcquiredTime.Sub(startTime)
+			processingTime    = endTime.Sub(lockAcquiredTime)
+			handlingTime      = endTime.Sub(startTime)
 		)
-		histogram.Observe(float64(endTime.Sub(startTime)))
+		messageHistograms.handlingTime.Observe(float64(handlingTime))
+		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
+		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),
 		)
+		if handlingTime > syncProcessingTimeWarnLimit && isNormalOp {
+			h.ctx.Log.Warn("handling chan message took longer than expected",
+				zap.Duration("handlingTime", handlingTime),
+				zap.Duration("processingTime", processingTime),
+				zap.Duration("acquireLockTime", acquireLockTime),
+				zap.Stringer("messageOp", op),
+				zap.Any("message", body),
+			)
+		}
 	}()
 
 	state := h.ctx.State.Get()

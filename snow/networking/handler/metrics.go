@@ -16,7 +16,13 @@ import (
 type metrics struct {
 	expired      prometheus.Counter
 	asyncExpired prometheus.Counter
-	messages     map[message.Op]metric.Averager
+	messages     map[message.Op]*messageProcessing
+}
+
+type messageProcessing struct {
+	handlingTime    metric.Averager
+	processingTime  metric.Averager
+	acquireLockTime metric.Averager
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
@@ -37,16 +43,33 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 		reg.Register(asyncExpired),
 	)
 
-	messages := make(map[message.Op]metric.Averager, len(message.ConsensusOps))
+	messages := make(map[message.Op]*messageProcessing, len(message.ConsensusOps))
 	for _, op := range message.ConsensusOps {
 		opStr := op.String()
-		messages[op] = metric.NewAveragerWithErrs(
-			namespace,
-			opStr,
-			fmt.Sprintf("time (in ns) of processing a %s", opStr),
-			reg,
-			&errs,
-		)
+		messageProcessing := &messageProcessing{
+			handlingTime: metric.NewAveragerWithErrs(
+				namespace,
+				opStr,
+				fmt.Sprintf("time (in ns) of handling a %s", opStr),
+				reg,
+				&errs,
+			),
+			processingTime: metric.NewAveragerWithErrs(
+				namespace,
+				fmt.Sprintf("%s_processing", opStr),
+				fmt.Sprintf("time (in ns) of processing a %s", opStr),
+				reg,
+				&errs,
+			),
+			acquireLockTime: metric.NewAveragerWithErrs(
+				namespace,
+				fmt.Sprintf("%s_lock", opStr),
+				fmt.Sprintf("time (in ns) of acquiring a lock to process a %s", opStr),
+				reg,
+				&errs,
+			),
+		}
+		messages[op] = messageProcessing
 	}
 
 	return &metrics{
