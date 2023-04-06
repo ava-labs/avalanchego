@@ -198,6 +198,13 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 
 func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+
+	// for sake of generality, we assume staker may be an updated version
+	// of validator.validator. We explicitly remove the previous version of
+	// staker to handle this case.
+	prevStaker := validator.validator
+	v.stakers.Delete(prevStaker)
+
 	validator.validator = nil
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
@@ -206,8 +213,6 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 		staker: staker,
 		status: deleted,
 	}
-
-	v.stakers.Delete(staker)
 }
 
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {

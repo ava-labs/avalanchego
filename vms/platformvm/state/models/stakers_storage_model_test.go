@@ -33,7 +33,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1680772732335585950)
+	// parameters := gopter.DefaultTestParametersWithSeed(1680776522915343378)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -320,7 +320,6 @@ func updateStakerInModel(model *stakersStorageModel) error {
 }
 
 func (*updateCurrentValidatorCommand) PreCondition(commands.State) bool {
-	// We allow inserting the same validator twice
 	return true
 }
 
@@ -339,31 +338,74 @@ func (*updateCurrentValidatorCommand) String() string {
 	return "UpdateCurrentValidator"
 }
 
-var genUpdateCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
-	func(state.Staker) commands.Command {
+var genUpdateCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &updateCurrentValidatorCommand{}
 	},
 )
 
 // DeleteCurrentValidator section
-type deleteCurrentValidatorCommand state.Staker
+type deleteCurrentValidatorCommand struct{}
 
-func (v *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	staker := (*state.Staker)(v)
+func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	// delete first validator, if any
 	sys := sut.(*sysUnderTest)
 	topDiff := sys.getTopChainState()
-	topDiff.DeleteCurrentValidator(staker)
+
+	stakerIt, err := topDiff.GetCurrentStakerIterator()
+	if err != nil {
+		panic(err)
+	}
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return sys // no current validator to delete
+	}
+	stakerIt.Release()
+
+	topDiff.DeleteCurrentValidator(validator)
 	return sys // returns sys to allow comparison with state in PostCondition
 }
 
-func (v *deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	staker := (*state.Staker)(v)
-	cmdState.(*stakersStorageModel).DeleteCurrentValidator(staker)
+func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return cmdState // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	model.DeleteCurrentValidator(validator)
 	return cmdState
 }
 
 func (*deleteCurrentValidatorCommand) PreCondition(commands.State) bool {
-	// Don't even require staker to be inserted before being deleted
 	return true
 }
 
@@ -378,14 +420,13 @@ func (*deleteCurrentValidatorCommand) PostCondition(cmdState commands.State, res
 	return &gopter.PropResult{Status: gopter.PropFalse}
 }
 
-func (v *deleteCurrentValidatorCommand) String() string {
-	return fmt.Sprintf("DeleteCurrentValidator(subnetID: %v, nodeID: %v, txID: %v)", v.SubnetID, v.NodeID, v.TxID)
+func (*deleteCurrentValidatorCommand) String() string {
+	return "DeleteCurrentValidator"
 }
 
-var genDeleteCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
-	func(staker state.Staker) commands.Command {
-		cmd := (*deleteCurrentValidatorCommand)(&staker)
-		return cmd
+var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &deleteCurrentValidatorCommand{}
 	},
 )
 
