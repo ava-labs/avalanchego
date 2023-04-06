@@ -4,12 +4,19 @@
 package state
 
 import (
+	"math"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/btree"
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestMaskedIterator(t *testing.T) {
@@ -75,6 +82,119 @@ func TestMaskedIterator(t *testing.T) {
 	require.False(it.Next())
 }
 
-// func TestMaskIteratorProperties(t *testing.T) {
+func TestMaskIteratorProperties(t *testing.T) {
+	properties := gopter.NewProperties(nil)
 
-// }
+	properties.Property("Mask iterator output must be sorted", prop.ForAll(
+		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+			_, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
+
+			res := make([]*Staker, 0, len(parentStakers))
+			for maskedIt.Next() {
+				cpy := *maskedIt.Value()
+				res = append(res, &cpy)
+			}
+
+			for idx := 1; idx < len(res); idx++ {
+				if !res[idx-1].Less(res[idx]) {
+					return "out of order stakers"
+				}
+			}
+
+			return ""
+		},
+		maskedIteratorTestGenerator()...,
+	))
+
+	properties.Property("Masked stakers must not be in the output", prop.ForAll(
+		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+			deleted, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
+
+			res := set.NewSet[ids.ID](0)
+			for maskedIt.Next() {
+				res.Add(maskedIt.Value().TxID)
+			}
+
+			for id, _ := range deleted {
+				if res.Contains(id) {
+					return "deleted stakers returned when it should not have"
+				}
+			}
+
+			return ""
+		},
+		maskedIteratorTestGenerator()...,
+	))
+
+	properties.Property("Updated stakers must be returned instead of their parent version", prop.ForAll(
+		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+			_, updated, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
+
+			res := make(map[ids.ID]*Staker)
+			for maskedIt.Next() {
+				staker := maskedIt.Value()
+				res[staker.TxID] = staker
+			}
+
+			for id, up := range updated {
+				ret, found := res[id]
+				if !found {
+					return "updated staker not found"
+				}
+
+				if !reflect.DeepEqual(ret, up) {
+					return "updated staker different from expected"
+				}
+			}
+
+			return ""
+		},
+		maskedIteratorTestGenerator()...,
+	))
+
+	properties.TestingRun(t)
+}
+
+func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) (
+	map[ids.ID]*Staker, // deletedStakers
+	map[ids.ID]*Staker, // updatedStakers
+	StakerIterator,
+) {
+	parentTree := btree.NewG(defaultTreeDegree, (*Staker).Less)
+	for _, staker := range parentStakers {
+		cpy := staker
+		parentTree.ReplaceOrInsert(&cpy)
+	}
+	parentIt := NewTreeIterator(parentTree)
+
+	deletedStakers := make(map[ids.ID]*Staker)
+	for _, idx := range deletedIndexes {
+		s := parentStakers[idx]
+		deletedStakers[s.TxID] = &s
+	}
+
+	updatedStakers := make(map[ids.ID]*Staker)
+	for _, idx := range updatedIndexes {
+		s := parentStakers[idx]
+
+		cpy := s
+		RotateStakerTimesInPlace(&cpy)
+		updatedStakers[s.TxID] = &cpy
+	}
+
+	return deletedStakers, updatedStakers, NewMaskedIterator(parentIt, deletedStakers, updatedStakers)
+}
+
+func maskedIteratorTestGenerator() []gopter.Gen {
+	parentStakersCount := 20
+
+	return []gopter.Gen{
+		gen.SliceOfN(parentStakersCount, StakerGenerator(AnyPriority, nil, nil, math.MaxUint64)),
+		// TODO ABENEGIA: add indexs of deleted and updated stakers
+		// Just generate permutation of indexes till parentStakersCount
+		// and select number of deleted (first part of permutation)
+		// and number of updated (second part of permutation)
+		gen.Const([]int{1, 3, 5, 7, 9, 10}),   // TODO ABENEGIA: randomize
+		gen.Const([]int{2, 4, 6, 11, 12, 13}), // TODO ABENEGIA: randomize
+	}
+}
