@@ -423,7 +423,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
-		// Check if the chain is in normal operation at the start of message execution (may change during execution)
+		// Check if the chain is in normal operation at the start of message
+		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
@@ -844,7 +845,8 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
-		// Check if the chain is in normal operation at the start of message execution (may change during execution)
+		// Check if the chain is in normal operation at the start of message
+		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
