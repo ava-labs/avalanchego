@@ -364,6 +364,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 			health.CheckerFunc(func(context.Context) (interface{}, error) {
 				return nil, healthCheckErr
 			}),
+			chainParams.SubnetID.String(),
 		)
 		if err != nil {
 			m.Log.Error("failed to register failing health check",
@@ -983,7 +984,7 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Register health check for this chain
-	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1281,7 +1282,7 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 

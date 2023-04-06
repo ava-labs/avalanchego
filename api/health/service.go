@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,6 +23,10 @@ type APIReply struct {
 	Healthy bool              `json:"healthy"`
 }
 
+type HealthArgs struct {
+	SubnetIDs []ids.ID `json:"subnetIDs"`
+}
+
 // Readiness returns if the node has finished initialization
 func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIReply) error {
 	s.log.Debug("API called",
@@ -33,12 +38,19 @@ func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIReply) error
 }
 
 // Health returns a summation of the health of the node
-func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIReply) error {
+func (s *Service) Health(_ *http.Request, args *HealthArgs, reply *APIReply) error {
 	s.log.Debug("API called",
 		zap.String("service", "health"),
 		zap.String("method", "health"),
 	)
-	reply.Checks, reply.Healthy = s.health.Health()
+
+	// convert subnetIDs to string tags
+	tags := make([]string, len(args.SubnetIDs))
+	for i, subnetID := range args.SubnetIDs {
+		tags[i] = subnetID.String()
+	}
+
+	reply.Checks, reply.Healthy = s.health.Health(tags...)
 	return nil
 }
 
