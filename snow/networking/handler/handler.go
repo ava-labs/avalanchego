@@ -444,11 +444,11 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			acquireLockTime   = lockAcquiredTime.Sub(startTime)
+			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
@@ -457,7 +457,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
-				zap.Duration("acquireLockTime", acquireLockTime),
+				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
 				zap.Any("message", body),
@@ -764,10 +764,12 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
+			processingTime    = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		// Processing an async message does not grab a lock, so we skip observing [acquireLockTime].
-		messageHistograms.processingTime.Observe(float64(endTime.Sub(startTime)))
+		// There is no lock grabbed here, so both metrics are identical
+		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling async message",
 			zap.Stringer("messageOp", op),
@@ -860,10 +862,10 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			acquireLockTime   = lockAcquiredTime.Sub(startTime)
+			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
 		)
-		messageHistograms.acquireLockTime.Observe(float64(acquireLockTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
@@ -872,7 +874,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		if processingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling chan message took longer than expected",
 				zap.Duration("processingTime", processingTime),
-				zap.Duration("acquireLockTime", acquireLockTime),
+				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("messageOp", op),
 				zap.Any("message", body),
 			)

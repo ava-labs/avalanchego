@@ -21,7 +21,7 @@ type metrics struct {
 
 type messageProcessing struct {
 	processingTime  metric.Averager
-	acquireLockTime metric.Averager
+	msgHandlingTime metric.Averager
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
@@ -53,10 +53,10 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 				reg,
 				&errs,
 			),
-			acquireLockTime: metric.NewAveragerWithErrs(
+			msgHandlingTime: metric.NewAveragerWithErrs(
 				namespace,
-				fmt.Sprintf("%s_lock", opStr),
-				fmt.Sprintf("time (in ns) of acquiring a lock to process a %s", opStr),
+				fmt.Sprintf("%s_msg_handling", opStr),
+				fmt.Sprintf("time (in ns) handling a %s after grabbing the lock", opStr),
 				reg,
 				&errs,
 			),
