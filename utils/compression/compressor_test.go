@@ -41,6 +41,9 @@ var (
 
 func TestDecompressZipBombs(t *testing.T) {
 	for compressionType, zipBomb := range zipBombs {
+		// Make sure that the hardcoded zip bomb would be a valid message.
+		require.Less(t, len(zipBomb), maxMessageSize)
+
 		newCompressorFunc := newCompressorFuncs[compressionType]
 
 		t.Run(compressionType.String(), func(t *testing.T) {
@@ -57,6 +60,8 @@ func TestDecompressZipBombs(t *testing.T) {
 
 			require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
 
+			// Make sure that we didn't allocate significantly more memory than
+			// the max message size.
 			bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
 			require.Less(t, bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
 		})
