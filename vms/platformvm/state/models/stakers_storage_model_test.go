@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
 	"github.com/leanovate/gopter/gen"
@@ -88,19 +89,23 @@ func (s *sysUnderTest) getTopChainState() state.Chain {
 	return topChainState
 }
 
-// flushBottomDiff returns bottom diff if available
-func (s *sysUnderTest) flushBottomDiff() {
+// flushBottomDiff applies bottom diff if available
+func (s *sysUnderTest) flushBottomDiff() bool {
 	if len(s.sortedDiffIDs) == 0 {
-		return
+		return false
 	}
 	bottomDiffID := s.sortedDiffIDs[0]
 	diffToApply := s.diffsMap[bottomDiffID]
 
-	diffToApply.Apply(s.baseState)
+	err := diffToApply.Apply(s.baseState)
+	if err != nil {
+		panic(err)
+	}
 	s.baseState.SetLastAccepted(bottomDiffID)
 
 	s.sortedDiffIDs = s.sortedDiffIDs[1:]
 	delete(s.diffsMap, bottomDiffID)
+	return true
 }
 
 // stakersCommands creates/destroy the system under test and generates
@@ -141,11 +146,13 @@ var stakersCommands = &commands.ProtoCommands{
 			panic(err)
 		}
 	},
-	// TODO ABENEGIA: using gen.Const(newStakersStorageModel()) would not recreated model
+	// Note: using gen.Const(newStakersStorageModel()) would not recreated model
 	// among calls. Hence just use a dummy generated with sole purpose of recreating model
-	InitialStateGen: gen.IntRange(1, 2).Map(func(int) *stakersStorageModel {
-		return newStakersStorageModel()
-	}),
+	InitialStateGen: gen.IntRange(1, 2).Map(
+		func(int) *stakersStorageModel {
+			return newStakersStorageModel()
+		},
+	),
 
 	InitialPreConditionFunc: func(state commands.State) bool {
 		return true // nothing to do for now
@@ -198,10 +205,11 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 }
 
 func (v *putCurrentValidatorCommand) String() string {
-	return fmt.Sprintf("PutCurrentValidator(subnetID: %s, nodeID: %s, txID: %s)", v.SubnetID, v.NodeID, v.TxID)
+	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentValidatorCommand = stakerGenerator(anyPriority, nil, nil).Map(
+var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil).Map(
 	func(staker state.Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
@@ -209,24 +217,67 @@ var genPutCurrentValidatorCommand = stakerGenerator(anyPriority, nil, nil).Map(
 )
 
 // DeleteCurrentValidator section
-type deleteCurrentValidatorCommand state.Staker
+type deleteCurrentValidatorCommand struct{}
 
-func (v *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	staker := (*state.Staker)(v)
+func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	// delete first validator, if any
 	sys := sut.(*sysUnderTest)
 	topDiff := sys.getTopChainState()
-	topDiff.DeleteCurrentValidator(staker)
+
+	stakerIt, err := topDiff.GetCurrentStakerIterator()
+	if err != nil {
+		panic(err)
+	}
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return sys // no current validator to delete
+	}
+	stakerIt.Release()
+
+	topDiff.DeleteCurrentValidator(validator)
 	return sys // returns sys to allow comparison with state in PostCondition
 }
 
-func (v *deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	staker := (*state.Staker)(v)
-	cmdState.(*stakersStorageModel).DeleteCurrentValidator(staker)
+func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *state.Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return cmdState // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	model.DeleteCurrentValidator(validator)
 	return cmdState
 }
 
 func (*deleteCurrentValidatorCommand) PreCondition(commands.State) bool {
-	// Don't even require staker to be inserted before being deleted
 	return true
 }
 
@@ -241,14 +292,13 @@ func (*deleteCurrentValidatorCommand) PostCondition(cmdState commands.State, res
 	return &gopter.PropResult{Status: gopter.PropFalse}
 }
 
-func (v *deleteCurrentValidatorCommand) String() string {
-	return fmt.Sprintf("DeleteCurrentValidator(subnetID: %s, nodeID: %s, txID: %s)", v.SubnetID, v.NodeID, v.TxID)
+func (*deleteCurrentValidatorCommand) String() string {
+	return "DeleteCurrentValidator"
 }
 
-var genDeleteCurrentValidatorCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(staker state.Staker) commands.Command {
-		cmd := (*deleteCurrentValidatorCommand)(&staker)
-		return cmd
+var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &deleteCurrentValidatorCommand{}
 	},
 )
 
@@ -284,8 +334,8 @@ func (*addTopDiffCommand) String() string {
 	return "AddTopDiffCommand"
 }
 
-var genAddTopDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &addTopDiffCommand{}
 	},
 )
@@ -295,7 +345,7 @@ type applyBottomDiffCommand struct{}
 
 func (*applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	sys.flushBottomDiff()
+	_ = sys.flushBottomDiff()
 	return sys
 }
 
@@ -322,8 +372,8 @@ func (*applyBottomDiffCommand) String() string {
 	return "ApplyBottomDiffCommand"
 }
 
-var genApplyBottomDiffCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &applyBottomDiffCommand{}
 	},
 )
@@ -363,8 +413,8 @@ func (*commitBottomStateCommand) String() string {
 	return "CommitBottomStateCommand"
 }
 
-var genCommitBottomStateCommand = stakerGenerator(anyPriority, nil, nil).Map(
-	func(state.Staker) commands.Command {
+var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
 		return &commitBottomStateCommand{}
 	},
 )
@@ -382,25 +432,28 @@ func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) b
 		return false
 	}
 
-	for {
-		modelNext := modelIt.Next()
-		sysNext := sysIt.Next()
-		if modelNext != sysNext {
-			return false
-		}
-		if !sysNext {
-			break // done with both model and sys iterations
-		}
+	modelStakers := make([]*state.Staker, 0)
+	for modelIt.Next() {
+		modelStakers = append(modelStakers, modelIt.Value())
+	}
+	modelIt.Release()
 
-		modelStaker := modelIt.Value()
-		sysStaker := sysIt.Value()
+	sysStakers := make([]*state.Staker, 0)
+	for sysIt.Next() {
+		sysStakers = append(sysStakers, sysIt.Value())
+	}
+	sysIt.Release()
 
+	if len(modelStakers) != len(sysStakers) {
+		return false
+	}
+
+	for idx, modelStaker := range modelStakers {
+		sysStaker := sysStakers[idx]
 		if modelStaker == nil || sysStaker == nil || !reflect.DeepEqual(modelStaker, sysStaker) {
 			return false
 		}
 	}
 
-	modelIt.Release()
-	sysIt.Release()
 	return true
 }
