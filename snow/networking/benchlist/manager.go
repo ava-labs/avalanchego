@@ -97,7 +97,7 @@ func (m *manager) GetBenched(nodeID ids.NodeID) []ids.ID {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	benched := []ids.ID{}
+	var benched []ids.ID
 	for chainID, benchlist := range m.chainBenchlists {
 		if !benchlist.IsBenched(nodeID) {
 			continue
@@ -190,5 +190,5 @@ func (noBenchlist) IsBenched(ids.NodeID, ids.ID) bool {
 }
 
 func (noBenchlist) GetBenched(ids.NodeID) []ids.ID {
-	return []ids.ID{}
+	return nil
 }

@@ -34,7 +34,7 @@ func (op *MintOperation) Cost() (uint64, error) {
 
 // Outs Returns []TransferOutput as []verify.State
 func (op *MintOperation) Outs() []verify.State {
-	outs := []verify.State{}
+	var outs []verify.State
 	for _, out := range op.Outputs {
 		outs = append(outs, &TransferOutput{
 			GroupID:      op.GroupID,

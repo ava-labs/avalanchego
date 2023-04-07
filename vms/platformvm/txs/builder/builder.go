@@ -212,8 +212,10 @@ func (b *builder) NewImportTx(
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
 	}
 
-	importedInputs := []*avax.TransferableInput{}
-	signers := [][]*secp256k1.PrivateKey{}
+	var (
+		importedInputs = []*avax.TransferableInput(nil)
+		signers        = [][]*secp256k1.PrivateKey(nil)
+	)
 
 	importedAmounts := make(map[ids.ID]uint64)
 	now := b.clk.Unix()
@@ -244,10 +246,12 @@ func (b *builder) NewImportTx(
 		return nil, errNoFunds // No imported UTXOs were spendable
 	}
 
-	importedAVAX := importedAmounts[b.ctx.AVAXAssetID]
+	var (
+		importedAVAX = importedAmounts[b.ctx.AVAXAssetID]
+		ins          = []*avax.TransferableInput(nil)
+		outs         = []*avax.TransferableOutput(nil)
+	)
 
-	ins := []*avax.TransferableInput{}
-	outs := []*avax.TransferableOutput{}
 	switch {
 	case importedAVAX < b.cfg.TxFee: // imported amount goes toward paying tx fee
 		var baseSigners [][]*secp256k1.PrivateKey

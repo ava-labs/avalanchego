@@ -166,10 +166,12 @@ func (h *handler) Spend(
 	// Minimum time this transaction will be issued at
 	now := uint64(h.clk.Time().Unix())
 
-	ins := []*avax.TransferableInput{}
-	returnedOuts := []*avax.TransferableOutput{}
-	stakedOuts := []*avax.TransferableOutput{}
-	signers := [][]*secp256k1.PrivateKey{}
+	var (
+		ins          = []*avax.TransferableInput(nil)
+		returnedOuts = []*avax.TransferableOutput(nil)
+		stakedOuts   = []*avax.TransferableOutput(nil)
+		signers      = [][]*secp256k1.PrivateKey(nil)
+	)
 
 	// Amount of AVAX that has been staked
 	amountStaked := uint64(0)

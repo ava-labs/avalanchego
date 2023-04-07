@@ -116,11 +116,13 @@ func (s *spender) Spend(
 	[][]*secp256k1.PrivateKey, // signers
 	error,
 ) {
-	amountsSpent := make(map[ids.ID]uint64, len(amounts))
-	time := s.clock.Unix()
+	var (
+		amountsSpent = make(map[ids.ID]uint64, len(amounts))
+		time         = s.clock.Unix()
+		ins          = []*avax.TransferableInput(nil)
+		keys         = [][]*secp256k1.PrivateKey(nil)
+	)
 
-	ins := []*avax.TransferableInput{}
-	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amount := amounts[assetID]
@@ -183,10 +185,11 @@ func (s *spender) SpendNFT(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := s.clock.Unix()
-
-	ops := []*txs.Operation{}
-	keys := [][]*secp256k1.PrivateKey{}
+	var (
+		time = s.clock.Unix()
+		ops  = []*txs.Operation(nil)
+		keys = [][]*secp256k1.PrivateKey(nil)
+	)
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -255,11 +258,13 @@ func (s *spender) SpendAll(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	amountsSpent := make(map[ids.ID]uint64)
-	time := s.clock.Unix()
+	var (
+		amountsSpent = make(map[ids.ID]uint64)
+		time         = s.clock.Unix()
+		ins          = []*avax.TransferableInput(nil)
+		keys         = [][]*secp256k1.PrivateKey(nil)
+	)
 
-	ins := []*avax.TransferableInput{}
-	keys := [][]*secp256k1.PrivateKey{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		amountSpent := amountsSpent[assetID]
@@ -305,10 +310,11 @@ func (s *spender) Mint(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := s.clock.Unix()
-
-	ops := []*txs.Operation{}
-	keys := [][]*secp256k1.PrivateKey{}
+	var (
+		time = s.clock.Unix()
+		ops  = []*txs.Operation(nil)
+		keys = [][]*secp256k1.PrivateKey(nil)
+	)
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
@@ -379,10 +385,11 @@ func (s *spender) MintNFT(
 	[][]*secp256k1.PrivateKey,
 	error,
 ) {
-	time := s.clock.Unix()
-
-	ops := []*txs.Operation{}
-	keys := [][]*secp256k1.PrivateKey{}
+	var (
+		time = s.clock.Unix()
+		ops  = []*txs.Operation(nil)
+		keys = [][]*secp256k1.PrivateKey(nil)
+	)
 
 	for _, utxo := range utxos {
 		// makes sure that the variable isn't overwritten with the next iteration
