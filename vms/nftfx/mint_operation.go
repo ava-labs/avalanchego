@@ -34,13 +34,13 @@ func (op *MintOperation) Cost() (uint64, error) {
 
 // Outs Returns []TransferOutput as []verify.State
 func (op *MintOperation) Outs() []verify.State {
-	var outs []verify.State
-	for _, out := range op.Outputs {
-		outs = append(outs, &TransferOutput{
+	outs := make([]verify.State, len(op.Outputs))
+	for i, out := range op.Outputs {
+		outs[i] = &TransferOutput{
 			GroupID:      op.GroupID,
 			Payload:      op.Payload,
 			OutputOwners: *out,
-		})
+		}
 	}
 	return outs
 }

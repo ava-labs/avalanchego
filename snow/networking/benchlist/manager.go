@@ -91,13 +91,13 @@ func (m *manager) IsBenched(nodeID ids.NodeID, chainID ids.ID) bool {
 }
 
 // GetBenched returns an array of chainIDs where the specified
-// [nodeID] is benched. If called on an id.ShortID that does
+// [nodeID] is benched. If called on an ids.NodeID that does
 // not map to a validator, it will return an empty array.
 func (m *manager) GetBenched(nodeID ids.NodeID) []ids.ID {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	var benched []ids.ID
+	var benched []ids.ID //nolint:prealloc // Don't preallocate since most of the time this will be empty
 	for chainID, benchlist := range m.chainBenchlists {
 		if !benchlist.IsBenched(nodeID) {
 			continue
