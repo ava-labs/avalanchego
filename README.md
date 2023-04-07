@@ -1,5 +1,9 @@
 # Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
 
+> :warning: firewood is alpha-level software and is not ready for production
+> use. Do not use firewood to store production data. See the
+> [license](./LICENSE.md) for more information regarding firewood usage.
+
 Firewood is an embedded key-value store, optimized to store blockchain state.
 It prioritizes access to latest state, by providing extremely fast reads, but
 also provides a limited view into past state. It does not copy-on-write the
