@@ -9,6 +9,7 @@ module github.com/ava-labs/avalanchego
 go 1.19
 
 require (
+	github.com/DataDog/zstd v1.5.2
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner-sdk v0.3.0
