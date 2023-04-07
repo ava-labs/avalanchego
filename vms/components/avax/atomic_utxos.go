@@ -1,3 +1,13 @@
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -10,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var _ AtomicUTXOManager = (*atomicUTXOManager)(nil)
@@ -83,11 +94,27 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 
 	utxos := make([]*UTXO, len(allUTXOBytes))
 	for i, utxoBytes := range allUTXOBytes {
-		utxo := &UTXO{}
-		if _, err := a.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		utxo, _, err := UnmarshalUTXO(a.codec, utxoBytes)
+		if err != nil {
 			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
 	}
 	return utxos, lastAddrID, lastUTXOID, nil
+}
+
+func UnmarshalUTXO(codec codec.Manager, utxoBytes []byte) (*UTXO, []verify.State, error) {
+	var err error
+
+	utxo := &UTXO{}
+	if _, err := codec.Unmarshal(utxoBytes, utxo); err == nil {
+		return utxo, []verify.State{}, nil
+	}
+
+	wrappedUTXO := &UTXOWithMSig{}
+	if _, err := codec.Unmarshal(utxoBytes, wrappedUTXO); err == nil {
+		return &wrappedUTXO.UTXO, wrappedUTXO.Aliases, nil
+	}
+
+	return nil, nil, fmt.Errorf("failed to unmarshal UTXO: %w", err)
 }
