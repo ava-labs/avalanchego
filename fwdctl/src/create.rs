@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use anyhow::{anyhow, Result};
 use clap::{value_parser, Args};
 use firewood::db::{DBConfig, DBRevConfig, DiskBufferConfig, WALConfig, DB};

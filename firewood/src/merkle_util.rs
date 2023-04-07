@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use crate::merkle::*;
 use crate::proof::Proof;
 use crate::{dynamic_mem::DynamicMem, proof::ProofError};

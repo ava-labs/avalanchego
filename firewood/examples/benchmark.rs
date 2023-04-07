@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 use clap::Parser;
 use criterion::Criterion;
 use firewood::db::{DBConfig, WALConfig, DB};

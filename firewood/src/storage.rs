@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 // TODO: try to get rid of the use `RefCell` in this file
 
 use std::cell::{RefCell, RefMut};

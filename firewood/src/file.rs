@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 // Copied from CedrusDB
 
 pub(crate) use std::os::unix::io::RawFd as Fd;

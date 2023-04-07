@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 //! # Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
 //!
 //! Firewood is an embedded key-value store, optimized to store blockchain state. It prioritizes

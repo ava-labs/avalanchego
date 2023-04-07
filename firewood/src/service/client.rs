@@ -1,3 +1,6 @@
+// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
 /// Client side connection structure
 ///
 /// A connection is used to send messages to the firewood thread.
