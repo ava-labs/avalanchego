@@ -6,6 +6,7 @@ package state
 import (
 	"math"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -86,7 +87,12 @@ func TestMaskIteratorProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("Mask iterator output must be sorted", prop.ForAll(
-		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+		func(parentStakers []Staker, indexes []int, counts []int) string {
+			deletedCount := counts[0]
+			updatedCount := counts[1]
+			deletedIndexes := indexes[0:deletedCount]
+			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
 			_, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
 			res := make([]*Staker, 0, len(parentStakers))
@@ -107,7 +113,12 @@ func TestMaskIteratorProperties(t *testing.T) {
 	))
 
 	properties.Property("Masked stakers must not be in the output", prop.ForAll(
-		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+		func(parentStakers []Staker, indexes []int, counts []int) string {
+			deletedCount := counts[0]
+			updatedCount := counts[1]
+			deletedIndexes := indexes[0:deletedCount]
+			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
 			deleted, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
 			res := set.NewSet[ids.ID](0)
@@ -115,7 +126,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				res.Add(maskedIt.Value().TxID)
 			}
 
-			for id, _ := range deleted {
+			for id := range deleted {
 				if res.Contains(id) {
 					return "deleted stakers returned when it should not have"
 				}
@@ -127,7 +138,12 @@ func TestMaskIteratorProperties(t *testing.T) {
 	))
 
 	properties.Property("Updated stakers must be returned instead of their parent version", prop.ForAll(
-		func(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) string {
+		func(parentStakers []Staker, indexes []int, counts []int) string {
+			deletedCount := counts[0]
+			updatedCount := counts[1]
+			deletedIndexes := indexes[0:deletedCount]
+			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
 			_, updated, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
 			res := make(map[ids.ID]*Staker)
@@ -153,6 +169,45 @@ func TestMaskIteratorProperties(t *testing.T) {
 	))
 
 	properties.TestingRun(t)
+}
+
+func indexPermutationGenerator(sliceLen int) gopter.Gen {
+	return gen.SliceOfN(sliceLen, gen.Int()).FlatMap(
+		func(v interface{}) gopter.Gen {
+			randomIndexes := v.([]int)
+
+			sorted := make([]int, len(randomIndexes))
+			copy(sorted, randomIndexes)
+			sort.Ints(sorted)
+
+			res := make([]int, 0, len(randomIndexes))
+
+			for _, rnd := range randomIndexes {
+				idx := 0
+				for ; sorted[idx] != rnd; idx++ {
+				}
+
+				res = append(res, idx)
+			}
+			return gen.Const(res)
+		},
+		reflect.TypeOf([]int{}),
+	)
+}
+
+func maskedIteratorTestGenerator() []gopter.Gen {
+	parentStakersCount := 10
+
+	return []gopter.Gen{
+		gen.SliceOfN(parentStakersCount, StakerGenerator(AnyPriority, nil, nil, math.MaxUint64)),
+		indexPermutationGenerator(parentStakersCount),
+		gen.SliceOfN(2, gen.IntRange(0, parentStakersCount)).SuchThat(func(v interface{}) bool {
+			nums := v.([]int)
+			deletedCount := nums[0]
+			updatedCount := nums[1]
+			return deletedCount >= 0 && updatedCount >= 0 && deletedCount+updatedCount <= parentStakersCount
+		}),
+	}
 }
 
 func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) (
@@ -183,18 +238,4 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	}
 
 	return deletedStakers, updatedStakers, NewMaskedIterator(parentIt, deletedStakers, updatedStakers)
-}
-
-func maskedIteratorTestGenerator() []gopter.Gen {
-	parentStakersCount := 20
-
-	return []gopter.Gen{
-		gen.SliceOfN(parentStakersCount, StakerGenerator(AnyPriority, nil, nil, math.MaxUint64)),
-		// TODO ABENEGIA: add indexs of deleted and updated stakers
-		// Just generate permutation of indexes till parentStakersCount
-		// and select number of deleted (first part of permutation)
-		// and number of updated (second part of permutation)
-		gen.Const([]int{1, 3, 5, 7, 9, 10}),   // TODO ABENEGIA: randomize
-		gen.Const([]int{2, 4, 6, 11, 12, 13}), // TODO ABENEGIA: randomize
-	}
 }

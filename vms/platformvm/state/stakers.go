@@ -607,6 +607,7 @@ func (s *diffStakers) DeleteDelegator(staker *Staker) {
 		s.deletedStakers = make(map[ids.ID]*Staker)
 	}
 	s.deletedStakers[staker.TxID] = staker
+	delete(s.updatedStakers, staker.TxID)
 }
 
 func (s *diffStakers) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
