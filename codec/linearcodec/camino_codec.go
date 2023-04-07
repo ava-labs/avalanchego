@@ -27,6 +27,7 @@ type CaminoCodec interface {
 	codec.CaminoRegistry
 	codec.Codec
 	SkipRegistrations(int)
+	SkipCustomRegistrations(int)
 }
 
 type caminoLinearCodec struct {
@@ -73,4 +74,11 @@ func (c *caminoLinearCodec) RegisterCustomType(val interface{}) error {
 	c.typeToTypeID[valType] = c.nextCustomTypeID
 	c.nextCustomTypeID++
 	return nil
+}
+
+// Skip some number of type IDs
+func (c *caminoLinearCodec) SkipCustomRegistrations(num int) {
+	c.lock.Lock()
+	c.nextCustomTypeID += uint32(num)
+	c.lock.Unlock()
 }
