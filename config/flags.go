@@ -4,13 +4,13 @@
 package config
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -50,12 +50,21 @@ var (
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
 )
 
-func addProcessFlags(fs *flag.FlagSet) {
+func deprecateFlags(fs *pflag.FlagSet) error {
+	for key, message := range deprecatedKeys {
+		if err := fs.MarkDeprecated(key, message); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
 }
 
-func addNodeFlags(fs *flag.FlagSet) {
+func addNodeFlags(fs *pflag.FlagSet) {
 	// Home directory
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
@@ -286,7 +295,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
 	fs.Int(SnowQuorumSizeKey, 15, "Alpha value to use for required number positive results")
-	fs.Int(SnowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
+	// TODO: Replace this temporary flag description after the X-chain
+	// linearization with "Beta value to use for virtuous transactions"
+	fs.Int(SnowVirtuousCommitThresholdKey, 15, "This flag is temporarily ignored due to the X-chain linearization")
 	fs.Int(SnowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
 	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
 	fs.Int(SnowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
@@ -365,10 +376,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
-func BuildFlagSet() *flag.FlagSet {
-	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
-	// and then putting those into a *plag.FlagSet
-	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
+func BuildFlagSet() *pflag.FlagSet {
+	fs := pflag.NewFlagSet(constants.AppName, pflag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)
 	return fs
