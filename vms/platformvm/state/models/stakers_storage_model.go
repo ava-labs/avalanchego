@@ -4,6 +4,8 @@
 package models
 
 import (
+	"errors"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -190,6 +192,21 @@ func getCurrentStakerIterator(
 		current:       nil,
 		sortedStakers: allStakers,
 	}
+}
+
+func (*stakersStorageModel) SetDelegateeReward(
+	ids.ID,
+	ids.NodeID,
+	uint64,
+) error {
+	return errors.New("method non implemented in model")
+}
+
+func (*stakersStorageModel) GetDelegateeReward(
+	ids.ID,
+	ids.NodeID,
+) (uint64, error) {
+	return 0, errors.New("method non implemented in model")
 }
 
 type stakersStorageIteratorModel struct {
