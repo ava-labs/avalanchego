@@ -197,7 +197,7 @@ func (b *Block) Verify(context.Context) error {
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
 	stateDiff.SetLastAccepted(blkID)
-	stateDiff.AddBlock(b)
+	stateDiff.AddBlock(b.Block)
 
 	b.manager.blkIDToState[blkID] = blockState
 	b.manager.mempool.Remove(txs)
