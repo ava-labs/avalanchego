@@ -26,10 +26,10 @@ const (
 
 var errUnhealthy = errors.New("unhealthy")
 
-func awaitReadiness(r Reporter) {
+func awaitReadiness(r Reporter, ready bool) {
 	for {
-		_, ready := r.Readiness()
-		if ready {
+		_, ok := r.Readiness()
+		if ready == ok {
 			return
 		}
 		time.Sleep(awaitFreq)
@@ -147,7 +147,7 @@ func TestPassingChecks(t *testing.T) {
 	defer h.Stop()
 
 	{
-		awaitReadiness(h)
+		awaitReadiness(h, true)
 
 		readinessResult, readiness := h.Readiness()
 		require.Len(readinessResult, 1)
@@ -213,7 +213,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
-	awaitReadiness(h)
+	awaitReadiness(h, true)
 	awaitHealthy(h, true)
 	awaitLiveness(h, true)
 
@@ -291,61 +291,131 @@ func TestTags(t *testing.T) {
 	require.NoError(err)
 	err = h.RegisterHealthCheck("check4", check, "tag1", "tag2")
 	require.NoError(err)
+	err = h.RegisterHealthCheck("check5", check, GlobalTag)
+	require.NoError(err)
 
 	// default checks
 	{
 		healthResult, health := h.Health()
-		require.Len(healthResult, 4)
+		require.Len(healthResult, 5)
 		require.Contains(healthResult, "check1")
 		require.Contains(healthResult, "check2")
 		require.Contains(healthResult, "check3")
 		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
 		require.False(health)
 
 		healthResult, health = h.Health("tag1")
-		require.Len(healthResult, 2)
-		require.Contains(healthResult, "check2")
-		require.Contains(healthResult, "check4")
-		require.False(health)
-	}
-
-	h.Start(context.Background(), checkFreq)
-	defer h.Stop()
-
-	awaitHealthy(h, true)
-
-	{
-		healthResult, health := h.Health()
-		require.Len(healthResult, 4)
-		require.Contains(healthResult, "check1")
-		require.Contains(healthResult, "check2")
-		require.Contains(healthResult, "check3")
-		require.Contains(healthResult, "check4")
-		require.True(health)
-
-		healthResult, health = h.Health("tag1")
-		require.Len(healthResult, 2)
-		require.Contains(healthResult, "check2")
-		require.Contains(healthResult, "check4")
-		require.True(health)
-	}
-
-	// now we'll add a new failing check
-	{
-		err = h.RegisterHealthCheck("check5", check, "tag1")
-		require.NoError(err)
-
-		healthResult, health := h.Health("tag1")
 		require.Len(healthResult, 3)
 		require.Contains(healthResult, "check2")
 		require.Contains(healthResult, "check4")
 		require.Contains(healthResult, "check5")
 		require.False(health)
 
-		healthResult, health = h.Health("tag2")
-		require.Len(healthResult, 2)
+		healthResult, health = h.Health("tag1", "tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
 		require.Contains(healthResult, "check3")
 		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("nonExistentTag")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("tag1", "tag2", "nonExistentTag")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+	}
+
+	h.Start(context.Background(), checkFreq)
+
+	awaitHealthy(h, true)
+
+	{
+		healthResult, health := h.Health()
+		require.Len(healthResult, 5)
+		require.Contains(healthResult, "check1")
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
 		require.True(health)
+
+		healthResult, health = h.Health("tag1")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1", "tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("nonExistentTag")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1", "tag2", "nonExistentTag")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+	}
+
+	// stop the health check
+	h.Stop()
+
+	{
+		// now we'll add a new check which is unhealthy by default (notYetRunResult)
+		err = h.RegisterHealthCheck("check6", check, "tag1")
+		require.NoError(err)
+
+		awaitHealthy(h, false)
+
+		healthResult, health := h.Health("tag1")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.Contains(healthResult, "check6")
+		require.Equal(notYetRunResult, healthResult["check6"])
+		require.False(health)
+
+		healthResult, health = h.Health("tag2")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		// add global tag
+		err = h.RegisterHealthCheck("check7", check, GlobalTag)
+		require.NoError(err)
+
+		awaitHealthy(h, false)
+
+		healthResult, health = h.Health("tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.Contains(healthResult, "check7")
+		require.Equal(notYetRunResult, healthResult["check7"])
+		require.False(health)
 	}
 }

@@ -5,6 +5,7 @@ package health
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,7 +40,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Readiness(nil, nil, &reply)
+		err = s.Readiness(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		require.Len(reply.Checks, 1)
@@ -50,7 +51,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Health(nil, nil, &reply)
+		err = s.Health(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		require.Len(reply.Checks, 1)
@@ -61,7 +62,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Liveness(nil, nil, &reply)
+		err = s.Liveness(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		require.Len(reply.Checks, 1)
@@ -73,13 +74,13 @@ func TestServiceResponses(t *testing.T) {
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
-	awaitReadiness(h)
+	awaitReadiness(h, true)
 	awaitHealthy(h, true)
 	awaitLiveness(h, true)
 
 	{
 		reply := APIReply{}
-		err = s.Readiness(nil, nil, &reply)
+		err = s.Readiness(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		result := reply.Checks["check"]
@@ -91,7 +92,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Health(nil, nil, &reply)
+		err = s.Health(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		result := reply.Checks["check"]
@@ -103,7 +104,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Liveness(nil, nil, &reply)
+		err = s.Liveness(nil, &APIArgs{}, &reply)
 		require.NoError(err)
 
 		result := reply.Checks["check"]
@@ -124,72 +125,117 @@ func TestServiceTagResponse(t *testing.T) {
 	subnetID1 := ids.GenerateTestID()
 	subnetID2 := ids.GenerateTestID()
 
-	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check1", check)
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check2", check, subnetID1.String())
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check3", check, subnetID2.String())
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check4", check, subnetID1.String(), subnetID2.String())
-	require.NoError(err)
-
-	s := &Service{
-		log:    logging.NoLog{},
-		health: h,
+	// test cases
+	type testMethods struct {
+		name     string
+		register func(Health, string, Checker, ...string) error
+		check    func(*Service, *http.Request, *APIArgs, *APIReply) error
+		await    func(Reporter, bool)
 	}
 
-	// default checks
-	{
-		reply := APIReply{}
-		err = s.Health(nil, nil, &reply)
-		require.NoError(err)
-		require.Len(reply.Checks, 4)
-		require.Contains(reply.Checks, "check1")
-		require.Contains(reply.Checks, "check2")
-		require.Contains(reply.Checks, "check3")
-		require.Contains(reply.Checks, "check4")
-		require.Equal(notYetRunResult, reply.Checks["check1"])
-		require.False(reply.Healthy)
-
-		err = s.Health(nil, &HealthArgs{SubnetIDs: []ids.ID{subnetID1}}, &reply)
-		require.NoError(err)
-		require.Len(reply.Checks, 2)
-		require.Contains(reply.Checks, "check2")
-		require.Contains(reply.Checks, "check4")
-		require.Equal(notYetRunResult, reply.Checks["check2"])
-		require.False(reply.Healthy)
+	tests := []testMethods{
+		{
+			name: "Readiness",
+			register: func(h Health, s1 string, c Checker, s2 ...string) error {
+				return h.RegisterReadinessCheck(s1, c, s2...)
+			},
+			check: func(s *Service, req *http.Request, a1 *APIArgs, a2 *APIReply) error {
+				return s.Readiness(req, a1, a2)
+			},
+			await: awaitReadiness,
+		},
+		{
+			name: "Health",
+			register: func(h Health, s1 string, c Checker, s2 ...string) error {
+				return h.RegisterHealthCheck(s1, c, s2...)
+			},
+			check: func(s *Service, r *http.Request, a1 *APIArgs, a2 *APIReply) error {
+				return s.Health(r, a1, a2)
+			},
+			await: awaitHealthy,
+		},
+		{
+			name: "Liveness",
+			register: func(h Health, s1 string, c Checker, s2 ...string) error {
+				return h.RegisterLivenessCheck(s1, c, s2...)
+			},
+			check: func(s *Service, r *http.Request, a1 *APIArgs, a2 *APIReply) error {
+				return s.Liveness(r, a1, a2)
+			},
+			await: awaitLiveness,
+		},
 	}
 
-	h.Start(context.Background(), checkFreq)
-	defer h.Stop()
-
-	awaitHealthy(h, true)
-
-	{
-		reply := APIReply{}
-		err = s.Health(nil, &HealthArgs{SubnetIDs: []ids.ID{subnetID1}}, &reply)
+	for _, test := range tests {
+		h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 		require.NoError(err)
-		require.Len(reply.Checks, 2)
-		require.Contains(reply.Checks, "check2")
-		require.Contains(reply.Checks, "check4")
-		require.True(reply.Healthy)
-	}
-
-	// now we'll add a new failing check
-	{
-		err = h.RegisterHealthCheck("check5", check, subnetID1.String())
+		err = test.register(h, "check1", check)
+		require.NoError(err)
+		err = test.register(h, "check2", check, subnetID1.String())
+		require.NoError(err)
+		err = test.register(h, "check3", check, subnetID2.String())
+		require.NoError(err)
+		err = test.register(h, "check4", check, subnetID1.String(), subnetID2.String())
 		require.NoError(err)
 
-		reply := APIReply{}
-		err = s.Health(nil, &HealthArgs{SubnetIDs: []ids.ID{subnetID1}}, &reply)
-		require.NoError(err)
-		require.Len(reply.Checks, 3)
-		require.Contains(reply.Checks, "check2")
-		require.Contains(reply.Checks, "check4")
-		require.Contains(reply.Checks, "check5")
-		require.Equal(notYetRunResult, reply.Checks["check5"])
-		require.False(reply.Healthy)
+		s := &Service{
+			log:    logging.NoLog{},
+			health: h,
+		}
+
+		// default checks
+		{
+			reply := APIReply{}
+			err = test.check(s, nil, &APIArgs{}, &reply)
+			require.NoError(err)
+			require.Len(reply.Checks, 4)
+			require.Contains(reply.Checks, "check1")
+			require.Contains(reply.Checks, "check2")
+			require.Contains(reply.Checks, "check3")
+			require.Contains(reply.Checks, "check4")
+			require.Equal(notYetRunResult, reply.Checks["check1"])
+			require.False(reply.Healthy)
+
+			err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
+			require.NoError(err)
+			require.Len(reply.Checks, 2)
+			require.Contains(reply.Checks, "check2")
+			require.Contains(reply.Checks, "check4")
+			require.Equal(notYetRunResult, reply.Checks["check2"])
+			require.False(reply.Healthy)
+		}
+
+		h.Start(context.Background(), checkFreq)
+
+		test.await(h, true)
+
+		{
+			reply := APIReply{}
+			err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
+			require.NoError(err)
+			require.Len(reply.Checks, 2)
+			require.Contains(reply.Checks, "check2")
+			require.Contains(reply.Checks, "check4")
+			require.True(reply.Healthy)
+		}
+
+		// stop the health check
+		h.Stop()
+
+		{
+			// now we'll add a new check which is unhealthy by default (notYetRunResult)
+			err = test.register(h, "check5", check, subnetID1.String())
+			require.NoError(err)
+
+			reply := APIReply{}
+			err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
+			require.NoError(err)
+			require.Len(reply.Checks, 3)
+			require.Contains(reply.Checks, "check2")
+			require.Contains(reply.Checks, "check4")
+			require.Contains(reply.Checks, "check5")
+			require.Equal(notYetRunResult, reply.Checks["check5"])
+			require.False(reply.Healthy)
+		}
 	}
 }

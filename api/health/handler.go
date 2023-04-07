@@ -4,14 +4,12 @@
 package health
 
 import (
-	"fmt"
 	"net/http"
 
 	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -47,10 +45,6 @@ func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, 
 	return handler, err
 }
 
-type errorMsg struct {
-	Error string `json:"error"`
-}
-
 // NewGetHandler return a health handler that supports GET requests reporting
 // the result of the provided [reporter].
 func NewGetHandler(reporter func(tags ...string) (map[string]Result, bool)) http.Handler {
@@ -58,21 +52,8 @@ func NewGetHandler(reporter func(tags ...string) (map[string]Result, bool)) http
 		// Make sure the content type is set before writing the header.
 		w.Header().Set("Content-Type", "application/json")
 
-		subnetIDs := r.URL.Query()["subnetID"]
-
-		// check if the subnetID is a valid ID
-		for _, subnetID := range subnetIDs {
-			if _, err := ids.FromString(subnetID); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				err := fmt.Errorf("invalid subnetID %s: %w", subnetID, err)
-				_ = stdjson.NewEncoder(w).Encode(errorMsg{
-					Error: err.Error(),
-				})
-				return
-			}
-		}
-
-		checks, healthy := reporter(subnetIDs...)
+		tags := r.URL.Query()["tag"]
+		checks, healthy := reporter(tags...)
 		if !healthy {
 			// If a health check has failed, we should return a 503.
 			w.WriteHeader(http.StatusServiceUnavailable)
