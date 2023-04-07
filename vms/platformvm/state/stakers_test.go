@@ -142,7 +142,7 @@ func TestDiffStakersValidator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := diffStakers{}
+	v := newDiffStakers()
 
 	v.PutDelegator(delegator)
 
@@ -183,7 +183,7 @@ func TestDiffStakersDeleteValidator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := diffStakers{}
+	v := newDiffStakers()
 
 	_, status := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
 	require.Equal(unmodified, status)
@@ -199,7 +199,7 @@ func TestDiffStakersDelegator(t *testing.T) {
 	staker := newTestStaker()
 	delegator := newTestStaker()
 
-	v := diffStakers{}
+	v := newDiffStakers()
 
 	v.PutValidator(staker)
 

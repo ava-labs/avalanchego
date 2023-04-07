@@ -36,8 +36,8 @@ type diff struct {
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
 
-	currentStakerDiffs diffStakers
-	pendingStakerDiffs diffStakers
+	currentStakerDiffs *diffStakers
+	pendingStakerDiffs *diffStakers
 
 	addedSubnets []*txs.Tx
 	// Subnet ID --> Tx that transforms the subnet
@@ -64,9 +64,11 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:      parentID,
-		stateVersions: stateVersions,
-		timestamp:     parentState.GetTimestamp(),
+		parentID:           parentID,
+		stateVersions:      stateVersions,
+		timestamp:          parentState.GetTimestamp(),
+		currentStakerDiffs: newDiffStakers(),
+		pendingStakerDiffs: newDiffStakers(),
 	}, nil
 }
 
