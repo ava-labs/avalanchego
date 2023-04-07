@@ -262,6 +262,21 @@ func (mr *MockDiffMockRecorder) GetCurrentValidator(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockDiff)(nil).GetCurrentValidator), arg0, arg1)
 }
 
+// GetDelegateeReward mocks base method.
+func (m *MockDiff) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDelegateeReward", arg0, arg1)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDelegateeReward indicates an expected call of GetDelegateeReward.
+func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
+}
+
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockDiff) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -455,6 +470,20 @@ func (m *MockDiff) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSupply), arg0, arg1)
+}
+
+// SetDelegateeReward mocks base method.
+func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDelegateeReward", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetDelegateeReward indicates an expected call of SetDelegateeReward.
+func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
 // SetTimestamp mocks base method.

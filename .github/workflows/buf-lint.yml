@@ -2,6 +2,12 @@ name: Lint proto files
 
 on:
   push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
 
 permissions:
   contents: read

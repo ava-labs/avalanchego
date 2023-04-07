@@ -225,14 +225,13 @@ func addSubnet(env *environment) {
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
+
+	if err = testSubnet1.Unsigned.Visit(&executor); err != nil {
 		panic(err)
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	err = stateDiff.Apply(env.state)
-	if err != nil {
+	if err := stateDiff.Apply(env.state); err != nil {
 		panic(err)
 	}
 }

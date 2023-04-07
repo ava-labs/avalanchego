@@ -112,12 +112,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(postBanff bool) *environment {
+func newEnvironment(postBanff, postCortina bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff)
-	clk := defaultClock(postBanff)
+	config := defaultConfig(postBanff, postCortina)
+	clk := defaultClock(postBanff || postCortina)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -206,14 +206,13 @@ func addSubnet(
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
+
+	if err = testSubnet1.Unsigned.Visit(&executor); err != nil {
 		panic(err)
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	err = stateDiff.Apply(env.state)
-	if err != nil {
+	if err := stateDiff.Apply(env.state); err != nil {
 		panic(err)
 	}
 }
@@ -284,10 +283,14 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff bool) config.Config {
+func defaultConfig(postBanff, postCortina bool) config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
+	}
+	cortinaTime := mockable.MaxTime
+	if postCortina {
+		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
 
 	vdrs := validators.NewManager()
@@ -314,12 +317,13 @@ func defaultConfig(postBanff bool) config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
 	}
 }
 
-func defaultClock(postBanff bool) mockable.Clock {
+func defaultClock(postFork bool) mockable.Clock {
 	now := defaultGenesisTime
-	if postBanff {
+	if postFork {
 		// 1 second after Banff fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}

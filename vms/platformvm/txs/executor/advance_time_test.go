@@ -25,7 +25,7 @@ import (
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -82,7 +82,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -109,7 +109,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
@@ -144,7 +144,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require.NoError(err)
 
 	// Case: Timestamp is after next validator end time
-	env = newEnvironment( /*postBanff*/ false)
+	env = newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -346,7 +346,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment( /*postBanff*/ false)
+			env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 			env.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
@@ -448,7 +448,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -549,7 +549,7 @@ func TestTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment( /*postBanff*/ false)
+			env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 			env.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
@@ -620,7 +620,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -729,7 +729,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -828,7 +828,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -859,7 +859,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -890,7 +890,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
