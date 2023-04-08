@@ -905,6 +905,35 @@ fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
 }
 
 #[test]
+// Tests the range starts with zero and ends with 0xffff...fff.
+fn test_both_sides_range_proof() -> Result<(), ProofError> {
+    for _ in 0..10 {
+        let mut set = HashMap::new();
+        for _ in 0..4096 as u32 {
+            let key = rand::thread_rng().gen::<[u8; 32]>();
+            let val = rand::thread_rng().gen::<[u8; 20]>();
+            set.insert(key, val);
+        }
+        let mut items = Vec::from_iter(set.iter());
+        items.sort();
+        let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
+
+        let start: [u8; 32] = [0; 32];
+        let end: [u8; 32] = [255; 32];
+
+        let mut proof = merkle.prove(start)?;
+        assert!(!proof.0.is_empty());
+        let end_proof = merkle.prove(end)?;
+        assert!(!end_proof.0.is_empty());
+        proof.concat_proofs(end_proof);
+
+        let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 20]>) = items.into_iter().unzip();
+        merkle.verify_range_proof(&proof, &start, &end, keys, vals)?;
+    }
+    Ok(())
+}
+
+#[test]
 // Tests normal range proof with both edge proofs
 // as the existent proof, but with an extra empty value included, which is a
 // noop technically, but practically should be rejected.
