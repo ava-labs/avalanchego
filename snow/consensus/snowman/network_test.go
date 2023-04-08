@@ -117,8 +117,8 @@ func (n *Network) Round() error {
 		return err
 	}
 
-	// If this node has been finalized, remove it from the poller
-	if running.Finalized() {
+	// If this node finished querying, remove it from the poller
+	if running.NumProcessing() == 0 {
 		newSize := len(n.running) - 1
 		n.running[runningInd] = n.running[newSize]
 		n.running = n.running[:newSize]

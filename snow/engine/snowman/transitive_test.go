@@ -2386,7 +2386,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !te.Consensus.Finalized() {
+	if te.Consensus.NumProcessing() != 0 {
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
@@ -2507,7 +2507,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatal(err)
 	}
 
-	if !te.Consensus.Finalized() {
+	if te.Consensus.NumProcessing() != 0 {
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
@@ -2515,7 +2515,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatal(err)
 	}
 
-	if !te.Consensus.Finalized() {
+	if te.Consensus.NumProcessing() != 0 {
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
@@ -2616,7 +2616,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if !te.Consensus.Finalized() {
+	if te.Consensus.NumProcessing() != 0 {
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
@@ -2624,7 +2624,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if !te.Consensus.Finalized() {
+	if te.Consensus.NumProcessing() != 0 {
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 

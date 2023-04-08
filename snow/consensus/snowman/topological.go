@@ -102,33 +102,30 @@ type votes struct {
 }
 
 func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64, rootTime time.Time) error {
-	if err := params.Verify(); err != nil {
-		return err
-	}
-
-	latencyMetrics, err := metrics.NewLatency("blks", "block(s)", ctx.Log, "", ctx.Registerer)
+	err := params.Verify()
 	if err != nil {
 		return err
 	}
-	ts.Latency = latencyMetrics
 
-	pollsMetrics, err := metrics.NewPolls("", ctx.Registerer)
+	ts.Latency, err = metrics.NewLatency("blks", "block(s)", ctx.Log, "", ctx.Registerer)
 	if err != nil {
 		return err
 	}
-	ts.Polls = pollsMetrics
 
-	heightMetrics, err := metrics.NewHeight("", ctx.Registerer)
+	ts.Polls, err = metrics.NewPolls("", ctx.Registerer)
 	if err != nil {
 		return err
 	}
-	ts.Height = heightMetrics
 
-	timestampMetrics, err := metrics.NewTimestamp("", ctx.Registerer)
+	ts.Height, err = metrics.NewHeight("", ctx.Registerer)
 	if err != nil {
 		return err
 	}
-	ts.Timestamp = timestampMetrics
+
+	ts.Timestamp, err = metrics.NewTimestamp("", ctx.Registerer)
+	if err != nil {
+		return err
+	}
 
 	ts.leaves = set.Set[ids.ID]{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
@@ -307,10 +304,6 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 		ts.preferredIDs.Add(ts.tail)
 	}
 	return nil
-}
-
-func (ts *Topological) Finalized() bool {
-	return len(ts.blocks) == 1
 }
 
 // HealthCheck returns information about the consensus health.
