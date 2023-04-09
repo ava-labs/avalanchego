@@ -102,9 +102,13 @@ func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (Re
 }
 
 func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
-	out, ok := outIntf.(*TransferOutput)
+	out, ok := outIntf.(Owned)
 	if !ok {
 		return errWrongOutputType
+	}
+	owners, ok := out.Owners().(*OutputOwners)
+	if !ok {
+		return errWrongOwnerType
 	}
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
@@ -112,8 +116,8 @@ func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
 	}
 
 	// We don't support msig combinations / nesting
-	if len(out.OutputOwners.Addrs) > 1 {
-		for _, addr := range out.OutputOwners.Addrs {
+	if len(owners.Addrs) > 1 {
+		for _, addr := range owners.Addrs {
 			if _, err := msig.GetMultisigAlias(addr); err != database.ErrNotFound {
 				return errMsigCombination
 			}
@@ -136,11 +140,14 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 	if !ok {
 		return errWrongCredentialType
 	}
-	out, ok := utxoIntf.(*TransferOutput)
+	out, ok := utxoIntf.(TransferOutputIntf)
 	if !ok {
 		return errWrongUTXOType
 	}
-
+	owners, ok := out.Owners().(*OutputOwners)
+	if !ok {
+		return errWrongOwnerType
+	}
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
 		return errNotAliasGetter
@@ -148,11 +155,11 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 
 	if err := verify.All(out, in, cred); err != nil {
 		return err
-	} else if out.Amt != in.Amt {
+	} else if out.Amount() != in.Amt {
 		return fmt.Errorf("out amount and input differ")
 	}
 
-	return fx.verifyMultisigCredentials(tx, &in.Input, cred, &out.OutputOwners, msig)
+	return fx.verifyMultisigCredentials(tx, &in.Input, cred, owners, msig)
 }
 
 func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msigIntf interface{}) error {

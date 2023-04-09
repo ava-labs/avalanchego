@@ -393,6 +393,20 @@ func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.Out
 	}
 }
 
+func generateCrossOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, recipient ids.ShortID) *avax.TransferableOutput {
+	var out avax.TransferableOut = &secp256k1fx.CrossTransferOutput{
+		TransferOutput: secp256k1fx.TransferOutput{
+			Amt:          amount,
+			OutputOwners: outputOwners,
+		},
+		Recipient: recipient,
+	}
+	return &avax.TransferableOutput{
+		Asset: avax.Asset{ID: assetID},
+		Out:   out,
+	}
+}
+
 func generateTestIn(assetID ids.ID, amount uint64, depositTxID, bondTxID ids.ID, sigIndices []uint32) *avax.TransferableInput {
 	var in avax.TransferableIn = &secp256k1fx.TransferInput{
 		Amt: amount,

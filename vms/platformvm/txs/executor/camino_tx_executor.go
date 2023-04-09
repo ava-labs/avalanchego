@@ -371,12 +371,12 @@ func (e *CaminoStandardTxExecutor) wrapAtomicElementsForMultisig(tx *txs.ExportT
 	}
 
 	for i, output := range tx.ExportedOutputs {
-		out, ok := output.Out.(*secp256k1fx.TransferOutput)
+		owned, ok := output.Out.(secp256k1fx.Owned)
 		if !ok {
 			return locked.ErrWrongOutType
 		}
 
-		aliasInfs, err := e.Fx.CollectMultisigAliases(&out.OutputOwners, e.State)
+		aliasInfs, err := e.Fx.CollectMultisigAliases(owned.Owners(), e.State)
 		if err != nil {
 			return err
 		}

@@ -916,28 +916,6 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 
 			err := executor.ExportTx(exportTx)
 			require.ErrorIs(t, err, tt.expectedErr)
-
-			exportedOutputsTx := &txs.ExportTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins: []*avax.TransferableInput{
-						generateTestIn(avaxAssetID, 10, ids.Empty, ids.Empty, sigIndices),
-					},
-					Outs: []*avax.TransferableOutput{
-						generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-					},
-				}},
-				DestinationChain: env.ctx.XChainID,
-				ExportedOutputs: []*avax.TransferableOutput{
-					generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.GenerateTestID()),
-				},
-			}
-
-			executor = generateExecutor(exportedOutputsTx, env)
-
-			err = executor.ExportTx(exportedOutputsTx)
-			require.ErrorIs(t, err, locked.ErrWrongOutType)
 		})
 
 		t.Run("ImportTx "+name, func(t *testing.T) {
@@ -4767,6 +4745,100 @@ func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 				aliasIDs[i] = alias.(*multisig.AliasWithNonce).ID
 			}
 			require.Equal(tt.expectedMsigAddrs, aliasIDs)
+		})
+	}
+}
+
+func TestCaminoCrossExport(t *testing.T) {
+	addr0 := caminoPreFundedKeys[0].Address()
+	addr1 := caminoPreFundedKeys[1].Address()
+
+	sigIndices := []uint32{0}
+	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr0},
+	}
+
+	tests := map[string]struct {
+		utxos        []*avax.UTXO
+		ins          []*avax.TransferableInput
+		exportedOuts []*avax.TransferableOutput
+		expectedErr  error
+	}{
+		"CrossTransferOutput OK": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{0}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(avaxAssetID, defaultCaminoValidatorWeight, ids.Empty, ids.Empty, sigIndices),
+			},
+			exportedOuts: []*avax.TransferableOutput{
+				generateCrossOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, addr1),
+			},
+		},
+		"CrossTransferOutput Invalid Recipient": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{0}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(avaxAssetID, defaultCaminoValidatorWeight, ids.Empty, ids.Empty, sigIndices),
+			},
+			exportedOuts: []*avax.TransferableOutput{
+				generateCrossOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.ShortEmpty),
+			},
+			expectedErr: secp256k1fx.ErrEmptyRecipient,
+		},
+	}
+
+	generateExecutor := func(unsidngedTx txs.UnsignedTx, env *caminoEnvironment) CaminoStandardTxExecutor {
+		tx, err := txs.NewSigned(unsidngedTx, txs.Codec, signers)
+		require.NoError(t, err)
+
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+		require.NoError(t, err)
+
+		executor := CaminoStandardTxExecutor{
+			StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			},
+		}
+
+		return executor
+	}
+
+	for name, tt := range tests {
+		t.Run("ExportTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, false, api.Camino{LockModeBondDeposit: true, VerifyNodeSignature: true})
+			for _, utxo := range tt.utxos {
+				env.state.AddUTXO(utxo)
+			}
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownCaminoEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			exportTx := &txs.ExportTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         []*avax.TransferableOutput{},
+				}},
+				DestinationChain: env.ctx.XChainID,
+				ExportedOutputs:  tt.exportedOuts,
+			}
+
+			executor := generateExecutor(exportTx, env)
+
+			err := executor.ExportTx(exportTx)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
