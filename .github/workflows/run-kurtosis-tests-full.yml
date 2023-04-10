@@ -3,7 +3,7 @@ name: Kurtosis Tests Full
 on:
   push:
     tags:
-      - "*" # Push events to every tag
+      - "*"
     branches:
       - master
       - dev
