@@ -310,14 +310,8 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		}
 
 		proofOfLargestKey := changeproof.EndProof
-		if len(changeproof.KeyValues) > 0 {
-			largestHandledKey = changeproof.KeyValues[len(changeproof.KeyValues)-1].Key
-		}
-		if len(changeproof.DeletedKeys) > 0 {
-			lastDeletedKey := changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1]
-			if bytes.Compare(lastDeletedKey, largestHandledKey) == 1 || len(changeproof.KeyValues) == 0 {
-				largestHandledKey = lastDeletedKey
-			}
+		if len(changeproof.DeletedKeys) > 0 && (len(changeproof.KeyValues) == 0 ||
+			bytes.Compare(changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1], changeproof.KeyValues[len(changeproof.KeyValues)-1].Key) == 1) {
 			// since this is a deletion proof, the deleted key will no longer be present in the local db
 			// we can switch to a node with a prefix of the deleted key, which should still exist in the local db
 			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
@@ -337,6 +331,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			largestHandledKey = nextStartKey
 		}
 	}
+
 	m.completeWorkItem(workItem, largestHandledKey, rootID)
 }
 
@@ -401,26 +396,32 @@ func (m *StateSyncManager) findNextKey(
 		return nil, nil
 	}
 
-	receivedKey := receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value
+	receivedKeyPath := receivedProofNodes[len(receivedProofNodes)-1].KeyPath
 	// generate a proof for the same key as the passed in proof
-	localProof, err := m.config.SyncDB.GetProof(ctx, receivedKey)
+	localProof, err := m.config.SyncDB.GetProof(ctx, receivedKeyPath.Value)
 	if err != nil {
 		return nil, err
 	}
 	localProofNodes := localProof.Path
 
+	// If the received key had an odd length, then due to the restriction that proofs are for []byte rather than SerializedPath
+	// the last local proof node might be for the even length version of the key.
+	// If that is the case, then remove that last node.
+	if receivedKeyPath.NibbleLength%2 == 1 && !receivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
+		localProofNodes = localProofNodes[:len(localProofNodes)-1]
+	}
+
 	var result []byte
 	localIndex := len(localProofNodes) - 1
 	receivedIndex := len(receivedProofNodes) - 1
-	startKeyPath := merkledb.SerializedPath{Value: receivedKey, NibbleLength: 2 * len(receivedKey)}
 
 	// Just return the start key when the proof nodes contain keys that are not prefixes of the start key
 	// this occurs mostly in change proofs where the largest returned key was a deleted key.
-	// Since the key was deleted, it no longer shows up in the proof nodes
+	// Since the key was deleted, it no longer shows up in the proof nodes.
 	// for now, just fallback to using the start key, which is always correct.
 	// TODO: determine a more accurate nextKey in this scenario
-	if !startKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !startKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
-		return receivedKey, nil
+	if !receivedKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !receivedKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
+		return receivedKeyPath.Value, nil
 	}
 
 	// walk up the node paths until a difference is found
@@ -430,8 +431,8 @@ func (m *StateSyncManager) findNextKey(
 		// the two nodes have the same key
 		if localNode.KeyPath.Equal(receivedNode.KeyPath) {
 			startingChildIndex := byte(0)
-			if localNode.KeyPath.NibbleLength < startKeyPath.NibbleLength {
-				startingChildIndex = startKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
+			if localNode.KeyPath.NibbleLength < receivedKeyPath.NibbleLength {
+				startingChildIndex = receivedKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
 			}
 			// the two nodes have the same path, so ensure that all children have matching ids
 			for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
@@ -465,7 +466,7 @@ func (m *StateSyncManager) findNextKey(
 		}
 
 		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := startKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
+		for nextKeyNibble := receivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
 				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
 				break
