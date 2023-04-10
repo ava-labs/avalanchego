@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 
 	"github.com/ava-labs/avalanchego/utils/storage"
@@ -29,17 +30,27 @@ type CPUUser interface {
 	CPUUsage() float64
 }
 
+type MemoryUser interface {
+	// MemoryUsage returns the amount of bytes this user has allocated.
+	MemoryUsage() uint64
+
+	// AvailableMemoryBytes returns number of bytes available for the OS to
+	// allocate.
+	AvailableMemoryBytes() uint64
+}
+
 type DiskUser interface {
 	// DiskUsage returns the number of bytes per second read from/written to
 	// disk recently.
 	DiskUsage() (read float64, write float64)
 
-	// returns number of bytes available in the db volume
+	// AvailableDiskBytes returns number of bytes available in the db volume.
 	AvailableDiskBytes() uint64
 }
 
 type User interface {
 	CPUUser
+	MemoryUser
 	DiskUser
 }
 
@@ -65,14 +76,16 @@ type manager struct {
 	processesLock sync.Mutex
 	processes     map[int]*proc
 
-	usageLock sync.RWMutex
-	cpuUsage  float64
+	usageLock   sync.RWMutex
+	cpuUsage    float64
+	memoryUsage uint64
 	// [readUsage] is the number of bytes/second read from disk recently.
 	readUsage float64
 	// [writeUsage] is the number of bytes/second written to disk recently.
 	writeUsage float64
 
-	availableDiskBytes uint64
+	availableMemoryBytes uint64
+	availableDiskBytes   uint64
 
 	closeOnce sync.Once
 	onClose   chan struct{}
@@ -93,6 +106,20 @@ func (m *manager) CPUUsage() float64 {
 	defer m.usageLock.RUnlock()
 
 	return m.cpuUsage
+}
+
+func (m *manager) MemoryUsage() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.memoryUsage
+}
+
+func (m *manager) AvailableMemoryBytes() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableMemoryBytes
 }
 
 func (m *manager) DiskUsage() (float64, float64) {
@@ -143,22 +170,26 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 	frequencyInSeconds := frequency.Seconds()
 	for {
-		currentCPUUsage, currentReadUsage, currentWriteUsage := m.getActiveUsage(frequencyInSeconds)
+		currentCPUUsage, currentMemoryUsage, currentReadUsage, currentWriteUsage := m.getActiveUsage(frequencyInSeconds)
 		currentScaledCPUUsage := newCPUWeight * currentCPUUsage
 		currentScaledReadUsage := newDiskWeight * currentReadUsage
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
+		machineMemory, getMemoryErr := mem.VirtualMemory()
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
 
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
+		m.memoryUsage = currentMemoryUsage
 		m.readUsage = oldDiskWeight*m.readUsage + currentScaledReadUsage
 		m.writeUsage = oldDiskWeight*m.writeUsage + currentScaledWriteUsage
 
+		if getMemoryErr == nil {
+			m.availableMemoryBytes = machineMemory.Available
+		}
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
 		}
-
 		m.usageLock.Unlock()
 
 		select {
@@ -171,25 +202,28 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 // Returns:
 // 1. Current CPU usage by all processes.
-// 2. Current bytes/sec read from disk by all processes.
-// 3. Current bytes/sec written to disk by all processes.
-func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64, float64) {
+// 2. Current Memory usage by all processes.
+// 3. Current bytes/sec read from disk by all processes.
+// 4. Current bytes/sec written to disk by all processes.
+func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, float64, float64) {
 	m.processesLock.Lock()
 	defer m.processesLock.Unlock()
 
 	var (
-		totalCPU   float64
-		totalRead  float64
-		totalWrite float64
+		totalCPU    float64
+		totalMemory uint64
+		totalRead   float64
+		totalWrite  float64
 	)
 	for _, p := range m.processes {
-		cpu, read, write := p.getActiveUsage(secondsSinceLastUpdate)
+		cpu, memory, read, write := p.getActiveUsage(secondsSinceLastUpdate)
 		totalCPU += cpu
+		totalMemory += memory
 		totalRead += read
 		totalWrite += write
 	}
 
-	return totalCPU, totalRead, totalWrite
+	return totalCPU, totalMemory, totalRead, totalWrite
 }
 
 type proc struct {
@@ -207,17 +241,22 @@ type proc struct {
 	lastWriteBytes uint64
 }
 
-func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64, float64) {
+func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, float64, float64) {
 	// If there is an error tracking the CPU/disk utilization of a process,
 	// assume that the utilization is 0.
 	times, err := p.p.Times()
 	if err != nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	}
 
 	io, err := p.p.IOCounters()
 	if err != nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0
+	}
+
+	mem, err := p.p.MemoryInfo()
+	if err != nil {
+		return 0, 0, 0, 0
 	}
 
 	var (
@@ -246,7 +285,7 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 	p.lastReadBytes = io.ReadBytes
 	p.lastWriteBytes = io.WriteBytes
 
-	return cpu, read, write
+	return cpu, mem.RSS, read, write
 }
 
 // getSampleWeights converts the frequency of CPU sampling and the halflife of

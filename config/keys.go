@@ -192,6 +192,8 @@ const (
 	SystemTrackerProcessingHalflifeKey                 = "system-tracker-processing-halflife"
 	SystemTrackerCPUHalflifeKey                        = "system-tracker-cpu-halflife"
 	SystemTrackerDiskHalflifeKey                       = "system-tracker-disk-halflife"
+	SystemTrackerRequiredAvailableMemoryKey            = "system-tracker-memory-required-available"
+	SystemTrackerWarningThresholdAvailableMemoryKey    = "system-tracker-memory-warning-threshold-available"
 	SystemTrackerRequiredAvailableDiskSpaceKey         = "system-tracker-disk-required-available-space"
 	SystemTrackerWarningThresholdAvailableDiskSpaceKey = "system-tracker-disk-warning-threshold-available-space"
 	DiskVdrAllocKey                                    = "throttler-inbound-disk-validator-alloc"

@@ -356,6 +356,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(SystemTrackerProcessingHalflifeKey, 15*time.Second, "Halflife to use for the processing requests tracker. Larger halflife --> usage metrics change more slowly")
 	fs.Duration(SystemTrackerCPUHalflifeKey, 15*time.Second, "Halflife to use for the cpu tracker. Larger halflife --> cpu usage metrics change more slowly")
 	fs.Duration(SystemTrackerDiskHalflifeKey, time.Minute, "Halflife to use for the disk tracker. Larger halflife --> disk usage metrics change more slowly")
+	fs.Uint64(SystemTrackerRequiredAvailableMemoryKey, units.GiB/2, "Minimum amount of available memory, under which the node will shutdown.")
+	fs.Uint64(SystemTrackerWarningThresholdAvailableMemoryKey, units.GiB, fmt.Sprintf("Warning threshold for the amount of available memory, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableMemoryKey))
 	fs.Uint64(SystemTrackerRequiredAvailableDiskSpaceKey, units.GiB/2, "Minimum number of available bytes on disk, under which the node will shutdown.")
 	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, units.GiB, fmt.Sprintf("Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
 

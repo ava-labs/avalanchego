@@ -210,6 +210,9 @@ type Config struct {
 
 	DiskTargeterConfig tracker.TargeterConfig `json:"diskTargeterConfig"`
 
+	RequiredAvailableMemory         uint64 `json:"requiredAvailableMemory"`
+	WarningThresholdAvailableMemory uint64 `json:"warningThresholdAvailableMemory"`
+
 	RequiredAvailableDiskSpace         uint64 `json:"requiredAvailableDiskSpace"`
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
 

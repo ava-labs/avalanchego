@@ -1045,9 +1045,51 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
 
+	memorySpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+		// confirm that the node has enough memory to continue operating if
+		// there is too little memory remaining, first report unhealthy and then
+		// shutdown the node
+
+		usedMemoryBytes := n.resourceManager.MemoryUsage()
+		availableMemoryBytes := n.resourceManager.AvailableMemoryBytes()
+
+		var err error
+		if availableMemoryBytes < n.Config.RequiredAvailableMemory {
+			n.Log.Fatal("low on memory. Shutting down...",
+				zap.Uint64("usedMemory", usedMemoryBytes),
+				zap.Uint64("availableMemory", availableMemoryBytes),
+			)
+			go n.Shutdown(1)
+			err = fmt.Errorf(
+				"remaining available memory (%d) is below minimum required available memory (%d) when using (%d)",
+				availableMemoryBytes,
+				n.Config.RequiredAvailableMemory,
+				usedMemoryBytes,
+			)
+		} else if availableMemoryBytes < n.Config.WarningThresholdAvailableMemory {
+			err = fmt.Errorf(
+				"remaining available memory (%d) is below the warning threshold of available memory (%d) when using (%d)",
+				availableMemoryBytes,
+				n.Config.WarningThresholdAvailableDiskSpace,
+				usedMemoryBytes,
+			)
+		}
+
+		return map[string]interface{}{
+			"usedMemoryBytes":      usedMemoryBytes,
+			"availableMemoryBytes": availableMemoryBytes,
+		}, err
+	})
+
+	err = n.health.RegisterHealthCheck("memory", memorySpaceCheck)
+	if err != nil {
+		return fmt.Errorf("couldn't register memory resource health check: %w", err)
+	}
+
 	diskSpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// confirm that the node has enough disk space to continue operating
-		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
+		// if there is too little disk space remaining, first report unhealthy
+		// and then shutdown the node
 
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
 
@@ -1057,9 +1099,17 @@ func (n *Node) initHealthAPI() error {
 				zap.Uint64("remainingDiskBytes", availableDiskBytes),
 			)
 			go n.Shutdown(1)
-			err = fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+			err = fmt.Errorf(
+				"remaining available disk space (%d) is below minimum required available space (%d)",
+				availableDiskBytes,
+				n.Config.RequiredAvailableDiskSpace,
+			)
 		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
-			err = fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+			err = fmt.Errorf(
+				"remaining available disk space (%d) is below the warning threshold of disk space (%d)",
+				availableDiskBytes,
+				n.Config.WarningThresholdAvailableDiskSpace,
+			)
 		}
 
 		return map[string]interface{}{
@@ -1069,7 +1119,7 @@ func (n *Node) initHealthAPI() error {
 
 	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck)
 	if err != nil {
-		return fmt.Errorf("couldn't register resource health check: %w", err)
+		return fmt.Errorf("couldn't register disk resource health check: %w", err)
 	}
 
 	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
