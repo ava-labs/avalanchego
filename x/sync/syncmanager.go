@@ -266,7 +266,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	if workItem.LocalRootID == rootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(workItem, workItem.end, rootID)
+		m.completeWorkItem(ctx, workItem, rootID, nil)
 		return
 	}
 
@@ -301,38 +301,24 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	largestHandledKey := workItem.end
+	var proofOfLargestKey []merkledb.ProofNode
+
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
 		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
 			m.setError(err)
 			return
 		}
-
-		proofOfLargestKey := changeproof.EndProof
+		proofOfLargestKey = changeproof.EndProof
 		if len(changeproof.DeletedKeys) > 0 && (len(changeproof.KeyValues) == 0 ||
 			bytes.Compare(changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1], changeproof.KeyValues[len(changeproof.KeyValues)-1].Key) == 1) {
 			// since this is a deletion proof, the deleted key will no longer be present in the local db
 			// we can switch to a node with a prefix of the deleted key, which should still exist in the local db
 			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
 		}
-
-		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestKey)
-		if err != nil {
-			m.setError(err)
-			return
-		}
-
-		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey != nil {
-			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
-			largestHandledKey = nextStartKey
-		}
 	}
 
-	m.completeWorkItem(workItem, largestHandledKey, rootID)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -359,30 +345,18 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	largestHandledKey := workItem.end
+	//var proofOfLargestKey []merkledb.ProofNode
+	proofOfLargestKey := proof.EndProof
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
-
-		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, workItem.end, proof.EndProof)
-		if err != nil {
-			m.setError(err)
-			return
-		}
-
-		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey != nil {
-			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
-			largestHandledKey = nextStartKey
-		}
+		proofOfLargestKey = proof.EndProof
 	}
 
-	m.completeWorkItem(workItem, largestHandledKey, rootID)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
 }
 
 // Attempt to find what key to query next based on the differences between
@@ -577,7 +551,23 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(workItem *syncWorkItem, largestHandledKey []byte, rootID ids.ID) {
+func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestSentKey []merkledb.ProofNode) {
+	largestHandledKey := workItem.end
+
+	// find the next key to start querying by comparing the proofs for the last completed key
+	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestSentKey)
+	if err != nil {
+		m.setError(err)
+		return
+	}
+
+	// nextStartKey being nil indicates that the entire range has been completed
+	if nextStartKey != nil {
+		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
+		m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
+		largestHandledKey = nextStartKey
+	}
+
 	// completed the range [workItem.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
 		zap.Binary("start", workItem.start),
