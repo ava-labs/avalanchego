@@ -19,7 +19,7 @@ func (noUsage) MemoryUsage() uint64 {
 }
 
 func (noUsage) AvailableMemoryBytes() uint64 {
-	return 0
+	return math.MaxUint64
 }
 
 func (noUsage) DiskUsage() (float64, float64) {

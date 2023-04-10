@@ -1203,26 +1203,40 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
+// getMemoryConfig returns:
+// - requiredAvailableMemory under which the node will shutdown
+// - warningThresholdAvailableMemory under which the node report unhealthy
 func getMemoryConfig(v *viper.Viper) (uint64, uint64, error) {
 	requiredAvailableMemory := v.GetUint64(SystemTrackerRequiredAvailableMemoryKey)
 	warningThresholdAvailableMemory := v.GetUint64(SystemTrackerWarningThresholdAvailableMemoryKey)
-	switch {
-	case warningThresholdAvailableMemory < requiredAvailableMemory:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableMemoryKey, warningThresholdAvailableMemory, SystemTrackerRequiredAvailableMemoryKey, requiredAvailableMemory)
-	default:
-		return requiredAvailableMemory, warningThresholdAvailableMemory, nil
+	if warningThresholdAvailableMemory < requiredAvailableMemory {
+		return 0, 0, fmt.Errorf(
+			"%q (%d) < %q (%d)",
+			SystemTrackerWarningThresholdAvailableMemoryKey,
+			warningThresholdAvailableMemory,
+			SystemTrackerRequiredAvailableMemoryKey,
+			requiredAvailableMemory,
+		)
 	}
+	return requiredAvailableMemory, warningThresholdAvailableMemory, nil
 }
 
+// getDiskSpaceConfig returns:
+// - requiredAvailableDiskSpace under which the node will shutdown
+// - warningThresholdAvailableDiskSpace under which the node report unhealthy
 func getDiskSpaceConfig(v *viper.Viper) (uint64, uint64, error) {
 	requiredAvailableDiskSpace := v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
 	warningThresholdAvailableDiskSpace := v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
-	switch {
-	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
-	default:
-		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, nil
+	if warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace {
+		return 0, 0, fmt.Errorf(
+			"%q (%d) < %q (%d)",
+			SystemTrackerWarningThresholdAvailableDiskSpaceKey,
+			warningThresholdAvailableDiskSpace,
+			SystemTrackerRequiredAvailableDiskSpaceKey,
+			requiredAvailableDiskSpace,
+		)
 	}
+	return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, nil
 }
 
 func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {

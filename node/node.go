@@ -1046,9 +1046,9 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	memorySpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		// confirm that the node has enough memory to continue operating if
+		// Confirm that the node has enough memory to continue operating. If
 		// there is too little memory remaining, first report unhealthy and then
-		// shutdown the node
+		// shutdown the node.
 
 		usedMemoryBytes := n.resourceManager.MemoryUsage()
 		availableMemoryBytes := n.resourceManager.AvailableMemoryBytes()
@@ -1087,9 +1087,9 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	diskSpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-		// confirm that the node has enough disk space to continue operating
-		// if there is too little disk space remaining, first report unhealthy
-		// and then shutdown the node
+		// Confirm that the node has enough disk space to continue operating.
+		// If there is too little disk space remaining, first report unhealthy
+		// and then shutdown the node.
 
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
 
