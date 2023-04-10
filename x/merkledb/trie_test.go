@@ -575,9 +575,12 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	atomicTrue := utils.Atomic[bool]{}
 	atomicTrue.Set(true)
 
+	parentTrie := utils.Atomic[TrieView]{}
+	parentTrie.Set(view1)
+
 	// Case: Committing a view which is invalid
 	err = view1.commitChanges(context.Background(), &trieView{
-		parentTrie:  newAtomic[TrieView](view1),
+		parentTrie:  parentTrie,
 		invalidated: atomicTrue,
 	})
 	require.ErrorIs(err, ErrInvalid)
