@@ -164,13 +164,10 @@ func newTrieView(
 	if root == nil {
 		return nil, ErrNoValidRoot
 	}
-
-	pTrie := utils.Atomic[TrieView]{}
-	pTrie.Set(parentTrie)
 	return &trieView{
 		root:                  root,
 		db:                    db,
-		parentTrie:            pTrie,
+		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
@@ -192,12 +189,11 @@ func newTrieViewWithChanges(
 	if !ok {
 		return nil, ErrNoValidRoot
 	}
-	pTrie := utils.Atomic[TrieView]{}
-	pTrie.Set(parentTrie)
+
 	return &trieView{
 		root:                  passedRootChange.after,
 		db:                    db,
-		parentTrie:            pTrie,
+		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
