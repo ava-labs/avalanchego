@@ -213,7 +213,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 		// the two dbs should be in sync, so next key should be nil
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
-		nextKey, err := syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), lastKey, proof.EndProof)
 		require.NoError(t, err)
 		require.Nil(t, nextKey)
 
@@ -246,7 +246,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			// both nibbles were 0, so move onto the next byte
 		}
 
-		nextKey, err = syncer.findNextKey(context.Background(), lastKey, endPointBeforeNewKey, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), endPointBeforeNewKey, proof.EndProof)
 		require.NoError(t, err)
 
 		// next key would be after the end of the range, so it returns nil instead
@@ -298,7 +298,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(t, err)
 
 		// next key at prefix of newly added point
-		nextKey, err := syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), nil, proof.EndProof)
 		require.NoError(t, err)
 		require.NotNil(t, nextKey)
 
@@ -314,7 +314,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(t, err)
 
 		// next key at prefix of newly added point
-		nextKey, err = syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), nil, proof.EndProof)
 		require.NoError(t, err)
 		require.NotNil(t, nextKey)
 
@@ -383,7 +383,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
 		require.NoError(t, err)
 
-		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), nil, proof.EndProof)
 		require.NoError(t, err)
 		require.Equal(t, nextKey, lastKey)
 	}
