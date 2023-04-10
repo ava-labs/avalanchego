@@ -192,13 +192,15 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 		machineMemory, getMemoryErr := mem.VirtualMemory()
 		if getMemoryErr != nil {
-			m.log.Warn("failed to lookup resource usage",
+			m.log.Debug("failed to lookup resource",
+				zap.String("resource", "system memory"),
 				zap.Error(getMemoryErr),
 			)
 		}
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
 		if getBytesErr != nil {
-			m.log.Warn("failed to get available storage",
+			m.log.Debug("failed to lookup resource",
+				zap.String("resource", "system disk"),
 				zap.Error(getBytesErr),
 			)
 		}
@@ -272,7 +274,8 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 	// assume that the utilization is 0.
 	times, err := p.p.Times()
 	if err != nil {
-		p.log.Warn("failed to get CPU usage",
+		p.log.Debug("failed to lookup resource",
+			zap.String("resource", "process CPU"),
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
@@ -281,7 +284,8 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 
 	io, err := p.p.IOCounters()
 	if err != nil {
-		p.log.Warn("failed to get IO usage",
+		p.log.Debug("failed to lookup resource",
+			zap.String("resource", "process IO"),
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
@@ -290,7 +294,8 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 
 	mem, err := p.p.MemoryInfo()
 	if err != nil {
-		p.log.Warn("failed to get memory usage",
+		p.log.Debug("failed to lookup resource",
+			zap.String("resource", "process memory"),
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
