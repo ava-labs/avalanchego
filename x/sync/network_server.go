@@ -6,7 +6,6 @@ package sync
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"time"
 
@@ -203,27 +202,30 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		// shrink more if the early keys are extremely large
 		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
 			// determine if the deleted key or changed key is the next smallest key
-			currentBytes := 0
+			keyBytesCount := 0
 
 			// if there is a deleted key at deleteKeyIndex and
 			// (there are no more change keys or the changed key is larger than the deleted key)
 			if deleteKeyIndex < len(changeProof.DeletedKeys) &&
 				(changeKeyIndex >= len(changeProof.KeyValues) ||
 					bytes.Compare(changeProof.KeyValues[changeKeyIndex].Key, changeProof.DeletedKeys[deleteKeyIndex]) > 0) {
-				currentBytes = len(changeProof.DeletedKeys[deleteKeyIndex]) + binary.MaxVarintLen64
+				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.DeletedKeys[deleteKeyIndex])
+				if err != nil {
+					return err
+				}
 				deleteKeyIndex++
 			} else if changeKeyIndex < len(changeProof.KeyValues) {
-				currentBytes = len(changeProof.KeyValues[changeKeyIndex].Key) + len(changeProof.KeyValues[changeKeyIndex].Value) + 2*binary.MaxVarintLen64
+				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) + merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Value)
 				changeKeyIndex++
 			}
 
-			if bytesEstimate+currentBytes > bytesLimit {
+			if bytesEstimate+keyBytesCount > bytesLimit {
 				// adding the current KV would put the size over the limit
 				// so only return up to the keyIndex number of keys
 				keyLimit = keyIndex
 				break
 			}
-			bytesEstimate += currentBytes
+			bytesEstimate += keyBytesCount
 		}
 	}
 	// errors are fatal, so log for the moment
@@ -314,7 +316,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		// shrink more if the early keys are extremely large
 		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
 			nextKV := rangeProof.KeyValues[keyIndex]
-			kvEstBytes := len(nextKV.Key) + len(nextKV.Value) + 2*binary.MaxVarintLen64
+			kvEstBytes := merkledb.Codec.ByteSliceSize(nextKV.Key) + merkledb.Codec.ByteSliceSize(nextKV.Value)
 
 			if bytesEstimate+kvEstBytes > bytesLimit {
 				// adding the current KV would put the size over the limit
@@ -340,7 +342,7 @@ func getBytesEstimateOfProofNodes(proofNodes []merkledb.ProofNode) int {
 	total := 0
 	for _, proofNode := range proofNodes {
 		// size of a node is the bytes in the key, the value, and the children hashes (plus 1 byte for each children map index)
-		total += binary.MaxVarintLen64 + len(proofNode.KeyPath.Value) + len(proofNode.ValueOrHash.Value()) + len(proofNode.Children)*(len(ids.Empty)+1)
+		total += merkledb.Codec.ByteSliceSize(proofNode.KeyPath.Value) + merkledb.Codec.ByteSliceSize(proofNode.ValueOrHash.Value()) + len(proofNode.Children)*(len(ids.Empty)+1)
 	}
 	return total
 }

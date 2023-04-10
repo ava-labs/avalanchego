@@ -71,6 +71,7 @@ type EncoderDecoder interface {
 
 // TODO actually encode the version and remove version from the interface
 type Encoder interface {
+	ByteSliceSize(value []byte) int
 	EncodeProof(version uint16, p *Proof) ([]byte, error)
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
@@ -617,6 +618,13 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+func (c *codecImpl) ByteSliceSize(value []byte) int {
+	buf := c.varIntPool.Get().([]byte)
+	size := binary.PutVarint(buf, int64(len(value)))
+	c.varIntPool.Put(buf)
+	return size + len(value)
 }
 
 func (c *codecImpl) encodeByteSlice(dst io.Writer, value []byte) error {
