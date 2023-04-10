@@ -133,7 +133,6 @@ func Test_Server_GetRangeProof(t *testing.T) {
 }
 
 func Test_Server_GetChangeProof(t *testing.T) {
-
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 	trieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
 	require.NoError(t, err)
