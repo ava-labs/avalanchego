@@ -109,6 +109,12 @@ type trieView struct {
 	estimatedSize int
 }
 
+func newAtomic[T any](v T) utils.Atomic[T] {
+	val := utils.Atomic[T]{}
+	val.Set(v)
+	return val
+}
+
 // NewView returns a new view on top of this one.
 // Adds the new view to [t.childViews].
 // Assumes [t.lock] is not held.
@@ -167,7 +173,7 @@ func newTrieView(
 	return &trieView{
 		root:                  root,
 		db:                    db,
-		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
+		parentTrie:            newAtomic[TrieView](parentTrie),
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
@@ -193,7 +199,7 @@ func newTrieViewWithChanges(
 	return &trieView{
 		root:                  passedRootChange.after,
 		db:                    db,
-		parentTrie:            utils.NewAtomic[TrieView](parentTrie),
+		parentTrie:            newAtomic[TrieView](parentTrie),
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),

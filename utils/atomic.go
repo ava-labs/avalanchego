@@ -12,10 +12,6 @@ type Atomic[T any] struct {
 	value T
 }
 
-func NewAtomic[T any](v T) Atomic[T] {
-	return Atomic[T]{value: v}
-}
-
 func (a *Atomic[T]) Get() T {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
