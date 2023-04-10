@@ -215,7 +215,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				}
 				deleteKeyIndex++
 			} else if changeKeyIndex < len(changeProof.KeyValues) {
-				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) + merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Value)
+				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) +
+					merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Value)
 				changeKeyIndex++
 			}
 
@@ -341,8 +342,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 func getBytesEstimateOfProofNodes(proofNodes []merkledb.ProofNode) int {
 	total := 0
 	for _, proofNode := range proofNodes {
-		// size of a node is the bytes in the key, the value, and the children hashes (plus 1 byte for each children map index)
-		total += merkledb.Codec.ByteSliceSize(proofNode.KeyPath.Value) + merkledb.Codec.ByteSliceSize(proofNode.ValueOrHash.Value()) + len(proofNode.Children)*(len(ids.Empty)+1)
+		total += merkledb.Codec.ProofNodeSize(proofNode)
 	}
 	return total
 }

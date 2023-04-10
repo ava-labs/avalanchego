@@ -72,6 +72,7 @@ type EncoderDecoder interface {
 // TODO actually encode the version and remove version from the interface
 type Encoder interface {
 	ByteSliceSize(value []byte) int
+	ProofNodeSize(value ProofNode) int
 	EncodeProof(version uint16, p *Proof) ([]byte, error)
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
@@ -625,6 +626,19 @@ func (c *codecImpl) ByteSliceSize(value []byte) int {
 	size := binary.PutVarint(buf, int64(len(value)))
 	c.varIntPool.Put(buf)
 	return size + len(value)
+}
+
+func (c *codecImpl) ProofNodeSize(proofNode ProofNode) int {
+	sizeOfKeyPath := c.ByteSliceSize(proofNode.KeyPath.Value)
+	sizeOfMaybeValue := c.ByteSliceSize(proofNode.ValueOrHash.Value()) + 1
+
+	buf := c.varIntPool.Get().([]byte)
+	sizeOfChildrenCount := binary.PutVarint(buf, int64(len(proofNode.Children)))
+	c.varIntPool.Put(buf)
+
+	sizeOfChildren := sizeOfChildrenCount + len(proofNode.Children)*(len(ids.Empty)+1)
+
+	return sizeOfKeyPath + sizeOfMaybeValue + sizeOfChildren
 }
 
 func (c *codecImpl) encodeByteSlice(dst io.Writer, value []byte) error {

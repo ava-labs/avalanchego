@@ -572,6 +572,21 @@ func FuzzCodecImpl_ByteSliceSize_Matches_EncodeByteSlice(f *testing.F) {
 	)
 }
 
+func TestCodecImpl_ProofNodeSize_Matches_EncodeProofNode(t *testing.T) {
+	require := require.New(t)
+	codec := Codec.(*codecImpl)
+	for i := 0; i < 100; i++ {
+		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+
+		proofNode := newRandomProofNode(r)
+
+		buf := &bytes.Buffer{}
+		err := codec.encodeProofNode(proofNode, buf)
+		require.NoError(err)
+		require.Equal(buf.Len(), codec.ProofNodeSize(proofNode))
+	}
+}
+
 func TestCodecImpl_ByteSliceSize_Matches_EncodeByteSlice(t *testing.T) {
 	require := require.New(t)
 	codec := Codec.(*codecImpl)
