@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 
@@ -191,7 +192,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 		machineMemory, getMemoryErr := mem.VirtualMemory()
 		if getMemoryErr != nil {
-			m.log.Warn("failed to get available system memory",
+			m.log.Warn("failed to lookup resource usage",
 				zap.Error(getMemoryErr),
 			)
 		}
@@ -275,7 +276,7 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
-		return 0, 0, 0, 0
+		times = &cpu.TimesStat{}
 	}
 
 	io, err := p.p.IOCounters()
@@ -284,7 +285,7 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
-		return 0, 0, 0, 0
+		io = &process.IOCountersStat{}
 	}
 
 	mem, err := p.p.MemoryInfo()
@@ -293,7 +294,7 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 			zap.Int32("pid", p.p.Pid),
 			zap.Error(err),
 		)
-		return 0, 0, 0, 0
+		mem = &process.MemoryInfoStat{}
 	}
 
 	var (
