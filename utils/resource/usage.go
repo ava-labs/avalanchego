@@ -8,9 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
@@ -73,6 +76,7 @@ type Manager interface {
 }
 
 type manager struct {
+	log           logging.Logger
 	processesLock sync.Mutex
 	processes     map[int]*proc
 
@@ -91,8 +95,15 @@ type manager struct {
 	onClose   chan struct{}
 }
 
-func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) Manager {
+func NewManager(
+	log logging.Logger,
+	diskPath string,
+	frequency time.Duration,
+	cpuHalflife time.Duration,
+	diskHalflife time.Duration,
+) Manager {
 	m := &manager{
+		log:                log,
 		processes:          make(map[int]*proc),
 		onClose:            make(chan struct{}),
 		availableDiskBytes: math.MaxUint64,
@@ -142,7 +153,10 @@ func (m *manager) TrackProcess(pid int) {
 		return
 	}
 
-	process := &proc{p: p}
+	process := &proc{
+		log: m.log,
+		p:   p,
+	}
 
 	m.processesLock.Lock()
 	m.processes[pid] = process
@@ -176,7 +190,17 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
 		machineMemory, getMemoryErr := mem.VirtualMemory()
+		if getMemoryErr != nil {
+			m.log.Warn("failed to get available system memory",
+				zap.Error(getMemoryErr),
+			)
+		}
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+		if getBytesErr != nil {
+			m.log.Warn("failed to get available storage",
+				zap.Error(getBytesErr),
+			)
+		}
 
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
@@ -227,7 +251,8 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint6
 }
 
 type proc struct {
-	p *process.Process
+	log logging.Logger
+	p   *process.Process
 
 	initialized bool
 
@@ -246,16 +271,28 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, uint64, 
 	// assume that the utilization is 0.
 	times, err := p.p.Times()
 	if err != nil {
+		p.log.Warn("failed to get CPU usage",
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
 		return 0, 0, 0, 0
 	}
 
 	io, err := p.p.IOCounters()
 	if err != nil {
+		p.log.Warn("failed to get IO usage",
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
 		return 0, 0, 0, 0
 	}
 
 	mem, err := p.p.MemoryInfo()
 	if err != nil {
+		p.log.Warn("failed to get memory usage",
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
 		return 0, 0, 0, 0
 	}
 
