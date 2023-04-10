@@ -116,8 +116,6 @@ func TestServiceResponses(t *testing.T) {
 }
 
 func TestServiceTagResponse(t *testing.T) {
-	require := require.New(t)
-
 	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
@@ -168,6 +166,8 @@ func TestServiceTagResponse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
 			h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 			require.NoError(err)
 			err = test.register(h, "check1", check)
