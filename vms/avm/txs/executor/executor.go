@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -65,6 +65,9 @@ func (e *Executor) OperationTx(tx *txs.OperationTx) error {
 	txID := e.Tx.ID()
 	index := len(tx.Outs)
 	for _, op := range tx.Ops {
+		for _, utxoID := range op.UTXOIDs {
+			e.State.DeleteUTXO(utxoID.InputID())
+		}
 		asset := op.AssetID()
 		for _, out := range op.Op.Outs() {
 			e.State.AddUTXO(&avax.UTXO{

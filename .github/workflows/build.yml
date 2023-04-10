@@ -4,6 +4,12 @@ name: Build on supported platforms
 
 on:
   push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
 
 permissions:
   contents: write
@@ -19,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: '1.19'
+          go-version: '~1.19.6'
           check-latest: true
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2

@@ -2,13 +2,9 @@
 
 ## TODOs
 
-- [ ] Improve invariants around trieview commitment. Either:
-  - [ ] Consider allowing a child view to commit into a parent view without committing to the base DB.
-- [ ] Allow concurrent reads into the trieview.
 - [ ] Remove special casing around the root node from the physical structure of the hashed tree.
 - [ ] Analyze performance impact of needing to skip intermediate nodes when generating range and change proofs
   - [ ] Consider moving nodes with values to a separate db prefix
-- [ ] Replace naive concurrent hashing with a more optimized implementation
 - [ ] Analyze performance of using database snapshots rather than in-memory history
 - [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
 
@@ -39,6 +35,11 @@ To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compress
 
 ## Design choices
 
+### []byte copying
+Nodes contain a []byte which represents its value.  This slice should never be edited internally.  This allows usage without having to make copies of it for safety.
+Anytime these values leave the library, for example in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc, they need to be copied into a new slice to prevent
+edits made outside of the library from being reflected in the DB/TrieViews.
+
 ### Single node type
 
 A `Merkle Node` holds the IDs of its children, its value, as well as any path extension. This simplifies some logic and allows all of the data about a node to be loaded in a single database read. This trades off a small amount of storage efficiency (some fields may be `nil` but are still stored for every node).
@@ -49,23 +50,22 @@ A `trieView` is built atop another trie, and that trie could change at any point
 
 ### Locking
 
+`Database` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
+`Database` has a `Mutex` named `commitLock`.  It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read->write.
+
 A `trieView` is built atop another trie, which may be the underlying `Database` or another `trieView`.
 It's important to guarantee atomicity/consistency of trie operations.
 That is, if a view method is executing, the views/database underneath the view shouldn't be changing.
 To prevent this, we need to use locking.
 
-`trieView` has a `Mutex` named `lock` that's held when most of its methods are executing.
-It also has a `Mutex` named `invalidationLock` that is held during methods that change the view's validity or tracking of child views' validity.
-Trie methods also grab the write `lock` for all views that its built atop, and a read lock for the underlying `Database`.
-The exception is `Commit`, which grabs a write lock for the `Database`.
-This is the only `trieView` method that modifies the underlying `Database`.
-Locking the view stack ensures that while the method is executing, the underlying `Database` doesn't change, and no view below it is committed.
+`trieView` has a `RWMutex` named `lock` that's held when methods that access the trie's structure are executing.  It is responsible for ensuring that writing/reading from a `trieView` or from any *ancestor* is safe.
+It also has a `RWMutex` named `validityTrackingLock` that is held during methods that change the view's validity, tracking of child views' validity, or of the `trieView` parent trie.  This lock ensures that writing/reading from `trieView` or any of its *descendants* is safe.
+The `Commit` function also grabs the `Database`'s `commitLock` lock. This is the only `trieView` method that modifies the underlying `Database`.  If an ancestor is modified during this time, the commit will error with ErrInvalid.
 
-To prevent deadlocks, `trieView` and `Database` never lock a view that is built atop itself.
-That is, locking is always done from a view down to the underlying `Database`, never the other way around.
 In some of `Database`'s methods, we create a `trieView` and call unexported methods on it without locking it.
 We do so because the exported counterpart of the method read locks the `Database`, which is already locked.
-This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.  Additionally, any function that takes the `invalidationLock` should avoid taking the `trieView.lock` as this will likely trigger a deadlock as well.
+This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.  
 
-`Database` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
-`trieView`'s `Commit` method explicitly grabs this lock.
+To prevent deadlocks, `trieView` and `Database` never acquire the `lock` of any descendant views that are built atop it.
+That is, locking is always done from a view down to the underlying `Database`, never the other way around.
+The `validityTrackingLock` goes the opposite way.  Views can validityTrackingLock their children, but not their ancestors. Because of this, any function that takes the `validityTrackingLock` should avoid taking the `lock` as this will likely trigger a deadlock.  Keeping `lock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.  

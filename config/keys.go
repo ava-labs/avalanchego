@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -54,6 +54,10 @@ const (
 	HTTPAllowedOrigins                                 = "http-allowed-origins"
 	HTTPShutdownTimeoutKey                             = "http-shutdown-timeout"
 	HTTPShutdownWaitKey                                = "http-shutdown-wait"
+	HTTPReadTimeoutKey                                 = "http-read-timeout"
+	HTTPReadHeaderTimeoutKey                           = "http-read-header-timeout"
+	HTTPWriteTimeoutKey                                = "http-write-timeout"
+	HTTPIdleTimeoutKey                                 = "http-idle-timeout"
 	APIAuthRequiredKey                                 = "api-auth-required"
 	APIAuthPasswordKey                                 = "api-auth-password"
 	APIAuthPasswordFileKey                             = "api-auth-password-file"
@@ -94,7 +98,8 @@ const (
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
 	NetworkPingFrequencyKey                            = "network-ping-frequency"
 	NetworkMaxReconnectDelayKey                        = "network-max-reconnect-delay"
-	NetworkCompressionEnabledKey                       = "network-compression-enabled"
+	NetworkCompressionEnabledKey                       = "network-compression-enabled" // TODO this is deprecated. Eventually remove it and constants.DefaultNetworkCompressionEnabled
+	NetworkCompressionTypeKey                          = "network-compression-type"
 	NetworkMaxClockDifferenceKey                       = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                          = "network-allow-private-ips"
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -19,8 +19,8 @@ type ifConfigResolver struct {
 	url string
 }
 
-func (r *ifConfigResolver) Resolve() (net.IP, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", r.url, nil)
+func (r *ifConfigResolver) Resolve(ctx context.Context) (net.IP, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", r.url, nil)
 	if err != nil {
 		return nil, err
 	}

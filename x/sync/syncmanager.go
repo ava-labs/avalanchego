@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -155,7 +155,7 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.enqueueWork(newWorkItem(ids.Empty, nil, nil, lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, nil, lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -285,9 +285,6 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	m.workLock.Lock()
-	defer m.workLock.Unlock()
-
 	select {
 	case <-m.syncDoneChan:
 		// If we're closed, don't apply the proof.
@@ -342,11 +339,6 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 		m.setError(err)
 		return
 	}
-
-	// TODO danlaine: Do we need this or can we
-	// grab just before touching [m.unprocessedWork]?
-	m.workLock.Lock()
-	defer m.workLock.Unlock()
 
 	select {
 	case <-m.syncDoneChan:
@@ -549,7 +541,7 @@ func (m *StateSyncManager) setError(err error) {
 }
 
 // Mark the range [start, end] as synced up to [rootID].
-// Assumes [m.workLock] is held.
+// Assumes [m.workLock] is not held.
 func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
 	if !bytes.Equal(largestHandledKey, workItem.end) {
@@ -576,6 +568,9 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 		zap.Binary("end", largestHandledKey),
 	)
 	if m.getTargetRoot() == rootID {
+		m.workLock.Lock()
+		defer m.workLock.Unlock()
+
 		m.processedWork.MergeInsert(newWorkItem(rootID, workItem.start, largestHandledKey, workItem.priority))
 	} else {
 		// the root has changed, so reinsert with high priority
@@ -586,9 +581,13 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 // Queue the given key range to be fetched and applied.
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
-// Assumes [m.workLock] is held.
+// Assumes [m.workLock] is not held.
 func (m *StateSyncManager) enqueueWork(item *syncWorkItem) {
-	defer m.unprocessedWorkCond.Signal()
+	m.workLock.Lock()
+	defer func() {
+		m.workLock.Unlock()
+		m.unprocessedWorkCond.Signal()
+	}()
 
 	if m.processingWorkItems+m.unprocessedWork.Len() > 2*m.config.SimultaneousWorkLimit {
 		// There are too many work items already, don't split the range

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -76,6 +76,18 @@ const (
 )
 
 var (
+	// Commonly shared VM DB prefix
+	vmDBPrefix = []byte("vm")
+
+	// Bootstrapping prefixes for LinearizableVMs
+	vertexDBPrefix              = []byte("vertex")
+	vertexBootstrappingDBPrefix = []byte("vertex_bs")
+	txBootstrappingDBPrefix     = []byte("tx_bs")
+	blockBootstrappingDBPrefix  = []byte("block_bs")
+
+	// Bootstrapping prefixes for ChainVMs
+	bootstrappingDB = []byte("bs")
+
 	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped        = errors.New("subnets not bootstrapped")
@@ -164,8 +176,9 @@ type ManagerConfig struct {
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
-	DecisionAcceptorGroup       snow.AcceptorGroup
-	ConsensusAcceptorGroup      snow.AcceptorGroup
+	BlockAcceptorGroup          snow.AcceptorGroup
+	TxAcceptorGroup             snow.AcceptorGroup
+	VertexAcceptorGroup         snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
@@ -466,8 +479,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		DecisionAcceptor:    m.DecisionAcceptorGroup,
-		ConsensusAcceptor:   m.ConsensusAcceptorGroup,
+		BlockAcceptor:       m.BlockAcceptorGroup,
+		TxAcceptor:          m.TxAcceptorGroup,
+		VertexAcceptor:      m.VertexAcceptorGroup,
 		Registerer:          consensusMetrics,
 		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
@@ -525,7 +539,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 	var chain *chain
 	switch vm := vm.(type) {
-	case vertex.DAGVM:
+	case vertex.LinearizableVMWithEngine:
 		chain, err = m.createAvalancheChain(
 			ctx,
 			chainParams.GenesisData,
@@ -575,7 +589,7 @@ func (m *manager) createAvalancheChain(
 	genesisData []byte,
 	vdrs,
 	beacons validators.Set,
-	vm vertex.DAGVM,
+	vm vertex.LinearizableVMWithEngine,
 	fxs []*common.Fx,
 	bootstrapWeight uint64,
 	sb subnets.Subnet,
@@ -583,17 +597,23 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
+	ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+		State: snow.Initializing,
+	})
+
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
 	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
+	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
 
 	db := prefixDBManager.Current()
-	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
+	vertexDB := prefixdb.New(vertexDBPrefix, db.Database)
+	vertexBootstrappingDB := prefixdb.New(vertexBootstrappingDBPrefix, db.Database)
+	txBootstrappingDB := prefixdb.New(txBootstrappingDBPrefix, db.Database)
+	blockBootstrappingDB := prefixdb.New(blockBootstrappingDBPrefix, db.Database)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, "vtx", ctx.AvalancheRegisterer)
 	if err != nil {
@@ -603,13 +623,17 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, err
 	}
+	blockBlocker, err := queue.NewWithMissing(blockBootstrappingDB, "block", ctx.Registerer)
+	if err != nil {
+		return nil, err
+	}
 
 	// The channel through which a VM may send messages to the consensus engine
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	// Passes messages from the consensus engine to the network
-	messageSender, err := sender.New(
+	// Passes messages from the avalanche engines to the network
+	avalancheMessageSender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
@@ -619,14 +643,48 @@ func (m *manager) createAvalancheChain(
 		sb,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
 	}
 
 	if m.TracingEnabled {
-		messageSender = sender.Trace(messageSender, m.Tracer)
+		avalancheMessageSender = sender.Trace(avalancheMessageSender, m.Tracer)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
+	err = m.VertexAcceptorGroup.RegisterAcceptor(
+		ctx.ChainID,
+		"gossip",
+		avalancheMessageSender,
+		false,
+	)
+	if err != nil { // Set up the event dispatcher
+		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
+	}
+
+	// Passes messages from the snowman engines to the network
+	snowmanMessageSender, err := sender.New(
+		ctx,
+		m.MsgCreator,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		sb,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize avalanche sender: %w", err)
+	}
+
+	if m.TracingEnabled {
+		snowmanMessageSender = sender.Trace(snowmanMessageSender, m.Tracer)
+	}
+
+	err = m.BlockAcceptorGroup.RegisterAcceptor(
+		ctx.ChainID,
+		"gossip",
+		snowmanMessageSender,
+		false,
+	)
+	if err != nil { // Set up the event dispatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -646,14 +704,34 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := state.NewSerializer(
 		state.SerializerConfig{
-			ChainID:             ctx.ChainID,
-			VM:                  vm,
-			DB:                  vertexDB,
-			Log:                 ctx.Log,
-			XChainMigrationTime: version.GetXChainMigrationTime(ctx.NetworkID),
+			ChainID:     ctx.ChainID,
+			VM:          vm,
+			DB:          vertexDB,
+			Log:         ctx.Log,
+			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
 		},
 	)
 
+	avalancheRegisterer := metrics.NewOptionalGatherer()
+	snowmanRegisterer := metrics.NewOptionalGatherer()
+
+	registerer := metrics.NewMultiGatherer()
+	if err := registerer.Register("avalanche", avalancheRegisterer); err != nil {
+		return nil, err
+	}
+	if err := registerer.Register("", snowmanRegisterer); err != nil {
+		return nil, err
+	}
+	if err := ctx.Context.Metrics.Register(registerer); err != nil {
+		return nil, err
+	}
+
+	ctx.Context.Metrics = avalancheRegisterer
+
+	// The only difference between using avalancheMessageSender and
+	// snowmanMessageSender here is where the metrics will be placed. Because we
+	// end up using this sender after the linearization, we pass in
+	// snowmanMessageSender here.
 	err = vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -663,10 +741,68 @@ func (m *manager) createAvalancheChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		messageSender,
+		snowmanMessageSender,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
+	}
+
+	// Initialize the ProposerVM and the vm wrapped inside it
+	minBlockDelay := proposervm.DefaultMinBlockDelay
+	if subnetCfg, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+		minBlockDelay = subnetCfg.ProposerMinBlockDelay
+	}
+	m.Log.Info("creating proposervm wrapper",
+		zap.Time("activationTime", m.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Duration("minBlockDelay", minBlockDelay),
+	)
+
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+
+	untracedVMWrappedInsideProposerVM := &linearizeOnInitializeVM{
+		LinearizableVMWithEngine: vm,
+	}
+
+	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
+	if m.TracingEnabled {
+		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, chainAlias, m.Tracer)
+	}
+
+	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
+	// using.
+	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+		vmWrappedInsideProposerVM,
+		m.ApricotPhase4Time,
+		m.ApricotPhase4MinPChainHeight,
+		minBlockDelay,
+		m.StakingCert.PrivateKey.(crypto.Signer),
+		m.StakingCert.Leaf,
+	)
+
+	if m.MeterVMEnabled {
+		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM)
+	}
+	if m.TracingEnabled {
+		vmWrappingProposerVM = tracedvm.NewBlockVM(vmWrappingProposerVM, "proposervm", m.Tracer)
+	}
+
+	// Note: linearizableVM is the VM that the Avalanche engines should be
+	// using.
+	linearizableVM := &initializeOnLinearizeVM{
+		DAGVM:          vm,
+		vmToInitialize: vmWrappingProposerVM,
+		vmToLinearize:  untracedVMWrappedInsideProposerVM,
+
+		registerer:   snowmanRegisterer,
+		ctx:          ctx.Context,
+		dbManager:    vmDBManager,
+		genesisBytes: genesisData,
+		upgradeBytes: chainConfig.Upgrade,
+		configBytes:  chainConfig.Config,
+		toEngine:     msgChan,
+		fxs:          fxs,
+		appSender:    snowmanMessageSender,
 	}
 
 	consensusParams := sb.Config().ConsensusParameters
@@ -676,7 +812,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx,
 		vdrs,
 		msgChan,
@@ -693,15 +829,81 @@ func (m *manager) createAvalancheChain(
 	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
 	beacons.RegisterCallbackListener(startupTracker)
 
-	commonCfg := common.Config{
+	snowmanCommonCfg := common.Config{
+		Ctx:                            ctx,
+		Beacons:                        beacons,
+		SampleK:                        sampleK,
+		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
+		StartupTracker:                 startupTracker,
+		Sender:                         snowmanMessageSender,
+		BootstrapTracker:               sb,
+		Timer:                          h,
+		RetryBootstrap:                 m.RetryBootstrap,
+		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
+		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
+		AncestorsMaxContainersSent:     m.BootstrapAncestorsMaxContainersSent,
+		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+	snowGetHandler, err := snowgetter.New(vmWrappingProposerVM, snowmanCommonCfg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
+	}
+
+	var snowmanConsensus smcon.Consensus = &smcon.Topological{}
+	if m.TracingEnabled {
+		snowmanConsensus = smcon.Trace(snowmanConsensus, m.Tracer)
+	}
+
+	// Create engine, bootstrapper and state-syncer in this order,
+	// to make sure start callbacks are duly initialized
+	snowmanEngineConfig := smeng.Config{
+		Ctx:           snowmanCommonCfg.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            vmWrappingProposerVM,
+		Sender:        snowmanCommonCfg.Sender,
+		Validators:    vdrs,
+		Params:        consensusParams.Parameters,
+		Consensus:     snowmanConsensus,
+	}
+	snowmanEngine, err := smeng.New(snowmanEngineConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
+	}
+
+	if m.TracingEnabled {
+		snowmanEngine = smeng.TraceEngine(snowmanEngine, m.Tracer)
+	}
+
+	// create bootstrap gear
+	bootstrapCfg := smbootstrap.Config{
+		Config:        snowmanCommonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blockBlocker,
+		VM:            vmWrappingProposerVM,
+	}
+	snowmanBootstrapper, err := smbootstrap.New(
+		context.TODO(),
+		bootstrapCfg,
+		snowmanEngine.Start,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
+	}
+
+	if m.TracingEnabled {
+		snowmanBootstrapper = common.TraceBootstrapableEngine(snowmanBootstrapper, m.Tracer)
+	}
+
+	avalancheCommonCfg := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         messageSender,
+		Sender:                         avalancheMessageSender,
 		BootstrapTracker:               sb,
-		Timer:                          handler,
+		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -710,68 +912,78 @@ func (m *manager) createAvalancheChain(
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	avaGetHandler, err := avagetter.New(vtxManager, commonCfg)
+	avaGetHandler, err := avagetter.New(vtxManager, avalancheCommonCfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
 	// create bootstrap gear
-	bootstrapperConfig := avbootstrap.Config{
-		Config:        commonCfg,
+	avalancheBootstrapperConfig := avbootstrap.Config{
+		Config:        avalancheCommonCfg,
 		AllGetsServer: avaGetHandler,
 		VtxBlocked:    vtxBlocker,
 		TxBlocked:     txBlocker,
 		Manager:       vtxManager,
-		VM:            vm,
+		VM:            linearizableVM,
 	}
-	bootstrapper, err := avbootstrap.New(
+
+	var avalancheConsensus avcon.Consensus = &avcon.Topological{}
+	if m.TracingEnabled {
+		avalancheConsensus = avcon.Trace(avalancheConsensus, m.Tracer)
+	}
+
+	// create engine gear
+	avalancheEngineConfig := aveng.Config{
+		Ctx:           ctx,
+		AllGetsServer: avaGetHandler,
+		VM:            linearizableVM,
+		Manager:       vtxManager,
+		Sender:        avalancheMessageSender,
+		Validators:    vdrs,
+		Params:        consensusParams,
+		Consensus:     avalancheConsensus,
+	}
+	avalancheEngine, err := aveng.New(
+		avalancheEngineConfig,
+		snowmanEngine.Start,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	}
+
+	if m.TracingEnabled {
+		avalancheEngine = aveng.TraceEngine(avalancheEngine, m.Tracer)
+	}
+
+	avalancheBootstrapper, err := avbootstrap.New(
 		context.TODO(),
-		bootstrapperConfig,
-		func(ctx context.Context, lastReqID uint32) error {
-			return handler.Consensus().Start(ctx, lastReqID+1)
-		},
+		avalancheBootstrapperConfig,
+		avalancheEngine.Start,
+		snowmanBootstrapper.Start,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
 	}
 
 	if m.TracingEnabled {
-		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
+		avalancheBootstrapper = common.TraceBootstrapableEngine(avalancheBootstrapper, m.Tracer)
 	}
 
-	handler.SetBootstrapper(bootstrapper)
-
-	var consensus avcon.Consensus = &avcon.Topological{}
-	if m.TracingEnabled {
-		consensus = avcon.Trace(consensus, m.Tracer)
-	}
-
-	// create engine gear
-	engineConfig := aveng.Config{
-		Ctx:           bootstrapperConfig.Ctx,
-		AllGetsServer: avaGetHandler,
-		VM:            bootstrapperConfig.VM,
-		Manager:       vtxManager,
-		Sender:        bootstrapperConfig.Sender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     consensus,
-	}
-	engine, err := aveng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
-	}
-
-	if m.TracingEnabled {
-		engine = aveng.TraceEngine(engine, m.Tracer)
-	}
-
-	handler.SetConsensus(engine)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: avalancheBootstrapper,
+			Consensus:    avalancheEngine,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: snowmanBootstrapper,
+			Consensus:    snowmanEngine,
+		},
+	})
 
 	// Register health check for this chain
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-
-	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -779,7 +991,7 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Context: ctx,
 		VM:      vm,
-		Handler: handler,
+		Handler: h,
 	}, nil
 }
 
@@ -797,15 +1009,20 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
+	ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Initializing,
+	})
+
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
 		return nil, err
 	}
 	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
+	vmDBManager := prefixDBManager.NewPrefixDBManager(vmDBPrefix)
 
 	db := prefixDBManager.Current()
-	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
+	bootstrappingDB := prefixdb.New(bootstrappingDB, db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "block", ctx.Registerer)
 	if err != nil {
@@ -834,7 +1051,13 @@ func (m *manager) createSnowmanChain(
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
+	err = m.BlockAcceptorGroup.RegisterAcceptor(
+		ctx.ChainID,
+		"gossip",
+		messageSender,
+		false,
+	)
+	if err != nil { // Set up the event dispatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -944,7 +1167,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx,
 		vdrs,
 		msgChan,
@@ -969,7 +1192,7 @@ func (m *manager) createSnowmanChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
-		Timer:                          handler,
+		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -1008,8 +1231,6 @@ func (m *manager) createSnowmanChain(
 		engine = smeng.TraceEngine(engine, m.Tracer)
 	}
 
-	handler.SetConsensus(engine)
-
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		Config:        commonCfg,
@@ -1031,8 +1252,6 @@ func (m *manager) createSnowmanChain(
 		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
 	}
 
-	handler.SetBootstrapper(bootstrapper)
-
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
 		commonCfg,
@@ -1052,10 +1271,17 @@ func (m *manager) createSnowmanChain(
 		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
 	}
 
-	handler.SetStateSyncer(stateSyncer)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: nil,
+		Snowman: &handler.Engine{
+			StateSyncer:  stateSyncer,
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1063,7 +1289,7 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Context: ctx,
 		VM:      vm,
-		Handler: handler,
+		Handler: h,
 	}, nil
 }
 

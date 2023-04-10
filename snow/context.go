@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snow
@@ -75,15 +75,17 @@ type ConsensusContext struct {
 	// consensus operations after the DAG linearization.
 	AvalancheRegisterer Registerer
 
-	// DecisionAcceptor is the callback that will be fired whenever a VM is
-	// notified that their object, either a block in snowman or a transaction
-	// in avalanche, was accepted.
-	DecisionAcceptor Acceptor
+	// BlockAcceptor is the callback that will be fired whenever a VM is
+	// notified that their block was accepted.
+	BlockAcceptor Acceptor
 
-	// ConsensusAcceptor is the callback that will be fired whenever a
-	// container, either a block in snowman or a vertex in avalanche, was
+	// TxAcceptor is the callback that will be fired whenever a VM is notified
+	// that their transaction was accepted.
+	TxAcceptor Acceptor
+
+	// VertexAcceptor is the callback that will be fired whenever a vertex was
 	// accepted.
-	ConsensusAcceptor Acceptor
+	VertexAcceptor Acceptor
 
 	// State indicates the current state of this consensus instance.
 	State utils.Atomic[EngineState]
@@ -119,7 +121,8 @@ func DefaultConsensusContextTest() *ConsensusContext {
 		Context:             DefaultContextTest(),
 		Registerer:          prometheus.NewRegistry(),
 		AvalancheRegisterer: prometheus.NewRegistry(),
-		DecisionAcceptor:    noOpAcceptor{},
-		ConsensusAcceptor:   noOpAcceptor{},
+		BlockAcceptor:       noOpAcceptor{},
+		TxAcceptor:          noOpAcceptor{},
+		VertexAcceptor:      noOpAcceptor{},
 	}
 }

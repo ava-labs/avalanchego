@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -104,7 +104,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
-	if err = addPathInfo(ctx, view, proof.Path, provenPath, provenPath); err != nil {
+	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
 	}
 
@@ -222,7 +222,7 @@ func (proof *RangeProof) Verify(
 
 	// Insert all key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(ctx, newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
@@ -232,10 +232,10 @@ func (proof *RangeProof) Verify(
 	// By inserting all children < [start], we prove that there are no keys
 	// > [start] but less than the first key given. That is, the peer who
 	// gave us this proof is not omitting nodes.
-	if err := addPathInfo(ctx, view, proof.StartProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
 		return err
 	}
-	if err := addPathInfo(ctx, view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
 		return err
 	}
 
@@ -351,7 +351,39 @@ func (proof *ChangeProof) Verify(
 		return ErrNoStartProof
 	}
 
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyValues))
+	// Make sure the key-value pairs are sorted and in [start, end].
+	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
+		return err
+	}
+
+	// Make sure the deleted keys are sorted and in [start, end].
+	deletedKeys := make([]KeyValue, len(proof.DeletedKeys))
+	for i, key := range proof.DeletedKeys {
+		deletedKeys[i] = KeyValue{Key: key, Value: nil}
+	}
+	if err := verifyKeyValues(deletedKeys, start, end); err != nil {
+		return err
+	}
+
+	smallestPath := newPath(start)
+
+	// Make sure the start proof, if given, is well-formed.
+	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
+		return err
+	}
+
+	// Find the greatest key in [proof.KeyValues] and [proof.DeletedKeys].
+	// Note that [proof.EndProof] is a proof for this key.
+	// [largestPath] is also used when we add children of proof nodes to [trie] below.
+	largestPath := newPath(proof.getLargestKey(end))
+
+	// Make sure the end proof, if given, is well-formed.
+	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+		return err
+	}
+
+	// gather all key/values in the proof
+	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyValues)+len(proof.DeletedKeys))
 	for _, keyValue := range proof.KeyValues {
 		keyValues[newPath(keyValue.Key)] = Some(keyValue.Value)
 	}
@@ -359,45 +391,10 @@ func (proof *ChangeProof) Verify(
 		keyValues[newPath(key)] = Nothing[[]byte]()
 	}
 
-	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
-		return err
-	}
+	// want to prevent commit writes to DB, but not prevent db reads
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
-	// Make sure the deleted keys are sorted and in [start, end].
-	for i := 0; i < len(proof.DeletedKeys); i++ {
-		deletedKey := proof.DeletedKeys[i]
-		if i < len(proof.DeletedKeys)-1 && bytes.Compare(deletedKey, proof.DeletedKeys[i+1]) >= 0 {
-			return ErrNonIncreasingValues
-		}
-		if (len(start) > 0 && bytes.Compare(deletedKey, start) < 0) ||
-			(len(end) > 0 && bytes.Compare(deletedKey, end) > 0) {
-			return ErrStateFromOutsideOfRange
-		}
-	}
-
-	largestKey := end
-
-	// Find the greatest key in [proof.KeyValues] and [proof.DeletedKeys].
-	// Note that [proof.EndProof] is a proof for this key.
-	// [largestKey] is also used when we add children of proof nodes to [trie] below.
-	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
-	}
-	if len(proof.DeletedKeys) > 0 {
-		lastDeleted := proof.DeletedKeys[len(proof.DeletedKeys)-1]
-		if bytes.Compare(lastDeleted, largestKey) > 0 {
-			largestKey = lastDeleted
-		}
-	}
-
-	smallestPath := newPath(start)
-	largestPath := newPath(largestKey)
-
-	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
-		return err
-	}
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
@@ -409,10 +406,6 @@ func (proof *ChangeProof) Verify(
 		return err
 	}
 
-	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
-		return err
-	}
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
@@ -424,35 +417,32 @@ func (proof *ChangeProof) Verify(
 		return err
 	}
 
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ctx)
+	view, err := db.newUntrackedView(len(proof.KeyValues))
 	if err != nil {
 		return err
 	}
 
 	// Insert the key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(ctx, newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
 
 	// Remove the deleted keys from the trie.
 	for _, key := range proof.DeletedKeys {
-		if err := view.removeFromTrie(ctx, newPath(key)); err != nil {
+		if err := view.removeFromTrie(newPath(key)); err != nil {
 			return err
 		}
 	}
 
 	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(ctx, view, proof.StartProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
 		return err
 	}
-	if err := addPathInfo(ctx, view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
 		return err
 	}
 
@@ -515,6 +505,22 @@ func verifyAllChangeProofKeyValuesPresent(
 func (proof *ChangeProof) Empty() bool {
 	return len(proof.KeyValues) == 0 && len(proof.DeletedKeys) == 0 &&
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
+}
+
+// Returns the largest key in [proof.KeyValues] and [proof.DeletedKeys].
+// If there are no keys in the proof, returns [end].
+func (proof *ChangeProof) getLargestKey(end []byte) []byte {
+	largestKey := end
+	if len(proof.KeyValues) > 0 {
+		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+	}
+	if len(proof.DeletedKeys) > 0 {
+		lastDeleted := proof.DeletedKeys[len(proof.DeletedKeys)-1]
+		if bytes.Compare(lastDeleted, largestKey) > 0 || len(proof.KeyValues) == 0 {
+			largestKey = lastDeleted
+		}
+	}
+	return largestKey
 }
 
 // Returns nil iff both hold:
@@ -607,9 +613,8 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 // For each proof node, adds the children that are < [start] or > [end].
 // If [start] is empty, no children are < [start].
 // If [end] is empty, no children are > [end].
-// Assumes [t]'s view stack is locked.
+// Assumes [t.lock] is held.
 func addPathInfo(
-	ctx context.Context,
 	t *trieView,
 	proofPath []ProofNode,
 	startPath path,
@@ -631,7 +636,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insertIntoTrie(ctx, keyPath, Nothing[[]byte]())
+		n, err := t.insertIntoTrie(keyPath, Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -671,9 +676,8 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		ctx,
 		memdb.New(),
 		Config{
-			Tracer:         tracer,
-			ValueCacheSize: verificationCacheSize,
-			NodeCacheSize:  verificationCacheSize,
+			Tracer:        tracer,
+			NodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
@@ -681,5 +685,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(ctx)
+	return db.newUntrackedView(defaultPreallocationSize)
 }

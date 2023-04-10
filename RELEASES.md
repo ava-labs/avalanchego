@@ -1,5 +1,172 @@
 # Release Notes
 
+## [v1.9.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.16)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
+- Removed unnecessary repoll after rejecting vertices
+- Improved snowstorm lookup error handling
+- Removed rejected vertices from the Avalanche frontier more aggressively
+- Reduced default health check values for processing decisions
+
+## [v1.9.15](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.15)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
+- Fixed `x/merkledb.ChangeProof#getLargestKey` to correctly handle no changes
+- Added test for `avm/txs/executor.SemanticVerifier#verifyFxUsage` with multiple valid fxs
+- Fixed CPU + bandwidth performance regression during vertex processing
+- Added example usage of the `/ext/index/X/block` API
+- Reduced the default value of `--snow-optimal-processing` from `50` to `10`
+- Updated the year in the license header
+
+## [v1.9.14](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.14)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
+## [v1.9.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.13)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
+## [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.
+
+### Networking
+
+- Removed linger setting on P2P connections
+- Improved error message when failing to calculate peer uptimes
+- Removed `EngineType` from P2P response messages
+- Added context cancellation during dynamic IP updates
+- Reduced the maximum P2P reconnect delay from 1 hour to 1 minute
+
+### Consensus
+
+- Added support to switch from `Avalanche` consensus to `Snowman` consensus
+- Added support for routing consensus messages to either `Avalanche` or `Snowman` consensus on the same chain
+- Removed usage of deferred evaluation of the `handler.Consensus` in the `Avalanche` `OnFinished` callback
+- Dropped inbound `Avalanche` consensus messages after switching to `Snowman` consensus
+- Renamed the `Avalanche` VM metrics prefix from `avalanche_{chainID}_vm_` to `avalanche_{chainID}_vm_avalanche`
+- Replaced `consensus` and `decision` dispatchers with `block`, `tx`, and `vertex` dispatchers
+- Removed `Avalanche` bootstrapping restarts during the switch to `Snowman` consensus
+
+### AVM
+
+- Added `avm` block execution manager
+- Added `avm` block builder
+- Refactored `avm` transaction syntactic verification
+- Refactored `avm` transaction semantic verification
+- Refactored `avm` transaction execution
+- Added `avm` mempool gossip
+- Removed block timer interface from `avm` `mempool`
+- Moved `toEngine` channel into the `avm` `mempool`
+- Added `GetUTXOFromID` to the `avm` `state.Chain` interface
+- Added unpopulated `MerkleRoot` to `avm` blocks
+- Added `avm` transaction based metrics
+- Replaced error strings with error interfaces in the `avm` mempool
+
+### PlatformVM
+
+- Added logs when the local nodes stake amount changes
+- Moved `platformvm` `message` package into `components`
+- Replaced error strings with error interfaces in the `platformvm` mempool
+
+### Warp
+
+- Added `ID` method to `warp.UnsignedMessage`
+- Improved `warp.Signature` verification error descriptions
+
+### Miscellaneous
+
+- Improved `merkledb` locking to allow concurrent read access through `trieView`s
+- Fixed `Banff` transaction signing with ledger when using the wallet
+- Emitted github artifacts after successful builds
+- Added non-blocking bounded queue
+- Converted the `x.Parser` helper to be a `block.Parser` interface from a `tx.Parser` interface
+
+### Cleanup
+
+- Separated dockerhub image publishing from the kurtosis test workflow
+- Exported various errors to use in testing
+- Removed the `vms/components/state` package
+- Replaced ad-hoc linked hashmaps with the standard data-structure
+- Removed `usr/local/lib/avalanche` from deb packages
+- Standardized usage of `constants.UnitTestID`
+
+### Examples
+
+- Added P-chain `RemoveSubnetValidatorTx` example using the wallet
+- Added X-chain `CreateAssetTx` example using the wallet
+
+### Configs
+
+- Added support to specify `HTTP` server timeouts
+  - `--http-read-timeout`
+  - `--http-read-header-timeout`
+  - `--http-write-timeout`
+  - `--http-idle-timeout`
+
+### APIs
+
+- Added `avm` block APIs
+  - `avm.getBlock`
+  - `avm.getBlockByHeight`
+  - `avm.getHeight`
+- Converted `avm` APIs to only surface accepted state
+- Deprecated all `ipcs` APIs
+  - `ipcs.publishBlockchain`
+  - `ipcs.unpublishBlockchain`
+  - `ipcs.getPublishedBlockchains`
+- Deprecated all `keystore` APIs
+  - `keystore.createUser`
+  - `keystore.deleteUser`
+  - `keystore.listUsers`
+  - `keystore.importUser`
+  - `keystore.exportUser`
+- Deprecated the `avm/pubsub` API endpoint
+- Deprecated various `avm` APIs
+  - `avm.getAddressTxs`
+  - `avm.getBalance`
+  - `avm.getAllBalances`
+  - `avm.createAsset`
+  - `avm.createFixedCapAsset`
+  - `avm.createVariableCapAsset`
+  - `avm.createNFTAsset`
+  - `avm.createAddress`
+  - `avm.listAddresses`
+  - `avm.exportKey`
+  - `avm.importKey`
+  - `avm.mint`
+  - `avm.sendNFT`
+  - `avm.mintNFT`
+  - `avm.import`
+  - `avm.export`
+  - `avm.send`
+  - `avm.sendMultiple`
+- Deprecated the `avm/wallet` API endpoint
+  - `wallet.issueTx`
+  - `wallet.send`
+  - `wallet.sendMultiple`
+- Deprecated various `platformvm` APIs
+  - `platform.exportKey`
+  - `platform.importKey`
+  - `platform.getBalance`
+  - `platform.createAddress`
+  - `platform.listAddresses`
+  - `platform.getSubnets`
+  - `platform.addValidator`
+  - `platform.addDelegator`
+  - `platform.addSubnetValidator`
+  - `platform.createSubnet`
+  - `platform.exportAVAX`
+  - `platform.importAVAX`
+  - `platform.createBlockchain`
+  - `platform.getBlockchains`
+  - `platform.getStake`
+  - `platform.getMaxStakeAmount`
+  - `platform.getRewardUTXOs`
+- Deprecated the `stake` field in the `platform.getTotalStake` response in favor of `weight`
+
 ## [v1.9.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.11)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
@@ -39,7 +40,6 @@ const (
 )
 
 var (
-	errUnknownAssetID     = errors.New("unknown asset ID")
 	errTxNotCreateAsset   = errors.New("transaction doesn't create an asset")
 	errNoMinters          = errors.New("no minters provided")
 	errNoHoldersOrMinters = errors.New("no minters or initialHolders provided")
@@ -50,14 +50,134 @@ var (
 	errNoAddresses        = errors.New("no addresses provided")
 	errNoKeys             = errors.New("from addresses have no keys or funds")
 	errMissingPrivateKey  = errors.New("argument 'privateKey' not given")
+	errNotLinearized      = errors.New("chain is not linearized")
 )
-
-// Service defines the base service for the asset vm
-type Service struct{ vm *VM }
 
 // FormattedAssetID defines a JSON formatted struct containing an assetID as a string
 type FormattedAssetID struct {
 	AssetID ids.ID `json:"assetID"`
+}
+
+// Service defines the base service for the asset vm
+type Service struct{ vm *VM }
+
+// GetBlock returns the requested block.
+func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getBlock"),
+		zap.Stringer("blkID", args.BlockID),
+		zap.Stringer("encoding", args.Encoding),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLinearized
+	}
+	block, err := s.vm.chainManager.GetStatelessBlock(args.BlockID)
+	if err != nil {
+		return fmt.Errorf("couldn't get block with id %s: %w", args.BlockID, err)
+	}
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		for _, tx := range block.Txs() {
+			err := tx.Unsigned.Visit(&txInit{
+				tx:            tx,
+				ctx:           s.vm.ctx,
+				typeToFxIndex: s.vm.typeToFxIndex,
+				fxs:           s.vm.fxs,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
+	}
+
+	return nil
+}
+
+// GetBlockByHeight returns the block at the given height.
+func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightArgs, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getBlockByHeight"),
+		zap.Uint64("height", args.Height),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLinearized
+	}
+	reply.Encoding = args.Encoding
+
+	blockID, err := s.vm.state.GetBlockID(args.Height)
+	if err != nil {
+		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
+	}
+	block, err := s.vm.chainManager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		for _, tx := range block.Txs() {
+			err := tx.Unsigned.Visit(&txInit{
+				tx:            tx,
+				ctx:           s.vm.ctx,
+				typeToFxIndex: s.vm.typeToFxIndex,
+				fxs:           s.vm.fxs,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
+	}
+
+	return nil
+}
+
+// GetHeight returns the height of the last accepted block.
+func (s *Service) GetHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "avm"),
+		zap.String("method", "getHeight"),
+	)
+
+	if s.vm.chainManager == nil {
+		return errNotLinearized
+	}
+
+	blockID := s.vm.state.GetLastAccepted()
+	block, err := s.vm.chainManager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get last accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+
+	reply.Height = json.Uint64(block.Height())
+	return nil
 }
 
 // IssueTx attempts to issue a transaction into consensus
@@ -81,6 +201,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 	return nil
 }
 
+// TODO: After the chain is linearized, remove this.
 func (s *Service) IssueStopVertex(_ *http.Request, _, _ *struct{}) error {
 	return s.vm.issueStopVertex()
 }
@@ -163,9 +284,10 @@ func (s *Service) GetAddressTxs(_ *http.Request, args *GetAddressTxsArgs, reply 
 
 // GetTxStatus returns the status of the specified transaction
 //
-// TODO: deprecate GetTxStatus after the linearization.
+// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
+// used instead to determine if the tx was accepted.
 func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	s.vm.ctx.Log.Debug("API called",
+	s.vm.ctx.Log.Debug("deprecated API called",
 		zap.String("service", "avm"),
 		zap.String("method", "getTxStatus"),
 		zap.Stringer("txID", args.TxID),
@@ -175,12 +297,18 @@ func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxS
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   s.vm,
-		txID: args.TxID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-
-	reply.Status = tx.Status()
+	_, err := chainState.GetTx(args.TxID)
+	switch err {
+	case nil:
+		reply.Status = choices.Accepted
+	case database.ErrNotFound:
+		reply.Status = choices.Unknown
+	default:
+		return err
+	}
 	return nil
 }
 
@@ -196,27 +324,25 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 		return errNilTxID
 	}
 
-	tx := UniqueTx{
-		vm:   s.vm,
-		txID: args.TxID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-	if status := tx.Status(); !status.Fetched() {
-		return errUnknownTx
+	tx, err := chainState.GetTx(args.TxID)
+	if err != nil {
+		return err
 	}
 
 	reply.Encoding = args.Encoding
-
 	if args.Encoding == formatting.JSON {
 		reply.Tx = tx
 		return tx.Unsigned.Visit(&txInit{
-			tx:            tx.Tx,
+			tx:            tx,
 			ctx:           s.vm.ctx,
 			typeToFxIndex: s.vm.typeToFxIndex,
 			fxs:           s.vm.fxs,
 		})
 	}
 
-	var err error
 	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %w", err)
@@ -349,12 +475,12 @@ func (s *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescription
 		return err
 	}
 
-	tx := &UniqueTx{
-		vm:   s.vm,
-		txID: assetID,
+	chainState := &chainState{
+		State: s.vm.state,
 	}
-	if status := tx.Status(); !status.Fetched() {
-		return errUnknownAssetID
+	tx, err := chainState.GetTx(assetID)
+	if err != nil {
+		return err
 	}
 	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
 	if !ok {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -62,6 +62,10 @@ func (v *SemanticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 	if err := v.BaseTx(&tx.BaseTx); err != nil {
 		return err
+	}
+
+	if !v.Bootstrapped || v.Tx.ID().String() == "MkvpJS13eCnEYeYi9B5zuWrU9goG9RBj7nr83U7BjrFV22a12" {
+		return nil
 	}
 
 	offset := len(tx.Ins)

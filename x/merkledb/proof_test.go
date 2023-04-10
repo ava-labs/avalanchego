@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -21,10 +21,9 @@ func getBasicDB() (*Database, error) {
 		context.Background(),
 		memdb.New(),
 		Config{
-			Tracer:         newNoopTracer(),
-			ValueCacheSize: 1000,
-			HistoryLength:  1000,
-			NodeCacheSize:  1000,
+			Tracer:        newNoopTracer(),
+			HistoryLength: 1000,
+			NodeCacheSize: 1000,
 		},
 		&mockMetrics{},
 	)
@@ -312,7 +311,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	_, err = trie.GetRangeProof(context.Background(), nil, nil, -1)
@@ -326,7 +325,7 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(t, err)
 	require.NotNil(t, dbTrie)
-	trie, err := dbTrie.NewView(context.Background())
+	trie, err := dbTrie.NewView()
 	require.NoError(t, err)
 
 	err = trie.Insert(context.Background(), []byte("key0"), []byte("value0"))
@@ -780,6 +779,105 @@ func Test_RangeProof_Marshal_Errors(t *testing.T) {
 		parsedProof := &RangeProof{}
 		_, err = Codec.DecodeRangeProof(broken, parsedProof)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	}
+}
+
+func TestChangeProofGetLargestKey(t *testing.T) {
+	type test struct {
+		name     string
+		proof    ChangeProof
+		end      []byte
+		expected []byte
+	}
+
+	tests := []test{
+		{
+			name:     "empty proof",
+			proof:    ChangeProof{},
+			end:      []byte{0},
+			expected: []byte{0},
+		},
+		{
+			name: "1 KV no deleted keys",
+			proof: ChangeProof{
+				KeyValues: []KeyValue{
+					{
+						Key: []byte{1},
+					},
+				},
+			},
+			end:      []byte{0},
+			expected: []byte{1},
+		},
+		{
+			name: "2 KV no deleted keys",
+			proof: ChangeProof{
+				KeyValues: []KeyValue{
+					{
+						Key: []byte{1},
+					},
+					{
+						Key: []byte{2},
+					},
+				},
+			},
+			end:      []byte{0},
+			expected: []byte{2},
+		},
+		{
+			name: "no KVs 1 deleted key",
+			proof: ChangeProof{
+				DeletedKeys: [][]byte{{1}},
+			},
+			end:      []byte{0},
+			expected: []byte{1},
+		},
+		{
+			name: "no KVs 2 deleted keys",
+			proof: ChangeProof{
+				DeletedKeys: [][]byte{{1}, {2}},
+			},
+			end:      []byte{0},
+			expected: []byte{2},
+		},
+		{
+			name: "KV and deleted keys; KV larger",
+			proof: ChangeProof{
+				KeyValues: []KeyValue{
+					{
+						Key: []byte{1},
+					},
+					{
+						Key: []byte{3},
+					},
+				},
+				DeletedKeys: [][]byte{{0}, {2}},
+			},
+			end:      []byte{5},
+			expected: []byte{3},
+		},
+		{
+			name: "KV and deleted keys; deleted key larger",
+			proof: ChangeProof{
+				KeyValues: []KeyValue{
+					{
+						Key: []byte{0},
+					},
+					{
+						Key: []byte{2},
+					},
+				},
+				DeletedKeys: [][]byte{{1}, {3}},
+			},
+			end:      []byte{5},
+			expected: []byte{3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, tt.proof.getLargestKey(tt.end))
+		})
 	}
 }
 

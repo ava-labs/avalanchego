@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package states
@@ -280,7 +280,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()
-	genesisTimestamp := version.XChainMigrationDefaultTime
+	genesisTimestamp := version.CortinaDefaultTime
 	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
 	require.NoError(err)
 

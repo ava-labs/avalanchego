@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -79,7 +79,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		called <- struct{}{}
 		return nil
 	}
-	handler.SetBootstrapper(bootstrapper)
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+		},
+	})
 	ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
@@ -91,14 +95,20 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	chainID := ids.ID{}
-	msg := message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	msg := Message{
+		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
 	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	msg = Message{
+		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
 	handler.Push(context.Background(), msg)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
@@ -163,14 +173,19 @@ func TestHandlerClosesOnError(t *testing.T) {
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errFatal
 	}
-	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	handler.SetConsensus(engine)
+
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
@@ -188,7 +203,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
-	msg := message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, 0)
+	msg := Message{
+		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, 0),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+	}
 	handler.Push(context.Background(), msg)
 
 	ticker := time.NewTicker(time.Second)
@@ -243,7 +261,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		closed <- struct{}{}
 		return nil
 	}
-	handler.SetBootstrapper(bootstrapper)
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+		},
+	})
 	ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
@@ -258,8 +280,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
-	inMsg := message.InternalGetFailed(nodeID, chainID, reqID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
-	handler.Push(context.Background(), inMsg)
+	inInboundMessage := Message{
+		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID, p2p.EngineType_ENGINE_TYPE_SNOWMAN),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+	}
+	handler.Push(context.Background(), inInboundMessage)
 
 	ticker := time.NewTicker(time.Second)
 	select {
@@ -305,7 +330,6 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
@@ -316,7 +340,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		calledNotify <- struct{}{}
 		return nil
 	}
-	handler.SetConsensus(engine)
+
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
+
 	ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrap is done
@@ -376,14 +407,19 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	handler.SetConsensus(engine)
+
+	handler.SetEngineManager(&EngineManager{
+		Snowman: &Engine{
+			Bootstrapper: bootstrapper,
+			Consensus:    engine,
+		},
+	})
 	ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrap is done
@@ -405,6 +441,176 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	wg.Add(1)
 	defer wg.Wait()
 
-	subnetMsg := message.InternalConnectedSubnet(nodeID, subnetID)
-	handler.Push(context.Background(), subnetMsg)
+	subnetInboundMessage := Message{
+		InboundMessage: message.InternalConnectedSubnet(nodeID, subnetID),
+		EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+	}
+	handler.Push(context.Background(), subnetInboundMessage)
+}
+
+// Tests that messages are routed to the correct engine type
+func TestDynamicEngineTypeDispatch(t *testing.T) {
+	tests := []struct {
+		name                string
+		currentEngineType   p2p.EngineType
+		requestedEngineType p2p.EngineType
+		setup               func(
+			h Handler,
+			b common.BootstrapableEngine,
+			e common.Engine,
+		)
+	}{
+		{
+			name:                "current - avalanche, requested - unspecified",
+			currentEngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			requestedEngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
+				h.SetEngineManager(&EngineManager{
+					Avalanche: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: b,
+						Consensus:    e,
+					},
+					Snowman: nil,
+				})
+			},
+		},
+		{
+			name:                "current - avalanche, requested - avalanche",
+			currentEngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			requestedEngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
+				h.SetEngineManager(&EngineManager{
+					Avalanche: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: b,
+						Consensus:    e,
+					},
+					Snowman: nil,
+				})
+			},
+		},
+		{
+			name:                "current - snowman, requested - unspecified",
+			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
+				h.SetEngineManager(&EngineManager{
+					Avalanche: nil,
+					Snowman: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: b,
+						Consensus:    e,
+					},
+				})
+			},
+		},
+		{
+			name:                "current - snowman, requested - avalanche",
+			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
+				h.SetEngineManager(&EngineManager{
+					Avalanche: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: nil,
+						Consensus:    e,
+					},
+					Snowman: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: b,
+						Consensus:    nil,
+					},
+				})
+			},
+		},
+		{
+			name:                "current - snowman, requested - snowman",
+			currentEngineType:   p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			requestedEngineType: p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
+				h.SetEngineManager(&EngineManager{
+					Avalanche: nil,
+					Snowman: &Engine{
+						StateSyncer:  nil,
+						Bootstrapper: b,
+						Consensus:    e,
+					},
+				})
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			messageReceived := make(chan struct{})
+			ctx := snow.DefaultConsensusContextTest()
+			vdrs := validators.NewSet()
+			err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
+			require.NoError(t, err)
+
+			resourceTracker, err := tracker.NewResourceTracker(
+				prometheus.NewRegistry(),
+				resource.NoUsage,
+				meter.ContinuousFactory{},
+				time.Second,
+			)
+			require.NoError(t, err)
+			handler, err := New(
+				ctx,
+				vdrs,
+				nil,
+				time.Second,
+				resourceTracker,
+				validators.UnhandledSubnetConnector,
+				subnets.New(ids.EmptyNodeID, subnets.Config{}),
+			)
+			require.NoError(t, err)
+
+			bootstrapper := &common.BootstrapperTest{
+				BootstrapableTest: common.BootstrapableTest{
+					T: t,
+				},
+				EngineTest: common.EngineTest{
+					T: t,
+				},
+			}
+			bootstrapper.Default(false)
+
+			engine := &common.EngineTest{T: t}
+			engine.Default(false)
+			engine.ContextF = func() *snow.ConsensusContext {
+				return ctx
+			}
+			engine.ChitsF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID, acceptedIDs []ids.ID) error {
+				close(messageReceived)
+				return nil
+			}
+
+			test.setup(handler, bootstrapper, engine)
+
+			ctx.State.Set(snow.EngineState{
+				Type:  test.currentEngineType,
+				State: snow.NormalOp, // assumed bootstrap is done
+			})
+
+			bootstrapper.StartF = func(context.Context, uint32) error {
+				return nil
+			}
+
+			handler.Start(context.Background(), false)
+			handler.Push(context.TODO(), Message{
+				InboundMessage: message.InboundChits(
+					ids.Empty,
+					uint32(0),
+					nil,
+					nil,
+					ids.EmptyNodeID,
+				),
+				EngineType: test.requestedEngineType,
+			})
+
+			<-messageReceived
+		})
+	}
 }

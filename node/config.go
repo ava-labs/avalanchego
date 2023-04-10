@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,6 +44,7 @@ type APIIndexerConfig struct {
 }
 
 type HTTPConfig struct {
+	server.HTTPConfig
 	APIConfig `json:"apiConfig"`
 	HTTPHost  string `json:"httpHost"`
 	HTTPPort  uint16 `json:"httpPort"`

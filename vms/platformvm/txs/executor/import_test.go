@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment( /*postBanff*/ false)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
