@@ -1,0 +1,248 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package compression
+
+import (
+	"fmt"
+	"math"
+	"runtime"
+	"testing"
+
+	_ "embed"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/units"
+)
+
+const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
+
+var (
+	newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
+		TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
+			return NewNoCompressor(), nil
+		},
+		TypeGzip: NewGzipCompressor,
+		TypeZstd: NewZstdCompressor,
+	}
+
+	//go:embed gzip_zip_bomb.bin
+	gzipZipBomb []byte
+
+	//go:embed zstd_zip_bomb.bin
+	zstdZipBomb []byte
+
+	zipBombs = map[Type][]byte{
+		TypeGzip: gzipZipBomb,
+		TypeZstd: zstdZipBomb,
+	}
+)
+
+func TestDecompressZipBombs(t *testing.T) {
+	for compressionType, zipBomb := range zipBombs {
+		// Make sure that the hardcoded zip bomb would be a valid message.
+		require.Less(t, len(zipBomb), maxMessageSize)
+
+		newCompressorFunc := newCompressorFuncs[compressionType]
+
+		t.Run(compressionType.String(), func(t *testing.T) {
+			compressor, err := newCompressorFunc(maxMessageSize)
+			require.NoError(t, err)
+
+			var (
+				beforeDecompressionStats runtime.MemStats
+				afterDecompressionStats  runtime.MemStats
+			)
+			runtime.ReadMemStats(&beforeDecompressionStats)
+			_, err = compressor.Decompress(zipBomb)
+			runtime.ReadMemStats(&afterDecompressionStats)
+
+			require.ErrorIs(t, err, ErrDecompressedMsgTooLarge)
+
+			// Make sure that we didn't allocate significantly more memory than
+			// the max message size.
+			bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+			require.Less(t, bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
+		})
+	}
+}
+
+func TestCompressDecompress(t *testing.T) {
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		t.Run(compressionType.String(), func(t *testing.T) {
+			data := utils.RandomBytes(4096)
+			data2 := utils.RandomBytes(4096)
+
+			compressor, err := newCompressorFunc(maxMessageSize)
+			require.NoError(t, err)
+
+			dataCompressed, err := compressor.Compress(data)
+			require.NoError(t, err)
+
+			data2Compressed, err := compressor.Compress(data2)
+			require.NoError(t, err)
+
+			dataDecompressed, err := compressor.Decompress(dataCompressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data, dataDecompressed)
+
+			data2Decompressed, err := compressor.Decompress(data2Compressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data2, data2Decompressed)
+
+			dataDecompressed, err = compressor.Decompress(dataCompressed)
+			require.NoError(t, err)
+			require.EqualValues(t, data, dataDecompressed)
+
+			maxMessage := utils.RandomBytes(maxMessageSize)
+			maxMessageCompressed, err := compressor.Compress(maxMessage)
+			require.NoError(t, err)
+
+			maxMessageDecompressed, err := compressor.Decompress(maxMessageCompressed)
+			require.NoError(t, err)
+
+			require.EqualValues(t, maxMessage, maxMessageDecompressed)
+		})
+	}
+}
+
+func TestSizeLimiting(t *testing.T) {
+	for compressionType, compressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		t.Run(compressionType.String(), func(t *testing.T) {
+			compressor, err := compressorFunc(maxMessageSize)
+			require.NoError(t, err)
+
+			data := make([]byte, maxMessageSize+1)
+			_, err = compressor.Compress(data) // should be too large
+			require.Error(t, err)
+
+			compressor2, err := compressorFunc(2 * maxMessageSize)
+			require.NoError(t, err)
+
+			dataCompressed, err := compressor2.Compress(data)
+			require.NoError(t, err)
+
+			_, err = compressor.Decompress(dataCompressed) // should be too large
+			require.Error(t, err)
+		})
+	}
+}
+
+// Attempts to create a compressor with math.MaxInt64
+// which leads to undefined decompress behavior due to integer overflow
+// in limit reader creation.
+func TestNewCompressorWithInvalidLimit(t *testing.T) {
+	for compressionType, compressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		t.Run(compressionType.String(), func(t *testing.T) {
+			require := require.New(t)
+			_, err := compressorFunc(math.MaxInt64)
+			require.ErrorIs(err, ErrInvalidMaxSizeCompressor)
+		})
+	}
+}
+
+func FuzzGzipCompressor(f *testing.F) {
+	fuzzHelper(f, TypeGzip)
+}
+
+func FuzzZstdCompressor(f *testing.F) {
+	fuzzHelper(f, TypeZstd)
+}
+
+func fuzzHelper(f *testing.F, compressionType Type) {
+	var (
+		compressor Compressor
+		err        error
+	)
+	switch compressionType {
+	case TypeGzip:
+		compressor, err = NewGzipCompressor(maxMessageSize)
+		require.NoError(f, err)
+	case TypeZstd:
+		compressor, err = NewZstdCompressor(maxMessageSize)
+		require.NoError(f, err)
+	default:
+		f.Fatal("Unknown compression type")
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		if len(data) > maxMessageSize {
+			_, err := compressor.Compress(data)
+			require.Error(err)
+		}
+
+		compressed, err := compressor.Compress(data)
+		require.NoError(err)
+
+		decompressed, err := compressor.Decompress(compressed)
+		require.NoError(err)
+
+		require.Equal(data, decompressed)
+	})
+}
+
+func BenchmarkCompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+		maxMessageSize,
+	}
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
+				require.NoError(b, err)
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Compress(bytes)
+					require.NoError(b, err)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkDecompress(b *testing.B) {
+	sizes := []int{
+		0,
+		256,
+		units.KiB,
+		units.MiB,
+		maxMessageSize,
+	}
+	for compressionType, newCompressorFunc := range newCompressorFuncs {
+		if compressionType == TypeNone {
+			continue
+		}
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				bytes := utils.RandomBytes(size)
+				compressor, err := newCompressorFunc(maxMessageSize)
+				require.NoError(b, err)
+
+				compressedBytes, err := compressor.Compress(bytes)
+				require.NoError(b, err)
+
+				for n := 0; n < b.N; n++ {
+					_, err := compressor.Decompress(compressedBytes)
+					require.NoError(b, err)
+				}
+			})
+		}
+	}
+}

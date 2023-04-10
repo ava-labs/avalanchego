@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
@@ -49,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -62,7 +64,9 @@ const (
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
-	deprecatedKeys = map[string]string{}
+	deprecatedKeys = map[string]string{
+		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
+	}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -81,6 +85,7 @@ var (
 	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
+	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
@@ -302,13 +307,45 @@ func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 	}
 }
 
-func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duration) (network.Config, error) {
+func getNetworkConfig(
+	v *viper.Viper,
+	stakingEnabled bool,
+	halflife time.Duration,
+	networkID uint32, // TODO remove after cortina upgrade
+) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
 	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
 	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
+
+	var (
+		compressionType compression.Type
+		err             error
+	)
+	if v.IsSet(NetworkCompressionTypeKey) {
+		if v.IsSet(NetworkCompressionEnabledKey) {
+			return network.Config{}, fmt.Errorf("cannot set both %q and %q", NetworkCompressionTypeKey, NetworkCompressionEnabledKey)
+		}
+
+		compressionType, err = compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
+		if err != nil {
+			return network.Config{}, err
+		}
+	} else {
+		if v.GetBool(NetworkCompressionEnabledKey) {
+			compressionType = constants.DefaultNetworkCompressionType
+		} else {
+			compressionType = compression.TypeNone
+		}
+	}
+
+	cortinaTime := version.GetCortinaTime(networkID)
+	if compressionType == compression.TypeZstd && !time.Now().After(cortinaTime) {
+		// TODO remove after cortina upgrade
+		return network.Config{}, errZstdNotSupported
+	}
 	config := network.Config{
 		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
@@ -383,7 +420,7 @@ func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duratio
 		},
 
 		MaxClockDifference:           v.GetDuration(NetworkMaxClockDifferenceKey),
-		CompressionEnabled:           v.GetBool(NetworkCompressionEnabledKey),
+		CompressionType:              compressionType,
 		PingFrequency:                v.GetDuration(NetworkPingFrequencyKey),
 		AllowPrivateIPs:              v.GetBool(NetworkAllowPrivateIPsKey),
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
@@ -1345,7 +1382,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife, nodeConfig.NetworkID)
 	if err != nil {
 		return node.Config{}, err
 	}
