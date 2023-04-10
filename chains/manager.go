@@ -1324,7 +1324,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		if len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
-		return []ids.ID{}, nil
+		return nil, nil
 	})
 	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
