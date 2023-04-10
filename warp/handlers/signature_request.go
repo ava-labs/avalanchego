@@ -61,7 +61,7 @@ func (s *signatureRequestHandler) OnSignatureRequest(ctx context.Context, nodeID
 	response := message.SignatureResponse{Signature: signature}
 	responseBytes, err := s.codec.Marshal(message.Version, &response)
 	if err != nil {
-		log.Warn("could not marshal SignatureResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "err", err)
+		log.Error("could not marshal SignatureResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil, nil
 	}
 

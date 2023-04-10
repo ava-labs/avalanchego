@@ -304,7 +304,7 @@ func (vm *VM) Initialize(
 	vm.syntacticBlockValidator = NewBlockValidator()
 
 	if g.Config.FeeConfig == commontype.EmptyFeeConfig {
-		log.Warn("No fee config given in genesis, setting default fee config", "DefaultFeeConfig", params.DefaultFeeConfig)
+		log.Info("No fee config given in genesis, setting default fee config", "DefaultFeeConfig", params.DefaultFeeConfig)
 		g.Config.FeeConfig = params.DefaultFeeConfig
 	}
 
@@ -369,7 +369,7 @@ func (vm *VM) Initialize(
 		log.Info("Setting fee recipient", "address", address)
 		vm.ethConfig.Miner.Etherbase = address
 	} else {
-		log.Warn("Config has not specified any coinbase address. Defaulting to the blackhole address.")
+		log.Info("Config has not specified any coinbase address. Defaulting to the blackhole address.")
 		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
