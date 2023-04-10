@@ -577,7 +577,7 @@ func Test_Trie_CommitChanges(t *testing.T) {
 
 	// Case: Committing a view which is invalid
 	err = view1.commitChanges(context.Background(), &trieView{
-		parentTrie:  utils.NewAtomic[TrieView](view1),
+		parentTrie:  newAtomic[TrieView](view1),
 		invalidated: atomicTrue,
 	})
 	require.ErrorIs(err, ErrInvalid)
