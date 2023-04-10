@@ -5,10 +5,11 @@ package merkledb
 
 import (
 	"context"
-	"github.com/ava-labs/avalanchego/utils"
 	"math/rand"
 	"strconv"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils"
 
 	"github.com/stretchr/testify/require"
 

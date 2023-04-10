@@ -8,9 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/utils"
 	"runtime"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils"
 
 	"go.opentelemetry.io/otel/attribute"
 
