@@ -1081,7 +1081,7 @@ func (n *Node) initHealthAPI() error {
 		}, err
 	})
 
-	err = n.health.RegisterHealthCheck("memory", memorySpaceCheck)
+	err = n.health.RegisterHealthCheck("memory", memorySpaceCheck, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register memory resource health check: %w", err)
 	}
