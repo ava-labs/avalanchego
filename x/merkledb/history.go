@@ -96,13 +96,13 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 		return nil, ErrRootIDNotPresent
 	}
 
-	// [lastStartRootChange] is the last appearance of [startRoot]
+	// [startRootChanges] is the last appearance of [startRoot]
 	startRootChanges, ok := th.lastChanges[startRoot]
 	if !ok {
 		return nil, ErrStartRootNotFound
 	}
 
-	// lastStartRootChange is after the lastEndRootChange, but that is  just the latest appearance of start root
+	// startRootChanges is after the lastEndRootChange, but that is  just the latest appearance of start root
 	// there may be an earlier entry, so attempt to find an entry that comes before lastEndRootChange
 	if startRootChanges.index > lastEndRootChange.index {
 		th.history.DescendLessOrEqual(
@@ -141,13 +141,13 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
 	combinedChanges := newChangeSummary(maxLength)
 
-	// For each change after [lastStartRootChange] up to and including
+	// For each change after [startRootChanges] up to and including
 	// [lastEndRootChange], record the change in [combinedChanges].
 	th.history.AscendGreaterOrEqual(
 		startRootChanges,
 		func(item *changeSummaryAndIndex) bool {
 			if item == startRootChanges {
-				// Start from the first change after [lastStartRootChange].
+				// Start from the first change after [startRootChanges].
 				return true
 			}
 			if item.index > lastEndRootChange.index {
