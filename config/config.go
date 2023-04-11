@@ -1310,6 +1310,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
 	}
 
+	// App handling
+	nodeConfig.ConsensusAppConcurrency = int(v.GetUint(ConsensusAppConcurrencyKey))
+	if nodeConfig.ConsensusAppConcurrency <= 0 {
+		return node.Config{}, fmt.Errorf("%s must be > 0", ConsensusAppConcurrencyKey)
+	}
+
 	nodeConfig.UseCurrentHeight = v.GetBool(ProposerVMUseCurrentHeightKey)
 
 	// Logging

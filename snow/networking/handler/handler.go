@@ -32,7 +32,6 @@ import (
 )
 
 const (
-	threadPoolSize        = 2
 	numDispatchersToClose = 3
 	// If a consensus message takes longer than this to process, the handler
 	// will log a warning.
@@ -121,6 +120,7 @@ func New(
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
+	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
