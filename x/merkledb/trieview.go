@@ -565,6 +565,8 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // CommitToParent commits the changes from this view to its parent Trie
 func (t *trieView) CommitToParent(ctx context.Context) error {
+	// TODO: Only lock the commitlock when the parent is the DB
+	// TODO: fix concurrency bugs with CommitToParent
 	t.db.commitLock.Lock()
 	defer t.db.commitLock.Unlock()
 
