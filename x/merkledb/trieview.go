@@ -519,6 +519,8 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	case trieToCommit.invalidated.Get():
 		// don't apply changes from an invalid view
 		return ErrInvalid
+	case t.committed:
+		return t.parentTrie.Get().commitChanges(ctx, trieToCommit)
 	}
 
 	// Invalidate all child views except the view being committed.
