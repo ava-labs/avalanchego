@@ -25,6 +25,26 @@ The supported plugin version is `25`.
 - use `require` in `utils/wrappers` tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1280
 - add support for tracking delegatee rewards to validator metadata by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1273
 - defer delegatee rewards until end of validator staking period by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1262
+- Initialize UptimeCalculator in TestPeer by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1283
+- Add Avalanche liveness health checks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1287
+- Skip AMI generation with Fuji tags by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1288
+- Use `maps.Equal` in `set.Equals` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1290
+- return accrued delegator rewards in `GetCurrentValidators` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1291
+- Add zstd compression by @danlaine in https://github.com/ava-labs/avalanchego/pull/1278
+- implement `txs.Visitor` in X chain wallet by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1299
+- Parallelize gzip compression by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1293
+- Add zip bomb tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1300
+- Gossip Avalanche frontier after the linearization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1303
+- Add fine grained metrics+logging for handling, processing, and grab l… by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1301
+- Persist stateless block in AVM state by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1305
+- Initialize FxID fields in GetBlock and GetBlockByHeight by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1306
+- Filterable Health Tags by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1304
+- increase health await timeout by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1317
+- Expose GetEngineManager from the chain Handler by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1316
+- Add BLS benchmarks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1318
+- Encode codec version in merkledb by @danlaine in https://github.com/ava-labs/avalanchego/pull/1313
+- Expose consensus-app-concurrency by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1322
+- Adjust Logic In Merkle DB History by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1310
 
 ### New Contributors
 
@@ -33,8 +53,10 @@ The supported plugin version is `25`.
 - @krakxn made their first contribution in https://github.com/ava-labs/avalanchego/pull/1102
 - @kyl27 made their first contribution in https://github.com/ava-labs/avalanchego/pull/1256
 - @dhrubabasu made their first contribution in https://github.com/ava-labs/avalanchego/pull/1279
+- @joshua-kim made their first contribution in https://github.com/ava-labs/avalanchego/pull/1283
+- @dboehm-avalabs made their first contribution in https://github.com/ava-labs/avalanchego/pull/1310
 
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.9.16...v1.10.0-fuji
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.9.16...v1.10.0
 
 ## [v1.9.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.16)
 
