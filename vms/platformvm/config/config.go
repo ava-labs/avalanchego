@@ -101,6 +101,9 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
+	// Time of the continuous staking network upgrade
+	ContinuousStakingTime time.Time
+
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.
 	// [constants.PrimaryNetworkID] is always a key in this map.
