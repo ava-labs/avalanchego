@@ -189,12 +189,12 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	for _, i := range []int{1, 10, 1000, 2000} {
 		vs := setupValidatorSet(b, i)
 		b.Run(fmt.Sprintf("get_validator_set_%d_validators", i), func(b *testing.B) {
-			benchmarkGetValidatorSet(b, i, vs)
+			benchmarkGetValidatorSet(b, vs)
 		})
 	}
 }
 
-func benchmarkGetValidatorSet(b *testing.B, i int, vs map[ids.NodeID]*validators.GetValidatorOutput) {
+func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
