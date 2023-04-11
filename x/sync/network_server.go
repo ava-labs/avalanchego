@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"time"
 
 	"go.uber.org/zap"
@@ -20,10 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-// Maximum number of key-value pairs to return in a proof.
-// This overrides any other Limit specified in a RangeProofRequest
-// or ChangeProofRequest if the given Limit is greater.
-const maxKeyValuesLimit = 1024
+const (
+	// Maximum number of key-value pairs to return in a proof.
+	// This overrides any other Limit specified in a RangeProofRequest
+	// or ChangeProofRequest if the given Limit is greater.
+	maxKeyValuesLimit        = 2048
+	maxByteSizeLimit         = units.MiB
+	endProofSizeBufferAmount = 2 * units.KiB
+)
 
 var (
 	_ Handler = (*NetworkServer)(nil)
@@ -144,8 +149,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		keyLimit = maxKeyValuesLimit
 	}
 	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > defaultRequestByteSizeLimit {
-		bytesLimit = defaultRequestByteSizeLimit
+	if bytesLimit > maxByteSizeLimit {
+		bytesLimit = maxByteSizeLimit
 	}
 
 	// attempt to get a proof within the bytes limit
@@ -185,8 +190,9 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if bytesEstimate > int(req.BytesLimit) {
 			return ErrMinProofSizeIsTooLarge
 		}
-
-		bytesEstimate += getBytesEstimateOfProofNodes(changeProof.EndProof)
+		// since the number of keys is decreasing, the new endproof will be a different size than the current one
+		// use the current endproof plus a small buffer to account for potential size differences
+		bytesEstimate += getBytesEstimateOfProofNodes(changeProof.EndProof) + endProofSizeBufferAmount
 		deleteKeyIndex := 0
 		changeKeyIndex := 0
 
@@ -247,8 +253,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyLimit = maxKeyValuesLimit
 	}
 	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > defaultRequestByteSizeLimit {
-		bytesLimit = defaultRequestByteSizeLimit
+	if bytesLimit > maxByteSizeLimit {
+		bytesLimit = maxByteSizeLimit
 	}
 	for keyLimit > 0 {
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, int(keyLimit))
@@ -287,7 +293,9 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			return ErrMinProofSizeIsTooLarge
 		}
 
-		bytesEstimate += getBytesEstimateOfProofNodes(rangeProof.EndProof)
+		// since the number of keys is decreasing, the new endproof will be a different size than the current one
+		// use the current endproof plus a small buffer to account for potential size differences
+		bytesEstimate += getBytesEstimateOfProofNodes(rangeProof.EndProof) + endProofSizeBufferAmount
 
 		// shrink more if the early keys are extremely large
 		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {

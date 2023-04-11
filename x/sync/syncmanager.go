@@ -21,7 +21,7 @@ import (
 
 const (
 	defaultRequestKeyLimit      = 1024
-	defaultRequestByteSizeLimit = units.MiB
+	defaultRequestByteSizeLimit = 512 * units.KiB
 )
 
 var (
