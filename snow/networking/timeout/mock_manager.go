@@ -43,13 +43,13 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 // Dispatch mocks base method.
 func (m *MockManager) Dispatch() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Dispatch")
+	m.ctrl.Call(m, "Start")
 }
 
 // Dispatch indicates an expected call of Dispatch.
 func (mr *MockManagerMockRecorder) Dispatch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockManager)(nil).Dispatch))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockManager)(nil).Dispatch))
 }
 
 // IsBenched mocks base method.

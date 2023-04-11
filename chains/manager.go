@@ -105,9 +105,6 @@ var (
 type Manager interface {
 	ids.Aliaser
 
-	// Return the router this Manager is using to route consensus messages to chains
-	Router() router.Router
-
 	// Queues a chain to be created in the future after chain creator is unblocked.
 	// This is only called from the P-chain thread to create other chains
 	// Queued chains are created only after P-chain is bootstrapped.
@@ -199,10 +196,8 @@ type ManagerConfig struct {
 	RetryBootstrapWarnFrequency int                       // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]subnets.Config // ID -> SubnetConfig
 	ChainConfigs                map[string]ChainConfig    // alias -> ChainConfig
-	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
-	ShutdownNodeFunc func(exitCode int)
-	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
-	Metrics          metrics.MultiGatherer
+	MeterVMEnabled              bool                      // Should each VM be wrapped with a MeterVM
+	Metrics                     metrics.MultiGatherer
 
 	ConsensusGossipFrequency time.Duration
 	ConsensusAppConcurrency  int
@@ -254,10 +249,12 @@ type manager struct {
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
+
+	cancel func()
 }
 
 // New returns a new Manager
-func New(config *ManagerConfig) Manager {
+func New(config *ManagerConfig, cancel func()) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
@@ -266,12 +263,8 @@ func New(config *ManagerConfig) Manager {
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
+		cancel:                 cancel,
 	}
-}
-
-// Router that this chain manager is using to route consensus messages to chains
-func (m *manager) Router() router.Router {
-	return m.ManagerConfig.Router
 }
 
 // QueueChainCreation queues a chain creation request
@@ -342,7 +335,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 				zap.Stringer("vmID", chainParams.VMID),
 				zap.Error(err),
 			)
-			go m.ShutdownNodeFunc(1)
+			m.cancel()
 			return
 		}
 

@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -62,10 +63,9 @@ func TestNewIndexer(t *testing.T) {
 		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
 	}
 
-	idxrIntf, err := NewIndexer(config)
+	idxrIntf, err := NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	require.True(ok)
@@ -85,7 +85,6 @@ func TestNewIndexer(t *testing.T) {
 	require.NotNil(idxr.blockAcceptorGroup)
 	require.NotNil(idxr.txAcceptorGroup)
 	require.NotNil(idxr.vertexAcceptorGroup)
-	require.NotNil(idxr.shutdownF)
 	require.False(idxr.hasRunBefore)
 }
 
@@ -94,8 +93,7 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	require := require.New(t)
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-	shutdown := &sync.WaitGroup{}
-	shutdown.Add(1)
+
 	config := Config{
 		IndexingEnabled:     true,
 		Log:                 logging.NoLog{},
@@ -104,25 +102,25 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 		TxAcceptorGroup:     snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:           &apiServerMock{},
-		ShutdownF:           shutdown.Done,
 	}
 
-	idxrIntf, err := NewIndexer(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	idxrIntf, err := NewIndexer(config, cancel)
 	require.NoError(err)
 	require.False(idxrIntf.(*indexer).hasRunBefore)
 	require.NoError(db.Commit())
 	require.NoError(idxrIntf.Close())
-	shutdown.Wait()
-	shutdown.Add(1)
+	<-ctx.Done()
 
+	ctx, cancel = context.WithCancel(context.Background())
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, cancel)
 	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	require.True(ok)
 	require.True(idxr.hasRunBefore)
 	require.NoError(idxr.Close())
-	shutdown.Wait()
+	<-ctx.Done()
 }
 
 // Test registering a linear chain and a DAG chain and accepting
@@ -144,11 +142,10 @@ func TestIndexer(t *testing.T) {
 		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:            server,
-		ShutdownF:            func() {},
 	}
 
 	// Create indexer
-	idxrIntf, err := NewIndexer(config)
+	idxrIntf, err := NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	require.True(ok)
@@ -230,7 +227,7 @@ func TestIndexer(t *testing.T) {
 
 	// Re-open the indexer
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	now = time.Now()
@@ -387,7 +384,7 @@ func TestIndexer(t *testing.T) {
 
 	// Re-open one more time and re-register chains
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	require.True(ok)
@@ -423,9 +420,8 @@ func TestIncompleteIndex(t *testing.T) {
 		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
 	}
-	idxrIntf, err := NewIndexer(config)
+	idxrIntf, err := NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	require.True(ok)
@@ -452,7 +448,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.NoError(idxr.Close())
 	config.IndexingEnabled = true
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	require.True(ok)
@@ -468,7 +464,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.NoError(idxr.Close())
 	config.AllowIncompleteIndex = true
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	require.True(ok)
@@ -484,7 +480,7 @@ func TestIncompleteIndex(t *testing.T) {
 	config.AllowIncompleteIndex = false
 	config.IndexingEnabled = false
 	config.DB = versiondb.New(baseDB)
-	idxrIntf, err = NewIndexer(config)
+	idxrIntf, err = NewIndexer(config, func() {})
 	require.NoError(err)
 	_, ok = idxrIntf.(*indexer)
 	require.True(ok)
@@ -507,11 +503,10 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
 		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:            &apiServerMock{},
-		ShutdownF:            func() {},
 	}
 
 	// Create indexer
-	idxrIntf, err := NewIndexer(config)
+	idxrIntf, err := NewIndexer(config, func() {})
 	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
 	require.True(ok)

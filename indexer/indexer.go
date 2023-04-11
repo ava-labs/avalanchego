@@ -65,7 +65,6 @@ type Config struct {
 	TxAcceptorGroup      snow.AcceptorGroup
 	VertexAcceptorGroup  snow.AcceptorGroup
 	APIServer            server.PathAdder
-	ShutdownF            func()
 }
 
 // Indexer causes accepted containers for a given chain
@@ -79,7 +78,7 @@ type Indexer interface {
 }
 
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
-func NewIndexer(config Config) (Indexer, error) {
+func NewIndexer(config Config, cancel func()) (Indexer, error) {
 	indexer := &indexer{
 		codec:                codec.NewManager(codecMaxSize),
 		log:                  config.Log,
@@ -93,7 +92,7 @@ func NewIndexer(config Config) (Indexer, error) {
 		vtxIndices:           map[ids.ID]Index{},
 		blockIndices:         map[ids.ID]Index{},
 		pathAdder:            config.APIServer,
-		shutdownF:            config.ShutdownF,
+		cancel:               cancel,
 	}
 
 	if err := indexer.codec.RegisterCodec(
@@ -117,9 +116,6 @@ type indexer struct {
 	log    logging.Logger
 	db     database.Database
 	closed bool
-
-	// Called in a goroutine on shutdown
-	shutdownF func()
 
 	// true if this is not the first run using this database
 	hasRunBefore bool
@@ -147,6 +143,9 @@ type indexer struct {
 	txAcceptorGroup snow.AcceptorGroup
 	// Notifies of newly accepted vertices
 	vertexAcceptorGroup snow.AcceptorGroup
+
+	// called on close
+	cancel func()
 }
 
 // Assumes [ctx.Lock] is not held
@@ -381,6 +380,8 @@ func (i *indexer) close() error {
 	if i.closed {
 		return nil
 	}
+	defer i.cancel()
+
 	i.closed = true
 
 	errs := &wrappers.Errs{}
@@ -404,7 +405,6 @@ func (i *indexer) close() error {
 	}
 	errs.Add(i.db.Close())
 
-	go i.shutdownF()
 	return errs.Err
 }
 

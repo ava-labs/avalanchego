@@ -112,3 +112,18 @@ func rotate(name string, maxNumFiles int) error {
 	_, err := filesystem.RenameIfExists(name, destFilename)
 	return err
 }
+
+var _ ContinuousProfiler = (*NoOpContinuousProfiler)(nil)
+
+type NoOpContinuousProfiler struct {
+	Close chan struct{}
+}
+
+func (n NoOpContinuousProfiler) Dispatch() error {
+	<-n.Close
+	return nil
+}
+
+func (n NoOpContinuousProfiler) Shutdown() {
+	close(n.Close)
+}

@@ -5,7 +5,6 @@ package chains
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
 )
 
 // TestManager implements Manager but does nothing. Always returns nil error.
@@ -13,10 +12,6 @@ import (
 var TestManager Manager = testManager{}
 
 type testManager struct{}
-
-func (testManager) Router() router.Router {
-	return nil
-}
 
 func (testManager) QueueChainCreation(ChainParameters) {}
 
