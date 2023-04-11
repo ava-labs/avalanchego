@@ -2,7 +2,10 @@ name: Test upgrade
 
 on:
   push:
+    tags:
+      - "*"
     branches:
+      - master
       - dev
   pull_request:
 
