@@ -567,21 +567,15 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // CommitToParent commits the changes from this view to its parent Trie
 func (t *trieView) CommitToParent(ctx context.Context) error {
-	// if we are about to write to the db, then we to hold the commitLock
-	if t.getParentTrie() == t.db {
-		t.db.commitLock.Lock()
-		defer t.db.commitLock.Unlock()
-	}
-
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.commitToParent(ctx)
+	return t.commitToParent(ctx, true)
 }
 
 // commitToParent commits the changes from this view to its parent Trie
 // assumes [t.lock] is held
-func (t *trieView) commitToParent(ctx context.Context) error {
+func (t *trieView) commitToParent(ctx context.Context, commitLockIfParentDB bool) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
 	defer span.End()
 
@@ -598,8 +592,16 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 	}
 
 	// overwrite this view with changes from the incoming view
-	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
+	parent := t.getParentTrie()
+	if commitLockIfParentDB && parent == t.db {
+		t.db.commitLock.Lock()
+		defer t.db.commitLock.Unlock()
+	}
+	if err := parent.commitChanges(ctx, t); err != nil {
 		return err
+	}
+	if t.isInvalid() {
+		return ErrInvalid
 	}
 
 	t.committed = true
@@ -620,7 +622,7 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	defer span.End()
 
 	// first merge changes into the parent trie
-	if err := t.commitToParent(ctx); err != nil {
+	if err := t.commitToParent(ctx, false); err != nil {
 		return err
 	}
 
