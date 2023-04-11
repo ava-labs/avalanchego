@@ -222,10 +222,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
 	// getting the Merkle root forces any unupdated nodes to recalculate their ids
-	if t.parentTrie != nil {
-		if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-			return err
-		}
+	if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
+		return err
 	}
 
 	if err := t.applyChangedValuesToTrie(ctx); err != nil {
