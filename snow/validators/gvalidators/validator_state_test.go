@@ -187,9 +187,8 @@ func TestGetValidatorSet(t *testing.T) {
 // request based on a mocked validator set.
 func BenchmarkGetValidatorSet(b *testing.B) {
 	for _, i := range []int{1, 10, 1000, 2000} {
+		vs := setupValidatorSet(b, i)
 		b.Run(fmt.Sprintf("get_validator_set_%d_validators", i), func(b *testing.B) {
-			vs := setupValidatorSet(b, i)
-			b.ResetTimer()
 			benchmarkGetValidatorSet(b, i, vs)
 		})
 	}
