@@ -71,8 +71,11 @@ type EncoderDecoder interface {
 
 // TODO actually encode the version and remove version from the interface
 type Encoder interface {
+	// ByteSliceSize provides the number of bytes in the serialized form of byte slice
 	ByteSliceSize(value []byte) int
+	// ProofNodeSize provides the number of bytes in the serialized form of a ProofNode
 	ProofNodeSize(value ProofNode) int
+
 	EncodeProof(version uint16, p *Proof) ([]byte, error)
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 	EncodeRangeProof(version uint16, p *RangeProof) ([]byte, error)
