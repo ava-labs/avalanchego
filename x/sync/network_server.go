@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"time"
 
 	"go.uber.org/zap"
@@ -26,7 +27,7 @@ const (
 	// This overrides any other Limit specified in a RangeProofRequest
 	// or ChangeProofRequest if the given Limit is greater.
 	maxKeyValuesLimit        = 2048
-	maxByteSizeLimit         = units.MiB
+	maxByteSizeLimit         = constants.DefaultMaxMessageSize - 4*units.KiB
 	endProofSizeBufferAmount = 2 * units.KiB
 )
 
