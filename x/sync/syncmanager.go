@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	"go.uber.org/zap"
 
