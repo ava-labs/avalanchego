@@ -57,6 +57,7 @@ type Handler interface {
 	ShouldHandle(nodeID ids.NodeID) bool
 
 	SetEngineManager(engineManager *EngineManager)
+	GetEngineManager() *EngineManager
 
 	SetOnStopped(onStopped func())
 	Start(ctx context.Context, recoverPanic bool)
@@ -167,6 +168,10 @@ func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
 	h.engineManager = engineManager
+}
+
+func (h *handler) GetEngineManager() *EngineManager {
+	return h.engineManager
 }
 
 func (h *handler) SetOnStopped(onStopped func()) {
