@@ -52,6 +52,36 @@ firewood. Firewood exists to provide a very fast storage layer for [qEVM](https:
 firewood is licensed by the Ecosystem License. For more information, see the
 [LICENSE file](./LICENSE.md).
 
+## Roadmap
+### Green Milestone 
+This milestone will focus on additional code cleanup, including supporting
+concurrent access to a specific revision, as well as cleaning up the basic
+reader and writer interfaces to have consistent read/write semantics.
+- [ ] Concurrent readers of pinned revisions while allowing additional batches
+to commit, to support parallel reads for the past consistent states. The revisions
+are uniquely identified by root hashes.
+- [ ] Pin a reader to a specific revision, so that future commits or other
+operations do not see any changes.
+- [ ] Be able to read-your-write in a batch that is not committed. Uncommitted
+changes will not be shown to any other concurrent readers.
+### Seasoned milestone
+This milestone will add support for proposals, including proposed future
+branches, with a cache to make committing these branches efficiently.
+- [ ] Be able to propose a batch against the existing committed revision, or
+propose a batch against any existing proposed revision.
+- [ ] Be able to quickly commit a batch that has been proposed. Note that this
+invalidates all other proposals that are not children of the committed proposed batch.
+### Dried milestone
+The focus of this milestone will be to support synchronization to other
+instances to replicate the state. A synchronization library should also
+be developed for this milestone.
+- [ ] Support replicating the full state with corresponding range proofs that
+verify the correctness of the data.
+- [ ] Support replicating the delta state from the last sync point with
+corresponding range proofs that verify the correctness of the data.
+- [ ] Enforce limits on the size of the range proof as well as keys to make
+  synchronization easier for clients.
+
 ## Build
 Firewood currently is Linux-only, as it has a dependency on the asynchronous
 I/O provided by the Linux kernel (see `libaio`). Unfortunately, Docker is not
