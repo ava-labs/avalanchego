@@ -36,7 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const engineType = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+const (
+	engineType         = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+	testThreadPoolSize = 2
+)
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
@@ -89,6 +92,7 @@ func TestShutdown(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -224,6 +228,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -380,6 +385,7 @@ func TestRouterTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -848,6 +854,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -1138,6 +1145,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -1287,6 +1295,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(requester.NodeID, subnets.Config{}),
@@ -1304,6 +1313,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(responder.NodeID, subnets.Config{}),
@@ -1552,6 +1562,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,

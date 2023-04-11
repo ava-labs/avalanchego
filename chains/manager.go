@@ -205,6 +205,7 @@ type ManagerConfig struct {
 	Metrics          metrics.MultiGatherer
 
 	ConsensusGossipFrequency time.Duration
+	ConsensusAppConcurrency  int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -818,6 +819,7 @@ func (m *manager) createAvalancheChain(
 		vdrs,
 		msgChan,
 		m.ConsensusGossipFrequency,
+		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
@@ -1173,6 +1175,7 @@ func (m *manager) createSnowmanChain(
 		vdrs,
 		msgChan,
 		m.ConsensusGossipFrequency,
+		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,
 		sb,
