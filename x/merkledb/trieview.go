@@ -567,6 +567,9 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // CommitToParent commits the changes from this view to its parent Trie
 func (t *trieView) CommitToParent(ctx context.Context) error {
+	t.db.commitLock.Lock()
+	defer t.db.commitLock.Unlock()
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
