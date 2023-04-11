@@ -1195,20 +1195,29 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
 		require.NoError(t, err)
 
-		childView, err := parentView.NewView()
+		childView1, err := parentView.NewView()
 		require.NoError(t, err)
-		err = childView.Insert(context.Background(), []byte{1}, []byte{1})
+		err = childView1.Insert(context.Background(), []byte{1}, []byte{1})
+		require.NoError(t, err)
+
+		childView2, err := childView1.NewView()
+		require.NoError(t, err)
+		err = childView2.Insert(context.Background(), []byte{2}, []byte{2})
 		require.NoError(t, err)
 
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 		go func() {
 			defer wg.Done()
 			require.NoError(t, parentView.CommitToParent(context.Background()))
 		}()
 		go func() {
 			defer wg.Done()
-			go require.NoError(t, childView.CommitToParent(context.Background()))
+			require.NoError(t, childView1.CommitToParent(context.Background()))
+		}()
+		go func() {
+			defer wg.Done()
+			require.NoError(t, childView2.CommitToParent(context.Background()))
 		}()
 
 		wg.Wait()
@@ -1220,6 +1229,10 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 		val1, err := baseView.GetValue(context.Background(), []byte{1})
 		require.NoError(t, err)
 		require.Equal(t, []byte{1}, val1)
+
+		val2, err := baseView.GetValue(context.Background(), []byte{2})
+		require.NoError(t, err)
+		require.Equal(t, []byte{2}, val2)
 	}
 }
 
@@ -1234,20 +1247,29 @@ func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
 		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
 		require.NoError(t, err)
 
-		childView, err := parentView.NewView()
+		childView1, err := parentView.NewView()
 		require.NoError(t, err)
-		err = childView.Insert(context.Background(), []byte{1}, []byte{1})
+		err = childView1.Insert(context.Background(), []byte{1}, []byte{1})
+		require.NoError(t, err)
+
+		childView2, err := childView1.NewView()
+		require.NoError(t, err)
+		err = childView2.Insert(context.Background(), []byte{2}, []byte{2})
 		require.NoError(t, err)
 
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 		go func() {
 			defer wg.Done()
 			require.NoError(t, parentView.CommitToParent(context.Background()))
 		}()
 		go func() {
 			defer wg.Done()
-			go require.NoError(t, childView.CommitToParent(context.Background()))
+			require.NoError(t, childView1.CommitToParent(context.Background()))
+		}()
+		go func() {
+			defer wg.Done()
+			require.NoError(t, childView2.CommitToParent(context.Background()))
 		}()
 
 		wg.Wait()
@@ -1259,6 +1281,10 @@ func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
 		val1, err := dbTrie.GetValue(context.Background(), []byte{1})
 		require.NoError(t, err)
 		require.Equal(t, []byte{1}, val1)
+
+		val2, err := dbTrie.GetValue(context.Background(), []byte{2})
+		require.NoError(t, err)
+		require.Equal(t, []byte{2}, val2)
 	}
 }
 
