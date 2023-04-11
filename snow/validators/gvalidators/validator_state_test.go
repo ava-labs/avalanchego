@@ -219,7 +219,7 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
 	sk, _ := bls.NewSecretKey()
 	pk := bls.PublicFromSecretKey(sk)
-	for i := 0; i < size-1; i++ {
+	for i := 0; i < size; i++ {
 		id := ids.GenerateTestNodeID()
 		set[id] = &validators.GetValidatorOutput{
 			NodeID:    id,
