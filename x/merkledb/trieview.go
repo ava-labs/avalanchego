@@ -27,7 +27,7 @@ const defaultPreallocationSize = 100
 
 var (
 	ErrCommitted          = errors.New("view has been committed")
-	ErrInvalid            = errors.New("the trie this view was based on has changed, rending this view invalid")
+	ErrInvalid            = errors.New("the trie this view was based on has changed, rendering this view invalid")
 	ErrOddLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
 	)
@@ -600,9 +600,6 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 	// overwrite this view with changes from the incoming view
 	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
 		return err
-	}
-	if t.isInvalid() {
-		return ErrInvalid
 	}
 
 	t.committed = true

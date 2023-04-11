@@ -753,7 +753,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.invalidateChildrenExcept(trieToCommit)
 
 	// move any child views of the committed trie onto the db after changes have been made
-	defer db.moveChildViewsToDB(trieToCommit)
+	db.moveChildViewsToDB(trieToCommit)
 
 	if len(changes.nodes) == 0 {
 		return nil
