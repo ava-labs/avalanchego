@@ -10,4 +10,5 @@ type CaminoVisitor interface {
 	ClaimTx(*ClaimTx) error
 	RegisterNodeTx(*RegisterNodeTx) error
 	RewardsImportTx(*RewardsImportTx) error
+	BaseTx(*BaseTx) error
 }

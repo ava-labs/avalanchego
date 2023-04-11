@@ -1341,6 +1341,36 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 	return nil
 }
 
+func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	if e.Bootstrapped.GetValue() {
+		if err := e.Backend.FlowChecker.VerifyLock(
+			tx,
+			e.State,
+			tx.Ins,
+			tx.Outs,
+			e.Tx.Creds,
+			e.Backend.Config.TxFee,
+			e.Backend.Ctx.AVAXAssetID,
+			locked.StateUnlocked,
+		); err != nil {
+			return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		}
+	}
+
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
+
+	return nil
+}
+
 func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {
 	newCredsLen := len(tx.Creds) - num
 	removedCreds := tx.Creds[newCredsLen:len(tx.Creds)]

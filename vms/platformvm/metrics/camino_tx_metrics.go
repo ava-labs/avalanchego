@@ -18,7 +18,8 @@ type caminoTxMetrics struct {
 	numUnlockDepositTxs,
 	numClaimTxs,
 	numRegisterNodeTxs,
-	numRewardsImportTxs prometheus.Counter
+	numRewardsImportTxs,
+	numBaseTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -40,6 +41,7 @@ func newCaminoTxMetrics(
 		numClaimTxs:         newTxMetric(namespace, "claim", registerer, &errs),
 		numRegisterNodeTxs:  newTxMetric(namespace, "register_node", registerer, &errs),
 		numRewardsImportTxs: newTxMetric(namespace, "rewards_import", registerer, &errs),
+		numBaseTxs:          newTxMetric(namespace, "base", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -67,6 +69,10 @@ func (*txMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
 }
 
 func (*txMetrics) RewardsImportTx(*txs.RewardsImportTx) error {
+	return nil
+}
+
+func (*txMetrics) BaseTx(*txs.BaseTx) error {
 	return nil
 }
 
@@ -99,5 +105,10 @@ func (m *caminoTxMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 func (m *caminoTxMetrics) RewardsImportTx(*txs.RewardsImportTx) error {
 	m.numRegisterNodeTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) BaseTx(*txs.BaseTx) error {
+	m.numBaseTxs.Inc()
 	return nil
 }
