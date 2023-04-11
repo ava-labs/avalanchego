@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"time"
 
 	"go.uber.org/zap"
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 

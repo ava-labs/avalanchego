@@ -367,8 +367,6 @@ func sendChangeRequest(
 func TestGetChangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
-	require := require.New(t)
-
 	trieDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
@@ -378,7 +376,7 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 	verificationDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
@@ -388,47 +386,47 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// create changes
 	for x := 0; x < 200; x++ {
 		view, err := trieDB.NewView()
-		require.NoError(err)
+		require.NoError(t, err)
 
 		// add some key/values
 		for i := 0; i < 10; i++ {
 			key := make([]byte, r.Intn(100))
 			_, err = r.Read(key)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			val := make([]byte, r.Intn(100))
 			_, err = r.Read(val)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			err = view.Insert(context.Background(), key, val)
-			require.NoError(err)
+			require.NoError(t, err)
 		}
 
 		// delete a key
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
 			err = view.Remove(context.Background(), it.Key())
-			require.NoError(err)
+			require.NoError(t, err)
 		}
-		require.NoError(it.Error())
+		require.NoError(t, it.Error())
 		it.Release()
 
-		require.NoError(view.CommitToDB(context.Background()))
+		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
 	endRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	tests := map[string]struct {
 		db                  *merkledb.Database
@@ -528,6 +526,8 @@ func TestGetChangeProof(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
 			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
 			if test.expectedErr != nil {
 				require.ErrorIs(err, test.expectedErr)
