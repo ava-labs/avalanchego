@@ -102,7 +102,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 		return nil, ErrStartRootNotFound
 	}
 
-	// startRootChanges is after the lastEndRootChange, but that is  just the latest appearance of start root
+	// startRootChanges is after the lastEndRootChange, but that is just the latest appearance of start root
 	// there may be an earlier entry, so attempt to find an entry that comes before lastEndRootChange
 	if startRootChanges.index > lastEndRootChange.index {
 		th.history.DescendLessOrEqual(
