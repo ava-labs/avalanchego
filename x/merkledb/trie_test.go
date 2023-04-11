@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -1177,4 +1178,85 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	require.True(view2.invalidated)
 	require.True(view3.invalidated)
 	require.Empty(view1.childViews)
+}
+
+func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
+	for i := 0; i < 5000; i++ {
+		dbTrie, err := getBasicDB()
+		require.NoError(t, err)
+		require.NotNil(t, dbTrie)
+
+		baseView, err := dbTrie.NewView()
+		require.NoError(t, err)
+
+		parentView, err := baseView.NewView()
+		require.NoError(t, err)
+		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
+		require.NoError(t, err)
+
+		childView, err := parentView.NewView()
+		require.NoError(t, err)
+		err = childView.Insert(context.Background(), []byte{1}, []byte{1})
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			require.NoError(t, parentView.CommitToParent(context.Background()))
+		}()
+		go func() {
+			defer wg.Done()
+			go require.NoError(t, childView.CommitToParent(context.Background()))
+		}()
+
+		wg.Wait()
+
+		val0, err := baseView.GetValue(context.Background(), []byte{0})
+		require.NoError(t, err)
+		require.Equal(t, []byte{0}, val0)
+
+		val1, err := baseView.GetValue(context.Background(), []byte{1})
+		require.NoError(t, err)
+		require.Equal(t, []byte{1}, val1)
+	}
+}
+
+func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
+	for i := 0; i < 5000; i++ {
+		dbTrie, err := getBasicDB()
+		require.NoError(t, err)
+		require.NotNil(t, dbTrie)
+
+		parentView, err := dbTrie.NewView()
+		require.NoError(t, err)
+		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
+		require.NoError(t, err)
+
+		childView, err := parentView.NewView()
+		require.NoError(t, err)
+		err = childView.Insert(context.Background(), []byte{1}, []byte{1})
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			require.NoError(t, parentView.CommitToParent(context.Background()))
+		}()
+		go func() {
+			defer wg.Done()
+			go require.NoError(t, childView.CommitToParent(context.Background()))
+		}()
+
+		wg.Wait()
+
+		val0, err := dbTrie.GetValue(context.Background(), []byte{0})
+		require.NoError(t, err)
+		require.Equal(t, []byte{0}, val0)
+
+		val1, err := dbTrie.GetValue(context.Background(), []byte{1})
+		require.NoError(t, err)
+		require.Equal(t, []byte{1}, val1)
+	}
 }

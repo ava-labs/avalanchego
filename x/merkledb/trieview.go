@@ -515,12 +515,14 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	case trieToCommit == nil:
 		// no changes to apply
 		return nil
-	case trieToCommit.getParentTrie() != t:
-		// trieToCommit needs to be a child of t, otherwise the changes merge would not work
-		return ErrViewIsNotAChild
 	case trieToCommit.isInvalid():
 		// don't apply changes from an invalid view
 		return ErrInvalid
+	case t.committed:
+		return t.getParentTrie().commitChanges(ctx, trieToCommit)
+	case trieToCommit.getParentTrie() != t:
+		// trieToCommit needs to be a child of t, otherwise the changes merge would not work
+		return ErrViewIsNotAChild
 	}
 
 	// Invalidate all child views except the view being committed.
