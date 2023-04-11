@@ -246,6 +246,7 @@ func (it *iterator) fetch() {
 			case onUpdated := <-it.reqUpdateError:
 				it.updateError()
 				close(onUpdated)
+				continue
 			case <-it.onClose:
 				return
 			}
