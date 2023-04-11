@@ -8,12 +8,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Version is the current default codec version
-const Version = txs.Version
+const (
+	Version                  = txs.Version
+	ContinuousStakingVersion = txs.ContinuousStakingVersion
+)
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -25,13 +29,38 @@ var (
 )
 
 func init() {
-	c := linearcodec.NewDefault()
+	lc := linearcodec.New(
+		[]string{
+			reflectcodec.DefaultTagName,
+			txs.PreContinuousStakingTag,
+		},
+		linearcodec.DefaultMaxSliceLength,
+	)
+	contLc := linearcodec.New([]string{
+		reflectcodec.DefaultTagName,
+		txs.ContinuousStakingTag,
+	},
+		linearcodec.DefaultMaxSliceLength,
+	)
 	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+
+	gc := linearcodec.New(
+		[]string{
+			reflectcodec.DefaultTagName,
+			txs.PreContinuousStakingTag,
+		},
+		math.MaxInt32,
+	)
+	contGc := linearcodec.New([]string{
+		reflectcodec.DefaultTagName,
+		txs.ContinuousStakingTag,
+	},
+		math.MaxInt32,
+	)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{c, gc} {
+	for _, c := range []codec.Registry{lc, contLc, gc, contGc} {
 		errs.Add(
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
@@ -39,8 +68,11 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
+		Codec.RegisterCodec(Version, lc),
 		GenesisCodec.RegisterCodec(Version, gc),
+
+		Codec.RegisterCodec(ContinuousStakingVersion, contLc),
+		GenesisCodec.RegisterCodec(ContinuousStakingVersion, contGc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
