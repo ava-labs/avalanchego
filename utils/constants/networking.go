@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -54,7 +55,8 @@ const (
 	DefaultNetworkTimeoutCoefficient    = 2
 	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
 
-	DefaultNetworkCompressionEnabled        = true
+	DefaultNetworkCompressionEnabled        = true // TODO remove when NetworkCompressionEnabledKey is removed
+	DefaultNetworkCompressionType           = compression.TypeGzip
 	DefaultNetworkMaxClockDifference        = time.Minute
 	DefaultNetworkAllowPrivateIPs           = true
 	DefaultNetworkRequireValidatorToConnect = false
