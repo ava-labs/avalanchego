@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 
 	"go.uber.org/zap"
 
