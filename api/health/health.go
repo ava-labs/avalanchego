@@ -14,6 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+// GlobalTag is the tag that is returned for all health check results,
+// regardless of the tags passed to the Reporter.
+// Registering a health check with this tag will ensure that it is always
+// included in the results.
+const GlobalTag = "global"
+
 var _ Health = (*health)(nil)
 
 // Health defines the full health service interface for registering, reporting
@@ -28,16 +34,16 @@ type Health interface {
 
 // Registerer defines how to register new components to check the health of.
 type Registerer interface {
-	RegisterReadinessCheck(name string, checker Checker) error
-	RegisterHealthCheck(name string, checker Checker) error
-	RegisterLivenessCheck(name string, checker Checker) error
+	RegisterReadinessCheck(name string, checker Checker, tags ...string) error
+	RegisterHealthCheck(name string, checker Checker, tags ...string) error
+	RegisterLivenessCheck(name string, checker Checker, tags ...string) error
 }
 
 // Reporter returns the current health status.
 type Reporter interface {
-	Readiness() (map[string]Result, bool)
-	Health() (map[string]Result, bool)
-	Liveness() (map[string]Result, bool)
+	Readiness(tags ...string) (map[string]Result, bool)
+	Health(tags ...string) (map[string]Result, bool)
+	Liveness(tags ...string) (map[string]Result, bool)
 }
 
 type health struct {
@@ -67,20 +73,20 @@ func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
 	}, err
 }
 
-func (h *health) RegisterReadinessCheck(name string, checker Checker) error {
-	return h.readiness.RegisterMonotonicCheck(name, checker)
+func (h *health) RegisterReadinessCheck(name string, checker Checker, tags ...string) error {
+	return h.readiness.RegisterMonotonicCheck(name, checker, tags...)
 }
 
-func (h *health) RegisterHealthCheck(name string, checker Checker) error {
-	return h.health.RegisterCheck(name, checker)
+func (h *health) RegisterHealthCheck(name string, checker Checker, tags ...string) error {
+	return h.health.RegisterCheck(name, checker, tags...)
 }
 
-func (h *health) RegisterLivenessCheck(name string, checker Checker) error {
-	return h.liveness.RegisterCheck(name, checker)
+func (h *health) RegisterLivenessCheck(name string, checker Checker, tags ...string) error {
+	return h.liveness.RegisterCheck(name, checker, tags...)
 }
 
-func (h *health) Readiness() (map[string]Result, bool) {
-	results, healthy := h.readiness.Results()
+func (h *health) Readiness(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.readiness.Results(tags...)
 	if !healthy {
 		h.log.Warn("failing readiness check",
 			zap.Reflect("reason", results),
@@ -89,8 +95,8 @@ func (h *health) Readiness() (map[string]Result, bool) {
 	return results, healthy
 }
 
-func (h *health) Health() (map[string]Result, bool) {
-	results, healthy := h.health.Results()
+func (h *health) Health(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.health.Results(tags...)
 	if !healthy {
 		h.log.Warn("failing health check",
 			zap.Reflect("reason", results),
@@ -99,8 +105,8 @@ func (h *health) Health() (map[string]Result, bool) {
 	return results, healthy
 }
 
-func (h *health) Liveness() (map[string]Result, bool) {
-	results, healthy := h.liveness.Results()
+func (h *health) Liveness(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.liveness.Results(tags...)
 	if !healthy {
 		h.log.Warn("failing liveness check",
 			zap.Reflect("reason", results),
