@@ -68,7 +68,7 @@ func BenchmarkVerify(b *testing.B) {
 
 func BenchmarkAggregatePublicKeys(b *testing.B) {
 	keys := make([]*PublicKey, 4096)
-	for i := 0; i < len(keys); i++ {
+	for i := range keys {
 		privateKey, err := NewSecretKey()
 		require.NoError(b, err)
 
