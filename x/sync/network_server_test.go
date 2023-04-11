@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
@@ -62,7 +61,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 				Start:      []byte{1},
 				End:        []byte{0},
 			},
@@ -72,7 +71,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   2 * defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -80,7 +79,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 2 * constants.DefaultMaxMessageSize,
+				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
 		},
 	}
@@ -213,7 +212,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 				Start:        []byte{1},
 				End:          []byte{0},
 			},
@@ -224,7 +223,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     2 * defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -233,7 +232,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   2 * constants.DefaultMaxMessageSize,
+				BytesLimit:   2 * defaultRequestByteSizeLimit,
 			},
 		},
 	}

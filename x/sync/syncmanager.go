@@ -8,17 +8,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"sync"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-const defaultRequestKeyLimit = 1024
+const (
+	defaultRequestKeyLimit      = 1024
+	defaultRequestByteSizeLimit = units.MiB
+)
 
 var (
 	token                         = struct{}{}
@@ -273,7 +276,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			Start:        workItem.start,
 			End:          workItem.end,
 			KeyLimit:     defaultRequestKeyLimit,
-			BytesLimit:   constants.DefaultMaxMessageSize,
+			BytesLimit:   defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -330,7 +333,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 			Start:      workItem.start,
 			End:        workItem.end,
 			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: constants.DefaultMaxMessageSize,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 	)
 	if err != nil {

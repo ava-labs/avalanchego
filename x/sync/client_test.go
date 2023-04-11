@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -144,7 +143,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -153,7 +152,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
@@ -165,7 +164,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -175,7 +174,7 @@ func TestGetRangeProof(t *testing.T) {
 				Root:       largeTrieRoot,
 				Start:      largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: 30,
 		},
@@ -186,7 +185,7 @@ func TestGetRangeProof(t *testing.T) {
 				Start:      largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
 				End:        largeTrieKeys[1099], // (inclusive range)
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: 100,
 		},
@@ -195,7 +194,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[1:]
@@ -207,7 +206,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				start := response.KeyValues[1].Key
@@ -226,7 +225,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
@@ -238,7 +237,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
@@ -250,7 +249,7 @@ func TestGetRangeProof(t *testing.T) {
 			request: &RangeProofRequest{
 				Root:       largeTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: constants.DefaultMaxMessageSize,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.StartProof = nil
@@ -451,7 +450,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -460,7 +459,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
@@ -472,7 +471,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -481,7 +480,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = response.KeyValues[1:]
@@ -493,7 +492,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
@@ -505,7 +504,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
@@ -517,7 +516,7 @@ func TestGetChangeProof(t *testing.T) {
 				StartingRoot: startRoot,
 				EndingRoot:   endRoot,
 				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   constants.DefaultMaxMessageSize,
+				BytesLimit:   defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.StartProof = nil
@@ -559,7 +558,7 @@ func TestRangeProofRetries(t *testing.T) {
 	request := &RangeProofRequest{
 		Root:       root,
 		KeyLimit:   uint16(keyCount),
-		BytesLimit: constants.DefaultMaxMessageSize,
+		BytesLimit: defaultRequestByteSizeLimit,
 	}
 
 	responseCount := 0

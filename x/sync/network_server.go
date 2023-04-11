@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
@@ -145,8 +144,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		keyLimit = maxKeyValuesLimit
 	}
 	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > constants.DefaultMaxMessageSize {
-		bytesLimit = constants.DefaultMaxMessageSize
+	if bytesLimit > defaultRequestByteSizeLimit {
+		bytesLimit = defaultRequestByteSizeLimit
 	}
 
 	// attempt to get a proof within the bytes limit
@@ -264,8 +263,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyLimit = maxKeyValuesLimit
 	}
 	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > constants.DefaultMaxMessageSize {
-		bytesLimit = constants.DefaultMaxMessageSize
+	if bytesLimit > defaultRequestByteSizeLimit {
+		bytesLimit = defaultRequestByteSizeLimit
 	}
 	for keyLimit > 0 {
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, int(keyLimit))
