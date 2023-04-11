@@ -159,13 +159,13 @@ type stateBlk struct {
  * | |-. current
  * | | |-. validator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | |-. delegator
  * | | | '-. list
  * | | |   '-- txID -> potential reward
  * | | |-. subnetValidator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward or potential reward or nil
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> potential reward
@@ -214,7 +214,7 @@ type stateBlk struct {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	validatorUptimes
+	validatorState
 
 	cfg          *config.Config
 	ctx          *snow.Context
@@ -486,7 +486,7 @@ func new(
 	}
 
 	return &state{
-		validatorUptimes: newValidatorUptimes(),
+		validatorState: newValidatorState(),
 
 		cfg:          cfg,
 		ctx:          ctx,
@@ -1114,21 +1114,22 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		uptimeBytes := validatorIt.Value()
-		uptime := &uptimeAndReward{
+		metadataBytes := validatorIt.Value()
+		metadata := &validatorMetadata{
 			txID: txID,
+			// Note: we don't provide [LastUpdated] here because we expect it to
+			// always be present on disk.
 		}
-		if _, err := txs.Codec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
-		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
 		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, uptime.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1138,7 +1139,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorUptimes.LoadUptime(staker.NodeID, staker.SubnetID, uptime)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -1159,34 +1160,18 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		uptimeReward := &uptimeAndReward{
+		metadataBytes := subnetValidatorIt.Value()
+		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
 			LastUpdated: uint64(stakerTx.StartTime().Unix()),
 		}
-		// Permissioned validators originally wrote their values as nil.
-		// With Banff we wrote the potential reward.
-		// We now write the uptime and reward together.
-		storedBytes := subnetValidatorIt.Value()
-		switch len(storedBytes) {
-		// no uptime or potential reward was stored
-		case 0:
-		// potential reward was stored and uptime was not
-		case database.Uint64Size:
-			uptimeReward.PotentialReward, err = database.ParseUInt64(storedBytes)
-			if err != nil {
-				return err
-			}
-		// both uptime and potential reward were stored
-		default:
-			if _, err := txs.Codec.Unmarshal(storedBytes, uptimeReward); err != nil {
-				return err
-			}
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
+			return err
 		}
-		uptimeReward.lastUpdated = time.Unix(int64(uptimeReward.LastUpdated), 0)
 
-		staker, err := NewCurrentStaker(txID, stakerTx, uptimeReward.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1195,7 +1180,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorUptimes.LoadUptime(staker.NodeID, staker.SubnetID, uptimeReward)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	delegatorIt := s.currentDelegatorList.NewIterator()
@@ -1383,7 +1368,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
-		s.WriteUptimes(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
+		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
@@ -1611,25 +1596,29 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				weightDiff.Amount = staker.Weight
 
 				// The validator is being added.
-				vdr := &uptimeAndReward{
+				//
+				// Invariant: It's impossible for a delegator to have been
+				// rewarded in the same block that the validator was added.
+				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
-					UpDuration:      0,
-					LastUpdated:     uint64(staker.StartTime.Unix()),
-					PotentialReward: staker.PotentialReward,
+					UpDuration:               0,
+					LastUpdated:              uint64(staker.StartTime.Unix()),
+					PotentialReward:          staker.PotentialReward,
+					PotentialDelegateeReward: 0,
 				}
 
-				vdrBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, vdr)
+				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
 
-				if err = validatorDB.Put(staker.TxID[:], vdrBytes); err != nil {
+				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
+				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
 			case deleted:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
@@ -1650,7 +1639,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.validatorUptimes.DeleteUptime(nodeID, subnetID)
+				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
