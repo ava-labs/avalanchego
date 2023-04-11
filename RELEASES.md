@@ -45,6 +45,8 @@ The supported plugin version is `25`.
 - Encode codec version in merkledb by @danlaine in https://github.com/ava-labs/avalanchego/pull/1313
 - Expose consensus-app-concurrency by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1322
 - Adjust Logic In Merkle DB History by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1310
+- Fix Concurrency Bug In CommitToParent by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1320
+- Cleanup goroutines on health.Stop by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1325
 
 ### New Contributors
 
