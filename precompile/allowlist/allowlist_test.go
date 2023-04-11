@@ -60,3 +60,12 @@ func TestAllowListRun(t *testing.T) {
 	}
 	RunPrecompileWithAllowListTests(t, dummyModule, state.NewTestStateDB, nil)
 }
+
+func BenchmarkAllowList(b *testing.B) {
+	dummyModule := modules.Module{
+		Address:      dummyAddr,
+		Contract:     CreateAllowListPrecompile(dummyAddr),
+		Configurator: &dummyConfigurator{},
+	}
+	BenchPrecompileWithAllowList(b, dummyModule, state.NewTestStateDB, nil)
+}

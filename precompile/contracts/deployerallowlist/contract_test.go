@@ -13,3 +13,7 @@ import (
 func TestContractDeployerAllowListRun(t *testing.T) {
 	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, nil)
 }
+
+func BenchmarkContractDeployerAllowList(b *testing.B) {
+	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, nil)
+}

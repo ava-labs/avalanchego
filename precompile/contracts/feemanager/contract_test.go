@@ -17,26 +17,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testFeeConfig = commontype.FeeConfig{
-	GasLimit:        big.NewInt(8_000_000),
-	TargetBlockRate: 2, // in seconds
+var (
+	testFeeConfig = commontype.FeeConfig{
+		GasLimit:        big.NewInt(8_000_000),
+		TargetBlockRate: 2, // in seconds
 
-	MinBaseFee:               big.NewInt(25_000_000_000),
-	TargetGas:                big.NewInt(15_000_000),
-	BaseFeeChangeDenominator: big.NewInt(36),
+		MinBaseFee:               big.NewInt(25_000_000_000),
+		TargetGas:                big.NewInt(15_000_000),
+		BaseFeeChangeDenominator: big.NewInt(36),
 
-	MinBlockGasCost:  big.NewInt(0),
-	MaxBlockGasCost:  big.NewInt(1_000_000),
-	BlockGasCostStep: big.NewInt(200_000),
-}
-
-func TestFeeManager(t *testing.T) {
-	testBlockNumber := big.NewInt(7)
-	tests := map[string]testutils.PrecompileTest{
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(1_000_000),
+		BlockGasCostStep: big.NewInt(200_000),
+	}
+	testBlockNumber = big.NewInt(7)
+	tests           = map[string]testutils.PrecompileTest{
 		"set config from no role fails": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -49,7 +48,7 @@ func TestFeeManager(t *testing.T) {
 		"set config from enabled address": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -58,7 +57,7 @@ func TestFeeManager(t *testing.T) {
 			SuppliedGas: SetFeeConfigGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
@@ -66,7 +65,7 @@ func TestFeeManager(t *testing.T) {
 		"set invalid config from enabled address": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				feeConfig := testFeeConfig
 				feeConfig.MinBlockGasCost = new(big.Int).Mul(feeConfig.MaxBlockGasCost, common.Big2)
 				input, err := PackSetFeeConfig(feeConfig)
@@ -80,7 +79,7 @@ func TestFeeManager(t *testing.T) {
 				InitialFeeConfig: &testFeeConfig,
 			},
 			ExpectedErr: "cannot be greater than maxBlockGasCost",
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
@@ -88,7 +87,7 @@ func TestFeeManager(t *testing.T) {
 		"set config from admin address": {
 			Caller:     allowlist.TestAdminAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -98,7 +97,7 @@ func TestFeeManager(t *testing.T) {
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			BlockNumber: testBlockNumber.Int64(),
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
@@ -107,7 +106,7 @@ func TestFeeManager(t *testing.T) {
 		},
 		"get fee config from non-enabled address": {
 			Caller: allowlist.TestNoRoleAddr,
-			BeforeHook: func(t *testing.T, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state contract.StateDB) {
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
 				err := StoreFeeConfig(state, testFeeConfig, contract.NewMockBlockContext(big.NewInt(6), 0))
 				require.NoError(t, err)
@@ -117,10 +116,12 @@ func TestFeeManager(t *testing.T) {
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
 				res, err := PackFeeConfig(testFeeConfig)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -138,11 +139,13 @@ func TestFeeManager(t *testing.T) {
 			ReadOnly: true,
 			ExpectedRes: func() []byte {
 				res, err := PackFeeConfig(testFeeConfig)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
 			BlockNumber: testBlockNumber.Int64(),
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -151,7 +154,7 @@ func TestFeeManager(t *testing.T) {
 		},
 		"get last changed at from non-enabled address": {
 			Caller: allowlist.TestNoRoleAddr,
-			BeforeHook: func(t *testing.T, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state contract.StateDB) {
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
 				err := StoreFeeConfig(state, testFeeConfig, contract.NewMockBlockContext(testBlockNumber, 0))
 				require.NoError(t, err)
@@ -160,7 +163,7 @@ func TestFeeManager(t *testing.T) {
 			SuppliedGas: GetLastChangedAtGasCost,
 			ReadOnly:    true,
 			ExpectedRes: common.BigToHash(testBlockNumber).Bytes(),
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -170,7 +173,7 @@ func TestFeeManager(t *testing.T) {
 		"readOnly setFeeConfig with noRole fails": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -183,7 +186,7 @@ func TestFeeManager(t *testing.T) {
 		"readOnly setFeeConfig with allow role fails": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -196,7 +199,7 @@ func TestFeeManager(t *testing.T) {
 		"readOnly setFeeConfig with admin role fails": {
 			Caller:     allowlist.TestAdminAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -209,7 +212,7 @@ func TestFeeManager(t *testing.T) {
 		"insufficient gas setFeeConfig from admin": {
 			Caller:     allowlist.TestAdminAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
@@ -220,6 +223,12 @@ func TestFeeManager(t *testing.T) {
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
 	}
+)
 
+func TestFeeManager(t *testing.T) {
 	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, tests)
+}
+
+func BenchmarkFeeManager(b *testing.B) {
+	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, tests)
 }

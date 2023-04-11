@@ -48,6 +48,9 @@ type StateDB interface {
 
 	Suicide(common.Address) bool
 	Finalise(deleteEmptyObjects bool)
+
+	Snapshot() int
+	RevertToSnapshot(int)
 }
 
 // AccessibleState defines the interface exposed to stateful precompile contracts

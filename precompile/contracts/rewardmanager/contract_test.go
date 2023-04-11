@@ -16,14 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRewardManagerRun(t *testing.T) {
-	testAddr := common.HexToAddress("0x0123")
-
-	tests := map[string]testutils.PrecompileTest{
+var (
+	testAddr = common.HexToAddress("0x0123")
+	tests    = map[string]testutils.PrecompileTest{
 		"set allow fee recipients from no role fails": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAllowFeeRecipients()
 				require.NoError(t, err)
 
@@ -36,7 +35,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"set reward address from no role fails": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetRewardAddress(testAddr)
 				require.NoError(t, err)
 
@@ -49,7 +48,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"disable rewards from no role fails": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackDisableRewards()
 				require.NoError(t, err)
 
@@ -62,7 +61,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"set allow fee recipients from enabled succeeds": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAllowFeeRecipients()
 				require.NoError(t, err)
 
@@ -71,7 +70,7 @@ func TestRewardManagerRun(t *testing.T) {
 			SuppliedGas: AllowFeeRecipientsGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				_, isFeeRecipients := GetStoredRewardAddress(state)
 				require.True(t, isFeeRecipients)
 			},
@@ -79,7 +78,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"set reward address from enabled succeeds": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetRewardAddress(testAddr)
 				require.NoError(t, err)
 
@@ -88,7 +87,7 @@ func TestRewardManagerRun(t *testing.T) {
 			SuppliedGas: SetRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.Equal(t, testAddr, address)
 				require.False(t, isFeeRecipients)
@@ -97,7 +96,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"disable rewards from enabled succeeds": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackDisableRewards()
 				require.NoError(t, err)
 
@@ -106,7 +105,7 @@ func TestRewardManagerRun(t *testing.T) {
 			SuppliedGas: DisableRewardsGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t *testing.T, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state contract.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
 				require.Equal(t, constants.BlackholeAddr, address)
@@ -114,11 +113,11 @@ func TestRewardManagerRun(t *testing.T) {
 		},
 		"get current reward address from no role succeeds": {
 			Caller: allowlist.TestNoRoleAddr,
-			BeforeHook: func(t *testing.T, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state contract.StateDB) {
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
 				StoreRewardAddress(state, testAddr)
 			},
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackCurrentRewardAddress()
 				require.NoError(t, err)
 
@@ -128,17 +127,19 @@ func TestRewardManagerRun(t *testing.T) {
 			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackCurrentRewardAddressOutput(testAddr)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
 		},
 		"get are fee recipients allowed from no role succeeds": {
 			Caller: allowlist.TestNoRoleAddr,
-			BeforeHook: func(t *testing.T, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state contract.StateDB) {
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
 				EnableAllowFeeRecipients(state)
 			},
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 				return input
@@ -147,14 +148,16 @@ func TestRewardManagerRun(t *testing.T) {
 			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackAreFeeRecipientsAllowedOutput(true)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
 		},
 		"get initial config with address": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackCurrentRewardAddress()
 				require.NoError(t, err)
 				return input
@@ -168,14 +171,16 @@ func TestRewardManagerRun(t *testing.T) {
 			ReadOnly: false,
 			ExpectedRes: func() []byte {
 				res, err := PackCurrentRewardAddressOutput(testAddr)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
 		},
 		"get initial config with allow fee recipients enabled": {
 			Caller:     allowlist.TestNoRoleAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 				return input
@@ -189,14 +194,16 @@ func TestRewardManagerRun(t *testing.T) {
 			ReadOnly: false,
 			ExpectedRes: func() []byte {
 				res, err := PackAreFeeRecipientsAllowedOutput(true)
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				return res
 			}(),
 		},
 		"readOnly allow fee recipients with allowed role fails": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAllowFeeRecipients()
 				require.NoError(t, err)
 
@@ -209,7 +216,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"readOnly set reward addresss with allowed role fails": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetRewardAddress(testAddr)
 				require.NoError(t, err)
 
@@ -222,7 +229,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"insufficient gas set reward address from allowed role": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackSetRewardAddress(testAddr)
 				require.NoError(t, err)
 
@@ -235,7 +242,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"insufficient gas allow fee recipients from allowed role": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAllowFeeRecipients()
 				require.NoError(t, err)
 
@@ -248,7 +255,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"insufficient gas read current reward address from allowed role": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackCurrentRewardAddress()
 				require.NoError(t, err)
 
@@ -261,7 +268,7 @@ func TestRewardManagerRun(t *testing.T) {
 		"insufficient gas are fee recipients allowed from allowed role": {
 			Caller:     allowlist.TestEnabledAddr,
 			BeforeHook: allowlist.SetDefaultRoles(Module.Address),
-			InputFn: func(t *testing.T) []byte {
+			InputFn: func(t testing.TB) []byte {
 				input, err := PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 
@@ -272,6 +279,12 @@ func TestRewardManagerRun(t *testing.T) {
 			ExpectedErr: vmerrs.ErrOutOfGas.Error(),
 		},
 	}
+)
 
+func TestRewardManagerRun(t *testing.T) {
 	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, tests)
+}
+
+func BenchmarkRewardManager(b *testing.B) {
+	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, tests)
 }

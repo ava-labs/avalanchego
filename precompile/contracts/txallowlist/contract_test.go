@@ -13,3 +13,7 @@ import (
 func TestTxAllowListRun(t *testing.T) {
 	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, nil)
 }
+
+func BenchmarkTxAllowList(b *testing.B) {
+	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, nil)
+}

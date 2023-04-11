@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewTestStateDB(t *testing.T) contract.StateDB {
+func NewTestStateDB(t testing.TB) contract.StateDB {
 	db := memorydb.New()
 	stateDB, err := New(common.Hash{}, NewDatabase(db), nil)
 	require.NoError(t, err)
