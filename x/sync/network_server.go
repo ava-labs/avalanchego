@@ -26,8 +26,12 @@ const (
 	// Maximum number of key-value pairs to return in a proof.
 	// This overrides any other Limit specified in a RangeProofRequest
 	// or ChangeProofRequest if the given Limit is greater.
-	maxKeyValuesLimit        = 2048
-	maxByteSizeLimit         = constants.DefaultMaxMessageSize - 4*units.KiB
+	maxKeyValuesLimit = 2048
+	// Estimated max overhead, in bytes, of putting a proof into a message.
+	// We use this to ensure that the proof we generate is not too large to fit in a message.
+	// TODO: refine this estimate. This is almost certainly a large overestimate.
+	estimatedMessageOverhead = 4 * units.KiB
+	maxByteSizeLimit         = constants.DefaultMaxMessageSize - estimatedMessageOverhead
 	endProofSizeBufferAmount = 2 * units.KiB
 )
 
