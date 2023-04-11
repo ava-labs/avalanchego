@@ -9,8 +9,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
-
 	"go.uber.org/zap"
 
 	"google.golang.org/grpc/codes"
@@ -18,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
