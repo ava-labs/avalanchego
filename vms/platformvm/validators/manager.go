@@ -55,17 +55,17 @@ func NewManager(
 	cfg config.Config,
 	state state.State,
 	metrics metrics.Metrics,
-	clk mockable.Clock,
+	clk *mockable.Clock,
 ) Manager {
 	return &manager{
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
-		clk:     &clk,
+		clk:     clk,
 		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
-				Clock:   &clk,
+				Clock:   clk,
 				MaxSize: maxRecentlyAcceptedWindowSize,
 				TTL:     recentlyAcceptedWindowTTL,
 			},

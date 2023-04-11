@@ -323,9 +323,9 @@ func defaultConfig() *config.Config {
 
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {

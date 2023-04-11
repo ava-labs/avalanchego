@@ -384,7 +384,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			metrics, err := metrics.New("", prometheus.NewRegistry(), cfg.TrackedSubnets)
 			r.NoError(err)
 
-			clk := mockable.Clock{}
+			clk := &mockable.Clock{}
 			validatorssSet := NewManager(cfg, mockState, metrics, clk)
 
 			// Mock the VM's validators
