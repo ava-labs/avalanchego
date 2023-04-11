@@ -6,6 +6,7 @@ package gvalidators
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -180,4 +181,50 @@ func TestGetValidatorSet(t *testing.T) {
 
 	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
 	require.Error(err)
+}
+
+// BenchmarkGetValidatorSet measures the time it takes complete a gRPC client
+// request based on a mocked validator set.
+func BenchmarkGetValidatorSet(b *testing.B) {
+	for _, i := range []int{1, 10, 1000, 2000} {
+		vs := setupValidatorSet(b, i)
+		b.Run(fmt.Sprintf("get_validator_set_%d_validators", i), func(b *testing.B) {
+			benchmarkGetValidatorSet(b, vs)
+		})
+	}
+}
+
+func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
+	require := require.New(b)
+	ctrl := gomock.NewController(b)
+	state := setupState(b, ctrl)
+	defer func() {
+		ctrl.Finish()
+		state.closeFn()
+	}()
+
+	height := uint64(1337)
+	subnetID := ids.GenerateTestID()
+	for i := 0; i < b.N; i++ {
+		state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(vs, nil)
+		_, err := state.client.GetValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+	}
+}
+
+func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetValidatorOutput {
+	b.Helper()
+
+	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
+	sk, _ := bls.NewSecretKey()
+	pk := bls.PublicFromSecretKey(sk)
+	for i := 0; i < size; i++ {
+		id := ids.GenerateTestNodeID()
+		set[id] = &validators.GetValidatorOutput{
+			NodeID:    id,
+			PublicKey: pk,
+			Weight:    uint64(i),
+		}
+	}
+	return set
 }
