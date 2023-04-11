@@ -183,15 +183,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 
 		// just the start proof is too large, so a proof is impossible
 		if bytesEstimate > int(req.BytesLimit) {
-			// errors are fatal, so log for the moment
-			s.log.Warn(
-				"cannot generate a proof within bytes limit",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("req", req),
-				zap.Error(ErrMinProofSizeIsTooLarge),
-			)
-			return nil
+			return ErrMinProofSizeIsTooLarge
 		}
 
 		bytesEstimate += getBytesEstimateOfProofNodes(changeProof.EndProof)
@@ -228,15 +220,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			bytesEstimate += keyBytesCount
 		}
 	}
-	// errors are fatal, so log for the moment
-	s.log.Warn(
-		"cannot generate a proof within bytes limit",
-		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
-		zap.Stringer("req", req),
-		zap.Error(ErrMinProofSizeIsTooLarge),
-	)
-	return nil
+	return ErrMinProofSizeIsTooLarge
 }
 
 // Generates a range proof and sends it to [nodeID].
@@ -300,15 +284,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 
 		// just the start proof is too large, so a proof is impossible
 		if bytesEstimate > int(req.BytesLimit) {
-			// errors are fatal, so log for the moment
-			s.log.Warn(
-				"cannot generate a proof within bytes limit",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("req", req),
-				zap.Error(ErrMinProofSizeIsTooLarge),
-			)
-			return nil
+			return ErrMinProofSizeIsTooLarge
 		}
 
 		bytesEstimate += getBytesEstimateOfProofNodes(rangeProof.EndProof)
@@ -327,15 +303,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			bytesEstimate += kvEstBytes
 		}
 	}
-	// errors are fatal, so log for the moment
-	s.log.Warn(
-		"cannot generate a proof within bytes limit",
-		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
-		zap.Stringer("req", req),
-		zap.Error(ErrMinProofSizeIsTooLarge),
-	)
-	return nil
+	return ErrMinProofSizeIsTooLarge
 }
 
 func getBytesEstimateOfProofNodes(proofNodes []merkledb.ProofNode) int {
