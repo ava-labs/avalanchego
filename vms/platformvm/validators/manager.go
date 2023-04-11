@@ -30,34 +30,34 @@ const (
 )
 
 var (
-	_ validators.State = (*set)(nil)
+	_ validators.State = (*manager)(nil)
 
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
 // P-chain must be able to provide information about validators active
-// at different heights. [QueribleSet] interface encapsulates all the machinery
+// at different heights. [QueryManager] interface encapsulates all the machinery
 // to achieve this.
-type QueribleSet interface {
+type QueryManager interface {
 	validators.State
 
 	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
 }
 
-// Set interface adds to QueribleSet the ability to blocks IDs
+// Manager interface adds to QueribleSet the ability to blocks IDs
 // to serve GetMinimumHeight
-type Set interface {
-	QueribleSet
+type Manager interface {
+	QueryManager
 	Track(blkID ids.ID)
 }
 
-func NewSet(
+func NewManager(
 	cfg config.Config,
 	state state.State,
 	metrics metrics.Metrics,
 	clk mockable.Clock,
-) Set {
-	return &set{
+) Manager {
+	return &manager{
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
@@ -73,7 +73,7 @@ func NewSet(
 	}
 }
 
-type set struct {
+type manager struct {
 	cfg     config.Config
 	state   state.State
 	metrics metrics.Metrics
@@ -105,17 +105,17 @@ type set struct {
 // If [UseCurrentHeight] is true, we will always return the last accepted block
 // height as the minimum. This is used to trigger the proposervm on recently
 // created subnets before [recentlyAcceptedWindowTTL].
-func (vs *set) GetMinimumHeight(ctx context.Context) (uint64, error) {
-	if vs.cfg.UseCurrentHeight {
-		return vs.GetCurrentHeight(ctx)
+func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
+	if m.cfg.UseCurrentHeight {
+		return m.GetCurrentHeight(ctx)
 	}
 
-	oldest, ok := vs.recentlyAccepted.Oldest()
+	oldest, ok := m.recentlyAccepted.Oldest()
 	if !ok {
-		return vs.GetCurrentHeight(ctx)
+		return m.GetCurrentHeight(ctx)
 	}
 
-	blk, _, err := vs.state.GetStatelessBlock(oldest)
+	blk, _, err := m.state.GetStatelessBlock(oldest)
 	if err != nil {
 		return 0, err
 	}
@@ -129,9 +129,9 @@ func (vs *set) GetMinimumHeight(ctx context.Context) (uint64, error) {
 }
 
 // GetCurrentHeight returns the height of the last accepted block
-func (vs *set) GetCurrentHeight(context.Context) (uint64, error) {
-	lastAcceptedID := vs.state.GetLastAccepted()
-	lastAccepted, _, err := vs.state.GetStatelessBlock(lastAcceptedID)
+func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
+	lastAcceptedID := m.state.GetLastAccepted()
+	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}
@@ -140,22 +140,22 @@ func (vs *set) GetCurrentHeight(context.Context) (uint64, error) {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
-func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache, exists := vs.caches[subnetID]
+func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	validatorSetsCache, exists := m.caches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
 		// Only cache tracked subnets
-		if subnetID == constants.PrimaryNetworkID || vs.cfg.TrackedSubnets.Contains(subnetID) {
-			vs.caches[subnetID] = validatorSetsCache
+		if subnetID == constants.PrimaryNetworkID || m.cfg.TrackedSubnets.Contains(subnetID) {
+			m.caches[subnetID] = validatorSetsCache
 		}
 	}
 
 	if validatorSet, ok := validatorSetsCache.Get(height); ok {
-		vs.metrics.IncValidatorSetsCached()
+		m.metrics.IncValidatorSetsCached()
 		return validatorSet, nil
 	}
 
-	lastAcceptedHeight, err := vs.GetCurrentHeight(ctx)
+	lastAcceptedHeight, err := m.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -164,16 +164,16 @@ func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.
 	}
 
 	// get the start time to track metrics
-	startTime := vs.clk.Time()
+	startTime := m.clk.Time()
 
-	currentSubnetValidators, ok := vs.cfg.Validators.Get(subnetID)
+	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
 		currentSubnetValidators = validators.NewSet()
-		if err := vs.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
+		if err := m.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
 			return nil, err
 		}
 	}
-	currentPrimaryNetworkValidators, ok := vs.cfg.Validators.Get(constants.PrimaryNetworkID)
+	currentPrimaryNetworkValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		return nil, ErrMissingValidatorSet
@@ -195,7 +195,7 @@ func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
-		weightDiffs, err := vs.state.GetValidatorWeightDiffs(i, subnetID)
+		weightDiffs, err := m.state.GetValidatorWeightDiffs(i, subnetID)
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +235,7 @@ func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.
 			}
 		}
 
-		pkDiffs, err := vs.state.GetValidatorPublicKeyDiffs(i)
+		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(i)
 		if err != nil {
 			return nil, err
 		}
@@ -255,20 +255,20 @@ func (vs *set) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.
 	// cache the validator set
 	validatorSetsCache.Put(height, vdrSet)
 
-	endTime := vs.clk.Time()
-	vs.metrics.IncValidatorSetsCreated()
-	vs.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
-	vs.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
+	endTime := m.clk.Time()
+	m.metrics.IncValidatorSetsCreated()
+	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
+	m.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
 }
 
 // GetCurrentHeight returns the height of the last accepted block
-func (vs *set) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
+func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
 	}
 
-	chainTx, _, err := vs.state.GetTx(chainID)
+	chainTx, _, err := m.state.GetTx(chainID)
 	if err != nil {
 		return ids.Empty, fmt.Errorf(
 			"problem retrieving blockchain %q: %w",
@@ -283,8 +283,8 @@ func (vs *set) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	return chain.SubnetID, nil
 }
 
-func (vs *set) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
-	validatorSet, exist := vs.cfg.Validators.Get(subnetID)
+func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
+	validatorSet, exist := m.cfg.Validators.Get(subnetID)
 	if !exist {
 		return nil, false
 	}
@@ -298,6 +298,6 @@ func (vs *set) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
 	return validatorIDs, true
 }
 
-func (vs *set) Track(blkID ids.ID) {
-	vs.recentlyAccepted.Add(blkID)
+func (m *manager) Track(blkID ids.ID) {
+	m.recentlyAccepted.Add(blkID)
 }

@@ -385,7 +385,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			r.NoError(err)
 
 			clk := mockable.Clock{}
-			validatorssSet := NewSet(cfg, mockState, metrics, clk)
+			validatorssSet := NewManager(cfg, mockState, metrics, clk)
 
 			// Mock the VM's validators
 			mockSubnetVdrSet := validators.NewMockSet(ctrl)

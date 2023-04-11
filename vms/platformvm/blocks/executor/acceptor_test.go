@@ -61,7 +61,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			state: s,
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestSet,
+		validators: validators.TestManager,
 	}
 
 	err = acceptor.ApricotProposalBlock(blk)
@@ -98,7 +98,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestSet,
+		validators: validators.TestManager,
 	}
 
 	blk, err := blocks.NewApricotAtomicBlock(
@@ -179,7 +179,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestSet,
+		validators: validators.TestManager,
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
@@ -270,7 +270,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   validators.TestSet,
+		validators:   validators.TestManager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -356,7 +356,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   validators.TestSet,
+		validators:   validators.TestManager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 

@@ -24,7 +24,7 @@ var _ blocks.Visitor = (*acceptor)(nil)
 type acceptor struct {
 	*backend
 	metrics      metrics.Metrics
-	validators   validators.Set
+	validators   validators.Manager
 	bootstrapped *utils.Atomic[bool]
 }
 

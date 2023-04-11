@@ -204,7 +204,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.state,
 			res.backend,
-			pvalidators.TestSet,
+			pvalidators.TestManager,
 		)
 		addSubnet(res)
 	} else {
@@ -213,7 +213,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.mockedState,
 			res.backend,
-			pvalidators.TestSet,
+			pvalidators.TestManager,
 		)
 		// we do not add any subnet to state, since we can mock
 		// whatever we need
