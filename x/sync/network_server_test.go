@@ -39,7 +39,8 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 1000,
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: ErrMinProofSizeIsTooLarge,
 		},
 		"byteslimit is 0": {
 			request: &RangeProofRequest{
