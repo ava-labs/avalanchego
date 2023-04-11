@@ -28,7 +28,12 @@ type Health interface {
 	Registerer
 	Reporter
 
+	// Start running periodic health checks at the specified frequency.
+	// Repeated calls to Start will be no-ops.
 	Start(ctx context.Context, freq time.Duration)
+
+	// Stop running periodic health checks. Stop should only be called after
+	// Start. Once Stop returns, no more health checks will be executed.
 	Stop()
 }
 
