@@ -592,6 +592,7 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 		return err
 	}
 
+	// write this view's changes into its parent
 	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
 		return err
 	}
