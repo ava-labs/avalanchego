@@ -542,6 +542,53 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 	return nil
 }
 
+type TransferArgs struct {
+	api.UserPass
+	api.JSONFromAddrs
+	Change     platformapi.Owner `json:"change"`
+	TransferTo platformapi.Owner `json:"transferTo"`
+	Amount     uint64            `json:"amount"`
+}
+
+// Transfer issues an BaseTx
+func (s *CaminoService) Transfer(_ *http.Request, args *TransferArgs, reply *api.JSONTxID) error {
+	s.vm.ctx.Log.Debug("Platform: Transfer called")
+
+	privKeys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
+	if err != nil {
+		return err
+	}
+
+	change, err := s.getOutputOwner(&args.Change)
+	if err != nil {
+		return err
+	}
+
+	transferTo, err := s.getOutputOwner(&args.TransferTo)
+	if err != nil {
+		return err
+	}
+
+	// Create the transaction
+	tx, err := s.vm.txBuilder.NewBaseTx(
+		args.Amount,
+		transferTo,
+		privKeys,
+		change,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	reply.TxID = tx.ID()
+
+	if err := s.vm.Builder.AddUnverifiedTx(tx); err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	return nil
+}
+
 func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSONAddress, response *api.JSONAddress) error {
 	s.vm.ctx.Log.Debug("Platform: GetRegisteredShortIDLink called")
 

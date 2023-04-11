@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -11,7 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var _ UnsignedTx = (*MultisigAliasTx)(nil)
+var (
+	errNonExecutableTx = errors.New("this tx type can't be executed, its genesis-only")
+
+	_ UnsignedTx = (*MultisigAliasTx)(nil)
+)
 
 // MultisigAliasTx is an unsigned multisig alias tx
 type MultisigAliasTx struct {
