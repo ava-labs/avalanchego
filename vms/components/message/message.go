@@ -63,7 +63,8 @@ func Parse(bytes []byte) (Message, error) {
 	} else {
 		// This message wasn't encoded with proto.
 		// It must have been encoded with avalanchego's codec.
-		// TODO remove once all nodes support proto encoding.
+		// TODO remove else statement remove once all nodes support proto encoding.
+		// i.e. when all nodes are on v1.11.0 or later.
 		version, err := c.Unmarshal(bytes, &msg)
 		if err != nil {
 			return nil, err
@@ -78,6 +79,26 @@ func Parse(bytes []byte) (Message, error) {
 
 func Build(msg Message) ([]byte, error) {
 	bytes, err := c.Marshal(codecVersion, &msg)
+	msg.initialize(bytes)
+	return bytes, err
+}
+
+// TODO once all nodes support handling of proto encoded messages
+// (i.e. when all nodes are on v1.11.0 or later), replace Build
+// with this function.
+func BuildProto(msg Message) ([]byte, error) {
+	var protoMsg pbmessage.Message
+	switch m := msg.(type) {
+	case *Tx:
+		protoMsg.Message = &pbmessage.Message_Tx{
+			Tx: &pbmessage.Tx{
+				TxBytes: m.Tx,
+			},
+		}
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
+	}
+	bytes, err := proto.Marshal(&protoMsg)
 	msg.initialize(bytes)
 	return bytes, err
 }

@@ -17,3 +17,23 @@ func TestParseGibberish(t *testing.T) {
 	_, err := Parse(randomBytes)
 	require.Error(t, err)
 }
+
+func TestBuildParseProto(t *testing.T) {
+	require := require.New(t)
+
+	txBytes := []byte{'y', 'e', 'e', 't'}
+	txMsg := Tx{
+		Tx: txBytes,
+	}
+	txMsgBytes, err := BuildProto(&txMsg)
+	require.NoError(err)
+
+	parsedMsgIntf, err := Parse(txMsgBytes)
+	require.NoError(err)
+
+	parsedMsg, ok := parsedMsgIntf.(*Tx)
+	require.True(ok)
+
+	require.Equal(txBytes, parsedMsg.Tx)
+
+}
