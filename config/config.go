@@ -1305,9 +1305,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
-	if nodeConfig.ConsensusGossipFrequency < 0 {
-		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
+	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusAcceptedFrontierGossipFrequencyKey)
+	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusAcceptedFrontierGossipFrequencyKey)
 	}
 
 	// App handling

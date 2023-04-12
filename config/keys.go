@@ -142,7 +142,7 @@ const (
 	IpcsChainIDsKey                                    = "ipcs-chain-ids"
 	IpcsPathKey                                        = "ipcs-path"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
-	ConsensusGossipFrequencyKey                        = "consensus-gossip-frequency"
+	ConsensusAcceptedFrontierGossipFrequencyKey        = "consensus-accepted-frontier-gossip-frequency"
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
