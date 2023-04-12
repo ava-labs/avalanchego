@@ -1,5 +1,10 @@
 # Release Notes
 
+## [v0.12.0](https://github.com/ava-labs/coreth/releases/tag/v0.12.0)
+
+- Increase C-Chain block gas limit to 15M in Cortina
+- Add Mainnet and Fuji Cortina Activation timestamps
+
 ## [v0.11.9](https://github.com/ava-labs/coreth/releases/tag/v0.11.9)
 
 - Downgrade SetPreference log from warn to debug
