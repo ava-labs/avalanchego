@@ -33,8 +33,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.24.0
 	github.com/pires/go-proxyproto v0.6.2
-	github.com/prometheus/client_golang v1.13.0
-	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_model v0.3.0
 	github.com/rs/cors v1.7.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spaolacci/murmur3 v1.1.0
