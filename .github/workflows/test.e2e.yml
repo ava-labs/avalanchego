@@ -2,7 +2,10 @@ name: Test e2e
 
 on:
   push:
+    tags:
+      - "*"
     branches:
+      - master
       - dev
   pull_request:
 
