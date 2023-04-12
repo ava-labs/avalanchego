@@ -216,6 +216,7 @@ type ManagerConfig struct {
 	Metrics          metrics.MultiGatherer
 
 	ConsensusGossipFrequency time.Duration
+	ConsensusAppConcurrency  int
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -836,6 +837,7 @@ func (m *manager) createAvalancheChain(
 		vdrs,
 		msgChan,
 		m.ConsensusGossipFrequency,
+		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
@@ -1191,6 +1193,7 @@ func (m *manager) createSnowmanChain(
 		vdrs,
 		msgChan,
 		m.ConsensusGossipFrequency,
+		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
 		subnetConnector,
 		sb,
@@ -1342,7 +1345,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		if len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
-		return nil, nil
+		return []ids.ID{}, nil
 	})
 	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
