@@ -81,6 +81,17 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, reply *api.G
 
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
+		for _, tx := range block.Txs() {
+			err := tx.Unsigned.Visit(&txInit{
+				tx:            tx,
+				ctx:           s.vm.ctx,
+				typeToFxIndex: s.vm.typeToFxIndex,
+				fxs:           s.vm.fxs,
+			})
+			if err != nil {
+				return err
+			}
+		}
 		reply.Block = block
 		return nil
 	}
@@ -121,6 +132,17 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
+		for _, tx := range block.Txs() {
+			err := tx.Unsigned.Visit(&txInit{
+				tx:            tx,
+				ctx:           s.vm.ctx,
+				typeToFxIndex: s.vm.typeToFxIndex,
+				fxs:           s.vm.fxs,
+			})
+			if err != nil {
+				return err
+			}
+		}
 		reply.Block = block
 		return nil
 	}

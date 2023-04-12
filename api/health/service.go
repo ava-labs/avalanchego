@@ -22,32 +22,41 @@ type APIReply struct {
 	Healthy bool              `json:"healthy"`
 }
 
+// APIArgs is the arguments for Readiness, Health, and Liveness.
+type APIArgs struct {
+	Tags []string `json:"tags"`
+}
+
 // Readiness returns if the node has finished initialization
-func (s *Service) Readiness(_ *http.Request, _ *struct{}, reply *APIReply) error {
+func (s *Service) Readiness(_ *http.Request, args *APIArgs, reply *APIReply) error {
 	s.log.Debug("API called",
 		zap.String("service", "health"),
 		zap.String("method", "readiness"),
+		zap.Strings("tags", args.Tags),
 	)
-	reply.Checks, reply.Healthy = s.health.Readiness()
+	reply.Checks, reply.Healthy = s.health.Readiness(args.Tags...)
 	return nil
 }
 
 // Health returns a summation of the health of the node
-func (s *Service) Health(_ *http.Request, _ *struct{}, reply *APIReply) error {
+func (s *Service) Health(_ *http.Request, args *APIArgs, reply *APIReply) error {
 	s.log.Debug("API called",
 		zap.String("service", "health"),
 		zap.String("method", "health"),
+		zap.Strings("tags", args.Tags),
 	)
-	reply.Checks, reply.Healthy = s.health.Health()
+
+	reply.Checks, reply.Healthy = s.health.Health(args.Tags...)
 	return nil
 }
 
 // Liveness returns if the node is in need of a restart
-func (s *Service) Liveness(_ *http.Request, _ *struct{}, reply *APIReply) error {
+func (s *Service) Liveness(_ *http.Request, args *APIArgs, reply *APIReply) error {
 	s.log.Debug("API called",
 		zap.String("service", "health"),
 		zap.String("method", "liveness"),
+		zap.Strings("tags", args.Tags),
 	)
-	reply.Checks, reply.Healthy = s.health.Liveness()
+	reply.Checks, reply.Healthy = s.health.Liveness(args.Tags...)
 	return nil
 }
