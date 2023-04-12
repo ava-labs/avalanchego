@@ -40,7 +40,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// Assumes that startCmd will launch a node with HTTP Port at [utils.DefaultLocalNodeURI]
 	healthClient := health.NewClient(utils.DefaultLocalNodeURI)
-	healthy, err := health.AwaitReady(ctx, healthClient, 5*time.Second)
+	healthy, err := health.AwaitReady(ctx, healthClient, 5*time.Second, nil)
 	gomega.Expect(err).Should(gomega.BeNil())
 	gomega.Expect(healthy).Should(gomega.BeTrue())
 	log.Info("AvalancheGo node is healthy")

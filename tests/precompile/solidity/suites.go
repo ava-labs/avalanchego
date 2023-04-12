@@ -17,7 +17,7 @@ import (
 var _ = ginkgo.Describe("[Precompiles]", ginkgo.Ordered, func() {
 	ginkgo.It("ping the network", ginkgo.Label("setup"), func() {
 		client := health.NewClient(utils.DefaultLocalNodeURI)
-		healthy, err := client.Readiness(context.Background())
+		healthy, err := client.Readiness(context.Background(), nil)
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(healthy.Healthy).Should(gomega.BeTrue())
 	})
