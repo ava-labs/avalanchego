@@ -345,3 +345,33 @@ func (a *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error
 	reply.NewVMs, err = ids.GetRelevantAliases(a.VMManager, loadedVMs)
 	return err
 }
+
+type SetDisableUnhealthyAPIArgs struct {
+	Disable bool `json:"disable"`
+}
+
+func (a *Admin) SetDisableUnhealthyAPI(_ *http.Request, args *SetDisableUnhealthyAPIArgs, reply *GetDisableUnhealthyAPIReply) error {
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "setDisableUnhealthyAPI"),
+		zap.Bool("disable", args.Disable),
+	)
+
+	a.ChainManager.SetDisableUnhealthyAPI(args.Disable)
+	reply.Disabled = a.ChainManager.GetDisableUnhealthyAPI()
+	return nil
+}
+
+type GetDisableUnhealthyAPIReply struct {
+	Disabled bool `json:"disabled"`
+}
+
+func (a *Admin) GetDisableUnhealthyAPI(_ *http.Request, _ *struct{}, reply *GetDisableUnhealthyAPIReply) error {
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "getDisableUnhealthyAPI"),
+	)
+
+	reply.Disabled = a.ChainManager.GetDisableUnhealthyAPI()
+	return nil
+}
