@@ -14,13 +14,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 const (
-	defaultRequestKeyLimit      = 1024
-	defaultRequestByteSizeLimit = 512 * units.KiB
+	defaultRequestKeyLimit      = maxKeyValuesLimit
+	defaultRequestByteSizeLimit = maxByteSizeLimit
 )
 
 var (
