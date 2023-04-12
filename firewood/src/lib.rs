@@ -95,7 +95,7 @@
 //! The three layers are depicted as follows:
 //!
 //! <p align="center">
-//!     <img src="/assets/three-layers.svg" width="80%">
+//!     <img src="https://ava-labs.github.io/firewood/assets/three-layers.svg" width="80%">
 //! </p>
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
@@ -166,7 +166,7 @@
 //! we "push down" these changes to the base and clear up the staging space.
 //!
 //! <p align="center">
-//!     <img src="/assets/architecture.svg" width="100%">
+//!     <img src="https://ava-labs.github.io/firewood/assets/architecture.svg" width="100%">
 //! </p>
 //!
 //! Thanks to the shadow pages, we can both revive some historical versions of the store and

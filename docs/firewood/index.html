@@ -93,7 +93,7 @@ and maintain the code.</p>
 </ul>
 <p>The three layers are depicted as follows:</p>
 <p align="center">
-    <img src="/assets/three-layers.svg" width="80%">
+    <img src="https://ava-labs.github.io/firewood/assets/three-layers.svg" width="80%">
 </p>
 <p>Given the abstraction, one can easily realize the fact that the actual data that affect the
 state of the data structure (trie) is what the linear space (<code>MemStore</code>) keeps track of, that is,
@@ -169,7 +169,7 @@ and a reference to the its base (master) so any reads could partially hit those 
 and/or fall through to the base, whereas all writes are captured. Finally, when things go well,
 we “push down” these changes to the base and clear up the staging space.</p>
 <p align="center">
-    <img src="/assets/architecture.svg" width="100%">
+    <img src="https://ava-labs.github.io/firewood/assets/architecture.svg" width="100%">
 </p>
 <p>Thanks to the shadow pages, we can both revive some historical versions of the store and
 maintain a rolling window of past revisions on-the-fly. The right hand side of the diagram
