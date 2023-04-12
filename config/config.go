@@ -68,24 +68,24 @@ var (
 		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
 	}
 
-	errInvalidStakerWeights          = errors.New("staking weights must be positive")
-	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
-	errAuthPasswordTooWeak           = errors.New("API auth password is not strong enough")
-	errInvalidUptimeRequirement      = errors.New("uptime requirement must be in the range [0, 1]")
-	errMinValidatorStakeAboveMax     = errors.New("minimum validator stake can't be greater than maximum validator stake")
-	errInvalidDelegationFee          = errors.New("delegation fee must be in the range [0, 1,000,000]")
-	errInvalidMinStakeDuration       = errors.New("min stake duration must be > 0")
-	errMinStakeDurationAboveMax      = errors.New("max stake duration can't be less than min stake duration")
-	errStakeMaxConsumptionTooLarge   = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
-	errStakeMaxConsumptionBelowMin   = errors.New("stake max consumption can't be less than min stake consumption")
-	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
-	errCannotTrackPrimaryNetwork     = errors.New("cannot track primary network")
-	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
-	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
-	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
-	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
-	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
-	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
+	errInvalidWeights                         = errors.New("sybil protection disabled weights must be positive")
+	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
+	errAuthPasswordTooWeak                    = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement               = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax              = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee                   = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration                = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax               = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMaxConsumptionTooLarge            = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
+	errStakeMaxConsumptionBelowMin            = errors.New("stake max consumption can't be less than min stake consumption")
+	errStakeMintingPeriodBelowMin             = errors.New("stake minting period can't be less than max stake duration")
+	errCannotTrackPrimaryNetwork              = errors.New("cannot track primary network")
+	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errStakingCertContentUnset                = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errMissingStakingSigningKeyFile           = errors.New("missing staking signing key file")
+	errTracingEndpointEmpty                   = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
+	errPluginDirNotADirectory                 = errors.New("plugin dir is not a directory")
+	errZstdNotSupported                       = errors.New("zstd compression not supported until v1.10")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
@@ -791,18 +791,18 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
-		EnableStaking:         v.GetBool(StakingEnabledKey),
-		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
+		EnableStaking:         v.GetBool(SybilProtectionEnabledKey),
+		DisabledStakingWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		StakingKeyPath:        GetExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:       GetExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:     GetExpandedArg(v, StakingSignerKeyPathKey),
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
-		return node.StakingConfig{}, errInvalidStakerWeights
+		return node.StakingConfig{}, errInvalidWeights
 	}
 
 	if !config.EnableStaking && (networkID == constants.MainnetID || networkID == constants.FujiID) {
-		return node.StakingConfig{}, errStakingDisableOnPublicNetwork
+		return node.StakingConfig{}, errSybilProtectionDisabledOnPublicNetwork
 	}
 
 	var err error
