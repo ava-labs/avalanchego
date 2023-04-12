@@ -161,35 +161,32 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
 					if existing, ok := combinedChanges.values[key]; ok {
 						existing.after = valueChange.after
+						if existing.before.hasValue == existing.after.hasValue &&
+							bytes.Equal(existing.before.value, existing.after.value) {
+							delete(combinedChanges.values, key)
+							sortedKeys.Delete(key)
+						}
 					} else {
 						combinedChanges.values[key] = &change[Maybe[[]byte]]{
 							before: valueChange.before,
 							after:  valueChange.after,
 						}
-					}
-
-					currentChange := combinedChanges.values[key]
-					// value ended up identical to the start, so remove the no-op change
-					if currentChange.before.hasValue == currentChange.after.hasValue &&
-						bytes.Equal(currentChange.before.value, currentChange.after.value) {
-						delete(combinedChanges.values, key)
-						sortedKeys.Delete(key)
-					} else {
 						sortedKeys.ReplaceOrInsert(key)
 					}
-				}
-			}
-
-			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for sortedKeys.Len() > maxLength {
-				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					delete(combinedChanges.values, greatestKey)
 				}
 			}
 
 			return true
 		},
 	)
+
+	// Keep only the smallest [maxLength] items in [combinedChanges.values].
+	for sortedKeys.Len() > maxLength {
+		if greatestKey, found := sortedKeys.DeleteMax(); found {
+			delete(combinedChanges.values, greatestKey)
+		}
+	}
+
 	return combinedChanges, nil
 }
 
