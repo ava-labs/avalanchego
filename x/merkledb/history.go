@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -166,7 +167,16 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 							after:  valueChange.after,
 						}
 					}
-					sortedKeys.ReplaceOrInsert(key)
+
+					currentChange := combinedChanges.values[key]
+					// value ended up identical to the start, so remove the no-op change
+					if currentChange.before.hasValue == currentChange.after.hasValue &&
+						bytes.Equal(currentChange.before.value, currentChange.after.value) {
+						delete(combinedChanges.values, key)
+						sortedKeys.Delete(key)
+					} else {
+						sortedKeys.ReplaceOrInsert(key)
+					}
 				}
 			}
 
