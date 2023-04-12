@@ -197,30 +197,28 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		// add some small buffer to account for potential size differences
 		keyValueBytes += endProofSizeBufferAmount
 
-		deleteKeyIndex := 0
-		changeKeyIndex := 0
+		deleteKeyIndex := len(changeProof.DeletedKeys) - 1
+		changeKeyIndex := len(changeProof.KeyValues) - 1
 
 		// shrink the number of keys until it fits within the limit
-		for keyIndex := keyLimit - 1; keyIndex >= 0; keyIndex-- {
+		for ; keyLimit > 0; keyLimit-- {
 			// determine if the deleted key or changed key is the next smallest key
 
 			// if there is a deleted key at deleteKeyIndex and
 			// (there are no more change keys or the changed key is larger than the deleted key)
-			if deleteKeyIndex < len(changeProof.DeletedKeys) &&
-				(changeKeyIndex >= len(changeProof.KeyValues) ||
+			if deleteKeyIndex >= 0 &&
+				(changeKeyIndex >= 0 ||
 					bytes.Compare(changeProof.KeyValues[changeKeyIndex].Key, changeProof.DeletedKeys[deleteKeyIndex]) > 0) {
 				keyValueBytes -= merkledb.Codec.ByteSliceSize(changeProof.DeletedKeys[deleteKeyIndex])
-				deleteKeyIndex++
-			} else if changeKeyIndex < len(changeProof.KeyValues) {
+				deleteKeyIndex--
+			} else if changeKeyIndex >= 0 {
 				keyValueBytes -= merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) +
 					merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Value)
-				changeKeyIndex++
+				changeKeyIndex--
 			}
 
+			// we have eliminated enough keys to be under the limit
 			if keyValueBytes < bytesLimit {
-				// adding the current KV would put the size over the limit
-				// so only return up to the keyIndex number of keys
-				keyLimit = keyIndex
 				break
 			}
 		}
@@ -295,14 +293,12 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyValueBytes := len(proofBytes) - (sizeOfStartProof + getBytesEstimateOfProofNodes(rangeProof.EndProof))
 
 		// shrink more if the early keys are extremely large
-		for keyIndex := keyLimit - 1; keyIndex >= 0; keyIndex-- {
-			nextKV := rangeProof.KeyValues[keyIndex]
+		for ; keyLimit > 0; keyLimit-- {
+			nextKV := rangeProof.KeyValues[keyLimit-1]
 			keyValueBytes -= merkledb.Codec.ByteSliceSize(nextKV.Key) + merkledb.Codec.ByteSliceSize(nextKV.Value)
 
+			// we have eliminated enough keys to be under the limit
 			if keyValueBytes < bytesLimit {
-				// adding the current KV would put the size over the limit
-				// so only return up to the keyIndex number of keys
-				keyLimit = keyIndex
 				break
 			}
 		}
