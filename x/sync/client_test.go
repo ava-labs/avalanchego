@@ -372,8 +372,8 @@ func TestGetChangeProof(t *testing.T) {
 		memdb.New(),
 		merkledb.Config{
 			Tracer:        newNoopTracer(),
-			HistoryLength: 1000,
-			NodeCacheSize: 1000,
+			HistoryLength: defaultRequestKeyLimit,
+			NodeCacheSize: defaultRequestKeyLimit,
 		},
 	)
 	require.NoError(t, err)
@@ -382,8 +382,8 @@ func TestGetChangeProof(t *testing.T) {
 		memdb.New(),
 		merkledb.Config{
 			Tracer:        newNoopTracer(),
-			HistoryLength: 1000,
-			NodeCacheSize: 1000,
+			HistoryLength: defaultRequestKeyLimit,
+			NodeCacheSize: defaultRequestKeyLimit,
 		},
 	)
 	require.NoError(t, err)
@@ -391,7 +391,7 @@ func TestGetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	// create changes
-	for x := 0; x < 200; x++ {
+	for x := 0; x < defaultRequestKeyLimit/2; x++ {
 		view, err := trieDB.NewView()
 		require.NoError(t, err)
 
@@ -483,7 +483,7 @@ func TestGetChangeProof(t *testing.T) {
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = response.KeyValues[1:]
 			},
-			expectedErr: merkledb.ErrProofValueDoesntMatch,
+			expectedErr: merkledb.ErrInvalidProof,
 		},
 		"removed last key in response": {
 			request: &ChangeProofRequest{
@@ -495,7 +495,7 @@ func TestGetChangeProof(t *testing.T) {
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
 			},
-			expectedErr: merkledb.ErrInvalidProof,
+			expectedErr: merkledb.ErrProofNodeNotForKey,
 		},
 		"removed key from middle of response": {
 			request: &ChangeProofRequest{
