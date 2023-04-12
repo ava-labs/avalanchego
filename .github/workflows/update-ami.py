@@ -22,7 +22,7 @@ for var in variables:
     print("A Variable is not set correctly or this is not the right repo.  Only validating packer.")
     update_marketplace = False
 
-if 'rc' in tag:
+if 'rc' in tag or 'fuji' in tag:
   print("This is a release candidate.  Only validating packer.")
   update_marketplace = False
 

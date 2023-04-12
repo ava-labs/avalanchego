@@ -1,5 +1,65 @@
 # Release Notes
 
+## [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)
+
+[This upgrade](https://medium.com/avalancheavax/cortina-x-chain-linearization-a1d9305553f6) linearizes the X-chain, introduces delegation batching to the P-chain, and increases the maximum block size on the C-chain.
+
+The changes in the upgrade go into effect at 11 AM ET, April 25th 2023 on Mainnet.
+
+**All Mainnet nodes should upgrade before 11 AM ET, April 25th 2023.**
+
+The supported plugin version is `25`.
+
+### What's Changed
+
+- Add CODEOWNERS for the x/ package by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1260
+- Feature Spec Template by @richardpringle in https://github.com/ava-labs/avalanchego/pull/1258
+- Standardize CI triggers by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1265
+- special case no sent/received message in network health check by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1263
+- Fix bug template by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1268
+- Replace `flags` usage with `pflags` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1270
+- Fixed grammatical errors in `README.md` by @krakxn in https://github.com/ava-labs/avalanchego/pull/1102
+- Add tests for race conditions in merkledb by @kyl27 in https://github.com/ava-labs/avalanchego/pull/1256
+- Add P-chain indexer API example by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1271
+- use `require` in `snow/choices` tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1279
+- use `require` in `utils/wrappers` tests by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1280
+- add support for tracking delegatee rewards to validator metadata by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1273
+- defer delegatee rewards until end of validator staking period by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1262
+- Initialize UptimeCalculator in TestPeer by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1283
+- Add Avalanche liveness health checks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1287
+- Skip AMI generation with Fuji tags by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1288
+- Use `maps.Equal` in `set.Equals` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1290
+- return accrued delegator rewards in `GetCurrentValidators` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1291
+- Add zstd compression by @danlaine in https://github.com/ava-labs/avalanchego/pull/1278
+- implement `txs.Visitor` in X chain wallet by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1299
+- Parallelize gzip compression by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1293
+- Add zip bomb tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1300
+- Gossip Avalanche frontier after the linearization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1303
+- Add fine grained metrics+logging for handling, processing, and grab l… by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1301
+- Persist stateless block in AVM state by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1305
+- Initialize FxID fields in GetBlock and GetBlockByHeight by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1306
+- Filterable Health Tags by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1304
+- increase health await timeout by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1317
+- Expose GetEngineManager from the chain Handler by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1316
+- Add BLS benchmarks by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1318
+- Encode codec version in merkledb by @danlaine in https://github.com/ava-labs/avalanchego/pull/1313
+- Expose consensus-app-concurrency by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1322
+- Adjust Logic In Merkle DB History by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1310
+- Fix Concurrency Bug In CommitToParent by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1320
+- Cleanup goroutines on health.Stop by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1325
+
+### New Contributors
+
+- @richardpringle made their first contribution in https://github.com/ava-labs/avalanchego/pull/1258
+- @ceyonur made their first contribution in https://github.com/ava-labs/avalanchego/pull/1263
+- @krakxn made their first contribution in https://github.com/ava-labs/avalanchego/pull/1102
+- @kyl27 made their first contribution in https://github.com/ava-labs/avalanchego/pull/1256
+- @dhrubabasu made their first contribution in https://github.com/ava-labs/avalanchego/pull/1279
+- @joshua-kim made their first contribution in https://github.com/ava-labs/avalanchego/pull/1283
+- @dboehm-avalabs made their first contribution in https://github.com/ava-labs/avalanchego/pull/1310
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.9.16...v1.10.0
+
 ## [v1.9.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.16)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `24`.

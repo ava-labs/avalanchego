@@ -115,14 +115,15 @@ type PermissionlessValidator struct {
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,
 	// if applicable.
-	DelegationRewardOwner *Owner                    `json:"delegationRewardOwner,omitempty"`
-	PotentialReward       *json.Uint64              `json:"potentialReward,omitempty"`
-	DelegationFee         json.Float32              `json:"delegationFee"`
-	ExactDelegationFee    *json.Uint32              `json:"exactDelegationFee,omitempty"`
-	Uptime                *json.Float32             `json:"uptime,omitempty"`
-	Connected             bool                      `json:"connected"`
-	Staked                []UTXO                    `json:"staked,omitempty"`
-	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
+	DelegationRewardOwner  *Owner                    `json:"delegationRewardOwner,omitempty"`
+	PotentialReward        *json.Uint64              `json:"potentialReward,omitempty"`
+	AccruedDelegateeReward *json.Uint64              `json:"accruedDelegateeReward,omitempty"`
+	DelegationFee          json.Float32              `json:"delegationFee"`
+	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Uptime                 *json.Float32             `json:"uptime,omitempty"`
+	Connected              bool                      `json:"connected"`
+	Staked                 []UTXO                    `json:"staked,omitempty"`
+	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
 	// The delegators delegating to this validator
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
