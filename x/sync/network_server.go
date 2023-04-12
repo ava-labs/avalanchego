@@ -181,8 +181,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 		// the proof size was too large, try to shrink it
 
-		// ensure that the new limit is always smaller
-		keyLimit = uint16(len(changeProof.KeyValues)+len(changeProof.DeletedKeys)) - 1
+		keyLimit = uint16(len(changeProof.KeyValues) + len(changeProof.DeletedKeys))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
 		sizeOfStartProof := getBytesEstimateOfProofNodes(changeProof.StartProof)
@@ -283,7 +282,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		// the proof size was too large, try to shrink it
 
 		// ensure that the new limit is always smaller
-		keyLimit = uint16(len(rangeProof.KeyValues)) - 1
+		keyLimit = uint16(len(rangeProof.KeyValues))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
 		sizeOfStartProof := getBytesEstimateOfProofNodes(rangeProof.StartProof)
