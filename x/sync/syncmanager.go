@@ -304,14 +304,13 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 	var proofOfLargestKey []merkledb.ProofNode
 
 	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
+	if len(changeproof.KeyChanges) > 0 {
 		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
 			m.setError(err)
 			return
 		}
 		proofOfLargestKey = changeproof.EndProof
-		if len(changeproof.DeletedKeys) > 0 && (len(changeproof.KeyValues) == 0 ||
-			bytes.Compare(changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1], changeproof.KeyValues[len(changeproof.KeyValues)-1].Key) == 1) {
+		if changeproof.KeyChanges[len(changeproof.KeyChanges)-1].Value.IsNothing() {
 			// since this is a deletion proof, the deleted key will no longer be present in the local db
 			// we can switch to a node with a prefix of the deleted key, which should still exist in the local db
 			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
