@@ -36,4 +36,7 @@ func TestBuildParseProto(t *testing.T) {
 
 	require.Equal(txBytes, parsedMsg.Tx)
 
+	// Parse invalid message
+	_, err = Parse([]byte{1, 3, 3, 7})
+	require.Error(err)
 }
