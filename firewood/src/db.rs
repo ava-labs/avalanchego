@@ -74,7 +74,7 @@ struct DBParams {
 /// Config for accessing a version of the DB.
 #[derive(TypedBuilder, Clone, Debug)]
 pub struct DBRevConfig {
-    /// Maximum cached MPT objects.
+    /// Maximum cached Trie objects.
     #[builder(default = 1 << 20)]
     pub merkle_ncached_objs: usize,
     /// Maximum cached Blob (currently just `Account`) objects.
@@ -96,7 +96,7 @@ pub struct DBConfig {
     #[builder(default = 22)] // 4MB file by default
     pub meta_file_nbit: u64,
     /// Maximum cached pages for the item stash. This is the low-level cache used by the linear
-    /// space that holds MPT nodes and account objects.
+    /// space that holds Trie nodes and account objects.
     #[builder(default = 262144)] // 1G total size by default
     pub payload_ncached_pages: usize,
     /// Maximum cached file descriptors for the item stash.
@@ -290,7 +290,7 @@ impl DBRev {
         }
     }
 
-    /// Dump the MPT of the generic key-value storage.
+    /// Dump the Trie of the generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
         self.merkle
             .dump(self.header.kv_root, w)
@@ -304,7 +304,7 @@ impl DBRev {
             .map_err(DBError::Merkle)
     }
 
-    /// Dump the MPT of the entire account model storage.
+    /// Dump the Trie of the entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
         self.merkle
             .dump(self.header.acc_root, w)
@@ -319,7 +319,7 @@ impl DBRev {
         })
     }
 
-    /// Dump the MPT of the state storage under an account.
+    /// Dump the Trie of the state storage under an account.
     pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
         let acc = match self.merkle.get(key, self.header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
@@ -350,7 +350,7 @@ impl DBRev {
         })
     }
 
-    /// Provides a proof that a key is in the MPT.
+    /// Provides a proof that a key is in the Trie.
     pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, MerkleError> {
         self.merkle
             .prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
@@ -687,17 +687,17 @@ impl DB {
         }
     }
 
-    /// Dump the MPT of the latest generic key-value storage.
+    /// Dump the Trie of the latest generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
         self.inner.lock().latest.kv_dump(w)
     }
 
-    /// Dump the MPT of the latest entire account model storage.
+    /// Dump the Trie of the latest entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
         self.inner.lock().latest.dump(w)
     }
 
-    /// Dump the MPT of the latest state storage under an account.
+    /// Dump the Trie of the latest state storage under an account.
     pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
         self.inner.lock().latest.dump_account(key, w)
     }

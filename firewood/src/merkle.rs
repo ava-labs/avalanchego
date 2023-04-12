@@ -76,7 +76,7 @@ impl MummyItem for Hash {
     }
 }
 
-/// PartialPath keeps a list of nibbles to represent a path on the MPT.
+/// PartialPath keeps a list of nibbles to represent a path on the Trie.
 #[derive(PartialEq, Eq, Clone)]
 pub struct PartialPath(Vec<u8>);
 

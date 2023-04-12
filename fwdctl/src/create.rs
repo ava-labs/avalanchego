@@ -50,7 +50,7 @@ pub struct Options {
         default_value_t = 262144,
         value_name = "PAYLOAD_NCACHED_PAGES",
         help = "Maximum cached pages for the item stash. This is the low-level cache used by the linear
-    space that holds MPT nodes and account objects."
+    space that holds trie nodes and account objects."
     )]
     pub payload_ncached_pages: usize,
 
@@ -110,7 +110,7 @@ pub struct Options {
         required = false,
         default_value_t = 1 << 20,
         value_name = "REV_MERKLE_NCACHED",
-        help = "Config for accessing a version of the DB. Maximum cached MPT objects.")]
+        help = "Config for accessing a version of the DB. Maximum cached trie objects.")]
     merkle_ncached_objs: usize,
 
     #[arg(
