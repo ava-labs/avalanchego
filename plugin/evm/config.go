@@ -55,7 +55,8 @@ const (
 	// time assumptions:
 	// - normal bootstrap processing time: ~14 blocks / second
 	// - state sync time: ~6 hrs.
-	defaultStateSyncMinBlocks = 300_000
+	defaultStateSyncMinBlocks   = 300_000
+	defaultStateSyncRequestSize = 256 // the number of key/values to ask peers for per request
 )
 
 var (
@@ -186,6 +187,7 @@ type Config struct {
 	StateSyncIDs             string `json:"state-sync-ids"`
 	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`
 	StateSyncMinBlocks       uint64 `json:"state-sync-min-blocks"`
+	StateSyncRequestSize     uint16 `json:"state-sync-request-size"`
 
 	// SkipUpgradeCheck disables checking that upgrades must take place before the last
 	// accepted block. Skipping this check is useful when a node operator does not update
@@ -263,6 +265,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
+	c.StateSyncRequestSize = defaultStateSyncRequestSize
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 	c.AcceptedCacheSize = defaultAcceptedCacheSize
 }

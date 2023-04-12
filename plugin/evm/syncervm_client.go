@@ -42,7 +42,8 @@ type stateSyncClientConfig struct {
 	// Specifies the number of blocks behind the latest state summary that the chain must be
 	// in order to prefer performing state sync over falling back to the normal bootstrapping
 	// algorithm.
-	stateSyncMinBlocks uint64
+	stateSyncMinBlocks   uint64
+	stateSyncRequestSize uint16 // number of key/value pairs to ask peers for per request
 
 	lastAcceptedHeight uint64
 
@@ -283,6 +284,7 @@ func (client *stateSyncerClient) syncStateTrie(ctx context.Context) error {
 		DB:                       client.chaindb,
 		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
 		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
+		RequestSize:              client.stateSyncRequestSize,
 	})
 	if err != nil {
 		return err

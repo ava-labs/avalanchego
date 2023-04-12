@@ -505,15 +505,16 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 				BlockParser:      vm,
 			},
 		),
-		enabled:            vm.config.StateSyncEnabled,
-		skipResume:         vm.config.StateSyncSkipResume,
-		stateSyncMinBlocks: vm.config.StateSyncMinBlocks,
-		lastAcceptedHeight: lastAcceptedHeight, // TODO clean up how this is passed around
-		chaindb:            vm.chaindb,
-		metadataDB:         vm.metadataDB,
-		acceptedBlockDB:    vm.acceptedBlockDB,
-		db:                 vm.db,
-		toEngine:           vm.toEngine,
+		enabled:              vm.config.StateSyncEnabled,
+		skipResume:           vm.config.StateSyncSkipResume,
+		stateSyncMinBlocks:   vm.config.StateSyncMinBlocks,
+		stateSyncRequestSize: vm.config.StateSyncRequestSize,
+		lastAcceptedHeight:   lastAcceptedHeight, // TODO clean up how this is passed around
+		chaindb:              vm.chaindb,
+		metadataDB:           vm.metadataDB,
+		acceptedBlockDB:      vm.acceptedBlockDB,
+		db:                   vm.db,
+		toEngine:             vm.toEngine,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

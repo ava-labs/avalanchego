@@ -28,8 +28,9 @@ type StateSyncerConfig struct {
 	Client                   syncclient.Client
 	DB                       ethdb.Database
 	BatchSize                int
-	MaxOutstandingCodeHashes int // Maximum number of code hashes in the code syncer queue
-	NumCodeFetchingWorkers   int // Number of code syncing threads
+	MaxOutstandingCodeHashes int    // Maximum number of code hashes in the code syncer queue
+	NumCodeFetchingWorkers   int    // Number of code syncing threads
+	RequestSize              uint16 // Number of leafs to request from a peer at a time
 }
 
 // stateSync keeps the state of the entire state sync operation.
@@ -82,7 +83,7 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		mainTrieDone: make(chan struct{}),
 		done:         make(chan error, 1),
 	}
-	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments)
+	ss.syncer = syncclient.NewCallbackLeafSyncer(config.Client, ss.segments, config.RequestSize)
 	ss.codeSyncer = newCodeSyncer(CodeSyncerConfig{
 		DB:                       config.DB,
 		Client:                   config.Client,

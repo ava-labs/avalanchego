@@ -799,7 +799,7 @@ func TestGetLeafsRetries(t *testing.T) {
 		Root:  root,
 		Start: bytes.Repeat([]byte{0x00}, common.HashLength),
 		End:   bytes.Repeat([]byte{0xff}, common.HashLength),
-		Limit: defaultLeafRequestLimit,
+		Limit: 1024,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

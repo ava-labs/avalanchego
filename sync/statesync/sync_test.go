@@ -62,6 +62,7 @@ func testSync(t *testing.T, test syncTest) {
 		BatchSize:                1000, // Use a lower batch size in order to get test coverage of batches being written early.
 		NumCodeFetchingWorkers:   DefaultNumCodeFetchingWorkers,
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
+		RequestSize:              1024,
 	})
 	if err != nil {
 		t.Fatal(err)
