@@ -1,0 +1,34 @@
+[package]
+name = "firewood"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enum-as-inner = "0.5.1"
+parking_lot = "0.12.1"
+rlp = "0.5.1"
+sha3 = "0.10.2"
+once_cell = "1.13.1"
+hex = "0.4.3"
+lru = "0.8.0"
+libaio-futures = "0.2.2"
+nix = "0.25.0"
+typed-builder = "0.10.0"
+tokio = { version = "1.21.1", features = ["rt", "sync", "macros"] }
+shale = "0.1.7"
+growth-ring = "0.3.0"
+futures = "0.3.24"
+primitive-types = { verison = "0.12.0", features = ["impl-rlp"] }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dev-dependencies]
+clap = { version = "4.0.2", features = ["cargo", "derive"] }
+criterion = "0.4.0"
+keccak-hasher = "0.15.3"
+rand = "0.8.5"
+triehash = "0.8.4"
+
+[profile.release]
+debug = true

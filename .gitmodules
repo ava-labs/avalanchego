@@ -1,0 +1,3 @@
+[submodule "shale"]
+	path = shale
+	url = https://github.com/Determinant/shale.git

@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  pull_request:
+    branches: 
+      - "*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Lint
+        run: cargo fmt && git diff --exit-code
+      - name: Clippy
+        run: cargo clippy --fix --no-deps && git diff --exit-code
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - name: Build
+        run: cargo build --verbose
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - name: Run tests
+        run: cargo test --verbose
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - name: Run simple example
+        run: cargo run --example simple
+      - name: Run dump example
+        run: cargo run --example dump
+      - name: Run benchmark example
+        run: cargo run --example benchmark -- --nbatch 10000 --batch-size 10
+      - name: Run rev example
+        run: cargo run --example rev

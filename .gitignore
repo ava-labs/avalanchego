@@ -1,0 +1,4 @@
+/target
+Cargo.lock
+shale/target/
+shale/Cargo.lock
