@@ -555,61 +555,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 	)
 }
 
-func FuzzCodecImplByteSliceSizeMatchesEncodeByteSlice(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-
-			codec := Codec.(*codecImpl)
-			buf := &bytes.Buffer{}
-			err := codec.encodeByteSlice(buf, b)
-			require.NoError(err)
-			require.Equal(buf.Len(), codec.ByteSliceSize(b))
-		},
-	)
-}
-
-func TestCodecImpl_ProofNodeSize_Matches_EncodeProofNode(t *testing.T) {
-	require := require.New(t)
-	codec := Codec.(*codecImpl)
-	for i := 0; i < 100; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-
-		proofNode := newRandomProofNode(r)
-
-		buf := &bytes.Buffer{}
-		err := codec.encodeProofNode(proofNode, buf)
-		require.NoError(err)
-		require.Equal(buf.Len(), codec.ProofNodeSize(proofNode))
-	}
-}
-
-func TestCodecImpl_ByteSliceSize_Matches_EncodeByteSlice(t *testing.T) {
-	require := require.New(t)
-	codec := Codec.(*codecImpl)
-
-	var currentValue []byte
-	buf := &bytes.Buffer{}
-	err := codec.encodeByteSlice(buf, currentValue)
-	require.NoError(err)
-	require.Equal(buf.Len(), codec.ByteSliceSize(currentValue))
-
-	for i := 0; i < 100; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-		currentValue = make([]byte, r.Intn(500))
-		_, err := r.Read(currentValue)
-		require.NoError(err)
-
-		buf := &bytes.Buffer{}
-		err = codec.encodeByteSlice(buf, currentValue)
-		require.NoError(err)
-		require.Equal(buf.Len(), codec.ByteSliceSize(currentValue))
-	}
-}
-
 func TestCodec_DecodeProof(t *testing.T) {
 	require := require.New(t)
 

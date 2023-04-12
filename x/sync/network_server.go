@@ -245,11 +245,3 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	}
 	return ErrMinProofSizeIsTooLarge
 }
-
-func getBytesEstimateOfProofNodes(proofNodes []merkledb.ProofNode) int {
-	total := 0
-	for _, proofNode := range proofNodes {
-		total += merkledb.Codec.ProofNodeSize(proofNode)
-	}
-	return total
-}
