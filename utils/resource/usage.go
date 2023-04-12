@@ -28,7 +28,7 @@ type CPUUser interface {
 	// compute) then the return value will be 1.5.
 	CPUUsage() float64
 
-	CPUCycles(pid int) uint64
+	CPUCycles(pid int) float64
 }
 
 type DiskUser interface {
@@ -36,10 +36,10 @@ type DiskUser interface {
 	// disk recently.
 	DiskUsage() (read float64, write float64)
 
-	DiskNumberRead(pid int) (read float64)
+	DiskNumberRead(pid int) (read uint64)
 	DiskReadBytes(pid int) (readBytes uint64)
 
-	DiskNumberWrite(pid int) (write float64)
+	DiskNumberWrite(pid int) (write uint64)
 	DiskWriteBytes(pid int) (writeBytes uint64)
 
 	// returns number of bytes available in the db volume

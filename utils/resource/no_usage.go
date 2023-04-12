@@ -21,3 +21,23 @@ func (noUsage) DiskUsage() (float64, float64) {
 func (noUsage) AvailableDiskBytes() uint64 {
 	return math.MaxUint64
 }
+
+func (noUsage) CPUCycles(pid int) float64 {
+	return 0
+}
+
+func (noUsage) DiskNumberRead(pid int) (read uint64) {
+	return 0
+}
+
+func (noUsage) DiskReadBytes(pid int) (readBytes uint64) {
+	return 0
+}
+
+func (noUsage) DiskNumberWrite(pid int) (write uint64) {
+	return 0
+}
+
+func (noUsage) DiskWriteBytes(pid int) (writeBytes uint64) {
+	return 0
+}
