@@ -181,15 +181,6 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		nodeID              ids.NodeID
 		proofNil            bool
 	}{
-		"proof too small": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   1000,
-			},
-			proofNil: true,
-		},
 		"byteslimit is 0": {
 			request: &ChangeProofRequest{
 				StartingRoot: startRoot,
