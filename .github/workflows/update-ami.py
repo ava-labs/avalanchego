@@ -15,11 +15,14 @@ product_id = os.getenv('PRODUCT_ID')
 role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
 tag = vtag.replace('v', '')
-skip_create_ami = os.getenv('SKIP_CREATE_AMI')
+skip_create_ami = os.getenv('SKIP_CREATE_AMI', True)
 
 def packer_build(packerfile):
-  # Create the packer image and return the AMIID
   print("Running the packer build")
+  subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True)
+
+def packer_build_update(packerfile):
+  print("Creating packer AMI image for Marketplace")
   output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE)
   found = re.findall('ami-[a-z0-9]*', str(output.stdout))
 
@@ -73,12 +76,10 @@ def update_ami(amifile, amiid):
     print(f"An error occurred while updating AMI delivery options: {e}")
 
 def main():
-  amiid = packer_build(packerfile)
-
-  if skip_create_ami == True:
-    print('No AMI created.  Skipping marketplace update')
+  if skip_create_ami == "True":
+    packer_build(packerfile)
   else:
-    update_ami(amifile, amiid)
+    update_ami(amifile, packer_build_update(packerfile))
 
 if __name__ == '__main__':
   main()

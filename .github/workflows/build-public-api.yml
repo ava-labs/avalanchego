@@ -2,10 +2,8 @@ name: build-public-ami
 
 on:
   push:
-#    tags:
-#      - "*"
-    branches:
-      - "INFRA-2318"
+    tags:
+      - "*"
   workflow_dispatch:
     inputs:
       tag:
@@ -41,6 +39,13 @@ jobs:
           fi
         shell: bash
 
+      - name: Set if you you skip ami creation in packer
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Setting SKIP_CREATE_AMI..."
+            echo "SKIP_CREATE_AMI=False" >> $GITHUB_ENV
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -52,7 +57,6 @@ jobs:
         run: |
           ./.github/workflows/update-ami.py
         env:
-#          TAG: ${{ env.TAG }}
-          TAG: "v1.9.14"
+          TAG: ${{ env.TAG }}
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}
