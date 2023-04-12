@@ -185,50 +185,48 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 		// the proof size was too large, try to shrink it
 
-		// ensure that the new limit is always smaller
-		keyLimit = uint16((len(changeProof.KeyValues) + len(changeProof.DeletedKeys)) / 2)
+		keyLimit = uint16(len(changeProof.KeyValues) + len(changeProof.DeletedKeys))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
-		bytesEstimate := getBytesEstimateOfProofNodes(changeProof.StartProof)
+		sizeOfStartProof := getBytesEstimateOfProofNodes(changeProof.StartProof)
 
 		// just the start proof is too large, so a proof is impossible
-		if bytesEstimate > int(req.BytesLimit) {
+		if sizeOfStartProof > int(req.BytesLimit) {
 			return ErrMinProofSizeIsTooLarge
 		}
-		// since the number of keys is decreasing, the new endproof will be a different size than the current one
-		// use the current endproof plus a small buffer to account for potential size differences
-		bytesEstimate += getBytesEstimateOfProofNodes(changeProof.EndProof) + endProofSizeBufferAmount
+
+		keyValueBytes := len(proofBytes) - (sizeOfStartProof + getBytesEstimateOfProofNodes(changeProof.EndProof))
+
+		// since the number of keys is changing, the new endproof will be a different size than the current one
+		// add some small buffer to account for potential size differences
+		keyValueBytes += endProofSizeBufferAmount
+
 		deleteKeyIndex := 0
 		changeKeyIndex := 0
 
-		// shrink more if the early keys are extremely large
-		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
+		// shrink the number of keys until it fits within the limit
+		for keyIndex := keyLimit - 1; keyIndex >= 0; keyIndex-- {
 			// determine if the deleted key or changed key is the next smallest key
-			keyBytesCount := 0
 
 			// if there is a deleted key at deleteKeyIndex and
 			// (there are no more change keys or the changed key is larger than the deleted key)
 			if deleteKeyIndex < len(changeProof.DeletedKeys) &&
 				(changeKeyIndex >= len(changeProof.KeyValues) ||
 					bytes.Compare(changeProof.KeyValues[changeKeyIndex].Key, changeProof.DeletedKeys[deleteKeyIndex]) > 0) {
-				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.DeletedKeys[deleteKeyIndex])
-				if err != nil {
-					return err
-				}
+				keyValueBytes -= merkledb.Codec.ByteSliceSize(changeProof.DeletedKeys[deleteKeyIndex])
 				deleteKeyIndex++
 			} else if changeKeyIndex < len(changeProof.KeyValues) {
-				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) +
+				keyValueBytes -= merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) +
 					merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Value)
 				changeKeyIndex++
 			}
 
-			if bytesEstimate+keyBytesCount > bytesLimit {
+			if keyValueBytes < bytesLimit {
 				// adding the current KV would put the size over the limit
 				// so only return up to the keyIndex number of keys
 				keyLimit = keyIndex
 				break
 			}
-			bytesEstimate += keyBytesCount
 		}
 	}
 	return ErrMinProofSizeIsTooLarge
@@ -288,32 +286,29 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		// the proof size was too large, try to shrink it
 
 		// ensure that the new limit is always smaller
-		keyLimit = uint16(len(rangeProof.KeyValues) / 2)
+		keyLimit = uint16(len(rangeProof.KeyValues))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
-		bytesEstimate := getBytesEstimateOfProofNodes(rangeProof.StartProof)
+		sizeOfStartProof := getBytesEstimateOfProofNodes(rangeProof.StartProof)
 
 		// just the start proof is too large, so a proof is impossible
-		if bytesEstimate > int(req.BytesLimit) {
+		if sizeOfStartProof > int(req.BytesLimit) {
 			return ErrMinProofSizeIsTooLarge
 		}
 
-		// since the number of keys is decreasing, the new endproof will be a different size than the current one
-		// use the current endproof plus a small buffer to account for potential size differences
-		bytesEstimate += getBytesEstimateOfProofNodes(rangeProof.EndProof) + endProofSizeBufferAmount
+		keyValueBytes := len(proofBytes) - (sizeOfStartProof + getBytesEstimateOfProofNodes(rangeProof.EndProof))
 
 		// shrink more if the early keys are extremely large
-		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
+		for keyIndex := keyLimit - 1; keyIndex >= 0; keyIndex-- {
 			nextKV := rangeProof.KeyValues[keyIndex]
-			kvEstBytes := merkledb.Codec.ByteSliceSize(nextKV.Key) + merkledb.Codec.ByteSliceSize(nextKV.Value)
+			keyValueBytes -= merkledb.Codec.ByteSliceSize(nextKV.Key) + merkledb.Codec.ByteSliceSize(nextKV.Value)
 
-			if bytesEstimate+kvEstBytes > bytesLimit {
+			if keyValueBytes < bytesLimit {
 				// adding the current KV would put the size over the limit
 				// so only return up to the keyIndex number of keys
 				keyLimit = keyIndex
 				break
 			}
-			bytesEstimate += kvEstBytes
 		}
 	}
 	return ErrMinProofSizeIsTooLarge
