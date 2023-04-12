@@ -32,8 +32,8 @@ const (
 	minKeyChangeLen      = minByteSliceLen + minMaybeByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
 	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen
-	minChangeProofLen    = minCodecVersionLen + +boolLen + 2*minProofPathLen + 2*minVarIntLen
-	minRangeProofLen     = minCodecVersionLen + +2*minProofPathLen + minVarIntLen
+	minChangeProofLen    = minCodecVersionLen + boolLen + 2*minProofPathLen + 2*minVarIntLen
+	minRangeProofLen     = minCodecVersionLen + 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minCodecVersionLen + minMaybeByteSliceLen + minVarIntLen
 	minHashValuesLen     = minCodecVersionLen + minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
 	minProofNodeChildLen = minVarIntLen + idLen
