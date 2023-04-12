@@ -42,7 +42,7 @@ jobs:
       - name: Set whether to skip ami creation in packer
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Setting SKIP_CREATE_AMI to False
+            echo "Setting SKIP_CREATE_AMI to False"
             echo "SKIP_CREATE_AMI=False" >> $GITHUB_ENV
           fi
 
