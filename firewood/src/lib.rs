@@ -5,20 +5,17 @@
 //!
 //! Firewood is an embedded key-value store, optimized to store blockchain state. It prioritizes
 //! access to latest state, by providing extremely fast reads, but also provides a limited view
-//! into past state. It does not copy-on-write the Merkle Patricia Trie (MPT) to generate an ever
-//! growing forest of tries like EVM, but instead keeps one latest version of the MPT index on disk
+//! into past state. It does not copy-on-write the state trie to generate an ever
+//! growing forest of tries like other databases, but instead keeps one latest version of the trie index on disk
 //! and apply in-place updates to it. This ensures that the database size is small and stable
 //! during the course of running firewood. Firewood was first conceived to provide a very fast
-//! storage layer for qEVM to enable a fast, complete EVM system with right design choices made
-//! totally from scratch, but it also serves as a drop-in replacement for any EVM-compatible
-//! blockchain storage system, and fits for the general use of a certified key-value store of
-//! arbitrary data.
+//! storage layer for the EVM but could be used on any blockchain that requires authenticated state.
 //!
-//! Firewood is a robust database implemented from the ground up to directly store MPT nodes and
+//! Firewood is a robust database implemented from the ground up to directly store trie nodes and
 //! user data. Unlike most (if not all) of the solutions in the field, it is not built on top of a
 //! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, firewood directly uses
 //! the tree structure as the index on disk. Thus, there is no additional "emulation" of the
-//! logical MPT to flatten out the data structure to feed into the underlying DB that is unaware
+//! logical trie to flatten out the data structure to feed into the underlying DB that is unaware
 //! of the data being stored.
 //!
 //! Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL guarantees
@@ -28,12 +25,11 @@
 //! will also contribute to the configured window of changes (at batch granularity) to access any past
 //! versions with no additional cost at all.
 //!
-//! The on-disk footprint of Firewood is more compact than geth. It provides two isolated storage
-//! space which can be both or selectively used the user. The account model portion of the storage
-//! offers something very similar to `StateDB` in geth, which captures the address-"state key"
-//! style of two-level access for an account's (smart contract's) state. Therefore, it takes
-//! minimal effort to delegate all state storage from an EVM implementation to firewood. The other
-//! portion of the storage supports generic MPT storage for arbitrary keys and values. When unused,
+//! Firewood provides two isolated storage spaces which can be both or selectively used the user.
+//! The account model portion of the storage offers something very similar to `StateDB` in geth,
+//! which captures the address-"state key" style of two-level access for an account's (smart contract's) state.
+//! Therefore, it takes minimal effort to delegate all state storage from an EVM implementation to firewood. The other
+//! portion of the storage supports generic trie storage for arbitrary keys and values. When unused,
 //! there is no additional cost.
 //!
 //! # Design Philosophy & Overview
@@ -90,7 +86,7 @@
 //!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
 //!   basic implementation in `shale` crate, but one can always define his/her own `ShaleStore`).
 //!
-//! - Data structure: in Firewood, one or more Ethereum-style MPTs are maintained by invoking
+//! - Data structure: in Firewood, one or more tries are maintained by invoking
 //!   `ShaleStore` (see `src/merkle.rs`; another stash for code objects is in `src/account.rs`).
 //!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
 //!   persisted on disk. It is as if they're just in memory, which makes it much easier to write
@@ -99,11 +95,11 @@
 //! The three layers are depicted as follows:
 //!
 //! <p align="center">
-//!     <img src="https://drive.google.com/uc?export=view&id=1KnlpqnxkmFd_aKZHwcferIdX137GVZJr" width="80%">
+//!     <img src="/assets/three-layers.svg" width="80%">
 //! </p>
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
-//! state of the data structure (MPT) is what the linear space (`MemStore`) keeps track of, that is,
+//! state of the data structure (trie) is what the linear space (`MemStore`) keeps track of, that is,
 //! a flat but conceptually large byte vector. In other words, given a valid byte vector as the
 //! content of the linear space, the higher level data structure can be *uniquely* determined, there
 //! is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
@@ -116,8 +112,8 @@
 //!
 //! ## Page-based Shadowing and Revisions
 //!
-//! Following the idea that the MPTs are just a view of a linear byte space, all writes made to the
-//! MPTs inside Firewood will eventually be consolidated into some interval writes to the linear
+//! Following the idea that the tries are just a view of a linear byte space, all writes made to the
+//! tries inside Firewood will eventually be consolidated into some interval writes to the linear
 //! space. The writes may overlap and some frequent writes are even done to the same spot in the
 //! space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
 //! virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
@@ -133,13 +129,13 @@
 //!
 //! In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:
 //!
-//! - Traverse the MPT, and that induces the access to some nodes. Suppose the nodes are not already in
+//! - Traverse the trie, and that induces the access to some nodes. Suppose the nodes are not already in
 //!   memory, then:
 //!
 //! - Bring the necessary pages that contain the accessed nodes into the memory and cache them
 //!   (`storage::CachedSpace`).
 //!
-//! - Make changes to the MPT, and that induces the writes to some nodes. The nodes are either
+//! - Make changes to the trie, and that induces the writes to some nodes. The nodes are either
 //!   already cached in memory (its pages are cached, or its handle `ObjRef<Node>` is still in
 //!   `shale::ObjCache`) or need to be brought into the memory (if that's the case, go back to the
 //!   second step for it).
@@ -170,7 +166,7 @@
 //! we "push down" these changes to the base and clear up the staging space.
 //!
 //! <p align="center">
-//!     <img src="https://drive.google.com/uc?export=view&id=1l2CUbq85nX_g0GfQj44ClrKXd253sBFv" width="100%">
+//!     <img src="/assets/architecture.svg" width="100%">
 //! </p>
 //!
 //! Thanks to the shadow pages, we can both revive some historical versions of the store and
@@ -183,11 +179,11 @@
 //! "rewinding" changes to patch the necessary locations in the linear space, while the rest of the
 //! linear space is very likely untouched by that historical write batch.
 //!
-//! Then, with the three-layer abstraction we previously talked about, an historical MPT could be
+//! Then, with the three-layer abstraction we previously talked about, a historical trie could be
 //! derived. In fact, because there is no mandatory traversal or scanning in the process, the
 //! only cost to revive a historical state from the log is to just playback the records and create
 //! those shadow pages. There is very little additional cost because the ghost space is summoned on an
-//! on-demand manner while one accesses the historical MPT.
+//! on-demand manner while one accesses the historical trie.
 //!
 //! In the other direction, when new write batches are committed, the system moves forward, we can
 //! therefore maintain a rolling window of past revisions in memory with *zero* cost. The
