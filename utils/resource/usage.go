@@ -27,12 +27,20 @@ type CPUUser interface {
 	// that process is currently using 150% CPU (i.e. one and a half cores of
 	// compute) then the return value will be 1.5.
 	CPUUsage() float64
+
+	CPUCycles(pid int) uint64
 }
 
 type DiskUser interface {
 	// DiskUsage returns the number of bytes per second read from/written to
 	// disk recently.
 	DiskUsage() (read float64, write float64)
+
+	DiskNumberRead(pid int) (read float64)
+	DiskReadBytes(pid int) (readBytes uint64)
+
+	DiskNumberWrite(pid int) (write float64)
+	DiskWriteBytes(pid int) (writeBytes uint64)
 
 	// returns number of bytes available in the db volume
 	AvailableDiskBytes() uint64
@@ -95,11 +103,46 @@ func (m *manager) CPUUsage() float64 {
 	return m.cpuUsage
 }
 
+func (m *manager) CPUCycles(pid int) float64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.processes[pid].cpuCycles
+}
+
 func (m *manager) DiskUsage() (float64, float64) {
 	m.usageLock.RLock()
 	defer m.usageLock.RUnlock()
 
 	return m.readUsage, m.writeUsage
+}
+
+func (m *manager) DiskNumberRead(pid int) uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.processes[pid].read
+}
+
+func (m *manager) DiskReadBytes(pid int) uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.processes[pid].lastReadBytes
+}
+
+func (m *manager) DiskNumberWrite(pid int) uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.processes[pid].write
+}
+
+func (m *manager) DiskWriteBytes(pid int) uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.processes[pid].lastWriteBytes
 }
 
 func (m *manager) AvailableDiskBytes() uint64 {
@@ -205,6 +248,12 @@ type proc struct {
 	// [lastWriteBytes] is the most recent measurement of total disk bytes
 	// written.
 	lastWriteBytes uint64
+
+	// number of CPUCycles
+	cpuCycles float64
+
+	// number of reads and writes
+	read, write uint64
 }
 
 func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64, float64) {
@@ -230,14 +279,17 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 		if totalCPU > p.lastTotalCPU {
 			newCPU := totalCPU - p.lastTotalCPU
 			cpu = newCPU / secondsSinceLastUpdate
+			p.cpuCycles = newCPU
 		}
 		if io.ReadBytes > p.lastReadBytes {
 			newRead := io.ReadBytes - p.lastReadBytes
 			read = float64(newRead) / secondsSinceLastUpdate
+			p.read = newRead
 		}
 		if io.WriteBytes > p.lastWriteBytes {
 			newWrite := io.WriteBytes - p.lastWriteBytes
 			write = float64(newWrite) / secondsSinceLastUpdate
+			p.write = newWrite
 		}
 	}
 
