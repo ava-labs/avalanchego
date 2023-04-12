@@ -182,7 +182,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		// the proof size was too large, try to shrink it
 
 		// ensure that the new limit is always smaller
-		keyLimit = uint16((len(changeProof.KeyValues) + len(changeProof.DeletedKeys)) / 2)
+		keyLimit = uint16(len(changeProof.KeyValues) + len(changeProof.DeletedKeys))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
 		bytesEstimate := getBytesEstimateOfProofNodes(changeProof.StartProof)
@@ -198,7 +198,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		changeKeyIndex := 0
 
 		// shrink more if the early keys are extremely large
-		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
+		for keyIndex := uint16(0); keyIndex < keyLimit; keyIndex++ {
 			// determine if the deleted key or changed key is the next smallest key
 			keyBytesCount := 0
 
@@ -208,9 +208,6 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				(changeKeyIndex >= len(changeProof.KeyValues) ||
 					bytes.Compare(changeProof.KeyValues[changeKeyIndex].Key, changeProof.DeletedKeys[deleteKeyIndex]) > 0) {
 				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.DeletedKeys[deleteKeyIndex])
-				if err != nil {
-					return err
-				}
 				deleteKeyIndex++
 			} else if changeKeyIndex < len(changeProof.KeyValues) {
 				keyBytesCount = merkledb.Codec.ByteSliceSize(changeProof.KeyValues[changeKeyIndex].Key) +
@@ -284,7 +281,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		// the proof size was too large, try to shrink it
 
 		// ensure that the new limit is always smaller
-		keyLimit = uint16(len(rangeProof.KeyValues) / 2)
+		keyLimit = uint16(len(rangeProof.KeyValues))
 
 		// estimate the bytes of the start and end proof to ensure that everything will fit into the bytesLimit
 		bytesEstimate := getBytesEstimateOfProofNodes(rangeProof.StartProof)
@@ -299,7 +296,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		bytesEstimate += getBytesEstimateOfProofNodes(rangeProof.EndProof) + endProofSizeBufferAmount
 
 		// shrink more if the early keys are extremely large
-		for keyIndex := uint16(1); keyIndex < keyLimit; keyIndex++ {
+		for keyIndex := uint16(0); keyIndex < keyLimit; keyIndex++ {
 			nextKV := rangeProof.KeyValues[keyIndex]
 			kvEstBytes := merkledb.Codec.ByteSliceSize(nextKV.Key) + merkledb.Codec.ByteSliceSize(nextKV.Value)
 
