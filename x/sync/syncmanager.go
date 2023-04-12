@@ -345,8 +345,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	//var proofOfLargestKey []merkledb.ProofNode
-	proofOfLargestKey := proof.EndProof
+	var proofOfLargestKey []merkledb.ProofNode
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
