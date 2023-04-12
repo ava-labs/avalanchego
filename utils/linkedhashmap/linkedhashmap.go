@@ -57,8 +57,8 @@ func (lh *linkedHashmap[K, V]) Put(key K, val V) {
 }
 
 func (lh *linkedHashmap[K, V]) Get(key K) (V, bool) {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
+	lh.lock.RLock()
+	defer lh.lock.RUnlock()
 
 	return lh.get(key)
 }
