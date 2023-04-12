@@ -232,6 +232,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
+	fs.Bool(DisableUnhealthyAPIKey, false, "If true, the node will not serve chain APIs if the chain or the node is unhealthy")
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")

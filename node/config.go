@@ -70,6 +70,9 @@ type APIConfig struct {
 	KeystoreAPIEnabled bool `json:"keystoreAPIEnabled"`
 	MetricsAPIEnabled  bool `json:"metricsAPIEnabled"`
 	HealthAPIEnabled   bool `json:"healthAPIEnabled"`
+
+	// DisableUnhealthyAPI disables the API if the chain or node is unhealthy.
+	DisableUnhealthyAPI bool `json:"disableUnhealthyAPI"`
 }
 
 type IPConfig struct {
