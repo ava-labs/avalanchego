@@ -120,9 +120,9 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	largeTrieKeyCount := 10_000
-	largeTrieDB, _, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
+	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
 	require.NoError(t, err)
-	_, err = largeTrieDB.GetMerkleRoot(context.Background())
+	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -140,125 +140,125 @@ func TestGetRangeProof(t *testing.T) {
 				BytesLimit: 10000,
 			},
 		},
-		// "full response for small (single request) trie": {
-		// 	db: smallTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       smallTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	expectedResponseLen: defaultRequestKeyLimit,
-		// },
-		// "too many leaves in response": {
-		// 	db: smallTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       smallTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
-		// 	},
-		// 	expectedErr: errTooManyKeys,
-		// },
-		// "partial response to request for entire trie (full leaf limit)": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	expectedResponseLen: defaultRequestKeyLimit,
-		// },
-		// "full response from near end of trie to end of trie (less than leaf limit)": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		Start:      largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	expectedResponseLen: 30,
-		// },
-		// "full response for intermediate range of trie (less than leaf limit)": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		Start:      largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-		// 		End:        largeTrieKeys[1099], // (inclusive range)
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	expectedResponseLen: 100,
-		// },
-		// "removed first key in response": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		response.KeyValues = response.KeyValues[1:]
-		// 	},
-		// 	expectedErr: merkledb.ErrInvalidProof,
-		// },
-		// "removed first key in response and replaced proof": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		start := response.KeyValues[1].Key
-		// 		proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultRequestKeyLimit)
-		// 		if err != nil {
-		// 			panic(err)
-		// 		}
-		// 		response.KeyValues = proof.KeyValues
-		// 		response.StartProof = proof.StartProof
-		// 		response.EndProof = proof.EndProof
-		// 	},
-		// 	expectedErr: merkledb.ErrProofNodeNotForKey,
-		// },
-		// "removed last key in response": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
-		// 	},
-		// 	expectedErr: merkledb.ErrInvalidProof,
-		// },
-		// "removed key from middle of response": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
-		// 	},
-		// 	expectedErr: merkledb.ErrInvalidProof,
-		// },
-		// "all proof keys removed from response": {
-		// 	db: largeTrieDB,
-		// 	request: &pbsync.RangeProofRequest{
-		// 		Root:       largeTrieRoot[:],
-		// 		KeyLimit:   defaultRequestKeyLimit,
-		// 		BytesLimit: defaultRequestByteSizeLimit,
-		// 	},
-		// 	modifyResponse: func(response *merkledb.RangeProof) {
-		// 		response.StartProof = nil
-		// 		response.EndProof = nil
-		// 	},
-		// 	expectedErr: merkledb.ErrInvalidProof,
-		// },
+		"full response for small (single request) trie": {
+			db: smallTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       smallTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
+		"too many leaves in response": {
+			db: smallTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       smallTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
+			},
+			expectedErr: errTooManyKeys,
+		},
+		"partial response to request for entire trie (full leaf limit)": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
+		"full response from near end of trie to end of trie (less than leaf limit)": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				Start:      largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: 30,
+		},
+		"full response for intermediate range of trie (less than leaf limit)": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				Start:      largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
+				End:        largeTrieKeys[1099], // (inclusive range)
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: 100,
+		},
+		"removed first key in response": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.KeyValues = response.KeyValues[1:]
+			},
+			expectedErr: merkledb.ErrInvalidProof,
+		},
+		"removed first key in response and replaced proof": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				start := response.KeyValues[1].Key
+				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultRequestKeyLimit)
+				if err != nil {
+					panic(err)
+				}
+				response.KeyValues = proof.KeyValues
+				response.StartProof = proof.StartProof
+				response.EndProof = proof.EndProof
+			},
+			expectedErr: merkledb.ErrProofNodeNotForKey,
+		},
+		"removed last key in response": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
+			},
+			expectedErr: merkledb.ErrInvalidProof,
+		},
+		"removed key from middle of response": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
+			},
+			expectedErr: merkledb.ErrInvalidProof,
+		},
+		"all proof keys removed from response": {
+			db: largeTrieDB,
+			request: &pbsync.RangeProofRequest{
+				Root:       largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.StartProof = nil
+				response.EndProof = nil
+			},
+			expectedErr: merkledb.ErrInvalidProof,
+		},
 	}
 
 	for name, test := range tests {
