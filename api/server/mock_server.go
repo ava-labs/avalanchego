@@ -8,6 +8,7 @@
 package server
 
 import (
+	http "net/http"
 	reflect "reflect"
 	sync "sync"
 
@@ -143,6 +144,18 @@ func (m *MockServer) RegisterChain(arg0 string, arg1 *snow.ConsensusContext, arg
 func (mr *MockServerMockRecorder) RegisterChain(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterChain", reflect.TypeOf((*MockServer)(nil).RegisterChain), arg0, arg1, arg2)
+}
+
+// RegisterChainWrapper mocks base method.
+func (m *MockServer) RegisterChainWrapper(arg0 func(http.Handler) http.Handler) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RegisterChainWrapper", arg0)
+}
+
+// RegisterChainWrapper indicates an expected call of RegisterChainWrapper.
+func (mr *MockServerMockRecorder) RegisterChainWrapper(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterChainWrapper", reflect.TypeOf((*MockServer)(nil).RegisterChainWrapper), arg0)
 }
 
 // Shutdown mocks base method.

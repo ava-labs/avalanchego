@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -43,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -131,6 +133,14 @@ type Manager interface {
 	// be called once.
 	StartChainCreator(platformChain ChainParameters) error
 
+	// SetDisableUnhealthyAPI sets whether or not the API server should be
+	// disabled if the chain is unhealthy.
+	SetDisableUnhealthyAPI(bool)
+
+	// GetDisableUnhealthyAPI returns whether or not the API server should be
+	// disabled if the chain is unhealthy.
+	GetDisableUnhealthyAPI() bool
+
 	Shutdown()
 }
 
@@ -194,7 +204,8 @@ type ManagerConfig struct {
 	CChainID                    ids.ID          // ID of the C-Chain,
 	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
-	Health                      health.Registerer
+	Health                      health.Health
+	InitialDisableUnhealthyAPI  bool
 	RetryBootstrap              bool                      // Should Bootstrap be retried
 	RetryBootstrapWarnFrequency int                       // Max number of times to retry bootstrap before warning the node operator
 	SubnetConfigs               map[ids.ID]subnets.Config // ID -> SubnetConfig
@@ -251,13 +262,15 @@ type manager struct {
 	// Value: The chain
 	chains map[ids.ID]handler.Handler
 
+	disableUnhealthyAPI utils.Atomic[bool]
+
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
 }
 
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
-	return &manager{
+	manager := &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
 		subnets:                make(map[ids.ID]subnets.Subnet),
@@ -266,6 +279,8 @@ func New(config *ManagerConfig) Manager {
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
 	}
+	manager.disableUnhealthyAPI.Set(config.InitialDisableUnhealthyAPI)
+	return manager
 }
 
 // Router that this chain manager is using to route consensus messages to chains
@@ -365,6 +380,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 				return nil, healthCheckErr
 			}),
 			chainParams.SubnetID.String(),
+			chainParams.ID.String(),
 		)
 		if err != nil {
 			m.Log.Error("failed to register failing health check",
@@ -391,6 +407,8 @@ func (m *manager) createChain(chainParams ChainParameters) {
 			zap.Error(err),
 		)
 	}
+
+	m.Server.RegisterChainWrapper(m.newAPIWrapper(chain.Context))
 
 	// Notify those that registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Context, chain.VM)
@@ -984,7 +1002,7 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Register health check for this chain
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String(), ctx.ChainID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1282,7 +1300,7 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String(), ctx.ChainID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1401,6 +1419,14 @@ func (m *manager) LookupVM(alias string) (ids.ID, error) {
 	return m.VMManager.Lookup(alias)
 }
 
+func (m *manager) SetDisableUnhealthyAPI(disable bool) {
+	m.disableUnhealthyAPI.Set(disable)
+}
+
+func (m *manager) GetDisableUnhealthyAPI() bool {
+	return m.disableUnhealthyAPI.Get()
+}
+
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created
 func (m *manager) notifyRegistrants(name string, ctx *snow.ConsensusContext, vm common.VM) {
@@ -1426,4 +1452,29 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	}
 
 	return ChainConfig{}, nil
+}
+
+func (m *manager) newAPIWrapper(ctx *snow.ConsensusContext) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			// If chain isn't done bootstrapping, ignore API calls.
+			case ctx.State.Get().State != snow.NormalOp:
+				w.WriteHeader(http.StatusServiceUnavailable)
+				// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
+				_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+			// If this check is enabled and chain is unhealthy; ignore API calls.
+			case m.disableUnhealthyAPI.Get() && !m.isChainHealthy(ctx.ChainID.String()):
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte("API call rejected because chain is not healthy"))
+			default:
+				h.ServeHTTP(w, r)
+			}
+		})
+	}
+}
+
+func (m *manager) isChainHealthy(chainID string) bool {
+	_, ok := m.Health.Health(chainID)
+	return ok
 }

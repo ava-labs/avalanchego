@@ -72,6 +72,7 @@ type Server interface {
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
 	RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
+	RegisterChainWrapper(func(http.Handler) http.Handler)
 	// Shutdown this server
 	Shutdown() error
 }
@@ -101,6 +102,9 @@ type server struct {
 
 	// Maps endpoints to handlers
 	router *router
+
+	// wrappers to wrap the handler with
+	chainWrapper func(http.Handler) http.Handler
 
 	srv *http.Server
 }
@@ -221,6 +225,11 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 	return s.srv.Serve(listener)
 }
 
+// RegisterChainWrapper registers a wrapper to wrap the chain handler.
+func (s *server) RegisterChainWrapper(f func(http.Handler) http.Handler) {
+	s.chainWrapper = f
+}
+
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
 	var (
 		handlers map[string]*common.HTTPHandler
@@ -256,6 +265,7 @@ func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm 
 			)
 			continue
 		}
+
 		if err := s.addChainRoute(chainName, handler, ctx, defaultEndpoint, extension); err != nil {
 			s.log.Error("error adding route",
 				zap.Error(err),
@@ -287,8 +297,12 @@ func (s *server) addChainRoute(chainName string, handler *common.HTTPHandler, ct
 	if err != nil {
 		return err
 	}
-	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
-	h = rejectMiddleware(h, ctx)
+
+	// Apply custom chain wrappers to the handler
+	if s.chainWrapper != nil {
+		h = s.chainWrapper(h)
+	}
+
 	h = s.metrics.wrapHandler(chainName, h)
 	return s.router.AddRouter(url, endpoint, h)
 }
@@ -370,20 +384,6 @@ func lockMiddleware(
 	}
 
 	return api.TraceHandler(lockedHandler, name, tracer), nil
-}
-
-// Reject middleware wraps a handler. If the chain that the context describes is
-// not done state-syncing/bootstrapping, writes back an error.
-func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
-		if ctx.State.Get().State != snow.NormalOp {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
-			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
-		} else {
-			handler.ServeHTTP(w, r)
-		}
-	})
 }
 
 func (s *server) AddAliases(endpoint string, aliases ...string) error {

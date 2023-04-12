@@ -63,3 +63,8 @@ func (testManager) Lookup(s string) (ids.ID, error) {
 func (testManager) LookupVM(s string) (ids.ID, error) {
 	return ids.FromString(s)
 }
+
+func (testManager) SetDisableUnhealthyAPI(bool) {}
+func (testManager) GetDisableUnhealthyAPI() bool {
+	return false
+}
