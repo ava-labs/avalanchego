@@ -98,7 +98,8 @@ const (
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
 	NetworkPingFrequencyKey                            = "network-ping-frequency"
 	NetworkMaxReconnectDelayKey                        = "network-max-reconnect-delay"
-	NetworkCompressionEnabledKey                       = "network-compression-enabled"
+	NetworkCompressionEnabledKey                       = "network-compression-enabled" // TODO this is deprecated. Eventually remove it and constants.DefaultNetworkCompressionEnabled
+	NetworkCompressionTypeKey                          = "network-compression-type"
 	NetworkMaxClockDifferenceKey                       = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                          = "network-allow-private-ips"
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"
@@ -142,6 +143,7 @@ const (
 	IpcsPathKey                                        = "ipcs-path"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
 	ConsensusGossipFrequencyKey                        = "consensus-gossip-frequency"
+	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
 	ConsensusGossipAcceptedFrontierPeerSizeKey         = "consensus-accepted-frontier-gossip-peer-size"
