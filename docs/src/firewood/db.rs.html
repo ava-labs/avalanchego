@@ -1,0 +1,2020 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/db.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>db.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../firewood/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../firewood/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
+<span id="711">711</span>
+<span id="712">712</span>
+<span id="713">713</span>
+<span id="714">714</span>
+<span id="715">715</span>
+<span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
+<span id="974">974</span>
+<span id="975">975</span>
+<span id="976">976</span>
+<span id="977">977</span>
+<span id="978">978</span>
+<span id="979">979</span>
+<span id="980">980</span>
+<span id="981">981</span>
+<span id="982">982</span>
+<span id="983">983</span>
+<span id="984">984</span>
+<span id="985">985</span>
+<span id="986">986</span>
+<span id="987">987</span>
+<span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
+<span id="991">991</span>
+<span id="992">992</span>
+<span id="993">993</span>
+<span id="994">994</span>
+<span id="995">995</span>
+<span id="996">996</span>
+<span id="997">997</span>
+<span id="998">998</span>
+<span id="999">999</span>
+<span id="1000">1000</span>
+<span id="1001">1001</span>
+<span id="1002">1002</span>
+<span id="1003">1003</span>
+<span id="1004">1004</span>
+<span id="1005">1005</span>
+<span id="1006">1006</span>
+<span id="1007">1007</span>
+<span id="1008">1008</span>
+<span id="1009">1009</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::collections::VecDeque;
+<span class="kw">use </span>std::io::{Cursor, Write};
+<span class="kw">use </span>std::rc::Rc;
+<span class="kw">use </span>std::thread::JoinHandle;
+
+<span class="kw">use </span>parking_lot::{Mutex, MutexGuard};
+<span class="kw">use </span>primitive_types::U256;
+<span class="kw">use </span>shale::{compact::CompactSpaceHeader, MemStore, MummyItem, MummyObj, ObjPtr, SpaceID};
+<span class="kw">use </span>typed_builder::TypedBuilder;
+
+<span class="kw">use </span><span class="kw">crate</span>::account::{Account, AccountRLP, Blob, BlobStash};
+<span class="kw">use </span><span class="kw">crate</span>::file;
+<span class="kw">use </span><span class="kw">crate</span>::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
+<span class="kw">use </span><span class="kw">crate</span>::storage::{CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared};
+<span class="kw">pub use </span><span class="kw">crate</span>::storage::{DiskBufferConfig, WALConfig};
+
+<span class="kw">const </span>MERKLE_META_SPACE: SpaceID = <span class="number">0x0</span>;
+<span class="kw">const </span>MERKLE_PAYLOAD_SPACE: SpaceID = <span class="number">0x1</span>;
+<span class="kw">const </span>BLOB_META_SPACE: SpaceID = <span class="number">0x2</span>;
+<span class="kw">const </span>BLOB_PAYLOAD_SPACE: SpaceID = <span class="number">0x3</span>;
+<span class="kw">const </span>SPACE_RESERVED: u64 = <span class="number">0x1000</span>;
+
+<span class="kw">const </span>MAGIC_STR: <span class="kw-2">&amp;</span>[u8; <span class="number">13</span>] = <span class="string">b&quot;firewood v0.1&quot;</span>;
+
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub enum </span>DBError {
+    InvalidParams,
+    Merkle(MerkleError),
+    Blob(<span class="kw">crate</span>::account::BlobError),
+    System(nix::Error),
+}
+
+<span class="doccomment">/// DBParams contains the constants that are fixed upon the creation of the DB, this ensures the
+/// correct parameters are used when the DB is opened later (the parameters here will override the
+/// parameters in [DBConfig] if the DB already exists).
+</span><span class="attribute">#[repr(C)]
+</span><span class="kw">struct </span>DBParams {
+    magic: [u8; <span class="number">16</span>],
+    meta_file_nbit: u64,
+    payload_file_nbit: u64,
+    payload_regn_nbit: u64,
+    wal_file_nbit: u64,
+    wal_block_nbit: u64,
+}
+
+<span class="doccomment">/// Config for accessing a version of the DB.
+</span><span class="attribute">#[derive(TypedBuilder, Clone)]
+</span><span class="kw">pub struct </span>DBRevConfig {
+    <span class="doccomment">/// Maximum cached MPT objects.
+    </span><span class="attribute">#[builder(default = <span class="number">1 </span>&lt;&lt; <span class="number">20</span>)]
+    </span>merkle_ncached_objs: usize,
+    <span class="doccomment">/// Maximum cached Blob (currently just `Account`) objects.
+    </span><span class="attribute">#[builder(default = <span class="number">4096</span>)]
+    </span>blob_ncached_objs: usize,
+}
+
+<span class="doccomment">/// Database configuration.
+</span><span class="attribute">#[derive(TypedBuilder)]
+</span><span class="kw">pub struct </span>DBConfig {
+    <span class="doccomment">/// Maximum cached pages for the free list of the item stash.
+    </span><span class="attribute">#[builder(default = <span class="number">16384</span>)] </span><span class="comment">// 64M total size by default
+    </span>meta_ncached_pages: usize,
+    <span class="doccomment">/// Maximum cached file descriptors for the free list of the item stash.
+    </span><span class="attribute">#[builder(default = <span class="number">1024</span>)] </span><span class="comment">// 1K fds by default
+    </span>meta_ncached_files: usize,
+    <span class="doccomment">/// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
+    /// the power of 2 for the file size.
+    </span><span class="attribute">#[builder(default = <span class="number">22</span>)] </span><span class="comment">// 4MB file by default
+    </span>meta_file_nbit: u64,
+    <span class="doccomment">/// Maximum cached pages for the item stash. This is the low-level cache used by the linear
+    /// space that holds MPT nodes and account objects.
+    </span><span class="attribute">#[builder(default = <span class="number">262144</span>)] </span><span class="comment">// 1G total size by default
+    </span>payload_ncached_pages: usize,
+    <span class="doccomment">/// Maximum cached file descriptors for the item stash.
+    </span><span class="attribute">#[builder(default = <span class="number">1024</span>)] </span><span class="comment">// 1K fds by default
+    </span>payload_ncached_files: usize,
+    <span class="doccomment">/// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
+    /// the power of 2 for the file size.
+    </span><span class="attribute">#[builder(default = <span class="number">22</span>)] </span><span class="comment">// 4MB file by default
+    </span>payload_file_nbit: u64,
+    <span class="doccomment">/// Maximum steps of walk to recycle a freed item.
+    </span><span class="attribute">#[builder(default = <span class="number">10</span>)]
+    </span>payload_max_walk: u64,
+    <span class="doccomment">/// Region size in bits (should be not greater than `payload_file_nbit`). One file is
+    /// partitioned into multiple regions. Just use the default value.
+    </span><span class="attribute">#[builder(default = <span class="number">22</span>)]
+    </span>payload_regn_nbit: u64,
+    <span class="doccomment">/// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
+    /// existing contents will be lost.
+    </span><span class="attribute">#[builder(default = <span class="bool-val">false</span>)]
+    </span>truncate: bool,
+    <span class="doccomment">/// Config for accessing a version of the DB.
+    </span><span class="attribute">#[builder(default = DBRevConfig::builder().build())]
+    </span>rev: DBRevConfig,
+    <span class="doccomment">/// Config for the disk buffer.
+    </span><span class="attribute">#[builder(default = DiskBufferConfig::builder().build())]
+    </span>buffer: DiskBufferConfig,
+    <span class="doccomment">/// Config for WAL.
+    </span><span class="attribute">#[builder(default = WALConfig::builder().build())]
+    </span>wal: WALConfig,
+}
+
+<span class="doccomment">/// Necessary linear space instances bundled for a `CompactSpace`.
+</span><span class="kw">struct </span>SubUniverse&lt;T&gt; {
+    meta: T,
+    payload: T,
+}
+
+<span class="kw">impl</span>&lt;T&gt; SubUniverse&lt;T&gt; {
+    <span class="kw">fn </span>new(meta: T, payload: T) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ meta, payload }
+    }
+}
+
+<span class="kw">impl </span>SubUniverse&lt;StoreRevShared&gt; {
+    <span class="kw">fn </span>to_mem_store_r(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SubUniverse&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+        SubUniverse {
+            meta: <span class="self">self</span>.meta.inner().clone(),
+            payload: <span class="self">self</span>.payload.inner().clone(),
+        }
+    }
+}
+
+<span class="kw">impl </span>SubUniverse&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+    <span class="kw">fn </span>rewind(<span class="kw-2">&amp;</span><span class="self">self</span>, meta_writes: <span class="kw-2">&amp;</span>[SpaceWrite], payload_writes: <span class="kw-2">&amp;</span>[SpaceWrite]) -&gt; SubUniverse&lt;StoreRevShared&gt; {
+        SubUniverse::new(
+            StoreRevShared::from_ash(<span class="self">self</span>.meta.clone(), meta_writes),
+            StoreRevShared::from_ash(<span class="self">self</span>.payload.clone(), payload_writes),
+        )
+    }
+}
+
+<span class="kw">impl </span>SubUniverse&lt;Rc&lt;CachedSpace&gt;&gt; {
+    <span class="kw">fn </span>to_mem_store_r(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SubUniverse&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+        SubUniverse {
+            meta: <span class="self">self</span>.meta.clone(),
+            payload: <span class="self">self</span>.payload.clone(),
+        }
+    }
+}
+
+<span class="doccomment">/// DB-wide metadata, it keeps track of the roots of the top-level tries.
+</span><span class="kw">struct </span>DBHeader {
+    <span class="doccomment">/// The root node of the account model storage. (Where the values are [Account] objects, which
+    /// may contain the root for the secondary trie.)
+    </span>acc_root: ObjPtr&lt;Node&gt;,
+    <span class="doccomment">/// The root node of the generic key-value store.
+    </span>kv_root: ObjPtr&lt;Node&gt;,
+}
+
+<span class="kw">impl </span>DBHeader {
+    <span class="kw">pub const </span>MSIZE: u64 = <span class="number">16</span>;
+
+    <span class="kw">pub fn </span>new_empty() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            acc_root: ObjPtr::null(),
+            kv_root: ObjPtr::null(),
+        }
+    }
+}
+
+<span class="kw">impl </span>MummyItem <span class="kw">for </span>DBHeader {
+    <span class="kw">fn </span>hydrate(addr: u64, mem: <span class="kw-2">&amp;</span><span class="kw">dyn </span>MemStore) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, shale::ShaleError&gt; {
+        <span class="kw">let </span>raw = mem
+            .get_view(addr, <span class="self">Self</span>::MSIZE)
+            .ok_or(shale::ShaleError::LinearMemStoreError)<span class="question-mark">?</span>;
+        <span class="kw">let </span>acc_root = u64::from_le_bytes(raw[..<span class="number">8</span>].try_into().unwrap());
+        <span class="kw">let </span>kv_root = u64::from_le_bytes(raw[<span class="number">8</span>..].try_into().unwrap());
+        <span class="kw">unsafe </span>{
+            <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+                acc_root: ObjPtr::new_from_addr(acc_root),
+                kv_root: ObjPtr::new_from_addr(kv_root),
+            })
+        }
+    }
+
+    <span class="kw">fn </span>dehydrated_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">Self</span>::MSIZE
+    }
+
+    <span class="kw">fn </span>dehydrate(<span class="kw-2">&amp;</span><span class="self">self</span>, to: <span class="kw-2">&amp;mut </span>[u8]) {
+        <span class="kw">let </span><span class="kw-2">mut </span>cur = Cursor::new(to);
+        cur.write_all(<span class="kw-2">&amp;</span><span class="self">self</span>.acc_root.addr().to_le_bytes()).unwrap();
+        cur.write_all(<span class="kw-2">&amp;</span><span class="self">self</span>.kv_root.addr().to_le_bytes()).unwrap();
+    }
+}
+
+<span class="doccomment">/// Necessary linear space instances bundled for the state of the entire DB.
+</span><span class="kw">struct </span>Universe&lt;T&gt; {
+    merkle: SubUniverse&lt;T&gt;,
+    blob: SubUniverse&lt;T&gt;,
+}
+
+<span class="kw">impl </span>Universe&lt;StoreRevShared&gt; {
+    <span class="kw">fn </span>to_mem_store_r(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Universe&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+        Universe {
+            merkle: <span class="self">self</span>.merkle.to_mem_store_r(),
+            blob: <span class="self">self</span>.blob.to_mem_store_r(),
+        }
+    }
+}
+
+<span class="kw">impl </span>Universe&lt;Rc&lt;CachedSpace&gt;&gt; {
+    <span class="kw">fn </span>to_mem_store_r(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Universe&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+        Universe {
+            merkle: <span class="self">self</span>.merkle.to_mem_store_r(),
+            blob: <span class="self">self</span>.blob.to_mem_store_r(),
+        }
+    }
+}
+
+<span class="kw">impl </span>Universe&lt;Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;&gt; {
+    <span class="kw">fn </span>rewind(
+        <span class="kw-2">&amp;</span><span class="self">self</span>, merkle_meta_writes: <span class="kw-2">&amp;</span>[SpaceWrite], merkle_payload_writes: <span class="kw-2">&amp;</span>[SpaceWrite],
+        blob_meta_writes: <span class="kw-2">&amp;</span>[SpaceWrite], blob_payload_writes: <span class="kw-2">&amp;</span>[SpaceWrite],
+    ) -&gt; Universe&lt;StoreRevShared&gt; {
+        Universe {
+            merkle: <span class="self">self</span>.merkle.rewind(merkle_meta_writes, merkle_payload_writes),
+            blob: <span class="self">self</span>.blob.rewind(blob_meta_writes, blob_payload_writes),
+        }
+    }
+}
+
+<span class="doccomment">/// Some readable version of the DB.
+</span><span class="kw">pub struct </span>DBRev {
+    header: shale::Obj&lt;DBHeader&gt;,
+    merkle: Merkle,
+    blob: BlobStash,
+}
+
+<span class="kw">impl </span>DBRev {
+    <span class="kw">fn </span>flush_dirty(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;()&gt; {
+        <span class="self">self</span>.header.flush_dirty();
+        <span class="self">self</span>.merkle.flush_dirty()<span class="question-mark">?</span>;
+        <span class="self">self</span>.blob.flush_dirty()
+    }
+
+    <span class="kw">fn </span>borrow_split(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; (<span class="kw-2">&amp;mut </span>shale::Obj&lt;DBHeader&gt;, <span class="kw-2">&amp;mut </span>Merkle, <span class="kw-2">&amp;mut </span>BlobStash) {
+        (<span class="kw-2">&amp;mut </span><span class="self">self</span>.header, <span class="kw-2">&amp;mut </span><span class="self">self</span>.merkle, <span class="kw-2">&amp;mut </span><span class="self">self</span>.blob)
+    }
+
+    <span class="doccomment">/// Get root hash of the generic key-value storage.
+    </span><span class="kw">pub fn </span>kv_root_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Hash, DBError&gt; {
+        <span class="self">self</span>.merkle
+            .root_hash::&lt;IdTrans&gt;(<span class="self">self</span>.header.kv_root)
+            .map_err(DBError::Merkle)
+    }
+
+    <span class="doccomment">/// Dump the MPT of the generic key-value storage.
+    </span><span class="kw">pub fn </span>kv_dump(<span class="kw-2">&amp;</span><span class="self">self</span>, w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="self">self</span>.merkle.dump(<span class="self">self</span>.header.kv_root, w).map_err(DBError::Merkle)
+    }
+
+    <span class="doccomment">/// Get root hash of the world state of all accounts.
+    </span><span class="kw">pub fn </span>root_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Hash, DBError&gt; {
+        <span class="self">self</span>.merkle
+            .root_hash::&lt;AccountRLP&gt;(<span class="self">self</span>.header.acc_root)
+            .map_err(DBError::Merkle)
+    }
+
+    <span class="doccomment">/// Dump the MPT of the entire account model storage.
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="self">self</span>.merkle.dump(<span class="self">self</span>.header.acc_root, w).map_err(DBError::Merkle)
+    }
+
+    <span class="kw">fn </span>get_account(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Account, DBError&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="self">self</span>.merkle.get(key, <span class="self">self</span>.header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(bytes)) =&gt; Account::deserialize(<span class="kw-2">&amp;</span>bytes),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; Account::default(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        })
+    }
+
+    <span class="doccomment">/// Dump the MPT of the state storage under an account.
+    </span><span class="kw">pub fn </span>dump_account(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="kw">let </span>acc = <span class="kw">match </span><span class="self">self</span>.merkle.get(key, <span class="self">self</span>.header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(bytes)) =&gt; Account::deserialize(<span class="kw-2">&amp;</span>bytes),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; Account::default(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        };
+        <span class="macro">writeln!</span>(w, <span class="string">&quot;{acc:?}&quot;</span>).unwrap();
+        <span class="kw">if </span>!acc.root.is_null() {
+            <span class="self">self</span>.merkle.dump(acc.root, w).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Get balance of the account.
+    </span><span class="kw">pub fn </span>get_balance(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;U256, DBError&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.get_account(key)<span class="question-mark">?</span>.balance)
+    }
+
+    <span class="doccomment">/// Get code of the account.
+    </span><span class="kw">pub fn </span>get_code(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, DBError&gt; {
+        <span class="kw">let </span>code = <span class="self">self</span>.get_account(key)<span class="question-mark">?</span>.code;
+        <span class="kw">if </span>code.is_null() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(Vec::new())
+        }
+        <span class="kw">let </span>b = <span class="self">self</span>.blob.get_blob(code).map_err(DBError::Blob)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="kw-2">&amp;**</span>b {
+            Blob::Code(code) =&gt; code.clone(),
+        })
+    }
+
+    <span class="doccomment">/// Get nonce of the account.
+    </span><span class="kw">pub fn </span>get_nonce(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;u64, DBError&gt; {
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.get_account(key)<span class="question-mark">?</span>.nonce)
+    }
+
+    <span class="doccomment">/// Get the state value indexed by `sub_key` in the account indexed by `key`.
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], sub_key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, DBError&gt; {
+        <span class="kw">let </span>root = <span class="self">self</span>.get_account(key)<span class="question-mark">?</span>.root;
+        <span class="kw">if </span>root.is_null() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(Vec::new())
+        }
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="self">self</span>.merkle.get(sub_key, root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(v)) =&gt; v.to_vec(),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; Vec::new(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        })
+    }
+
+    <span class="doccomment">/// Check if the account exists.
+    </span><span class="kw">pub fn </span>exist(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;bool, DBError&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw">match </span><span class="self">self</span>.merkle.get(key, <span class="self">self</span>.header.acc_root) {
+            <span class="prelude-val">Ok</span>(r) =&gt; r.is_some(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        })
+    }
+}
+
+<span class="kw">struct </span>DBInner {
+    latest: DBRev,
+    disk_requester: <span class="kw">crate</span>::storage::DiskBufferRequester,
+    disk_thread: <span class="prelude-ty">Option</span>&lt;JoinHandle&lt;()&gt;&gt;,
+    staging: Universe&lt;Rc&lt;StoreRevMut&gt;&gt;,
+    cached: Universe&lt;Rc&lt;CachedSpace&gt;&gt;,
+    revisions: VecDeque&lt;Universe&lt;StoreRevShared&gt;&gt;,
+    max_revisions: usize,
+}
+
+<span class="kw">impl </span>Drop <span class="kw">for </span>DBInner {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.disk_requester.shutdown();
+        <span class="self">self</span>.disk_thread.take().map(JoinHandle::join);
+    }
+}
+
+<span class="doccomment">/// Firewood database handle.
+</span><span class="kw">pub struct </span>DB {
+    inner: Mutex&lt;DBInner&gt;,
+    payload_regn_nbit: u64,
+    rev_cfg: DBRevConfig,
+}
+
+<span class="kw">impl </span>DB {
+    <span class="doccomment">/// Open a database.
+    </span><span class="kw">pub fn </span>new(db_path: <span class="kw-2">&amp;</span>str, cfg: <span class="kw-2">&amp;</span>DBConfig) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="comment">// TODO: make sure all fds are released at the end
+        </span><span class="kw">if </span>cfg.truncate {
+            <span class="kw">let _ </span>= std::fs::remove_dir_all(db_path);
+        }
+        <span class="kw">let </span>(db_fd, reset) = file::open_dir(db_path, cfg.truncate).map_err(DBError::System)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>merkle_fd = file::touch_dir(<span class="string">&quot;merkle&quot;</span>, db_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+        <span class="kw">let </span>merkle_meta_fd = file::touch_dir(<span class="string">&quot;meta&quot;</span>, merkle_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+        <span class="kw">let </span>merkle_payload_fd = file::touch_dir(<span class="string">&quot;compact&quot;</span>, merkle_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>blob_fd = file::touch_dir(<span class="string">&quot;blob&quot;</span>, db_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+        <span class="kw">let </span>blob_meta_fd = file::touch_dir(<span class="string">&quot;meta&quot;</span>, blob_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+        <span class="kw">let </span>blob_payload_fd = file::touch_dir(<span class="string">&quot;compact&quot;</span>, blob_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>file0 = <span class="kw">crate</span>::file::File::new(<span class="number">0</span>, SPACE_RESERVED, merkle_meta_fd).map_err(DBError::System)<span class="question-mark">?</span>;
+        <span class="kw">let </span>fd0 = file0.get_fd();
+
+        <span class="kw">if </span>reset {
+            <span class="comment">// initialize DBParams
+            </span><span class="kw">if </span>cfg.payload_file_nbit &lt; cfg.payload_regn_nbit || cfg.payload_regn_nbit &lt; <span class="kw">crate</span>::storage::PAGE_SIZE_NBIT {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::InvalidParams)
+            }
+            nix::unistd::ftruncate(fd0, <span class="number">0</span>).map_err(DBError::System)<span class="question-mark">?</span>;
+            nix::unistd::ftruncate(fd0, <span class="number">1 </span>&lt;&lt; cfg.meta_file_nbit).map_err(DBError::System)<span class="question-mark">?</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>magic = [<span class="number">0</span>; <span class="number">16</span>];
+            magic[..MAGIC_STR.len()].copy_from_slice(MAGIC_STR);
+            <span class="kw">let </span>header = DBParams {
+                magic,
+                meta_file_nbit: cfg.meta_file_nbit,
+                payload_file_nbit: cfg.payload_file_nbit,
+                payload_regn_nbit: cfg.payload_regn_nbit,
+                wal_file_nbit: cfg.wal.file_nbit,
+                wal_block_nbit: cfg.wal.block_nbit,
+            };
+            nix::sys::uio::pwrite(fd0, <span class="kw-2">&amp;</span>shale::util::get_raw_bytes(<span class="kw-2">&amp;</span>header), <span class="number">0</span>).map_err(DBError::System)<span class="question-mark">?</span>;
+        }
+
+        <span class="comment">// read DBParams
+        </span><span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; std::mem::size_of::&lt;DBParams&gt;()];
+        nix::sys::uio::pread(fd0, <span class="kw-2">&amp;mut </span>header_bytes, <span class="number">0</span>).map_err(DBError::System)<span class="question-mark">?</span>;
+        drop(file0);
+        <span class="kw">let </span><span class="kw-2">mut </span>offset = header_bytes.len() <span class="kw">as </span>u64;
+        <span class="kw">let </span>header = <span class="kw">unsafe </span>{ std::mem::transmute::&lt;<span class="kw">_</span>, DBParams&gt;(header_bytes) };
+
+        <span class="comment">// setup disk buffer
+        </span><span class="kw">let </span>cached = Universe {
+            merkle: SubUniverse::new(
+                Rc::new(
+                    CachedSpace::new(
+                        <span class="kw-2">&amp;</span>StoreConfig::builder()
+                            .ncached_pages(cfg.meta_ncached_pages)
+                            .ncached_files(cfg.meta_ncached_files)
+                            .space_id(MERKLE_META_SPACE)
+                            .file_nbit(header.meta_file_nbit)
+                            .rootfd(merkle_meta_fd)
+                            .build(),
+                    )
+                    .unwrap(),
+                ),
+                Rc::new(
+                    CachedSpace::new(
+                        <span class="kw-2">&amp;</span>StoreConfig::builder()
+                            .ncached_pages(cfg.payload_ncached_pages)
+                            .ncached_files(cfg.payload_ncached_files)
+                            .space_id(MERKLE_PAYLOAD_SPACE)
+                            .file_nbit(header.payload_file_nbit)
+                            .rootfd(merkle_payload_fd)
+                            .build(),
+                    )
+                    .unwrap(),
+                ),
+            ),
+            blob: SubUniverse::new(
+                Rc::new(
+                    CachedSpace::new(
+                        <span class="kw-2">&amp;</span>StoreConfig::builder()
+                            .ncached_pages(cfg.meta_ncached_pages)
+                            .ncached_files(cfg.meta_ncached_files)
+                            .space_id(BLOB_META_SPACE)
+                            .file_nbit(header.meta_file_nbit)
+                            .rootfd(blob_meta_fd)
+                            .build(),
+                    )
+                    .unwrap(),
+                ),
+                Rc::new(
+                    CachedSpace::new(
+                        <span class="kw-2">&amp;</span>StoreConfig::builder()
+                            .ncached_pages(cfg.payload_ncached_pages)
+                            .ncached_files(cfg.payload_ncached_files)
+                            .space_id(BLOB_PAYLOAD_SPACE)
+                            .file_nbit(header.payload_file_nbit)
+                            .rootfd(blob_payload_fd)
+                            .build(),
+                    )
+                    .unwrap(),
+                ),
+            ),
+        };
+
+        <span class="kw">let </span>wal = WALConfig::builder()
+            .file_nbit(header.wal_file_nbit)
+            .block_nbit(header.wal_block_nbit)
+            .max_revisions(cfg.wal.max_revisions)
+            .build();
+        <span class="kw">let </span>(sender, inbound) = tokio::sync::mpsc::channel(cfg.buffer.max_buffered);
+        <span class="kw">let </span>disk_requester = <span class="kw">crate</span>::storage::DiskBufferRequester::new(sender);
+        <span class="kw">let </span>buffer = cfg.buffer.clone();
+        <span class="kw">let </span>disk_thread = <span class="prelude-val">Some</span>(std::thread::spawn(<span class="kw">move </span>|| {
+            <span class="kw">let </span>disk_buffer = DiskBuffer::new(inbound, <span class="kw-2">&amp;</span>buffer, <span class="kw-2">&amp;</span>wal).unwrap();
+            disk_buffer.run()
+        }));
+
+        disk_requester.reg_cached_space(cached.merkle.meta.as_ref());
+        disk_requester.reg_cached_space(cached.merkle.payload.as_ref());
+        disk_requester.reg_cached_space(cached.blob.meta.as_ref());
+        disk_requester.reg_cached_space(cached.blob.payload.as_ref());
+
+        <span class="kw">let </span>staging = Universe {
+            merkle: SubUniverse::new(
+                Rc::new(StoreRevMut::new(cached.merkle.meta.clone() <span class="kw">as </span>Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;)),
+                Rc::new(StoreRevMut::new(cached.merkle.payload.clone() <span class="kw">as </span>Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;)),
+            ),
+            blob: SubUniverse::new(
+                Rc::new(StoreRevMut::new(cached.blob.meta.clone() <span class="kw">as </span>Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;)),
+                Rc::new(StoreRevMut::new(cached.blob.payload.clone() <span class="kw">as </span>Rc&lt;<span class="kw">dyn </span>MemStoreR&gt;)),
+            ),
+        };
+
+        <span class="comment">// recover from WAL
+        </span>disk_requester.init_wal(<span class="string">&quot;wal&quot;</span>, db_fd);
+
+        <span class="comment">// set up the storage layout
+        </span><span class="kw">let </span>db_header: ObjPtr&lt;DBHeader&gt;;
+        <span class="kw">let </span>merkle_payload_header: ObjPtr&lt;CompactSpaceHeader&gt;;
+        <span class="kw">let </span>blob_payload_header: ObjPtr&lt;CompactSpaceHeader&gt;;
+        <span class="kw">unsafe </span>{
+            db_header = ObjPtr::new_from_addr(offset);
+            offset += DBHeader::MSIZE;
+            merkle_payload_header = ObjPtr::new_from_addr(offset);
+            offset += CompactSpaceHeader::MSIZE;
+            <span class="macro">assert!</span>(offset &lt;= SPACE_RESERVED);
+            blob_payload_header = ObjPtr::new_from_addr(<span class="number">0</span>);
+        }
+
+        <span class="kw">if </span>reset {
+            <span class="comment">// initialize space headers
+            </span>staging.merkle.meta.write(
+                merkle_payload_header.addr(),
+                <span class="kw-2">&amp;</span>shale::to_dehydrated(<span class="kw-2">&amp;</span>shale::compact::CompactSpaceHeader::new(SPACE_RESERVED, SPACE_RESERVED)),
+            );
+            staging
+                .merkle
+                .meta
+                .write(db_header.addr(), <span class="kw-2">&amp;</span>shale::to_dehydrated(<span class="kw-2">&amp;</span>DBHeader::new_empty()));
+            staging.blob.meta.write(
+                blob_payload_header.addr(),
+                <span class="kw-2">&amp;</span>shale::to_dehydrated(<span class="kw-2">&amp;</span>shale::compact::CompactSpaceHeader::new(SPACE_RESERVED, SPACE_RESERVED)),
+            );
+        }
+
+        <span class="kw">let </span>(<span class="kw-2">mut </span>db_header_ref, merkle_payload_header_ref, blob_payload_header_ref) = <span class="kw">unsafe </span>{
+            <span class="kw">let </span>merkle_meta_ref = staging.merkle.meta.as_ref() <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>MemStore;
+            <span class="kw">let </span>blob_meta_ref = staging.blob.meta.as_ref() <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>MemStore;
+
+            (
+                MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                MummyObj::ptr_to_obj(
+                    merkle_meta_ref,
+                    merkle_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
+                MummyObj::ptr_to_obj(blob_meta_ref, blob_payload_header, shale::compact::CompactHeader::MSIZE).unwrap(),
+            )
+        };
+
+        <span class="kw">let </span>merkle_space = shale::compact::CompactSpace::new(
+            staging.merkle.meta.clone(),
+            staging.merkle.payload.clone(),
+            merkle_payload_header_ref,
+            shale::ObjCache::new(cfg.rev.merkle_ncached_objs),
+            cfg.payload_max_walk,
+            header.payload_regn_nbit,
+        )
+        .unwrap();
+
+        <span class="kw">let </span>blob_space = shale::compact::CompactSpace::new(
+            staging.blob.meta.clone(),
+            staging.blob.payload.clone(),
+            blob_payload_header_ref,
+            shale::ObjCache::new(cfg.rev.blob_ncached_objs),
+            cfg.payload_max_walk,
+            header.payload_regn_nbit,
+        )
+        .unwrap();
+
+        <span class="kw">if </span>db_header_ref.acc_root.is_null() {
+            <span class="kw">let </span><span class="kw-2">mut </span>err = <span class="prelude-val">Ok</span>(());
+            <span class="comment">// create the sentinel node
+            </span>db_header_ref
+                .write(|r| {
+                    err = (|| {
+                        Merkle::init_root(<span class="kw-2">&amp;mut </span>r.acc_root, <span class="kw-2">&amp;</span>merkle_space)<span class="question-mark">?</span>;
+                        Merkle::init_root(<span class="kw-2">&amp;mut </span>r.kv_root, <span class="kw-2">&amp;</span>merkle_space)
+                    })();
+                })
+                .unwrap();
+            err.map_err(DBError::Merkle)<span class="question-mark">?
+        </span>}
+
+        <span class="kw">let </span><span class="kw-2">mut </span>latest = DBRev {
+            header: db_header_ref,
+            merkle: Merkle::new(Box::new(merkle_space)),
+            blob: BlobStash::new(Box::new(blob_space)),
+        };
+        latest.flush_dirty().unwrap();
+
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            inner: Mutex::new(DBInner {
+                latest,
+                disk_thread,
+                disk_requester,
+                staging,
+                cached,
+                revisions: VecDeque::new(),
+                max_revisions: cfg.wal.max_revisions <span class="kw">as </span>usize,
+            }),
+            payload_regn_nbit: header.payload_regn_nbit,
+            rev_cfg: cfg.rev.clone(),
+        })
+    }
+
+    <span class="doccomment">/// Create a write batch.
+    </span><span class="kw">pub fn </span>new_writebatch(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; WriteBatch {
+        WriteBatch {
+            m: <span class="self">self</span>.inner.lock(),
+            root_hash_recalc: <span class="bool-val">true</span>,
+            committed: <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="doccomment">/// Dump the MPT of the latest generic key-value storage.
+    </span><span class="kw">pub fn </span>kv_dump(<span class="kw-2">&amp;</span><span class="self">self</span>, w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.kv_dump(w)
+    }
+
+    <span class="doccomment">/// Dump the MPT of the latest entire account model storage.
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.dump(w)
+    }
+
+    <span class="doccomment">/// Dump the MPT of the latest state storage under an account.
+    </span><span class="kw">pub fn </span>dump_account(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], w: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Write) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.dump_account(key, w)
+    }
+
+    <span class="doccomment">/// Get root hash of the latest generic key-value storage.
+    </span><span class="kw">pub fn </span>kv_root_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Hash, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.kv_root_hash()
+    }
+
+    <span class="doccomment">/// Get root hash of the latest world state of all accounts.
+    </span><span class="kw">pub fn </span>root_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Hash, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.root_hash()
+    }
+
+    <span class="doccomment">/// Get the latest balance of the account.
+    </span><span class="kw">pub fn </span>get_balance(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;U256, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.get_balance(key)
+    }
+
+    <span class="doccomment">/// Get the latest code of the account.
+    </span><span class="kw">pub fn </span>get_code(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.get_code(key)
+    }
+
+    <span class="doccomment">/// Get the latest nonce of the account.
+    </span><span class="kw">pub fn </span>get_nonce(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;u64, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.get_nonce(key)
+    }
+
+    <span class="doccomment">/// Get the latest state value indexed by `sub_key` in the account indexed by `key`.
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], sub_key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.get_state(key, sub_key)
+    }
+
+    <span class="doccomment">/// Check if the account exists in the latest world state.
+    </span><span class="kw">pub fn </span>exist(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;bool, DBError&gt; {
+        <span class="self">self</span>.inner.lock().latest.exist(key)
+    }
+
+    <span class="doccomment">/// Get a handle that grants the access to some historical state of the entire DB.
+    </span><span class="kw">pub fn </span>get_revision(<span class="kw-2">&amp;</span><span class="self">self</span>, nback: usize, cfg: <span class="prelude-ty">Option</span>&lt;DBRevConfig&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;Revision&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>inner = <span class="self">self</span>.inner.lock();
+
+        <span class="kw">let </span>rlen = inner.revisions.len();
+        <span class="kw">if </span>nback == <span class="number">0 </span>|| nback &gt; inner.max_revisions {
+            <span class="kw">return </span><span class="prelude-val">None
+        </span>}
+        <span class="kw">if </span>rlen &lt; nback {
+            <span class="kw">let </span>ashes = inner.disk_requester.collect_ash(nback);
+            <span class="kw">for </span><span class="kw-2">mut </span>ash <span class="kw">in </span>ashes.into_iter().skip(rlen) {
+                <span class="kw">for </span>(<span class="kw">_</span>, a) <span class="kw">in </span>ash.<span class="number">0</span>.iter_mut() {
+                    a.old.reverse()
+                }
+
+                <span class="kw">let </span>u = <span class="kw">match </span>inner.revisions.back() {
+                    <span class="prelude-val">Some</span>(u) =&gt; u.to_mem_store_r(),
+                    <span class="prelude-val">None </span>=&gt; inner.cached.to_mem_store_r(),
+                };
+                inner.revisions.push_back(u.rewind(
+                    <span class="kw-2">&amp;</span>ash.<span class="number">0</span>[<span class="kw-2">&amp;</span>MERKLE_META_SPACE].old,
+                    <span class="kw-2">&amp;</span>ash.<span class="number">0</span>[<span class="kw-2">&amp;</span>MERKLE_PAYLOAD_SPACE].old,
+                    <span class="kw-2">&amp;</span>ash.<span class="number">0</span>[<span class="kw-2">&amp;</span>BLOB_META_SPACE].old,
+                    <span class="kw-2">&amp;</span>ash.<span class="number">0</span>[<span class="kw-2">&amp;</span>BLOB_PAYLOAD_SPACE].old,
+                ));
+            }
+        }
+        <span class="kw">if </span>inner.revisions.len() &lt; nback {
+            <span class="kw">return </span><span class="prelude-val">None
+        </span>}
+        <span class="comment">// set up the storage layout
+        </span><span class="kw">let </span>db_header: ObjPtr&lt;DBHeader&gt;;
+        <span class="kw">let </span>merkle_payload_header: ObjPtr&lt;CompactSpaceHeader&gt;;
+        <span class="kw">let </span>blob_payload_header: ObjPtr&lt;CompactSpaceHeader&gt;;
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>offset = std::mem::size_of::&lt;DBParams&gt;() <span class="kw">as </span>u64;
+            <span class="comment">// DBHeader starts after DBParams in merkle meta space
+            </span>db_header = ObjPtr::new_from_addr(offset);
+            offset += DBHeader::MSIZE;
+            <span class="comment">// Merkle CompactHeader starts after DBHeader in merkle meta space
+            </span>merkle_payload_header = ObjPtr::new_from_addr(offset);
+            offset += CompactSpaceHeader::MSIZE;
+            <span class="macro">assert!</span>(offset &lt;= SPACE_RESERVED);
+            <span class="comment">// Blob CompactSpaceHeader starts right in blob meta space
+            </span>blob_payload_header = ObjPtr::new_from_addr(<span class="number">0</span>);
+        }
+
+        <span class="kw">let </span>space = <span class="kw-2">&amp;</span>inner.revisions[nback - <span class="number">1</span>];
+
+        <span class="kw">let </span>(db_header_ref, merkle_payload_header_ref, blob_payload_header_ref) = <span class="kw">unsafe </span>{
+            <span class="kw">let </span>merkle_meta_ref = <span class="kw-2">&amp;</span>space.merkle.meta <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>MemStore;
+            <span class="kw">let </span>blob_meta_ref = <span class="kw-2">&amp;</span>space.blob.meta <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>MemStore;
+
+            (
+                MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                MummyObj::ptr_to_obj(
+                    merkle_meta_ref,
+                    merkle_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
+                MummyObj::ptr_to_obj(blob_meta_ref, blob_payload_header, shale::compact::CompactHeader::MSIZE).unwrap(),
+            )
+        };
+
+        <span class="kw">let </span>merkle_space = shale::compact::CompactSpace::new(
+            Rc::new(space.merkle.meta.clone()),
+            Rc::new(space.merkle.payload.clone()),
+            merkle_payload_header_ref,
+            shale::ObjCache::new(cfg.as_ref().unwrap_or(<span class="kw-2">&amp;</span><span class="self">self</span>.rev_cfg).merkle_ncached_objs),
+            <span class="number">0</span>,
+            <span class="self">self</span>.payload_regn_nbit,
+        )
+        .unwrap();
+
+        <span class="kw">let </span>blob_space = shale::compact::CompactSpace::new(
+            Rc::new(space.blob.meta.clone()),
+            Rc::new(space.blob.payload.clone()),
+            blob_payload_header_ref,
+            shale::ObjCache::new(cfg.as_ref().unwrap_or(<span class="kw-2">&amp;</span><span class="self">self</span>.rev_cfg).blob_ncached_objs),
+            <span class="number">0</span>,
+            <span class="self">self</span>.payload_regn_nbit,
+        )
+        .unwrap();
+
+        <span class="prelude-val">Some</span>(Revision {
+            _m: inner,
+            rev: DBRev {
+                header: db_header_ref,
+                merkle: Merkle::new(Box::new(merkle_space)),
+                blob: BlobStash::new(Box::new(blob_space)),
+            },
+        })
+    }
+}
+
+<span class="doccomment">/// Lock protected handle to a readable version of the DB.
+</span><span class="kw">pub struct </span>Revision&lt;<span class="lifetime">&#39;a</span>&gt; {
+    _m: MutexGuard&lt;<span class="lifetime">&#39;a</span>, DBInner&gt;,
+    rev: DBRev,
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; std::ops::Deref <span class="kw">for </span>Revision&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">type </span>Target = DBRev;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>DBRev {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.rev
+    }
+}
+
+<span class="doccomment">/// An atomic batch of changes made to the DB. Each operation on a [WriteBatch] will move itself
+/// because when an error occurs, the write batch will be automaticlaly aborted so that the DB
+/// remains clean.
+</span><span class="kw">pub struct </span>WriteBatch&lt;<span class="lifetime">&#39;a</span>&gt; {
+    m: MutexGuard&lt;<span class="lifetime">&#39;a</span>, DBInner&gt;,
+    root_hash_recalc: bool,
+    committed: bool,
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; WriteBatch&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Insert an item to the generic key-value storage.
+    </span><span class="kw">pub fn </span>kv_insert&lt;K: AsRef&lt;[u8]&gt;&gt;(<span class="kw-2">mut </span><span class="self">self</span>, key: K, val: Vec&lt;u8&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">let </span>(header, merkle, <span class="kw">_</span>) = <span class="self">self</span>.m.latest.borrow_split();
+        merkle.insert(key, val, header.kv_root).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Remove an item from the generic key-value storage. `val` will be set to the value that is
+    /// removed from the storage if it exists.
+    </span><span class="kw">pub fn </span>kv_remove&lt;K: AsRef&lt;[u8]&gt;&gt;(<span class="kw-2">mut </span><span class="self">self</span>, key: K, val: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">let </span>(header, merkle, <span class="kw">_</span>) = <span class="self">self</span>.m.latest.borrow_split();
+        <span class="kw-2">*</span>val = merkle.remove(key, header.kv_root).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="kw">fn </span>change_account(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], modify: <span class="kw">impl </span>FnOnce(<span class="kw-2">&amp;mut </span>Account, <span class="kw-2">&amp;mut </span>BlobStash) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), DBError&gt; {
+        <span class="kw">let </span>(header, merkle, blob) = <span class="self">self</span>.m.latest.borrow_split();
+        <span class="kw">match </span>merkle.get_mut(key, header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw-2">mut </span>bytes)) =&gt; {
+                <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="prelude-val">Ok</span>(());
+                bytes
+                    .write(|b| {
+                        <span class="kw">let </span><span class="kw-2">mut </span>acc = Account::deserialize(b);
+                        ret = modify(<span class="kw-2">&amp;mut </span>acc, blob);
+                        <span class="kw">if </span>ret.is_err() {
+                            <span class="kw">return
+                        </span>}
+                        <span class="kw-2">*</span>b = acc.serialize();
+                    })
+                    .map_err(DBError::Merkle)<span class="question-mark">?</span>;
+                ret<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; {
+                <span class="kw">let </span><span class="kw-2">mut </span>acc = Account::default();
+                modify(<span class="kw-2">&amp;mut </span>acc, blob)<span class="question-mark">?</span>;
+                merkle
+                    .insert(key, acc.serialize(), header.acc_root)
+                    .map_err(DBError::Merkle)<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Set balance of the account.
+    </span><span class="kw">pub fn </span>set_balance(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], balance: U256) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="self">self</span>.change_account(key, |acc, <span class="kw">_</span>| {
+            acc.balance = balance;
+            <span class="prelude-val">Ok</span>(())
+        })<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Set code of the account.
+    </span><span class="kw">pub fn </span>set_code(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], code: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">use </span>sha3::Digest;
+        <span class="self">self</span>.change_account(key, |acc, blob_stash| {
+            <span class="kw">if </span>!acc.code.is_null() {
+                blob_stash.free_blob(acc.code).map_err(DBError::Blob)<span class="question-mark">?</span>;
+            }
+            acc.set_code(
+                Hash(sha3::Keccak256::digest(code).into()),
+                blob_stash
+                    .new_blob(Blob::Code(code.to_vec()))
+                    .map_err(DBError::Blob)<span class="question-mark">?
+                    </span>.as_ptr(),
+            );
+            <span class="prelude-val">Ok</span>(())
+        })<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Set nonce of the account.
+    </span><span class="kw">pub fn </span>set_nonce(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], nonce: u64) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="self">self</span>.change_account(key, |acc, <span class="kw">_</span>| {
+            acc.nonce = nonce;
+            <span class="prelude-val">Ok</span>(())
+        })<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Set the state value indexed by `sub_key` in the account indexed by `key`.
+    </span><span class="kw">pub fn </span>set_state(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], sub_key: <span class="kw-2">&amp;</span>[u8], val: Vec&lt;u8&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">let </span>(header, merkle, <span class="kw">_</span>) = <span class="self">self</span>.m.latest.borrow_split();
+        <span class="kw">let </span><span class="kw-2">mut </span>acc = <span class="kw">match </span>merkle.get(key, header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(r)) =&gt; Account::deserialize(<span class="kw-2">&amp;</span>r),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; Account::default(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        };
+        <span class="kw">if </span>acc.root.is_null() {
+            Merkle::init_root(<span class="kw-2">&amp;mut </span>acc.root, merkle.get_store()).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        }
+        merkle.insert(sub_key, val, acc.root).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        acc.root_hash = merkle.root_hash::&lt;IdTrans&gt;(acc.root).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        merkle
+            .insert(key, acc.serialize(), header.acc_root)
+            .map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Create an account.
+    </span><span class="kw">pub fn </span>create_account(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">let </span>(header, merkle, <span class="kw">_</span>) = <span class="self">self</span>.m.latest.borrow_split();
+        <span class="kw">let </span>old_balance = <span class="kw">match </span>merkle.get_mut(key, header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(bytes)) =&gt; Account::deserialize(<span class="kw-2">&amp;</span>bytes.get()).balance,
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; U256::zero(),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        };
+        <span class="kw">let </span>acc = Account {
+            balance: old_balance,
+            ..Default::default()
+        };
+        merkle
+            .insert(key, acc.serialize(), header.acc_root)
+            .map_err(DBError::Merkle)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Delete an account.
+    </span><span class="kw">pub fn </span>delete_account(<span class="kw-2">mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>[u8], acc: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;Account&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, DBError&gt; {
+        <span class="kw">let </span>(header, merkle, blob_stash) = <span class="self">self</span>.m.latest.borrow_split();
+        <span class="kw">let </span><span class="kw-2">mut </span>a = <span class="kw">match </span>merkle.remove(key, header.acc_root) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(bytes)) =&gt; Account::deserialize(<span class="kw-2">&amp;</span>bytes),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; {
+                <span class="kw-2">*</span>acc = <span class="prelude-val">None</span>;
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">self</span>)
+            }
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(DBError::Merkle(e)),
+        };
+        <span class="kw">if </span>!a.root.is_null() {
+            merkle.remove_tree(a.root).map_err(DBError::Merkle)<span class="question-mark">?</span>;
+            a.root = ObjPtr::null();
+        }
+        <span class="kw">if </span>!a.code.is_null() {
+            blob_stash.free_blob(a.code).map_err(DBError::Blob)<span class="question-mark">?</span>;
+            a.code = ObjPtr::null();
+        }
+        <span class="kw-2">*</span>acc = <span class="prelude-val">Some</span>(a);
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Do not rehash merkle roots upon commit. This will leave the recalculation of the dirty root
+    /// hashes to future invocation of `root_hash`, `kv_root_hash` or batch commits.
+    </span><span class="kw">pub fn </span>no_root_hash(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.root_hash_recalc = <span class="bool-val">false</span>;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Persist all changes to the DB. The atomicity of the [WriteBatch] guarantees all changes are
+    /// either retained on disk or lost together during a crash.
+    </span><span class="kw">pub fn </span>commit(<span class="kw-2">mut </span><span class="self">self</span>) {
+        <span class="kw">use </span><span class="kw">crate</span>::storage::BufferWrite;
+        <span class="kw">let </span>inner = <span class="kw-2">&amp;mut *</span><span class="self">self</span>.m;
+        <span class="kw">if </span><span class="self">self</span>.root_hash_recalc {
+            inner.latest.root_hash().ok();
+            inner.latest.kv_root_hash().ok();
+        }
+        <span class="comment">// clear the staging layer and apply changes to the CachedSpace
+        </span>inner.latest.flush_dirty().unwrap();
+        <span class="kw">let </span>(merkle_payload_pages, merkle_payload_plain) = inner.staging.merkle.payload.take_delta();
+        <span class="kw">let </span>(merkle_meta_pages, merkle_meta_plain) = inner.staging.merkle.meta.take_delta();
+        <span class="kw">let </span>(blob_payload_pages, blob_payload_plain) = inner.staging.blob.payload.take_delta();
+        <span class="kw">let </span>(blob_meta_pages, blob_meta_plain) = inner.staging.blob.meta.take_delta();
+
+        <span class="kw">let </span>old_merkle_meta_delta = inner.cached.merkle.meta.update(<span class="kw-2">&amp;</span>merkle_meta_pages).unwrap();
+        <span class="kw">let </span>old_merkle_payload_delta = inner.cached.merkle.payload.update(<span class="kw-2">&amp;</span>merkle_payload_pages).unwrap();
+        <span class="kw">let </span>old_blob_meta_delta = inner.cached.blob.meta.update(<span class="kw-2">&amp;</span>blob_meta_pages).unwrap();
+        <span class="kw">let </span>old_blob_payload_delta = inner.cached.blob.payload.update(<span class="kw-2">&amp;</span>blob_payload_pages).unwrap();
+
+        <span class="comment">// update the rolling window of past revisions
+        </span><span class="kw">let </span>new_base = Universe {
+            merkle: SubUniverse::new(
+                StoreRevShared::from_delta(inner.cached.merkle.meta.clone(), old_merkle_meta_delta),
+                StoreRevShared::from_delta(inner.cached.merkle.payload.clone(), old_merkle_payload_delta),
+            ),
+            blob: SubUniverse::new(
+                StoreRevShared::from_delta(inner.cached.blob.meta.clone(), old_blob_meta_delta),
+                StoreRevShared::from_delta(inner.cached.blob.payload.clone(), old_blob_payload_delta),
+            ),
+        };
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(rev) = inner.revisions.front_mut() {
+            rev.merkle.meta.set_prev(new_base.merkle.meta.inner().clone());
+            rev.merkle.payload.set_prev(new_base.merkle.payload.inner().clone());
+            rev.blob.meta.set_prev(new_base.blob.meta.inner().clone());
+            rev.blob.payload.set_prev(new_base.blob.payload.inner().clone());
+        }
+        inner.revisions.push_front(new_base);
+        <span class="kw">while </span>inner.revisions.len() &gt; inner.max_revisions {
+            inner.revisions.pop_back();
+        }
+
+        <span class="self">self</span>.committed = <span class="bool-val">true</span>;
+
+        <span class="comment">// schedule writes to the disk
+        </span>inner.disk_requester.write(
+            <span class="macro">vec!</span>[
+                BufferWrite {
+                    space_id: inner.staging.merkle.payload.id(),
+                    delta: merkle_payload_pages,
+                },
+                BufferWrite {
+                    space_id: inner.staging.merkle.meta.id(),
+                    delta: merkle_meta_pages,
+                },
+                BufferWrite {
+                    space_id: inner.staging.blob.payload.id(),
+                    delta: blob_payload_pages,
+                },
+                BufferWrite {
+                    space_id: inner.staging.blob.meta.id(),
+                    delta: blob_meta_pages,
+                },
+            ],
+            <span class="kw">crate</span>::storage::AshRecord(
+                [
+                    (MERKLE_META_SPACE, merkle_meta_plain),
+                    (MERKLE_PAYLOAD_SPACE, merkle_payload_plain),
+                    (BLOB_META_SPACE, blob_meta_plain),
+                    (BLOB_PAYLOAD_SPACE, blob_payload_plain),
+                ]
+                .into(),
+            ),
+        );
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Drop <span class="kw">for </span>WriteBatch&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">if </span>!<span class="self">self</span>.committed {
+            <span class="comment">// drop the staging changes
+            </span><span class="self">self</span>.m.staging.merkle.payload.take_delta();
+            <span class="self">self</span>.m.staging.merkle.meta.take_delta();
+            <span class="self">self</span>.m.staging.blob.payload.take_delta();
+            <span class="self">self</span>.m.staging.blob.meta.take_delta();
+        }
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="firewood" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (7fcf850d7 2022-10-23)" ></div></body></html>

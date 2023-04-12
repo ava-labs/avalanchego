@@ -1,0 +1,408 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><a class="sidebar-logo" href="../../firewood/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../firewood/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+</pre><pre class="rust"><code><span class="doccomment">//! # Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
+//!
+//! Firewood is an embedded key-value store, optimized to store blockchain state. It prioritizes
+//! access to latest state, by providing extremely fast reads, but also provides a limited view
+//! into past state. It does not copy-on-write the Merkle Patricia Trie (MPT) to generate an ever
+//! growing forest of tries like EVM, but instead keeps one latest version of the MPT index on disk
+//! and apply in-place updates to it. This ensures that the database size is small and stable
+//! during the course of running firewood. Firewood was first conceived to provide a very fast
+//! storage layer for qEVM to enable a fast, complete EVM system with right design choices made
+//! totally from scratch, but it also serves as a drop-in replacement for any EVM-compatible
+//! blockchain storage system, and fits for the general use of a certified key-value store of
+//! arbitrary data.
+//!
+//! Firewood is a robust database implemented from the ground up to directly store MPT nodes and
+//! user data. Unlike most (if not all) of the solutions in the field, it is not built on top of a
+//! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, firewood directly uses
+//! the tree structure as the index on disk. Thus, there is no additional &quot;emulation&quot; of the
+//! logical MPT to flatten out the data structure to feed into the underlying DB that is unaware
+//! of the data being stored.
+//!
+//! Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL guarantees
+//! atomicity and durability in the database, but also offers &quot;reversibility&quot;: some portion
+//! of the old WAL can be optionally kept around to allow a fast in-memory rollback to recover
+//! some past versions of the entire store back in memory. While running the store, new changes
+//! will also contribute to the configured window of changes (at batch granularity) to access any past
+//! versions with no additional cost at all.
+//!
+//! The on-disk footprint of Firewood is more compact than geth. It provides two isolated storage
+//! space which can be both or selectively used the user. The account model portion of the storage
+//! offers something very similar to `StateDB` in geth, which captures the address-&quot;state key&quot;
+//! style of two-level access for an account&#39;s (smart contract&#39;s) state. Therefore, it takes
+//! minimal effort to delegate all state storage from an EVM implementation to firewood. The other
+//! portion of the storage supports generic MPT storage for arbitrary keys and values. When unused,
+//! there is no additional cost.
+//!
+//! # Design Philosophy &amp; Overview
+//!
+//! With some on-going academic research efforts and increasing demand of faster local storage
+//! solutions for the chain state, we realized there are mainly two different regimes of designs.
+//!
+//! - &quot;Archival&quot; Storage: this style of design emphasizes on the ability to hold all historical
+//!   data and retrieve a revision of any wold state at a reasonable performance. To economically
+//!   store all historical certified data, usually copy-on-write merkle tries are used to just
+//!   capture the changes made by a committed block. The entire storage consists of a forest of these
+//!   &quot;delta&quot; tries. The total size of the storage will keep growing over the chain length and an ideal,
+//!   well-executed plan for this is to make sure the performance degradation is reasonable or
+//!   well-contained with respect to the ever-increasing size of the index. This design is useful
+//!   for nodes which serve as the backend for some indexing service (e.g., chain explorer) or as a
+//!   query portal to some user agent (e.g., wallet apps). Blockchains with poor finality may also
+//!   need this because the &quot;canonical&quot; branch of the chain could switch (but not necessarily a
+//!   practical concern nowadays) to a different fork at times.
+//!
+//! - &quot;Validation&quot; Storage: this regime optimizes for the storage footprint and the performance of
+//!   operations upon the latest/recent states. With the assumption that the chain&#39;s total state
+//!   size is relatively stable over ever-coming blocks, one can just make the latest state
+//!   persisted and available to the blockchain system as that&#39;s what matters for most of the time.
+//!   While one can still keep some volatile state versions in memory for mutation and VM
+//!   execution, the final commit to some state works on a singleton so the indexed merkle tries
+//!   may be typically updated in place. It is also possible (e.g., firewood) to allow some
+//!   infrequent access to historical versions with higher cost, and/or allow fast access to
+//!   versions of the store within certain limited recency. This style of storage is useful for
+//!   the blockchain systems where only (or mostly) the latest state is required and data footprint
+//!   should remain constant or grow slowly if possible for sustainability. Validators who
+//!   directly participate in the consensus and vote for the blocks, for example, can largely
+//!   benefit from such a design.
+//!
+//! In firewood, we take a closer look at the second regime and have come up with a simple but
+//! robust architecture that fulfills the need for such blockchain storage.
+//!
+//! ## Storage Model
+//!
+//! Firewood is built by three layers of abstractions that totally decouple the
+//! layout/representation of the data on disk from the actual logical data structure it retains:
+//!
+//! - Linear, memory-like space: the [shale](https://crates.io/crates/shale) crate from an academic
+//!   project (CedrusDB) code offers a `MemStore` abstraction for a (64-bit) byte-addressable space
+//!   that abstracts away the intricate method that actually persists the in-memory data on the
+//!   secondary storage medium (e.g., hard drive). The implementor of `MemStore` will provide the
+//!   functions to give the user of `MemStore` an illusion that the user is operating upon a
+//!   byte-addressable memory space. It is just a &quot;magical&quot; array of bytes one can view and change
+//!   that is mirrored to the disk. In reality, the linear space will be chunked into files under a
+//!   directory, but the user does not have to even know about this.
+//!
+//! - Persistent item storage stash: `ShaleStore` trait from `shale` defines a pool of typed
+//!   objects that are persisted on disk but also made accessible in memory transparently. It is
+//!   built on top of `MemStore` by defining how &quot;items&quot; of the given type are laid out, allocated
+//!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
+//!   basic implementation in `shale` crate, but one can always define his/her own `ShaleStore`).
+//!
+//! - Data structure: in Firewood, one or more Ethereum-style MPTs are maintained by invoking
+//!   `ShaleStore` (see `src/merkle.rs`; another stash for code objects is in `src/account.rs`).
+//!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
+//!   persisted on disk. It is as if they&#39;re just in memory, which makes it much easier to write
+//!   and maintain the code.
+//!
+//! The three layers are depicted as follows:
+//!
+//! &lt;p align=&quot;center&quot;&gt;
+//!     &lt;img src=&quot;https://drive.google.com/uc?export=view&amp;id=1KnlpqnxkmFd_aKZHwcferIdX137GVZJr&quot; width=&quot;80%&quot;&gt;
+//! &lt;/p&gt;
+//!
+//! Given the abstraction, one can easily realize the fact that the actual data that affect the
+//! state of the data structure (MPT) is what the linear space (`MemStore`) keeps track of, that is,
+//! a flat but conceptually large byte vector. In other words, given a valid byte vector as the
+//! content of the linear space, the higher level data structure can be *uniquely* determined, there
+//! is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
+//! or less than that, like a way to interpret the bytes. This nice property allows us to completely
+//! separate the logical data from its physical representation, greatly simplifies the storage
+//! management, and allows reusing the code. It is still a very versatile abstraction, as in theory
+//! any persistent data could be stored this way -- sometimes you need to swap in a different
+//! `MemShale` or `MemStore` implementation, but without having to touch the code for the persisted
+//! data structure.
+//!
+//! ## Page-based Shadowing and Revisions
+//!
+//! Following the idea that the MPTs are just a view of a linear byte space, all writes made to the
+//! MPTs inside Firewood will eventually be consolidated into some interval writes to the linear
+//! space. The writes may overlap and some frequent writes are even done to the same spot in the
+//! space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
+//! virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
+//! dirty pages in some `MemStore` instantiation (see `storage::StoreRevMut`). When a
+//! [`db::WriteBatch`] commits, both the recorded interval writes and the aggregated in-memory
+//! dirty pages induced by this write batch are taken out from the linear space. Although they are
+//! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
+//! become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL
+//! subsystem (supported by [growthring](https://crates.io/crates/growth-ring)). After the
+//! WAL record is written (one record per write batch), the dirty pages are then pushed to the
+//! on-disk linear space to mirror the change by some asynchronous, out-of-order file writes. See
+//! the `BufferCmd::WriteBatch` part of `DiskBuffer::process` for the detailed logic.
+//!
+//! In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:
+//!
+//! - Traverse the MPT, and that induces the access to some nodes. Suppose the nodes are not already in
+//!   memory, then:
+//!
+//! - Bring the necessary pages that contain the accessed nodes into the memory and cache them
+//!   (`storage::CachedSpace`).
+//!
+//! - Make changes to the MPT, and that induces the writes to some nodes. The nodes are either
+//!   already cached in memory (its pages are cached, or its handle `ObjRef&lt;Node&gt;` is still in
+//!   `shale::ObjCache`) or need to be brought into the memory (if that&#39;s the case, go back to the
+//!   second step for it).
+//!
+//! - Writes to nodes are converted into interval writes to the stagging `StoreRevMut` space that
+//!   overlays atop `CachedSpace`, so all dirty pages during the current write batch will be
+//!   exactly captured in `StoreRevMut` (see `StoreRevMut::take_delta`).
+//!
+//! - Finally:
+//!
+//!   - Abort: when the write batch is dropped without invoking `db::WriteBatch::commit`, all in-memory
+//!     changes will be discarded, the dirty pages from `StoreRevMut` will be dropped and the merkle
+//!     will &quot;revert&quot; back to its original state without actually having to rollback anything.
+//!
+//!   - Commit: otherwise, the write batch is committed, the interval writes (`storage::Ash`) will be bundled
+//!     into a single WAL record (`storage::AshRecord`) and sent to WAL subsystem, before dirty pages
+//!     are scheduled to be written to the space files. Also the dirty pages are applied to the
+//!     underlying `CachedSpace`. `StoreRevMut` becomes empty again for further write batches.
+//!
+//! Parts of the following diagram show this normal flow, the &quot;staging&quot; space (implemented by
+//! `StoreRevMut`) concept is a bit similar to the staging area in Git, which enables the handling
+//! of (resuming from) write errors, clean abortion of an on-going write batch so the entire store
+//! state remains intact, and also reduces unnecessary premature disk writes. Essentially, we
+//! copy-on-write pages in the space that are touched upon, without directly mutating the
+//! underlying &quot;master&quot; space. The staging space is just a collection of these &quot;shadowing&quot; pages
+//! and a reference to the its base (master) so any reads could partially hit those dirty pages
+//! and/or fall through to the base, whereas all writes are captured. Finally, when things go well,
+//! we &quot;push down&quot; these changes to the base and clear up the staging space.
+//!
+//! &lt;p align=&quot;center&quot;&gt;
+//!     &lt;img src=&quot;https://drive.google.com/uc?export=view&amp;id=1l2CUbq85nX_g0GfQj44ClrKXd253sBFv&quot; width=&quot;100%&quot;&gt;
+//! &lt;/p&gt;
+//!
+//! Thanks to the shadow pages, we can both revive some historical versions of the store and
+//! maintain a rolling window of past revisions on-the-fly. The right hand side of the diagram
+//! shows previously logged write batch records could be kept even though they are no longer needed
+//! for the purpose of crash recovery. The interval writes from a record can be aggregated into
+//! pages (see `storage::StoreDelta::new`) and used to reconstruct a &quot;ghost&quot; image of past
+//! revision of the linear space (just like how staging space works, except that the ghost space is
+//! essentially read-only once constructed). The shadow pages there will function as some
+//! &quot;rewinding&quot; changes to patch the necessary locations in the linear space, while the rest of the
+//! linear space is very likely untouched by that historical write batch.
+//!
+//! Then, with the three-layer abstraction we previously talked about, an historical MPT could be
+//! derived. In fact, because there is no mandatory traversal or scanning in the process, the
+//! only cost to revive a historical state from the log is to just playback the records and create
+//! those shadow pages. There is very little additional cost because the ghost space is summoned on an
+//! on-demand manner while one accesses the historical MPT.
+//!
+//! In the other direction, when new write batches are committed, the system moves forward, we can
+//! therefore maintain a rolling window of past revisions in memory with *zero* cost. The
+//! mid-bottom of the diagram shows when a write batch is committed, the persisted (master) space goes one
+//! step forward, the staging space is cleared, and an extra ghost space (colored in purple) can be
+//! created to hold the version of the store before the commit. The backward delta is applied to
+//! counteract the change that has been made to the persisted store, which is also a set of shadow pages.
+//! No change is required for other historical ghost space instances. Finally, we can phase out
+//! some very old ghost space to keep the size of the rolling window invariant.
+//!
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>account;
+<span class="kw">pub mod </span>db;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>file;
+<span class="kw">pub mod </span>merkle;
+<span class="kw">pub mod </span>proof;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>storage;
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="firewood" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (7fcf850d7 2022-10-23)" ></div></body></html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval."><meta name="keywords" content="rust, rustlang, rust-lang, firewood"><title>firewood - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../normalize.css"><link rel="stylesheet" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../ayu.css" disabled><link rel="stylesheet" href="../dark.css" disabled><link rel="stylesheet" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../firewood/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../firewood/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">Crate firewood</a></h2><div class="sidebar-elems"><ul class="block"><li class="version">Version 0.0.1</li><li><a id="all-types" href="all.html">All Items</a></li></ul><section><ul class="block"><li><a href="#modules">Modules</a></li></ul></section></div></nav><main><div class="width-limiter"><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div></div></form></nav><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn">Crate <a class="mod" href="#">firewood</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></h1><span class="out-of-band"><a class="srclink" href="../src/firewood/lib.rs.html#1-203">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="firewood-non-archival-blockchain-key-value-store-with-hyper-fast-recent-state-retrieval"><a href="#firewood-non-archival-blockchain-key-value-store-with-hyper-fast-recent-state-retrieval">Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.</a></h2>
+<p>Firewood is an embedded key-value store, optimized to store blockchain state. It prioritizes
+access to latest state, by providing extremely fast reads, but also provides a limited view
+into past state. It does not copy-on-write the Merkle Patricia Trie (MPT) to generate an ever
+growing forest of tries like EVM, but instead keeps one latest version of the MPT index on disk
+and apply in-place updates to it. This ensures that the database size is small and stable
+during the course of running firewood. Firewood was first conceived to provide a very fast
+storage layer for qEVM to enable a fast, complete EVM system with right design choices made
+totally from scratch, but it also serves as a drop-in replacement for any EVM-compatible
+blockchain storage system, and fits for the general use of a certified key-value store of
+arbitrary data.</p>
+<p>Firewood is a robust database implemented from the ground up to directly store MPT nodes and
+user data. Unlike most (if not all) of the solutions in the field, it is not built on top of a
+generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, firewood directly uses
+the tree structure as the index on disk. Thus, there is no additional “emulation” of the
+logical MPT to flatten out the data structure to feed into the underlying DB that is unaware
+of the data being stored.</p>
+<p>Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL guarantees
+atomicity and durability in the database, but also offers “reversibility”: some portion
+of the old WAL can be optionally kept around to allow a fast in-memory rollback to recover
+some past versions of the entire store back in memory. While running the store, new changes
+will also contribute to the configured window of changes (at batch granularity) to access any past
+versions with no additional cost at all.</p>
+<p>The on-disk footprint of Firewood is more compact than geth. It provides two isolated storage
+space which can be both or selectively used the user. The account model portion of the storage
+offers something very similar to <code>StateDB</code> in geth, which captures the address-“state key”
+style of two-level access for an account’s (smart contract’s) state. Therefore, it takes
+minimal effort to delegate all state storage from an EVM implementation to firewood. The other
+portion of the storage supports generic MPT storage for arbitrary keys and values. When unused,
+there is no additional cost.</p>
+<h2 id="design-philosophy--overview"><a href="#design-philosophy--overview">Design Philosophy &amp; Overview</a></h2>
+<p>With some on-going academic research efforts and increasing demand of faster local storage
+solutions for the chain state, we realized there are mainly two different regimes of designs.</p>
+<ul>
+<li>
+<p>“Archival” Storage: this style of design emphasizes on the ability to hold all historical
+data and retrieve a revision of any wold state at a reasonable performance. To economically
+store all historical certified data, usually copy-on-write merkle tries are used to just
+capture the changes made by a committed block. The entire storage consists of a forest of these
+“delta” tries. The total size of the storage will keep growing over the chain length and an ideal,
+well-executed plan for this is to make sure the performance degradation is reasonable or
+well-contained with respect to the ever-increasing size of the index. This design is useful
+for nodes which serve as the backend for some indexing service (e.g., chain explorer) or as a
+query portal to some user agent (e.g., wallet apps). Blockchains with poor finality may also
+need this because the “canonical” branch of the chain could switch (but not necessarily a
+practical concern nowadays) to a different fork at times.</p>
+</li>
+<li>
+<p>“Validation” Storage: this regime optimizes for the storage footprint and the performance of
+operations upon the latest/recent states. With the assumption that the chain’s total state
+size is relatively stable over ever-coming blocks, one can just make the latest state
+persisted and available to the blockchain system as that’s what matters for most of the time.
+While one can still keep some volatile state versions in memory for mutation and VM
+execution, the final commit to some state works on a singleton so the indexed merkle tries
+may be typically updated in place. It is also possible (e.g., firewood) to allow some
+infrequent access to historical versions with higher cost, and/or allow fast access to
+versions of the store within certain limited recency. This style of storage is useful for
+the blockchain systems where only (or mostly) the latest state is required and data footprint
+should remain constant or grow slowly if possible for sustainability. Validators who
+directly participate in the consensus and vote for the blocks, for example, can largely
+benefit from such a design.</p>
+</li>
+</ul>
+<p>In firewood, we take a closer look at the second regime and have come up with a simple but
+robust architecture that fulfills the need for such blockchain storage.</p>
+<h3 id="storage-model"><a href="#storage-model">Storage Model</a></h3>
+<p>Firewood is built by three layers of abstractions that totally decouple the
+layout/representation of the data on disk from the actual logical data structure it retains:</p>
+<ul>
+<li>
+<p>Linear, memory-like space: the <a href="https://crates.io/crates/shale">shale</a> crate from an academic
+project (CedrusDB) code offers a <code>MemStore</code> abstraction for a (64-bit) byte-addressable space
+that abstracts away the intricate method that actually persists the in-memory data on the
+secondary storage medium (e.g., hard drive). The implementor of <code>MemStore</code> will provide the
+functions to give the user of <code>MemStore</code> an illusion that the user is operating upon a
+byte-addressable memory space. It is just a “magical” array of bytes one can view and change
+that is mirrored to the disk. In reality, the linear space will be chunked into files under a
+directory, but the user does not have to even know about this.</p>
+</li>
+<li>
+<p>Persistent item storage stash: <code>ShaleStore</code> trait from <code>shale</code> defines a pool of typed
+objects that are persisted on disk but also made accessible in memory transparently. It is
+built on top of <code>MemStore</code> by defining how “items” of the given type are laid out, allocated
+and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
+basic implementation in <code>shale</code> crate, but one can always define his/her own <code>ShaleStore</code>).</p>
+</li>
+<li>
+<p>Data structure: in Firewood, one or more Ethereum-style MPTs are maintained by invoking
+<code>ShaleStore</code> (see <code>src/merkle.rs</code>; another stash for code objects is in <code>src/account.rs</code>).
+The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
+persisted on disk. It is as if they’re just in memory, which makes it much easier to write
+and maintain the code.</p>
+</li>
+</ul>
+<p>The three layers are depicted as follows:</p>
+<p align="center">
+    <img src="https://drive.google.com/uc?export=view&id=1KnlpqnxkmFd_aKZHwcferIdX137GVZJr" width="80%">
+</p>
+<p>Given the abstraction, one can easily realize the fact that the actual data that affect the
+state of the data structure (MPT) is what the linear space (<code>MemStore</code>) keeps track of, that is,
+a flat but conceptually large byte vector. In other words, given a valid byte vector as the
+content of the linear space, the higher level data structure can be <em>uniquely</em> determined, there
+is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
+or less than that, like a way to interpret the bytes. This nice property allows us to completely
+separate the logical data from its physical representation, greatly simplifies the storage
+management, and allows reusing the code. It is still a very versatile abstraction, as in theory
+any persistent data could be stored this way – sometimes you need to swap in a different
+<code>MemShale</code> or <code>MemStore</code> implementation, but without having to touch the code for the persisted
+data structure.</p>
+<h3 id="page-based-shadowing-and-revisions"><a href="#page-based-shadowing-and-revisions">Page-based Shadowing and Revisions</a></h3>
+<p>Following the idea that the MPTs are just a view of a linear byte space, all writes made to the
+MPTs inside Firewood will eventually be consolidated into some interval writes to the linear
+space. The writes may overlap and some frequent writes are even done to the same spot in the
+space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
+virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
+dirty pages in some <code>MemStore</code> instantiation (see <code>storage::StoreRevMut</code>). When a
+<a href="db/struct.WriteBatch.html" title="db::WriteBatch"><code>db::WriteBatch</code></a> commits, both the recorded interval writes and the aggregated in-memory
+dirty pages induced by this write batch are taken out from the linear space. Although they are
+mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
+become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL
+subsystem (supported by <a href="https://crates.io/crates/growth-ring">growthring</a>). After the
+WAL record is written (one record per write batch), the dirty pages are then pushed to the
+on-disk linear space to mirror the change by some asynchronous, out-of-order file writes. See
+the <code>BufferCmd::WriteBatch</code> part of <code>DiskBuffer::process</code> for the detailed logic.</p>
+<p>In short, a Read-Modify-Write (RMW) style normal operation flow is as follows in Firewood:</p>
+<ul>
+<li>
+<p>Traverse the MPT, and that induces the access to some nodes. Suppose the nodes are not already in
+memory, then:</p>
+</li>
+<li>
+<p>Bring the necessary pages that contain the accessed nodes into the memory and cache them
+(<code>storage::CachedSpace</code>).</p>
+</li>
+<li>
+<p>Make changes to the MPT, and that induces the writes to some nodes. The nodes are either
+already cached in memory (its pages are cached, or its handle <code>ObjRef&lt;Node&gt;</code> is still in
+<code>shale::ObjCache</code>) or need to be brought into the memory (if that’s the case, go back to the
+second step for it).</p>
+</li>
+<li>
+<p>Writes to nodes are converted into interval writes to the stagging <code>StoreRevMut</code> space that
+overlays atop <code>CachedSpace</code>, so all dirty pages during the current write batch will be
+exactly captured in <code>StoreRevMut</code> (see <code>StoreRevMut::take_delta</code>).</p>
+</li>
+<li>
+<p>Finally:</p>
+<ul>
+<li>
+<p>Abort: when the write batch is dropped without invoking <code>db::WriteBatch::commit</code>, all in-memory
+changes will be discarded, the dirty pages from <code>StoreRevMut</code> will be dropped and the merkle
+will “revert” back to its original state without actually having to rollback anything.</p>
+</li>
+<li>
+<p>Commit: otherwise, the write batch is committed, the interval writes (<code>storage::Ash</code>) will be bundled
+into a single WAL record (<code>storage::AshRecord</code>) and sent to WAL subsystem, before dirty pages
+are scheduled to be written to the space files. Also the dirty pages are applied to the
+underlying <code>CachedSpace</code>. <code>StoreRevMut</code> becomes empty again for further write batches.</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>Parts of the following diagram show this normal flow, the “staging” space (implemented by
+<code>StoreRevMut</code>) concept is a bit similar to the staging area in Git, which enables the handling
+of (resuming from) write errors, clean abortion of an on-going write batch so the entire store
+state remains intact, and also reduces unnecessary premature disk writes. Essentially, we
+copy-on-write pages in the space that are touched upon, without directly mutating the
+underlying “master” space. The staging space is just a collection of these “shadowing” pages
+and a reference to the its base (master) so any reads could partially hit those dirty pages
+and/or fall through to the base, whereas all writes are captured. Finally, when things go well,
+we “push down” these changes to the base and clear up the staging space.</p>
+<p align="center">
+    <img src="https://drive.google.com/uc?export=view&id=1l2CUbq85nX_g0GfQj44ClrKXd253sBFv" width="100%">
+</p>
+<p>Thanks to the shadow pages, we can both revive some historical versions of the store and
+maintain a rolling window of past revisions on-the-fly. The right hand side of the diagram
+shows previously logged write batch records could be kept even though they are no longer needed
+for the purpose of crash recovery. The interval writes from a record can be aggregated into
+pages (see <code>storage::StoreDelta::new</code>) and used to reconstruct a “ghost” image of past
+revision of the linear space (just like how staging space works, except that the ghost space is
+essentially read-only once constructed). The shadow pages there will function as some
+“rewinding” changes to patch the necessary locations in the linear space, while the rest of the
+linear space is very likely untouched by that historical write batch.</p>
+<p>Then, with the three-layer abstraction we previously talked about, an historical MPT could be
+derived. In fact, because there is no mandatory traversal or scanning in the process, the
+only cost to revive a historical state from the log is to just playback the records and create
+those shadow pages. There is very little additional cost because the ghost space is summoned on an
+on-demand manner while one accesses the historical MPT.</p>
+<p>In the other direction, when new write batches are committed, the system moves forward, we can
+therefore maintain a rolling window of past revisions in memory with <em>zero</em> cost. The
+mid-bottom of the diagram shows when a write batch is committed, the persisted (master) space goes one
+step forward, the staging space is cleared, and an extra ghost space (colored in purple) can be
+created to hold the version of the store before the commit. The backward delta is applied to
+counteract the change that has been made to the persisted store, which is also a set of shadow pages.
+No change is required for other historical ghost space instances. Finally, we can phase out
+some very old ghost space to keep the size of the rolling window invariant.</p>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="db/index.html" title="firewood::db mod">db</a></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="merkle/index.html" title="firewood::merkle mod">merkle</a></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="proof/index.html" title="firewood::proof mod">proof</a></div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="firewood" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0-nightly (7fcf850d7 2022-10-23)" ></div></body></html>
