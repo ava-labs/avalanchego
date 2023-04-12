@@ -315,8 +315,8 @@ func getNetworkConfig(
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
-	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
-	upgradeCooldown := v.GetDuration(InboundConnUpgradeThrottlerCooldownKey)
+	maxInboundConnsPerSec := v.GetFloat64(NetworkInboundThrottlerMaxConnsPerSecKey)
+	upgradeCooldown := v.GetDuration(NetworkInboundConnUpgradeThrottlerCooldownKey)
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 
@@ -395,8 +395,8 @@ func getNetworkConfig(
 		ProxyReadHeaderTimeout: v.GetDuration(NetworkTCPProxyReadTimeoutKey),
 
 		DialerConfig: dialer.Config{
-			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRpsKey),
-			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeoutKey),
+			ThrottleRps:       v.GetUint32(NetworkOutboundConnectionThrottlingRpsKey),
+			ConnectionTimeout: v.GetDuration(NetworkOutboundConnectionTimeoutKey),
 		},
 
 		TLSKeyLogFile: v.GetString(NetworkTLSKeyLogFileKey),
@@ -441,7 +441,7 @@ func getNetworkConfig(
 	case config.HealthConfig.MaxPortionSendQueueBytesFull < 0 || config.HealthConfig.MaxPortionSendQueueBytesFull > 1:
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
-		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeoutKey)
+		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
 	case config.PeerListGossipFreq < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	case config.MaxReconnectDelay < 0:
