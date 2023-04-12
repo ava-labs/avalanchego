@@ -495,7 +495,7 @@ func TestGetChangeProof(t *testing.T) {
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
 			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
+			expectedErr: merkledb.ErrInvalidProof,
 		},
 		"removed key from middle of response": {
 			request: &ChangeProofRequest{
