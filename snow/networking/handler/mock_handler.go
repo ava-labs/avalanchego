@@ -54,6 +54,20 @@ func (mr *MockHandlerMockRecorder) Context() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockHandler)(nil).Context))
 }
 
+// GetEngineManager mocks base method.
+func (m *MockHandler) GetEngineManager() *EngineManager {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEngineManager")
+	ret0, _ := ret[0].(*EngineManager)
+	return ret0
+}
+
+// GetEngineManager indicates an expected call of GetEngineManager.
+func (mr *MockHandlerMockRecorder) GetEngineManager() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEngineManager", reflect.TypeOf((*MockHandler)(nil).GetEngineManager))
+}
+
 // HealthCheck mocks base method.
 func (m *MockHandler) HealthCheck(arg0 context.Context) (interface{}, error) {
 	m.ctrl.T.Helper()
