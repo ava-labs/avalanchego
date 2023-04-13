@@ -882,7 +882,8 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 
 	// finally if file is not specified/readable go for the predefined config
 	config := genesis.GetConfig(networkID)
-	return genesis.FromConfig(config)
+	a, b, _, _, _, _, err := genesis.FromConfig(config)
+	return a, b, err
 }
 
 func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
@@ -1308,6 +1309,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
 	if nodeConfig.ConsensusGossipFrequency < 0 {
 		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
+	}
+
+	// App handling
+	nodeConfig.ConsensusAppConcurrency = int(v.GetUint(ConsensusAppConcurrencyKey))
+	if nodeConfig.ConsensusAppConcurrency <= 0 {
+		return node.Config{}, fmt.Errorf("%s must be > 0", ConsensusAppConcurrencyKey)
 	}
 
 	nodeConfig.UseCurrentHeight = v.GetBool(ProposerVMUseCurrentHeightKey)

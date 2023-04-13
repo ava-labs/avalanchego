@@ -37,6 +37,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
+const testThreadPoolSize = 2
+
 var defaultSubnetConfig = subnets.Config{
 	GossipConfig: subnets.GossipConfig{
 		AcceptedFrontierPeerSize:  2,
@@ -122,6 +124,7 @@ func TestTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		time.Hour,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -395,6 +398,7 @@ func TestReliableMessages(t *testing.T) {
 		vdrs,
 		nil,
 		1,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -543,6 +547,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
