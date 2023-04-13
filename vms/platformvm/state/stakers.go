@@ -381,7 +381,6 @@ type diffValidator struct {
 	validator stakerAndStatus
 
 	// added/updated/deletedStakers should be mutually non-overlapping
-	// TODO ABENEGIA: Verify whether they are, with ad-hoc UTs in state.Commit
 	// TODO ABENEGIA: consider enforcing state exclusivity via construction rather than verification
 	addedDelegators   *btree.BTreeG[*Staker]
 	updatedDelegators map[ids.ID]*Staker

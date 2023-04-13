@@ -18,10 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -80,211 +84,210 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	require.NoError(block.Verify(context.Background()))
 }
 
-// TODO ABENEGIA: unlock test once maskerIterator has been fixed
-// func TestBanffStandardBlockTimeVerification(t *testing.T) {
-// 	require := require.New(t)
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestBanffStandardBlockTimeVerification(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	env := newEnvironment(t, ctrl)
-// 	defer func() {
-// 		require.NoError(shutdownEnvironment(env))
-// 	}()
-// 	now := env.clk.Time()
-// 	env.clk.Set(now)
-// 	env.config.BanffTime = time.Time{} // activate Banff
+	env := newEnvironment(t, ctrl)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+	now := env.clk.Time()
+	env.clk.Set(now)
+	env.config.BanffTime = time.Time{} // activate Banff
 
-// 	// setup and store parent block
-// 	// it's a standard block for simplicity
-// 	parentTime := now
-// 	parentHeight := uint64(2022)
+	// setup and store parent block
+	// it's a standard block for simplicity
+	parentTime := now
+	parentHeight := uint64(2022)
 
-// 	banffParentBlk, err := blocks.NewBanffStandardBlock(
-// 		parentTime,
-// 		ids.Empty, // does not matter
-// 		parentHeight,
-// 		nil, // txs do not matter in this test
-// 	)
-// 	require.NoError(err)
-// 	parentID := banffParentBlk.ID()
+	banffParentBlk, err := blocks.NewBanffStandardBlock(
+		parentTime,
+		ids.Empty, // does not matter
+		parentHeight,
+		nil, // txs do not matter in this test
+	)
+	require.NoError(err)
+	parentID := banffParentBlk.ID()
 
-// 	// store parent block, with relevant quantities
-// 	onParentAccept := state.NewMockDiff(ctrl)
-// 	chainTime := env.clk.Time().Truncate(time.Second)
-// 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-// 		statelessBlock: banffParentBlk,
-// 		onAcceptState:  onParentAccept,
-// 		timestamp:      chainTime,
-// 	}
-// 	env.blkManager.(*manager).lastAccepted = parentID
-// 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
-// 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	// store parent block, with relevant quantities
+	onParentAccept := state.NewMockDiff(ctrl)
+	chainTime := env.clk.Time().Truncate(time.Second)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: banffParentBlk,
+		onAcceptState:  onParentAccept,
+		timestamp:      chainTime,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
-// 	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
+	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
 
-// 	// store just once current staker to mark next staker time.
-// 	currentStakerIt := state.NewMockStakerIterator(ctrl)
-// 	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
-// 	currentStakerIt.EXPECT().Value().Return(
-// 		&state.Staker{
-// 			NextTime: nextStakerTime,
-// 			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-// 		},
-// 	).AnyTimes()
-// 	currentStakerIt.EXPECT().Release().Return().AnyTimes()
-// 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
+	// store just once current staker to mark next staker time.
+	currentStakerIt := state.NewMockStakerIterator(ctrl)
+	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
+	currentStakerIt.EXPECT().Value().Return(
+		&state.Staker{
+			NextTime: nextStakerTime,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+		},
+	).AnyTimes()
+	currentStakerIt.EXPECT().Release().Return().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
-// 	// no pending stakers
-// 	pendingIt := state.NewMockStakerIterator(ctrl)
-// 	pendingIt.EXPECT().Next().Return(false).AnyTimes()
-// 	pendingIt.EXPECT().Release().Return().AnyTimes()
-// 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
+	// no pending stakers
+	pendingIt := state.NewMockStakerIterator(ctrl)
+	pendingIt.EXPECT().Next().Return(false).AnyTimes()
+	pendingIt.EXPECT().Release().Return().AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
-// 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
-// 	txID := ids.GenerateTestID()
-// 	utxo := &avax.UTXO{
-// 		UTXOID: avax.UTXOID{
-// 			TxID: txID,
-// 		},
-// 		Asset: avax.Asset{
-// 			ID: avaxAssetID,
-// 		},
-// 		Out: &secp256k1fx.TransferOutput{
-// 			Amt: env.config.CreateSubnetTxFee,
-// 		},
-// 	}
-// 	utxoID := utxo.InputID()
-// 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
+	txID := ids.GenerateTestID()
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID: txID,
+		},
+		Asset: avax.Asset{
+			ID: avaxAssetID,
+		},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: env.config.CreateSubnetTxFee,
+		},
+	}
+	utxoID := utxo.InputID()
+	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
 
-// 	// Create the tx
-// 	utx := &txs.CreateSubnetTx{
-// 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-// 			NetworkID:    env.ctx.NetworkID,
-// 			BlockchainID: env.ctx.ChainID,
-// 			Ins: []*avax.TransferableInput{{
-// 				UTXOID: utxo.UTXOID,
-// 				Asset:  utxo.Asset,
-// 				In: &secp256k1fx.TransferInput{
-// 					Amt: env.config.CreateSubnetTxFee,
-// 				},
-// 			}},
-// 		}},
-// 		Owner: &secp256k1fx.OutputOwners{},
-// 	}
-// 	tx := &txs.Tx{Unsigned: utx}
-// 	require.NoError(tx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{{}}))
+	// Create the tx
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: utxo.UTXOID,
+				Asset:  utxo.Asset,
+				In: &secp256k1fx.TransferInput{
+					Amt: env.config.CreateSubnetTxFee,
+				},
+			}},
+		}},
+		Owner: &secp256k1fx.OutputOwners{},
+	}
+	tx := &txs.Tx{Unsigned: utx}
+	require.NoError(tx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{{}}))
 
-// 	{
-// 		// wrong version
-// 		banffChildBlk, err := blocks.NewApricotStandardBlock(
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.Error(block.Verify(context.Background()))
-// 	}
+	{
+		// wrong version
+		banffChildBlk, err := blocks.NewApricotStandardBlock(
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.Error(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// wrong height
-// 		childTimestamp := parentTime.Add(time.Second)
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height(),
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.Error(block.Verify(context.Background()))
-// 	}
+	{
+		// wrong height
+		childTimestamp := parentTime.Add(time.Second)
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height(),
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.Error(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// wrong timestamp, earlier than parent
-// 		childTimestamp := parentTime.Add(-1 * time.Second)
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.Error(block.Verify(context.Background()))
-// 	}
+	{
+		// wrong timestamp, earlier than parent
+		childTimestamp := parentTime.Add(-1 * time.Second)
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.Error(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// wrong timestamp, violated synchrony bound
-// 		childTimestamp := parentTime.Add(txexecutor.SyncBound).Add(time.Second)
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.Error(block.Verify(context.Background()))
-// 	}
+	{
+		// wrong timestamp, violated synchrony bound
+		childTimestamp := parentTime.Add(txexecutor.SyncBound).Add(time.Second)
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.Error(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// wrong timestamp, skipped staker set change event
-// 		childTimestamp := nextStakerTime.Add(time.Second)
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.Error(block.Verify(context.Background()))
-// 	}
+	{
+		// wrong timestamp, skipped staker set change event
+		childTimestamp := nextStakerTime.Add(time.Second)
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.Error(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// no state changes
-// 		childTimestamp := parentTime
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			nil,
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.ErrorIs(block.Verify(context.Background()), errBanffStandardBlockWithoutChanges)
-// 	}
+	{
+		// no state changes
+		childTimestamp := parentTime
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			nil,
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.ErrorIs(block.Verify(context.Background()), errBanffStandardBlockWithoutChanges)
+	}
 
-// 	{
-// 		// valid block, same timestamp as parent block
-// 		childTimestamp := parentTime
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.NoError(block.Verify(context.Background()))
-// 	}
+	{
+		// valid block, same timestamp as parent block
+		childTimestamp := parentTime
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.NoError(block.Verify(context.Background()))
+	}
 
-// 	{
-// 		// valid
-// 		childTimestamp := nextStakerTime
-// 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-// 			childTimestamp,
-// 			banffParentBlk.ID(),
-// 			banffParentBlk.Height()+1,
-// 			[]*txs.Tx{tx},
-// 		)
-// 		require.NoError(err)
-// 		block := env.blkManager.NewBlock(banffChildBlk)
-// 		require.NoError(block.Verify(context.Background()))
-// 	}
-// }
+	{
+		// valid
+		childTimestamp := nextStakerTime
+		banffChildBlk, err := blocks.NewBanffStandardBlock(
+			childTimestamp,
+			banffParentBlk.ID(),
+			banffParentBlk.Height()+1,
+			[]*txs.Tx{tx},
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(banffChildBlk)
+		require.NoError(block.Verify(context.Background()))
+	}
+}
 
 func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
