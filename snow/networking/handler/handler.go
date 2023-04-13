@@ -32,7 +32,6 @@ import (
 )
 
 const (
-	threadPoolSize        = 2
 	numDispatchersToClose = 3
 	// If a consensus message takes longer than this to process, the handler
 	// will log a warning.
@@ -57,6 +56,7 @@ type Handler interface {
 	ShouldHandle(nodeID ids.NodeID) bool
 
 	SetEngineManager(engineManager *EngineManager)
+	GetEngineManager() *EngineManager
 
 	SetOnStopped(onStopped func())
 	Start(ctx context.Context, recoverPanic bool)
@@ -120,6 +120,7 @@ func New(
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
+	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
@@ -167,6 +168,10 @@ func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
 	h.engineManager = engineManager
+}
+
+func (h *handler) GetEngineManager() *EngineManager {
+	return h.engineManager
 }
 
 func (h *handler) SetOnStopped(onStopped func()) {
