@@ -12,7 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var errGetVtx = errors.New("unexpectedly called GetVtx")
+var (
+	_ Engine = (*EngineTest)(nil)
+
+	errGetVtx = errors.New("unexpectedly called GetVtx")
+)
 
 // EngineTest is a test engine
 type EngineTest struct {
