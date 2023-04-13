@@ -280,7 +280,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	})
-
+	require.NoError(t, err)
 	require.NoError(t, db.Put([]byte{0x12}, []byte{4}))
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x20}, proof.Path)
@@ -315,6 +315,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	})
+	require.NoError(t, err)
 	require.NoError(t, db.Delete([]byte{0x12}))
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x20}, proof.Path)
