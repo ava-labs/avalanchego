@@ -381,8 +381,8 @@ func (m *StateSyncManager) findNextKey(
 	localProofNodes := localProof.Path
 
 	// If the received key had an odd length, then due to the restriction that proofs are for []byte rather than SerializedPath
-	// the last local proof node might be for the even length version of the key.
-	// If that is the case, then remove that last node.
+	// the last local proof node might be for the even nibble length version of the key.
+	// If that is the case, then remove that last node so that the proof is just for the odd nibble length version of the key
 	if receivedKeyPath.NibbleLength%2 == 1 && !receivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
