@@ -1833,6 +1833,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		beacons,
 		msgChan,
 		time.Hour,
+		2,
 		cpuTracker,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),

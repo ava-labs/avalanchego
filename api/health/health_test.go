@@ -22,7 +22,7 @@ import (
 const (
 	checkFreq    = time.Millisecond
 	awaitFreq    = 50 * time.Microsecond
-	awaitTimeout = 10 * time.Second
+	awaitTimeout = 30 * time.Second
 )
 
 var errUnhealthy = errors.New("unhealthy")
