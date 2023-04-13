@@ -554,15 +554,14 @@ func (m *StateSyncManager) setError(err error) {
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
 func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestReceivedKey []merkledb.ProofNode) {
-	largestHandledKey := workItem.end
-
 	// find the next key to start querying by comparing the proofs for the last completed key
 	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestReceivedKey)
 	if err != nil {
 		m.setError(err)
 		return
 	}
-
+	
+	largestHandledKey := workItem.end
 	// nextStartKey being nil indicates that the entire range has been completed
 	if nextStartKey != nil {
 		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
