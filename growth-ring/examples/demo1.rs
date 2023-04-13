@@ -1,6 +1,7 @@
 use futures::executor::block_on;
 use growthring::{
     wal::{WALBytes, WALLoader, WALRingId, WALWriter},
+    walerror::WALError,
     WALStoreAIO,
 };
 use rand::{seq::SliceRandom, Rng, SeedableRng};
@@ -15,7 +16,7 @@ fn test(records: Vec<String>, wal: &mut WALWriter<WALStoreAIO>) -> Vec<WALRingId
     res
 }
 
-fn recover(payload: WALBytes, ringid: WALRingId) -> Result<(), ()> {
+fn recover(payload: WALBytes, ringid: WALRingId) -> Result<(), WALError> {
     println!(
         "recover(payload={}, ringid={:?}",
         std::str::from_utf8(&payload).unwrap(),

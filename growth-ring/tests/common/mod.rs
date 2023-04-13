@@ -2,7 +2,7 @@
 #[allow(dead_code)]
 use async_trait::async_trait;
 use futures::executor::block_on;
-use growthring::wal::{WALBytes, WALFile, WALLoader, WALPos, WALRingId, WALStore};
+use growthring::wal::{WALBytes, WALError, WALFile, WALLoader, WALPos, WALRingId, WALStore};
 use indexmap::{map::Entry, IndexMap};
 use rand::Rng;
 use std::cell::RefCell;
@@ -38,9 +38,9 @@ pub struct WALFileEmul<G: FailGen> {
 
 #[async_trait(?Send)]
 impl<G: FailGen> WALFile for WALFileEmul<G> {
-    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), ()> {
+    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         let offset = offset as usize;
         if offset + length > self.file.borrow().len() {
@@ -52,26 +52,26 @@ impl<G: FailGen> WALFile for WALFileEmul<G> {
         Ok(())
     }
 
-    fn truncate(&self, length: usize) -> Result<(), ()> {
+    async fn truncate(&self, length: usize) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         self.file.borrow_mut().resize(length, 0);
         Ok(())
     }
 
-    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), ()> {
+    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         let offset = offset as usize;
         self.file.borrow_mut()[offset..offset + data.len()].copy_from_slice(&data);
         Ok(())
     }
 
-    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, ()> {
+    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
 
         let offset = offset as usize;
@@ -126,9 +126,9 @@ where
 {
     type FileNameIter = std::vec::IntoIter<String>;
 
-    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, ()> {
+    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         match self.state.borrow_mut().files.entry(filename.to_string()) {
             hash_map::Entry::Occupied(e) => Ok(Box::new(WALFileEmul {
@@ -142,28 +142,28 @@ where
                         fgen: self.fgen.clone(),
                     }))
                 } else {
-                    Err(())
+                    Err(WALError::Other)
                 }
             }
         }
     }
 
-    async fn remove_file(&self, filename: String) -> Result<(), ()> {
+    async fn remove_file(&self, filename: String) -> Result<(), WALError> {
         //println!("remove_file(filename={})", filename);
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         self.state
             .borrow_mut()
             .files
             .remove(&filename)
-            .ok_or(())
+            .ok_or(WALError::Other)
             .map(|_| ())
     }
 
-    fn enumerate_files(&self) -> Result<Self::FileNameIter, ()> {
+    fn enumerate_files(&self) -> Result<Self::FileNameIter, WALError> {
         if self.fgen.next_fail() {
-            return Err(());
+            return Err(WALError::Other);
         }
         let mut logfiles = Vec::new();
         for (fname, _) in self.state.borrow().files.iter() {
@@ -495,13 +495,13 @@ impl PaintingSim {
         ops: &mut Vec<PaintStrokes>,
         ringid_map: &mut HashMap<WALRingId, usize>,
         fgen: Rc<G>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), WALError> {
         let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(self.seed);
         let mut wal = block_on(loader.load(
             WALStoreEmul::new(state, fgen.clone()),
             |_, _| {
                 if fgen.next_fail() {
-                    Err(())
+                    Err(WALError::Other)
                 } else {
                     Ok(())
                 }
@@ -529,11 +529,11 @@ impl PaintingSim {
                 .zip(pss_.into_iter())
                 .map(|(r, ps)| -> Result<_, _> {
                     ops.push(ps);
-                    let (rec, rid) = futures::executor::block_on(r)?;
+                    let (rec, rid) = futures::executor::block_on(r).map_err(|_| WALError::Other)?;
                     ringid_map.insert(rid, ops.len() - 1);
                     Ok((rec, rid))
                 })
-                .collect::<Result<Vec<_>, ()>>()?;
+                .collect::<Result<Vec<_>, WALError>>()?;
             // finish appending to WAL
             /*
             for rid in rids.iter() {
@@ -548,7 +548,7 @@ impl PaintingSim {
             for _ in 0..rng.gen_range(1..self.k) {
                 // storage I/O could fail
                 if fgen.next_fail() {
-                    return Err(());
+                    return Err(WALError::Other);
                 }
                 if let Some((fin_rid, _)) = canvas.rand_paint(&mut rng) {
                     if let Some(rid) = fin_rid {

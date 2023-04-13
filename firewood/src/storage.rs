@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use aiofut::{AIOBuilder, AIOManager};
 use growthring::{
-    wal::{RecoverPolicy, WALLoader, WALWriter},
+    wal::{RecoverPolicy, WALError, WALLoader, WALWriter},
     WALStoreAIO,
 };
 use nix::fcntl::{flock, FlockArg};
@@ -1011,11 +1011,12 @@ impl DiskBuffer {
         }
     }
 
-    async fn init_wal(&mut self, rootfd: Fd, waldir: String) -> Result<(), ()> {
+    async fn init_wal(&mut self, rootfd: Fd, waldir: String) -> Result<(), WALError> {
         let mut aiobuilder = AIOBuilder::default();
         aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
-        let aiomgr = aiobuilder.build().map_err(|_| ())?;
-        let store = WALStoreAIO::new(&waldir, false, Some(rootfd), Some(aiomgr)).map_err(|_| ())?;
+        let aiomgr = aiobuilder.build().map_err(|_| WALError::Other)?;
+        let store = WALStoreAIO::new(&waldir, false, Some(rootfd), Some(aiomgr))
+            .map_err(|_| WALError::Other)?;
         let mut loader = WALLoader::new();
         loader
             .file_nbit(self.wal_cfg.file_nbit)
@@ -1038,11 +1039,14 @@ impl DiskBuffer {
                             let file_mask = (1 << file_nbit) - 1;
                             let fid = offset >> file_nbit;
                             nix::sys::uio::pwrite(
-                                file_pool.get_file(fid).map_err(|_| ())?.get_fd(),
+                                file_pool
+                                    .get_file(fid)
+                                    .map_err(|_| WALError::Other)?
+                                    .get_fd(),
                                 &data,
                                 (offset & file_mask) as nix::libc::off_t,
                             )
-                            .map_err(|_| ())?;
+                            .map_err(|_| WALError::Other)?;
                         }
                     }
                     Ok(())

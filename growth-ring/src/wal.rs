@@ -13,6 +13,8 @@ use std::mem::MaybeUninit;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 
+pub use crate::walerror::WALError;
+
 const FILENAME_FMT: &str = r"[0-9a-f]+\.log";
 
 enum WALRingType {
@@ -171,17 +173,17 @@ struct WALState {
 #[async_trait(?Send)]
 pub trait WALFile {
     /// Initialize the file space in [offset, offset + length) to zero.
-    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), ()>;
+    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), WALError>;
     /// Write data with offset. We assume all previous `allocate`/`truncate` invocations are visible
     /// if ordered earlier (should be guaranteed by most OS).  Additionally, the write caused
     /// by each invocation of this function should be _atomic_ (the entire single write should be
     /// all or nothing).
-    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), ()>;
+    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), WALError>;
     /// Read data with offset. Return `Ok(None)` when it reaches EOF.
-    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, ()>;
+    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, WALError>;
     /// Truncate a file to a specified length.
     #[allow(clippy::result_unit_err)]
-    fn truncate(&self, length: usize) -> Result<(), ()>;
+    async fn truncate(&self, length: usize) -> Result<(), WALError>;
 }
 
 #[async_trait(?Send)]
@@ -189,13 +191,13 @@ pub trait WALStore {
     type FileNameIter: Iterator<Item = String>;
 
     /// Open a file given the filename, create the file if not exists when `touch` is `true`.
-    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, ()>;
+    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, WALError>;
     /// Unlink a file given the filename.
-    async fn remove_file(&self, filename: String) -> Result<(), ()>;
+    async fn remove_file(&self, filename: String) -> Result<(), WALError>;
     /// Enumerate all WAL filenames. It should include all WAL files that are previously opened
     /// (created) but not removed. The list could be unordered.
     #[allow(clippy::result_unit_err)]
-    fn enumerate_files(&self) -> Result<Self::FileNameIter, ()>;
+    fn enumerate_files(&self) -> Result<Self::FileNameIter, WALError>;
 }
 
 struct WALFileHandle<'a, F: WALStore> {
@@ -228,9 +230,9 @@ struct WALFilePool<F: WALStore> {
     #[allow(clippy::type_complexity)]
     handle_used: RefCell<HashMap<WALFileId, UnsafeCell<(Box<dyn WALFile>, usize)>>>,
     #[allow(clippy::type_complexity)]
-    last_write: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), ()>>>>>>,
+    last_write: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WALError>>>>>>,
     #[allow(clippy::type_complexity)]
-    last_peel: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), ()>>>>>>,
+    last_peel: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WALError>>>>>>,
     file_nbit: u64,
     file_size: u64,
     block_nbit: u64,
@@ -242,11 +244,11 @@ impl<F: WALStore> WALFilePool<F> {
         file_nbit: u64,
         block_nbit: u64,
         cache_size: NonZeroUsize,
-    ) -> Result<Self, ()> {
+    ) -> Result<Self, WALError> {
         let file_nbit = file_nbit;
         let block_nbit = block_nbit;
         let header_file = store.open_file("HEAD", true).await?;
-        header_file.truncate(HEADER_SIZE)?;
+        header_file.truncate(HEADER_SIZE).await?;
         Ok(WALFilePool {
             store,
             header_file,
@@ -260,14 +262,14 @@ impl<F: WALStore> WALFilePool<F> {
         })
     }
 
-    async fn read_header(&self) -> Result<Header, ()> {
+    async fn read_header(&self) -> Result<Header, WALError> {
         let bytes = self.header_file.read(0, HEADER_SIZE).await?.unwrap();
         let bytes: [u8; HEADER_SIZE] = (&*bytes).try_into().unwrap();
         let header: Header = cast_slice(&bytes)[0];
         Ok(header)
     }
 
-    async fn write_header(&self, header: &Header) -> Result<(), ()> {
+    async fn write_header(&self, header: &Header) -> Result<(), WALError> {
         let base = header as *const Header as usize as *const u8;
         let bytes = unsafe { std::slice::from_raw_parts(base, HEADER_SIZE) };
         self.header_file.write(0, bytes.into()).await?;
@@ -276,7 +278,7 @@ impl<F: WALStore> WALFilePool<F> {
 
     #[allow(clippy::await_holding_refcell_ref)]
     // TODO: Refactor to remove mutable reference from being awaited.
-    async fn get_file(&self, fid: u64, touch: bool) -> Result<WALFileHandle<F>, ()> {
+    async fn get_file(&self, fid: u64, touch: bool) -> Result<WALFileHandle<F>, WALError> {
         let pool = self as *const WALFilePool<F>;
         if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
             let handle = match self.handle_used.borrow_mut().entry(fid) {
@@ -325,7 +327,7 @@ impl<F: WALStore> WALFilePool<F> {
     fn write<'a>(
         &'a mut self,
         writes: Vec<(WALPos, WALBytes)>,
-    ) -> Vec<Pin<Box<dyn Future<Output = Result<(), ()>> + 'a>>> {
+    ) -> Vec<Pin<Box<dyn Future<Output = Result<(), WALError>> + 'a>>> {
         if writes.is_empty() {
             return Vec::new();
         }
@@ -350,7 +352,7 @@ impl<F: WALStore> WALFilePool<F> {
         let alloc = async move {
             last_write.await?;
             let mut last_h: Option<
-                Pin<Box<dyn Future<Output = Result<WALFileHandle<'a, F>, ()>> + 'a>>,
+                Pin<Box<dyn Future<Output = Result<WALFileHandle<'a, F>, WALError>> + 'a>>,
             > = None;
             for ((next_fid, wl), h) in meta.into_iter().zip(files.into_iter()) {
                 if let Some(lh) = last_h.take() {
@@ -403,13 +405,13 @@ impl<F: WALStore> WALFilePool<F> {
         &'a mut self,
         state: &mut WALState,
         keep_nrecords: u32,
-    ) -> impl Future<Output = Result<(), ()>> + 'a {
+    ) -> impl Future<Output = Result<(), WALError>> + 'a {
         let last_peel = unsafe {
             std::mem::replace(&mut *self.last_peel.get(), std::mem::MaybeUninit::uninit())
                 .assume_init()
         };
 
-        let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), ()>>>>> = Vec::new();
+        let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), WALError>>>>> = Vec::new();
         while state.pending_removal.len() > 1 {
             let (fid, counter) = state.pending_removal.front().unwrap();
             if counter_lt(counter + keep_nrecords, state.counter) {
@@ -627,7 +629,7 @@ impl<F: WALStore> WALWriter<F> {
         &mut self,
         records: T,
         keep_nrecords: u32,
-    ) -> Result<(), ()> {
+    ) -> Result<(), WALError> {
         let msize = self.msize as u64;
         let block_size = self.block_size as u64;
         let state = &mut self.state;
@@ -670,7 +672,7 @@ impl<F: WALStore> WALWriter<F> {
         &'a self,
         nrecords: usize,
         recover_policy: &RecoverPolicy,
-    ) -> Result<Vec<WALBytes>, ()> {
+    ) -> Result<Vec<WALBytes>, WALError> {
         let filename_fmt = regex::Regex::new(FILENAME_FMT).unwrap();
         let file_pool = &self.file_pool;
         let file_nbit = file_pool.file_nbit;
@@ -699,21 +701,21 @@ impl<F: WALStore> WALWriter<F> {
                 rings.push(ring);
             }
             for ring in rings.into_iter().rev() {
-                let ring = ring.map_err(|_| ())?;
+                let ring = ring.map_err(|_| WALError::Other)?;
                 let (header, payload) = ring;
                 let payload = payload.unwrap();
                 match header.rtype.try_into() {
                     Ok(WALRingType::Full) => {
                         assert!(chunks.is_none());
                         if !WALLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
-                            return Err(());
+                            return Err(WALError::InvalidChecksum);
                         }
                         off += header.rsize as u64;
                         records.push(payload);
                     }
                     Ok(WALRingType::First) => {
                         if !WALLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
-                            return Err(());
+                            return Err(WALError::InvalidChecksum);
                         }
                         if let Some(mut chunks) = chunks.take() {
                             chunks.push(payload);
@@ -743,7 +745,7 @@ impl<F: WALStore> WALWriter<F> {
                     }
                     Ok(WALRingType::Null) => break,
                     Err(_) => match recover_policy {
-                        RecoverPolicy::Strict => return Err(()),
+                        RecoverPolicy::Strict => return Err(WALError::Other),
                         RecoverPolicy::BestEffort => break 'outer,
                     },
                 }
@@ -811,18 +813,18 @@ impl WALLoader {
         self
     }
 
-    fn verify_checksum_(data: &[u8], checksum: u32, p: &RecoverPolicy) -> Result<bool, ()> {
+    fn verify_checksum_(data: &[u8], checksum: u32, p: &RecoverPolicy) -> Result<bool, WALError> {
         if checksum == CRC32.checksum(data) {
             Ok(true)
         } else {
             match p {
-                RecoverPolicy::Strict => Err(()),
+                RecoverPolicy::Strict => Err(WALError::Other),
                 RecoverPolicy::BestEffort => Ok(false),
             }
         }
     }
 
-    fn verify_checksum(&self, data: &[u8], checksum: u32) -> Result<bool, ()> {
+    fn verify_checksum(&self, data: &[u8], checksum: u32) -> Result<bool, WALError> {
         Self::verify_checksum_(data, checksum, &self.recover_policy)
     }
 
@@ -916,7 +918,7 @@ impl WALLoader {
                             Some(check!(check!(
                                 v.file.read(v.off, header.rsize as usize).await
                             )
-                            .ok_or(())))
+                            .ok_or(WALError::Other)))
                         } else {
                             None
                         };
@@ -1018,8 +1020,8 @@ impl WALLoader {
                     match header.rtype.try_into() {
                         Ok(WALRingType::Full) => {
                             assert!(v.chunks.is_none());
-                            let payload =
-                                check!(check!(v.file.read(v.off, rsize as usize).await).ok_or(()));
+                            let payload = check!(check!(v.file.read(v.off, rsize as usize).await)
+                                .ok_or(WALError::Other));
                             // TODO: improve the behavior when CRC32 fails
                             if !check!(self.verify_checksum(&payload, header.crc32)) {
                                 die!()
@@ -1037,8 +1039,8 @@ impl WALLoader {
                         }
                         Ok(WALRingType::First) => {
                             assert!(v.chunks.is_none());
-                            let chunk =
-                                check!(check!(v.file.read(v.off, rsize as usize).await).ok_or(()));
+                            let chunk = check!(check!(v.file.read(v.off, rsize as usize).await)
+                                .ok_or(WALError::Other));
                             if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                 die!()
                             }
@@ -1050,8 +1052,8 @@ impl WALLoader {
                                 chunks, off, file, ..
                             } = &mut *v;
                             if let Some((chunks, _)) = chunks {
-                                let chunk =
-                                    check!(check!(file.read(*off, rsize as usize).await).ok_or(()));
+                                let chunk = check!(check!(file.read(*off, rsize as usize).await)
+                                    .ok_or(WALError::Other));
                                 if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                     die!()
                                 }
@@ -1063,10 +1065,9 @@ impl WALLoader {
                             let v_off = v.off;
                             v.off += rsize as u64;
                             if let Some((mut chunks, ringid_start)) = v.chunks.take() {
-                                let chunk = check!(check!(
-                                    v.file.read(v_off, rsize as usize).await
-                                )
-                                .ok_or(()));
+                                let chunk =
+                                    check!(check!(v.file.read(v_off, rsize as usize).await)
+                                        .ok_or(WALError::Other));
                                 if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                     die!()
                                 }
@@ -1105,12 +1106,12 @@ impl WALLoader {
     }
 
     /// Recover by reading the WAL files.
-    pub async fn load<S: WALStore, F: FnMut(WALBytes, WALRingId) -> Result<(), ()>>(
+    pub async fn load<S: WALStore, F: FnMut(WALBytes, WALRingId) -> Result<(), WALError>>(
         &self,
         store: S,
         mut recover_func: F,
         keep_nrecords: u32,
-    ) -> Result<WALWriter<S>, ()> {
+    ) -> Result<WALWriter<S>, WALError> {
         let msize = std::mem::size_of::<WALRingBlob>();
         assert!(self.file_nbit > self.block_nbit);
         assert!(msize < 1 << self.block_nbit);
@@ -1152,7 +1153,7 @@ impl WALLoader {
                     let (bytes, ring_id, _) = match res {
                         Err(e) => {
                             if e {
-                                return Err(());
+                                return Err(WALError::Other);
                             } else {
                                 break 'outer;
                             }
@@ -1170,7 +1171,7 @@ impl WALLoader {
                 .collect()
                 .await;
             for e in records.into_iter().rev() {
-                let (rec, _) = e.map_err(|_| ())?;
+                let (rec, _) = e.map_err(|_| WALError::Other)?;
                 if rec.rtype == WALRingType::Full as u8 || rec.rtype == WALRingType::Last as u8 {
                     counter = rec.counter + 1;
                     break 'outer;
@@ -1193,7 +1194,7 @@ impl WALLoader {
             let stream = Self::read_rings(&f, false, self.block_nbit, &self.recover_policy);
             futures::pin_mut!(stream);
             while let Some(r) = stream.next().await {
-                last = Some(r.map_err(|_| ())?);
+                last = Some(r.map_err(|_| WALError::Other)?);
             }
             if let Some((last_rec, _)) = last {
                 if !counter_lt(last_rec.counter + keep_nrecords, counter) {
@@ -1204,7 +1205,7 @@ impl WALLoader {
                 }
             }
             if !skip_remove {
-                f.truncate(0)?;
+                f.truncate(0).await?;
                 file_pool.store.remove_file(fname).await?;
             }
         }

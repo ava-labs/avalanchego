@@ -48,6 +48,7 @@
 #[macro_use]
 extern crate scan_fmt;
 pub mod wal;
+pub mod walerror;
 
 use aiofut::{AIOBuilder, AIOManager};
 use async_trait::async_trait;
@@ -61,6 +62,7 @@ use nix::unistd::{close, ftruncate, mkdir, unlinkat, UnlinkatFlags};
 use std::os::unix::io::RawFd;
 use std::sync::Arc;
 use wal::{WALBytes, WALFile, WALPos, WALStore};
+use walerror::WALError;
 
 pub struct WALFileAIO {
     fd: RawFd,
@@ -70,7 +72,7 @@ pub struct WALFileAIO {
 #[allow(clippy::result_unit_err)]
 // TODO: Refactor to return a meaningful error.
 impl WALFileAIO {
-    pub fn new(rootfd: RawFd, filename: &str, aiomgr: Arc<AIOManager>) -> Result<Self, ()> {
+    pub fn new(rootfd: RawFd, filename: &str, aiomgr: Arc<AIOManager>) -> Result<Self, WALError> {
         openat(
             rootfd,
             filename,
@@ -78,7 +80,7 @@ impl WALFileAIO {
             Mode::S_IRUSR | Mode::S_IWUSR,
         )
         .map(|fd| WALFileAIO { fd, aiomgr })
-        .map_err(|_| ())
+        .map_err(From::from)
     }
 }
 
@@ -91,7 +93,7 @@ impl Drop for WALFileAIO {
 #[async_trait(?Send)]
 impl WALFile for WALFileAIO {
     #[cfg(target_os = "linux")]
-    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), ()> {
+    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), WALError> {
         // TODO: is there any async version of fallocate?
         return fallocate(
             self.fd,
@@ -100,32 +102,32 @@ impl WALFile for WALFileAIO {
             length as off_t,
         )
         .map(|_| ())
-        .map_err(|_| ());
+        .map_err(Into::into);
     }
     #[cfg(not(target_os = "linux"))]
     // TODO: macos support is possible here, but possibly unnecessary
-    async fn allocate(&self, _offset: WALPos, _length: usize) -> Result<(), ()> {
+    async fn allocate(&self, _offset: WALPos, _length: usize) -> Result<(), WALError> {
         Ok(())
     }
 
-    fn truncate(&self, length: usize) -> Result<(), ()> {
-        ftruncate(self.fd, length as off_t).map_err(|_| ())
+    async fn truncate(&self, length: usize) -> Result<(), WALError> {
+        ftruncate(self.fd, length as off_t).map_err(From::from)
     }
 
-    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), ()> {
+    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), WALError> {
         let (res, data) = self.aiomgr.write(self.fd, offset, data, None).await;
-        res.map_err(|_| ()).and_then(|nwrote| {
+        res.map_err(Into::into).and_then(|nwrote| {
             if nwrote == data.len() {
                 Ok(())
             } else {
-                Err(())
+                Err(WALError::Other)
             }
         })
     }
 
-    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, ()> {
+    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, WALError> {
         let (res, data) = self.aiomgr.read(self.fd, offset, length, None).await;
-        res.map_err(|_| ())
+        res.map_err(From::from)
             .map(|nread| if nread == length { Some(data) } else { None })
     }
 }
@@ -205,22 +207,22 @@ pub fn oflags() -> OFlag {
 impl WALStore for WALStoreAIO {
     type FileNameIter = std::vec::IntoIter<String>;
 
-    async fn open_file(&self, filename: &str, _touch: bool) -> Result<Box<dyn WALFile>, ()> {
+    async fn open_file(&self, filename: &str, _touch: bool) -> Result<Box<dyn WALFile>, WALError> {
         let filename = filename.to_string();
         WALFileAIO::new(self.rootfd, &filename, self.aiomgr.clone())
             .map(|f| Box::new(f) as Box<dyn WALFile>)
     }
 
-    async fn remove_file(&self, filename: String) -> Result<(), ()> {
+    async fn remove_file(&self, filename: String) -> Result<(), WALError> {
         unlinkat(
             Some(self.rootfd),
             filename.as_str(),
             UnlinkatFlags::NoRemoveDir,
         )
-        .map_err(|_| ())
+        .map_err(From::from)
     }
 
-    fn enumerate_files(&self) -> Result<Self::FileNameIter, ()> {
+    fn enumerate_files(&self) -> Result<Self::FileNameIter, WALError> {
         let mut logfiles = Vec::new();
         for ent in nix::dir::Dir::openat(self.rootfd, "./", OFlag::empty(), Mode::empty())
             .unwrap()
