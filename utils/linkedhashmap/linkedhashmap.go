@@ -108,7 +108,8 @@ func (lh *linkedHashmap[K, V]) put(key K, value V) {
 
 func (lh *linkedHashmap[K, V]) get(key K) (V, bool) {
 	if e, ok := lh.entryMap[key]; ok {
-		return e.Value.(keyValue[K, V]).value, true
+		kv := e.Value.(keyValue[K, V])
+		return kv.value, true
 	}
 	return utils.Zero[V](), false
 }
@@ -126,14 +127,16 @@ func (lh *linkedHashmap[K, V]) len() int {
 
 func (lh *linkedHashmap[K, V]) oldest() (K, V, bool) {
 	if val := lh.entryList.Front(); val != nil {
-		return val.Value.(keyValue[K, V]).key, val.Value.(keyValue[K, V]).value, true
+		kv := val.Value.(keyValue[K, V])
+		return kv.key, kv.value, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
 }
 
 func (lh *linkedHashmap[K, V]) newest() (K, V, bool) {
 	if val := lh.entryList.Back(); val != nil {
-		return val.Value.(keyValue[K, V]).key, val.Value.(keyValue[K, V]).value, true
+		kv := val.Value.(keyValue[K, V])
+		return kv.key, kv.value, true
 	}
 	return utils.Zero[K](), utils.Zero[V](), false
 }
