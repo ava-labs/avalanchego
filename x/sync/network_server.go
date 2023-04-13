@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	pbsync "github.com/ava-labs/avalanchego/proto/pb/sync"
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *NetworkServer) AppRequest(
 	deadline time.Time,
 	request []byte,
 ) error {
-	var req pbsync.Request
+	var req syncpb.Request
 	if err := proto.Unmarshal(request, &req); err != nil {
 		s.log.Debug(
 			"failed to unmarshal AppRequest",
@@ -106,9 +106,9 @@ func (s *NetworkServer) AppRequest(
 
 	var err error
 	switch req := req.GetMessage().(type) {
-	case *pbsync.Request_ChangeProofRequest:
+	case *syncpb.Request_ChangeProofRequest:
 		err = s.HandleChangeProofRequest(ctx, nodeID, requestID, req.ChangeProofRequest)
-	case *pbsync.Request_RangeProofRequest:
+	case *syncpb.Request_RangeProofRequest:
 		err = s.HandleRangeProofRequest(ctx, nodeID, requestID, req.RangeProofRequest)
 	default:
 		s.log.Debug(
@@ -151,7 +151,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *pbsync.ChangeProofRequest,
+	req *syncpb.ChangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
@@ -222,7 +222,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *pbsync.RangeProofRequest,
+	req *syncpb.RangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
