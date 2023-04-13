@@ -57,8 +57,8 @@ func (lh *linkedHashmap[K, V]) Put(key K, val V) {
 }
 
 func (lh *linkedHashmap[K, V]) Get(key K) (V, bool) {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
+	lh.lock.RLock()
+	defer lh.lock.RUnlock()
 
 	return lh.get(key)
 }
@@ -71,22 +71,22 @@ func (lh *linkedHashmap[K, V]) Delete(key K) {
 }
 
 func (lh *linkedHashmap[K, V]) Len() int {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
+	lh.lock.RLock()
+	defer lh.lock.RUnlock()
 
 	return lh.len()
 }
 
 func (lh *linkedHashmap[K, V]) Oldest() (K, V, bool) {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
+	lh.lock.RLock()
+	defer lh.lock.RUnlock()
 
 	return lh.oldest()
 }
 
 func (lh *linkedHashmap[K, V]) Newest() (K, V, bool) {
-	lh.lock.Lock()
-	defer lh.lock.Unlock()
+	lh.lock.RLock()
+	defer lh.lock.RUnlock()
 
 	return lh.newest()
 }
