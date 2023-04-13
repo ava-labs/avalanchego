@@ -301,7 +301,8 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	var proofOfLargestKey []merkledb.ProofNode
+	// only needs to be set if we actually received key/values
+	var proofOfLargestReceivedKey []merkledb.ProofNode
 
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeproof.KeyChanges) > 0 {
@@ -309,15 +310,18 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			m.setError(err)
 			return
 		}
-		proofOfLargestKey = changeproof.EndProof
+		proofOfLargestReceivedKey = changeproof.EndProof
 		if changeproof.KeyChanges[len(changeproof.KeyChanges)-1].Value.IsNothing() {
-			// since this is a deletion proof, the deleted key will no longer be present in the local db
-			// we can switch to a node with a prefix of the deleted key, which should still exist in the local db
-			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
+			// Since this is a deletion proof, the deleted key will no longer be present in the local db
+			// and this proof is an exclusion proof.
+			// If we remove the last proof node, we end up with a valid proof for a prefix of the deleted key.
+			// Any remaining changes in the range of this change proof have to occur after this prefix,
+			// so we can use it as the starting point of our search for the next different key
+			proofOfLargestReceivedKey = proofOfLargestReceivedKey[:len(proofOfLargestReceivedKey)-1]
 		}
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -344,17 +348,18 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	var proofOfLargestKey []merkledb.ProofNode
+	// only needs to be set if we actually received key/values
+	var proofOfLargestReceivedKey []merkledb.ProofNode
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
-		proofOfLargestKey = proof.EndProof
+		proofOfLargestReceivedKey = proof.EndProof
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
 }
 
 // Attempt to find what key to query next based on the differences between
@@ -377,8 +382,8 @@ func (m *StateSyncManager) findNextKey(
 	localProofNodes := localProof.Path
 
 	// If the received key had an odd length, then due to the restriction that proofs are for []byte rather than SerializedPath
-	// the last local proof node might be for the even length version of the key.
-	// If that is the case, then remove that last node.
+	// the last local proof node might be for the even nibble length version of the key.
+	// If that is the case, then remove that last node so that the proof is just for the odd nibble length version of the key
 	if receivedKeyPath.NibbleLength%2 == 1 && !receivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
@@ -386,15 +391,6 @@ func (m *StateSyncManager) findNextKey(
 	var result []byte
 	localIndex := len(localProofNodes) - 1
 	receivedIndex := len(receivedProofNodes) - 1
-
-	// Just return the start key when the proof nodes contain keys that are not prefixes of the start key
-	// this occurs mostly in change proofs where the largest returned key was a deleted key.
-	// Since the key was deleted, it no longer shows up in the proof nodes.
-	// for now, just fallback to using the start key, which is always correct.
-	// TODO: determine a more accurate nextKey in this scenario
-	if !receivedKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !receivedKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
-		return receivedKeyPath.Value, nil
-	}
 
 	// walk up the node paths until a difference is found
 	for receivedIndex >= 0 && result == nil {
@@ -435,6 +431,13 @@ func (m *StateSyncManager) findNextKey(
 			// the local proof has an extra node due to a branch that was not present in the received proof
 			branchNode = localNode
 			localIndex--
+		}
+
+		// I believe the change to changeproofs when their largest key is a deleted keys fixes this,
+		// but leave this safeguard in place in case I am wrong.
+		// TODO: Figure out the scenario where this can happen and fix
+		if receivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return receivedKeyPath.Value, nil
 		}
 
 		// the two nodes have different paths, so find where they branched
@@ -549,11 +552,11 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestSentKey []merkledb.ProofNode) {
+func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestReceivedKey []merkledb.ProofNode) {
 	largestHandledKey := workItem.end
 
 	// find the next key to start querying by comparing the proofs for the last completed key
-	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestSentKey)
+	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestReceivedKey)
 	if err != nil {
 		m.setError(err)
 		return

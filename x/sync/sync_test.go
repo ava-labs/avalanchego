@@ -254,6 +254,75 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	}
 }
 
+func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		merkledb.Config{
+			Tracer:        newNoopTracer(),
+			HistoryLength: 0,
+			NodeCacheSize: 1000,
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
+	require.NoError(t, db.Put([]byte{0x11, 0x11}, []byte{2}))
+
+	syncRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(t, err)
+	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
+	require.NoError(t, err)
+
+	syncer, err := NewStateSyncManager(StateSyncConfig{
+		SyncDB:                db,
+		Client:                &mockClient{db: nil},
+		TargetRoot:            syncRoot,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte{0x12}, []byte{4}))
+
+	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x20}, proof.Path)
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x12}, nextKey)
+}
+
+func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		merkledb.Config{
+			Tracer:        newNoopTracer(),
+			HistoryLength: 0,
+			NodeCacheSize: 1000,
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
+	require.NoError(t, db.Put([]byte{0x12}, []byte{2}))
+	require.NoError(t, db.Put([]byte{0x11, 0x11}, []byte{3}))
+
+	syncRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(t, err)
+	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
+	require.NoError(t, err)
+
+	syncer, err := NewStateSyncManager(StateSyncConfig{
+		SyncDB:                db,
+		Client:                &mockClient{db: nil},
+		TargetRoot:            syncRoot,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Delete([]byte{0x12}))
+
+	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x20}, proof.Path)
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x12}, nextKey)
+}
+
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
