@@ -432,6 +432,8 @@ func (m *StateSyncManager) findNextKey(
 			localIndex--
 		}
 
+		// I believe the change to changeproofs when their largest key is a deleted keys fixes this,
+		// but leave this safeguard in place in case I am wrong.
 		// TODO: Figure out the scenario where this can happen and fix
 		if receivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
 			return receivedKeyPath.Value, nil
