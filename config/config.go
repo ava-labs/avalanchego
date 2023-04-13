@@ -882,7 +882,8 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 
 	// finally if file is not specified/readable go for the predefined config
 	config := genesis.GetConfig(networkID)
-	return genesis.FromConfig(config)
+	a, b, _, _, _, _, err := genesis.FromConfig(config)
+	return a, b, err
 }
 
 func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
