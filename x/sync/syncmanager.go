@@ -396,7 +396,7 @@ func (m *StateSyncManager) findNextKey(
 	// Since the key was deleted, it no longer shows up in the proof nodes.
 	// for now, just fallback to using the start key, which is always correct.
 	// TODO: determine a more accurate nextKey in this scenario
-	if !receivedKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !receivedKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
+	if !receivedKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) {
 		return receivedKeyPath.Value, nil
 	}
 
@@ -430,19 +430,24 @@ func (m *StateSyncManager) findNextKey(
 		}
 
 		var branchNode merkledb.ProofNode
-
+		var startNibble byte
 		if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
 			// the received proof has an extra node due to a branch that is not present locally
 			branchNode = receivedNode
+			startNibble = receivedNode.KeyPath.NibbleVal(localNode.KeyPath.NibbleLength)
 			receivedIndex--
-		} else {
+		} else if receivedNode.KeyPath.NibbleLength < localNode.KeyPath.NibbleLength {
 			// the local proof has an extra node due to a branch that was not present in the received proof
 			branchNode = localNode
+			startNibble = localNode.KeyPath.NibbleVal(receivedNode.KeyPath.NibbleLength)
 			localIndex--
+		} else {
+			result = receivedKeyPath.Value
+			break
 		}
 
 		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := receivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
+		for nextKeyNibble := startNibble + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
 				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
 				break
