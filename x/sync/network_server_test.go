@@ -27,11 +27,12 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		request             *RangeProofRequest
-		expectedErr         error
-		expectedResponseLen int
-		nodeID              ids.NodeID
-		proofNil            bool
+		request                  *RangeProofRequest
+		expectedErr              error
+		expectedResponseLen      int
+		expectedMaxResponseBytes int
+		nodeID                   ids.NodeID
+		proofNil                 bool
 	}{
 		"proof too small": {
 			request: &RangeProofRequest{
@@ -82,6 +83,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
 	}
 
@@ -128,6 +130,9 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			bytes, err := merkledb.Codec.EncodeRangeProof(Version, proofResult)
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
+			if test.expectedMaxResponseBytes > 0 {
+				require.LessOrEqual(len(bytes), test.expectedMaxResponseBytes)
+			}
 		})
 	}
 }
@@ -175,11 +180,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		request             *ChangeProofRequest
-		expectedErr         error
-		expectedResponseLen int
-		nodeID              ids.NodeID
-		proofNil            bool
+		request                  *ChangeProofRequest
+		expectedErr              error
+		expectedResponseLen      int
+		expectedMaxResponseBytes int
+		nodeID                   ids.NodeID
+		proofNil                 bool
 	}{
 		"byteslimit is 0": {
 			request: &ChangeProofRequest{
@@ -226,6 +232,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				KeyLimit:     defaultRequestKeyLimit,
 				BytesLimit:   2 * defaultRequestByteSizeLimit,
 			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
 	}
 
@@ -272,6 +279,9 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			bytes, err := merkledb.Codec.EncodeChangeProof(Version, proofResult)
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
+			if test.expectedMaxResponseBytes > 0 {
+				require.LessOrEqual(len(bytes), test.expectedMaxResponseBytes)
+			}
 		})
 	}
 }
