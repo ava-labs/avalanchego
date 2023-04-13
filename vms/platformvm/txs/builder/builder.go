@@ -290,7 +290,7 @@ func (b *builder) NewImportTx(
 		SourceChain:    from,
 		ImportedInputs: importedInputs,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (b *builder) NewExportTx(
 			},
 		}},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +418,7 @@ func (b *builder) NewCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +461,7 @@ func (b *builder) NewAddValidatorTx(
 		},
 		DelegationShares: shares,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (b *builder) NewAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +548,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +584,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +593,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 
 func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
 	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +602,7 @@ func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
 
 func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, nil)
 	if err != nil {
 		return nil, err
 	}

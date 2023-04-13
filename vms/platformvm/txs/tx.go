@@ -38,10 +38,11 @@ type Tx struct {
 func NewSigned(
 	unsigned UnsignedTx,
 	c codec.Manager,
+	version uint16,
 	signers [][]*secp256k1.PrivateKey,
 ) (*Tx, error) {
 	res := &Tx{Unsigned: unsigned}
-	return res, res.Sign(c, signers)
+	return res, res.Sign(c, version, signers)
 }
 
 func (tx *Tx) Initialize(version uint16, c codec.Manager) error {
@@ -125,8 +126,8 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Sign this transaction with the provided signers
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
-func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
+func (tx *Tx) Sign(c codec.Manager, version uint16, signers [][]*secp256k1.PrivateKey) error {
+	unsignedBytes, err := c.Marshal(version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -147,7 +148,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

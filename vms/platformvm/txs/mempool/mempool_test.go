@@ -209,7 +209,7 @@ func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
 			SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
 		}
 
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +233,7 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 			DelegationShares: 100,
 		}
 
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, nil)
 		if err != nil {
 			return nil, err
 		}

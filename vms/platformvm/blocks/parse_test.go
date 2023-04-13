@@ -312,7 +312,7 @@ func testAtomicTx() (*txs.Tx, error) {
 		}},
 	}
 	signers := [][]*secp256k1.PrivateKey{{preFundedKeys[0]}}
-	return txs.NewSigned(utx, txs.Codec, signers)
+	return txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 }
 
 func testDecisionTxs() ([]*txs.Tx, error) {
@@ -356,7 +356,7 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		}
 
 		signers := [][]*secp256k1.PrivateKey{{preFundedKeys[0]}}
-		tx, err := txs.NewSigned(utx, txs.Codec, signers)
+		tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 		if err != nil {
 			return nil, err
 		}
@@ -371,5 +371,5 @@ func testProposalTx() (*txs.Tx, error) {
 	}
 
 	signers := [][]*secp256k1.PrivateKey{{preFundedKeys[0]}}
-	return txs.NewSigned(utx, txs.Codec, signers)
+	return txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 }

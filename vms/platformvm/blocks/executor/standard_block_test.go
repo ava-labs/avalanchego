@@ -177,7 +177,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		Owner: &secp256k1fx.OutputOwners{},
 	}
 	tx := &txs.Tx{Unsigned: utx}
-	require.NoError(tx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{{}}))
+	require.NoError(tx.Sign(txs.Codec, txs.Version, [][]*secp256k1.PrivateKey{{}}))
 
 	{
 		// wrong version

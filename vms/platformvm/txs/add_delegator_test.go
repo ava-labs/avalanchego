@@ -101,14 +101,14 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	require.ErrorIs(stx.SyntacticVerify(ctx), errSignedTxNotInitialized)
 
 	// Case: valid tx
-	stx, err = NewSigned(addDelegatorTx, Codec, signers)
+	stx, err = NewSigned(addDelegatorTx, Codec, Version, signers)
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addDelegatorTx.SyntacticallyVerified = false
 	addDelegatorTx.NetworkID++
-	stx, err = NewSigned(addDelegatorTx, Codec, signers)
+	stx, err = NewSigned(addDelegatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
@@ -117,7 +117,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// Case: delegator weight is not equal to total stake weight
 	addDelegatorTx.SyntacticallyVerified = false
 	addDelegatorTx.Wght = 2 * validatorWeight
-	stx, err = NewSigned(addDelegatorTx, Codec, signers)
+	stx, err = NewSigned(addDelegatorTx, Codec, Version, signers)
 	require.NoError(err)
 	require.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
 	addDelegatorTx.Wght = validatorWeight
@@ -194,7 +194,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 		},
 	}
 
-	stx, err = NewSigned(addDelegatorTx, Codec, signers)
+	stx, err = NewSigned(addDelegatorTx, Codec, Version, signers)
 	require.NoError(err)
 	require.Error(stx.SyntacticVerify(ctx))
 }

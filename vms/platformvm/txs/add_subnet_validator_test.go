@@ -84,14 +84,14 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: valid tx
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.NetworkID++
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
@@ -100,7 +100,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: Missing Subnet ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Subnet = ids.Empty
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
@@ -109,7 +109,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: No weight
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Wght = 0
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
@@ -120,7 +120,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
 	oldInput := *input
 	input.SigIndices[0] = input.SigIndices[1]
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
@@ -129,7 +129,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: adding to Primary Network
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Subnet = constants.PrimaryNetworkID
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.ErrorIs(err, errAddPrimaryNetworkValidator)
@@ -195,7 +195,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	}
 
 	// Case: valid tx
-	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, Version, signers)
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
