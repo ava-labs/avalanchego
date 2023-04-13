@@ -12,5 +12,5 @@ message Message {
 
 message Tx {
   // The byte representation of this transaction.
-  bytes tx_bytes = 1;
+  bytes tx = 1;
 }

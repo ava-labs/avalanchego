@@ -55,7 +55,7 @@ func Parse(bytes []byte) (Message, error) {
 		switch m := protoMsg.GetMessage().(type) {
 		case *pbmessage.Message_Tx:
 			msg = &Tx{
-				Tx: m.Tx.TxBytes,
+				Tx: m.Tx.Tx,
 			}
 		default:
 			return nil, fmt.Errorf("%w: %T", errUnknownMessageType, protoMsg.GetMessage())
@@ -92,7 +92,7 @@ func BuildProto(msg Message) ([]byte, error) {
 	case *Tx:
 		protoMsg.Message = &pbmessage.Message_Tx{
 			Tx: &pbmessage.Tx{
-				TxBytes: m.Tx,
+				Tx: m.Tx,
 			},
 		}
 	default:
