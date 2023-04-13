@@ -153,7 +153,11 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pbsync.ChangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 || req.KeyLimit == 0 || len(req.EndRoot) != hashing.HashLen || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
+	if req.BytesLimit == 0 ||
+		req.KeyLimit == 0 ||
+		len(req.StartRoot) != hashing.HashLen ||
+		len(req.EndRoot) != hashing.HashLen ||
+		(len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -220,7 +224,10 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pbsync.RangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 || req.KeyLimit == 0 || len(req.Root) != hashing.HashLen || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
+	if req.BytesLimit == 0 ||
+		req.KeyLimit == 0 ||
+		len(req.Root) != hashing.HashLen ||
+		(len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
