@@ -391,15 +391,6 @@ func (m *StateSyncManager) findNextKey(
 	localIndex := len(localProofNodes) - 1
 	receivedIndex := len(receivedProofNodes) - 1
 
-	// Just return the start key when the proof nodes contain keys that are not prefixes of the start key
-	// this occurs mostly in change proofs where the largest returned key was a deleted key.
-	// Since the key was deleted, it no longer shows up in the proof nodes.
-	// for now, just fallback to using the start key, which is always correct.
-	// TODO: determine a more accurate nextKey in this scenario
-	if !receivedKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) {
-		return receivedKeyPath.Value, nil
-	}
-
 	// walk up the node paths until a difference is found
 	for receivedIndex >= 0 && result == nil {
 		localNode := localProofNodes[localIndex]
@@ -430,24 +421,24 @@ func (m *StateSyncManager) findNextKey(
 		}
 
 		var branchNode merkledb.ProofNode
-		var startNibble byte
+
 		if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
 			// the received proof has an extra node due to a branch that is not present locally
 			branchNode = receivedNode
-			startNibble = receivedNode.KeyPath.NibbleVal(localNode.KeyPath.NibbleLength)
 			receivedIndex--
-		} else if receivedNode.KeyPath.NibbleLength < localNode.KeyPath.NibbleLength {
+		} else {
 			// the local proof has an extra node due to a branch that was not present in the received proof
 			branchNode = localNode
-			startNibble = localNode.KeyPath.NibbleVal(receivedNode.KeyPath.NibbleLength)
 			localIndex--
-		} else {
-			result = receivedKeyPath.Value
-			break
+		}
+
+		// TODO: Figure out the scenario where this can happen and fix
+		if receivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return receivedKeyPath.Value, nil
 		}
 
 		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := startNibble + 1; nextKeyNibble < 16; nextKeyNibble++ {
+		for nextKeyNibble := receivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
 				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
 				break
