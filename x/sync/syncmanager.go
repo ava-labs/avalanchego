@@ -301,7 +301,8 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	var proofOfLargestKey []merkledb.ProofNode
+	// only needs to be set if we actually received key/values
+	var proofOfLargestReceivedKey []merkledb.ProofNode
 
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
@@ -309,7 +310,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			m.setError(err)
 			return
 		}
-		proofOfLargestKey = changeproof.EndProof
+		proofOfLargestReceivedKey = changeproof.EndProof
 		if len(changeproof.DeletedKeys) > 0 && (len(changeproof.KeyValues) == 0 ||
 			bytes.Compare(changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1], changeproof.KeyValues[len(changeproof.KeyValues)-1].Key) == 1) {
 			// Since this is a deletion proof, the deleted key will no longer be present in the local db
@@ -317,11 +318,11 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			// If we remove the last proof node, we end up with a valid proof for a prefix of the deleted key.
 			// Any remaining changes in the range of this change proof have to occur after this prefix,
 			// so we can use it as the starting point of our search for the next different key
-			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
+			proofOfLargestReceivedKey = proofOfLargestReceivedKey[:len(proofOfLargestReceivedKey)-1]
 		}
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -348,17 +349,18 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	var proofOfLargestKey []merkledb.ProofNode
+	// only needs to be set if we actually received key/values
+	var proofOfLargestReceivedKey []merkledb.ProofNode
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
-		proofOfLargestKey = proof.EndProof
+		proofOfLargestReceivedKey = proof.EndProof
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestKey)
+	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
 }
 
 // Attempt to find what key to query next based on the differences between
@@ -551,11 +553,11 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestSentKey []merkledb.ProofNode) {
+func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestReceivedKey []merkledb.ProofNode) {
 	largestHandledKey := workItem.end
 
 	// find the next key to start querying by comparing the proofs for the last completed key
-	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestSentKey)
+	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestReceivedKey)
 	if err != nil {
 		m.setError(err)
 		return
