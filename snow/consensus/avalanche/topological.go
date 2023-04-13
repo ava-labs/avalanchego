@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -80,6 +80,8 @@ type Topological struct {
 	virtuousVoting set.Set[ids.ID]
 
 	// frontier is the set of vts that have no descendents
+	//
+	// Invariant: frontier never contains a rejected vertex
 	frontier map[ids.ID]Vertex
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
@@ -295,6 +297,12 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 		"outstandingVertices": numOutstandingVtx,
 	}
 
+	// check for long running vertices
+	oldestProcessingDuration := ta.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= ta.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningVertex"] = oldestProcessingDuration.String()
+
 	snowstormReport, err := ta.cg.HealthCheck(ctx)
 	healthy = healthy && err == nil
 	details["snowstorm"] = snowstormReport
@@ -303,6 +311,9 @@ func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 		var errorReasons []string
 		if isOutstandingVtx {
 			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding vertexes %d > %d", numOutstandingVtx, ta.params.MaxOutstandingItems))
+		}
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("vertex processing time %s > %s", oldestProcessingDuration, ta.params.MaxItemProcessingTime))
 		}
 		if err != nil {
 			errorReasons = append(errorReasons, err.Error())
@@ -498,8 +509,14 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// reissued.
 	ta.orphans.Remove(vtxID)
 
-	switch vtx.Status() {
-	case choices.Accepted:
+	// Note: it is not possible for the status to be rejected here. Update is
+	// only called when adding a new processing vertex and when updating the
+	// frontiers. If update is called with a rejected vertex when updating the
+	// frontiers, it is guaranteed that the vertex was rejected during the same
+	// frontier update. This means that the rejected vertex must have already
+	// been visited, which means update will have exited from the above
+	// preferenceCache check.
+	if vtx.Status() == choices.Accepted {
 		ta.preferred.Add(vtxID) // I'm preferred
 		ta.virtuous.Add(vtxID)  // Accepted is defined as virtuous
 
@@ -507,11 +524,6 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 
 		ta.preferenceCache[vtxID] = true
 		ta.virtuousCache[vtxID] = true
-		return nil
-	case choices.Rejected:
-		// I'm rejected
-		ta.preferenceCache[vtxID] = false
-		ta.virtuousCache[vtxID] = false
 		return nil
 	}
 
@@ -584,12 +596,11 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 				zap.Stringer("vtxID", vtxID),
 				zap.Stringer("parentID", dep.ID()),
 			)
-			if !txv.Status().Decided() {
-				if err := ta.cg.Remove(ctx, vtxID); err != nil {
-					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
-				}
-				ta.virtuousVoting.Remove(vtxID)
-			}
+			// Note: because the parent was rejected, the transaction vertex
+			// will have already been marked as rejected by the conflict graph.
+			// However, we still need to remove it from the set of virtuous
+			// transactions.
+			ta.virtuousVoting.Remove(vtxID)
 			if err := vtx.Reject(ctx); err != nil {
 				return err
 			}
@@ -614,11 +625,16 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	// Also, this will only happen from a byzantine node issuing the vertex.
 	// Therefore, this is very unlikely to actually be triggered in practice.
 
-	// Remove all my parents from the frontier
-	for _, dep := range deps {
-		delete(ta.frontier, dep.ID())
+	// If the vertex is going to be rejected, it and all of its children are
+	// going to be removed from the graph. This means that the parents may still
+	// exist in the frontier. If the vertex is not rejectable, then it will
+	// still be in the graph and the parents can not be part of the frontier.
+	if !rejectable {
+		for _, dep := range deps {
+			delete(ta.frontier, dep.ID())
+		}
+		ta.frontier[vtxID] = vtx // I have no descendents yet
 	}
-	ta.frontier[vtxID] = vtx // I have no descendents yet
 
 	ta.preferenceCache[vtxID] = preferred
 	ta.virtuousCache[vtxID] = virtuous

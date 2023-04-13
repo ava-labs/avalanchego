@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -9,19 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
-
-func Test_Node_Clone_Value_Safety(t *testing.T) {
-	root := newNode(nil, EmptyPath)
-	require.NotNil(t, root)
-
-	childNode := newNode(root, newPath([]byte("key")))
-	childNode.setValue(Some([]byte{1, 2, 3}))
-	require.NotNil(t, childNode)
-
-	clone := childNode.clone()
-	clone.value.value[0] = 0
-	require.NotEqual(t, clone.value.value[0], childNode.value.value[0])
-}
 
 func Test_Node_Marshal(t *testing.T) {
 	root := newNode(nil, EmptyPath)

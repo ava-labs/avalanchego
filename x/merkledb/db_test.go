@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -36,7 +36,27 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	n, err := db.getNode(newPath([]byte{0}))
 	require.NoError(t, err)
 	val[0] = 1
+
+	// node's value shouldn't be affected by the edit
 	require.NotEqual(t, val, n.value.value)
+}
+
+func Test_MerkleDB_GetValues_Safety(t *testing.T) {
+	db, err := getBasicDB()
+	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+
+	vals, errs := db.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(t, errs, 1)
+	require.NoError(t, errs[0])
+	require.Equal(t, []byte{0, 1, 2}, vals[0])
+	vals[0][0] = 1
+
+	// editing the value array shouldn't affect the db
+	vals, errs = db.GetValues(context.Background(), [][]byte{{0}})
+	require.Len(t, errs, 1)
+	require.NoError(t, errs[0])
+	require.Equal(t, []byte{0, 1, 2}, vals[0])
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
@@ -702,20 +722,16 @@ func Test_MerkleDB_RandomCases(t *testing.T) {
 	require := require.New(t)
 
 	for i := 150; i < 500; i += 10 {
-		db, err := getBasicDB()
-		require.NoError(err)
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-		runRandDBTest(require, db, r, generate(require, r, i, .01))
+		runRandDBTest(require, r, generate(require, r, i, .01))
 	}
 }
 
 func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
-	db, err := getBasicDB()
-	require.NoError(err)
 	r := rand.New(rand.NewSource(int64(0))) // #nosec G404
-	runRandDBTest(require, db, r, generateInitialValues(require, r, 2000, 2500, 0.0))
+	runRandDBTest(require, r, generateInitialValues(require, r, 2000, 3500, 0.0))
 }
 
 // randTest performs random trie operations.
@@ -733,19 +749,27 @@ const (
 	opDelete
 	opGet
 	opWriteBatch
-	opGenerateProof
+	opGenerateRangeProof
+	opGenerateChangeProof
 	opCheckhash
 	opMax // boundary value, not an actual op
 )
 
-func runRandDBTest(require *require.Assertions, db *Database, r *rand.Rand, rt randTest) {
+func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	startRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
 	values := make(map[path][]byte) // tracks content of the trie
 	currentBatch := db.NewBatch()
 	currentValues := make(map[path][]byte)
 	deleteValues := make(map[path]struct{})
 	pastRoots := []ids.ID{}
 
-	for _, step := range rt {
+	for i, step := range rt {
+		require.LessOrEqual(i, len(rt))
 		switch step.op {
 		case opUpdate:
 			err := currentBatch.Put(step.key, step.value)
@@ -757,7 +781,7 @@ func runRandDBTest(require *require.Assertions, db *Database, r *rand.Rand, rt r
 			require.NoError(err)
 			deleteValues[newPath(step.key)] = struct{}{}
 			delete(currentValues, newPath(step.key))
-		case opGenerateProof:
+		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			if len(pastRoots) > 0 {
@@ -772,6 +796,30 @@ func runRandDBTest(require *require.Assertions, db *Database, r *rand.Rand, rt r
 				root,
 			)
 			require.NoError(err)
+			require.LessOrEqual(len(rangeProof.KeyValues), 100)
+		case opGenerateChangeProof:
+			root, err := db.GetMerkleRoot(context.Background())
+			require.NoError(err)
+			if len(pastRoots) > 1 {
+				root = pastRoots[r.Intn(len(pastRoots))]
+			}
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, step.key, step.value, 100)
+			if startRoot == root {
+				require.ErrorIs(err, errSameRoot)
+				continue
+			}
+			require.NoError(err)
+			changeProofDB, err := getBasicDB()
+			require.NoError(err)
+			err = changeProof.Verify(
+				context.Background(),
+				changeProofDB,
+				step.key,
+				step.value,
+				root,
+			)
+			require.NoError(err)
+			require.LessOrEqual(len(changeProof.KeyValues)+len(changeProof.DeletedKeys), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -892,7 +940,7 @@ func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Ran
 			}
 		case opGet, opDelete:
 			step.key = genKey()
-		case opGenerateProof:
+		case opGenerateRangeProof, opGenerateChangeProof:
 			step.key = genKey()
 			step.value = genEnd(step.key)
 		case opCheckhash:

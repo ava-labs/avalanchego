@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -96,26 +97,32 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 		return nil, ErrRootIDNotPresent
 	}
 
-	// [lastStartRootChange] is the latest appearance of [startRoot]
-	// which came before [lastEndRootChange].
-	var lastStartRootChange *changeSummaryAndIndex
-	th.history.DescendLessOrEqual(
-		lastEndRootChange,
-		func(item *changeSummaryAndIndex) bool {
-			if item == lastEndRootChange {
-				return true // Skip first iteration
-			}
-			if item.rootID == startRoot {
-				lastStartRootChange = item
-				return false
-			}
-			return true
-		},
-	)
-
-	// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
-	if lastStartRootChange == nil {
+	// [startRootChanges] is the last appearance of [startRoot]
+	startRootChanges, ok := th.lastChanges[startRoot]
+	if !ok {
 		return nil, ErrStartRootNotFound
+	}
+
+	// startRootChanges is after the lastEndRootChange, but that is just the latest appearance of start root
+	// there may be an earlier entry, so attempt to find an entry that comes before lastEndRootChange
+	if startRootChanges.index > lastEndRootChange.index {
+		th.history.DescendLessOrEqual(
+			lastEndRootChange,
+			func(item *changeSummaryAndIndex) bool {
+				if item == lastEndRootChange {
+					return true // Skip first iteration
+				}
+				if item.rootID == startRoot {
+					startRootChanges = item
+					return false
+				}
+				return true
+			},
+		)
+		// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
+		if startRootChanges.index > lastEndRootChange.index {
+			return nil, ErrStartRootNotFound
+		}
 	}
 
 	// Keep changes sorted so the largest can be removed in order to stay within the maxLength limit.
@@ -135,13 +142,13 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
 	combinedChanges := newChangeSummary(maxLength)
 
-	// For each change after [lastStartRootChange] up to and including
+	// For each change after [startRootChanges] up to and including
 	// [lastEndRootChange], record the change in [combinedChanges].
 	th.history.AscendGreaterOrEqual(
-		lastStartRootChange,
+		startRootChanges,
 		func(item *changeSummaryAndIndex) bool {
-			if item == lastStartRootChange {
-				// Start from the first change after [lastStartRootChange].
+			if item == startRootChanges {
+				// Start from the first change after [startRootChanges].
 				return true
 			}
 			if item.index > lastEndRootChange.index {
@@ -149,31 +156,41 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				return false
 			}
 
+			// Add the changes from this commit to [combinedChanges].
 			for key, valueChange := range item.values {
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
+					// The key is in the range [start, end].
 					if existing, ok := combinedChanges.values[key]; ok {
+						// A change to this key already exists in [combinedChanges].
 						existing.after = valueChange.after
+						if existing.before.hasValue == existing.after.hasValue &&
+							bytes.Equal(existing.before.value, existing.after.value) {
+							// The change to this key is a no-op, so remove it from [combinedChanges].
+							delete(combinedChanges.values, key)
+							sortedKeys.Delete(key)
+						}
 					} else {
 						combinedChanges.values[key] = &change[Maybe[[]byte]]{
 							before: valueChange.before,
 							after:  valueChange.after,
 						}
+						sortedKeys.ReplaceOrInsert(key)
 					}
-					sortedKeys.ReplaceOrInsert(key)
-				}
-			}
-
-			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for sortedKeys.Len() > maxLength {
-				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					delete(combinedChanges.values, greatestKey)
 				}
 			}
 
 			return true
 		},
 	)
+
+	// Keep only the smallest [maxLength] items in [combinedChanges.values].
+	for sortedKeys.Len() > maxLength {
+		if greatestKey, found := sortedKeys.DeleteMax(); found {
+			delete(combinedChanges.values, greatestKey)
+		}
+	}
+
 	return combinedChanges, nil
 }
 

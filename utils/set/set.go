@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package set
@@ -134,17 +134,7 @@ func (s Set[T]) CappedList(size int) []T {
 
 // Equals returns true if the sets contain the same elements
 func (s Set[T]) Equals(other Set[T]) bool {
-	// Using maps.Equals makes the build not work for some reason so do this
-	// manually.
-	if s.Len() != other.Len() {
-		return false
-	}
-	for elt := range other {
-		if _, contains := s[elt]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(s, other)
 }
 
 // Removes and returns an element.

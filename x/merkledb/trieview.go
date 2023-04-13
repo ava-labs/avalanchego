@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -27,7 +27,7 @@ const defaultPreallocationSize = 100
 
 var (
 	ErrCommitted          = errors.New("view has been committed")
-	ErrInvalid            = errors.New("the trie this view was based on has changed, rending this view invalid")
+	ErrInvalid            = errors.New("the trie this view was based on has changed, rendering this view invalid")
 	ErrOddLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
 	)
@@ -222,10 +222,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
 	// getting the Merkle root forces any unupdated nodes to recalculate their ids
-	if t.parentTrie != nil {
-		if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-			return err
-		}
+	if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
+		return err
 	}
 
 	if err := t.applyChangedValuesToTrie(ctx); err != nil {
@@ -361,7 +359,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
-		proof.Value = closestNode.value
+		proof.Value = Clone(closestNode.value)
 		return proof, nil
 	}
 
@@ -436,6 +434,11 @@ func (t *trieView) GetRangeProof(
 		return nil, err
 	}
 
+	// copy values, so edits won't affect the underlying arrays
+	for i, kv := range result.KeyValues {
+		result.KeyValues[i] = KeyValue{Key: kv.Key, Value: slices.Clone(kv.Value)}
+	}
+
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
 	// The end proof we provide should be for the last key-value pair in the proof, not for
 	// the last key-value pair requested, which may not be in this proof.
@@ -483,7 +486,7 @@ func (t *trieView) GetRangeProof(
 
 // CommitToDB commits changes from this trie to the underlying DB.
 func (t *trieView) CommitToDB(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.Commit")
+	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
 	defer span.End()
 
 	t.db.commitLock.Lock()
@@ -562,11 +565,10 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // CommitToParent commits the changes from this view to its parent Trie
 func (t *trieView) CommitToParent(ctx context.Context) error {
-	// if we are about to write to the db, then we to hold the commitLock
-	if t.getParentTrie() == t.db {
-		t.db.commitLock.Lock()
-		defer t.db.commitLock.Unlock()
-	}
+	// TODO: Only lock the commitlock when the parent is the DB
+	// TODO: fix concurrency bugs with CommitToParent
+	t.db.commitLock.Lock()
+	defer t.db.commitLock.Unlock()
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -592,7 +594,7 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 		return err
 	}
 
-	// overwrite this view with changes from the incoming view
+	// write this view's changes into its parent
 	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
 		return err
 	}
@@ -859,7 +861,7 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValue(newPath(key), false)
+		results[i], valueErrors[i] = t.getValueCopy(newPath(key), false)
 	}
 	return results, valueErrors
 }
@@ -867,7 +869,17 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
-	return t.getValue(newPath(key), true)
+	return t.getValueCopy(newPath(key), true)
+}
+
+// getValueCopy returns a copy of the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+func (t *trieView) getValueCopy(key path, lock bool) ([]byte, error) {
+	val, err := t.getValue(key, lock)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
 }
 
 func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
@@ -890,7 +902,7 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key, true)
+	value, err := t.getParentTrie().getValue(key, true /*lock*/)
 	if err != nil {
 		return nil, err
 	}
@@ -1292,7 +1304,7 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key, true)
+	before, err := t.getParentTrie().getValue(key, true /*lock*/)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)

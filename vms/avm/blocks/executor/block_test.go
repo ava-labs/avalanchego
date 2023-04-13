@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -540,8 +540,9 @@ func TestBlockVerify(t *testing.T) {
 				require.Equal(b.Block, blockState.statelessBlock)
 
 				// Assert block is added to on accept state
-				_, err := blockState.onAcceptState.GetBlock(b.ID())
+				persistedBlock, err := blockState.onAcceptState.GetBlock(b.ID())
 				require.NoError(err)
+				require.Equal(b.Block, persistedBlock)
 
 				// Assert block is set to last accepted
 				lastAccepted := b.ID()

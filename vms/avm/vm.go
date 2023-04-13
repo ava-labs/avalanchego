@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -314,6 +314,20 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
+
+	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
+	if err != nil {
+		return err
+	}
+	utxoID := avax.UTXOID{
+		TxID:        txID,
+		OutputIndex: 192,
+	}
+	vm.state.DeleteUTXO(utxoID.InputID())
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+
 	vm.bootstrapped = true
 	return nil
 }
@@ -741,6 +755,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 // TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
 func (vm *VM) onAccept(tx *txs.Tx) error {
 	// Fetch the input UTXOs
+	txID := tx.ID()
 	inputUTXOIDs := tx.Unsigned.InputUTXOs()
 	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
 	for _, utxoID := range inputUTXOIDs {
@@ -750,6 +765,14 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		}
 
 		utxo, err := vm.state.GetUTXOFromID(utxoID)
+		if err == database.ErrNotFound {
+			vm.ctx.Log.Debug("dropping utxo from index",
+				zap.Stringer("txID", txID),
+				zap.Stringer("utxoTxID", utxoID.TxID),
+				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
+			)
+			continue
+		}
 		if err != nil {
 			// should never happen because the UTXO was previously verified to
 			// exist
@@ -758,7 +781,6 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
-	txID := tx.ID()
 	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
 	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {

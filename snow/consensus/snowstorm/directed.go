@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -6,6 +6,7 @@ package snowstorm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -182,12 +183,26 @@ func (dg *Directed) Finalized() bool {
 func (dg *Directed) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingTxs := dg.Latency.NumProcessing()
 	isOutstandingTxs := numOutstandingTxs <= dg.params.MaxOutstandingItems
+	healthy := isOutstandingTxs
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
-	if !isOutstandingTxs {
-		errorReason := fmt.Sprintf("number of outstanding txs %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems)
-		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", errorReason)
+
+	// check for long running transactions
+	oldestProcessingDuration := dg.Latency.MeasureAndGetOldestDuration()
+	processingTimeOK := oldestProcessingDuration <= dg.params.MaxItemProcessingTime
+	healthy = healthy && processingTimeOK
+	details["longestRunningTransaction"] = oldestProcessingDuration.String()
+
+	if !healthy {
+		var errorReasons []string
+		if !isOutstandingTxs {
+			errorReasons = append(errorReasons, fmt.Sprintf("number outstanding transactions %d > %d", numOutstandingTxs, dg.params.MaxOutstandingItems))
+		}
+		if !processingTimeOK {
+			errorReasons = append(errorReasons, fmt.Sprintf("transaction processing time %s > %s", oldestProcessingDuration, dg.params.MaxItemProcessingTime))
+		}
+		return details, fmt.Errorf("snowstorm consensus is not healthy reason: %s", strings.Join(errorReasons, ", "))
 	}
 	return details, nil
 }
@@ -301,7 +316,11 @@ func (dg *Directed) Add(ctx context.Context, tx Tx) error {
 	for otherID, otherWhitelist := range dg.whitelists {
 		// [txID] is not whitelisted by [otherWhitelist]
 		if !otherWhitelist.Contains(txID) {
-			otherNode := dg.txs[otherID]
+			otherNode, exists := dg.txs[otherID]
+			if !exists {
+				// This is not expected to happen.
+				return fmt.Errorf("whitelist tx %s is not in the graph", otherID)
+			}
 
 			// The [otherNode] should be preferred over [txNode] because a newly
 			// issued transaction's confidence is always 0 and ties are broken
@@ -346,7 +365,11 @@ func (dg *Directed) Add(ctx context.Context, tx Tx) error {
 		// Update txs conflicting with tx to account for its issuance
 		for conflictIDKey := range spenders {
 			// Get the node that contains this conflicting tx
-			conflict := dg.txs[conflictIDKey]
+			conflict, exists := dg.txs[conflictIDKey]
+			if !exists {
+				// This is not expected to happen.
+				return fmt.Errorf("spender tx %s is not in the graph", conflictIDKey)
+			}
 
 			// Add all the txs that spend this UTXO to this txs conflicts. These
 			// conflicting txs must be preferred over this tx. We know this
@@ -483,7 +506,11 @@ func (dg *Directed) RecordPoll(ctx context.Context, votes bag.Bag[ids.ID]) (bool
 		if txNode.tx.Status() != choices.Accepted {
 			// If this tx wasn't accepted, then this instance is only changed if
 			// preferences changed.
-			changed = dg.redirectEdges(txNode) || changed
+			edgeChanged, err := dg.redirectEdges(txNode)
+			if err != nil {
+				return false, err
+			}
+			changed = edgeChanged || changed
 		} else {
 			// By accepting a tx, the state of this instance has changed.
 			changed = true
@@ -518,7 +545,11 @@ func (dg *Directed) String() string {
 
 // accept the named txID and remove it from the graph
 func (dg *Directed) accept(ctx context.Context, txID ids.ID) error {
-	txNode := dg.txs[txID]
+	txNode, exists := dg.txs[txID]
+	if !exists {
+		// This is not expected to happen.
+		return fmt.Errorf("accepted tx %s is not in the graph", txID)
+	}
 	// We are accepting the tx, so we should remove the node from the graph.
 	delete(dg.txs, txID)
 	delete(dg.whitelists, txID)
@@ -549,7 +580,15 @@ func (dg *Directed) accept(ctx context.Context, txID ids.ID) error {
 // reject all the named txIDs and remove them from the graph
 func (dg *Directed) reject(ctx context.Context, conflictIDs set.Set[ids.ID]) error {
 	for conflictKey := range conflictIDs {
-		conflict := dg.txs[conflictKey]
+		conflict, exists := dg.txs[conflictKey]
+		if !exists {
+			// Transaction dependencies are cleaned up when the dependency is
+			// either accepted or rejected. However, a transaction may have
+			// already been rejected due to a conflict of its own. In this case,
+			// the transaction has already been cleaned up from memory and there
+			// is nothing more to be done.
+			continue
+		}
 		// This tx is no longer an option for consuming the UTXOs from its
 		// inputs, so we should remove their reference to this tx.
 		for _, inputID := range conflict.tx.InputIDs() {
@@ -596,12 +635,16 @@ func (dg *Directed) reject(ctx context.Context, conflictIDs set.Set[ids.ID]) err
 
 // redirectEdges attempts to turn outbound edges into inbound edges if the
 // preferences have changed
-func (dg *Directed) redirectEdges(tx *directedTx) bool {
+func (dg *Directed) redirectEdges(tx *directedTx) (bool, error) {
 	changed := false
 	for conflictID := range tx.outs {
-		changed = dg.redirectEdge(tx, conflictID) || changed
+		edgeChanged, err := dg.redirectEdge(tx, conflictID)
+		if err != nil {
+			return false, err
+		}
+		changed = edgeChanged || changed
 	}
-	return changed
+	return changed, nil
 }
 
 // Fixes the direction of the edge between [txNode] and [conflictID] if needed.
@@ -612,10 +655,15 @@ func (dg *Directed) redirectEdges(tx *directedTx) bool {
 // edge will be set to [conflictID] -> [txNode].
 //
 // Returns true if the direction was switched.
-func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
-	conflict := dg.txs[conflictID]
+func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) (bool, error) {
+	conflict, exists := dg.txs[conflictID]
+	if !exists {
+		// This is not expected to happen.
+		return false, fmt.Errorf("redirected tx %s is not in the graph", conflictID)
+	}
+
 	if txNode.numSuccessfulPolls <= conflict.numSuccessfulPolls {
-		return false
+		return false, nil
 	}
 
 	// Because this tx has a higher preference than the conflicting tx, we must
@@ -634,7 +682,7 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 		// If this tx doesn't have any outbound edges, it's preferred
 		dg.preferences.Add(nodeID)
 	}
-	return true
+	return true, nil
 }
 
 func (dg *Directed) removeConflict(txIDKey ids.ID, neighborIDs set.Set[ids.ID]) {

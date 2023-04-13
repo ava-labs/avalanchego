@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -97,6 +97,9 @@ type Config struct {
 
 	// Time of the Banff network upgrade
 	BanffTime time.Time
+
+	// Time of the Cortina network upgrade
+	CortinaTime time.Time
 
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.

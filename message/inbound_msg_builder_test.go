@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -21,6 +22,7 @@ func Test_newMsgBuilder(t *testing.T) {
 	require := require.New(t)
 
 	mb, err := newMsgBuilder(
+		logging.NoLog{},
 		"test",
 		prometheus.NewRegistry(),
 		10*time.Second,

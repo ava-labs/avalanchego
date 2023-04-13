@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -55,7 +56,7 @@ func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -68,7 +69,7 @@ func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
@@ -76,7 +77,7 @@ func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -89,7 +90,7 @@ func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
@@ -97,7 +98,7 @@ func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
@@ -110,7 +111,7 @@ func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 	txSigners = append(txSigners, txImportSigners...)
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
@@ -118,7 +119,7 @@ func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
@@ -131,7 +132,7 @@ func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx)
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, txSigners)
+	return sign(s.tx, true, txSigners)
 }
 
 func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
@@ -144,7 +145,7 @@ func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, txSigners)
+	return sign(s.tx, true, txSigners)
 }
 
 func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
@@ -152,7 +153,7 @@ func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVa
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, true, txSigners)
 }
 
 func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
@@ -160,7 +161,7 @@ func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txSigners)
+	return sign(s.tx, true, txSigners)
 }
 
 func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
@@ -260,11 +261,13 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 	return authSigners, nil
 }
 
-func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
+// TODO: remove [signHash] after the ledger supports signing all transactions.
+func sign(tx *txs.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
+	unsignedHash := hashing.ComputeHash256(unsignedBytes)
 
 	if expectedLen := len(txSigners); expectedLen != len(tx.Creds) {
 		tx.Creds = make([]verify.Verifiable, expectedLen)
@@ -307,7 +310,12 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 				continue
 			}
 
-			sig, err := signer.Sign(unsignedBytes)
+			var sig []byte
+			if signHash {
+				sig, err = signer.SignHash(unsignedHash)
+			} else {
+				sig, err = signer.Sign(unsignedBytes)
+			}
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}

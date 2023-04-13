@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -231,7 +231,9 @@ func addSubnet(env *environment) {
 	}
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(env.state)
+	if err := stateDiff.Apply(env.state); err != nil {
+		panic(err)
+	}
 }
 
 func defaultState(
@@ -249,6 +251,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)

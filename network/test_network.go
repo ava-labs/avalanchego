@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -79,9 +79,10 @@ func NewTestNetwork(
 ) (Network, error) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"",
-		constants.DefaultNetworkCompressionEnabled,
+		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
 	)
 	if err != nil {
@@ -163,7 +164,7 @@ func NewTestNetwork(
 		},
 
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
-		CompressionEnabled:           constants.DefaultNetworkCompressionEnabled,
+		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              constants.DefaultNetworkAllowPrivateIPs,
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,

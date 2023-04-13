@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -1721,7 +1721,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	chainRouter := &router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
 	err = chainRouter.Initialize(
@@ -1827,6 +1827,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		beacons,
 		msgChan,
 		time.Hour,
+		2,
 		cpuTracker,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -174,6 +174,9 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 
 func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	utxo, err := s.GetUTXO(utxoID)
+	if err == database.ErrNotFound {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

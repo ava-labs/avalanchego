@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	_ Trie              = &Database{}
+	_ TrieView          = &Database{}
 	_ database.Database = &Database{}
 
 	Codec, Version = newCodec()
@@ -230,6 +230,10 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
+	if db.closed {
+		return database.ErrClosed
+	}
+
 	view, err := db.prepareChangeProofView(proof)
 	if err != nil {
 		return err
@@ -242,6 +246,10 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
 
 	view, err := db.prepareRangeProofView(start, proof)
 	if err != nil {
@@ -312,27 +320,41 @@ func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	))
 	defer span.End()
 
+	// Lock to ensure no commit happens during the reads.
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		path := newPath(key)
-		values[i], errors[i] = db.getValue(path, false)
+		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
 	}
 	return values, errors
 }
 
-// Get the value associated with [key].
+// GetValue returns the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValue(newPath(key), true)
+	return db.getValueCopy(newPath(key), true /*lock*/)
 }
 
+// getValueCopy returns a copy of the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+func (db *Database) getValueCopy(key path, lock bool) ([]byte, error) {
+	val, err := db.getValue(key, lock)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(val), nil
+}
+
+// getValue returns the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+// If [lock], [db.lock]'s read lock is acquired.
+// Otherwise assumes [db.lock] is already held.
 func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	if lock {
 		db.lock.RLock()
@@ -342,15 +364,15 @@ func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
+
 	n, err := db.getNode(key)
 	if err != nil {
 		return nil, err
 	}
-	clonedVal := Clone(n.value)
-	if clonedVal.IsNothing() {
+	if n.value.IsNothing() {
 		return nil, database.ErrNotFound
 	}
-	return clonedVal.value, nil
+	return n.value.value, nil
 }
 
 // Returns the ID of the root node of the merkle trie.
@@ -360,6 +382,10 @@ func (db *Database) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 
 	db.lock.RLock()
 	defer db.lock.RUnlock()
+
+	if db.closed {
+		return ids.Empty, database.ErrClosed
+	}
 
 	return db.getMerkleRoot(), nil
 }
@@ -381,6 +407,10 @@ func (db *Database) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 // Returns a proof of the existence/non-existence of [key] in this trie.
 // Assumes [db.commitLock] is read locked.
 func (db *Database) getProof(ctx context.Context, key []byte) (*Proof, error) {
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
 	view, err := db.newUntrackedView(defaultPreallocationSize)
 	if err != nil {
 		return nil, err
@@ -426,6 +456,9 @@ func (db *Database) getRangeProofAtRoot(
 	end []byte,
 	maxLength int,
 ) (*RangeProof, error) {
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
@@ -457,6 +490,10 @@ func (db *Database) GetChangeProof(
 
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 
 	result := &ChangeProof{
 		HadRootsInHistory: true,
@@ -490,8 +527,9 @@ func (db *Database) GetChangeProof(
 			result.DeletedKeys = append(result.DeletedKeys, serializedKey)
 		} else {
 			result.KeyValues = append(result.KeyValues, KeyValue{
-				Key:   serializedKey,
-				Value: change.after.value,
+				Key: serializedKey,
+				// create a copy so edits of the []byte don't affect the db
+				Value: slices.Clone(change.after.value),
 			})
 		}
 	}
@@ -549,7 +587,7 @@ func (db *Database) NewView() (TrieView, error) {
 
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] is read locked.
+// Assumes [db.lock] and/or [db.commitLock] is read locked.
 func (db *Database) newUntrackedView(estimatedSize int) (*trieView, error) {
 	return newTrieView(db, db, db.root.clone(), estimatedSize)
 }
@@ -561,6 +599,10 @@ func (db *Database) newUntrackedView(estimatedSize int) (*trieView, error) {
 func (db *Database) NewPreallocatedView(estimatedSize int) (TrieView, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 
 	newView, err := newTrieView(db, db, db.root.clone(), estimatedSize)
 	if err != nil {
@@ -578,7 +620,7 @@ func (db *Database) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), true)
+	_, err := db.getValue(newPath(k), false /*lock*/)
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -586,6 +628,12 @@ func (db *Database) Has(k []byte) (bool, error) {
 }
 
 func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 	return db.nodeDB.HealthCheck(ctx)
 }
 
@@ -593,10 +641,11 @@ func (db *Database) Insert(ctx context.Context, k, v []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	db.lock.RLock()
-	view, err := db.newUntrackedView(defaultPreallocationSize)
-	db.lock.RUnlock()
+	if db.closed {
+		return database.ErrClosed
+	}
 
+	view, err := db.newUntrackedView(defaultPreallocationSize)
 	if err != nil {
 		return err
 	}
@@ -682,9 +731,11 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	db.lock.RLock()
+	if db.closed {
+		return database.ErrClosed
+	}
+
 	view, err := db.newUntrackedView(defaultPreallocationSize)
-	db.lock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -698,6 +749,10 @@ func (db *Database) Remove(ctx context.Context, key []byte) error {
 func (db *Database) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
 
 	view, err := db.prepareBatchView(ops)
 	if err != nil {
@@ -721,22 +776,21 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if trieToCommit == nil {
+	switch {
+	case db.closed:
+		return database.ErrClosed
+	case trieToCommit == nil:
 		return nil
-	}
-	if trieToCommit.isInvalid() {
+	case trieToCommit.isInvalid():
 		return ErrInvalid
 	}
+
 	changes := trieToCommit.changes
 	_, span := db.tracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
 	defer span.End()
-
-	if db.closed {
-		return database.ErrClosed
-	}
 
 	// invalidate all child views except for the view being committed
 	db.invalidateChildrenExcept(trieToCommit)
@@ -828,13 +882,13 @@ func (db *Database) moveChildViewsToDB(trieToCommit *trieView) {
 	trieToCommit.childViews = make([]*trieView, 0, defaultPreallocationSize)
 }
 
-// CommitToDB is a No Op for db since it is already in sync with itself
-// here to satisfy TrieView interface
+// CommitToDB is a no-op for db since it is already in sync with itself.
+// This exists to satisfy the TrieView interface.
 func (*Database) CommitToDB(context.Context) error {
 	return nil
 }
 
-// invalidate and remove any child views that aren't the exception
+// Invalidates and removes any child views that aren't [exception].
 // Assumes [db.lock] is held.
 func (db *Database) invalidateChildrenExcept(exception *trieView) {
 	isTrackedView := false
@@ -954,6 +1008,9 @@ func (db *Database) getEditableNode(key path) (*node, error) {
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
 func (db *Database) getNode(key path) (*node, error) {
+	if db.closed {
+		return nil, database.ErrClosed
+	}
 	if key == RootPath {
 		return db.root, nil
 	}
@@ -1001,6 +1058,11 @@ func (db *Database) getKeyValues(
 		db.lock.RLock()
 		defer db.lock.RUnlock()
 	}
+
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
@@ -1033,12 +1095,9 @@ func (db *Database) getKeyValues(
 }
 
 // Returns a new view atop [db] with the changes in [ops] applied to it.
-func (db *Database) prepareBatchView(
-	ops []database.BatchOp,
-) (*trieView, error) {
-	db.lock.RLock()
+// Assumes [db.commitLock] is read locked.
+func (db *Database) prepareBatchView(ops []database.BatchOp) (*trieView, error) {
 	view, err := db.newUntrackedView(len(ops))
-	db.lock.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -1060,10 +1119,9 @@ func (db *Database) prepareBatchView(
 
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues]
 // inserted and the key/value pairs in [proof.DeletedKeys] removed.
+// Assumes [db.commitLock] is locked.
 func (db *Database) prepareChangeProofView(proof *ChangeProof) (*trieView, error) {
-	db.lock.RLock()
 	view, err := db.newUntrackedView(len(proof.KeyValues))
-	db.lock.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -1085,13 +1143,10 @@ func (db *Database) prepareChangeProofView(proof *ChangeProof) (*trieView, error
 
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
 // any existing key-value pairs in the proof's range but not in the proof removed.
-// assumes [db.commitLock] is held
+// Assumes [db.commitLock] is locked.
 func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
 	// Don't need to lock [view] because nobody else has a reference to it.
-	db.lock.RLock()
 	view, err := db.newUntrackedView(len(proof.KeyValues))
-	db.lock.RUnlock()
-
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -179,6 +179,9 @@ type Config struct {
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
+	// ConsensusAppConcurrency defines the maximum number of goroutines to
+	// handle App messages per chain.
+	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 

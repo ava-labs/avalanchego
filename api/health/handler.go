@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -47,12 +47,13 @@ func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, 
 
 // NewGetHandler return a health handler that supports GET requests reporting
 // the result of the provided [reporter].
-func NewGetHandler(reporter func() (map[string]Result, bool)) http.Handler {
+func NewGetHandler(reporter func(tags ...string) (map[string]Result, bool)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Make sure the content type is set before writing the header.
 		w.Header().Set("Content-Type", "application/json")
 
-		checks, healthy := reporter()
+		tags := r.URL.Query()["tag"]
+		checks, healthy := reporter(tags...)
 		if !healthy {
 			// If a health check has failed, we should return a 503.
 			w.WriteHeader(http.StatusServiceUnavailable)
