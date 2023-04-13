@@ -902,7 +902,7 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	t.db.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key, true)
+	value, err := t.getParentTrie().getValue(key, true /*lock*/)
 	if err != nil {
 		return nil, err
 	}
@@ -1304,7 +1304,7 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key, true)
+	before, err := t.getParentTrie().getValue(key, true /*lock*/)
 	switch err {
 	case nil:
 		beforeMaybe = Some(before)
