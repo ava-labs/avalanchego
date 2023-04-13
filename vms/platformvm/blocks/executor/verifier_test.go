@@ -61,7 +61,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -148,8 +149,9 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BanffTime:         mockable.MaxTime, // banff is not activated
+				ApricotPhase5Time:     time.Now().Add(time.Hour),
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -238,8 +240,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BanffTime:         mockable.MaxTime, // banff is not activated
+				ApricotPhase5Time:     time.Now().Add(time.Hour),
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -345,7 +348,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -418,7 +422,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -480,7 +485,8 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -562,7 +568,12 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := blocks.NewBanffAbortBlock(test.childTime, parentID, childHeight)
+			statelessAbortBlk, err := blocks.NewBanffAbortBlock(
+				blocks.Version,
+				test.childTime,
+				parentID,
+				childHeight,
+			)
 			require.NoError(err)
 
 			// setup parent state
@@ -656,7 +667,12 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := blocks.NewBanffCommitBlock(test.childTime, parentID, childHeight)
+			statelessCommitBlk, err := blocks.NewBanffCommitBlock(
+				blocks.Version,
+				test.childTime,
+				parentID,
+				childHeight,
+			)
 			require.NoError(err)
 
 			// setup parent state
@@ -728,8 +744,9 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BanffTime:         mockable.MaxTime, // banff is not activated
+				ApricotPhase5Time:     time.Now().Add(time.Hour),
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -819,7 +836,8 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -886,6 +904,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
+		blocks.Version,
 		parentTime.Add(time.Second),
 		parentID,
 		2,
@@ -979,6 +998,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffCommitBlock(
+		blocks.Version,
 		timestamp,
 		parentID,
 		2,
@@ -1005,7 +1025,8 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime: mockable.MaxTime, // banff is not activated
+				BanffTime:             mockable.MaxTime, // banff is not activated
+				ContinuousStakingTime: mockable.MaxTime,
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1068,6 +1089,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffAbortBlock(
+		blocks.Version,
 		timestamp,
 		parentID,
 		2,

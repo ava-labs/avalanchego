@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -972,7 +973,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
-func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
+func newRemoveSubnetValidatorTx(t *testing.T, version uint16) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1027,7 +1028,7 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(version, txs.Codec))
 	return unsignedTx, tx
 }
 
@@ -1045,13 +1046,13 @@ type removeSubnetValidatorTxVerifyEnv struct {
 
 // Returns mock implementations that can be used in tests
 // for verifying RemoveSubnetValidatorTx.
-func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) removeSubnetValidatorTxVerifyEnv {
+func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Controller, version uint16) removeSubnetValidatorTxVerifyEnv {
 	t.Helper()
 
 	now := time.Now()
 	mockFx := fx.NewMockFx(ctrl)
 	mockFlowChecker := utxo.NewMockVerifier(ctrl)
-	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
+	unsignedTx, tx := newRemoveSubnetValidatorTx(t, version)
 	mockState := state.NewMockDiff(ctrl)
 	return removeSubnetValidatorTxVerifyEnv{
 		banffTime:   now,
@@ -1071,7 +1072,7 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
-		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor)
+		newExecutor func(*gomock.Controller, uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor)
 		shouldErr   bool
 		expectedErr error
 	}
@@ -1079,8 +1080,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	tests := []test{
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 
 				// Set dependency expectations.
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
@@ -1101,7 +1102,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1118,15 +1120,16 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1143,15 +1146,16 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "node isn't a validator of the subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1169,8 +1173,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "validator is permissionless",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 
 				staker := *env.staker
 				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
@@ -1180,7 +1184,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1198,8 +1203,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
@@ -1207,7 +1212,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1225,15 +1231,16 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "can't find subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(nil, status.Unknown, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1251,8 +1258,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "no permission to remove validator",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1266,7 +1273,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1284,8 +1292,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl, version)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1302,7 +1310,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1326,7 +1335,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			unsignedTx, executor := tt.newExecutor(ctrl)
+			unsignedTx, executor := tt.newExecutor(ctrl, txs.Version)
 			err := executor.RemoveSubnetValidatorTx(unsignedTx)
 			if tt.shouldErr {
 				require.Error(err)
@@ -1341,7 +1350,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 }
 
 // Returns a TransformSubnetTx that passes syntactic verification.
-func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
+func newTransformSubnetTx(t *testing.T, version uint16) (*txs.TransformSubnetTx, *txs.Tx) {
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1408,7 +1417,7 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(version, txs.Codec))
 	return unsignedTx, tx
 }
 
@@ -1426,13 +1435,13 @@ type transformSubnetTxVerifyEnv struct {
 
 // Returns mock implementations that can be used in tests
 // for verifying TransformSubnetTx.
-func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) transformSubnetTxVerifyEnv {
+func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller, version uint16) transformSubnetTxVerifyEnv {
 	t.Helper()
 
 	now := time.Now()
 	mockFx := fx.NewMockFx(ctrl)
 	mockFlowChecker := utxo.NewMockVerifier(ctrl)
-	unsignedTx, tx := newTransformSubnetTx(t)
+	unsignedTx, tx := newTransformSubnetTx(t, version)
 	mockState := state.NewMockDiff(ctrl)
 	return transformSubnetTxVerifyEnv{
 		banffTime:   now,
@@ -1451,22 +1460,23 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	type test struct {
 		name        string
-		newExecutor func(*gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor)
+		newExecutor func(*gomock.Controller, uint16) (*txs.TransformSubnetTx, *StandardTxExecutor)
 		err         error
 	}
 
 	tests := []test{
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl, version)
 				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1483,14 +1493,15 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 		},
 		{
 			name: "max stake duration too large",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl, version)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1507,16 +1518,17 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 		},
 		{
 			name: "fail subnet authorization",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl, version)
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1533,8 +1545,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl, version)
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fx.NewMockOwner(ctrl)
 				subnetTx := &txs.Tx{
@@ -1551,8 +1563,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1569,8 +1582,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 		},
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+			newExecutor: func(ctrl *gomock.Controller, version uint16) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl, version)
 
 				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
@@ -1592,8 +1605,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1615,7 +1629,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			unsignedTx, executor := tt.newExecutor(ctrl)
+			unsignedTx, executor := tt.newExecutor(ctrl, txs.Version)
 			err := executor.TransformSubnetTx(unsignedTx)
 			require.ErrorIs(t, err, tt.err)
 		})

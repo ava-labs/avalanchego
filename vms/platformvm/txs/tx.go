@@ -44,13 +44,13 @@ func NewSigned(
 	return res, res.Sign(c, signers)
 }
 
-func (tx *Tx) Initialize(c codec.Manager) error {
-	signedBytes, err := c.Marshal(Version, tx)
+func (tx *Tx) Initialize(version uint16, c codec.Manager) error {
+	signedBytes, err := c.Marshal(version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -71,11 +71,12 @@ func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 // P-Chain genesis txs whose length exceed the max length of txs.Codec.
 func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	if _, err := c.Unmarshal(signedBytes, tx); err != nil {
+	version, err := c.Unmarshal(signedBytes, tx)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(version, &tx.Unsigned)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}

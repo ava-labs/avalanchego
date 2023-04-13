@@ -324,9 +324,10 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
+		ApricotPhase3Time:     defaultValidateEndTime,
+		ApricotPhase5Time:     defaultValidateEndTime,
+		BanffTime:             time.Time{}, // neglecting fork ordering this for package tests
+		ContinuousStakingTime: mockable.MaxTime,
 	}
 }
 

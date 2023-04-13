@@ -443,7 +443,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		DelegationShares: reward.PercentDenominator,
 	}
 	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
-	require.NoError(initialValidatorTx.Initialize(txs.Codec))
+	require.NoError(initialValidatorTx.Initialize(txs.Version, txs.Codec))
 
 	initialChain := &txs.CreateChainTx{
 		SubnetID:   constants.PrimaryNetworkID,
@@ -452,7 +452,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		SubnetAuth: &secp256k1fx.Input{},
 	}
 	initialChainTx := &txs.Tx{Unsigned: initialChain}
-	require.NoError(initialChainTx.Initialize(txs.Codec))
+	require.NoError(initialChainTx.Initialize(txs.Version, txs.Codec))
 
 	genesisBlkID := ids.GenerateTestID()
 	genesisState := &genesis.State{

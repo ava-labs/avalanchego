@@ -121,6 +121,20 @@ func (mr *MockBlockMockRecorder) Txs() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Txs", reflect.TypeOf((*MockBlock)(nil).Txs))
 }
 
+// Version mocks base method.
+func (m *MockBlock) Version() uint16 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Version")
+	ret0, _ := ret[0].(uint16)
+	return ret0
+}
+
+// Version indicates an expected call of Version.
+func (mr *MockBlockMockRecorder) Version() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockBlock)(nil).Version))
+}
+
 // Visit mocks base method.
 func (m *MockBlock) Visit(arg0 Visitor) error {
 	m.ctrl.T.Helper()
@@ -136,15 +150,15 @@ func (mr *MockBlockMockRecorder) Visit(arg0 interface{}) *gomock.Call {
 }
 
 // initialize mocks base method.
-func (m *MockBlock) initialize(arg0 []byte) error {
+func (m *MockBlock) initialize(arg0 uint16, arg1 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "initialize", arg0)
+	ret := m.ctrl.Call(m, "initialize", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // initialize indicates an expected call of initialize.
-func (mr *MockBlockMockRecorder) initialize(arg0 interface{}) *gomock.Call {
+func (mr *MockBlockMockRecorder) initialize(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initialize", reflect.TypeOf((*MockBlock)(nil).initialize), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initialize", reflect.TypeOf((*MockBlock)(nil).initialize), arg0, arg1)
 }

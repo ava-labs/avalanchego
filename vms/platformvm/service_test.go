@@ -767,6 +767,7 @@ func TestGetBlock(t *testing.T) {
 			require.NoError(err)
 
 			statelessBlock, err := blocks.NewBanffStandardBlock(
+				blocks.Version,
 				preferred.Timestamp(),
 				preferred.ID(),
 				preferred.Height()+1,

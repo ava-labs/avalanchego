@@ -26,15 +26,16 @@ import (
 func TestRejectBlock(t *testing.T) {
 	type test struct {
 		name         string
-		newBlockFunc func() (blocks.Block, error)
+		newBlockFunc func(version uint16) (blocks.Block, error)
 		rejectFunc   func(*rejector, blocks.Block) error
 	}
 
 	tests := []test{
 		{
 			name: "proposal block",
-			newBlockFunc: func() (blocks.Block, error) {
+			newBlockFunc: func(version uint16) (blocks.Block, error) {
 				return blocks.NewBanffProposalBlock(
+					version,
 					time.Now(),
 					ids.GenerateTestID(),
 					1,
@@ -53,7 +54,7 @@ func TestRejectBlock(t *testing.T) {
 		},
 		{
 			name: "atomic block",
-			newBlockFunc: func() (blocks.Block, error) {
+			newBlockFunc: func(_ uint16) (blocks.Block, error) {
 				return blocks.NewApricotAtomicBlock(
 					ids.GenerateTestID(),
 					1,
@@ -72,8 +73,9 @@ func TestRejectBlock(t *testing.T) {
 		},
 		{
 			name: "standard block",
-			newBlockFunc: func() (blocks.Block, error) {
+			newBlockFunc: func(version uint16) (blocks.Block, error) {
 				return blocks.NewBanffStandardBlock(
+					version,
 					time.Now(),
 					ids.GenerateTestID(),
 					1,
@@ -94,8 +96,13 @@ func TestRejectBlock(t *testing.T) {
 		},
 		{
 			name: "commit",
-			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
+			newBlockFunc: func(version uint16) (blocks.Block, error) {
+				return blocks.NewBanffCommitBlock(
+					version,
+					time.Now(),
+					ids.GenerateTestID(), /*parent*/
+					1,                    /*height*/
+				)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.BanffCommitBlock(blk.(*blocks.BanffCommitBlock))
@@ -103,8 +110,13 @@ func TestRejectBlock(t *testing.T) {
 		},
 		{
 			name: "abort",
-			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
+			newBlockFunc: func(version uint16) (blocks.Block, error) {
+				return blocks.NewBanffAbortBlock(
+					version,
+					time.Now(),
+					ids.GenerateTestID(), /*parent*/
+					1,                    /*height*/
+				)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.BanffAbortBlock(blk.(*blocks.BanffAbortBlock))
@@ -118,7 +130,7 @@ func TestRejectBlock(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			blk, err := tt.newBlockFunc()
+			blk, err := tt.newBlockFunc(blocks.Version)
 			require.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)

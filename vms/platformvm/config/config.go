@@ -135,6 +135,10 @@ func (c *Config) IsBanffActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.BanffTime)
 }
 
+func (c *Config) IsContinuousStakingActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ContinuousStakingTime)
+}
+
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
 	if c.IsApricotPhase3Activated(timestamp) {
 		return c.CreateBlockchainTxFee

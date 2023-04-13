@@ -351,7 +351,7 @@ func TestBuildBlock(t *testing.T) {
 		timestamp        time.Time
 		forceAdvanceTime bool
 		parentStateF     func(*gomock.Controller) state.Chain
-		expectedBlkF     func(*require.Assertions) blocks.Block
+		expectedBlkF     func(*require.Assertions, uint16) blocks.Block
 		expectedErr      error
 	}
 
@@ -389,8 +389,9 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(require *require.Assertions, version uint16) blocks.Block {
 				expectedBlk, err := blocks.NewBanffProposalBlock(
+					version,
 					parentTimestamp,
 					parentID,
 					height,
@@ -436,8 +437,9 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(require *require.Assertions, version uint16) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					version,
 					parentTimestamp,
 					parentID,
 					height,
@@ -491,7 +493,7 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(*require.Assertions) blocks.Block {
+			expectedBlkF: func(*require.Assertions, uint16) blocks.Block {
 				return nil
 			},
 			expectedErr: errNoPendingBlocks,
@@ -539,8 +541,9 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(require *require.Assertions, version uint16) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					version,
 					now.Add(-1*time.Second), // note the advanced time
 					parentID,
 					height,
@@ -592,8 +595,9 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(require *require.Assertions, version uint16) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					version,
 					parentTimestamp,
 					parentID,
 					height,
@@ -646,8 +650,9 @@ func TestBuildBlock(t *testing.T) {
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
-			expectedBlkF: func(require *require.Assertions) blocks.Block {
+			expectedBlkF: func(require *require.Assertions, version uint16) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					version,
 					parentTimestamp,
 					parentID,
 					height,
@@ -668,6 +673,7 @@ func TestBuildBlock(t *testing.T) {
 
 			gotBlk, err := buildBlock(
 				tt.builderF(ctrl),
+				blocks.Version,
 				parentID,
 				height,
 				tt.timestamp,
@@ -679,7 +685,7 @@ func TestBuildBlock(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(require), gotBlk)
+			require.EqualValues(tt.expectedBlkF(require, blocks.Version), gotBlk)
 		})
 	}
 }

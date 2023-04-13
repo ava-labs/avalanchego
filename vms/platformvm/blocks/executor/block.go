@@ -83,7 +83,9 @@ func (b *Block) Timestamp() time.Time {
 }
 
 func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
-	options := options{}
+	options := options{
+		blkVersion: b.Version(),
+	}
 	if err := b.Block.Visit(&options); err != nil {
 		return [2]snowman.Block{}, err
 	}

@@ -337,6 +337,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		ApricotPhase3Time:      defaultValidateEndTime,
 		ApricotPhase5Time:      defaultValidateEndTime,
 		BanffTime:              banffForkTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -640,6 +641,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	statelessBlk, err := blocks.NewBanffStandardBlock(
+		blocks.Version,
 		preferred.Timestamp(),
 		preferredID,
 		preferredHeight+1,
@@ -1424,7 +1426,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	err := tx.Initialize(txs.Codec)
+	err := tx.Initialize(txs.Version, txs.Codec)
 	require.NoError(err)
 
 	preferred, err := vm.Builder.Preferred()
@@ -1522,6 +1524,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	// include a tx to make the block be accepted
+	version := uint16(txs.Version)
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    firstVM.ctx.NetworkID,
@@ -1539,9 +1542,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(version, txs.Codec))
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
+		version,
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -1661,6 +1665,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	// include a tx to make the block be accepted
+	ver := uint16(txs.Version)
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -1678,12 +1683,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(ver, txs.Codec))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	statelessBlk, err := blocks.NewBanffStandardBlock(
+		ver,
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -1975,6 +1981,7 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(err)
 
 	// include a tx1 to make the block be accepted
+	ver := uint16(txs.Version)
 	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
@@ -1992,7 +1999,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx1.Initialize(ver, txs.Codec))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -2001,6 +2008,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
+		ver,
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -2029,10 +2037,11 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx1.Initialize(ver, txs.Codec))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
 	statelessSecondAdvanceTimeBlk, err := blocks.NewBanffStandardBlock(
+		ver,
 		nextChainTime,
 		firstAdvanceTimeBlk.ID(),
 		firstAdvanceTimeBlk.Height()+1,
@@ -2903,6 +2912,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	statelessBlock, err := blocks.NewBanffStandardBlock(
+		txs.Version,
 		vm.state.GetTimestamp(),
 		createSubnetBlock.ID(),
 		createSubnetBlock.Height()+1,

@@ -317,7 +317,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			RewardsOwner:     owner,
 			DelegationShares: delegationFee,
 		}}
-		if err := tx.Initialize(txs.GenesisCodec); err != nil {
+		if err := tx.Initialize(txs.Version, txs.GenesisCodec); err != nil {
 			return err
 		}
 
@@ -343,7 +343,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
-		if err := tx.Initialize(txs.GenesisCodec); err != nil {
+		if err := tx.Initialize(txs.Version, txs.GenesisCodec); err != nil {
 			return err
 		}
 

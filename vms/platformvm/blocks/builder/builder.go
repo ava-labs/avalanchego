@@ -215,8 +215,14 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
+	blkVersion := uint16(blocks.Version)
+	if b.txExecutorBackend.Config.IsContinuousStakingActivated(timestamp) {
+		blkVersion = blocks.ContinuousStakingVersion
+	}
+
 	return buildBlock(
 		b,
+		blkVersion,
 		preferredID,
 		nextHeight,
 		timestamp,
@@ -336,6 +342,7 @@ func (b *builder) notifyBlockReady() {
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
 func buildBlock(
 	builder *builder,
+	version uint16,
 	parentID ids.ID,
 	height uint64,
 	timestamp time.Time,
@@ -356,6 +363,7 @@ func buildBlock(
 		}
 
 		return blocks.NewBanffProposalBlock(
+			version,
 			timestamp,
 			parentID,
 			height,
@@ -374,6 +382,7 @@ func buildBlock(
 
 	// Issue a block with as many transactions as possible.
 	return blocks.NewBanffStandardBlock(
+		version,
 		timestamp,
 		parentID,
 		height,

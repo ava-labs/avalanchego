@@ -20,6 +20,8 @@ type Block interface {
 	Bytes() []byte
 	Height() uint64
 
+	Version() uint16
+
 	// Txs returns list of transactions contained in the block
 	Txs() []*txs.Tx
 
@@ -28,7 +30,7 @@ type Block interface {
 
 	// note: initialize does not assume that block transactions
 	// are initialized, and initializes them itself if they aren't.
-	initialize(bytes []byte) error
+	initialize(version uint16, bytes []byte) error
 }
 
 type BanffBlock interface {
@@ -36,12 +38,12 @@ type BanffBlock interface {
 	Timestamp() time.Time
 }
 
-func initialize(blk Block) error {
+func initialize(version uint16, blk Block) error {
 	// We serialize this block as a pointer so that it can be deserialized into
 	// a Block
-	bytes, err := Codec.Marshal(Version, &blk)
+	bytes, err := Codec.Marshal(version, &blk)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal block: %w", err)
 	}
-	return blk.initialize(bytes)
+	return blk.initialize(version, bytes)
 }

@@ -19,6 +19,7 @@ func TestNewBanffAbortBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
 	blk, err := NewBanffAbortBlock(
+		Version,
 		timestamp,
 		parentID,
 		height,

@@ -30,6 +30,7 @@ func (b *BanffCommitBlock) Visit(v Visitor) error {
 }
 
 func NewBanffCommitBlock(
+	version uint16,
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
@@ -43,15 +44,15 @@ func NewBanffCommitBlock(
 			},
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(version, blk)
 }
 
 type ApricotCommitBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (b *ApricotCommitBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
+func (b *ApricotCommitBlock) initialize(version uint16, bytes []byte) error {
+	b.CommonBlock.initialize(version, bytes)
 	return nil
 }
 
@@ -75,5 +76,5 @@ func NewApricotCommitBlock(
 			Hght:   height,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(Version, blk)
 }

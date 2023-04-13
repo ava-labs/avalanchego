@@ -19,6 +19,7 @@ func TestNewBanffCommitBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
 	blk, err := NewBanffCommitBlock(
+		Version,
 		timestamp,
 		parentID,
 		height,

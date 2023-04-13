@@ -14,6 +14,8 @@ var _ blocks.Visitor = (*verifier)(nil)
 
 // options supports build new option blocks
 type options struct {
+	blkVersion uint16
+
 	// outputs populated by this struct's methods:
 	commitBlock blocks.Block
 	abortBlock  blocks.Block
@@ -33,7 +35,7 @@ func (o *options) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	nextHeight := b.Height() + 1
 
 	var err error
-	o.commitBlock, err = blocks.NewBanffCommitBlock(timestamp, blkID, nextHeight)
+	o.commitBlock, err = blocks.NewBanffCommitBlock(o.blkVersion, timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -41,7 +43,7 @@ func (o *options) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 		)
 	}
 
-	o.abortBlock, err = blocks.NewBanffAbortBlock(timestamp, blkID, nextHeight)
+	o.abortBlock, err = blocks.NewBanffAbortBlock(o.blkVersion, timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",
