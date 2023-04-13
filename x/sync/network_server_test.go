@@ -34,7 +34,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		nodeID                   ids.NodeID
 		proofNil                 bool
 	}{
-		"proof too small": {
+		"proof too large": {
 			request: &RangeProofRequest{
 				Root:       smallTrieRoot,
 				KeyLimit:   defaultRequestKeyLimit,
