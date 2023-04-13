@@ -2809,7 +2809,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
-		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3071,7 +3070,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
-		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3117,7 +3115,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
-		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3251,7 +3248,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
-		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)

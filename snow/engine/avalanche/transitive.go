@@ -28,12 +28,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Engine = (*Transitive)(nil)
-
 func New(
 	config Config,
 	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error,
-) (Engine, error) {
+) (*Transitive, error) {
 	return newTransitive(config, startSnowmanConsensus)
 }
 

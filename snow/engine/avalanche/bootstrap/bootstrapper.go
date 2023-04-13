@@ -35,8 +35,7 @@ var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 func New(
 	ctx context.Context,
 	config Config,
-	startAvalancheConsensus func(ctx context.Context, lastReqID uint32) error,
-	startSnowmanBootstrapping func(ctx context.Context, lastReqID uint32) error,
+	onFinished func(ctx context.Context, lastReqID uint32) error,
 ) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
@@ -50,24 +49,7 @@ func New(
 
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		Fetcher: common.Fetcher{
-			OnFinished: func(ctx context.Context, lastReqID uint32) error {
-				linearized, err := config.Manager.StopVertexAccepted(ctx)
-				if err != nil {
-					return err
-				}
-				if !linearized {
-					return startAvalancheConsensus(ctx, lastReqID)
-				}
-
-				// Invariant: edge will only be the stop vertex after its
-				// acceptance.
-				edge := config.Manager.Edge(ctx)
-				stopVertexID := edge[0]
-				if err := config.VM.Linearize(ctx, stopVertexID); err != nil {
-					return err
-				}
-				return startSnowmanBootstrapping(ctx, lastReqID)
-			},
+			OnFinished: onFinished,
 		},
 	}
 
@@ -627,11 +609,18 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if linearized {
-		b.processedCache.Flush()
-		return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
+	if !linearized {
+		b.Ctx.Log.Debug("checking for stop vertex before finishing bootstrapping")
+		return b.Restart(ctx, true)
 	}
 
-	b.Ctx.Log.Debug("checking for stop vertex before finishing bootstrapping")
-	return b.Restart(ctx, true)
+	// Invariant: edge will only be the stop vertex after its acceptance.
+	edge := b.Manager.Edge(ctx)
+	stopVertexID := edge[0]
+	if err := b.VM.Linearize(ctx, stopVertexID); err != nil {
+		return err
+	}
+
+	b.processedCache.Flush()
+	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
