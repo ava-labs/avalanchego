@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 
-	pbmessage "github.com/ava-labs/avalanchego/proto/pb/message"
+	messagepb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
 var (
@@ -47,13 +47,13 @@ func (m *message) Bytes() []byte {
 func Parse(bytes []byte) (Message, error) {
 	var (
 		msg      Message
-		protoMsg pbmessage.Message
+		protoMsg messagepb.Message
 	)
 
 	if err := proto.Unmarshal(bytes, &protoMsg); err == nil {
 		// This message was encoded with proto.
 		switch m := protoMsg.GetMessage().(type) {
-		case *pbmessage.Message_Tx:
+		case *messagepb.Message_Tx:
 			msg = &Tx{
 				Tx: m.Tx.Tx,
 			}
@@ -87,11 +87,11 @@ func Build(msg Message) ([]byte, error) {
 // (i.e. when all nodes are on v1.11.0 or later), replace Build
 // with this function.
 func BuildProto(msg Message) ([]byte, error) {
-	var protoMsg pbmessage.Message
+	var protoMsg messagepb.Message
 	switch m := msg.(type) {
 	case *Tx:
-		protoMsg.Message = &pbmessage.Message_Tx{
-			Tx: &pbmessage.Tx{
+		protoMsg.Message = &messagepb.Message_Tx{
+			Tx: &messagepb.Tx{
 				Tx: m.Tx,
 			},
 		}
