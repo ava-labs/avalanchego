@@ -36,15 +36,6 @@ var (
 	errTest          = errors.New("non-nil error")
 )
 
-type dummyHandler struct {
-	startEngineF func(ctx context.Context, startReqID uint32) error
-}
-
-func (dh *dummyHandler) onDoneBootstrapping(ctx context.Context, lastReqID uint32) error {
-	lastReqID++
-	return dh.startEngineF(ctx, lastReqID)
-}
-
 func noopStarter(context.Context, uint32) error {
 	return nil
 }
