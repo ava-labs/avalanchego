@@ -212,6 +212,10 @@ func newIterator(db *DatabaseClient, id uint64) *iterator {
 	return it
 }
 
+// Invariant: fetch is the only thread with access to send requests to the
+// server's iterator. This is needed because iterators are not thread safe and
+// the server expects the client (us) to only ever issue one request at a time
+// for a given iterator id.
 func (it *iterator) fetch() {
 	defer func() {
 		resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbpb.IteratorReleaseRequest{
