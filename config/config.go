@@ -791,6 +791,9 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
+		// We use SybilProtectionEnabledKey for CLI flags that is shown to the user
+		// and EnableStaking in the rest of the codebase. This is to avoid confusion
+		// with the name "staking" like in "AVAX staking".
 		EnableStaking:         v.GetBool(SybilProtectionEnabledKey),
 		DisabledStakingWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		StakingKeyPath:        GetExpandedArg(v, StakingTLSKeyPathKey),
