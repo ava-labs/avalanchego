@@ -560,7 +560,7 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 		m.setError(err)
 		return
 	}
-	
+
 	largestHandledKey := workItem.end
 	// nextStartKey being nil indicates that the entire range has been completed
 	if nextStartKey != nil {
