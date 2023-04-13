@@ -315,7 +315,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			// Since this is a deletion proof, the deleted key will no longer be present in the local db
 			// and this proof is an exclusion proof.
 			// If we remove the last proof node, we end up with a valid proof for a prefix of the deleted key.
-			// any remaining changes in the range of this change proof have to occur after this prefix,
+			// Any remaining changes in the range of this change proof have to occur after this prefix,
 			// so we can use it as the starting point of our search for the next different key
 			proofOfLargestKey = proofOfLargestKey[:len(proofOfLargestKey)-1]
 		}
