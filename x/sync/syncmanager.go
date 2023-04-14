@@ -132,8 +132,8 @@ func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
 	m := &StateSyncManager{
 		config:          config,
 		syncDoneChan:    make(chan struct{}),
-		unprocessedWork: newSyncWorkHeap(2 * config.SimultaneousWorkLimit),
-		processedWork:   newSyncWorkHeap(2 * config.SimultaneousWorkLimit),
+		unprocessedWork: newSyncWorkHeap(),
+		processedWork:   newSyncWorkHeap(),
 		workTokens:      make(chan struct{}, config.SimultaneousWorkLimit),
 	}
 	m.unprocessedWorkCond.L = &m.workLock
