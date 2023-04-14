@@ -61,7 +61,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	// next trie.
 	for i, checkpoint := range checkpoints {
 		// Create syncer targeting the current [syncTrie].
-		syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight)
+		syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, defaultStateSyncRequestSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +88,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *trie.Database, targetHeight ui
 	}
 
 	// Create syncer targeting the current [targetRoot].
-	syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight)
+	syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, defaultStateSyncRequestSize)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,8 +21,6 @@ var (
 	errFailedToFetchLeafs = errors.New("failed to fetch leafs")
 )
 
-const defaultLeafRequestLimit = 1024
-
 // LeafSyncTask represents a complete task to be completed by the leaf syncer.
 // Note: each LeafSyncTask is processed on its own goroutine and there will
 // not be concurrent calls to the callback methods. Implementations should return
@@ -40,9 +38,10 @@ type LeafSyncTask interface {
 }
 
 type CallbackLeafSyncer struct {
-	client LeafClient
-	done   chan error
-	tasks  <-chan LeafSyncTask
+	client      LeafClient
+	done        chan error
+	tasks       <-chan LeafSyncTask
+	requestSize uint16
 }
 
 type LeafClient interface {
@@ -52,11 +51,12 @@ type LeafClient interface {
 }
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask) *CallbackLeafSyncer {
+func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16) *CallbackLeafSyncer {
 	return &CallbackLeafSyncer{
-		client: client,
-		done:   make(chan error),
-		tasks:  tasks,
+		client:      client,
+		done:        make(chan error),
+		tasks:       tasks,
+		requestSize: requestSize,
 	}
 }
 
@@ -102,7 +102,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			Root:     root,
 			Account:  task.Account(),
 			Start:    start,
-			Limit:    defaultLeafRequestLimit,
+			Limit:    c.requestSize,
 			NodeType: task.NodeType(),
 		})
 		if err != nil {
