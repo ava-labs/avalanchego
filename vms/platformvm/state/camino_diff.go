@@ -116,6 +116,9 @@ func (d *diff) SetDepositOffer(offer *deposit.Offer) {
 
 func (d *diff) GetDepositOffer(offerID ids.ID) (*deposit.Offer, error) {
 	if offer, ok := d.caminoDiff.modifiedDepositOffers[offerID]; ok {
+		if offer == nil {
+			return nil, database.ErrNotFound
+		}
 		return offer, nil
 	}
 
@@ -268,8 +271,8 @@ func (d *diff) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID
 	return nextDepositIDs, nextUnlockTime, nil
 }
 
-func (d *diff) SetMultisigAlias(owner *multisig.AliasWithNonce) {
-	d.caminoDiff.modifiedMultisigAliases[owner.ID] = owner
+func (d *diff) SetMultisigAlias(alias *multisig.AliasWithNonce) {
+	d.caminoDiff.modifiedMultisigAliases[alias.ID] = alias
 }
 
 func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.AliasWithNonce, error) {

@@ -632,8 +632,8 @@ func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSON
 }
 
 type APIClaimable struct {
-	ValidatorRewards      uint64 `json:"validatorRewards"`
-	ExpiredDepositRewards uint64 `json:"expiredDepositRewards"`
+	ValidatorRewards      utilsjson.Uint64 `json:"validatorRewards"`
+	ExpiredDepositRewards utilsjson.Uint64 `json:"expiredDepositRewards"`
 }
 
 type GetClaimablesArgs struct {
@@ -667,8 +667,8 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 			return err
 		}
 
-		response.Claimables[i].ValidatorRewards = claimable.ValidatorReward
-		response.Claimables[i].ExpiredDepositRewards = claimable.ExpiredDepositReward
+		response.Claimables[i].ValidatorRewards = utilsjson.Uint64(claimable.ValidatorReward)
+		response.Claimables[i].ExpiredDepositRewards = utilsjson.Uint64(claimable.ExpiredDepositReward)
 	}
 
 	return nil
@@ -702,17 +702,18 @@ type GetDepositsArgs struct {
 }
 
 type GetDepositsReply struct {
-	Deposits         []*APIDeposit `json:"deposits"`
-	AvailableRewards []uint64      `json:"availableRewards"`
-	Timestamp        uint64        `json:"timestamp"`
+	Deposits         []*APIDeposit      `json:"deposits"`
+	AvailableRewards []utilsjson.Uint64 `json:"availableRewards"`
+	Timestamp        utilsjson.Uint64   `json:"timestamp"`
 }
 
 // GetDeposits returns deposits by IDs
 func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, reply *GetDepositsReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetDeposits called")
+	timestamp := s.vm.clock.Unix()
 	reply.Deposits = make([]*APIDeposit, len(args.DepositTxIDs))
-	reply.AvailableRewards = make([]uint64, len(args.DepositTxIDs))
-	reply.Timestamp = s.vm.clock.Unix()
+	reply.AvailableRewards = make([]utilsjson.Uint64, len(args.DepositTxIDs))
+	reply.Timestamp = utilsjson.Uint64(timestamp)
 	for i := range args.DepositTxIDs {
 		deposit, err := s.vm.state.GetDeposit(args.DepositTxIDs[i])
 		if err != nil {
@@ -740,7 +741,7 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 			return err
 		}
 
-		reply.AvailableRewards[i] = deposit.ClaimableReward(offer, reply.Timestamp)
+		reply.AvailableRewards[i] = utilsjson.Uint64(deposit.ClaimableReward(offer, timestamp))
 		reply.Deposits[i] = APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
 		reply.Deposits[i].RewardOwner = *apiRewardOwner
 	}
