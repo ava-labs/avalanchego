@@ -183,6 +183,19 @@ func TestGetValidatorSet(t *testing.T) {
 	require.Error(err)
 }
 
+func TestPublicKeyDeserialize(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+
+	pkBytes := pk.Serialize()
+	pkDe := new(bls.PublicKey).Deserialize(pkBytes)
+	require.NotNil(pkDe)
+	require.EqualValues(pk, pkDe)
+}
+
 // BenchmarkGetValidatorSet measures the time it takes complete a gRPC client
 // request based on a mocked validator set.
 func BenchmarkGetValidatorSet(b *testing.B) {

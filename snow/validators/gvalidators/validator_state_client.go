@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	_                            validators.State = (*Client)(nil)
-	errFailedPublicKeyDecompress                  = errors.New("couldn't decompress public key")
+	_                             validators.State = (*Client)(nil)
+	errFailedPublicKeyDeserialize                  = errors.New("couldn't deserialize public key")
 )
 
 type Client struct {
@@ -82,7 +82,7 @@ func (c *Client) GetValidatorSet(
 			// to the P-Chain and served by the gRPC server.
 			publicKey = new(bls.PublicKey).Deserialize(validator.PublicKey)
 			if publicKey == nil {
-				return nil, errFailedPublicKeyDecompress
+				return nil, errFailedPublicKeyDeserialize
 			}
 		}
 		vdrs[nodeID] = &validators.GetValidatorOutput{
