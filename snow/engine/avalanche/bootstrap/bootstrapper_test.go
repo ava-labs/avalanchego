@@ -133,7 +133,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		HeightV: 0,
 		BytesV:  vtxBytes1,
 	}
-	vtx2 := &avalanche.TestVertex{
+	vtx2 := &avalanche.TestVertex{ // vtx2 is the stop vertex
 		TestDecidable: choices.TestDecidable{
 			IDV:     vtxID2,
 			StatusV: choices.Processing,
@@ -188,6 +188,20 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			t.Fatal(errParsedUnknownVertex)
 			panic(errParsedUnknownVertex)
 		}
+	}
+
+	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
+		return vtx2.Status() == choices.Accepted, nil
+	}
+
+	manager.EdgeF = func(context.Context) []ids.ID {
+		require.Equal(choices.Accepted, vtx2.Status())
+		return []ids.ID{vtxID2}
+	}
+
+	vm.LinearizeF = func(_ context.Context, stopVertexID ids.ID) error {
+		require.Equal(vtxID2, stopVertexID)
+		return nil
 	}
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
