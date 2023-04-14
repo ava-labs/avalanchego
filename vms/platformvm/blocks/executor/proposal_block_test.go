@@ -570,11 +570,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
+				validator := txs.Validator{
+					NodeID: staker.nodeID,
+					Start:  uint64(staker.startTime.Unix()),
+					End:    uint64(staker.endTime.Unix()),
+					Wght:   env.config.MinValidatorStake,
+				}
 				tx, err := env.txBuilder.NewAddValidatorTx(
-					env.config.MinValidatorStake,
-					uint64(staker.startTime.Unix()),
-					uint64(staker.endTime.Unix()),
-					staker.nodeID,
+					validator,
 					staker.rewardAddress,
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -622,11 +625,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
 				staker0.endTime = newTime
+				validator := txs.Validator{
+					NodeID: ids.GenerateTestNodeID(),
+					Start:  uint64(staker0.startTime.Unix()),
+					End:    uint64(staker0.endTime.Unix()),
+					Wght:   10,
+				}
 				addStaker0, err := env.txBuilder.NewAddValidatorTx(
-					10,
-					uint64(staker0.startTime.Unix()),
-					uint64(staker0.endTime.Unix()),
-					staker0.nodeID,
+					validator,
 					staker0.rewardAddress,
 					reward.PercentDenominator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -778,11 +784,14 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0StartTime := defaultValidateStartTime
 	staker0EndTime := subnetVdr1EndTime
+	validator := txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  uint64(staker0StartTime.Unix()),
+		End:    uint64(staker0EndTime.Unix()),
+		Wght:   10,
+	}
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
-		10,
-		uint64(staker0StartTime.Unix()),
-		uint64(staker0EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		validator,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -891,11 +900,14 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			// so to allow proposalBlk issuance
 			staker0StartTime := defaultGenesisTime
 			staker0EndTime := subnetVdr1StartTime
+			validator := txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(staker0StartTime.Unix()),
+				End:    uint64(staker0EndTime.Unix()),
+				Wght:   10,
+			}
 			addStaker0, err := env.txBuilder.NewAddValidatorTx(
-				10,
-				uint64(staker0StartTime.Unix()),
-				uint64(staker0EndTime.Unix()),
-				ids.GenerateTestNodeID(),
+				validator,
 				ids.GenerateTestShortID(),
 				reward.PercentDenominator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -977,11 +989,14 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// just to allow proposalBlk issuance (with a reward Tx)
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
+	validator := txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  uint64(staker0StartTime.Unix()),
+		End:    uint64(staker0EndTime.Unix()),
+		Wght:   10,
+	}
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
-		10,
-		uint64(staker0StartTime.Unix()),
-		uint64(staker0EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		validator,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -1071,11 +1086,14 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
+	validator = txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  uint64(staker0StartTime.Unix()),
+		End:    uint64(staker0EndTime.Unix()),
+		Wght:   10,
+	}
 	addStaker0, err = env.txBuilder.NewAddValidatorTx(
-		10,
-		uint64(staker0StartTime.Unix()),
-		uint64(staker0EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		validator,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -1163,11 +1181,14 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
+	validator := txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  uint64(staker0StartTime.Unix()),
+		End:    uint64(staker0EndTime.Unix()),
+		Wght:   10,
+	}
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
-		10,
-		uint64(staker0StartTime.Unix()),
-		uint64(staker0EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		validator,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -1256,11 +1277,14 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
+	validator = txs.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  uint64(staker0StartTime.Unix()),
+		End:    uint64(staker0EndTime.Unix()),
+		Wght:   10,
+	}
 	addStaker0, err = env.txBuilder.NewAddValidatorTx(
-		10,
-		uint64(staker0StartTime.Unix()),
-		uint64(staker0EndTime.Unix()),
-		ids.GenerateTestNodeID(),
+		validator,
 		ids.GenerateTestShortID(),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},

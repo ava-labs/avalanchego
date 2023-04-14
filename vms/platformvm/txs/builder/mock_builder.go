@@ -71,18 +71,18 @@ func (mr *MockBuilderMockRecorder) NewAddSubnetValidatorTx(arg0, arg1, arg2, arg
 }
 
 // NewAddValidatorTx mocks base method.
-func (m *MockBuilder) NewAddValidatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 uint32, arg6 []*secp256k1.PrivateKey, arg7 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewAddValidatorTx(arg0 txs.Validator, arg1 ids.ShortID, arg2 uint32, arg3 []*secp256k1.PrivateKey, arg4 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewAddValidatorTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	ret := m.ctrl.Call(m, "NewAddValidatorTx", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*txs.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewAddValidatorTx indicates an expected call of NewAddValidatorTx.
-func (mr *MockBuilderMockRecorder) NewAddValidatorTx(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
+func (mr *MockBuilderMockRecorder) NewAddValidatorTx(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddValidatorTx", reflect.TypeOf((*MockBuilder)(nil).NewAddValidatorTx), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddValidatorTx", reflect.TypeOf((*MockBuilder)(nil).NewAddValidatorTx), arg0, arg1, arg2, arg3, arg4)
 }
 
 // NewAdvanceTimeTx mocks base method.

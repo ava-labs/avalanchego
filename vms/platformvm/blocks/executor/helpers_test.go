@@ -512,11 +512,15 @@ func addPendingValidator(
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
+	val := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   env.config.MinValidatorStake,
+	}
+
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
+		val,
 		rewardAddress,
 		reward.PercentDenominator,
 		keys,

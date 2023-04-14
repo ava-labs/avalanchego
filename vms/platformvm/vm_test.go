@@ -574,13 +574,16 @@ func TestAddValidatorCommit(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
+	validator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   vm.MinValidatorStake,
+	}
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
+		validator,
 		rewardAddress,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -621,13 +624,16 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	key, _ := testKeyFactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
+	validator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   vm.MinValidatorStake,
+	}
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
+		validator,
 		ids.ShortID(nodeID),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -679,13 +685,16 @@ func TestAddValidatorReject(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
+	validator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   vm.MinValidatorStake,
+	}
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		nodeID,
+		validator,
 		rewardAddress,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -725,13 +734,16 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
+	validator := txs.Validator{
+		NodeID: repeatNodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   vm.MinValidatorStake,
+	}
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
-		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
-		repeatNodeID,
+		validator,
 		ids.ShortID(repeatNodeID),
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -2853,11 +2865,14 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	id := key.PublicKey().Address()
 
+	validator := txs.Validator{
+		NodeID: ids.NodeID(id),
+		Start:  uint64(validatorStartTime.Unix()),
+		End:    uint64(validatorEndTime.Unix()),
+		Wght:   defaultMaxValidatorStake,
+	}
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
+		validator,
 		id,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},

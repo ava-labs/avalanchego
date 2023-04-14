@@ -1233,11 +1233,14 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	}
 
 	// Create the transaction
+	validator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(args.StartTime),
+		End:    uint64(args.EndTime),
+		Wght:   uint64(args.Weight),
+	}
 	tx, err := s.vm.txBuilder.NewAddValidatorTx(
-		uint64(args.Weight),                  // Stake amount
-		uint64(args.StartTime),               // Start time
-		uint64(args.EndTime),                 // End time
-		nodeID,                               // Node ID
+		validator,
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
 		privKeys.Keys,                        // Keys providing the staked tokens

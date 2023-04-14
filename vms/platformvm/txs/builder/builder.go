@@ -95,19 +95,13 @@ type DecisionTxBuilder interface {
 }
 
 type ProposalTxBuilder interface {
-	// stakeAmount: amount the validator stakes
-	// startTime: unix time they start validating
-	// endTime: unix time they stop validating
-	// nodeID: ID of the node we want to validate with
+	// validator: the features of the validator (nodeID, stakeAmount, duration)
 	// rewardAddress: address to send reward to, if applicable
 	// shares: 10,000 times percentage of reward taken from delegators
 	// keys: Keys providing the staked tokens
 	// changeAddr: Address to send change to, if there is any
 	NewAddValidatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
+		validator txs.Validator,
 		rewardAddress ids.ShortID,
 		shares uint32,
 		keys []*secp256k1.PrivateKey,
@@ -426,16 +420,13 @@ func (b *builder) NewCreateSubnetTx(
 }
 
 func (b *builder) NewAddValidatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
+	validator txs.Validator,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, validator.Wght, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -447,12 +438,7 @@ func (b *builder) NewAddValidatorTx(
 			Ins:          ins,
 			Outs:         unstakedOuts,
 		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
+		Validator: validator,
 		StakeOuts: stakedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,

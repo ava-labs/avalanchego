@@ -231,12 +231,15 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
+	vdr := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  vdrStartTime,
+		End:    vdrEndTime,
+		Wght:   env.config.MinValidatorStake,
+	}
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake, // stakeAmt
-		vdrStartTime,
-		vdrEndTime,
-		vdrNodeID,        // node ID
+		vdr,
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -355,12 +358,15 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
+	vdr := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  vdrStartTime,
+		End:    vdrEndTime,
+		Wght:   env.config.MinValidatorStake,
+	}
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		vdrStartTime,
-		vdrEndTime,
-		vdrNodeID,
+		vdr,
 		vdrRewardAddress,
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -576,12 +582,15 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
+	vdr := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  vdrStartTime,
+		End:    vdrEndTime,
+		Wght:   env.config.MinValidatorStake,
+	}
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake, // stakeAmt
-		vdrStartTime,
-		vdrEndTime,
-		vdrNodeID,        // node ID
+		vdr,
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -739,12 +748,15 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
 	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
+	vdr := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  vdrStartTime,
+		End:    vdrEndTime,
+		Wght:   env.config.MinValidatorStake,
+	}
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake, // stakeAmt
-		vdrStartTime,
-		vdrEndTime,
-		vdrNodeID,        // node ID
+		vdr,
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
