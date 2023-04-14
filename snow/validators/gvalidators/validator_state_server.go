@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
@@ -70,7 +69,11 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 			Weight: vdr.Weight,
 		}
 		if vdr.PublicKey != nil {
-			vdrPB.PublicKey = bls.PublicKeyToBytes(vdr.PublicKey)
+			// This is a performance optimization to avoid the cost of compression
+			// and key re-verification with PublicKeyToBytes. We can safely
+			// assume that the BLS Public Keys are verified before being added
+			// to the P-Chain.
+			vdrPB.PublicKey = vdr.PublicKey.Serialize()
 		}
 		resp.Validators[i] = vdrPB
 		i++
