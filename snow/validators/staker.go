@@ -12,8 +12,10 @@ import (
 type Staker interface {
 	// Staked is called when [nodeID] starts its staking period for its
 	// corresponding subnet.
+	// It's possible to receive duplicate messages for the same staked event.
 	Staked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
 	// Unstaked is called when [nodeID] finishes its staking period for its
 	// corresponding subnet.
+	// It's possible to receive duplicate messages for the same unstaked event.
 	Unstaked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
 }
