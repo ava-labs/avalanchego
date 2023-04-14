@@ -212,7 +212,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 		// the two dbs should be in sync, so next key should be nil
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
-		nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: nil}, lastKey, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), nil, nil, lastKey, proof.EndProof)
 		require.NoError(t, err)
 		require.Nil(t, nextKey)
 
@@ -245,7 +245,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			// both nibbles were 0, so move onto the next byte
 		}
 
-		nextKey, err = syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: endPointBeforeNewKey}, lastKey, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), nil, endPointBeforeNewKey, lastKey, proof.EndProof)
 		require.NoError(t, err)
 
 		// next key would be after the end of the range, so it returns nil instead
@@ -290,16 +290,16 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// there is now another value in the range that needs to be sync'ed
 	require.NoError(t, db.Put([]byte{0x13}, []byte{3}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: []byte{0x20}}, []byte{0x12}, noExtraNodeProof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), nil, []byte{0x20}, []byte{0x12}, noExtraNodeProof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x13}, nextKey)
 
-	nextKey, err = syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: []byte{0x20}}, []byte{0x11}, extraNodeProof.Path)
+	nextKey, err = syncer.findNextKey(context.Background(), nil, []byte{0x20}, []byte{0x11}, extraNodeProof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x13}, nextKey)
 
 	// extra node gets deleted and the remaining prefix node is not in the range, so default back to the lastReceivedKey
-	nextKey, err = syncer.findNextKey(context.Background(), &syncWorkItem{start: []byte{0x11}, end: []byte{0x20}}, []byte{0x11}, extraNodeProof.Path)
+	nextKey, err = syncer.findNextKey(context.Background(), []byte{0x11}, []byte{0x20}, []byte{0x11}, extraNodeProof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x11}, nextKey)
 }
@@ -333,7 +333,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Put([]byte{0x12}, []byte{4}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: []byte{0x20}}, []byte{0x11, 0x11}, proof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), nil, []byte{0x20}, []byte{0x11, 0x11}, proof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x12}, nextKey)
 }
@@ -368,7 +368,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Delete([]byte{0x12}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: []byte{0x20}}, []byte{0x11, 0x11}, proof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), nil, []byte{0x20}, []byte{0x11, 0x11}, proof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x12}, nextKey)
 }
@@ -417,7 +417,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(t, err)
 
 		// next key at prefix of newly added point
-		nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: nil}, lastKey, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), nil, nil, lastKey, proof.EndProof)
 		require.NoError(t, err)
 		require.NotNil(t, nextKey)
 
@@ -433,7 +433,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(t, err)
 
 		// next key at prefix of newly added point
-		nextKey, err = syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: nil}, lastKey, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), nil, nil, lastKey, proof.EndProof)
 		require.NoError(t, err)
 		require.NotNil(t, nextKey)
 
@@ -502,7 +502,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
 		require.NoError(t, err)
 
-		nextKey, err := syncer.findNextKey(context.Background(), &syncWorkItem{start: nil, end: nil}, proof.KeyValues[len(proof.KeyValues)-1].Key, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), nil, nil, proof.KeyValues[len(proof.KeyValues)-1].Key, proof.EndProof)
 		require.NoError(t, err)
 		require.Equal(t, nextKey, lastKey)
 	}

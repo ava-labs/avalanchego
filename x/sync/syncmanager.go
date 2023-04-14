@@ -365,7 +365,8 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 // the proof of the last received key in the local trie vs proof for the last received key recently received by the sync manager.
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
-	workItem *syncWorkItem,
+	rangeStart []byte,
+	rangeEnd []byte,
 	lastReceivedKey []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
@@ -376,7 +377,7 @@ func (m *StateSyncManager) findNextKey(
 	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
 		// if the new last proof key is before the start of the range, then fallback to the lastReceivedKey as the next key
-		if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, workItem.start) < 0 {
+		if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, rangeStart) < 0 {
 			return lastReceivedKey, nil
 		}
 		lastReceivedKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
@@ -456,7 +457,7 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	if result == nil || (len(workItem.end) > 0 && bytes.Compare(result, workItem.end) >= 0) {
+	if result == nil || (len(rangeEnd) > 0 && bytes.Compare(result, rangeEnd) >= 0) {
 		return nil, nil
 	}
 
@@ -563,7 +564,7 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 	// if the last key is equal to the end, then the full range is completed
 	if !bytes.Equal(largestHandledKey, workItem.end) {
 		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, workItem, largestHandledKey, proofOfLargestKey)
+		nextStartKey, err := m.findNextKey(ctx, workItem.start, workItem.end, largestHandledKey, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
