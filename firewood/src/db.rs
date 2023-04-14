@@ -7,10 +7,11 @@ use std::fmt;
 use std::io::{Cursor, Write};
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use bytemuck::{cast_slice, AnyBitPattern};
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::{Mutex, RwLock};
 use primitive_types::U256;
 use shale::{compact::CompactSpaceHeader, MemStore, MummyItem, MummyObj, ObjPtr, SpaceID};
 use typed_builder::TypedBuilder;
@@ -403,8 +404,6 @@ struct DBInner {
     disk_thread: Option<JoinHandle<()>>,
     staging: Universe<Rc<StoreRevMut>>,
     cached: Universe<Rc<CachedSpace>>,
-    revisions: VecDeque<Universe<StoreRevShared>>,
-    max_revisions: usize,
 }
 
 impl Drop for DBInner {
@@ -416,9 +415,15 @@ impl Drop for DBInner {
 
 /// Firewood database handle.
 pub struct DB {
-    inner: Mutex<DBInner>,
+    inner: Arc<RwLock<DBInner>>,
+    revisions: Arc<Mutex<DBRevInner>>,
     payload_regn_nbit: u64,
     rev_cfg: DBRevConfig,
+}
+
+pub struct DBRevInner {
+    inner: VecDeque<Universe<StoreRevShared>>,
+    max_revisions: usize,
 }
 
 impl DB {
@@ -664,15 +669,17 @@ impl DB {
         latest.flush_dirty().unwrap();
 
         Ok(Self {
-            inner: Mutex::new(DBInner {
+            inner: Arc::new(RwLock::new(DBInner {
                 latest,
                 disk_thread,
                 disk_requester,
                 staging,
                 cached,
-                revisions: VecDeque::new(),
+            })),
+            revisions: Arc::new(Mutex::new(DBRevInner {
+                inner: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
-            }),
+            })),
             payload_regn_nbit: header.payload_regn_nbit,
             rev_cfg: cfg.rev.clone(),
         })
@@ -681,7 +688,8 @@ impl DB {
     /// Create a write batch.
     pub fn new_writebatch(&self) -> WriteBatch {
         WriteBatch {
-            m: self.inner.lock(),
+            m: Arc::clone(&self.inner),
+            r: Arc::clone(&self.revisions),
             root_hash_recalc: true,
             committed: false,
         }
@@ -689,28 +697,28 @@ impl DB {
 
     /// Dump the Trie of the latest generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
-        self.inner.lock().latest.kv_dump(w)
+        self.inner.read().latest.kv_dump(w)
     }
 
     /// Dump the Trie of the latest entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
-        self.inner.lock().latest.dump(w)
+        self.inner.read().latest.dump(w)
     }
 
     /// Dump the Trie of the latest state storage under an account.
     pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
-        self.inner.lock().latest.dump_account(key, w)
+        self.inner.read().latest.dump_account(key, w)
     }
 
     /// Get root hash of the latest generic key-value storage.
     pub fn kv_root_hash(&self) -> Result<Hash, DBError> {
-        self.inner.lock().latest.kv_root_hash()
+        self.inner.read().latest.kv_root_hash()
     }
 
     /// Get a value in the kv store associated with a particular key.
     pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
         self.inner
-            .lock()
+            .read()
             .latest
             .kv_get(key)
             .ok_or(DBError::KeyNotFound)
@@ -718,32 +726,32 @@ impl DB {
 
     /// Get root hash of the latest world state of all accounts.
     pub fn root_hash(&self) -> Result<Hash, DBError> {
-        self.inner.lock().latest.root_hash()
+        self.inner.read().latest.root_hash()
     }
 
     /// Get the latest balance of the account.
     pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DBError> {
-        self.inner.lock().latest.get_balance(key)
+        self.inner.read().latest.get_balance(key)
     }
 
     /// Get the latest code of the account.
     pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
-        self.inner.lock().latest.get_code(key)
+        self.inner.read().latest.get_code(key)
     }
 
     /// Get the latest nonce of the account.
     pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DBError> {
-        self.inner.lock().latest.get_nonce(key)
+        self.inner.read().latest.get_nonce(key)
     }
 
     /// Get the latest state value indexed by `sub_key` in the account indexed by `key`.
     pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DBError> {
-        self.inner.lock().latest.get_state(key, sub_key)
+        self.inner.read().latest.get_state(key, sub_key)
     }
 
     /// Check if the account exists in the latest world state.
     pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DBError> {
-        self.inner.lock().latest.exist(key)
+        self.inner.read().latest.exist(key)
     }
 
     /// Get a handle that grants the access to some historical state of the entire DB.
@@ -755,10 +763,11 @@ impl DB {
     /// If nback equals 0, or is above the configured maximum number of revisions, this function returns None.
     /// It also returns None in the case where the nback is larger than the number of revisions available.
     pub fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<Revision> {
-        let mut inner = self.inner.lock();
+        let mut revisions = self.revisions.lock();
+        let inner = self.inner.read();
 
-        let rlen = inner.revisions.len();
-        if nback == 0 || nback > inner.max_revisions {
+        let rlen = revisions.inner.len();
+        if nback == 0 || nback > revisions.max_revisions {
             return None;
         }
         if rlen < nback {
@@ -769,11 +778,11 @@ impl DB {
                     a.old.reverse()
                 }
 
-                let u = match inner.revisions.back() {
+                let u = match revisions.inner.back() {
                     Some(u) => u.to_mem_store_r(),
                     None => inner.cached.to_mem_store_r(),
                 };
-                inner.revisions.push_back(u.rewind(
+                revisions.inner.push_back(u.rewind(
                     &ash.0[&MERKLE_META_SPACE].old,
                     &ash.0[&MERKLE_PAYLOAD_SPACE].old,
                     &ash.0[&BLOB_META_SPACE].old,
@@ -781,9 +790,10 @@ impl DB {
                 ));
             }
         }
-        if inner.revisions.len() < nback {
+        if revisions.inner.len() < nback {
             return None;
         }
+        drop(inner);
         // set up the storage layout
 
         let mut offset = std::mem::size_of::<DBParams>() as u64;
@@ -797,7 +807,7 @@ impl DB {
         // Blob CompactSpaceHeader starts right in blob meta space
         let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
-        let space = &inner.revisions[nback - 1];
+        let space = &revisions.inner[nback - 1];
 
         let (db_header_ref, merkle_payload_header_ref, blob_payload_header_ref) = {
             let merkle_meta_ref = &space.merkle.meta;
@@ -839,9 +849,7 @@ impl DB {
             self.payload_regn_nbit,
         )
         .unwrap();
-
         Some(Revision {
-            _m: inner,
             rev: DBRev {
                 header: db_header_ref,
                 merkle: Merkle::new(Box::new(merkle_space)),
@@ -852,12 +860,11 @@ impl DB {
 }
 
 /// Lock protected handle to a readable version of the DB.
-pub struct Revision<'a> {
-    _m: MutexGuard<'a, DBInner>,
+pub struct Revision {
     rev: DBRev,
 }
 
-impl<'a> std::ops::Deref for Revision<'a> {
+impl std::ops::Deref for Revision {
     type Target = DBRev;
     fn deref(&self) -> &DBRev {
         &self.rev
@@ -865,31 +872,36 @@ impl<'a> std::ops::Deref for Revision<'a> {
 }
 
 /// An atomic batch of changes made to the DB. Each operation on a [WriteBatch] will move itself
-/// because when an error occurs, the write batch will be automaticlaly aborted so that the DB
+/// because when an error occurs, the write batch will be automatically aborted so that the DB
 /// remains clean.
-pub struct WriteBatch<'a> {
-    m: MutexGuard<'a, DBInner>,
+pub struct WriteBatch {
+    m: Arc<RwLock<DBInner>>,
+    r: Arc<Mutex<DBRevInner>>,
     root_hash_recalc: bool,
     committed: bool,
 }
 
-impl<'a> WriteBatch<'a> {
+impl WriteBatch {
     /// Insert an item to the generic key-value storage.
-    pub fn kv_insert<K: AsRef<[u8]>>(mut self, key: K, val: Vec<u8>) -> Result<Self, DBError> {
-        let (header, merkle, _) = self.m.latest.borrow_split();
+    pub fn kv_insert<K: AsRef<[u8]>>(self, key: K, val: Vec<u8>) -> Result<Self, DBError> {
+        let mut rev = self.m.write();
+        let (header, merkle, _) = rev.latest.borrow_split();
         merkle
             .insert(key, val, header.kv_root)
             .map_err(DBError::Merkle)?;
+        drop(rev);
         Ok(self)
     }
 
     /// Remove an item from the generic key-value storage. `val` will be set to the value that is
     /// removed from the storage if it exists.
-    pub fn kv_remove<K: AsRef<[u8]>>(mut self, key: K) -> Result<(Self, Option<Vec<u8>>), DBError> {
-        let (header, merkle, _) = self.m.latest.borrow_split();
+    pub fn kv_remove<K: AsRef<[u8]>>(self, key: K) -> Result<(Self, Option<Vec<u8>>), DBError> {
+        let mut rev = self.m.write();
+        let (header, merkle, _) = rev.latest.borrow_split();
         let old_value = merkle
             .remove(key, header.kv_root)
             .map_err(DBError::Merkle)?;
+        drop(rev);
         Ok((self, old_value))
     }
 
@@ -898,7 +910,8 @@ impl<'a> WriteBatch<'a> {
         key: &[u8],
         modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DBError>,
     ) -> Result<(), DBError> {
-        let (header, merkle, blob) = self.m.latest.borrow_split();
+        let mut rev = self.m.write();
+        let (header, merkle, blob) = rev.latest.borrow_split();
         match merkle.get_mut(key, header.acc_root) {
             Ok(Some(mut bytes)) => {
                 let mut ret = Ok(());
@@ -964,8 +977,9 @@ impl<'a> WriteBatch<'a> {
     }
 
     /// Set the state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn set_state(mut self, key: &[u8], sub_key: &[u8], val: Vec<u8>) -> Result<Self, DBError> {
-        let (header, merkle, _) = self.m.latest.borrow_split();
+    pub fn set_state(self, key: &[u8], sub_key: &[u8], val: Vec<u8>) -> Result<Self, DBError> {
+        let mut rev = self.m.write();
+        let (header, merkle, _) = rev.latest.borrow_split();
         let mut acc = match merkle.get(key, header.acc_root) {
             Ok(Some(r)) => Account::deserialize(&r),
             Ok(None) => Account::default(),
@@ -983,12 +997,14 @@ impl<'a> WriteBatch<'a> {
         merkle
             .insert(key, acc.serialize(), header.acc_root)
             .map_err(DBError::Merkle)?;
+        drop(rev);
         Ok(self)
     }
 
     /// Create an account.
-    pub fn create_account(mut self, key: &[u8]) -> Result<Self, DBError> {
-        let (header, merkle, _) = self.m.latest.borrow_split();
+    pub fn create_account(self, key: &[u8]) -> Result<Self, DBError> {
+        let mut rev = self.m.write();
+        let (header, merkle, _) = rev.latest.borrow_split();
         let old_balance = match merkle.get_mut(key, header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes.get()).balance,
             Ok(None) => U256::zero(),
@@ -1001,20 +1017,20 @@ impl<'a> WriteBatch<'a> {
         merkle
             .insert(key, acc.serialize(), header.acc_root)
             .map_err(DBError::Merkle)?;
+
+        drop(rev);
         Ok(self)
     }
 
     /// Delete an account.
-    pub fn delete_account(
-        mut self,
-        key: &[u8],
-        acc: &mut Option<Account>,
-    ) -> Result<Self, DBError> {
-        let (header, merkle, blob_stash) = self.m.latest.borrow_split();
+    pub fn delete_account(self, key: &[u8], acc: &mut Option<Account>) -> Result<Self, DBError> {
+        let mut rev = self.m.write();
+        let (header, merkle, blob_stash) = rev.latest.borrow_split();
         let mut a = match merkle.remove(key, header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => {
                 *acc = None;
+                drop(rev);
                 return Ok(self);
             }
             Err(e) => return Err(DBError::Merkle(e)),
@@ -1028,6 +1044,7 @@ impl<'a> WriteBatch<'a> {
             a.code = ObjPtr::null();
         }
         *acc = Some(a);
+        drop(rev);
         Ok(self)
     }
 
@@ -1042,28 +1059,33 @@ impl<'a> WriteBatch<'a> {
     /// either retained on disk or lost together during a crash.
     pub fn commit(mut self) {
         use crate::storage::BufferWrite;
-        let inner = &mut *self.m;
+        let mut rev_inner = self.m.write();
         if self.root_hash_recalc {
-            inner.latest.root_hash().ok();
-            inner.latest.kv_root_hash().ok();
+            rev_inner.latest.root_hash().ok();
+            rev_inner.latest.kv_root_hash().ok();
         }
         // clear the staging layer and apply changes to the CachedSpace
-        inner.latest.flush_dirty().unwrap();
+        rev_inner.latest.flush_dirty().unwrap();
         let (merkle_payload_pages, merkle_payload_plain) =
-            inner.staging.merkle.payload.take_delta();
-        let (merkle_meta_pages, merkle_meta_plain) = inner.staging.merkle.meta.take_delta();
-        let (blob_payload_pages, blob_payload_plain) = inner.staging.blob.payload.take_delta();
-        let (blob_meta_pages, blob_meta_plain) = inner.staging.blob.meta.take_delta();
+            rev_inner.staging.merkle.payload.take_delta();
+        let (merkle_meta_pages, merkle_meta_plain) = rev_inner.staging.merkle.meta.take_delta();
+        let (blob_payload_pages, blob_payload_plain) = rev_inner.staging.blob.payload.take_delta();
+        let (blob_meta_pages, blob_meta_plain) = rev_inner.staging.blob.meta.take_delta();
 
-        let old_merkle_meta_delta = inner.cached.merkle.meta.update(&merkle_meta_pages).unwrap();
-        let old_merkle_payload_delta = inner
+        let old_merkle_meta_delta = rev_inner
+            .cached
+            .merkle
+            .meta
+            .update(&merkle_meta_pages)
+            .unwrap();
+        let old_merkle_payload_delta = rev_inner
             .cached
             .merkle
             .payload
             .update(&merkle_payload_pages)
             .unwrap();
-        let old_blob_meta_delta = inner.cached.blob.meta.update(&blob_meta_pages).unwrap();
-        let old_blob_payload_delta = inner
+        let old_blob_meta_delta = rev_inner.cached.blob.meta.update(&blob_meta_pages).unwrap();
+        let old_blob_payload_delta = rev_inner
             .cached
             .blob
             .payload
@@ -1073,22 +1095,26 @@ impl<'a> WriteBatch<'a> {
         // update the rolling window of past revisions
         let new_base = Universe {
             merkle: SubUniverse::new(
-                StoreRevShared::from_delta(inner.cached.merkle.meta.clone(), old_merkle_meta_delta),
                 StoreRevShared::from_delta(
-                    inner.cached.merkle.payload.clone(),
+                    rev_inner.cached.merkle.meta.clone(),
+                    old_merkle_meta_delta,
+                ),
+                StoreRevShared::from_delta(
+                    rev_inner.cached.merkle.payload.clone(),
                     old_merkle_payload_delta,
                 ),
             ),
             blob: SubUniverse::new(
-                StoreRevShared::from_delta(inner.cached.blob.meta.clone(), old_blob_meta_delta),
+                StoreRevShared::from_delta(rev_inner.cached.blob.meta.clone(), old_blob_meta_delta),
                 StoreRevShared::from_delta(
-                    inner.cached.blob.payload.clone(),
+                    rev_inner.cached.blob.payload.clone(),
                     old_blob_payload_delta,
                 ),
             ),
         };
 
-        if let Some(rev) = inner.revisions.front_mut() {
+        let mut revisions = self.r.lock();
+        if let Some(rev) = revisions.inner.front_mut() {
             rev.merkle
                 .meta
                 .set_prev(new_base.merkle.meta.inner().clone());
@@ -1100,30 +1126,30 @@ impl<'a> WriteBatch<'a> {
                 .payload
                 .set_prev(new_base.blob.payload.inner().clone());
         }
-        inner.revisions.push_front(new_base);
-        while inner.revisions.len() > inner.max_revisions {
-            inner.revisions.pop_back();
+        revisions.inner.push_front(new_base);
+        while revisions.inner.len() > revisions.max_revisions {
+            revisions.inner.pop_back();
         }
 
         self.committed = true;
 
         // schedule writes to the disk
-        inner.disk_requester.write(
+        rev_inner.disk_requester.write(
             vec![
                 BufferWrite {
-                    space_id: inner.staging.merkle.payload.id(),
+                    space_id: rev_inner.staging.merkle.payload.id(),
                     delta: merkle_payload_pages,
                 },
                 BufferWrite {
-                    space_id: inner.staging.merkle.meta.id(),
+                    space_id: rev_inner.staging.merkle.meta.id(),
                     delta: merkle_meta_pages,
                 },
                 BufferWrite {
-                    space_id: inner.staging.blob.payload.id(),
+                    space_id: rev_inner.staging.blob.payload.id(),
                     delta: blob_payload_pages,
                 },
                 BufferWrite {
-                    space_id: inner.staging.blob.meta.id(),
+                    space_id: rev_inner.staging.blob.meta.id(),
                     delta: blob_meta_pages,
                 },
             ],
@@ -1140,14 +1166,14 @@ impl<'a> WriteBatch<'a> {
     }
 }
 
-impl<'a> Drop for WriteBatch<'a> {
+impl Drop for WriteBatch {
     fn drop(&mut self) {
         if !self.committed {
             // drop the staging changes
-            self.m.staging.merkle.payload.take_delta();
-            self.m.staging.merkle.meta.take_delta();
-            self.m.staging.blob.payload.take_delta();
-            self.m.staging.blob.meta.take_delta();
+            self.m.read().staging.merkle.payload.take_delta();
+            self.m.read().staging.merkle.meta.take_delta();
+            self.m.read().staging.blob.payload.take_delta();
+            self.m.read().staging.blob.meta.take_delta();
         }
     }
 }

@@ -21,10 +21,34 @@ fn main() {
             "{}",
             hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
         );
+        let root_hash = *db.get_revision(1, None).unwrap().kv_root_hash().unwrap();
         println!(
             "{}",
             hex::encode(*db.get_revision(2, None).unwrap().kv_root_hash().unwrap())
         );
+        let write = db.new_writebatch().kv_insert("k", vec![b'v']).unwrap();
+
+        // Get a revision while a batch is active.
+        println!(
+            "{}",
+            hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
+        );
+        assert_eq!(
+            root_hash,
+            *db.get_revision(1, None).unwrap().kv_root_hash().unwrap()
+        );
+
+        // Read the uncommitted value while the batch is still active.
+        let val = db.kv_get("k").unwrap();
+        assert_eq!("v".as_bytes().to_vec(), val);
+
+        write.commit();
+        println!(
+            "{}",
+            hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
+        );
+        let val = db.kv_get("k").unwrap();
+        assert_eq!("v".as_bytes().to_vec(), val);
     }
     {
         let db = DB::new("rev_db", &cfg.truncate(false).build()).unwrap();
