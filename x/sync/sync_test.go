@@ -68,7 +68,7 @@ func Test_Creation(t *testing.T) {
 func Test_Completion(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		ctrl := gomock.NewController(t)
-
+		defer ctrl.Finish()
 		emptyDB, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
@@ -108,8 +108,6 @@ func Test_Completion(t *testing.T) {
 		require.Equal(t, 0, syncer.unprocessedWork.Len())
 		require.Equal(t, 1, syncer.processedWork.Len())
 		syncer.workLock.Unlock()
-
-		ctrl.Finish()
 	}
 }
 
