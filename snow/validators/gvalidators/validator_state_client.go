@@ -16,9 +16,9 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
 
-var ( 
-	_ validators.State = (*Client)(nil)
-	errFailedPublicKeyDecompress  = errors.New("couldn't decompress public key")
+var (
+	_                            validators.State = (*Client)(nil)
+	errFailedPublicKeyDecompress                  = errors.New("couldn't decompress public key")
 )
 
 type Client struct {

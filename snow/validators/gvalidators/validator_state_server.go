@@ -70,9 +70,7 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 		}
 		if vdr.PublicKey != nil {
 			// This is a performance optimization to avoid the cost of compression
-			// and key re-verification with PublicKeyToBytes. We can safely
-			// assume that the BLS Public Keys are verified before being added
-			// to the P-Chain.
+			// from PublicKeyToBytes.
 			vdrPB.PublicKey = vdr.PublicKey.Serialize()
 		}
 		resp.Validators[i] = vdrPB
