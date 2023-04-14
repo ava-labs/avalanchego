@@ -40,6 +40,8 @@ type VMClient interface {
 	// process is created other processes will be created to populate blockchains,
 	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
+	Staked(ctx context.Context, in *StakedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Unstaked(ctx context.Context, in *UnstakedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -143,6 +145,24 @@ func (c *vMClient) CreateHandlers(ctx context.Context, in *emptypb.Empty, opts .
 func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
 	out := new(CreateStaticHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/CreateStaticHandlers", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Staked(ctx context.Context, in *StakedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/Staked", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) Unstaked(ctx context.Context, in *UnstakedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/vm.VM/Unstaked", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +451,8 @@ type VMServer interface {
 	// process is created other processes will be created to populate blockchains,
 	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
+	Staked(context.Context, *StakedRequest) (*emptypb.Empty, error)
+	Unstaked(context.Context, *UnstakedRequest) (*emptypb.Empty, error)
 	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
 	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
@@ -506,6 +528,12 @@ func (UnimplementedVMServer) CreateHandlers(context.Context, *emptypb.Empty) (*C
 }
 func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
+}
+func (UnimplementedVMServer) Staked(context.Context, *StakedRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Staked not implemented")
+}
+func (UnimplementedVMServer) Unstaked(context.Context, *UnstakedRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unstaked not implemented")
 }
 func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connected not implemented")
@@ -693,6 +721,42 @@ func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Staked_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StakedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Staked(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/Staked",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Staked(ctx, req.(*StakedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_Unstaked_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnstakedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).Unstaked(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vm.VM/Unstaked",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).Unstaked(ctx, req.(*UnstakedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1245,6 +1309,14 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateStaticHandlers",
 			Handler:    _VM_CreateStaticHandlers_Handler,
+		},
+		{
+			MethodName: "Staked",
+			Handler:    _VM_Staked_Handler,
+		},
+		{
+			MethodName: "Unstaked",
+			Handler:    _VM_Unstaked_Handler,
 		},
 		{
 			MethodName: "Connected",

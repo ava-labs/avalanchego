@@ -432,7 +432,7 @@ type callbackListener struct {
 	t         *testing.T
 	onAdd     func(ids.NodeID, *bls.PublicKey, ids.ID, uint64)
 	onWeight  func(ids.NodeID, uint64, uint64)
-	onRemoved func(ids.NodeID, uint64)
+	onRemoved func(ids.NodeID, ids.ID, uint64)
 }
 
 func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -443,9 +443,9 @@ func (c *callbackListener) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey
 	}
 }
 
-func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (c *callbackListener) OnValidatorRemoved(nodeID ids.NodeID, txID ids.ID, weight uint64) {
 	if c.onRemoved != nil {
-		c.onRemoved(nodeID, weight)
+		c.onRemoved(nodeID, txID, weight)
 	} else {
 		c.t.Fail()
 	}
@@ -575,8 +575,9 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 			require.Equal(weight0, weight)
 			callCount++
 		},
-		onRemoved: func(nodeID ids.NodeID, weight uint64) {
+		onRemoved: func(nodeID ids.NodeID, txID ids.ID, weight uint64) {
 			require.Equal(nodeID0, nodeID)
+			require.Equal(txID0, txID)
 			require.Equal(weight0, weight)
 			callCount++
 		},

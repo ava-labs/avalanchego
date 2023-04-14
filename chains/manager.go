@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/reward"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
@@ -225,6 +226,8 @@ type ManagerConfig struct {
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
+
+	Slasher reward.Slasher
 }
 
 type manager struct {
@@ -288,6 +291,22 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 		}
 		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
+
+		if m.StakingEnabled && subnetID != constants.PrimaryNetworkID {
+			validatorSet, ok := m.Validators.Get(subnetID)
+			if !ok {
+				m.Log.Warn("skipping chain creation",
+					zap.String("reason", "subnet not initialized"),
+				)
+				return
+			}
+			callback := &router.StakerListener{
+				SubnetID: subnetID,
+				Router:   m.Router(),
+				Subnet:   sb,
+			}
+			validatorSet.RegisterCallbackListener(callback)
+		}
 	}
 	addedChain := sb.AddChain(chainParams.ID)
 	m.subnetsLock.Unlock()
@@ -480,6 +499,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
+			Slasher:        m.Slasher,
 		},
 		BlockAcceptor:       m.BlockAcceptorGroup,
 		TxAcceptor:          m.TxAcceptorGroup,

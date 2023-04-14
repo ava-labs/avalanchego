@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/reward"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -54,6 +56,8 @@ type Context struct {
 	ValidatorState validators.State // interface for P-Chain validators
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string
+
+	Slasher reward.Slasher
 }
 
 // Expose gatherer interface for unit testing.
@@ -103,16 +107,22 @@ func DefaultContextTest() *Context {
 		panic(err)
 	}
 	pk := bls.PublicFromSecretKey(sk)
+	log := logging.NoLog{}
+	slasher, err := reward.NewSlashDB(memdb.New(), log, prometheus.NewRegistry())
+	if err != nil {
+		panic(err)
+	}
 	return &Context{
 		NetworkID:    0,
 		SubnetID:     ids.Empty,
 		ChainID:      ids.Empty,
 		NodeID:       ids.EmptyNodeID,
 		PublicKey:    pk,
-		Log:          logging.NoLog{},
+		Log:          log,
 		BCLookup:     ids.NewAliaser(),
 		Metrics:      metrics.NewOptionalGatherer(),
 		ChainDataDir: "",
+		Slasher:      slasher,
 	}
 }
 

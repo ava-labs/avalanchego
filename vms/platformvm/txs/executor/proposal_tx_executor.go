@@ -642,7 +642,21 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 
-	e.PrefersCommit = uptime >= expectedUptimePercentage
+	slashed, err := e.Ctx.Slasher.Slashed(
+		stakerToRemove.NodeID,
+		stakerToRemove.TxID,
+		stakerToRemove.SubnetID,
+	)
+	if err != nil {
+		return err
+	}
+
+	// currently, rewards are not slashed on the primary network
+	slashRewards := stakerToRemove.SubnetID != constants.PrimaryNetworkID &&
+		slashed
+
+	e.PrefersCommit = uptime >= expectedUptimePercentage && !slashRewards
+
 	return nil
 }
 

@@ -51,6 +51,7 @@ type Transitive struct {
 	common.AncestorsHandler
 	common.AppHandler
 	validators.Connector
+	validators.Staker
 
 	RequestID uint32
 
@@ -106,6 +107,7 @@ func newTransitive(
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
+		Staker:                      config.VM,
 		acceptedFrontiers:           acceptedFrontiers,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,

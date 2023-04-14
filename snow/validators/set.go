@@ -87,7 +87,7 @@ type Set interface {
 
 type SetCallbackListener interface {
 	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
-	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
+	OnValidatorRemoved(validatorID ids.NodeID, txID ids.ID, weight uint64)
 	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
 }
 
@@ -267,7 +267,7 @@ func (s *vdrSet) removeWeight(nodeID ids.NodeID, weight uint64) error {
 		s.vdrSlice = s.vdrSlice[:lastIndex]
 		s.weights = s.weights[:lastIndex]
 
-		s.callValidatorRemovedCallbacks(nodeID, oldWeight)
+		s.callValidatorRemovedCallbacks(nodeID, vdr.TxID, oldWeight)
 	} else {
 		vdr.Weight = newWeight
 		s.weights[vdr.index] = newWeight
@@ -428,8 +428,8 @@ func (s *vdrSet) callValidatorAddedCallbacks(node ids.NodeID, pk *bls.PublicKey,
 }
 
 // Assumes [s.lock] is held
-func (s *vdrSet) callValidatorRemovedCallbacks(node ids.NodeID, weight uint64) {
+func (s *vdrSet) callValidatorRemovedCallbacks(node ids.NodeID, txID ids.ID, weight uint64) {
 	for _, callbackListener := range s.callbackListeners {
-		callbackListener.OnValidatorRemoved(node, weight)
+		callbackListener.OnValidatorRemoved(node, txID, weight)
 	}
 }

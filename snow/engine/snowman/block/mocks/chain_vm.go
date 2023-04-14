@@ -331,6 +331,34 @@ func (mr *MockChainVMMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockChainVM)(nil).Shutdown), arg0)
 }
 
+// Staked mocks base method.
+func (m *MockChainVM) Staked(arg0 context.Context, arg1 ids.NodeID, arg2 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Staked", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Staked indicates an expected call of Staked.
+func (mr *MockChainVMMockRecorder) Staked(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Staked", reflect.TypeOf((*MockChainVM)(nil).Staked), arg0, arg1, arg2)
+}
+
+// Unstaked mocks base method.
+func (m *MockChainVM) Unstaked(arg0 context.Context, arg1 ids.NodeID, arg2 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unstaked", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Unstaked indicates an expected call of Unstaked.
+func (mr *MockChainVMMockRecorder) Unstaked(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unstaked", reflect.TypeOf((*MockChainVM)(nil).Unstaked), arg0, arg1, arg2)
+}
+
 // Version mocks base method.
 func (m *MockChainVM) Version(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()

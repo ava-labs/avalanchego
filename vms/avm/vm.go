@@ -145,6 +145,14 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
 	return nil
 }
 
+func (*VM) Staked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
+func (*VM) Unstaked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
 /*
  ******************************************************************************
  ********************************* Common VM **********************************

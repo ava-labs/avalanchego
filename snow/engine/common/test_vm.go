@@ -25,6 +25,8 @@ var (
 	errHealthCheck                = errors.New("unexpectedly called HealthCheck")
 	errConnected                  = errors.New("unexpectedly called Connected")
 	errDisconnected               = errors.New("unexpectedly called Disconnected")
+	errStaked                     = errors.New("unexpectedly called Staked")
+	errUnstaked                   = errors.New("unexpectedly called Unstaked")
 	errVersion                    = errors.New("unexpectedly called Version")
 	errAppRequest                 = errors.New("unexpectedly called AppRequest")
 	errAppResponse                = errors.New("unexpectedly called AppResponse")
@@ -44,6 +46,7 @@ type TestVM struct {
 	CantInitialize, CantSetState,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
+	CantStaked, CantUnstaked,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
@@ -54,6 +57,8 @@ type TestVM struct {
 	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
+	StakedF                     func(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
+	UnstakedF                   func(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
 	HealthCheckF                func(context.Context) (interface{}, error)
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
@@ -79,6 +84,8 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantVersion = cant
 	vm.CantConnected = cant
 	vm.CantDisconnected = cant
+	vm.CantStaked = cant
+	vm.CantUnstaked = cant
 	vm.CantCrossChainAppRequest = cant
 	vm.CantCrossChainAppRequestFailed = cant
 	vm.CantCrossChainAppResponse = cant
@@ -277,6 +284,26 @@ func (vm *TestVM) Disconnected(ctx context.Context, id ids.NodeID) error {
 	}
 	if vm.CantDisconnected && vm.T != nil {
 		vm.T.Fatal(errDisconnected)
+	}
+	return nil
+}
+
+func (vm *TestVM) Staked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	if vm.StakedF != nil {
+		return vm.StakedF(ctx, nodeID, txID)
+	}
+	if vm.CantStaked && vm.T != nil {
+		vm.T.Fatal(errStaked)
+	}
+	return nil
+}
+
+func (vm *TestVM) Unstaked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	if vm.UnstakedF != nil {
+		return vm.UnstakedF(ctx, nodeID, txID)
+	}
+	if vm.CantUnstaked && vm.T != nil {
+		vm.T.Fatal(errUnstaked)
 	}
 	return nil
 }

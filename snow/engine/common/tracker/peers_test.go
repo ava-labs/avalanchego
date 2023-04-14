@@ -36,7 +36,7 @@ func TestPeers(t *testing.T) {
 	require.EqualValues(10, p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	p.OnValidatorRemoved(nodeID, 10)
+	p.OnValidatorRemoved(nodeID, ids.Empty, 10)
 	require.Zero(p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 

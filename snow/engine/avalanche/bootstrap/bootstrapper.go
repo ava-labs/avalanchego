@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -57,6 +58,7 @@ func New(
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
+		Staker:                      config.VM,
 
 		processedCache: &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		Fetcher: common.Fetcher{
@@ -122,6 +124,8 @@ type bootstrapper struct {
 
 	common.Bootstrapper
 	common.Fetcher
+
+	validators.Staker
 	metrics
 
 	started bool

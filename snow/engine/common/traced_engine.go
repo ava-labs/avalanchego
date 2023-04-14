@@ -358,6 +358,26 @@ func (e *tracedEngine) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return e.engine.Disconnected(ctx, nodeID)
 }
 
+func (e *tracedEngine) Staked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Staked", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Stringer("txID", txID),
+	))
+	defer span.End()
+
+	return e.engine.Staked(ctx, nodeID, txID)
+}
+
+func (e *tracedEngine) Unstaked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Unstaked", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Stringer("txID", txID),
+	))
+	defer span.End()
+
+	return e.engine.Unstaked(ctx, nodeID, txID)
+}
+
 func (e *tracedEngine) Timeout(ctx context.Context) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Timeout")
 	defer span.End()

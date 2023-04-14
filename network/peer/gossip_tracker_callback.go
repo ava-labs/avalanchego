@@ -43,7 +43,7 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 
 // OnValidatorRemoved removes [validatorID] from the set of validators that can
 // be gossiped about.
-func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
+func (g *GossipTrackerCallback) OnValidatorRemoved(nodeID ids.NodeID, _ ids.ID, _ uint64) {
 	if !g.GossipTracker.RemoveValidator(nodeID) {
 		g.Log.Error("failed to remove a validator",
 			zap.Stringer("nodeID", nodeID),

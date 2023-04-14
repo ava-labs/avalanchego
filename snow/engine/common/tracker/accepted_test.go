@@ -17,6 +17,7 @@ func TestAccepted(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	frontier0 := []ids.ID{ids.GenerateTestID()}
 	frontier1 := []ids.ID{ids.GenerateTestID()}
+	txID := ids.GenerateTestID()
 
 	a := NewAccepted()
 
@@ -25,7 +26,7 @@ func TestAccepted(t *testing.T) {
 	a.SetAcceptedFrontier(nodeID, frontier0)
 	require.Empty(a.AcceptedFrontier(nodeID))
 
-	a.OnValidatorAdded(nodeID, nil, ids.GenerateTestID(), 1)
+	a.OnValidatorAdded(nodeID, nil, txID, 1)
 
 	require.Empty(a.AcceptedFrontier(nodeID))
 
@@ -35,7 +36,7 @@ func TestAccepted(t *testing.T) {
 	a.SetAcceptedFrontier(nodeID, frontier1)
 	require.Equal(frontier1, a.AcceptedFrontier(nodeID))
 
-	a.OnValidatorRemoved(nodeID, 1)
+	a.OnValidatorRemoved(nodeID, txID, 1)
 
 	require.Empty(a.AcceptedFrontier(nodeID))
 }

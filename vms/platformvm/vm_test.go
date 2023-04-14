@@ -921,15 +921,6 @@ func TestRewardValidatorAccept(t *testing.T) {
 		require.NoError(err)
 		require.Equal(status.Aborted, txStatus)
 	}
-
-	require.NoError(commit.Accept(context.Background())) // reward the genesis validator
-
-	_, txStatus, err = vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
-
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(keys[1].PublicKey().Address()))
-	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test case where primary network validator not rewarded

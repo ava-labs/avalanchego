@@ -6,6 +6,8 @@ package subnets
 import (
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -23,6 +25,8 @@ type Allower interface {
 // bootstrapped.
 type Subnet interface {
 	common.BootstrapTracker
+
+	GetChains() []ids.ID
 
 	// AddChain adds a chain to this Subnet
 	AddChain(chainID ids.ID) bool
@@ -56,6 +60,13 @@ func (s *subnet) IsBootstrapped() bool {
 	defer s.lock.RUnlock()
 
 	return s.bootstrapping.Len() == 0
+}
+
+func (s *subnet) GetChains() []ids.ID {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return append(maps.Keys(s.bootstrapping), maps.Keys(s.bootstrapped)...)
 }
 
 func (s *subnet) Bootstrapped(chainID ids.ID) {

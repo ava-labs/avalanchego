@@ -386,6 +386,30 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 	return resp, nil
 }
 
+func (vm *VMServer) Staked(ctx context.Context, request *vmpb.StakedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(request.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	txID, err := ids.ToID(request.TxId)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Staked(ctx, nodeID, txID)
+}
+
+func (vm *VMServer) Unstaked(ctx context.Context, request *vmpb.UnstakedRequest) (*emptypb.Empty, error) {
+	nodeID, err := ids.ToNodeID(request.NodeId)
+	if err != nil {
+		return nil, err
+	}
+	txID, err := ids.ToID(request.TxId)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, vm.vm.Unstaked(ctx, nodeID, txID)
+}
+
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
