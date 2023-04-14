@@ -80,7 +80,7 @@ func (c *Client) GetValidatorSet(
 			// and key re-verification with PublicKeyFromBytes. We can safely
 			// assume that the BLS Public Keys are verified before being added
 			// to the P-Chain and served by the gRPC server.
-			publicKey := new(bls.PublicKey).Deserialize(validator.PublicKey)
+			publicKey = new(bls.PublicKey).Deserialize(validator.PublicKey)
 			if publicKey == nil {
 				return nil, errFailedPublicKeyDecompress
 			}
