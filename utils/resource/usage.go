@@ -231,7 +231,6 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 		m.processMetrics.numDiskReadBytes.WithLabelValues(processIDStr).Set(float64(p.lastReadBytes))
 		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.write))
 		m.processMetrics.numDiskWritesBytes.WithLabelValues(processIDStr).Set(float64(p.lastWriteBytes))
-
 	}
 
 	return totalCPU, totalRead, totalWrite
