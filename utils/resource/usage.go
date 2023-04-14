@@ -5,9 +5,11 @@ package resource
 
 import (
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/process"
 
 	"github.com/ava-labs/avalanchego/utils/storage"
@@ -27,20 +29,12 @@ type CPUUser interface {
 	// that process is currently using 150% CPU (i.e. one and a half cores of
 	// compute) then the return value will be 1.5.
 	CPUUsage() float64
-
-	CPUCycles(pid int) float64
 }
 
 type DiskUser interface {
 	// DiskUsage returns the number of bytes per second read from/written to
 	// disk recently.
 	DiskUsage() (read float64, write float64)
-
-	DiskNumberRead(pid int) (read uint64)
-	DiskReadBytes(pid int) (readBytes uint64)
-
-	DiskNumberWrite(pid int) (write uint64)
-	DiskWriteBytes(pid int) (writeBytes uint64)
 
 	// returns number of bytes available in the db volume
 	AvailableDiskBytes() uint64
@@ -84,6 +78,8 @@ type manager struct {
 
 	closeOnce sync.Once
 	onClose   chan struct{}
+
+	processMetrics *metrics
 }
 
 func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) Manager {
@@ -92,6 +88,11 @@ func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Durat
 		onClose:            make(chan struct{}),
 		availableDiskBytes: math.MaxUint64,
 	}
+
+	metricsRegisterer := prometheus.NewRegistry()
+	processMetrics, _ := newMetrics("System resources", metricsRegisterer, m.processes)
+	m.processMetrics = processMetrics
+
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
 	return m
 }
@@ -101,13 +102,6 @@ func (m *manager) CPUUsage() float64 {
 	defer m.usageLock.RUnlock()
 
 	return m.cpuUsage
-}
-
-func (m *manager) CPUCycles(pid int) float64 {
-	m.usageLock.RLock()
-	defer m.usageLock.RUnlock()
-
-	return m.processes[pid].cpuCycles
 }
 
 func (m *manager) DiskUsage() (float64, float64) {
@@ -230,6 +224,14 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 		totalCPU += cpu
 		totalRead += read
 		totalWrite += write
+
+		processIDStr := strconv.Itoa(int(p.p.Pid))
+		m.processMetrics.numCPUCycles.WithLabelValues(processIDStr).Set(p.cpuCycles)
+		m.processMetrics.numDiskReads.WithLabelValues(processIDStr).Set(float64(p.read))
+		m.processMetrics.numDiskReadBytes.WithLabelValues(processIDStr).Set(float64(p.lastReadBytes))
+		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.write))
+		m.processMetrics.numDiskWritesBytes.WithLabelValues(processIDStr).Set(float64(p.lastWriteBytes))
+
 	}
 
 	return totalCPU, totalRead, totalWrite
