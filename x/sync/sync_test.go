@@ -68,7 +68,6 @@ func Test_Creation(t *testing.T) {
 func Test_Completion(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		emptyDB, err := merkledb.New(
 			context.Background(),
@@ -109,6 +108,8 @@ func Test_Completion(t *testing.T) {
 		require.Equal(t, 0, syncer.unprocessedWork.Len())
 		require.Equal(t, 1, syncer.processedWork.Len())
 		syncer.workLock.Unlock()
+
+		ctrl.Finish()
 	}
 }
 
@@ -278,6 +279,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	})
+	require.NoError(t, err)
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
 	noExtraNodeProof, err := db.GetProof(context.Background(), []byte{0x12})
@@ -298,7 +300,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x13}, nextKey)
 
-	// extra node gets deleted and the remaining prefix node is outside of the range, so default back to the searchKey
+	// extra node gets deleted and the remaining prefix node is not in the range, so default back to the lastReceivedKey
 	nextKey, err = syncer.findNextKey(context.Background(), &syncWorkItem{start: []byte{0x11}, end: []byte{0x20}}, []byte{0x11}, extraNodeProof.Path)
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x11}, nextKey)
