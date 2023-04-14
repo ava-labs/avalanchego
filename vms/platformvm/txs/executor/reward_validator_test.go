@@ -249,12 +249,15 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
+	delegator := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  delStartTime,
+		End:    delEndTime,
+		Wght:   env.config.MinDelegatorStake,
+	}
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		delStartTime,
-		delEndTime,
-		vdrNodeID,
+		delegator,
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
@@ -376,12 +379,15 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
+	delegator := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  delStartTime,
+		End:    delEndTime,
+		Wght:   env.config.MinDelegatorStake,
+	}
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		delStartTime,
-		delEndTime,
-		vdrNodeID,
+		delegator,
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, /*=changeAddr*/
@@ -600,12 +606,15 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
+	delegator := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  delStartTime,
+		End:    delEndTime,
+		Wght:   env.config.MinDelegatorStake,
+	}
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		delStartTime,
-		delEndTime,
-		vdrNodeID,
+		delegator,
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
@@ -766,11 +775,15 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
+	delegator := txs.Validator{
+		NodeID: vdrNodeID,
+		Start:  delStartTime,
+		End:    delEndTime,
+		Wght:   env.config.MinDelegatorStake,
+	}
+
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		delStartTime,
-		delEndTime,
-		vdrNodeID,
+		delegator,
 		delRewardAddress,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,

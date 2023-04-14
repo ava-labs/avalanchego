@@ -41,18 +41,18 @@ func (m *MockBuilder) EXPECT() *MockBuilderMockRecorder {
 }
 
 // NewAddDelegatorTx mocks base method.
-func (m *MockBuilder) NewAddDelegatorTx(arg0, arg1, arg2 uint64, arg3 ids.NodeID, arg4 ids.ShortID, arg5 []*secp256k1.PrivateKey, arg6 ids.ShortID) (*txs.Tx, error) {
+func (m *MockBuilder) NewAddDelegatorTx(arg0 txs.Validator, arg1 ids.ShortID, arg2 []*secp256k1.PrivateKey, arg3 ids.ShortID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewAddDelegatorTx", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	ret := m.ctrl.Call(m, "NewAddDelegatorTx", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*txs.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewAddDelegatorTx indicates an expected call of NewAddDelegatorTx.
-func (mr *MockBuilderMockRecorder) NewAddDelegatorTx(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
+func (mr *MockBuilderMockRecorder) NewAddDelegatorTx(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddDelegatorTx", reflect.TypeOf((*MockBuilder)(nil).NewAddDelegatorTx), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddDelegatorTx", reflect.TypeOf((*MockBuilder)(nil).NewAddDelegatorTx), arg0, arg1, arg2, arg3)
 }
 
 // NewAddSubnetValidatorTx mocks base method.

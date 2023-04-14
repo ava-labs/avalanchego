@@ -108,18 +108,12 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
-	// stakeAmount: amount the delegator stakes
-	// startTime: unix time they start delegating
-	// endTime: unix time they stop delegating
-	// nodeID: ID of the node we are delegating to
+	// delegator: the features of the delegator (nodeID, stakeAmount, duration)
 	// rewardAddress: address to send reward to, if applicable
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
-		stakeAmount,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
+		delegator txs.Validator,
 		rewardAddress ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -426,7 +420,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, validator.Wght, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(b.state, keys, validator.Weight(), b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -455,15 +449,12 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
-	stakeAmount,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
+	delegator txs.Validator,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(b.state, keys, delegator.Weight(), b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -475,12 +466,7 @@ func (b *builder) NewAddDelegatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmount,
-		},
+		Validator: delegator,
 		StakeOuts: lockedOuts,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,

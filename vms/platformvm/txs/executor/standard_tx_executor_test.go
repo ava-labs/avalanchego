@@ -346,11 +346,14 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				require.NoError(shutdownEnvironment(freshTH))
 			}()
 
+			delegator := txs.Validator{
+				NodeID: tt.nodeID,
+				Start:  tt.startTime,
+				End:    tt.endTime,
+				Wght:   tt.stakeAmount,
+			}
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
-				tt.stakeAmount,
-				tt.startTime,
-				tt.endTime,
-				tt.nodeID,
+				delegator,
 				tt.rewardAddress,
 				tt.feeKeys,
 				ids.ShortEmpty,

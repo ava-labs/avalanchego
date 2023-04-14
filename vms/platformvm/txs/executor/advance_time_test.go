@@ -672,12 +672,15 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
+	delegator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(pendingDelegatorStartTime.Unix()),
+		End:    uint64(pendingDelegatorEndTime.Unix()),
+		Wght:   env.config.MinDelegatorStake,
+	}
 
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		uint64(pendingDelegatorStartTime.Unix()),
-		uint64(pendingDelegatorEndTime.Unix()),
-		nodeID,
+		delegator,
 		preFundedKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{
 			preFundedKeys[0],
@@ -775,11 +778,14 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
+	delegator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(pendingDelegatorStartTime.Unix()),
+		End:    uint64(pendingDelegatorEndTime.Unix()),
+		Wght:   env.config.MinDelegatorStake,
+	}
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		uint64(pendingDelegatorStartTime.Unix()),
-		uint64(pendingDelegatorEndTime.Unix()),
-		nodeID,
+		delegator,
 		preFundedKeys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1], preFundedKeys[4]},
 		ids.ShortEmpty,

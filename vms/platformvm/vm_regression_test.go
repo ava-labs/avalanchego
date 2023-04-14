@@ -91,11 +91,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
+	delegator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(firstDelegatorStartTime.Unix()),
+		End:    uint64(firstDelegatorEndTime.Unix()),
+		Wght:   4 * vm.MinValidatorStake, // maximum amount of stake this delegator can provide
+	}
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
-		uint64(firstDelegatorStartTime.Unix()),
-		uint64(firstDelegatorEndTime.Unix()),
-		nodeID,
+		delegator,
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
@@ -125,11 +128,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
 
 	// create valid tx
+	delegator = txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(secondDelegatorStartTime.Unix()),
+		End:    uint64(secondDelegatorEndTime.Unix()),
+		Wght:   vm.MinDelegatorStake,
+	}
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(secondDelegatorStartTime.Unix()),
-		uint64(secondDelegatorEndTime.Unix()),
-		nodeID,
+		delegator,
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[3]},
 		changeAddr,
@@ -149,11 +155,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
+	delegator = txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(thirdDelegatorStartTime.Unix()),
+		End:    uint64(thirdDelegatorEndTime.Unix()),
+		Wght:   vm.MinDelegatorStake,
+	}
 	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(thirdDelegatorStartTime.Unix()),
-		uint64(thirdDelegatorEndTime.Unix()),
-		nodeID,
+		delegator,
 		changeAddr,
 		[]*secp256k1.PrivateKey{keys[0], keys[1], keys[4]},
 		changeAddr,
@@ -252,11 +261,14 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
+			delegator := txs.Validator{
+				NodeID: ids.NodeID(id),
+				Start:  uint64(delegator1StartTime.Unix()),
+				End:    uint64(delegator1EndTime.Unix()),
+				Wght:   delegator1Stake,
+			}
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-				delegator1Stake,
-				uint64(delegator1StartTime.Unix()),
-				uint64(delegator1EndTime.Unix()),
-				ids.NodeID(id),
+				delegator,
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
@@ -275,11 +287,14 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
+			delegator = txs.Validator{
+				NodeID: ids.NodeID(id),
+				Start:  uint64(delegator2StartTime.Unix()),
+				End:    uint64(delegator2EndTime.Unix()),
+				Wght:   delegator2Stake,
+			}
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-				delegator2Stake,
-				uint64(delegator2StartTime.Unix()),
-				uint64(delegator2EndTime.Unix()),
-				ids.NodeID(id),
+				delegator,
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
@@ -298,11 +313,14 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
+			delegator = txs.Validator{
+				NodeID: ids.NodeID(id),
+				Start:  uint64(delegator3StartTime.Unix()),
+				End:    uint64(delegator3EndTime.Unix()),
+				Wght:   delegator3Stake,
+			}
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-				delegator3Stake,
-				uint64(delegator3StartTime.Unix()),
-				uint64(delegator3EndTime.Unix()),
-				ids.NodeID(id),
+				delegator,
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
@@ -321,11 +339,14 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
+			delegator = txs.Validator{
+				NodeID: ids.NodeID(id),
+				Start:  uint64(delegator4StartTime.Unix()),
+				End:    uint64(delegator4EndTime.Unix()),
+				Wght:   delegator4Stake,
+			}
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-				delegator4Stake,
-				uint64(delegator4StartTime.Unix()),
-				uint64(delegator4EndTime.Unix()),
-				ids.NodeID(id),
+				delegator,
 				keys[0].PublicKey().Address(),
 				[]*secp256k1.PrivateKey{keys[0], keys[1]},
 				changeAddr,
@@ -1253,11 +1274,14 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
+	delegator := txs.Validator{
+		NodeID: ids.NodeID(id),
+		Start:  uint64(delegator1StartTime.Unix()),
+		End:    uint64(delegator1EndTime.Unix()),
+		Wght:   delegator1Stake,
+	}
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator1Stake,
-		uint64(delegator1StartTime.Unix()),
-		uint64(delegator1EndTime.Unix()),
-		ids.NodeID(id),
+		delegator,
 		keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
@@ -1276,11 +1300,14 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
+	delegator = txs.Validator{
+		NodeID: ids.NodeID(id),
+		Start:  uint64(delegator2StartTime.Unix()),
+		End:    uint64(delegator2EndTime.Unix()),
+		Wght:   delegator2Stake,
+	}
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
-		delegator2Stake,
-		uint64(delegator2StartTime.Unix()),
-		uint64(delegator2EndTime.Unix()),
-		ids.NodeID(id),
+		delegator,
 		keys[0].PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,

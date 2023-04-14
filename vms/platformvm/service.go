@@ -1346,14 +1346,17 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 	}
 
 	// Create the transaction
+	delegator := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(args.StartTime),
+		End:    uint64(args.EndTime),
+		Wght:   uint64(args.Weight),
+	}
 	tx, err := s.vm.txBuilder.NewAddDelegatorTx(
-		uint64(args.Weight),    // Stake amount
-		uint64(args.StartTime), // Start time
-		uint64(args.EndTime),   // End time
-		nodeID,                 // Node ID
-		rewardAddress,          // Reward Address
-		privKeys.Keys,          // Private keys
-		changeAddr,             // Change address
+		delegator,
+		rewardAddress, // Reward Address
+		privKeys.Keys, // Private keys
+		changeAddr,    // Change address
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
