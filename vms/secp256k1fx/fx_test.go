@@ -296,7 +296,7 @@ func TestFxVerifyTransferWrongAmounts(t *testing.T) {
 		},
 	}
 
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrMismatchedAmounts)
 }
 
 func TestFxVerifyTransferTimelocked(t *testing.T) {
@@ -479,7 +479,7 @@ func TestFxVerifyTransferInvalidSignature(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out), errAddrsNotSortedUnique)
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), secp256k1.ErrInvalidSig)
 }
 
 func TestFxVerifyTransferWrongSigner(t *testing.T) {
@@ -518,7 +518,7 @@ func TestFxVerifyTransferWrongSigner(t *testing.T) {
 
 	require.NoError(fx.VerifyTransfer(tx, in, cred, out))
 	require.NoError(fx.Bootstrapped())
-	require.Error(fx.VerifyTransfer(tx, in, cred, out))
+	require.ErrorIs(fx.VerifyTransfer(tx, in, cred, out), ErrWrongSig)
 }
 
 func TestFxVerifyTransferSigIndexOOB(t *testing.T) {
