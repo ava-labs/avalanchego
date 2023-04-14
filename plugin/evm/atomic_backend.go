@@ -57,7 +57,7 @@ type AtomicBackend interface {
 
 	// Syncer creates and returns a new Syncer object that can be used to sync the
 	// state of the atomic trie from peers
-	Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64) (Syncer, error)
+	Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (Syncer, error)
 
 	// SetLastAccepted is used after state-sync to reset the last accepted block.
 	SetLastAccepted(lastAcceptedHash common.Hash)
@@ -325,8 +325,8 @@ func (a *atomicBackend) MarkApplyToSharedMemoryCursor(previousLastAcceptedHeight
 
 // Syncer creates and returns a new Syncer object that can be used to sync the
 // state of the atomic trie from peers
-func (a *atomicBackend) Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64) (Syncer, error) {
-	return newAtomicSyncer(client, a, targetRoot, targetHeight)
+func (a *atomicBackend) Syncer(client syncclient.LeafClient, targetRoot common.Hash, targetHeight uint64, requestSize uint16) (Syncer, error) {
+	return newAtomicSyncer(client, a, targetRoot, targetHeight, requestSize)
 }
 
 func (a *atomicBackend) GetVerifiedAtomicState(blockHash common.Hash) (AtomicState, error) {
