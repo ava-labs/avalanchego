@@ -28,6 +28,7 @@ import (
 var (
 	_ Handler = (*handler)(nil)
 
+	ErrInsufficientFunds            = errors.New("insufficient funds")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
@@ -371,8 +372,9 @@ func (h *handler) Spend(
 
 	if amountBurned < fee || amountStaked < amount {
 		return nil, nil, nil, nil, fmt.Errorf(
-			"provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
-			amountBurned, amountStaked, fee, amount)
+			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
+			ErrInsufficientFunds, amountBurned, amountStaked, fee, amount,
+		)
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys

@@ -52,7 +52,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.Error(err, "should have erred because a sig is missing")
+	require.ErrorIs(err, errUnauthorizedSubnetModification)
 }
 
 // Ensure Execute fails when an incorrect control signature is given
@@ -94,7 +94,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.Error(err, "should have failed verification because a sig is invalid")
+	require.ErrorIs(err, errUnauthorizedSubnetModification)
 }
 
 // Ensure Execute fails when the Subnet the blockchain specifies as
@@ -129,7 +129,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.Error(err, "should have failed because subnet doesn't exist")
+	require.ErrorIs(err, errCantFindSubnet)
 }
 
 // Ensure valid tx passes semanticVerify
