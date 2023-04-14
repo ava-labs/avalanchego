@@ -29,8 +29,6 @@ func (s *StakerListener) OnValidatorAdded(
 ) {
 	for _, chainID := range s.Subnet.GetChains() {
 		msg := message.InternalStaked(nodeID, chainID, txID)
-		// TODO make sure these aren't dropped in the handler, similar to
-		//  connected and disconnected
 		s.Router.HandleInbound(context.TODO(), msg)
 	}
 }
