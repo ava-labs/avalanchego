@@ -32,7 +32,7 @@ jobs:
           cargo login ${{ secrets.CARGO_TOKEN }}
           cargo publish -p firewood-growth-ring
       - name: publish firewood crate
-        continue-on-error: true
+        continue-on-error: false
         run: |
           cargo login ${{ secrets.CARGO_TOKEN }}
           cargo publish -p firewood
