@@ -700,7 +700,6 @@ func (t *trieView) invalidateChildrenExcept(exception *trieView) {
 			childView.invalidate()
 		}
 	}
-
 }
 
 // GetMerkleRoot returns the ID of the root of this trie.
