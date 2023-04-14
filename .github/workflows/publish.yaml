@@ -16,6 +16,21 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: publish shale crate
+        continue-on-error: true
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-shale
+      - name: publish libaio crate
+        continue-on-error: true
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-libaio
+      - name: publish growth-ring crate
+        continue-on-error: true
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-growth-ring
       - name: publish firewood crate
         continue-on-error: true
         run: |

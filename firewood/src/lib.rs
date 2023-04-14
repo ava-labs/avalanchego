@@ -205,3 +205,5 @@ pub(crate) mod storage;
 
 pub mod api;
 pub mod service;
+
+extern crate firewood_shale as shale;

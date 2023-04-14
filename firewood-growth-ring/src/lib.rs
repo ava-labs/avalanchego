@@ -50,8 +50,8 @@ extern crate scan_fmt;
 pub mod wal;
 pub mod walerror;
 
-use aiofut::{AIOBuilder, AIOManager};
 use async_trait::async_trait;
+use firewood_libaio::{AIOBuilder, AIOManager};
 use libc::off_t;
 #[cfg(target_os = "linux")]
 use nix::fcntl::{fallocate, open, openat, FallocateFlags, OFlag};

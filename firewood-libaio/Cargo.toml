@@ -1,9 +1,7 @@
 [package]
-name = "libaio-futures"
-version = "0.2.3"
-authors = ["Determinant <tederminant@gmail.com>"]
-edition = "2018"
-homepage = "https://github.com/Determinant/libaio-futures"
+name = "firewood-libaio"
+version = "0.0.1"
+edition = "2021"
 keywords = ["libaio", "aio", "async", "futures"]
 license = "MIT"
 description = "Straightforward Linux AIO using Futures/async/await."

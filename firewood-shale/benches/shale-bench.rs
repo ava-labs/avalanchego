@@ -1,5 +1,6 @@
 use bencher::{benchmark_group, benchmark_main, Bencher};
 
+extern crate firewood_shale as shale;
 use rand::Rng;
 use shale::{compact::CompactSpaceHeader, MemStore, MummyObj, ObjPtr, PlainMem};
 

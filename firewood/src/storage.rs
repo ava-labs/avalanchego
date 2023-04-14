@@ -11,13 +11,17 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use aiofut::{AIOBuilder, AIOManager};
-use growthring::{
+use firewood_libaio::{AIOBuilder, AIOManager};
+
+extern crate firewood_growth_ring as growth_ring;
+use growth_ring::{
     wal::{RecoverPolicy, WALError, WALLoader, WALWriter},
     WALStoreAIO,
 };
-use nix::fcntl::{flock, FlockArg};
+
 use shale::{MemStore, MemView, SpaceID};
+
+use nix::fcntl::{flock, FlockArg};
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
@@ -75,8 +79,8 @@ impl Ash {
 #[derive(Debug)]
 pub struct AshRecord(pub HashMap<SpaceID, Ash>);
 
-impl growthring::wal::Record for AshRecord {
-    fn serialize(&self) -> growthring::wal::WALBytes {
+impl growth_ring::wal::Record for AshRecord {
+    fn serialize(&self) -> growth_ring::wal::WALBytes {
         let mut bytes = Vec::new();
         bytes.extend((self.0.len() as u64).to_le_bytes());
         for (space_id, w) in self.0.iter() {
@@ -95,7 +99,7 @@ impl growthring::wal::Record for AshRecord {
 
 impl AshRecord {
     #[allow(clippy::boxed_local)]
-    fn deserialize(raw: growthring::wal::WALBytes) -> Self {
+    fn deserialize(raw: growth_ring::wal::WALBytes) -> Self {
         let mut r = &raw[..];
         let len = u64::from_le_bytes(r[..8].try_into().unwrap());
         r = &r[8..];
