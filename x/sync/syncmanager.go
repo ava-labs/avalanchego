@@ -362,7 +362,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 }
 
 // findNextKey attempts to find what key to query next based on the differences between
-// the proof of the search key in the local trie vs proof for the search key recently received by the sync manager.
+// the proof of the last received key in the local trie vs proof for the last received key recently received by the sync manager.
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
 	workItem *syncWorkItem,
@@ -371,11 +371,11 @@ func (m *StateSyncManager) findNextKey(
 ) ([]byte, error) {
 	lastReceivedKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
 
-	// If the received proof's last node has a key is after the searchKey, this is an exclusion proof.
-	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the search key
+	// If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
+	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
 	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
-		// if the new last proof key is before the start of the range, then fallback to the searchKey as the next key
+		// if the new last proof key is before the start of the range, then fallback to the lastReceivedKey as the next key
 		if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, workItem.start) < 0 {
 			return lastReceivedKey, nil
 		}
