@@ -7,15 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -841,4 +845,139 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
+}
+
+func TestRewardValidatorTx_Slashing(t *testing.T) {
+	tests := []struct {
+		name     string
+		subnetID ids.ID
+		slash    bool
+		reward   bool
+	}{
+		{
+			name:     "primary slashed",
+			subnetID: constants.PrimaryNetworkID,
+			slash:    true,
+			reward:   true,
+		},
+		{
+			name:     "primary not slashed",
+			subnetID: constants.PrimaryNetworkID,
+			slash:    false,
+			reward:   true,
+		},
+		{
+			name:     "subnet slashed",
+			subnetID: ids.GenerateTestID(),
+			slash:    true,
+			reward:   false,
+		},
+		{
+			name:     "subnet not slashed",
+			subnetID: ids.GenerateTestID(),
+			slash:    false,
+			reward:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			r := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			stakerToRemove := &state.Staker{
+				TxID:            ids.GenerateTestID(),
+				NodeID:          ids.GenerateTestNodeID(),
+				SubnetID:        test.subnetID,
+				PotentialReward: 0,
+			}
+
+			rewardValidatorTx := &txs.RewardValidatorTx{
+				TxID: stakerToRemove.TxID,
+			}
+
+			tx := &txs.Tx{
+				Unsigned: &txs.AddPermissionlessValidatorTx{
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: ids.GenerateTestID(),
+							},
+							FxID: ids.GenerateTestID(),
+							Out:  &secp256k1fx.TransferOutput{},
+						},
+					},
+				},
+			}
+
+			onCommitState := state.NewMockDiff(ctrl)
+			onAbortState := state.NewMockDiff(ctrl)
+
+			// set up our mock staker that just finished its staking period
+			currentStakerIterator := state.NewMockStakerIterator(ctrl)
+			currentStakerIterator.EXPECT().Next().Return(true)
+			currentStakerIterator.EXPECT().Value().Return(stakerToRemove)
+			currentStakerIterator.EXPECT().Release()
+			onCommitState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
+
+			// staker just completed its staking period
+			onCommitState.EXPECT().GetTimestamp().Return(stakerToRemove.EndTime)
+			onCommitState.EXPECT().GetCurrentValidator(
+				constants.PrimaryNetworkID,
+				stakerToRemove.NodeID,
+			).Return(stakerToRemove, nil)
+			onCommitState.EXPECT().GetTx(stakerToRemove.TxID).Return(tx, status.Committed, nil)
+
+			// staker should be removed from the staker set regardless of
+			// whether it receives a reward
+			onCommitState.EXPECT().DeleteCurrentValidator(stakerToRemove)
+			onAbortState.EXPECT().DeleteCurrentValidator(stakerToRemove)
+
+			onCommitState.EXPECT().AddUTXO(gomock.Any())
+			onAbortState.EXPECT().AddUTXO(gomock.Any())
+
+			onCommitState.EXPECT().GetDelegateeReward(stakerToRemove.SubnetID, stakerToRemove.NodeID).Return(uint64(0), nil)
+
+			onAbortState.EXPECT().GetCurrentSupply(stakerToRemove.SubnetID).Return(uint64(0), nil)
+			onAbortState.EXPECT().SetCurrentSupply(stakerToRemove.SubnetID, uint64(0))
+
+			if test.subnetID != constants.PrimaryNetworkID {
+				transformSubnetTx := &txs.Tx{
+					Unsigned: &txs.TransformSubnetTx{
+						UptimeRequirement: 0,
+					},
+				}
+				onCommitState.EXPECT().GetSubnetTransformation(stakerToRemove.SubnetID).Return(transformSubnetTx, nil)
+			}
+
+			mockUptime := state.NewMockState(ctrl)
+			mockUptime.EXPECT().GetUptime(stakerToRemove.NodeID, constants.PrimaryNetworkID)
+
+			ctx := snow.DefaultContextTest()
+
+			if test.slash {
+				r.NoError(ctx.Slasher.Slash(stakerToRemove.NodeID, stakerToRemove.TxID, stakerToRemove.SubnetID, "foobar"))
+			}
+
+			executor := ProposalTxExecutor{
+				Backend: &Backend{
+					Config: &config.Config{
+						UptimePercentage: 0,
+					},
+					Ctx:     ctx,
+					Uptimes: uptime.NewManager(mockUptime),
+				},
+				Tx:            tx,
+				OnCommitState: onCommitState,
+				OnAbortState:  onAbortState,
+				PrefersCommit: false,
+			}
+
+			err := executor.RewardValidatorTx(rewardValidatorTx)
+			r.NoError(err)
+
+			r.Equal(test.reward, executor.PrefersCommit)
+		})
+	}
 }
