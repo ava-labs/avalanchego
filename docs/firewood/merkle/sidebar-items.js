@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":[["MerkleError",""]],"fn":[["from_nibbles",""],["to_nibbles",""]],"struct":[["Hash",""],["IdTrans",""],["Merkle",""],["Node",""],["PartialPath","PartialPath keeps a list of nibbles to represent a path on the MPT."],["Ref",""],["RefMut",""]],"trait":[["ValueTransformer",""]]};
