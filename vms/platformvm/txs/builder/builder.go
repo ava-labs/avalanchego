@@ -127,11 +127,7 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for adding the validator
 	// changeAddr: address to send change to, if there is any
 	NewAddSubnetValidatorTx(
-		weight,
-		startTime,
-		endTime uint64,
-		nodeID ids.NodeID,
-		subnetID ids.ID,
+		subnetValidator txs.SubnetValidator,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
@@ -482,11 +478,7 @@ func (b *builder) NewAddDelegatorTx(
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
-	weight,
-	startTime,
-	endTime uint64,
-	nodeID ids.NodeID,
-	subnetID ids.ID,
+	subnetValidator txs.SubnetValidator,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
@@ -495,7 +487,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetValidator.SubnetID(), keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
@@ -509,16 +501,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		SubnetValidator: txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				Start:  startTime,
-				End:    endTime,
-				Wght:   weight,
-			},
-			Subnet: subnetID,
-		},
-		SubnetAuth: subnetAuth,
+		SubnetValidator: subnetValidator,
+		SubnetAuth:      subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, txs.Version, signers)
 	if err != nil {

@@ -1384,12 +1384,17 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
+	subnetValidator := txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: ids.NodeID(id),
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   defaultMaxValidatorStake,
+		},
+		Subnet: createSubnetTx.ID(),
+	}
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
-		createSubnetTx.ID(),
+		subnetValidator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 	)
@@ -1517,12 +1522,17 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	added := vm.Validators.Add(createSubnetTx.ID(), subnetValidators)
 	require.True(added)
 
+	subnetValidator := txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: ids.NodeID(id),
+			Start:  uint64(validatorStartTime.Unix()),
+			End:    uint64(validatorEndTime.Unix()),
+			Wght:   defaultMaxValidatorStake,
+		},
+		Subnet: createSubnetTx.ID(),
+	}
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		defaultMaxValidatorStake,
-		uint64(validatorStartTime.Unix()),
-		uint64(validatorEndTime.Unix()),
-		ids.NodeID(id),
-		createSubnetTx.ID(),
+		subnetValidator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		changeAddr,
 	)

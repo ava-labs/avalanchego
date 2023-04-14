@@ -597,12 +597,18 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
+				subnetValidator := txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: subStaker.nodeID,
+						Start:  uint64(subStaker.startTime.Unix()),
+						End:    uint64(subStaker.endTime.Unix()),
+						Wght:   10,
+					},
+					Subnet: subnetID,
+				}
+
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-					10, // Weight
-					uint64(subStaker.startTime.Unix()),
-					uint64(subStaker.endTime.Unix()),
-					subStaker.nodeID, // validator ID
-					subnetID,         // Subnet ID
+					subnetValidator,
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
 				)
@@ -728,12 +734,18 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Starts after the corre
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	subnetValidator := txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: subnetValidatorNodeID,
+			Start:  uint64(subnetVdr1StartTime.Unix()),
+			End:    uint64(subnetVdr1EndTime.Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	}
+
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-		1,                                  // Weight
-		uint64(subnetVdr1StartTime.Unix()), // Start time
-		uint64(subnetVdr1EndTime.Unix()),   // end time
-		subnetValidatorNodeID,              // Node ID
-		subnetID,                           // Subnet ID
+		subnetValidator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -754,12 +766,18 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
+	subnetValidator = txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: subnetVdr2NodeID,
+			Start:  uint64(subnetVdr1EndTime.Add(time.Second).Unix()),
+			End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	}
+
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
-		1, // Weight
-		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
-		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
-		subnetVdr2NodeID, // Node ID
-		subnetID,         // Subnet ID
+		subnetValidator,
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -872,12 +890,18 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			subnetValidator := txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: subnetValidatorNodeID,
+					Start:  uint64(subnetVdr1StartTime.Unix()),
+					End:    uint64(subnetVdr1EndTime.Unix()),
+					Wght:   1,
+				},
+				Subnet: subnetID,
+			}
+
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-				1,                                  // Weight
-				uint64(subnetVdr1StartTime.Unix()), // Start time
-				uint64(subnetVdr1EndTime.Unix()),   // end time
-				subnetValidatorNodeID,              // Node ID
-				subnetID,                           // Subnet ID
+				subnetValidator,
 				[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
 			)

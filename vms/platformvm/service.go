@@ -1454,12 +1454,17 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 	}
 
 	// Create the transaction
+	subnetValidator := txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: args.NodeID,
+			Start:  uint64(args.StartTime),
+			End:    uint64(args.EndTime),
+			Wght:   uint64(args.Weight),
+		},
+		Subnet: subnetID,
+	}
 	tx, err := s.vm.txBuilder.NewAddSubnetValidatorTx(
-		uint64(args.Weight),    // Stake amount
-		uint64(args.StartTime), // Start time
-		uint64(args.EndTime),   // End time
-		args.NodeID,            // Node ID
-		subnetID,               // Subnet ID
+		subnetValidator,
 		keys.Keys,
 		changeAddr,
 	)
