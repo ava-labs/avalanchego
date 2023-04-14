@@ -289,11 +289,10 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 			state := tt.stateF(ctrl)
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
+			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.Equal(tt.expectedErr, err)
 				return
 			}
-			require.NoError(err)
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
 		})

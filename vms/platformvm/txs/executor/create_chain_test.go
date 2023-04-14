@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -167,28 +168,28 @@ func TestCreateChainTxValid(t *testing.T) {
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	ap3Time := defaultGenesisTime.Add(time.Hour)
 	tests := []struct {
-		name         string
-		time         time.Time
-		fee          uint64
-		expectsError bool
+		name          string
+		time          time.Time
+		fee           uint64
+		expectedError error
 	}{
 		{
-			name:         "pre-fork - correctly priced",
-			time:         defaultGenesisTime,
-			fee:          0,
-			expectsError: false,
+			name:          "pre-fork - correctly priced",
+			time:          defaultGenesisTime,
+			fee:           0,
+			expectedError: nil,
 		},
 		{
-			name:         "post-fork - incorrectly priced",
-			time:         ap3Time,
-			fee:          100*defaultTxFee - 1*units.NanoAvax,
-			expectsError: true,
+			name:          "post-fork - incorrectly priced",
+			time:          ap3Time,
+			fee:           100*defaultTxFee - 1*units.NanoAvax,
+			expectedError: utxo.ErrMustBurnMore,
 		},
 		{
-			name:         "post-fork - correctly priced",
-			time:         ap3Time,
-			fee:          100 * defaultTxFee,
-			expectsError: false,
+			name:          "post-fork - correctly priced",
+			time:          ap3Time,
+			fee:           100 * defaultTxFee,
+			expectedError: nil,
 		},
 	}
 	for _, test := range tests {
@@ -237,7 +238,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			require.Equal(test.expectsError, err != nil)
+			require.ErrorIs(err, test.expectedError)
 		})
 	}
 }

@@ -29,6 +29,7 @@ var (
 	_ Handler = (*handler)(nil)
 
 	ErrInsufficientFunds            = errors.New("insufficient funds")
+	ErrMustBurnMore                 = errors.New("tx must burn more unlocked tokens")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
@@ -650,10 +651,10 @@ func (h *handler) VerifySpendUTXOs(
 		// More unlocked tokens produced than consumed. Invalid.
 		if unlockedProducedAsset > unlockedConsumedAsset {
 			return fmt.Errorf(
-				"tx produces more unlocked %q (%d) than it consumes (%d)",
+				"%w: %d %s",
+				ErrMustBurnMore,
+				unlockedProducedAsset-unlockedConsumedAsset,
 				assetID,
-				unlockedProducedAsset,
-				unlockedConsumedAsset,
 			)
 		}
 	}
