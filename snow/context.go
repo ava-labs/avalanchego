@@ -95,6 +95,9 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
+
+	// Subnet's stake this node must be	connected to in order to report healthy.
+	MinPercentConnectedStakeHealthy float64
 }
 
 func DefaultContextTest() *Context {

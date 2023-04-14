@@ -96,6 +96,7 @@ func TestShutdown(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		tracker.NewPeers(),
 	)
 	require.NoError(t, err)
 

@@ -1443,8 +1443,14 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters),
 	}
 
-	for subnetID, config := range subnetConfigs {
-		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters.Parameters)
+	// Invariant: nodeConfig.MinPercentConnectedStakeHealthy is populated for all tracked subnets
+	// including the primary network
+	for _, subnetID := range nodeConfig.TrackedSubnets.List() {
+		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
+			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(subnetConfig.ConsensusParameters.Parameters)
+		} else {
+			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters)
+		}
 	}
 
 	// Chain Configs

@@ -17,6 +17,8 @@ type metrics struct {
 	expired      prometheus.Counter
 	asyncExpired prometheus.Counter
 	messages     map[message.Op]*messageProcessing
+
+	percentConnected prometheus.Gauge
 }
 
 type messageProcessing struct {
@@ -37,9 +39,20 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 		Name:      "async_expired",
 		Help:      "Incoming async messages dropped because the message deadline expired",
 	})
+	// TODO: remove this comment
+	// This was in PlatformVM code before, and it was forced initialized to 0
+	// for each subnet. Moving this here means this will be initialized
+	// for per chain.
+	percentConnected := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "percent_connected",
+		Help:      "Percent of connected stake",
+	})
+
 	errs.Add(
 		reg.Register(expired),
 		reg.Register(asyncExpired),
+		reg.Register(percentConnected),
 	)
 
 	messages := make(map[message.Op]*messageProcessing, len(message.ConsensusOps))
@@ -65,8 +78,13 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	}
 
 	return &metrics{
-		expired:      expired,
-		asyncExpired: asyncExpired,
-		messages:     messages,
+		expired:          expired,
+		asyncExpired:     asyncExpired,
+		messages:         messages,
+		percentConnected: percentConnected,
 	}, errs.Err
+}
+
+func (m *metrics) SetPercentConnected(percent float64) {
+	m.percentConnected.Set(percent)
 }

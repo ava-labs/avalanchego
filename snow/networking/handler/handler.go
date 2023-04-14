@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -111,6 +113,9 @@ type handler struct {
 	subnetConnector validators.SubnetConnector
 
 	subnetAllower subnets.Allower
+
+	// Tracks the peers that are currently connected to this subnet
+	peerTracker commontracker.Peers
 }
 
 // Initialize this consensus handler
@@ -124,6 +129,7 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
+	peerTracker commontracker.Peers,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -138,6 +144,7 @@ func New(
 		resourceTracker:  resourceTracker,
 		subnetConnector:  subnetConnector,
 		subnetAllower:    subnet,
+		peerTracker:      peerTracker,
 	}
 
 	var err error
@@ -263,7 +270,37 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 			state.Type,
 		)
 	}
-	return engine.HealthCheck(ctx)
+	engineIntf, engineErr := engine.HealthCheck(ctx)
+	networkingIntf, networkingErr := h.networkHealthCheck()
+	intf := map[string]interface{}{
+		"engine":     engineIntf,
+		"networking": networkingIntf,
+	}
+	if engineErr == nil {
+		return intf, networkingErr
+	}
+	if networkingErr == nil {
+		return intf, engineErr
+	}
+	return intf, fmt.Errorf("engine: %w ; networking: %v", engineErr, networkingErr)
+}
+
+func (h *handler) networkHealthCheck() (interface{}, error) {
+	percentConnected := h.getPercentConnected()
+	details := map[string]float64{
+		"percentConnected": percentConnected,
+	}
+	h.metrics.SetPercentConnected(percentConnected)
+
+	var err error
+	if percentConnected < h.ctx.MinPercentConnectedStakeHealthy {
+		err = fmt.Errorf("connected to %f%% of network stake; should be connected to at least %f%%",
+			percentConnected*100,
+			h.ctx.MinPercentConnectedStakeHealthy*100,
+		)
+	}
+
+	return details, err
 }
 
 // Push the message onto the handler's queue
@@ -720,12 +757,22 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
+		// We can track peers connected to this chain handler or we can
+		// try to get this information from the P-chain.
+		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
+		if err != nil {
+			return err
+		}
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
 		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
+		err := h.peerTracker.Disconnected(ctx, nodeID)
+		if err != nil {
+			return err
+		}
 		return engine.Disconnected(ctx, nodeID)
 
 	default:
@@ -998,4 +1045,14 @@ func (h *handler) shutdown(ctx context.Context) {
 			zap.Error(err),
 		)
 	}
+}
+
+func (h *handler) getPercentConnected() float64 {
+	vdrSetWeight := h.validators.Weight()
+	if vdrSetWeight == 0 {
+		return 1
+	}
+
+	connectedStake := h.peerTracker.ConnectedWeight()
+	return float64(connectedStake) / float64(vdrSetWeight)
 }
