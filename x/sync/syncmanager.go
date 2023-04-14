@@ -266,7 +266,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	if workItem.LocalRootID == rootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, workItem, rootID, nil)
+		m.completeWorkItem(ctx, workItem, workItem.end, rootID, nil)
 		return
 	}
 
@@ -301,28 +301,26 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	// only needs to be set if we actually received key/values
-	var proofOfLargestReceivedKey []merkledb.ProofNode
-
+	largestHandledKey := workItem.end
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
 		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
 			m.setError(err)
 			return
 		}
-		proofOfLargestReceivedKey = changeproof.EndProof
-		if len(changeproof.DeletedKeys) > 0 && (len(changeproof.KeyValues) == 0 ||
-			bytes.Compare(changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1], changeproof.KeyValues[len(changeproof.KeyValues)-1].Key) == 1) {
-			// Since this is a deletion proof, the deleted key will no longer be present in the local db
-			// and this proof is an exclusion proof.
-			// If we remove the last proof node, we end up with a valid proof for a prefix of the deleted key.
-			// Any remaining changes in the range of this change proof have to occur after this prefix,
-			// so we can use it as the starting point of our search for the next different key
-			proofOfLargestReceivedKey = proofOfLargestReceivedKey[:len(proofOfLargestReceivedKey)-1]
+
+		if len(changeproof.KeyValues) > 0 {
+			largestHandledKey = changeproof.KeyValues[len(changeproof.KeyValues)-1].Key
+		}
+		if len(changeproof.DeletedKeys) > 0 {
+			lastDeletedKey := changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1]
+			if len(changeproof.KeyValues) == 0 || bytes.Compare(lastDeletedKey, largestHandledKey) == 1 {
+				largestHandledKey = lastDeletedKey
+			}
 		}
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
+	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeproof.EndProof)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -349,43 +347,50 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	default:
 	}
 
-	// only needs to be set if we actually received key/values
-	var proofOfLargestReceivedKey []merkledb.ProofNode
+	largestHandledKey := workItem.end
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
 		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
-		proofOfLargestReceivedKey = proof.EndProof
+
+		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
-	m.completeWorkItem(ctx, workItem, rootID, proofOfLargestReceivedKey)
+	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
 }
 
-// Attempt to find what key to query next based on the differences between
-// the local trie path to a node and the path recently received.
+// findNextKey attempts to find what key to query next based on the differences between
+// the proof of the search key in the local trie vs proof for the search key recently received by the sync manager.
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
-	end []byte,
+	workItem *syncWorkItem,
+	lastReceivedKey []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
-	if len(receivedProofNodes) == 0 {
-		return nil, nil
+	lastReceivedKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
+
+	// If the received proof's last node has a key is after the searchKey, this is an exclusion proof.
+	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the search key
+	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
+		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
+		// if the new last proof key is before the start of the range, then fallback to the searchKey as the next key
+		if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, workItem.start) < 0 {
+			return lastReceivedKey, nil
+		}
+		lastReceivedKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
 	}
 
-	receivedKeyPath := receivedProofNodes[len(receivedProofNodes)-1].KeyPath
-	// generate a proof for the same key as the passed in proof
-	localProof, err := m.config.SyncDB.GetProof(ctx, receivedKeyPath.Value)
+	proofOfStart, err := m.config.SyncDB.GetProof(ctx, lastReceivedKeyPath.Value)
 	if err != nil {
 		return nil, err
 	}
-	localProofNodes := localProof.Path
+	localProofNodes := proofOfStart.Path
 
-	// If the received key had an odd length, then due to the restriction that proofs are for []byte rather than SerializedPath
-	// the last local proof node might be for the even nibble length version of the key.
+	// If the received key had an odd length, then the proof generated might be for the even length version of the key (since getProof takes []byte).
 	// If that is the case, then remove that last node so that the proof is just for the odd nibble length version of the key
-	if receivedKeyPath.NibbleLength%2 == 1 && !receivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
+	if lastReceivedKeyPath.NibbleLength%2 == 1 && !lastReceivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
@@ -400,8 +405,8 @@ func (m *StateSyncManager) findNextKey(
 		// the two nodes have the same key
 		if localNode.KeyPath.Equal(receivedNode.KeyPath) {
 			startingChildIndex := byte(0)
-			if localNode.KeyPath.NibbleLength < receivedKeyPath.NibbleLength {
-				startingChildIndex = receivedKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
+			if localNode.KeyPath.NibbleLength < lastReceivedKeyPath.NibbleLength {
+				startingChildIndex = lastReceivedKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
 			}
 			// the two nodes have the same path, so ensure that all children have matching ids
 			for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
@@ -437,12 +442,12 @@ func (m *StateSyncManager) findNextKey(
 		// I believe the change to changeproofs when their largest key is a deleted keys fixes this,
 		// but leave this safeguard in place in case I am wrong.
 		// TODO: Figure out the scenario where this can happen and fix
-		if receivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
-			return receivedKeyPath.Value, nil
+		if lastReceivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return lastReceivedKey, nil
 		}
 
 		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := receivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
+		for nextKeyNibble := lastReceivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
 				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
 				break
@@ -450,7 +455,7 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	if result == nil || (len(end) > 0 && bytes.Compare(result, end) >= 0) {
+	if result == nil || (len(workItem.end) > 0 && bytes.Compare(result, workItem.end) >= 0) {
 		return nil, nil
 	}
 
@@ -553,20 +558,24 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, rootID ids.ID, proofOfLargestReceivedKey []merkledb.ProofNode) {
-	// find the next key to start querying by comparing the proofs for the last completed key
-	nextStartKey, err := m.findNextKey(ctx, workItem.end, proofOfLargestReceivedKey)
-	if err != nil {
-		m.setError(err)
-		return
-	}
+func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+	// if the last key is equal to the end, then the full range is completed
+	if !bytes.Equal(largestHandledKey, workItem.end) {
+		// find the next key to start querying by comparing the proofs for the last completed key
+		nextStartKey, err := m.findNextKey(ctx, workItem, largestHandledKey, proofOfLargestKey)
+		if err != nil {
+			m.setError(err)
+			return
+		}
 
-	largestHandledKey := workItem.end
-	// nextStartKey being nil indicates that the entire range has been completed
-	if nextStartKey != nil {
-		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-		m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
-		largestHandledKey = nextStartKey
+		largestHandledKey = workItem.end
+
+		// nextStartKey being nil indicates that the entire range has been completed
+		if nextStartKey != nil {
+			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
+			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
+			largestHandledKey = nextStartKey
+		}
 	}
 
 	// completed the range [workItem.start, lastKey], log and record in the completed work heap
