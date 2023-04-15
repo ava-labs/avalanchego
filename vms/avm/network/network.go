@@ -103,14 +103,17 @@ func (n *network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 		)
 		return nil
 	}
+	txID := tx.ID()
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
+	//
+	// Invariant: tx should not be referenced again without the context lock
+	// held to avoid any data races.
 	n.ctx.Lock.Lock()
 	err = n.issueTx(tx)
 	n.ctx.Lock.Unlock()
 	if err == nil {
-		txID := tx.ID()
 		n.gossipTx(ctx, txID, msgBytes)
 	}
 	return nil
