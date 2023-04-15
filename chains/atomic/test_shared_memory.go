@@ -205,7 +205,7 @@ func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ S
 		},
 	}}})
 	// TODO: require error to be errDuplicatedOperation
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
 	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
@@ -218,7 +218,7 @@ func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ S
 		Value: []byte{1},
 	}}}})
 	// TODO: require error to be errDuplicatedOperation
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
@@ -229,7 +229,7 @@ func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, 
 
 	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
 	// TODO: require error to be errDuplicatedOperation
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
