@@ -34,6 +34,7 @@ var (
 	errOverDelegated                   = errors.New("validator would be over delegated")
 	errIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
 	errTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
+	errAlreadyValidator                = errors.New("already a validator")
 	errDuplicateValidator              = errors.New("duplicate validator")
 	errDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	errWrongStakedAssetID              = errors.New("incorrect staked assetID")
@@ -103,8 +104,9 @@ func verifyAddValidatorTx(
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
-			"attempted to issue duplicate validation for %s",
+			"%s is %w of the primary network",
 			tx.Validator.NodeID,
+			errAlreadyValidator,
 		)
 	}
 	if err != database.ErrNotFound {

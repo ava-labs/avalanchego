@@ -840,7 +840,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should've errored because start time too early")
+		require.ErrorIs(err, errTimestampNotBeforeStartTime)
 	}
 
 	{
@@ -866,37 +866,11 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should've errored because start time too far in the future")
+		require.ErrorIs(err, errFutureStakeTime)
 	}
 
 	{
-		// Case: Validator already validating primary network
-		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix()),
-			uint64(defaultValidateEndTime.Unix()),
-			nodeID,
-			ids.ShortEmpty,
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
-		)
-		require.NoError(err)
-
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		executor := StandardTxExecutor{
-			Backend: &env.backend,
-			State:   onAcceptState,
-			Tx:      tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should've errored because validator already validating")
-	}
-
-	{
-		// Case: Validator in pending validator set of primary network
+		// Case: Validator in current validator set of primary network
 		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,                            // stake amount
@@ -917,15 +891,11 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		env.state.PutCurrentValidator(staker)
-		env.state.AddTx(tx, status.Committed)
-		dummyHeight := uint64(1)
-		env.state.SetHeight(dummyHeight)
-		err = env.state.Commit()
-		require.NoError(err)
-
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
+
+		onAcceptState.PutCurrentValidator(staker)
+		onAcceptState.AddTx(tx, status.Committed)
 
 		executor := StandardTxExecutor{
 			Backend: &env.backend,
@@ -933,15 +903,52 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because validator in pending validator set")
+		require.ErrorIs(err, errAlreadyValidator)
+	}
+
+	{
+		// Case: Validator in pending validator set of primary network
+		startTime := defaultGenesisTime.Add(1 * time.Second)
+		tx, err := env.txBuilder.NewAddValidatorTx(
+			env.config.MinValidatorStake,                            // stake amount
+			uint64(startTime.Unix()),                                // start time
+			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
+			nodeID,
+			ids.ShortEmpty,
+			reward.PercentDenominator, // shares
+			[]*secp256k1.PrivateKey{preFundedKeys[0]},
+			ids.ShortEmpty, // change addr // key
+		)
+		require.NoError(err)
+
+		staker, err := state.NewPendingStaker(
+			tx.ID(),
+			tx.Unsigned.(*txs.AddValidatorTx),
+		)
+		require.NoError(err)
+
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+		require.NoError(err)
+
+		onAcceptState.PutPendingValidator(staker)
+		onAcceptState.AddTx(tx, status.Committed)
+
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		require.ErrorIs(err, errAlreadyValidator)
 	}
 
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
+		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
 			env.config.MinValidatorStake,
-			uint64(defaultValidateStartTime.Unix()),
-			uint64(defaultValidateEndTime.Unix()),
+			uint64(startTime.Unix()),
+			uint64(startTime.Add(defaultMinStakingDuration).Unix()),
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator,
@@ -954,12 +961,12 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		utxoIDs, err := env.state.UTXOIDs(preFundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 		require.NoError(err)
 
-		for _, utxoID := range utxoIDs {
-			env.state.DeleteUTXO(utxoID)
-		}
-
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
+
+		for _, utxoID := range utxoIDs {
+			onAcceptState.DeleteUTXO(utxoID)
+		}
 
 		executor := StandardTxExecutor{
 			Backend: &env.backend,
@@ -967,7 +974,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because tx fee paying key has no funds")
+		require.ErrorIs(err, errFlowCheckFailed)
 	}
 }
 
