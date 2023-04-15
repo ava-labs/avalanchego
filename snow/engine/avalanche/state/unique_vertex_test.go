@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/utils/compare"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -381,114 +380,6 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 
 	if parent.Status().Fetched() {
 		t.Fatal("the parent is invalid, so it shouldn't be marked as fetched")
-	}
-}
-
-func TestStopVertexWhitelistEmpty(t *testing.T) {
-	// vtx itself is accepted, no parent ==> empty transitives
-	_, parseTx := generateTestTxs('a')
-
-	// create serializer object
-	ts := newTestSerializer(t, parseTx)
-
-	uvtx := newTestUniqueVertex(t, ts, nil, [][]byte{{'a'}}, true)
-	if err := uvtx.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	tsv, err := uvtx.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-	if tsv.Len() > 0 {
-		t.Fatal("expected empty whitelist")
-	}
-}
-
-func TestStopVertexWhitelistWithParents(t *testing.T) {
-	t.Parallel()
-
-	txs, parseTx := generateTestTxs('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
-	ts := newTestSerializer(t, parseTx)
-
-	//      (accepted)           (accepted)
-	//        vtx_1                vtx_2
-	//    [tx_a, tx_b]          [tx_c, tx_d]
-	//          ⬆      ⬉     ⬈       ⬆
-	//        vtx_3                vtx_4
-	//    [tx_e, tx_f]          [tx_g, tx_h]
-	//                    ⬉           ⬆
-	//                         stop_vertex_5
-	uvtx1 := newTestUniqueVertex(t, ts, nil, [][]byte{{'a'}, {'b'}}, false)
-	if err := uvtx1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	uvtx2 := newTestUniqueVertex(t, ts, nil, [][]byte{{'c'}, {'d'}}, false)
-	if err := uvtx2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	uvtx3 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'e'}, {'f'}}, false)
-	uvtx4 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'g'}, {'h'}}, false)
-	svtx5 := newTestUniqueVertex(t, ts, []ids.ID{uvtx3.id, uvtx4.id}, nil, true)
-
-	whitelist, err := svtx5.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-
-	expectedWhitelist := []ids.ID{
-		txs[4].ID(), // 'e'
-		txs[5].ID(), // 'f'
-		txs[6].ID(), // 'g'
-		txs[7].ID(), // 'h'
-		uvtx3.ID(),
-		uvtx4.ID(),
-		svtx5.ID(),
-	}
-	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
-		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
-	}
-}
-
-func TestStopVertexWhitelistWithLinearChain(t *testing.T) {
-	t.Parallel()
-
-	// 0 -> 1 -> 2 -> 3 -> 4 -> 5
-	// all vertices on the transitive paths are processing
-	txs, parseTx := generateTestTxs('a', 'b', 'c', 'd', 'e')
-
-	// create serializer object
-	ts := newTestSerializer(t, parseTx)
-
-	uvtx5 := newTestUniqueVertex(t, ts, nil, [][]byte{{'e'}}, false)
-	if err := uvtx5.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	uvtx4 := newTestUniqueVertex(t, ts, []ids.ID{uvtx5.id}, [][]byte{{'d'}}, false)
-	uvtx3 := newTestUniqueVertex(t, ts, []ids.ID{uvtx4.id}, [][]byte{{'c'}}, false)
-	uvtx2 := newTestUniqueVertex(t, ts, []ids.ID{uvtx3.id}, [][]byte{{'b'}}, false)
-	uvtx1 := newTestUniqueVertex(t, ts, []ids.ID{uvtx2.id}, [][]byte{{'a'}}, false)
-	uvtx0 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id}, nil, true)
-
-	whitelist, err := uvtx0.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-
-	expectedWhitelist := []ids.ID{
-		txs[0].ID(),
-		txs[1].ID(),
-		txs[2].ID(),
-		txs[3].ID(),
-		uvtx0.ID(),
-		uvtx1.ID(),
-		uvtx2.ID(),
-		uvtx3.ID(),
-		uvtx4.ID(),
-	}
-	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
-		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
 	}
 }
 

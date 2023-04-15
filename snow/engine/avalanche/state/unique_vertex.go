@@ -373,56 +373,6 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 	return nil
 }
 
-func (vtx *uniqueVertex) HasWhitelist() bool {
-	return vtx.v.vtx.StopVertex()
-}
-
-// "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
-// "vertex.StatelessVertex" is marked as a stop vertex.
-func (vtx *uniqueVertex) Whitelist(ctx context.Context) (set.Set[ids.ID], error) {
-	if !vtx.v.vtx.StopVertex() {
-		return nil, nil
-	}
-
-	// perform BFS on transitive paths until reaching the accepted frontier
-	// represents all processing transaction IDs transitively referenced by the
-	// vertex
-	queue := []avalanche.Vertex{vtx}
-	whitlist := set.NewSet[ids.ID](0)
-	visitedVtx := set.NewSet[ids.ID](0)
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-
-		if cur.Status() == choices.Accepted {
-			// have reached the accepted frontier on the transitive closure
-			// no need to continue the search on this path
-			continue
-		}
-		curID := cur.ID()
-		if visitedVtx.Contains(curID) {
-			continue
-		}
-		visitedVtx.Add(curID)
-
-		txs, err := cur.Txs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, tx := range txs {
-			whitlist.Add(tx.ID())
-		}
-		whitlist.Add(curID)
-
-		parents, err := cur.Parents()
-		if err != nil {
-			return nil, err
-		}
-		queue = append(queue, parents...)
-	}
-	return whitlist, nil
-}
-
 func (vtx *uniqueVertex) Height() (uint64, error) {
 	vtx.refresh()
 

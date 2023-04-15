@@ -13,7 +13,6 @@ import (
 // Vertex is a collection of multiple transactions tied to other vertices
 type Vertex interface {
 	choices.Decidable
-	snowstorm.Whitelister
 
 	// Vertex verification should be performed before issuance.
 	Verify(context.Context) error
