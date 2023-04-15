@@ -14,9 +14,6 @@ import (
 type Vertex interface {
 	choices.Decidable
 
-	// Vertex verification should be performed before issuance.
-	Verify(context.Context) error
-
 	// Returns the vertices this vertex depends on
 	Parents() ([]Vertex, error)
 
