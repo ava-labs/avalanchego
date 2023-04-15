@@ -6,6 +6,7 @@ package block
 import (
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,6 +20,7 @@ var (
 
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
 	errMissingProposer    = errors.New("expected proposer but none was provided")
+	errInvalidCertificate = errors.New("invalid certificate")
 )
 
 type Block interface {
@@ -92,7 +94,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
 	}
 
 	if err := staking.VerifyCertificate(cert); err != nil {
