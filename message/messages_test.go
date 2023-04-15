@@ -99,7 +99,7 @@ func TestMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:     false,
+			compressionType:  compression.TypeNone,
 			bypassThrottling: true,
 			bytesSaved:       false,
 		},
