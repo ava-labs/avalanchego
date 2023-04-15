@@ -183,7 +183,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			name:          "post-fork - incorrectly priced",
 			time:          ap3Time,
 			fee:           100*defaultTxFee - 1*units.NanoAvax,
-			expectedError: utxo.ErrMustBurnMore,
+			expectedError: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name:          "post-fork - correctly priced",
