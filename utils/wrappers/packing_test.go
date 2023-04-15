@@ -189,7 +189,7 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 
 	require.Nil(p.UnpackFixedBytes(4))
 	require.True(p.Errored())
-	require.Error(p.Err, errBadLength)
+	require.ErrorIs(p.Err, errBadLength)
 }
 
 func TestPackerPackBytes(t *testing.T) {

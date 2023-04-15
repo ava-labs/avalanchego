@@ -701,7 +701,7 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(blk.Reject(context.Background()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
-	require.Error(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -826,7 +826,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(blk.Reject(context.Background()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
-	require.Error(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in pending validator set
 	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
