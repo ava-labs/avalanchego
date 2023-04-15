@@ -16,7 +16,6 @@ var _ Vertex = (*TestVertex)(nil)
 type TestVertex struct {
 	choices.TestDecidable
 
-	VerifyErrV  error
 	ParentsV    []Vertex
 	ParentsErrV error
 	HeightV     uint64
@@ -24,10 +23,6 @@ type TestVertex struct {
 	TxsV        []snowstorm.Tx
 	TxsErrV     error
 	BytesV      []byte
-}
-
-func (v *TestVertex) Verify(context.Context) error {
-	return v.VerifyErrV
 }
 
 func (v *TestVertex) Parents() ([]Vertex, error) {
