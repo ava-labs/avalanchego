@@ -103,7 +103,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 				}
 			},
 			shouldErr:          true,
-			requireSpecificErr: errRemovePrimaryNetworkValidator,
+			requireSpecificErr: ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "invalid subnetAuth",

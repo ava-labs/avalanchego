@@ -1072,7 +1072,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
 		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor)
-		shouldErr   bool
 		expectedErr error
 	}
 
@@ -1114,7 +1113,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 		{
 			name: "tx fails syntactic verification",
@@ -1139,7 +1138,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr: true,
+			expectedErr: txs.ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "node isn't a validator of the subnet",
@@ -1164,7 +1163,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errNotValidator,
 		},
 		{
@@ -1193,7 +1191,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errRemovePermissionlessValidator,
 		},
 		{
@@ -1220,7 +1217,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
@@ -1246,7 +1242,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errCantFindSubnet,
 		},
 		{
@@ -1279,7 +1274,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errUnauthorizedSubnetModification,
 		},
 		{
@@ -1315,7 +1309,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			shouldErr:   true,
 			expectedErr: errFlowCheckFailed,
 		},
 	}
@@ -1328,14 +1321,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.RemoveSubnetValidatorTx(unsignedTx)
-			if tt.shouldErr {
-				require.Error(err)
-				if tt.expectedErr != nil {
-					require.ErrorIs(err, tt.expectedErr)
-				}
-				return
-			}
-			require.NoError(err)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
