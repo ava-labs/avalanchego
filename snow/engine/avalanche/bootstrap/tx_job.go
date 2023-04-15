@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -26,7 +26,7 @@ var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transa
 type txParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
-	vm                      vertex.DAGVM
+	vm                      vertex.LinearizableVM
 }
 
 func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error) {

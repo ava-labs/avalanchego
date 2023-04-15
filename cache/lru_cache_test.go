@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cache
@@ -41,6 +41,7 @@ func TestLRUResize(t *testing.T) {
 	}
 
 	cache.Size = 1
+	// id1 evicted
 
 	if _, found := cache.Get(id1); found {
 		t.Fatalf("Retrieve value when none exists")
@@ -51,6 +52,7 @@ func TestLRUResize(t *testing.T) {
 	}
 
 	cache.Size = 0
+	// We reset the size to 1 in resize
 
 	if _, found := cache.Get(id1); found {
 		t.Fatalf("Retrieve value when none exists")

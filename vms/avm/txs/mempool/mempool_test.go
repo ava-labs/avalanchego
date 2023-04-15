@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -20,17 +22,10 @@ import (
 )
 
 var (
-	_ BlockTimer = (*noopBlkTimer)(nil)
-
-	keys             = secp256k1.TestKeys()
-	networkID uint32 = 10
-	chainID          = ids.ID{5, 4, 3, 2, 1}
-	assetID          = ids.ID{1, 2, 3}
+	keys    = secp256k1.TestKeys()
+	chainID = ids.ID{5, 4, 3, 2, 1}
+	assetID = ids.ID{1, 2, 3}
 )
-
-type noopBlkTimer struct{}
-
-func (*noopBlkTimer) ResetBlockTimer() {}
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
@@ -38,7 +33,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempoolIntf, err := New("mempool", registerer, &noopBlkTimer{})
+	mempoolIntf, err := New("mempool", registerer, nil)
 	require.NoError(err)
 
 	mempool := mempoolIntf.(*mempool)
@@ -63,13 +58,18 @@ func TestTxsInMempool(t *testing.T) {
 	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
-	mempool, err := New("mempool", registerer, &noopBlkTimer{})
+	toEngine := make(chan common.Message, 100)
+	mempool, err := New("mempool", registerer, toEngine)
 	require.NoError(err)
 
 	testTxs := createTestTxs(2)
 
-	// txs must not already there before we start
-	require.False(mempool.HasTxs())
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+		t.Fatalf("should not have sent message to engine")
+	default:
+	}
 
 	for _, tx := range testTxs {
 		txID := tx.ID()
@@ -98,6 +98,22 @@ func TestTxsInMempool(t *testing.T) {
 		// we can reinsert it again to grow the mempool
 		require.NoError(mempool.Add(tx))
 	}
+
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+	default:
+		t.Fatalf("should have sent message to engine")
+	}
+
+	mempool.Remove(testTxs)
+
+	mempool.RequestBuildBlock()
+	select {
+	case <-toEngine:
+		t.Fatalf("should not have sent message to engine")
+	default:
+	}
 }
 
 func createTestTxs(count int) []*txs.Tx {
@@ -106,7 +122,7 @@ func createTestTxs(count int) []*txs.Tx {
 	for i := uint32(0); i < uint32(count); i++ {
 		tx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
+				NetworkID:    constants.UnitTestID,
 				BlockchainID: chainID,
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{

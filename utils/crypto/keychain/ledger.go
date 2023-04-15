@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keychain
@@ -14,6 +14,6 @@ type Ledger interface {
 	Address(displayHRP string, addressIndex uint32) (ids.ShortID, error)
 	Addresses(addressIndices []uint32) ([]ids.ShortID, error)
 	SignHash(hash []byte, addressIndices []uint32) ([][]byte, error)
-	// TODO: add SignTransaction
+	Sign(unsignedTxBytes []byte, addressIndices []uint32) ([][]byte, error)
 	Disconnect() error
 }

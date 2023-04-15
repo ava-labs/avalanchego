@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
 
 import (
-	"errors"
 	"io"
 
 	"go.uber.org/zap"
@@ -14,15 +13,13 @@ var (
 	// Discard is a mock WriterCloser that drops all writes and close requests
 	Discard io.WriteCloser = discard{}
 
-	errNoLoggerWrite = errors.New("NoLogger can't write")
-
 	_ Logger = NoLog{}
 )
 
 type NoLog struct{}
 
-func (NoLog) Write([]byte) (int, error) {
-	return 0, errNoLoggerWrite
+func (NoLog) Write(b []byte) (int, error) {
+	return len(b), nil
 }
 
 func (NoLog) Fatal(string, ...zap.Field) {}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -550,7 +550,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
 				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
-				require.Equal(1024, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			errMessage: "",
 		},
@@ -604,10 +604,8 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()
-	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
-	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()
-	if err := v.BindPFlags(pflag.CommandLine); err != nil {
+	if err := v.BindPFlags(fs); err != nil {
 		log.Fatal(err)
 	}
 	return v

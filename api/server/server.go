@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -33,10 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const (
-	baseURL           = "/ext"
-	readHeaderTimeout = 10 * time.Second
-)
+const baseURL = "/ext"
 
 var (
 	errUnknownLockOption = errors.New("invalid lock options")
@@ -79,6 +76,13 @@ type Server interface {
 	Shutdown() error
 }
 
+type HTTPConfig struct {
+	ReadTimeout       time.Duration `json:"readTimeout"`
+	ReadHeaderTimeout time.Duration `json:"readHeaderTimeout"`
+	WriteTimeout      time.Duration `json:"writeHeaderTimeout"`
+	IdleTimeout       time.Duration `json:"idleTimeout"`
+}
+
 type server struct {
 	// log this server writes to
 	log logging.Logger
@@ -114,6 +118,7 @@ func New(
 	tracer trace.Tracer,
 	namespace string,
 	registerer prometheus.Registerer,
+	httpConfig HTTPConfig,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -155,7 +160,10 @@ func New(
 		router:          router,
 		srv: &http.Server{
 			Handler:           handler,
-			ReadHeaderTimeout: readHeaderTimeout,
+			ReadTimeout:       httpConfig.ReadTimeout,
+			ReadHeaderTimeout: httpConfig.ReadHeaderTimeout,
+			WriteTimeout:      httpConfig.WriteTimeout,
+			IdleTimeout:       httpConfig.IdleTimeout,
 		},
 	}, nil
 }

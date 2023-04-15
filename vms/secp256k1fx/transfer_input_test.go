@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -49,7 +49,7 @@ func TestTransferInputVerifyNoValue(t *testing.T) {
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	require.ErrorIs(in.Verify(), errNoValueInput)
+	require.ErrorIs(in.Verify(), ErrNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {

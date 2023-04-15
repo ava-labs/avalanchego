@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -118,6 +118,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			requestID,
 			message.StateSummaryFrontierOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -256,6 +257,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			requestID,
 			message.AcceptedStateSummaryOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 
@@ -391,6 +393,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			requestID,
 			message.AcceptedFrontierOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -457,7 +460,6 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			requestID,
 			containerIDs,
 			nodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
@@ -468,7 +470,6 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		s.ctx.ChainID,
 		requestID,
 		containerIDs,
-		s.engineType,
 	)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
@@ -528,6 +529,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			requestID,
 			message.AcceptedOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -596,14 +598,13 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			requestID,
 			containerIDs,
 			nodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs, s.engineType)
+	outMsg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AcceptedOp),
@@ -654,6 +655,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		requestID,
 		message.AncestorsOp,
 		inMsg,
+		s.engineType,
 	)
 
 	// Sending a GetAncestors to myself always fails.
@@ -723,7 +725,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 // The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers, s.engineType)
+	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AncestorsOp),
@@ -778,6 +780,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		requestID,
 		message.PutOp,
 		inMsg,
+		s.engineType,
 	)
 
 	// Sending a Get to myself always fails.
@@ -915,6 +918,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			message.ChitsOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -1043,6 +1047,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			requestID,
 			message.ChitsOp,
 			inMsg,
+			s.engineType,
 		)
 	}
 
@@ -1150,14 +1155,13 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			votes,
 			accepted,
 			nodeID,
-			s.engineType,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes, accepted, s.engineType)
+	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes, accepted)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.ChitsOp),
@@ -1207,6 +1211,7 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 		requestID,
 		message.CrossChainAppResponseOp,
 		failedMsg,
+		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	)
 
 	inMsg := message.InternalCrossChainAppRequest(
@@ -1260,6 +1265,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			requestID,
 			message.AppResponseOp,
 			inMsg,
+			p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		)
 	}
 

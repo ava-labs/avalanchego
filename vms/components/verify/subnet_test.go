@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package verify
@@ -42,7 +42,7 @@ func TestSameSubnet(t *testing.T) {
 				}
 			},
 			chainID: chainID0,
-			result:  errSameChainID,
+			result:  ErrSameChainID,
 		},
 		{
 			name: "unknown chain",
@@ -70,7 +70,7 @@ func TestSameSubnet(t *testing.T) {
 				}
 			},
 			chainID: chainID1,
-			result:  errMismatchedSubnetIDs,
+			result:  ErrMismatchedSubnetIDs,
 		},
 		{
 			name: "same subnet",

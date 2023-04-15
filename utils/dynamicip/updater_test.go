@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -18,11 +18,11 @@ import (
 var _ Resolver = (*mockResolver)(nil)
 
 type mockResolver struct {
-	onResolve func() (net.IP, error)
+	onResolve func(context.Context) (net.IP, error)
 }
 
-func (r *mockResolver) Resolve() (net.IP, error) {
-	return r.onResolve()
+func (r *mockResolver) Resolve(ctx context.Context) (net.IP, error) {
+	return r.onResolve(ctx)
 }
 
 func TestNewUpdater(t *testing.T) {
@@ -32,7 +32,7 @@ func TestNewUpdater(t *testing.T) {
 	dynamicIP := ips.NewDynamicIPPort(originalIP, uint16(originalPort))
 	newIP := net.IPv4(1, 2, 3, 4)
 	resolver := &mockResolver{
-		onResolve: func() (net.IP, error) {
+		onResolve: func(context.Context) (net.IP, error) {
 			return newIP, nil
 		},
 	}
@@ -44,14 +44,14 @@ func TestNewUpdater(t *testing.T) {
 	)
 
 	// Assert NewUpdater returns expected type
-	require.IsType(&updater{}, updaterIntf)
-
-	updater := updaterIntf.(*updater)
+	updater, ok := updaterIntf.(*updater)
+	require.True(ok)
 
 	// Assert fields set
 	require.Equal(dynamicIP, updater.dynamicIP)
 	require.Equal(resolver, updater.resolver)
-	require.NotNil(updater.stopChan)
+	require.NotNil(updater.rootCtx)
+	require.NotNil(updater.rootCtxCancel)
 	require.NotNil(updater.doneChan)
 	require.Equal(updateFreq, updater.updateFreq)
 
@@ -78,10 +78,9 @@ func TestNewUpdater(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
 	defer cancel()
 	select {
-	case _, open := <-updater.stopChan:
-		require.False(open)
+	case <-updater.rootCtx.Done():
 	case <-ctx.Done():
-		require.FailNow("timeout waiting for stopChan to close")
+		require.FailNow("timeout waiting for root context cancellation")
 	}
 	select {
 	case _, open := <-updater.doneChan:

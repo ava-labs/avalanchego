@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -35,6 +36,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const testThreadPoolSize = 2
 
 var defaultSubnetConfig = subnets.Config{
 	GossipConfig: subnets.GossipConfig{
@@ -70,9 +73,10 @@ func TestTimeout(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -115,11 +119,12 @@ func TestTimeout(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx2,
 		vdrs,
 		nil,
 		time.Hour,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -142,18 +147,29 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
-	handler.SetBootstrapper(bootstrapper)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+	})
 	ctx2.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), handler)
+	chainRouter.AddChain(context.Background(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(context.Background(), false)
+	h.Start(context.Background(), false)
 
 	var (
 		wg           = sync.WaitGroup{}
@@ -330,9 +346,10 @@ func TestReliableMessages(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -376,11 +393,12 @@ func TestReliableMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx2,
 		vdrs,
 		nil,
 		1,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -413,18 +431,29 @@ func TestReliableMessages(t *testing.T) {
 		return nil
 	}
 	bootstrapper.CantGossip = false
-	handler.SetBootstrapper(bootstrapper)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+	})
 	ctx2.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), handler)
+	chainRouter.AddChain(context.Background(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(context.Background(), false)
+	h.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -466,9 +495,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)
@@ -512,11 +542,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
-	handler, err := handler.New(
+	h, err := handler.New(
 		ctx2,
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -548,18 +579,29 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		close(awaiting[int(reqID)])
 		return nil
 	}
-	handler.SetBootstrapper(bootstrapper)
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+		Snowman: &handler.Engine{
+			StateSyncer:  nil,
+			Bootstrapper: bootstrapper,
+			Consensus:    nil,
+		},
+	})
 	ctx2.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), handler)
+	chainRouter.AddChain(context.Background(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(context.Background(), false)
+	h.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -608,6 +650,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender)
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID])
+		engineType              p2p.EngineType
 	}
 
 	tests := []test{
@@ -742,6 +785,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
 			},
+			engineType: engineType,
 		},
 		{
 			name: "GetAccepted",
@@ -787,6 +831,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
 			},
+			engineType: engineType,
 		},
 	}
 
@@ -836,6 +881,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
+					tt.engineType,
 				)
 			}
 
@@ -962,7 +1008,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
-					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -973,7 +1018,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -994,7 +1038,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
-					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1005,7 +1048,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
-				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1233,6 +1275,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
+					engineType,            // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
@@ -1268,6 +1311,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
+					engineType,            // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine
@@ -1303,6 +1347,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
 					expectedFailedMsg,     // Failure Message
+					engineType,            // Engine Type
 				)
 
 				// Note that HandleInbound is called in a separate goroutine

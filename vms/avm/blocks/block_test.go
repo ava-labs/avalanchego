@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -19,10 +20,9 @@ import (
 )
 
 var (
-	networkID uint32 = 10
-	chainID          = ids.GenerateTestID()
-	keys             = secp256k1.TestKeys()
-	assetID          = ids.GenerateTestID()
+	chainID = ids.GenerateTestID()
+	keys    = secp256k1.TestKeys()
+	assetID = ids.GenerateTestID()
 )
 
 func TestStandardBlocks(t *testing.T) {
@@ -68,7 +68,7 @@ func createTestTxs(cm codec.Manager) ([]*txs.Tx, error) {
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: assetID},

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements X-Chain whitelist vtx (stop vertex) tests.
@@ -224,8 +224,8 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 					// +0 since no node should ever successfully issue another whitelist vtx
 					gomega.Expect(mm[metricVtxIssueSuccess]).Should(gomega.Equal(prev[metricVtxIssueSuccess]))
 
-					// +1 since the local node engine failed the conflicting whitelist vtx issue request
-					gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure] + 1))
+					// +0 since the local node engine should have dropped the conflicting whitelist vtx issue request
+					gomega.Expect(mm[metricVtxIssueFailure]).Should(gomega.Equal(prev[metricVtxIssueFailure]))
 
 					// +0 since the local node snowstorm successfully issued the whitelist tx "before", and no whitelist tx is being processed
 					gomega.Expect(mm[metricTxProcessing]).Should(gomega.Equal(prev[metricTxProcessing]))
@@ -242,7 +242,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 				}
 			})
 
-			ginkgo.By("issue regular, virtuous X-Chain tx, after whitelist vtx, should fail", func() {
+			ginkgo.By("issue regular, virtuous X-Chain tx, after whitelist vtx, should pass", func() {
 				balances, err := wallets[0].X().Builder().GetFTBalance()
 				gomega.Expect(err).Should(gomega.BeNil())
 
@@ -270,16 +270,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err.Error()).Should(gomega.ContainSubstring(context.DeadlineExceeded.Error()))
-
-				ep := uris[0] + "/ext/metrics"
-				mm, err := tests.GetMetricsValue(ep, allMetrics...)
 				gomega.Expect(err).Should(gomega.BeNil())
-
-				// regular, virtuous transaction should not change whitelist vtx metrics
-				prev := curMetrics[uris[0]]
-				gomega.Expect(mm).Should(gomega.Equal(prev))
-				curMetrics[uris[0]] = mm
 			})
 		})
 })

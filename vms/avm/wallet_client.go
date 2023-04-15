@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -22,6 +22,9 @@ type WalletClient interface {
 	// IssueTx issues a transaction to a node and returns the TxID
 	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
 	// Send [amount] of [assetID] to address [to]
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	Send(
 		ctx context.Context,
 		user api.UserPass,
@@ -34,6 +37,9 @@ type WalletClient interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// SendMultiple sends a transaction from [user] funding all [outputs]
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/x.Wallet` utility.
 	SendMultiple(
 		ctx context.Context,
 		user api.UserPass,
@@ -51,6 +57,9 @@ type walletClient struct {
 }
 
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
+//
+// Deprecated: Transactions should be issued using the
+// `avalanchego/wallet/chain/x.Wallet` utility.
 func NewWalletClient(uri, chain string) WalletClient {
 	path := fmt.Sprintf(
 		"%s/ext/%s/%s/wallet",

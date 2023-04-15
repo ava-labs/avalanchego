@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -53,16 +53,12 @@ var (
 	_ requestIDGetter = (*p2p.AppResponse)(nil)
 
 	_ engineTypeGetter = (*p2p.GetAcceptedFrontier)(nil)
-	_ engineTypeGetter = (*p2p.AcceptedFrontier)(nil)
 	_ engineTypeGetter = (*p2p.GetAccepted)(nil)
-	_ engineTypeGetter = (*p2p.Accepted)(nil)
 	_ engineTypeGetter = (*p2p.GetAncestors)(nil)
-	_ engineTypeGetter = (*p2p.Ancestors)(nil)
 	_ engineTypeGetter = (*p2p.Get)(nil)
 	_ engineTypeGetter = (*p2p.Put)(nil)
 	_ engineTypeGetter = (*p2p.PushQuery)(nil)
 	_ engineTypeGetter = (*p2p.PullQuery)(nil)
-	_ engineTypeGetter = (*p2p.Chits)(nil)
 
 	_ deadlineGetter = (*p2p.GetStateSummaryFrontier)(nil)
 	_ deadlineGetter = (*p2p.GetAcceptedStateSummary)(nil)
@@ -127,7 +123,7 @@ type engineTypeGetter interface {
 func GetEngineType(m any) (p2p.EngineType, bool) {
 	msg, ok := m.(engineTypeGetter)
 	if !ok {
-		return 0, false
+		return p2p.EngineType_ENGINE_TYPE_UNSPECIFIED, false
 	}
 	return msg.GetEngineType(), true
 }

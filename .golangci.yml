@@ -16,40 +16,37 @@ linters:
   disable-all: true
   enable:
     - asciicheck
+    - bodyclose
     - depguard
     - errcheck
-    - errorlint
     - exportloopref
     - goconst
     - gocritic
     - gofmt
     - gofumpt
     - goimports
-    - revive
+    - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
     - misspell
     - nakedret
+    - noctx
     - nolintlint
     - prealloc
+    - revive
+    - staticcheck
     - stylecheck
+    - typecheck
     - unconvert
     - unparam
     - unused
-    - unconvert
     - whitespace
-    - staticcheck
-    # - bodyclose
-    # - structcheck
-    # - lll
-    # - gomnd
-    # - goprintffuncname
-    # - interfacer
-    # - typecheck
+    # - errorlint (TODO: re-enable in go1.20 migration)
     # - goerr113
-    # - noctx
+    # - gomnd
+    # - lll
 
 linters-settings:
   errorlint:
@@ -83,13 +80,13 @@ linters-settings:
       - name: unhandled-error
         disabled: false
         arguments:
-          - "fmt.Fprint"
-          - "fmt.Fprintf"
-          - "fmt.Print"
-          - "fmt.Printf"
-          - "fmt.Println"
-          - "rand.Read"
-          - "sb.WriteString"
+          - "fmt\\.Fprint"
+          - "fmt\\.Fprintf"
+          - "fmt\\.Print"
+          - "fmt\\.Printf"
+          - "fmt\\.Println"
+          - "math/rand\\.Read"
+          - "strings\\.Builder\\.WriteString"
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
       - name: unused-parameter
         disabled: false
@@ -100,7 +97,7 @@ linters-settings:
       - name: useless-break
         disabled: false
   staticcheck:
-    go: "1.18"
+    go: "1.19"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"

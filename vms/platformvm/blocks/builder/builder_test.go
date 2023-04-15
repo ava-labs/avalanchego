@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
+
+var errTestingDropped = errors.New("testing dropped")
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
@@ -83,14 +86,14 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A tx simply added to mempool is obviously not marked as dropped
 	require.NoError(env.mempool.Add(tx))
 	require.True(env.mempool.Has(txID))
-	_, isDropped := env.mempool.GetDropReason(txID)
-	require.False(isDropped)
+	reason := env.mempool.GetDropReason(txID)
+	require.NoError(reason)
 
 	// When a tx is marked as dropped, it is still available to allow re-issuance
-	env.mempool.MarkDropped(txID, "dropped for testing")
+	env.mempool.MarkDropped(txID, errTestingDropped)
 	require.True(env.mempool.Has(txID)) // still available
-	_, isDropped = env.mempool.GetDropReason(txID)
-	require.True(isDropped)
+	reason = env.mempool.GetDropReason(txID)
+	require.ErrorIs(reason, errTestingDropped)
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
@@ -98,8 +101,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.NoError(env.mempool.Add(tx))
 
 	require.True(env.mempool.Has(txID))
-	_, isDropped = env.mempool.GetDropReason(txID)
-	require.False(isDropped)
+	reason = env.mempool.GetDropReason(txID)
+	require.NoError(reason)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {

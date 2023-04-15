@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -137,7 +137,6 @@ func InboundAcceptedFrontier(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -148,7 +147,6 @@ func InboundAcceptedFrontier(
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ContainerIds: containerIDBytes,
-			EngineType:   engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -183,7 +181,6 @@ func InboundAccepted(
 	requestID uint32,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -194,7 +191,6 @@ func InboundAccepted(
 			ChainId:      chainID[:],
 			RequestId:    requestID,
 			ContainerIds: containerIDBytes,
-			EngineType:   engineType,
 		},
 		expiration: mockable.MaxTime,
 	}
@@ -250,7 +246,6 @@ func InboundChits(
 	preferredContainerIDs []ids.ID,
 	acceptedContainerIDs []ids.ID,
 	nodeID ids.NodeID,
-	engineType p2p.EngineType,
 ) InboundMessage {
 	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
 	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
@@ -264,7 +259,6 @@ func InboundChits(
 			RequestId:             requestID,
 			PreferredContainerIds: preferredContainerIDBytes,
 			AcceptedContainerIds:  acceptedContainerIDBytes,
-			EngineType:            engineType,
 		},
 		expiration: mockable.MaxTime,
 	}

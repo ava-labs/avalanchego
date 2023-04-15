@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var errNilCredential = errors.New("nil credential")
+var ErrNilCredential = errors.New("nil credential")
 
 type Credential struct {
 	Sigs [][secp256k1.SignatureLen]byte `serialize:"true" json:"signatures"`
@@ -38,7 +38,7 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 func (cr *Credential) Verify() error {
 	switch {
 	case cr == nil:
-		return errNilCredential
+		return ErrNilCredential
 	default:
 		return nil
 	}

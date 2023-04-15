@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -69,6 +69,69 @@ func init() {
 		newTestValidator(),
 	}
 	utils.Sort(testVdrs)
+}
+
+func TestNumSigners(t *testing.T) {
+	tests := map[string]struct {
+		generateSignature func() *BitSetSignature
+		count             int
+		err               error
+	}{
+		"empty signers": {
+			generateSignature: func() *BitSetSignature {
+				return &BitSetSignature{}
+			},
+		},
+		"invalid signers": {
+			generateSignature: func() *BitSetSignature {
+				return &BitSetSignature{
+					Signers: make([]byte, 1),
+				}
+			},
+			err: ErrInvalidBitSet,
+		},
+		"no signers": {
+			generateSignature: func() *BitSetSignature {
+				signers := set.NewBits()
+				return &BitSetSignature{
+					Signers: signers.Bytes(),
+				}
+			},
+		},
+		"1 signer": {
+			generateSignature: func() *BitSetSignature {
+				signers := set.NewBits()
+				signers.Add(2)
+				return &BitSetSignature{
+					Signers: signers.Bytes(),
+				}
+			},
+			count: 1,
+		},
+		"multiple signers": {
+			generateSignature: func() *BitSetSignature {
+				signers := set.NewBits()
+				signers.Add(2)
+				signers.Add(11)
+				signers.Add(55)
+				signers.Add(93)
+				return &BitSetSignature{
+					Signers: signers.Bytes(),
+				}
+			},
+			count: 4,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			sig := tt.generateSignature()
+			count, err := sig.NumSigners()
+			require.Equal(tt.count, count)
+			require.ErrorIs(err, tt.err)
+		})
+	}
 }
 
 func TestSignatureVerification(t *testing.T) {

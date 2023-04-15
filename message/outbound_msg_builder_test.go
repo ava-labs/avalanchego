@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -12,28 +12,37 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func Test_newOutboundBuilder(t *testing.T) {
 	t.Parallel()
-	require := require.New(t)
 
 	mb, err := newMsgBuilder(
+		logging.NoLog{},
 		"test",
 		prometheus.NewRegistry(),
 		10*time.Second,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	builder := newOutboundBuilder(true /*compress*/, mb)
+	for _, compressionType := range []compression.Type{
+		compression.TypeNone,
+		compression.TypeGzip,
+		compression.TypeZstd,
+	} {
+		t.Run(compressionType.String(), func(t *testing.T) {
+			builder := newOutboundBuilder(compressionType, mb)
 
-	outMsg, err := builder.GetAcceptedStateSummary(
-		ids.GenerateTestID(),
-		12345,
-		time.Hour,
-		[]uint64{1000, 2000},
-	)
-	require.NoError(err)
-
-	t.Logf("outbound message built with size %d", len(outMsg.Bytes()))
+			outMsg, err := builder.GetAcceptedStateSummary(
+				ids.GenerateTestID(),
+				12345,
+				time.Hour,
+				[]uint64{1000, 2000},
+			)
+			require.NoError(t, err)
+			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes()))
+		})
+	}
 }

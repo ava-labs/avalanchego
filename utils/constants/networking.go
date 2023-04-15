@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -54,7 +55,8 @@ const (
 	DefaultNetworkTimeoutCoefficient    = 2
 	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
 
-	DefaultNetworkCompressionEnabled        = true
+	DefaultNetworkCompressionEnabled        = true // TODO remove when NetworkCompressionEnabledKey is removed
+	DefaultNetworkCompressionType           = compression.TypeGzip
 	DefaultNetworkMaxClockDifference        = time.Minute
 	DefaultNetworkAllowPrivateIPs           = true
 	DefaultNetworkRequireValidatorToConnect = false
@@ -77,6 +79,7 @@ const (
 
 	// Router
 	DefaultConsensusGossipFrequency                        = 10 * time.Second
+	DefaultConsensusAppConcurrency                         = 2
 	DefaultConsensusShutdownTimeout                        = 30 * time.Second
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
@@ -117,5 +120,5 @@ const (
 
 	// Delays
 	DefaultNetworkInitialReconnectDelay = time.Second
-	DefaultNetworkMaxReconnectDelay     = time.Hour
+	DefaultNetworkMaxReconnectDelay     = time.Minute
 )

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -70,6 +70,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -94,8 +95,9 @@ var (
 
 // Node is an instance of an Avalanche node.
 type Node struct {
-	Log        logging.Logger
-	LogFactory logging.Factory
+	Log          logging.Logger
+	VMFactoryLog logging.Logger
+	LogFactory   logging.Factory
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -132,8 +134,9 @@ type Node struct {
 	uptimeCalculator uptime.LockedCalculator
 
 	// dispatcher for events as they happen in consensus
-	DecisionAcceptorGroup  snow.AcceptorGroup
-	ConsensusAcceptorGroup snow.AcceptorGroup
+	BlockAcceptorGroup  snow.AcceptorGroup
+	TxAcceptorGroup     snow.AcceptorGroup
+	VertexAcceptorGroup snow.AcceptorGroup
 
 	IPCs *ipcs.ChainIPCs
 
@@ -175,6 +178,8 @@ type Node struct {
 	// Metrics Registerer
 	MetricsRegisterer *prometheus.Registry
 	MetricsGatherer   metrics.MultiGatherer
+
+	VMManager vms.Manager
 
 	// VM endpoint registry
 	VMRegistry registry.VMRegistry
@@ -501,8 +506,9 @@ func (n *Node) initBeacons() error {
 // Create the EventDispatcher used for hooking events
 // into the general process flow.
 func (n *Node) initEventDispatchers() {
-	n.DecisionAcceptorGroup = snow.NewAcceptorGroup(n.Log)
-	n.ConsensusAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.BlockAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.TxAcceptorGroup = snow.NewAcceptorGroup(n.Log)
+	n.VertexAcceptorGroup = snow.NewAcceptorGroup(n.Log)
 }
 
 func (n *Node) initIPCs() error {
@@ -516,7 +522,15 @@ func (n *Node) initIPCs() error {
 	}
 
 	var err error
-	n.IPCs, err = ipcs.NewChainIPCs(n.Log, n.Config.IPCPath, n.Config.NetworkID, n.ConsensusAcceptorGroup, n.DecisionAcceptorGroup, chainIDs)
+	n.IPCs, err = ipcs.NewChainIPCs(
+		n.Log,
+		n.Config.IPCPath,
+		n.Config.NetworkID,
+		n.BlockAcceptorGroup,
+		n.TxAcceptorGroup,
+		n.VertexAcceptorGroup,
+		chainIDs,
+	)
 	return err
 }
 
@@ -528,13 +542,14 @@ func (n *Node) initIndexer() error {
 	txIndexerDB := prefixdb.New(indexerDBPrefix, n.DB)
 	var err error
 	n.indexer, err = indexer.NewIndexer(indexer.Config{
-		IndexingEnabled:        n.Config.IndexAPIEnabled,
-		AllowIncompleteIndex:   n.Config.IndexAllowIncomplete,
-		DB:                     txIndexerDB,
-		Log:                    n.Log,
-		DecisionAcceptorGroup:  n.DecisionAcceptorGroup,
-		ConsensusAcceptorGroup: n.ConsensusAcceptorGroup,
-		APIServer:              n.APIServer,
+		IndexingEnabled:      n.Config.IndexAPIEnabled,
+		AllowIncompleteIndex: n.Config.IndexAllowIncomplete,
+		DB:                   txIndexerDB,
+		Log:                  n.Log,
+		BlockAcceptorGroup:   n.BlockAcceptorGroup,
+		TxAcceptorGroup:      n.TxAcceptorGroup,
+		VertexAcceptorGroup:  n.VertexAcceptorGroup,
+		APIServer:            n.APIServer,
 		ShutdownF: func() {
 			n.Shutdown(0) // TODO put exit code here
 		},
@@ -589,6 +604,7 @@ func (n *Node) initAPIServer() error {
 			n.tracer,
 			"api",
 			n.MetricsRegisterer,
+			n.Config.HTTPConfig.HTTPConfig,
 		)
 		return err
 	}
@@ -610,6 +626,7 @@ func (n *Node) initAPIServer() error {
 		n.tracer,
 		"api",
 		n.MetricsRegisterer,
+		n.Config.HTTPConfig.HTTPConfig,
 		a,
 	)
 	if err != nil {
@@ -636,7 +653,7 @@ func (n *Node) addDefaultVMAliases() error {
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
-			if err := n.Config.VMManager.Alias(vmID, alias); err != nil {
+			if err := n.Config.VMAliaser.Alias(vmID, alias); err != nil {
 				return err
 			}
 		}
@@ -704,9 +721,10 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
-		VMManager:                               n.Config.VMManager,
-		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
-		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
+		VMManager:                               n.VMManager,
+		BlockAcceptorGroup:                      n.BlockAcceptorGroup,
+		TxAcceptorGroup:                         n.TxAcceptorGroup,
+		VertexAcceptorGroup:                     n.VertexAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
 		Router:                                  n.Config.ConsensusRouter,
@@ -731,6 +749,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
 		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
+		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
@@ -764,9 +783,10 @@ func (n *Node) initVMs() error {
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
-		APIServer: n.APIServer,
-		Log:       n.Log,
-		VMManager: n.Config.VMManager,
+		APIServer:    n.APIServer,
+		Log:          n.Log,
+		VMFactoryLog: n.VMFactoryLog,
+		VMManager:    n.VMManager,
 	})
 
 	// Register the VMs that Avalanche supports
@@ -799,6 +819,7 @@ func (n *Node) initVMs() error {
 				ApricotPhase3Time:               version.GetApricotPhase3Time(n.Config.NetworkID),
 				ApricotPhase5Time:               version.GetApricotPhase5Time(n.Config.NetworkID),
 				BanffTime:                       version.GetBanffTime(n.Config.NetworkID),
+				CortinaTime:                     version.GetCortinaTime(n.Config.NetworkID),
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 				UseCurrentHeight:                n.Config.UseCurrentHeight,
 			},
@@ -810,9 +831,9 @@ func (n *Node) initVMs() error {
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -825,7 +846,7 @@ func (n *Node) initVMs() error {
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
 			FileReader:      filesystem.NewReader(),
-			Manager:         n.Config.VMManager,
+			Manager:         n.VMManager,
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
@@ -865,7 +886,7 @@ func (n *Node) initKeystoreAPI() error {
 		n.Log.Info("skipping keystore API initialization because it has been disabled")
 		return nil
 	}
-	n.Log.Info("initializing keystore API")
+	n.Log.Warn("initializing deprecated keystore API")
 	handler := &common.HTTPHandler{
 		LockOptions: common.NoLock,
 		Handler:     keystoreHandler,
@@ -929,7 +950,7 @@ func (n *Node) initAdminAPI() error {
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
 			LogFactory:   n.LogFactory,
 			NodeConfig:   n.Config,
-			VMManager:    n.Config.VMManager,
+			VMManager:    n.VMManager,
 			VMRegistry:   n.VMRegistry,
 		},
 	)
@@ -987,11 +1008,11 @@ func (n *Node) initInfoAPI() error {
 			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
 			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
 			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-			VMManager:                     n.Config.VMManager,
+			VMManager:                     n.VMManager,
 		},
 		n.Log,
 		n.chainManager,
-		n.Config.VMManager,
+		n.VMManager,
 		n.Config.NetworkConfig.MyIPPort,
 		n.Net,
 		primaryValidators,
@@ -1018,18 +1039,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net)
+	err = healthChecker.RegisterHealthCheck("network", n.Net, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter)
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB)
+	err = healthChecker.RegisterHealthCheck("database", n.DB, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1056,7 +1077,7 @@ func (n *Node) initHealthAPI() error {
 		}, err
 	})
 
-	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck)
+	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
@@ -1123,7 +1144,7 @@ func (n *Node) initIPCAPI() error {
 		n.Log.Info("skipping ipc API initialization because it has been disabled")
 		return nil
 	}
-	n.Log.Info("initializing ipc API")
+	n.Log.Warn("initializing deprecated ipc API")
 	service, err := ipcsapi.NewService(n.Log, n.chainManager, n.APIServer, n.IPCs)
 	if err != nil {
 		return err
@@ -1244,12 +1265,19 @@ func (n *Node) Initialize(
 		zap.Reflect("config", n.Config),
 	)
 
+	var err error
+	n.VMFactoryLog, err = logFactory.Make("vm-factory")
+	if err != nil {
+		return fmt.Errorf("problem creating vm logger: %w", err)
+	}
+
+	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
+
 	if err := n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
 	// Set up tracer
-	var err error
 	n.tracer, err = trace.New(n.Config.TraceConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize tracer: %w", err)
@@ -1285,9 +1313,10 @@ func (n *Node) Initialize(
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
 	n.msgCreator, err = message.NewCreator(
+		n.Log,
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionEnabled,
+		constants.DefaultNetworkCompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
@@ -1376,7 +1405,7 @@ func (n *Node) shutdown() {
 			}, errShuttingDown
 		})
 
-		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck)
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag)
 		if err != nil {
 			n.Log.Debug("couldn't register shuttingDown health check",
 				zap.Error(err),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms"
 )
 
 type IPCConfig struct {
@@ -44,6 +44,7 @@ type APIIndexerConfig struct {
 }
 
 type HTTPConfig struct {
+	server.HTTPConfig
 	APIConfig `json:"apiConfig"`
 	HTTPHost  string `json:"httpHost"`
 	HTTPPort  uint16 `json:"httpPort"`
@@ -178,6 +179,9 @@ type Config struct {
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
 	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
+	// ConsensusAppConcurrency defines the maximum number of goroutines to
+	// handle App messages per chain.
+	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 
@@ -186,7 +190,7 @@ type Config struct {
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
 
-	VMManager vms.Manager `json:"-"`
+	VMAliaser ids.Aliaser `json:"-"`
 
 	// Halflife to use for the processing requests tracker.
 	// Larger halflife --> usage metrics change more slowly.

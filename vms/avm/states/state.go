@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package states
@@ -44,22 +44,27 @@ var (
 	_ State = (*state)(nil)
 )
 
-type Chain interface {
+type ReadOnlyChain interface {
 	avax.UTXOGetter
+
+	// TODO: Remove GetUTXOFromID after the DAG linearization
+	GetUTXOFromID(utxoID *avax.UTXOID) (*avax.UTXO, error)
+
+	GetTx(txID ids.ID) (*txs.Tx, error)
+	GetBlockID(height uint64) (ids.ID, error)
+	GetBlock(blkID ids.ID) (blocks.Block, error)
+	GetLastAccepted() ids.ID
+	GetTimestamp() time.Time
+}
+
+type Chain interface {
+	ReadOnlyChain
 	avax.UTXOAdder
 	avax.UTXODeleter
 
-	GetTx(txID ids.ID) (*txs.Tx, error)
 	AddTx(tx *txs.Tx)
-
-	GetBlockID(height uint64) (ids.ID, error)
-	GetBlock(blkID ids.ID) (blocks.Block, error)
 	AddBlock(block blocks.Block)
-
-	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
-
-	GetTimestamp() time.Time
 	SetTimestamp(t time.Time)
 }
 
@@ -231,6 +236,10 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		return utxo, nil
 	}
 	return s.utxoState.GetUTXO(utxoID)
+}
+
+func (s *state) GetUTXOFromID(utxoID *avax.UTXOID) (*avax.UTXO, error) {
+	return s.GetUTXO(utxoID.InputID())
 }
 
 func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {

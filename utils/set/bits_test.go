@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package set
@@ -36,7 +36,7 @@ func Test_Bits_New(t *testing.T) {
 				require.True(b.Contains(bit))
 			}
 
-			require.Equal(test.length, b.Len())
+			require.Equal(test.length, b.BitLen())
 		})
 	}
 }
@@ -124,7 +124,7 @@ func Test_Bits_AddRemove(t *testing.T) {
 				require.True(b.Contains(element))
 			}
 
-			require.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.BitLen())
 		})
 	}
 }
@@ -197,7 +197,7 @@ func Test_Bits_Union(t *testing.T) {
 				require.True(b.Contains(element))
 			}
 
-			require.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.BitLen())
 		})
 	}
 }
@@ -383,7 +383,7 @@ func Test_Bits_Clear(t *testing.T) {
 
 			b.Clear()
 
-			require.Zero(b.Len())
+			require.Zero(b.BitLen())
 		})
 	}
 }
@@ -419,7 +419,7 @@ func Test_Bits_String(t *testing.T) {
 	}
 }
 
-func Test_Bits_HammingWeight(t *testing.T) {
+func Test_Bits_Len(t *testing.T) {
 	tests := []struct {
 		name     string
 		bitset   []int
@@ -465,7 +465,7 @@ func Test_Bits_HammingWeight(t *testing.T) {
 				b.Add(bit)
 			}
 
-			require.Equal(test.expected, b.HammingWeight())
+			require.Equal(test.expected, b.Len())
 		})
 	}
 }
@@ -499,7 +499,7 @@ func Test_Bits_Bytes(t *testing.T) {
 			bytes := b.Bytes()
 			fromBytes := BitsFromBytes(bytes)
 
-			require.Equal(len(tt.elts), fromBytes.HammingWeight())
+			require.Equal(len(tt.elts), fromBytes.Len())
 			for _, elt := range tt.elts {
 				require.True(fromBytes.Contains(elt))
 			}

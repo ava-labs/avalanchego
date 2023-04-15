@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package registry
@@ -433,9 +433,10 @@ func initRegistererTest(t *testing.T) *vmRegistererTestResources {
 	mockLog := logging.NewMockLogger(ctrl)
 
 	registerer := NewVMRegisterer(VMRegistererConfig{
-		APIServer: mockServer,
-		Log:       mockLog,
-		VMManager: mockManager,
+		APIServer:    mockServer,
+		Log:          mockLog,
+		VMFactoryLog: logging.NoLog{},
+		VMManager:    mockManager,
 	})
 
 	mockLog.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()

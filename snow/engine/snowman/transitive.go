@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -435,7 +435,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %s", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %v", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {

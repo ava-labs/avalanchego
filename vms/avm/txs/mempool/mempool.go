@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -40,13 +41,6 @@ var (
 	errConflictsWithOtherTx = errors.New("tx conflicts with other tx")
 )
 
-type BlockTimer interface {
-	// ResetBlockTimer schedules a timer to notify the consensus engine once
-	// there is a block ready to be built. If a block is ready to be built when
-	// this function is called, the engine will be notified directly.
-	ResetBlockTimer()
-}
-
 // Mempool contains transactions that have not yet been put into a block.
 type Mempool interface {
 	Add(tx *txs.Tx) error
@@ -54,17 +48,18 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// HasTxs returns true if there is at least one transaction in the mempool.
-	HasTxs() bool
-
 	// Peek returns the next first tx that was added to the mempool whose size
 	// is less than or equal to maxTxSize.
 	Peek(maxTxSize int) *txs.Tx
 
-	// Note: Dropped txs are added to droppedTxIDs but not not evicted from
+	// RequestBuildBlock notifies the consensus engine that a block should be
+	// built if there is at least one transaction in the mempool.
+	RequestBuildBlock()
+
+	// Note: Dropped txs are added to droppedTxIDs but not evicted from
 	// unissued. This allows previously dropped txs to be possibly reissued.
-	MarkDropped(txID ids.ID, reason string)
-	GetDropReason(txID ids.ID) (string, bool)
+	MarkDropped(txID ids.ID, reason error)
+	GetDropReason(txID ids.ID) error
 }
 
 type mempool struct {
@@ -74,19 +69,19 @@ type mempool struct {
 	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
 	numTxs      prometheus.Gauge
 
+	toEngine chan<- common.Message
+
 	// Key: Tx ID
-	// Value: String representation of the verification error
-	droppedTxIDs *cache.LRU[ids.ID, string]
+	// Value: Verification error
+	droppedTxIDs *cache.LRU[ids.ID, error]
 
 	consumedUTXOs set.Set[ids.ID]
-
-	blkTimer BlockTimer
 }
 
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	blkTimer BlockTimer,
+	toEngine chan<- common.Message,
 ) (Mempool, error) {
 	bytesAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -112,9 +107,9 @@ func New(
 		bytesAvailable:       maxMempoolSize,
 		unissuedTxs:          linkedhashmap.New[ids.ID, *txs.Tx](),
 		numTxs:               numTxsMetric,
-		droppedTxIDs:         &cache.LRU[ids.ID, string]{Size: droppedTxIDsCacheSize},
+		toEngine:             toEngine,
+		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		blkTimer:             blkTimer,
 	}, nil
 }
 
@@ -159,8 +154,6 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// An explicitly added tx must not be marked as dropped.
 	m.droppedTxIDs.Evict(txID)
-
-	m.blkTimer.ResetBlockTimer()
 	return nil
 }
 
@@ -193,10 +186,6 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	}
 }
 
-func (m *mempool) HasTxs() bool {
-	return m.unissuedTxs.Len() > 0
-}
-
 func (m *mempool) Peek(maxTxSize int) *txs.Tx {
 	txIter := m.unissuedTxs.NewIterator()
 	for txIter.Next() {
@@ -209,10 +198,22 @@ func (m *mempool) Peek(maxTxSize int) *txs.Tx {
 	return nil
 }
 
-func (m *mempool) MarkDropped(txID ids.ID, reason string) {
+func (m *mempool) RequestBuildBlock() {
+	if m.unissuedTxs.Len() == 0 {
+		return
+	}
+
+	select {
+	case m.toEngine <- common.PendingTxs:
+	default:
+	}
+}
+
+func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 	m.droppedTxIDs.Put(txID, reason)
 }
 
-func (m *mempool) GetDropReason(txID ids.ID) (string, bool) {
-	return m.droppedTxIDs.Get(txID)
+func (m *mempool) GetDropReason(txID ids.ID) error {
+	err, _ := m.droppedTxIDs.Get(txID)
+	return err
 }

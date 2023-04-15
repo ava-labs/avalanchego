@@ -1,0 +1,23 @@
+name: Kurtosis Tests Basic
+
+on:
+  push:
+    tags-ignore:
+      - "*" # Ignores all tags
+    branches-ignore:
+      - master
+      - dev
+
+jobs:
+  run_kurtosis_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Kurtosis Tests
+        env:
+          KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
+          KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+          DOCKER_REPO: ${{ secrets.docker_repo }}
+        run: .github/workflows/run_e2e_tests.sh avalanchego-basic --parallelism 2 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET

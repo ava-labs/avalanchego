@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
@@ -93,7 +93,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	env.Builder.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, errTestingDropped)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -25,7 +25,7 @@ type builderWithOptions struct {
 // given options by default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
-//     opterations.
+//     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
 func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {

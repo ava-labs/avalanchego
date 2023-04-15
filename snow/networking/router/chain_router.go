@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -41,6 +42,8 @@ type requestEntry struct {
 	time time.Time
 	// The type of request that was made
 	op message.Op
+	// The engine type of the request that was made
+	engineType p2p.EngineType
 }
 
 type peer struct {
@@ -149,7 +152,8 @@ func (cr *ChainRouter) RegisterRequest(
 	respondingChainID ids.ID,
 	requestID uint32,
 	op message.Op,
-	failedMsg message.InboundMessage,
+	timeoutMsg message.InboundMessage,
+	engineType p2p.EngineType,
 ) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
@@ -168,8 +172,9 @@ func (cr *ChainRouter) RegisterRequest(
 	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
-		time: cr.clock.Time(),
-		op:   op,
+		time:       cr.clock.Time(),
+		op:         op,
+		engineType: engineType,
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
@@ -190,7 +195,7 @@ func (cr *ChainRouter) RegisterRequest(
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
-			cr.HandleInbound(ctx, failedMsg)
+			cr.HandleInbound(ctx, timeoutMsg)
 		},
 	)
 }
@@ -280,7 +285,17 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			msg.OnFinishedHandling()
 			return
 		}
-		chain.Push(ctx, msg)
+
+		// Note: engineType is not guaranteed to be one of the explicitly named
+		// enum values. If it was not specified it defaults to UNSPECIFIED.
+		engineType, _ := message.GetEngineType(m)
+		chain.Push(
+			ctx,
+			handler.Message{
+				InboundMessage: msg,
+				EngineType:     engineType,
+			},
+		)
 		return
 	}
 
@@ -298,7 +313,13 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
 		// Pass the failure to the chain
-		chain.Push(ctx, msg)
+		chain.Push(
+			ctx,
+			handler.Message{
+				InboundMessage: msg,
+				EngineType:     req.engineType,
+			},
+		)
 		return
 	}
 
@@ -326,7 +347,13 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
-	chain.Push(ctx, msg)
+	chain.Push(
+		ctx,
+		handler.Message{
+			InboundMessage: msg,
+			EngineType:     req.engineType,
+		},
+	)
 }
 
 // Shutdown shuts down this router
@@ -386,7 +413,12 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 		}
 
 		msg := message.InternalConnected(validatorID, peer.version)
-		chain.Push(ctx, msg)
+		chain.Push(ctx,
+			handler.Message{
+				InboundMessage: msg,
+				EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+			},
+		)
 	}
 
 	// When we register the P-chain, we mark ourselves as connected on all of
@@ -442,7 +474,13 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 			// If staking is disabled, send a Connected message to every chain
 			// when connecting to the primary network
 			if subnetID == chain.Context().SubnetID || !cr.stakingEnabled {
-				chain.Push(context.TODO(), msg)
+				chain.Push(
+					context.TODO(),
+					handler.Message{
+						InboundMessage: msg,
+						EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+					},
+				)
 			}
 		}
 	}
@@ -469,7 +507,12 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	// disconnected properly.
 	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
-			chain.Push(context.TODO(), msg)
+			chain.Push(
+				context.TODO(),
+				handler.Message{
+					InboundMessage: msg,
+					EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+				})
 		}
 	}
 }
@@ -494,7 +537,12 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
-			chain.Push(context.TODO(), msg)
+			chain.Push(
+				context.TODO(),
+				handler.Message{
+					InboundMessage: msg,
+					EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+				})
 		}
 	}
 
@@ -524,7 +572,12 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chainHandlers {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
-			chain.Push(context.TODO(), msg)
+			chain.Push(
+				context.TODO(),
+				handler.Message{
+					InboundMessage: msg,
+					EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+				})
 		}
 	}
 
@@ -664,7 +717,13 @@ func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID i
 		)
 		return
 	}
-	platformChain.Push(context.TODO(), msg)
+	platformChain.Push(
+		context.TODO(),
+		handler.Message{
+			InboundMessage: msg,
+			EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+		},
+	)
 
 	peer.connectedSubnets.Add(subnetID)
 }

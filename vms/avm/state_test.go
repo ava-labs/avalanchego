@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -55,7 +56,7 @@ func TestSetsAndGets(t *testing.T) {
 	utxoID := utxo.InputID()
 
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
+		NetworkID:    constants.UnitTestID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{

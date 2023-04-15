@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -16,7 +16,7 @@ var (
 	errPending   = errors.New("unexpectedly called Pending")
 	errLinearize = errors.New("unexpectedly called Linearize")
 
-	_ DAGVM = (*TestVM)(nil)
+	_ LinearizableVM = (*TestVM)(nil)
 )
 
 type TestVM struct {

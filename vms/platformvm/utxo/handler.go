@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utxo
@@ -33,7 +33,7 @@ var (
 )
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
-//       P-chain wallet
+// P-chain wallet
 type Spender interface {
 	// Spend the provided amount while deducting the provided fee.
 	// Arguments:

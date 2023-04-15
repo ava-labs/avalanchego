@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -17,13 +17,13 @@ import (
 )
 
 var (
-	errNilTransferableOutput   = errors.New("nil transferable output is not valid")
-	errNilTransferableFxOutput = errors.New("nil transferable feature extension output is not valid")
-	errOutputsNotSorted        = errors.New("outputs not sorted")
+	ErrNilTransferableOutput   = errors.New("nil transferable output is not valid")
+	ErrNilTransferableFxOutput = errors.New("nil transferable feature extension output is not valid")
+	ErrOutputsNotSorted        = errors.New("outputs not sorted")
 
-	errNilTransferableInput   = errors.New("nil transferable input is not valid")
-	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
-	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
+	ErrNilTransferableInput   = errors.New("nil transferable input is not valid")
+	ErrNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
+	ErrInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 
 	_ verify.Verifiable                  = (*TransferableOutput)(nil)
 	_ verify.Verifiable                  = (*TransferableInput)(nil)
@@ -80,9 +80,9 @@ func (out *TransferableOutput) Output() TransferableOut {
 func (out *TransferableOutput) Verify() error {
 	switch {
 	case out == nil:
-		return errNilTransferableOutput
+		return ErrNilTransferableOutput
 	case out.Out == nil:
-		return errNilTransferableFxOutput
+		return ErrNilTransferableFxOutput
 	default:
 		return verify.All(&out.Asset, out.Out)
 	}
@@ -153,9 +153,9 @@ func (in *TransferableInput) Input() TransferableIn {
 func (in *TransferableInput) Verify() error {
 	switch {
 	case in == nil:
-		return errNilTransferableInput
+		return ErrNilTransferableInput
 	case in.In == nil:
-		return errNilTransferableFxInput
+		return ErrNilTransferableFxInput
 	default:
 		return verify.All(&in.UTXOID, &in.Asset, in.In)
 	}
@@ -221,7 +221,7 @@ func VerifyTx(
 			fc.Produce(out.AssetID(), out.Output().Amount())
 		}
 		if !IsSortedTransferableOutputs(outs, c) {
-			return errOutputsNotSorted
+			return ErrOutputsNotSorted
 		}
 	}
 
@@ -234,7 +234,7 @@ func VerifyTx(
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
 		if !utils.IsSortedAndUniqueSortable(ins) {
-			return errInputsNotSortedUnique
+			return ErrInputsNotSortedUnique
 		}
 	}
 

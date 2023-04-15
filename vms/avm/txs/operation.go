@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	errNilOperation              = errors.New("nil operation is not valid")
-	errNilFxOperation            = errors.New("nil fx operation is not valid")
-	errNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
+	ErrNilOperation              = errors.New("nil operation is not valid")
+	ErrNilFxOperation            = errors.New("nil fx operation is not valid")
+	ErrNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
 )
 
 type Operation struct {
@@ -33,11 +33,11 @@ type Operation struct {
 func (op *Operation) Verify() error {
 	switch {
 	case op == nil:
-		return errNilOperation
+		return ErrNilOperation
 	case op.Op == nil:
-		return errNilFxOperation
+		return ErrNilFxOperation
 	case !utils.IsSortedAndUniqueSortable(op.UTXOIDs):
-		return errNotSortedAndUniqueUTXOIDs
+		return ErrNotSortedAndUniqueUTXOIDs
 	default:
 		return verify.All(&op.Asset, op.Op)
 	}

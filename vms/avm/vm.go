@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -39,16 +39,21 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
+	"github.com/ava-labs/avalanchego/vms/avm/metrics"
+	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/blocks/builder"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
+	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
 const (
@@ -63,16 +68,17 @@ var (
 	errUnknownFx                 = errors.New("unknown feature extension")
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
-	errUnimplemented             = errors.New("unimplemented")
 
-	_ vertex.DAGVM = (*VM)(nil)
+	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
 )
 
 type VM struct {
-	common.AppHandler
+	network.Atomic
 
 	config.Config
-	metrics
+
+	metrics metrics.Metrics
+
 	avax.AddressManager
 	avax.AtomicUTXOManager
 	ids.Aliaser
@@ -84,9 +90,13 @@ type VM struct {
 	// Used to check local time
 	clock mockable.Clock
 
+	registerer prometheus.Registerer
+
 	parser blocks.Parser
 
 	pubsub *pubsub.Server
+
+	appSender common.AppSender
 
 	// State management
 	state states.State
@@ -117,6 +127,14 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
+
+	txBackend *txexecutor.Backend
+	dagState  *dagState
+
+	// These values are only initialized after the chain has been linearized.
+	blockbuilder.Builder
+	chainManager blockexecutor.Manager
+	network      network.Network
 }
 
 func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
@@ -147,9 +165,10 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	_ common.AppSender,
+	appSender common.AppSender,
 ) error {
-	vm.AppHandler = common.NewNoOpAppHandler(ctx.Log)
+	noopMessageHandler := common.NewNoOpAppHandler(ctx.Log)
+	vm.Atomic = network.NewAtomic(noopMessageHandler)
 
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
@@ -165,17 +184,22 @@ func (vm *VM) Initialize(
 	if err := ctx.Metrics.Register(registerer); err != nil {
 		return err
 	}
+	vm.registerer = registerer
 
-	err := vm.metrics.Initialize("", registerer)
+	// Initialize metrics as soon as possible
+	var err error
+	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
+
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.Aliaser = ids.NewAliaser()
 
 	db := dbManager.Current().Database
 	vm.ctx = ctx
 	vm.toEngine = toEngine
+	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
 	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
@@ -214,7 +238,7 @@ func (vm *VM) Initialize(
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := states.New(vm.db, vm.parser, registerer)
+	state, err := states.New(vm.db, vm.parser, vm.registerer)
 	if err != nil {
 		return err
 	}
@@ -238,13 +262,12 @@ func (vm *VM) Initialize(
 		Size: txDeduplicatorSize,
 	}
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
-	vm.walletService.pendingTxOrdering = list.New()
+	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Info("address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", registerer, avmConfig.IndexAllowIncomplete)
+		vm.ctx.Log.Warn("deprecated address transaction indexing is enabled")
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", vm.registerer, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
 		}
@@ -255,11 +278,27 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
+
+	vm.txBackend = &txexecutor.Backend{
+		Ctx:           ctx,
+		Config:        &vm.Config,
+		Fxs:           vm.fxs,
+		TypeToFxIndex: vm.typeToFxIndex,
+		Codec:         vm.parser.Codec(),
+		FeeAssetID:    vm.feeAssetID,
+		Bootstrapped:  false,
+	}
+	vm.dagState = &dagState{
+		Chain: vm.state,
+		vm:    vm,
+	}
+
 	return vm.state.Commit()
 }
 
 // onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
 func (vm *VM) onBootstrapStarted() error {
+	vm.txBackend.Bootstrapped = false
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -269,11 +308,26 @@ func (vm *VM) onBootstrapStarted() error {
 }
 
 func (vm *VM) onNormalOperationsStarted() error {
+	vm.txBackend.Bootstrapped = true
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
 		}
 	}
+
+	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
+	if err != nil {
+		return err
+	}
+	utxoID := avax.UTXOID{
+		TxID:        txID,
+		OutputIndex: 192,
+	}
+	vm.state.DeleteUTXO(utxoID.InputID())
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+
 	vm.bootstrapped = true
 	return nil
 }
@@ -318,8 +372,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -328,8 +382,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
@@ -359,24 +413,25 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
  ******************************************************************************
  */
 
-func (*VM) GetBlock(context.Context, ids.ID) (snowman.Block, error) {
-	return nil, errUnimplemented
+func (vm *VM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+	return vm.chainManager.GetBlock(blkID)
 }
 
-func (*VM) ParseBlock(context.Context, []byte) (snowman.Block, error) {
-	return nil, errUnimplemented
+func (vm *VM) ParseBlock(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+	blk, err := vm.parser.ParseBlock(blkBytes)
+	if err != nil {
+		return nil, err
+	}
+	return vm.chainManager.NewBlock(blk), nil
 }
 
-func (*VM) BuildBlock(context.Context) (snowman.Block, error) {
-	return nil, errUnimplemented
+func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
+	vm.chainManager.SetPreference(blkID)
+	return nil
 }
 
-func (*VM) SetPreference(context.Context, ids.ID) error {
-	return errUnimplemented
-}
-
-func (*VM) LastAccepted(context.Context) (ids.ID, error) {
-	return ids.Empty, errUnimplemented
+func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
+	return vm.chainManager.LastAccepted(), nil
 }
 
 /*
@@ -385,9 +440,49 @@ func (*VM) LastAccepted(context.Context) (ids.ID, error) {
  ******************************************************************************
  */
 
-func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID) error {
-	time := version.GetXChainMigrationTime(vm.ctx.NetworkID)
-	return vm.state.InitializeChainState(stopVertexID, time)
+func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
+	time := version.GetCortinaTime(vm.ctx.NetworkID)
+	err := vm.state.InitializeChainState(stopVertexID, time)
+	if err != nil {
+		return err
+	}
+
+	mempool, err := mempool.New("mempool", vm.registerer, toEngine)
+	if err != nil {
+		return fmt.Errorf("failed to create mempool: %w", err)
+	}
+
+	vm.chainManager = blockexecutor.NewManager(
+		mempool,
+		vm.metrics,
+		&chainState{
+			State: vm.state,
+		},
+		vm.txBackend,
+		&vm.clock,
+		vm.onAccept,
+	)
+
+	vm.Builder = blockbuilder.New(
+		vm.txBackend,
+		vm.chainManager,
+		&vm.clock,
+		mempool,
+	)
+
+	vm.network = network.New(
+		vm.ctx,
+		vm.parser,
+		vm.chainManager,
+		mempool,
+		vm.appSender,
+	)
+
+	// Note: It's important only to switch the networking stack after the full
+	// chainVM has been initialized. Traffic will immediately start being
+	// handled asynchronously.
+	vm.Atomic.Set(vm.network)
+	return nil
 }
 
 func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {
@@ -426,6 +521,29 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if !vm.bootstrapped {
 		return ids.ID{}, errBootstrapping
 	}
+
+	// If the chain has been linearized, issue the tx to the network.
+	if vm.Builder != nil {
+		tx, err := vm.parser.ParseTx(b)
+		if err != nil {
+			vm.ctx.Log.Debug("failed to parse tx",
+				zap.Error(err),
+			)
+			return ids.ID{}, err
+		}
+
+		err = vm.network.IssueTx(context.TODO(), tx)
+		if err != nil {
+			vm.ctx.Log.Debug("failed to add tx to mempool",
+				zap.Error(err),
+			)
+			return ids.ID{}, err
+		}
+
+		return tx.ID(), nil
+	}
+
+	// TODO: After the chain is linearized, remove the following code.
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
@@ -437,6 +555,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
+// TODO: After the chain is linearized, remove this.
 func (vm *VM) issueStopVertex() error {
 	select {
 	case vm.toEngine <- common.StopVertex:
@@ -570,129 +689,6 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 	}
 }
 
-func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
-	inputID := utxoID.InputID()
-	utxo, err := vm.state.GetUTXO(inputID)
-	if err == nil {
-		return utxo, nil
-	}
-
-	inputTx, inputIndex := utxoID.InputSource()
-	parent := UniqueTx{
-		vm:   vm,
-		txID: inputTx,
-	}
-
-	if err := parent.verifyWithoutCacheWrites(); err != nil {
-		return nil, errMissingUTXO
-	} else if status := parent.Status(); status.Decided() {
-		return nil, errMissingUTXO
-	}
-
-	parentUTXOs := parent.UTXOs()
-	if uint32(len(parentUTXOs)) <= inputIndex || int(inputIndex) < 0 {
-		return nil, errInvalidUTXO
-	}
-	return parentUTXOs[int(inputIndex)], nil
-}
-
-func (vm *VM) getFx(val interface{}) (int, error) {
-	valType := reflect.TypeOf(val)
-	fx, exists := vm.typeToFxIndex[valType]
-	if !exists {
-		return 0, errUnknownFx
-	}
-	return fx, nil
-}
-
-func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
-	// Check cache to see whether this asset supports this fx
-	if fxIDs, ok := vm.assetToFxCache.Get(assetID); ok {
-		return fxIDs.Contains(uint(fxID))
-	}
-	// Caches doesn't say whether this asset support this fx.
-	// Get the tx that created the asset and check.
-	tx := &UniqueTx{
-		vm:   vm,
-		txID: assetID,
-	}
-	if status := tx.Status(); !status.Fetched() {
-		return false
-	}
-	createAssetTx, ok := tx.Unsigned.(*txs.CreateAssetTx)
-	if !ok {
-		// This transaction was not an asset creation tx
-		return false
-	}
-	fxIDs := set.Bits64(0)
-	for _, state := range createAssetTx.States {
-		if state.FxIndex == uint32(fxID) {
-			// Cache that this asset supports this fx
-			fxIDs.Add(uint(fxID))
-		}
-	}
-	vm.assetToFxCache.Put(assetID, fxIDs)
-	return fxIDs.Contains(uint(fxID))
-}
-
-func (vm *VM) verifyTransferOfUTXO(utx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable, utxo *avax.UTXO) error {
-	fxIndex, err := vm.getFx(cred)
-	if err != nil {
-		return err
-	}
-	fx := vm.fxs[fxIndex].Fx
-
-	utxoAssetID := utxo.AssetID()
-	inAssetID := in.AssetID()
-	if utxoAssetID != inAssetID {
-		return errAssetIDMismatch
-	}
-
-	if !vm.verifyFxUsage(fxIndex, inAssetID) {
-		return errIncompatibleFx
-	}
-
-	return fx.VerifyTransfer(utx, in.In, cred, utxo.Out)
-}
-
-func (vm *VM) verifyTransfer(tx txs.UnsignedTx, in *avax.TransferableInput, cred verify.Verifiable) error {
-	utxo, err := vm.getUTXO(&in.UTXOID)
-	if err != nil {
-		return err
-	}
-	return vm.verifyTransferOfUTXO(tx, in, cred, utxo)
-}
-
-func (vm *VM) verifyOperation(tx *txs.OperationTx, op *txs.Operation, cred verify.Verifiable) error {
-	opAssetID := op.AssetID()
-
-	numUTXOs := len(op.UTXOIDs)
-	utxos := make([]interface{}, numUTXOs)
-	for i, utxoID := range op.UTXOIDs {
-		utxo, err := vm.getUTXO(utxoID)
-		if err != nil {
-			return err
-		}
-
-		utxoAssetID := utxo.AssetID()
-		if utxoAssetID != opAssetID {
-			return errAssetIDMismatch
-		}
-		utxos[i] = utxo.Out
-	}
-
-	fxIndex, err := vm.getFx(op.Op)
-	if err != nil {
-		return err
-	}
-	fx := vm.fxs[fxIndex].Fx
-
-	if !vm.verifyFxUsage(fxIndex, opAssetID) {
-		return errIncompatibleFx
-	}
-	return fx.VerifyOperation(tx, op.Op, cred, utxos)
-}
-
 // LoadUser returns:
 // 1) The UTXOs that reference one or more addresses controlled by the given user
 // 2) A keychain that contains this user's keys
@@ -751,6 +747,49 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 		return assetID, nil
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
+}
+
+// Invariant: onAccept is called when [tx] is being marked as accepted, but
+// before its state changes are applied.
+// Invariant: any error returned by onAccept should be considered fatal.
+// TODO: Remove [onAccept] once the deprecated APIs this powers are removed.
+func (vm *VM) onAccept(tx *txs.Tx) error {
+	// Fetch the input UTXOs
+	txID := tx.ID()
+	inputUTXOIDs := tx.Unsigned.InputUTXOs()
+	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
+	for _, utxoID := range inputUTXOIDs {
+		// Don't bother fetching the input UTXO if its symbolic
+		if utxoID.Symbolic() {
+			continue
+		}
+
+		utxo, err := vm.state.GetUTXOFromID(utxoID)
+		if err == database.ErrNotFound {
+			vm.ctx.Log.Debug("dropping utxo from index",
+				zap.Stringer("txID", txID),
+				zap.Stringer("utxoTxID", utxoID.TxID),
+				zap.Uint32("utxoOutputIndex", utxoID.OutputIndex),
+			)
+			continue
+		}
+		if err != nil {
+			// should never happen because the UTXO was previously verified to
+			// exist
+			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
+		}
+		inputUTXOs = append(inputUTXOs, utxo)
+	}
+
+	outputUTXOs := tx.UTXOs()
+	// index input and output UTXOs
+	if err := vm.addressTxsIndexer.Accept(txID, inputUTXOs, outputUTXOs); err != nil {
+		return fmt.Errorf("error indexing tx: %w", err)
+	}
+
+	vm.pubsub.Publish(NewPubSubFilterer(tx))
+	vm.walletService.decided(txID)
+	return nil
 }
 
 // UniqueTx de-duplicates the transaction.
