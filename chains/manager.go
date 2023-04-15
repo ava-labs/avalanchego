@@ -864,7 +864,7 @@ func (m *manager) createAvalancheChain(
 		VM:            vmWrappingProposerVM,
 		Sender:        snowmanCommonCfg.Sender,
 		Validators:    vdrs,
-		Params:        consensusParams.Parameters,
+		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
@@ -1194,7 +1194,7 @@ func (m *manager) createSnowmanChain(
 		VM:            vm,
 		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
-		Params:        consensusParams.Parameters,
+		Params:        consensusParams,
 		Consensus:     consensus,
 	}
 	engine, err := smeng.New(engineConfig)
