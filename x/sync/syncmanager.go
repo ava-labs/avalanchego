@@ -378,7 +378,7 @@ func (m *StateSyncManager) findNextKey(
 	var result []byte
 	localIndex := len(localProofNodes) - 1
 	receivedIndex := len(receivedProofNodes) - 1
-	startKeyPath := merkledb.SerializedPath{Value: start, NibbleLength: 2 * len(start)}
+	startKeyPath := merkledb.SerializedPath{Value: start}
 
 	// Just return the start key when the proof nodes contain keys that are not prefixes of the start key
 	// this occurs mostly in change proofs where the largest returned key was a deleted key.
@@ -396,8 +396,8 @@ func (m *StateSyncManager) findNextKey(
 		// the two nodes have the same key
 		if localNode.KeyPath.Equal(receivedNode.KeyPath) {
 			startingChildIndex := byte(0)
-			if localNode.KeyPath.NibbleLength < startKeyPath.NibbleLength {
-				startingChildIndex = startKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
+			if localNode.KeyPath.NibbleLength() < startKeyPath.NibbleLength() {
+				startingChildIndex = startKeyPath.NibbleVal(localNode.KeyPath.NibbleLength()) + 1
 			}
 			// the two nodes have the same path, so ensure that all children have matching ids
 			for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
@@ -420,7 +420,7 @@ func (m *StateSyncManager) findNextKey(
 
 		var branchNode merkledb.ProofNode
 
-		if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
+		if receivedNode.KeyPath.NibbleLength() > localNode.KeyPath.NibbleLength() {
 			// the received proof has an extra node due to a branch that is not present locally
 			branchNode = receivedNode
 			receivedIndex--
@@ -431,7 +431,7 @@ func (m *StateSyncManager) findNextKey(
 		}
 
 		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := startKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
+		for nextKeyNibble := startKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength()) + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
 				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
 				break

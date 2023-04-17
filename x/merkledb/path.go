@@ -16,22 +16,30 @@ const EmptyPath path = ""
 // The trie branch factor is 16, so the path may contain an odd number of nibbles.
 // If it did contain an odd number of nibbles, the last 4 bits of the last byte should be discarded.
 type SerializedPath struct {
-	NibbleLength int
-	Value        []byte
-}
-
-func (s SerializedPath) hasOddLength() bool {
-	return s.NibbleLength&1 == 1
+	HasOddNibbleLength bool
+	Value              []byte
 }
 
 func (s SerializedPath) Equal(other SerializedPath) bool {
-	return s.NibbleLength == other.NibbleLength && bytes.Equal(s.Value, other.Value)
+	return s.HasOddNibbleLength == other.HasOddNibbleLength && bytes.Equal(s.Value, other.Value)
 }
 
 func (s SerializedPath) deserialize() path {
 	result := newPath(s.Value)
 	// trim the last nibble if the path has an odd length
-	return result[:len(result)-s.NibbleLength&1]
+	if s.HasOddNibbleLength {
+		result = result[:len(result)-1]
+	}
+	return result
+}
+
+func (s SerializedPath) NibbleLength() int {
+	length := len(s.Value) * 2
+	// trim the last nibble if the path has an odd length
+	if s.HasOddNibbleLength {
+		length--
+	}
+	return length
 }
 
 // Returns true iff [prefix] is a prefix of [s] or equal to it.
@@ -40,7 +48,7 @@ func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
 		return false
 	}
 	prefixValue := prefix.Value
-	if !prefix.hasOddLength() {
+	if !prefix.HasOddNibbleLength {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
 	reducedSize := len(prefixValue) - 1
@@ -69,13 +77,16 @@ func (s SerializedPath) NibbleVal(nibbleIndex int) byte {
 
 func (s SerializedPath) AppendNibble(nibble byte) SerializedPath {
 	// even is 1 if even, 0 if odd
-	even := 1 - s.NibbleLength&1
-	value := make([]byte, len(s.Value)+even)
+	currentlyEven := 1
+	if s.HasOddNibbleLength {
+		currentlyEven -= 1
+	}
+	value := make([]byte, len(s.Value)+currentlyEven)
 	copy(value, s.Value)
 
 	// shift the nibble 4 left if even, do nothing if odd
-	value[len(value)-1] += nibble << (4 * even)
-	return SerializedPath{Value: value, NibbleLength: s.NibbleLength + 1}
+	value[len(value)-1] += nibble << (4 * currentlyEven)
+	return SerializedPath{Value: value, HasOddNibbleLength: currentlyEven == 1}
 }
 
 type path string
@@ -115,8 +126,8 @@ func (p path) Serialize() SerializedPath {
 	byteLength := (len(p) + 1) / 2
 
 	result := SerializedPath{
-		NibbleLength: len(p),
-		Value:        make([]byte, byteLength),
+		HasOddNibbleLength: len(p)%2 == 1,
+		Value:              make([]byte, byteLength),
 	}
 
 	// loop over the path's bytes
@@ -129,7 +140,7 @@ func (p path) Serialize() SerializedPath {
 	}
 
 	// if there is was a odd number of nibbles, grab the last one
-	if result.hasOddLength() {
+	if result.HasOddNibbleLength {
 		result.Value[keyIndex] = p[keyIndex<<1] << 4
 	}
 
