@@ -11,7 +11,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ## Issues
 
 ### Security
-- Do not open up a GitHub issue if it relates to a security vulnerability in AvalancheGo, and instead refer to our [security policy](../SECURITY.md).
+- Do not open up a GitHub issue if it relates to a security vulnerability in AvalancheGo, and instead refer to our [security policy](./SECURITY.md).
 
 ### Did you fix whitespace, format code, or make a purely cosmetic patch?
 
@@ -19,7 +19,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ### Other
 
-- Ensure the bug was not already reported by searching on GitHub under [issues](https://github.com/ava-labs/avalanchego/issues).
+- Ensure that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
 - If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
 
 #### Features
@@ -40,7 +40,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ```sh
 ./scripts/protobuf_codegen.sh
 ```
-- To add or remove an interface that needs a corresponding mock generated, add it to the mock file [here](../mocks.mockgen.txt). You can regenerate the mocks by running the following script.
+- To add or remove an interface that needs a corresponding mock generated, add it to the mock file [here](./scripts/mocks.mockgen.txt). You can regenerate the mocks by running the following script.
 ```sh
 ./scripts/mock.gen.sh
 ```
