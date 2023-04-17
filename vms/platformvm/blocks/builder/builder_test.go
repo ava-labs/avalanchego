@@ -38,7 +38,7 @@ var errTestingDropped = errors.New("testing dropped")
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, ContinuousStakingFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -73,7 +73,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, ContinuousStakingFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -106,7 +106,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t)
+	env := newEnvironment(t, ContinuousStakingFork)
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}

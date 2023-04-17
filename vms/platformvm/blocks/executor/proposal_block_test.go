@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -36,7 +35,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, ApricotFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -149,14 +148,11 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl)
+	env := newEnvironment(t, ctrl, ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime)
-	env.config.BanffTime = time.Time{}                  // activate Banff
-	env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-	env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
@@ -557,13 +553,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
+			env := newEnvironment(t, nil, ContinuousStakingFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			env.config.BanffTime = time.Time{}                  // activate Banff
-			env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-			env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -709,13 +702,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{}                  // activate Banff
-	env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-	env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
@@ -855,13 +845,10 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil)
+			env := newEnvironment(t, nil, ContinuousStakingFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
-			env.config.BanffTime = time.Time{}                  // activate Banff
-			env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-			env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -964,13 +951,10 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{}                  // activate Banff
-	env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-	env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1153,13 +1137,10 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil)
+	env := newEnvironment(t, nil, ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.config.BanffTime = time.Time{}                  // activate Banff
-	env.config.CortinaTime = mockable.MaxTime           // cortina is not activate
-	env.config.ContinuousStakingTime = mockable.MaxTime // continuous staking is not activated
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator

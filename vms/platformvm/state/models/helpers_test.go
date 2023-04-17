@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -110,7 +109,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase5Time:     defaultValidateEndTime,
 		BanffTime:             time.Time{}, // neglecting fork ordering this for package tests
 		CortinaTime:           time.Time{},
-		ContinuousStakingTime: mockable.MaxTime,
+		ContinuousStakingTime: time.Time{},
 	}
 }
 

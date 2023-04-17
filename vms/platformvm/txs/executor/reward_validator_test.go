@@ -25,7 +25,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -125,7 +125,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -219,7 +219,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(BanffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -349,7 +349,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, true /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -576,7 +576,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, true /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -742,7 +742,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

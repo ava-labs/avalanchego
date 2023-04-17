@@ -49,9 +49,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type activeFork uint8
+
 const (
 	testNetworkID = 10 // To be used in tests
 	defaultWeight = 10000
+
+	ApricotFork           activeFork = 0
+	BanffFork             activeFork = 1
+	CortinaFork           activeFork = 2
+	ContinuousStakingFork activeFork = 3
 )
 
 var (
@@ -112,30 +119,30 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(postBanff, postCortina, postContinuousStaking bool) *environment {
+func newEnvironment(fork activeFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina, postContinuousStaking)
-	clk := defaultClock(postBanff || postCortina || postContinuousStaking)
+	config := defaultConfig(fork)
+	clk := defaultClock(fork != ApricotFork)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
+	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewHandler(ctx, &clk, fx)
+	utxoHandler := utxo.NewHandler(ctx, clk, fx)
 
 	txBuilder := builder.New(
 		ctx,
-		&config,
-		&clk,
+		config,
+		clk,
 		fx,
 		baseState,
 		atomicUTXOs,
@@ -143,9 +150,9 @@ func newEnvironment(postBanff, postCortina, postContinuousStaking bool) *environ
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
-		Clk:          &clk,
+		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
@@ -155,8 +162,8 @@ func newEnvironment(postBanff, postCortina, postContinuousStaking bool) *environ
 
 	env := &environment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
-		clk:            &clk,
+		config:         config,
+		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
 		msm:            msm,
@@ -283,24 +290,33 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff, postCortina, postContinuousStaking bool) config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		banffTime             = mockable.MaxTime
+		cortinaTime           = mockable.MaxTime
+		continuousStakingTime = mockable.MaxTime
+	)
+
+	switch fork {
+	case ApricotFork:
+		// nothing todo
+	case BanffFork:
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
+	case CortinaFork:
+		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
-	}
-	continuousStakingForkTime := mockable.MaxTime
-	if postContinuousStaking {
-		continuousStakingForkTime = defaultValidateStartTime.Add(-2 * time.Second)
+	case ContinuousStakingFork:
+		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
+		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+		continuousStakingTime = defaultValidateStartTime.Add(-2 * time.Second)
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return config.Config{
+	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
@@ -322,11 +338,11 @@ func defaultConfig(postBanff, postCortina, postContinuousStaking bool) config.Co
 		ApricotPhase5Time:     defaultValidateEndTime,
 		BanffTime:             banffTime,
 		CortinaTime:           cortinaTime,
-		ContinuousStakingTime: continuousStakingForkTime,
+		ContinuousStakingTime: continuousStakingTime,
 	}
 }
 
-func defaultClock(postFork bool) mockable.Clock {
+func defaultClock(postFork bool) *mockable.Clock {
 	now := defaultGenesisTime
 	if postFork {
 		// 1 second after latest fork
@@ -334,7 +350,7 @@ func defaultClock(postFork bool) mockable.Clock {
 	}
 	clk := mockable.Clock{}
 	clk.Set(now)
-	return clk
+	return &clk
 }
 
 type fxVMInt struct {

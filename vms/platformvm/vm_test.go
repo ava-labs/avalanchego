@@ -73,9 +73,16 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+type activeFork uint8
+
 const (
 	testNetworkID = 10 // To be used in tests
 	defaultWeight = 10000
+
+	ApricotFork           activeFork = 0
+	BanffFork             activeFork = 1
+	CortinaFork           activeFork = 2
+	ContinuousStakingFork activeFork = 3
 )
 
 var (
@@ -103,7 +110,7 @@ var (
 	// time that genesis validators stop validating
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
-	banffForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
+	latestForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = secp256k1.TestKeys()
@@ -315,10 +322,33 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+
+	var (
+		banffTime             = mockable.MaxTime
+		cortinaTime           = mockable.MaxTime
+		continuousStakingTime = mockable.MaxTime
+	)
+
+	switch fork {
+	case ApricotFork:
+		// nothing todo
+	case BanffFork:
+		banffTime = time.Time{}
+	case CortinaFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+	case ContinuousStakingFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+		continuousStakingTime = time.Time{}
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -336,16 +366,16 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		RewardConfig:           defaultRewardConfig,
 		ApricotPhase3Time:      defaultValidateEndTime,
 		ApricotPhase5Time:      defaultValidateEndTime,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              banffTime,
+		CortinaTime:            cortinaTime,
+		ContinuousStakingTime:  continuousStakingTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
-	vm.clock.Set(banffForkTime.Add(time.Second))
+	vm.clock.Set(latestForkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
@@ -435,9 +465,9 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -503,7 +533,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -566,7 +596,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -604,15 +634,16 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	// Verify that new validator now in pending validator set
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	// Verify that new validator now in current validator set
+	// (ContinuousStakingFork is active)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 }
 
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(CortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -670,7 +701,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -714,7 +745,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -749,7 +780,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -795,7 +826,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -840,7 +871,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -939,7 +970,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1034,7 +1065,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1130,7 +1161,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1144,7 +1175,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1199,7 +1230,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1310,7 +1341,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1403,7 +1434,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1484,9 +1515,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -1499,7 +1530,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}
 	firstCtx.SharedMemory = msm
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := latestForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
@@ -1575,9 +1606,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -1633,12 +1664,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext()
 
@@ -1959,12 +1990,12 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
@@ -2059,7 +2090,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
@@ -2123,9 +2154,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             firstVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -2145,7 +2176,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	)
 	require.NoError(err)
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := latestForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
@@ -2167,9 +2198,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       .21,
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -2306,9 +2337,9 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              banffForkTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	ctx := defaultContext()
@@ -2334,7 +2365,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	initialClkTime := banffForkTime.Add(time.Second)
+	initialClkTime := latestForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
@@ -2422,9 +2453,9 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             vdrManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		BanffTime:              mockable.MaxTime,
-		CortinaTime:            mockable.MaxTime,
-		ContinuousStakingTime:  mockable.MaxTime,
+		BanffTime:              latestForkTime,
+		CortinaTime:            latestForkTime,
+		ContinuousStakingTime:  latestForkTime,
 	}}
 
 	ctx := defaultContext()
@@ -2846,10 +2877,10 @@ func copySubnetValidator(vdr *validators.Validator) *validators.Validator {
 func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := banffForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(CortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {

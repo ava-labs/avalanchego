@@ -22,7 +22,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, ContinuousStakingFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

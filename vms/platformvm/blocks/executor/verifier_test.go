@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-func TestVerifierVisitProposalBlock(t *testing.T) {
+func TestVerifierVisitApricotProposalBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -217,7 +217,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestVerifierVisitStandardBlock(t *testing.T) {
+func TestVerifierVisitApricotStandardBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -323,7 +323,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestVerifierVisitCommitBlock(t *testing.T) {
+func TestVerifierVisitApricotCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -398,7 +398,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestVerifierVisitAbortBlock(t *testing.T) {
+func TestVerifierVisitApricotAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -553,9 +553,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			config := &config.Config{
-				BanffTime:             time.Time{},      // banff is activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+				BanffTime:             time.Time{}, // banff is activated
+				CortinaTime:           time.Time{},
+				ContinuousStakingTime: time.Time{},
 			}
 
 			// Create mocked dependencies.
@@ -659,9 +659,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentHeight := uint64(1)
 
 			config := &config.Config{
-				BanffTime:             time.Time{},      // banff is activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+				BanffTime:             time.Time{}, // banff is activated
+				CortinaTime:           time.Time{},
+				ContinuousStakingTime: time.Time{},
 			}
 			backend := &backend{
 				blkIDToState: make(map[ids.ID]*blockState),
@@ -911,9 +911,9 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime:             time.Time{},      // banff is activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+				BanffTime:             time.Time{}, // banff is activated
+				CortinaTime:           time.Time{},
+				ContinuousStakingTime: time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -997,9 +997,9 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime:             time.Time{},      // banff is activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+				BanffTime:             time.Time{}, // banff is activated
+				CortinaTime:           time.Time{},
+				ContinuousStakingTime: time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1090,9 +1090,9 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BanffTime:             time.Time{},      // banff is activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+				BanffTime:             time.Time{}, // banff is activated
+				CortinaTime:           time.Time{},
+				ContinuousStakingTime: time.Time{},
 			},
 			Clk: &mockable.Clock{},
 		},

@@ -56,6 +56,8 @@ import (
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
+type activeFork uint8
+
 const (
 	pending stakerStatus = iota
 	current
@@ -64,6 +66,11 @@ const (
 	defaultWeight                 = 10000
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
+
+	ApricotFork           activeFork = 0
+	BanffFork             activeFork = 1
+	CortinaFork           activeFork = 2
+	ContinuousStakingFork activeFork = 3
 )
 
 var (
@@ -130,11 +137,15 @@ func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
-func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
+func newEnvironment(
+	t *testing.T,
+	ctrl *gomock.Controller,
+	fork activeFork,
+) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
-		clk:            defaultClock(),
+		config:         defaultConfig(fork),
+		clk:            defaultClock(fork != ApricotFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -334,7 +345,29 @@ func defaultCtx(db database.Database) *snow.Context {
 	return ctx
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		banffTime             = mockable.MaxTime
+		cortinaTime           = mockable.MaxTime
+		continuousStakingTime = mockable.MaxTime
+	)
+
+	switch fork {
+	case ApricotFork:
+		// nothing todo
+	case BanffFork:
+		banffTime = time.Time{}
+	case CortinaFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+	case ContinuousStakingFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+		continuousStakingTime = time.Time{}
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -358,15 +391,20 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time:     defaultValidateEndTime,
 		ApricotPhase5Time:     defaultValidateEndTime,
-		BanffTime:             mockable.MaxTime,
-		CortinaTime:           mockable.MaxTime,
-		ContinuousStakingTime: mockable.MaxTime,
+		BanffTime:             banffTime,
+		CortinaTime:           cortinaTime,
+		ContinuousStakingTime: continuousStakingTime,
 	}
 }
 
-func defaultClock() *mockable.Clock {
+func defaultClock(postFork bool) *mockable.Clock {
+	now := defaultGenesisTime
+	if postFork {
+		// 1 second after latest fork
+		now = defaultValidateEndTime.Add(-2 * time.Second)
+	}
 	clk := mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(now)
 	return &clk
 }
 

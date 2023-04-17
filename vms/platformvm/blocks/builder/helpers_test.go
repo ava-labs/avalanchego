@@ -55,11 +55,18 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+type activeFork uint8
+
 const (
 	testNetworkID                 = 10 // To be used in tests
 	defaultWeight                 = 10000
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
+
+	ApricotFork           activeFork = 0
+	BanffFork             activeFork = 1
+	CortinaFork           activeFork = 2
+	ContinuousStakingFork activeFork = 3
 )
 
 var (
@@ -108,11 +115,11 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
-		clk:            defaultClock(),
+		config:         defaultConfig(fork),
+		clk:            defaultClock(fork != ApricotFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -302,7 +309,29 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		banffTime             = mockable.MaxTime
+		cortinaTime           = mockable.MaxTime
+		continuousStakingTime = mockable.MaxTime
+	)
+
+	switch fork {
+	case ApricotFork:
+		// nothing todo
+	case BanffFork:
+		banffTime = time.Time{}
+	case CortinaFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+	case ContinuousStakingFork:
+		banffTime = time.Time{}
+		cortinaTime = time.Time{}
+		continuousStakingTime = time.Time{}
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -326,16 +355,20 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time:     defaultValidateEndTime,
 		ApricotPhase5Time:     defaultValidateEndTime,
-		BanffTime:             time.Time{}, // neglecting fork ordering this for package tests
-		CortinaTime:           time.Time{},
-		ContinuousStakingTime: mockable.MaxTime,
+		BanffTime:             banffTime,
+		CortinaTime:           cortinaTime,
+		ContinuousStakingTime: continuousStakingTime,
 	}
 }
 
-func defaultClock() *mockable.Clock {
-	// set time after Banff fork (and before default nextStakerTime)
+func defaultClock(postFork bool) *mockable.Clock {
+	now := defaultGenesisTime
+	if postFork {
+		// 1 second after latest fork
+		now = defaultValidateEndTime.Add(-2 * time.Second)
+	}
 	clk := mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(now)
 	return &clk
 }
 

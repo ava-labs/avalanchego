@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
+	env := newEnvironment(ContinuousStakingFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
