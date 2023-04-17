@@ -673,7 +673,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePing(m)
 		msg.OnFinishedHandling()
 		return
-	// Deprecated, TODO remove this in the future.
+	// Deprecated: remove this in the future.
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
@@ -782,7 +782,7 @@ func (p *peer) handleNewPing(msg *p2p.Ping) {
 	}
 }
 
-// Deprecated, TODO remove this in the future.
+// // Deprecated: remove this in the future.
 func (p *peer) handleOldPing(*p2p.Ping) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,

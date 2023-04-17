@@ -20,7 +20,7 @@ type Op byte
 const (
 	// Handshake:
 	PingOp Op = iota
-	PongOp    // Deprecated, TODO remove this in the future.
+	PongOp    // Deprecated: remove this in the future.
 	VersionOp
 	PeerListOp
 	PeerListAckOp
