@@ -32,6 +32,8 @@ const (
 var (
 	_ txs.Visitor = (*ProposalTxExecutor)(nil)
 
+	errRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
+	errRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	errChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
 	errInvalidState                  = errors.New("generated output isn't valid state")
 	errShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
@@ -323,9 +325,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	if stakerToRemove.TxID != tx.TxID {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s. Should be removing %s",
-			tx.TxID,
+			"%w: %s != %s",
+			errRemoveWrongStaker,
 			stakerToRemove.TxID,
+			tx.TxID,
 		)
 	}
 
@@ -333,8 +336,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	currentChainTime := e.OnCommitState.GetTimestamp()
 	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s before their end time %s",
+			"%w: TxID = %s with %s < %s",
+			errRemoveStakerTooEarly,
 			tx.TxID,
+			currentChainTime,
 			stakerToRemove.EndTime,
 		)
 	}
