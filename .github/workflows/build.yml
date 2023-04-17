@@ -18,7 +18,7 @@ jobs:
   goreleaser:
     strategy:
       matrix:
-        os: [ubunut-latest, ubuntu-20.04]
+        os: [ubuntu-latest, ubuntu-20.04]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
