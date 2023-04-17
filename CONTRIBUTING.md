@@ -20,7 +20,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ### Other
 
-- Ensure that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
+- Check that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
 - If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
 
 ## Features
@@ -31,9 +31,9 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ## Pull Request Guidelines
 
-- Open a new GitHub pull request with the patch.
+- Open a new GitHub pull request containing your changes.
 - Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
-- The PR should be opened against the `dev` branch, which contains all of the latest changes that are ready to be released.
+- The PR should be opened against the `dev` branch.
 - If your PR isn't ready to be reviewed just yet, you can open it as a draft to collect early feedback on your changes.
 - Once the PR is ready for review, mark it as ready-for-review and request review from one of the maintainers.
 
@@ -69,7 +69,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ### Continuous Integration (CI)
 
-Generally, pull requests will not be approved or merged unless they pass CI.
+- Pull requests will generally not be approved or merged unless they pass CI.
 
 ## Other
 
