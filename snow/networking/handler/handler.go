@@ -415,8 +415,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 		// Check if the chain is in normal operation at the start of message
 		// execution (may change during execution)
-		chainState, _       = h.ctx.GetChainState()
-		isExtendingFrontier = chainState == snow.ExtendingFrontier
+		isExtendingFrontier = h.ctx.IsChainBootstrapped()
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("nodeID", nodeID),
@@ -446,7 +445,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && isExtendingFrontier && h.ctx.IsChainBootstrapped() {
+		if processingTime > syncProcessingTimeWarnLimit && isExtendingFrontier {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Duration("msgHandlingTime", msgHandlingTime),
@@ -839,8 +838,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 
 		// Check if the chain is in normal operation at the start of message
 		// execution (may change during execution)
-		chainState, _       = h.ctx.GetChainState()
-		isExtendingFrontier = chainState == snow.ExtendingFrontier
+		isExtendingFrontier = h.ctx.IsChainBootstrapped()
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("messageOp", op),
