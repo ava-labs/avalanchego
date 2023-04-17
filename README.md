@@ -100,6 +100,9 @@ use-cases. Try running them via the command-line, via `cargo run --release
 
 To integrate firewood into a custom VM or other project, see the [firewood-connection](./firewood-connection/README.md) for a straightforward way to use firewood via custom message-passing.
 
+## Release
+See the [release documentation](./RELEASE.md) for detailed information on how to release firewood. 
+
 ## CLI
 Firewood comes with a CLI tool called `fwdctl` that enables one to create and interact with a local instance of a firewood database. For more information, see the [fwdctl README](fwdctl/README.md).
 
