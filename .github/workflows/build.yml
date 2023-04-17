@@ -35,6 +35,12 @@ jobs:
           # TODO: automate github release page announce and artifact uploads
           # https://goreleaser.com/cmd/goreleaser_release/
           args: release --rm-dist --skip-announce --skip-publish
+      - name: Archive Builds
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./dist
+
 
         # to automate release announcement
         # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret
