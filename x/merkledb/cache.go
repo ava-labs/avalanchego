@@ -30,6 +30,7 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	return c.fifo.Get(key)
 }
 
@@ -43,8 +44,6 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.fifo.Put(key, value) // Mark as MRU
 
 	if c.fifo.Len() > c.maxSize {
-		// Note that [c.cache] has already evicted the oldest
-		// element because its max size is [c.maxSize].
 		oldestKey, oldsetVal, _ := c.fifo.Oldest()
 		c.fifo.Delete(oldestKey)
 		return c.onEviction(oldsetVal)
