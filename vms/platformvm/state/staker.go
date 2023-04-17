@@ -83,15 +83,19 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewCurrentStaker(txID ids.ID, staker txs.Staker, startTime time.Time, potentialReward uint64) (*Staker, error) {
+func NewCurrentStaker(
+	txID ids.ID,
+	staker txs.Staker,
+	startTime time.Time,
+	stakingDuration time.Duration,
+	potentialReward uint64,
+) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 
-	// setting endTime as follows work smootly pre and post Continuous staking fork activation
-	duration := staker.EndTime().Sub(startTime)
-	endTime := startTime.Add(duration)
+	endTime := startTime.Add(stakingDuration)
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),

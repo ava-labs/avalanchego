@@ -146,6 +146,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	weight := uint64(12345)
 	startTime := time.Now().Truncate(time.Second)
 	endTime := time.Now().Truncate(time.Second)
+	duration := endTime.Sub(startTime)
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
@@ -154,10 +155,9 @@ func TestNewCurrentStaker(t *testing.T) {
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
 	stakerTx.EXPECT().Weight().Return(weight)
-	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
 
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, duration, potentialReward)
 	require.NotNil(staker)
 	require.NoError(err)
 	require.Equal(txID, staker.TxID)
@@ -173,7 +173,7 @@ func TestNewCurrentStaker(t *testing.T) {
 
 	stakerTx.EXPECT().PublicKey().Return(nil, false, errCustom)
 
-	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	_, err = NewCurrentStaker(txID, stakerTx, startTime, duration, potentialReward)
 	require.ErrorIs(err, errCustom)
 }
 

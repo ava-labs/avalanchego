@@ -302,7 +302,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 			stakeAmount,
 			currentSupply,
 		)
-		newStaker, err = state.NewCurrentStaker(txID, tx, chainTime, potentialReward)
+		newStaker, err = state.NewCurrentStaker(txID, tx, chainTime, stakeDuration, potentialReward)
 		if err != nil {
 			return err
 		}

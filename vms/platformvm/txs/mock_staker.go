@@ -67,6 +67,20 @@ func (mr *MockStakerMockRecorder) EndTime() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EndTime", reflect.TypeOf((*MockStaker)(nil).EndTime))
 }
 
+// Duration mocks base method.
+func (m *MockStaker) Duration() time.Duration {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Duration")
+	ret0, _ := ret[0].(time.Duration)
+	return ret0
+}
+
+// EndTime indicates an expected call of EndTime.
+func (mr *MockStakerMockRecorder) Duration() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Duration", reflect.TypeOf((*MockStaker)(nil).Duration))
+}
+
 // NodeID mocks base method.
 func (m *MockStaker) NodeID() ids.NodeID {
 	m.ctrl.T.Helper()

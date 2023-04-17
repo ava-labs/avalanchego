@@ -126,6 +126,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			addValTx.Validator.Duration(),
 			0,
 		)
 		require.NoError(t, err)
@@ -157,6 +158,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			addValTx.Validator.Duration(),
 			0,
 		)
 		require.NoError(t, err)
@@ -507,6 +509,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.Validator.Duration(),
 		0,
 	)
 	require.NoError(err)
@@ -647,6 +650,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
+		addSubnetValTx.Validator.Duration(),
 		0,
 	)
 	require.NoError(err)
@@ -793,6 +797,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			subnetTx.ID(),
 			addSubnetValTx,
 			addSubnetValTx.StartTime(),
+			addSubnetValTx.Validator.Duration(),
 			0,
 		)
 		require.NoError(err)
@@ -926,6 +931,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
+			addValTx.Validator.Duration(),
 			0,
 		)
 		require.NoError(err)
@@ -993,9 +999,10 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 	}()
 
 	var (
-		nodeID         = ids.GenerateTestNodeID()
-		dummyStartTime = time.Time{}
-		dummyEndTime   = time.Time{}.Add(defaultMinStakingDuration) // only duration matter
+		nodeID            = ids.GenerateTestNodeID()
+		validatorDuration = defaultMinStakingDuration
+		dummyStartTime    = time.Time{}
+		dummyEndTime      = time.Time{}.Add(validatorDuration)
 	)
 
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
@@ -1024,7 +1031,10 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 	// Check that a current validator is added
 	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
+
 	require.Equal(addValTx.ID(), val.TxID)
+	require.Equal(env.state.GetTimestamp(), val.StartTime)
+	require.Equal(val.StartTime.Add(validatorDuration), val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
