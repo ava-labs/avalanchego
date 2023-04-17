@@ -163,8 +163,8 @@ type ProposalTxBuilder interface {
 	// Commit block, will set the chain's timestamp to [timestamp].
 	NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error)
 
-	// RewardStakerTx creates a new transaction that proposes to remove the
-	// staker corresponding to [txID] from the default validator set.
+	// RewardStakerTx creates a new transaction that proposes to remove the staker
+	// [validatorID] from the default validator set.
 	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
 }
 
