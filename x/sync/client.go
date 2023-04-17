@@ -28,7 +28,8 @@ var (
 	_ Client = &client{}
 
 	errInvalidRangeProof = errors.New("failed to verify range proof")
-	errTooManyLeaves     = errors.New("response contains more than requested leaves")
+	errTooManyKeys       = errors.New("response contains more than requested keys")
+	errTooManyBytes      = errors.New("response contains more than requested bytes")
 )
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
@@ -76,6 +77,10 @@ func NewClient(config *ClientConfig) Client {
 // The returned change proof is verified.
 func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db *merkledb.Database) (*merkledb.ChangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
+		if len(responseBytes) > int(req.BytesLimit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
+		}
+
 		changeProof := &merkledb.ChangeProof{}
 		if _, err := merkledb.Codec.DecodeChangeProof(responseBytes, changeProof); err != nil {
 			return nil, err
@@ -83,8 +88,8 @@ func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db
 
 		// Ensure the response does not contain more than the requested number of leaves
 		// and the start and end roots match the requested roots.
-		if len(changeProof.KeyValues)+len(changeProof.DeletedKeys) > int(req.Limit) {
-			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(changeProof.KeyValues), req.Limit)
+		if len(changeProof.KeyValues)+len(changeProof.DeletedKeys) > int(req.KeyLimit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyValues), req.KeyLimit)
 		}
 
 		if err := changeProof.Verify(ctx, db, req.Start, req.End, req.EndingRoot); err != nil {
@@ -100,14 +105,18 @@ func (c *client) GetChangeProof(ctx context.Context, req *ChangeProofRequest, db
 // The returned range proof is verified.
 func (c *client) GetRangeProof(ctx context.Context, req *RangeProofRequest) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
+		if len(responseBytes) > int(req.BytesLimit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
+		}
+
 		rangeProof := &merkledb.RangeProof{}
 		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
 			return nil, err
 		}
 
 		// Ensure the response does not contain more than the maximum requested number of leaves.
-		if len(rangeProof.KeyValues) > int(req.Limit) {
-			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyLeaves, len(rangeProof.KeyValues), req.Limit)
+		if len(rangeProof.KeyValues) > int(req.KeyLimit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(rangeProof.KeyValues), req.KeyLimit)
 		}
 
 		if err := rangeProof.Verify(
