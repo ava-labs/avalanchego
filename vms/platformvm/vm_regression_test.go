@@ -205,7 +205,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(ContinuousStakingFork)
+			vm, _, _ := defaultVM(BanffFork)
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -1177,7 +1177,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(BanffFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {

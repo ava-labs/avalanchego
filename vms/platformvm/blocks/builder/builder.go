@@ -147,7 +147,13 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return err
 	}
 
-	if err := b.Mempool.Add(tx); err != nil {
+	// Retrieved Preferred timestamp to make sure we correctly handle
+	// Continuous Staking for in the mempool
+	preferred, err := b.Preferred()
+	if err != nil {
+		return err
+	}
+	if err := b.Mempool.Add(tx, preferred.Timestamp()); err != nil {
 		return err
 	}
 	return b.GossipTx(tx)

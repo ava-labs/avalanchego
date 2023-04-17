@@ -144,7 +144,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
-	err = env.Builder.Add(tx)
+	err = env.Builder.Add(tx, env.state.GetTimestamp())
 	require.NoError(err)
 
 	require.True(gossipedBytes == nil)

@@ -176,7 +176,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	res.mempool, err = mempool.NewMempool(res.config, res, "mempool", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
