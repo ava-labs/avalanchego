@@ -782,7 +782,7 @@ func (p *peer) handleNewPing(msg *p2p.Ping) {
 	}
 }
 
-// // Deprecated, TODO remove this in the future.
+// Deprecated, TODO remove this in the future.
 func (p *peer) handleOldPing(*p2p.Ping) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
