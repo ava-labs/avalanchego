@@ -16,7 +16,10 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubunut-latest, ubuntu-20.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -38,7 +41,7 @@ jobs:
       - name: Archive Builds
         uses: actions/upload-artifact@v3
         with:
-          name: dist
+          name: dist_${{ matrix.os }}
           path: ./dist
 
 
