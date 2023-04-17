@@ -399,9 +399,10 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator currently validating primary network
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
+		startTime := defaultValidateStartTime.Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(defaultValidateStartTime.Unix()),
+			uint64(startTime.Unix()),
 			uint64(defaultValidateEndTime.Unix())+1,
 			ids.NodeID(nodeID),
 			testSubnet1.ID(),
@@ -419,7 +420,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because validator stops validating primary network earlier than subnet")
+		require.ErrorIs(err, errValidatorSubset)
 	}
 
 	{
@@ -494,7 +495,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because validator not in the current or pending validator sets of the primary network")
+		require.ErrorIs(err, errNotValidator)
 	}
 
 	staker, err := state.NewCurrentStaker(
@@ -536,7 +537,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because validator starts validating primary network before starting to validate primary network")
+		require.ErrorIs(err, errValidatorSubset)
 	}
 
 	{
@@ -562,7 +563,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed because validator stops validating primary network after stops validating primary network")
+		require.ErrorIs(err, errValidatorSubset)
 	}
 
 	{
@@ -616,7 +617,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because starts validating at current timestamp")
+		require.ErrorIs(err, errTimestampNotBeforeStartTime)
 	}
 
 	// reset the timestamp
@@ -650,12 +651,13 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
+		startTime := defaultValidateStartTime.Add(time.Second)
 		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                           // weight
-			uint64(defaultValidateStartTime.Unix()), // start time
-			uint64(defaultValidateEndTime.Unix()),   // end time
-			ids.NodeID(nodeID),                      // node ID
-			testSubnet1.ID(),                        // subnet ID
+			defaultWeight,                         // weight
+			uint64(startTime.Unix()),              // start time
+			uint64(defaultValidateEndTime.Unix()), // end time
+			ids.NodeID(nodeID),                    // node ID
+			testSubnet1.ID(),                      // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -670,7 +672,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because validator already validating the specified subnet")
+		require.ErrorIs(err, errDuplicateValidator)
 	}
 
 	env.state.DeleteCurrentValidator(staker)
@@ -679,17 +681,25 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	{
-		// Case: Too many signatures
+		// Case: Duplicate signatures
+		startTime := defaultValidateStartTime.Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                     // weight
-			uint64(defaultGenesisTime.Unix()), // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
+			defaultWeight,            // weight
+			uint64(startTime.Unix()), // start time
+			uint64(startTime.Add(defaultMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
 		require.NoError(err)
+
+		// Duplicate a signature
+		addSubnetValidatorTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
+		input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+		input.SigIndices = append(input.SigIndices, input.SigIndices[0])
+		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
+		addSubnetValidatorTx.SyntacticallyVerified = false
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
@@ -700,15 +710,16 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because tx has 3 signatures but only 2 needed")
+		require.ErrorIs(err, secp256k1fx.ErrNotSortedUnique)
 	}
 
 	{
 		// Case: Too few signatures
+		startTime := defaultValidateStartTime.Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                     // weight
-			uint64(defaultGenesisTime.Unix()), // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
+			defaultWeight,            // weight
+			uint64(startTime.Unix()), // start time
+			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
@@ -732,15 +743,16 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because not enough control sigs")
+		require.ErrorIs(err, errUnauthorizedSubnetModification)
 	}
 
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
+		startTime := defaultValidateStartTime.Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                     // weight
-			uint64(defaultGenesisTime.Unix()), // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
+			defaultWeight,            // weight
+			uint64(startTime.Unix()), // start time
+			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], preFundedKeys[1]},
@@ -751,7 +763,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// Replace a valid signature with one from keys[3]
 		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 		require.NoError(err)
-		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
+		copy(tx.Creds[1].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
@@ -762,16 +774,17 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because a control sig is invalid")
+		require.ErrorIs(err, errUnauthorizedSubnetModification)
 	}
 
 	{
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
+		startTime := defaultValidateStartTime.Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-			defaultWeight,                       // weight
-			uint64(defaultGenesisTime.Unix())+1, // start time
-			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
+			defaultWeight,              // weight
+			uint64(startTime.Unix())+1, // start time
+			uint64(startTime.Add(defaultMinStakingDuration).Unix())+1, // end time
 			ids.NodeID(nodeID), // node ID
 			testSubnet1.ID(),   // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -801,7 +814,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should have failed verification because validator already in pending validator set of the specified subnet")
+		require.ErrorIs(err, errDuplicateValidator)
 	}
 }
 

@@ -184,8 +184,10 @@ func verifyAddSubnetValidatorTx(
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
-			"attempted to issue duplicate subnet validation for %s",
+			"attempted to issue %w for %s on subnet %s",
+			errDuplicateValidator,
 			tx.Validator.NodeID,
+			tx.SubnetValidator.Subnet,
 		)
 	}
 	if err != database.ErrNotFound {
@@ -197,6 +199,13 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if err == database.ErrNotFound {
+		return fmt.Errorf(
+			"%s %w of the primary network",
+			tx.Validator.NodeID,
+			errNotValidator,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
