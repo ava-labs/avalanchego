@@ -44,7 +44,9 @@ func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
 	reducedSize := len(prefixValue) - 1
-
+	if reducedSize < 0 {
+		return false
+	}
 	// grab the last nibble in the prefix and serialized path
 	prefixRemainder := prefixValue[reducedSize] >> 4
 	valueRemainder := s.Value[reducedSize] >> 4
@@ -60,10 +62,9 @@ func (s SerializedPath) HasStrictPrefix(prefix SerializedPath) bool {
 func (s SerializedPath) NibbleVal(nibbleIndex int) byte {
 	value := s.Value[nibbleIndex>>1]
 	isOdd := byte(nibbleIndex & 1)
-	isEven := (1 - isOdd)
 
-	// return value first(even index) or last 4(odd index) bits of the corresponding byte
-	return isEven*value>>4 + isOdd*(value&0x0F)
+	// return value first(even index) or last(odd index) 4 bits of the corresponding byte
+	return (1-isOdd)*value>>4 + isOdd*(value&0x0F)
 }
 
 func (s SerializedPath) AppendNibble(nibble byte) SerializedPath {
