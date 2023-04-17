@@ -337,14 +337,14 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	case ApricotFork:
 		// nothing todo
 	case BanffFork:
-		banffTime = time.Time{}
+		banffTime = latestForkTime
 	case CortinaFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
+		banffTime = latestForkTime
+		cortinaTime = latestForkTime
 	case ContinuousStakingFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
-		continuousStakingTime = time.Time{}
+		banffTime = latestForkTime
+		cortinaTime = latestForkTime
+		continuousStakingTime = latestForkTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
