@@ -27,7 +27,7 @@ func (s SerializedPath) Equal(other SerializedPath) bool {
 func (s SerializedPath) deserialize() path {
 	result := newPath(s.Value)
 	// trim the last nibble if the path has an odd length
-	if s.HasOddNibbleLength {
+	if s.HasOddNibbleLength && len(result) > 0 {
 		result = result[:len(result)-1]
 	}
 	return result
