@@ -292,7 +292,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
 
-		if m.StakingEnabled && subnetID != constants.PrimaryNetworkID {
+		if m.StakingEnabled {
 			validatorSet, ok := m.Validators.Get(subnetID)
 			if !ok {
 				m.Log.Warn("skipping chain creation",
