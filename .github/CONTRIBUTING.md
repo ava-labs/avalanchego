@@ -10,15 +10,21 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ## Issues
 
-### Did you find a bug?
-
-- Do not open up a GitHub issue if a bug is a security vulnerability in AvalancheGo, and instead refer to our [security policy](../SECURITY.md).
-- Ensure the bug was not already reported by searching on GitHub under [issues](https://github.com/ava-labs/avalanchego/issues).
-- If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new). Be sure to include a *title and clear description*, as much relevant information as possible, and a code sample/test case/reproduction of the bug if possible.
+### Security
+- Do not open up a GitHub issue if it relates to a security vulnerability in AvalancheGo, and instead refer to our [security policy](../SECURITY.md).
 
 ### Did you fix whitespace, format code, or make a purely cosmetic patch?
 
 - Changes from the community that are cosmetic in nature and do not add anything substantial to the stability, functionality, or testability of Rails will generally not be accepted.
+
+### Other
+
+- Ensure the bug was not already reported by searching on GitHub under [issues](https://github.com/ava-labs/avalanchego/issues).
+- If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
+
+#### Features
+
+- If an issue involves the discussion of the development of a new feature or the modification of an existing one, do not start development on a pull request until you receive positive feedback about the change from the maintainers.
 
 ## Pull Request Guidelines
 
