@@ -112,12 +112,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(postBanff, postCortina bool) *environment {
+func newEnvironment(postBanff, postCortina, postContinuousStaking bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	config := defaultConfig(postBanff, postCortina, postContinuousStaking)
+	clk := defaultClock(postBanff || postCortina || postContinuousStaking)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -283,8 +283,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-// TODO ABENEGIA: introduce postContinuousStaking
-func defaultConfig(postBanff, postCortina bool) config.Config {
+func defaultConfig(postBanff, postCortina, postContinuousStaking bool) config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
@@ -294,6 +293,9 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
 	continuousStakingForkTime := mockable.MaxTime
+	if postContinuousStaking {
+		continuousStakingForkTime = defaultValidateStartTime.Add(-2 * time.Second)
+	}
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()

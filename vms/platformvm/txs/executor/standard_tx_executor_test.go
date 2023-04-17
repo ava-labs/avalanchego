@@ -42,7 +42,7 @@ var errTest = errors.New("non-nil error")
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -168,7 +168,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -335,7 +335,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				require.NoError(shutdownEnvironment(freshTH))
@@ -391,7 +391,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -818,7 +818,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -982,6 +982,49 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		err = tx.Unsigned.Visit(&executor)
 		require.Error(err, "should have failed because tx fee paying key has no funds")
 	}
+}
+
+func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(true /*=postBanff*/, true /*=postCortina*/, true /*postContinuousStaking*/)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var (
+		nodeID         = ids.GenerateTestNodeID()
+		dummyStartTime = time.Time{}
+		dummyEndTime   = time.Time{}.Add(defaultMinStakingDuration) // only duration matter
+	)
+
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(dummyStartTime.Unix()),
+		uint64(dummyEndTime.Unix()),
+		nodeID,
+		ids.ShortEmpty,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addValTx,
+	}
+	err = addValTx.Unsigned.Visit(&executor)
+	require.NoError(err)
+
+	// Check that a current validator is added
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(addValTx.ID(), val.TxID)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

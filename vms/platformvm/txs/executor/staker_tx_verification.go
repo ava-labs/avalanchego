@@ -88,18 +88,6 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			errTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
-	}
-
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
@@ -129,11 +117,28 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, errFutureStakeTime
+	// Following ContinuousStaking fork activation, AddValidatorTx.StartTime
+	// won't be considered. Only duration will matter (i.e.
+	// AddValidatorTx.EndTime - AddValidatorTx.StartTime) which is validated above.
+	currentTimestamp := chainState.GetTimestamp()
+	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		// Ensure the proposed validator starts after the current time
+		startTime := tx.StartTime()
+		if !currentTimestamp.Before(startTime) {
+			return nil, fmt.Errorf(
+				"%w: %s >= %s",
+				errTimestampNotBeforeStartTime,
+				currentTimestamp,
+				startTime,
+			)
+		}
+
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return nil, errFutureStakeTime
+		}
 	}
 
 	return outs, nil

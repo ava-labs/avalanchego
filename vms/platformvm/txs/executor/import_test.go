@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/, false /*postContinuousStaking*/)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
