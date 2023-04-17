@@ -109,7 +109,7 @@ var (
 		PingFrequency:      constants.DefaultPingFrequency,
 		AllowPrivateIPs:    true,
 
-		CompressionEnabled: true,
+		CompressionType: constants.DefaultNetworkCompressionType,
 
 		UptimeCalculator:  uptime.NewManager(uptime.NewTestState()),
 		UptimeMetricFreq:  30 * time.Second,
@@ -187,9 +187,10 @@ func newMessageCreator(t *testing.T) message.Creator {
 	t.Helper()
 
 	mc, err := message.NewCreator(
+		logging.NoLog{},
 		prometheus.NewRegistry(),
 		"",
-		true,
+		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(t, err)

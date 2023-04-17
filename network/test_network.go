@@ -78,9 +78,10 @@ func NewTestNetwork(
 ) (Network, error) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"",
-		constants.DefaultNetworkCompressionEnabled,
+		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
 	)
 	if err != nil {
@@ -162,7 +163,7 @@ func NewTestNetwork(
 		},
 
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
-		CompressionEnabled:           constants.DefaultNetworkCompressionEnabled,
+		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              constants.DefaultNetworkAllowPrivateIPs,
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
