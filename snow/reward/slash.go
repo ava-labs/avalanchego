@@ -25,13 +25,20 @@ var (
 )
 
 type Slasher interface {
+	// Slash slashes the staking rewards for [nodeID] on [subnetID].
+	// This only affects the staking period corresponding to the [txID] of the
+	// transaction that added the validator to the staking set on the P-Chain.
 	Slash(
 		nodeID ids.NodeID,
 		txID ids.ID,
 		subnetID ids.ID,
 		metricName string,
 	) error
+	// Slashed returns whether or not [nodeID] is slashed for [subnetID] for the
+	// staking cycle corresponding to [txID] on the P-Chain.
 	Slashed(nodeID ids.NodeID, txID ids.ID, subnetID ids.ID) (bool, error)
+	// Reset resets the slashed status of [nodeID] on [subnetID] for the staking
+	// cycle corresponding to [txID] on the P-Chain.
 	Reset(nodeID ids.NodeID, txID ids.ID, subnetID ids.ID) error
 }
 
