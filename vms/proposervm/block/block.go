@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -95,10 +94,6 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
-	}
-
-	if err := staking.VerifyCertificate(cert); err != nil {
-		return err
 	}
 
 	b.cert = cert

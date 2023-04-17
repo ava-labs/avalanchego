@@ -685,20 +685,20 @@ func (t *trieView) updateParent(newParent TrieView) {
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidateChildrenExcept(exception *trieView) {
 	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	for _, childView := range t.childViews {
-		if childView != exception {
-			childView.invalidate()
-		}
-	}
+	childrenToInvalidate := t.childViews
 
 	// after invalidating the children, they no longer need to be tracked
 	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
-
 	// add back in the exception view since it is still valid
 	if exception != nil {
 		t.childViews = append(t.childViews, exception)
+	}
+	t.validityTrackingLock.Unlock()
+
+	for _, childView := range childrenToInvalidate {
+		if childView != exception {
+			childView.invalidate()
+		}
 	}
 }
 
