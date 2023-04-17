@@ -283,6 +283,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
+// TODO ABENEGIA: introduce postContinuousStaking
 func defaultConfig(postBanff, postCortina bool) config.Config {
 	banffTime := mockable.MaxTime
 	if postBanff {
@@ -292,6 +293,7 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 	if postCortina {
 		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 	}
+	continuousStakingForkTime := mockable.MaxTime
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
@@ -314,17 +316,18 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         banffTime,
-		CortinaTime:       cortinaTime,
+		ApricotPhase3Time:     defaultValidateEndTime,
+		ApricotPhase5Time:     defaultValidateEndTime,
+		BanffTime:             banffTime,
+		CortinaTime:           cortinaTime,
+		ContinuousStakingTime: continuousStakingForkTime,
 	}
 }
 
 func defaultClock(postFork bool) mockable.Clock {
 	now := defaultGenesisTime
 	if postFork {
-		// 1 second after Banff fork
+		// 1 second after latest fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := mockable.Clock{}

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1101,7 +1102,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1126,7 +1129,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1151,7 +1156,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1180,7 +1187,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1207,7 +1216,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1233,7 +1244,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1266,7 +1279,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1302,7 +1317,9 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1466,7 +1483,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1490,7 +1509,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime: env.banffTime,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1515,8 +1536,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1551,8 +1574,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
@@ -1592,8 +1617,10 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
-							BanffTime:        env.banffTime,
-							MaxStakeDuration: math.MaxInt64,
+							BanffTime:             env.banffTime,
+							CortinaTime:           mockable.MaxTime,
+							ContinuousStakingTime: mockable.MaxTime,
+							MaxStakeDuration:      math.MaxInt64,
 						},
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -366,6 +367,8 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	ctx := defaultContext()

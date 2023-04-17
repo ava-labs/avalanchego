@@ -337,6 +337,8 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		ApricotPhase3Time:      defaultValidateEndTime,
 		ApricotPhase5Time:      defaultValidateEndTime,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -434,6 +436,8 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1481,6 +1485,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -1570,6 +1576,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -1626,6 +1634,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -1950,6 +1960,8 @@ func TestUnverifiedParent(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	initialClkTime := banffForkTime.Add(time.Second)
@@ -2112,6 +2124,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		Validators:             firstVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	firstCtx := defaultContext()
@@ -2154,6 +2168,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		Validators:             secondVdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	secondCtx := defaultContext()
@@ -2291,6 +2307,8 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		Validators:             vdrs,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              banffForkTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	ctx := defaultContext()
@@ -2405,6 +2423,8 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		Validators:             vdrManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		BanffTime:              mockable.MaxTime,
+		CortinaTime:            mockable.MaxTime,
+		ContinuousStakingTime:  mockable.MaxTime,
 	}}
 
 	ctx := defaultContext()

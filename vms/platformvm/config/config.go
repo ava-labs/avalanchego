@@ -101,6 +101,9 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
+	// Time of the continuous staking network upgrade
+	ContinuousStakingTime time.Time
+
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.
 	// [constants.PrimaryNetworkID] is always a key in this map.
@@ -130,6 +133,10 @@ func (c *Config) IsApricotPhase5Activated(timestamp time.Time) bool {
 
 func (c *Config) IsBanffActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.BanffTime)
+}
+
+func (c *Config) IsContinuousStakingActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ContinuousStakingTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -866,6 +867,8 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	}()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
 	env.config.BanffTime = defaultGenesisTime.Add(SyncBound)
+	env.config.CortinaTime = mockable.MaxTime
+	env.config.ContinuousStakingTime = mockable.MaxTime
 
 	// Proposed advancing timestamp to the banff timestamp
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
