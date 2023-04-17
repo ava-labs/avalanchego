@@ -128,21 +128,6 @@ func (mr *MockChainMockRecorder) CalculateReward(arg0, arg1, arg2 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateReward", reflect.TypeOf((*MockChain)(nil).CalculateReward), arg0, arg1, arg2)
 }
 
-// Config mocks base method.
-func (m *MockChain) Config() (*config.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Config")
-	ret0, _ := ret[0].(*config.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Config indicates an expected call of Config.
-func (mr *MockChainMockRecorder) Config() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockChain)(nil).Config))
-}
-
 // DeleteCurrentDelegator mocks base method.
 func (m *MockChain) DeleteCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -216,6 +201,21 @@ func (m *MockChain) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 func (mr *MockChainMockRecorder) GetChains(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockChain)(nil).GetChains), arg0)
+}
+
+// GetConfig mocks base method.
+func (m *MockChain) GetConfig() (*config.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConfig")
+	ret0, _ := ret[0].(*config.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConfig indicates an expected call of GetConfig.
+func (mr *MockChainMockRecorder) GetConfig() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfig", reflect.TypeOf((*MockChain)(nil).GetConfig))
 }
 
 // GetCurrentDelegatorIterator mocks base method.

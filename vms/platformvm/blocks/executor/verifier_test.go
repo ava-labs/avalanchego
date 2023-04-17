@@ -49,7 +49,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().Config().Return(config, nil).AnyTimes()
+	parentOnAcceptState.EXPECT().GetConfig().Return(config, nil).AnyTimes()
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -234,7 +234,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	parentState.EXPECT().Config().Return(config, nil).AnyTimes()
+	parentState.EXPECT().GetConfig().Return(config, nil).AnyTimes()
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -590,7 +590,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
-			s.EXPECT().Config().Return(config, nil).AnyTimes()
+			s.EXPECT().GetConfig().Return(config, nil).AnyTimes()
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -688,7 +688,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
-			s.EXPECT().Config().Return(config, nil).Times(2)
+			s.EXPECT().GetConfig().Return(config, nil).Times(2)
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -810,7 +810,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().Config().Return(config, nil).AnyTimes()
+	parentState.EXPECT().GetConfig().Return(config, nil).AnyTimes()
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

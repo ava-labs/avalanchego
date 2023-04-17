@@ -201,7 +201,7 @@ func (mr *MockStateMockRecorder) CalculateReward(arg0, arg1, arg2 interface{}) *
 }
 
 // Config mocks base method.
-func (m *MockState) Config() (*config.Config, error) {
+func (m *MockState) GetConfig() (*config.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Config")
 	ret0, _ := ret[0].(*config.Config)
@@ -210,9 +210,9 @@ func (m *MockState) Config() (*config.Config, error) {
 }
 
 // Config indicates an expected call of Config.
-func (mr *MockStateMockRecorder) Config() *gomock.Call {
+func (mr *MockStateMockRecorder) GetConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockChain)(nil).Config))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockChain)(nil).GetConfig))
 }
 
 // DeleteCurrentDelegator mocks base method.

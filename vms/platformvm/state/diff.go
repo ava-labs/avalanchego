@@ -68,7 +68,7 @@ func NewDiff(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
-	cfg, err := parentState.Config()
+	cfg, err := parentState.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch config from parent state: %w", err)
 	}
@@ -421,12 +421,12 @@ func (d *diff) AddTx(tx *txs.Tx, status status.Status) {
 	}
 }
 
-func (d *diff) Config() (*config.Config, error) {
+func (d *diff) GetConfig() (*config.Config, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.Config()
+	return parentState.GetConfig()
 }
 
 func (d *diff) CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {

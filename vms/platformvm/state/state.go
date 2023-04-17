@@ -110,7 +110,7 @@ type Chain interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
 
-	Config() (*config.Config, error)
+	GetConfig() (*config.Config, error)
 	CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
 }
 
@@ -797,7 +797,7 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 	}
 }
 
-func (s *state) Config() (*config.Config, error) {
+func (s *state) GetConfig() (*config.Config, error) {
 	return s.cfg, nil
 }
 
