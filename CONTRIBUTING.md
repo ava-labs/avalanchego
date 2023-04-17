@@ -11,6 +11,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ## Issues
 
 ### Security
+
 - Do not open up a GitHub issue if it relates to a security vulnerability in AvalancheGo, and instead refer to our [security policy](./SECURITY.md).
 
 ### Did you fix whitespace, format code, or make a purely cosmetic patch?
@@ -22,9 +23,11 @@ To start developing on AvalancheGo, you'll need a few things installed.
 - Ensure that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
 - If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
 
-#### Features
+## Features
 
-- If an issue involves the discussion of the development of a new feature or the modification of an existing one, do not start development on a pull request until you receive positive feedback about the change from the maintainers.
+- If you want to start a discussion about the development of a new feature or the modfiication of an existing one, start a thread under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/ideas).
+- Post a thread about your idea and why it should be added to AvalancheGo. 
+- Don't start working on a pull request until you've received positive feedback from the maintainers.
 
 ## Pull Request Guidelines
 
@@ -72,7 +75,7 @@ Generally, pull requests will not be approved or merged unless they pass CI.
 
 ### Do you have questions about the source code?
 
-- Ask any question about AvalancheGo in the [Discord server](https://discord.com/invite/RwXY7P6).
+- Ask any question about AvalancheGo under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/q-a).
 
 ### Do you want to contribute to the Avalanche documentation?
 
