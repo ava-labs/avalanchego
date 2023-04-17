@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -30,6 +32,7 @@ type Diff interface {
 type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
+	rewardsCalc   reward.Calculator
 
 	timestamp time.Time
 
@@ -65,9 +68,14 @@ func NewDiff(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
+	cfg, err := parentState.Config()
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch config from parent state: %w", err)
+	}
 	return &diff{
 		parentID:           parentID,
 		stateVersions:      stateVersions,
+		rewardsCalc:        reward.NewCalculator(cfg.RewardConfig),
 		timestamp:          parentState.GetTimestamp(),
 		currentStakerDiffs: newDiffStakers(),
 		pendingStakerDiffs: newDiffStakers(),
@@ -411,6 +419,18 @@ func (d *diff) AddTx(tx *txs.Tx, status status.Status) {
 	} else {
 		d.addedTxs[txID] = txStatus
 	}
+}
+
+func (d *diff) Config() (*config.Config, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.Config()
+}
+
+func (d *diff) CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
+	return d.rewardsCalc.Calculate(stakedDuration, stakedAmount, currentSupply)
 }
 
 func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {

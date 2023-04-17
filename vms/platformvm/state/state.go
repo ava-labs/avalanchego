@@ -109,6 +109,9 @@ type Chain interface {
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
+
+	Config() (*config.Config, error)
+	CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
 }
 
 type State interface {
@@ -794,6 +797,14 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 	}
 }
 
+func (s *state) Config() (*config.Config, error) {
+	return s.cfg, nil
+}
+
+func (s *state) CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
+	return s.rewards.Calculate(stakedDuration, stakedAmount, currentSupply)
+}
+
 func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	if utxos, exists := s.addedRewardUTXOs[txID]; exists {
 		return utxos, nil
@@ -1038,7 +1049,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1137,7 +1148,7 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1179,7 +1190,7 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1220,7 +1231,7 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, potentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), potentialReward)
 			if err != nil {
 				return err
 			}

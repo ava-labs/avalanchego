@@ -35,6 +35,12 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	config := &config.Config{
+		BanffTime:             mockable.MaxTime, // banff is not activated
+		CortinaTime:           mockable.MaxTime, // cortina is not activate
+		ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+	}
+
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
@@ -43,6 +49,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().Config().Return(config, nil).AnyTimes()
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -60,12 +67,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				BanffTime:             mockable.MaxTime, // banff is not activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
-			},
-			Clk: &mockable.Clock{},
+			Config: config,
+			Clk:    &mockable.Clock{},
 		},
 		backend: backend,
 	}
@@ -219,12 +222,19 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	config := &config.Config{
+		BanffTime:             mockable.MaxTime, // banff is not activated
+		CortinaTime:           mockable.MaxTime, // cortina is not activate
+		ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+	}
+
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
+	parentState.EXPECT().Config().Return(config, nil).AnyTimes()
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -241,13 +251,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				ApricotPhase5Time:     time.Now().Add(time.Hour),
-				BanffTime:             mockable.MaxTime, // banff is not activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
-			},
-			Clk: &mockable.Clock{},
+			Config: config,
+			Clk:    &mockable.Clock{},
 		},
 		backend: backend,
 	}
@@ -547,6 +552,12 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 
+			config := &config.Config{
+				BanffTime:             time.Time{},      // banff is activated
+				CortinaTime:           mockable.MaxTime, // cortina is not activate
+				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+			}
+
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
 			mempool := mempool.NewMockMempool(ctrl)
@@ -564,12 +575,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
-						BanffTime:             time.Time{},      // banff is activated
-						CortinaTime:           mockable.MaxTime, // cortina is not activate
-						ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
-					},
-					Clk: &mockable.Clock{},
+					Config: config,
+					Clk:    &mockable.Clock{},
 				},
 				backend: backend,
 			}
@@ -583,6 +590,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().Config().Return(config, nil).AnyTimes()
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -650,6 +658,11 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
 
+			config := &config.Config{
+				BanffTime:             time.Time{},      // banff is activated
+				CortinaTime:           mockable.MaxTime, // cortina is not activate
+				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+			}
 			backend := &backend{
 				blkIDToState: make(map[ids.ID]*blockState),
 				Mempool:      mempool,
@@ -660,12 +673,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
-						BanffTime:             time.Time{},      // banff is activated
-						CortinaTime:           mockable.MaxTime, // cortina is not activate
-						ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
-					},
-					Clk: &mockable.Clock{},
+					Config: config,
+					Clk:    &mockable.Clock{},
 				},
 				backend: backend,
 			}
@@ -679,6 +688,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().Config().Return(config, nil).Times(2)
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -706,6 +716,13 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
+
+	config := &config.Config{
+		ApricotPhase5Time:     time.Now().Add(time.Hour),
+		BanffTime:             mockable.MaxTime, // banff is not activated
+		CortinaTime:           mockable.MaxTime, // cortina is not activate
+		ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
+	}
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
@@ -743,13 +760,8 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				ApricotPhase5Time:     time.Now().Add(time.Hour),
-				BanffTime:             mockable.MaxTime, // banff is not activated
-				CortinaTime:           mockable.MaxTime, // cortina is not activate
-				ContinuousStakingTime: mockable.MaxTime, // continuous staking is not activated
-			},
-			Clk: &mockable.Clock{},
+			Config: config,
+			Clk:    &mockable.Clock{},
 		},
 		backend: backend,
 	}
@@ -798,6 +810,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().Config().Return(config, nil).AnyTimes()
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

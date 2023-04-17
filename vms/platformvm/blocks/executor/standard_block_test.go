@@ -53,6 +53,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
 		onAcceptState:  onParentAccept,
@@ -116,6 +117,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 	chainTime := env.clk.Time().Truncate(time.Second)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,
@@ -618,9 +620,11 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

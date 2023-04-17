@@ -13,6 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -111,6 +112,35 @@ func (m *MockChain) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockChainMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockChain)(nil).AddUTXO), arg0)
+}
+
+// CalculateReward mocks base method.
+func (m *MockChain) CalculateReward(arg0 time.Duration, arg1, arg2 uint64) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CalculateReward", arg0, arg1, arg2)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// CalculateReward indicates an expected call of CalculateReward.
+func (mr *MockChainMockRecorder) CalculateReward(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateReward", reflect.TypeOf((*MockChain)(nil).CalculateReward), arg0, arg1, arg2)
+}
+
+// Config mocks base method.
+func (m *MockChain) Config() (*config.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Config")
+	ret0, _ := ret[0].(*config.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Config indicates an expected call of Config.
+func (mr *MockChainMockRecorder) Config() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockChain)(nil).Config))
 }
 
 // DeleteCurrentDelegator mocks base method.

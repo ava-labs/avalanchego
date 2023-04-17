@@ -112,12 +112,14 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Duration(1000), /*upDuration*/
 		time.Time{},         /*lastUpdated*/
 		nil,                 /*err*/
 	).AnyTimes()
+	env.mockedState.EXPECT().Config().Return(env.config, nil).AnyTimes()
 
 	// wrong height
 	statelessProposalBlock, err := blocks.NewApricotProposalBlock(
@@ -175,6 +177,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().Config().Return(env.config, nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,
@@ -632,9 +635,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// store Staker0 to state
+				addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 				staker0, err := state.NewCurrentStaker(
 					addStaker0.ID(),
-					addStaker0.Unsigned.(*txs.AddValidatorTx),
+					addValTx,
+					addValTx.StartTime(),
 					0,
 				)
 				require.NoError(err)
@@ -731,9 +736,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		addSubnetValTx,
+		addSubnetValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -789,9 +796,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -903,9 +912,11 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			// store Staker0 to state
+			addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 			staker, err = state.NewCurrentStaker(
 				addStaker0.ID(),
-				addStaker0.Unsigned.(*txs.AddValidatorTx),
+				addValTx,
+				addValTx.StartTime(),
 				0,
 			)
 			require.NoError(err)
@@ -990,9 +1001,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1083,9 +1096,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1176,9 +1191,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1268,9 +1285,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
+	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
-		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		addValTx,
+		addValTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

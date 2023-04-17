@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -278,16 +279,44 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
-		return err
+	var (
+		txID      = e.Tx.ID()
+		chainTime = e.State.GetTimestamp()
+		newStaker *state.Staker
+		err       error
+	)
+
+	if e.Config.IsContinuousStakingActivated(chainTime) {
+		// Post Continuous Staking fork, validators are immediately marked as current with:
+		// start time = current chain time
+		// end time = current chain time + (staker.EndTime - staker.StartTime)
+		stakeAmount := tx.Validator.Wght
+		stakeDuration := tx.Validator.Duration()
+		currentSupply, err := e.State.GetCurrentSupply(constants.PrimaryNetworkID)
+		if err != nil {
+			return err
+		}
+
+		potentialReward := e.State.CalculateReward(
+			stakeDuration,
+			stakeAmount,
+			currentSupply,
+		)
+		newStaker, err = state.NewCurrentStaker(txID, tx, chainTime, potentialReward)
+		if err != nil {
+			return err
+		}
+		e.State.PutCurrentValidator(newStaker)
+	} else {
+		newStaker, err = state.NewPendingStaker(txID, tx)
+		if err != nil {
+			return err
+		}
+		e.State.PutPendingValidator(newStaker)
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
