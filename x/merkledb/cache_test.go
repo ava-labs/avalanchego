@@ -157,7 +157,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 
 // Test the functionality of the cache when the onEviction function
 // returns an error.
-// Note this test assumes the internal cache is an LRU cache.
+// Note this test assumes the cache is FIFO.
 func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
@@ -182,12 +182,14 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 		require.Equal(i+1, cache.fifo.Len())
 	}
 
-	// Put another key. This should evict the LRU key (0)
+	// Cache has [0,1]
+
+	// Put another key. This should evict the first key (0)
 	// and return an error since 0 is even.
 	err := cache.Put(maxSize, maxSize)
 	require.ErrorIs(err, errTest)
 
-	// Cache should still have correct state [1,2]
+	// Cache has [1,2]
 	require.Equal(evicted, []int{0})
 	require.Equal(maxSize, cache.fifo.Len())
 	_, ok := cache.Get(0)
