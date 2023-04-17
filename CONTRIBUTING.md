@@ -16,7 +16,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 ### Did you fix whitespace, format code, or make a purely cosmetic patch?
 
-- Changes from the community that are cosmetic in nature and do not add anything substantial to the stability, functionality, or testability of Rails will generally not be accepted.
+- Changes from the community that are cosmetic in nature and do not add anything substantial to the stability, functionality, or testability of `avalanchego` will generally not be accepted.
 
 ### Other
 
