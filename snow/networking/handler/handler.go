@@ -32,7 +32,6 @@ import (
 )
 
 const (
-	threadPoolSize        = 2
 	numDispatchersToClose = 3
 	// If a consensus message takes longer than this to process, the handler
 	// will log a warning.
@@ -56,6 +55,7 @@ type Handler interface {
 	ShouldHandle(nodeID ids.NodeID) bool
 
 	SetEngineManager(engineManager *EngineManager)
+	GetEngineManager() *EngineManager
 
 	SetOnStopped(onStopped func())
 	Start(ctx context.Context, recoverPanic bool)
@@ -118,6 +118,7 @@ func New(
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
 	gossipFrequency time.Duration,
+	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
@@ -166,6 +167,10 @@ func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
 	h.engineManager = engineManager
+}
+
+func (h *handler) GetEngineManager() *EngineManager {
+	return h.engineManager
 }
 
 func (h *handler) SetOnStopped(onStopped func()) {
@@ -407,6 +412,11 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
+
+		// Check if the chain is in normal operation at the start of message
+		// execution (may change during execution)
+		chainState, _       = h.ctx.GetChainState()
+		isExtendingFrontier = chainState == snow.ExtendingFrontier
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("nodeID", nodeID),
@@ -419,23 +429,27 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
+	lockAcquiredTime := h.clock.Time()
 	defer func() {
 		h.ctx.Lock.Unlock()
 
 		var (
-			endTime        = h.clock.Time()
-			histogram      = h.metrics.messages[op]
-			processingTime = endTime.Sub(startTime)
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
+			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
+			processingTime    = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		histogram.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
+		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
-		if processingTime > syncProcessingTimeWarnLimit && h.ctx.IsChainBootstrapped() {
+		if processingTime > syncProcessingTimeWarnLimit && isExtendingFrontier && h.ctx.IsChainBootstrapped() {
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
+				zap.Duration("msgHandlingTime", msgHandlingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
 				zap.Any("message", body),
@@ -740,11 +754,14 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
-			endTime   = h.clock.Time()
-			histogram = h.metrics.messages[op]
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
+			processingTime    = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		histogram.Observe(float64(endTime.Sub(startTime)))
+		// There is no lock grabbed here, so both metrics are identical
+		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling async message",
 			zap.Stringer("messageOp", op),
@@ -819,6 +836,11 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		op        = msg.Op()
 		body      = msg.Message()
 		startTime = h.clock.Time()
+
+		// Check if the chain is in normal operation at the start of message
+		// execution (may change during execution)
+		chainState, _       = h.ctx.GetChainState()
+		isExtendingFrontier = chainState == snow.ExtendingFrontier
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("messageOp", op),
@@ -828,18 +850,30 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		zap.Any("message", body),
 	)
 	h.ctx.Lock.Lock()
+	lockAcquiredTime := h.clock.Time()
 	defer func() {
 		h.ctx.Lock.Unlock()
 
 		var (
-			endTime   = h.clock.Time()
-			histogram = h.metrics.messages[op]
+			endTime           = h.clock.Time()
+			messageHistograms = h.metrics.messages[op]
+			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
+			processingTime    = endTime.Sub(startTime)
 		)
-		histogram.Observe(float64(endTime.Sub(startTime)))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
+		messageHistograms.processingTime.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),
 		)
+		if processingTime > syncProcessingTimeWarnLimit && isExtendingFrontier {
+			h.ctx.Log.Warn("handling chan message took longer than expected",
+				zap.Duration("processingTime", processingTime),
+				zap.Duration("msgHandlingTime", msgHandlingTime),
+				zap.Stringer("messageOp", op),
+				zap.Any("message", body),
+			)
+		}
 	}()
 
 	engineState, currentEngineType := h.ctx.GetChainState()
@@ -858,6 +892,19 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
 	case *message.GossipRequest:
+		// TODO: After Cortina is activated, this can be removed as everyone
+		// will have accepted the StopVertex.
+		if currentEngineType == p2p.EngineType_ENGINE_TYPE_SNOWMAN {
+			avalancheEngine, ok := h.engineManager.Get(p2p.EngineType_ENGINE_TYPE_AVALANCHE).Get(engineState)
+			if ok {
+				// This chain was linearized, so we should gossip the Avalanche
+				// accepted frontier to make sure everyone eventually linearizes
+				// the chain.
+				if err := avalancheEngine.Gossip(context.TODO()); err != nil {
+					return err
+				}
+			}
+		}
 		return engine.Gossip(context.TODO())
 
 	case *message.Timeout:

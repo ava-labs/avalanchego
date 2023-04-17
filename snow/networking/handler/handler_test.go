@@ -28,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 )
 
+const testThreadPoolSize = 2
+
 var errFatal = errors.New("error should cause handler to close")
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
@@ -54,6 +56,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -148,6 +151,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -239,6 +243,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		vdrs,
 		nil,
 		1,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -319,6 +324,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		vdrs,
 		msgFromVMChan,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -396,6 +402,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		connector,
 		sb,
@@ -566,6 +573,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				vdrs,
 				nil,
 				time.Second,
+				testThreadPoolSize,
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
 				sb,

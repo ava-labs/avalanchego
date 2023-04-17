@@ -36,7 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const engineType = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+const (
+	engineType         = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+	testThreadPoolSize = 2
+)
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
@@ -93,6 +96,7 @@ func TestShutdown(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -229,6 +233,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -385,6 +390,7 @@ func TestRouterTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -855,6 +861,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -1143,6 +1150,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -1293,6 +1301,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		reqSb,
@@ -1313,6 +1322,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		respSb,
@@ -1553,6 +1563,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,

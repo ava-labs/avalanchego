@@ -540,8 +540,9 @@ func TestBlockVerify(t *testing.T) {
 				require.Equal(b.Block, blockState.statelessBlock)
 
 				// Assert block is added to on accept state
-				_, err := blockState.onAcceptState.GetBlock(b.ID())
+				persistedBlock, err := blockState.onAcceptState.GetBlock(b.ID())
 				require.NoError(err)
+				require.Equal(b.Block, persistedBlock)
 
 				// Assert block is set to last accepted
 				lastAccepted := b.ID()
