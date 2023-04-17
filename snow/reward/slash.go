@@ -93,7 +93,6 @@ func (s *SlashDB) Slash(
 		subnetIDLabel: subnetID.String(),
 		metricLabel:   metric,
 	})
-
 	if err != nil {
 		return err
 	}
