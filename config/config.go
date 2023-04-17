@@ -65,7 +65,16 @@ const (
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	deprecatedKeys = map[string]string{
-		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
+		NetworkCompressionEnabledKey:           fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
+		GenesisConfigFileKey:                   fmt.Sprintf("use --%s instead", GenesisFileKey),
+		GenesisConfigContentKey:                fmt.Sprintf("use --%s instead", GenesisFileContentKey),
+		InboundConnUpgradeThrottlerCooldownKey: fmt.Sprintf("use --%s instead", NetworkInboundConnUpgradeThrottlerCooldownKey),
+		InboundThrottlerMaxConnsPerSecKey:      fmt.Sprintf("use --%s instead", NetworkInboundThrottlerMaxConnsPerSecKey),
+		OutboundConnectionThrottlingRpsKey:     fmt.Sprintf("use --%s instead", NetworkOutboundConnectionThrottlingRpsKey),
+		OutboundConnectionTimeoutKey:           fmt.Sprintf("use --%s instead", NetworkOutboundConnectionTimeoutKey),
+		StakingEnabledKey:                      fmt.Sprintf("use --%s instead", SybilProtectionEnabledKey),
+		StakingDisabledWeightKey:               fmt.Sprintf("use --%s instead", SybilProtectionDisabledWeightKey),
+		ConsensusGossipFrequencyKey:            fmt.Sprintf("use --%s instead", ConsensusAcceptedFrontierGossipFrequencyKey),
 	}
 
 	errInvalidWeights                         = errors.New("sybil protection disabled weights must be positive")
@@ -315,8 +324,8 @@ func getNetworkConfig(
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
-	maxInboundConnsPerSec := v.GetFloat64(NetworkInboundThrottlerMaxConnsPerSecKey)
-	upgradeCooldown := v.GetDuration(NetworkInboundConnUpgradeThrottlerCooldownKey)
+	maxInboundConnsPerSec := v.GetFloat64(getRenamedKey(v, InboundThrottlerMaxConnsPerSecKey, NetworkInboundThrottlerMaxConnsPerSecKey))
+	upgradeCooldown := v.GetDuration(getRenamedKey(v, InboundConnUpgradeThrottlerCooldownKey, NetworkInboundConnUpgradeThrottlerCooldownKey))
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 
@@ -395,8 +404,8 @@ func getNetworkConfig(
 		ProxyReadHeaderTimeout: v.GetDuration(NetworkTCPProxyReadTimeoutKey),
 
 		DialerConfig: dialer.Config{
-			ThrottleRps:       v.GetUint32(NetworkOutboundConnectionThrottlingRpsKey),
-			ConnectionTimeout: v.GetDuration(NetworkOutboundConnectionTimeoutKey),
+			ThrottleRps:       v.GetUint32(getRenamedKey(v, OutboundConnectionThrottlingRpsKey, NetworkOutboundConnectionThrottlingRpsKey)),
+			ConnectionTimeout: v.GetDuration(getRenamedKey(v, OutboundConnectionTimeoutKey, NetworkOutboundConnectionTimeoutKey)),
 		},
 
 		TLSKeyLogFile: v.GetString(NetworkTLSKeyLogFileKey),
@@ -794,8 +803,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		// We use SybilProtectionEnabledKey for CLI flags that is shown to the user
 		// and EnableStaking in the rest of the codebase. This is to avoid confusion
 		// with the name "staking" like in "AVAX staking".
-		EnableStaking:         v.GetBool(SybilProtectionEnabledKey),
-		DisabledStakingWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
+		EnableStaking:         v.GetBool(getRenamedKey(v, StakingEnabledKey, SybilProtectionEnabledKey)),
+		DisabledStakingWeight: v.GetUint64(getRenamedKey(v, StakingDisabledWeightKey, SybilProtectionDisabledWeightKey)),
 		StakingKeyPath:        GetExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:       GetExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:     GetExpandedArg(v, StakingSignerKeyPathKey),
@@ -872,14 +881,14 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 
 func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
-	if v.IsSet(GenesisFileContentKey) {
-		genesisData := v.GetString(GenesisFileContentKey)
+	if v.IsSet(getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey)) {
+		genesisData := v.GetString(getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey))
 		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
 	// if content is not specified go for the file
-	if v.IsSet(GenesisFileKey) {
-		genesisFileName := GetExpandedArg(v, GenesisFileKey)
+	if v.IsSet(getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey)) {
+		genesisFileName := GetExpandedArg(v, getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey))
 		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
@@ -1308,7 +1317,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusAcceptedFrontierGossipFrequencyKey)
+	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(getRenamedKey(v, ConsensusGossipFrequencyKey, ConsensusAcceptedFrontierGossipFrequencyKey))
 	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
 		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusAcceptedFrontierGossipFrequencyKey)
 	}
@@ -1522,4 +1531,13 @@ func providedFlags(v *viper.Viper) map[string]interface{} {
 		}
 	}
 	return customSettings
+}
+
+// getRenamedKey returns the new key if it is set, otherwise it returns the deprecated key.
+func getRenamedKey(v *viper.Viper, deprecatedKey string, newKey string) string {
+	if v.IsSet(newKey) {
+		return newKey
+	}
+
+	return deprecatedKey
 }
