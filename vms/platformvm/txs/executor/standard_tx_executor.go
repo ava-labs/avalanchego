@@ -491,6 +491,9 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 				stakerTx.Weight(),
 				currentSupply,
 			)
+
+			updatedSupply := currentSupply + potentialReward
+			e.State.SetCurrentSupply(stakerTx.SubnetID(), updatedSupply)
 		}
 
 		newStaker, err := state.NewCurrentStaker(txID, stakerTx, chainTime, stakeDuration, potentialReward)
