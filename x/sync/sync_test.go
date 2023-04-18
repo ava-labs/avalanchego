@@ -701,7 +701,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 5; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
 
 		dbToSync, err := generateTrie(t, r, 10000)

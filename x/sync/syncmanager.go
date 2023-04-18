@@ -569,7 +569,7 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 	// if the last key is equal to the end, then the full range is completed
 	if !bytes.Equal(largestHandledKey, workItem.end) {
 		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, workItem.end, largestHandledKey, proofOfLargestKey)
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
