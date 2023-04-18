@@ -420,6 +420,7 @@ func (m *StateSyncManager) findNextKey(
 			}
 		default:
 			{
+				// the two nodes are at the same depth, so compare them
 				currentNode = &localProofNode
 				alternateNode = &receivedProofNode
 				localProofNodeIndex--
