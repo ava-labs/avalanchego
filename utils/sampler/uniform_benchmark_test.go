@@ -27,10 +27,7 @@ func BenchmarkAllUniform(b *testing.B) {
 }
 
 func UniformBenchmark(b *testing.B, s Uniform, size uint64, toSample int) {
-	err := s.Initialize(size)
-	if err != nil {
-		b.Fatal(err)
-	}
+	s.Initialize(size)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
