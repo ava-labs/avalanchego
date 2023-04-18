@@ -284,8 +284,15 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		chainTime = e.State.GetTimestamp()
 	)
 
-	if err := e.addStakerFromStakerTx(tx, chainTime); err != nil {
+	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	if err != nil {
 		return err
+	}
+
+	if staker.IsPending() {
+		e.State.PutPendingValidator(staker)
+	} else {
+		e.State.PutCurrentValidator(staker)
 	}
 
 	avax.Consume(e.State, tx.Ins)
@@ -307,8 +314,16 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		txID      = e.Tx.ID()
 		chainTime = e.State.GetTimestamp()
 	)
-	if err := e.addStakerFromStakerTx(tx, chainTime); err != nil {
+
+	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	if err != nil {
 		return err
+	}
+
+	if staker.IsPending() {
+		e.State.PutPendingValidator(staker)
+	} else {
+		e.State.PutCurrentValidator(staker)
 	}
 
 	avax.Produce(e.State, txID, tx.Outs)
@@ -325,16 +340,24 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	var (
+		txID      = e.Tx.ID()
+		chainTime = e.State.GetTimestamp()
+	)
+
+	staker, err := e.addStakerFromStakerTx(tx, chainTime)
 	if err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
+	if staker.IsPending() {
+		e.State.PutPendingDelegator(staker)
+	} else {
+		e.State.PutCurrentDelegator(staker)
+	}
+
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
@@ -429,8 +452,16 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		txID      = e.Tx.ID()
 		chainTime = e.State.GetTimestamp()
 	)
-	if err := e.addStakerFromStakerTx(tx, chainTime); err != nil {
+
+	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	if err != nil {
 		return err
+	}
+
+	if staker.IsPending() {
+		e.State.PutPendingValidator(staker)
+	} else {
+		e.State.PutCurrentValidator(staker)
 	}
 
 	avax.Consume(e.State, tx.Ins)
@@ -464,50 +495,39 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
 	chainTime time.Time,
-) error {
+) (*state.Staker, error) {
 	txID := e.Tx.ID()
-	if e.Config.IsContinuousStakingActivated(chainTime) {
-		// Post Continuous Staking fork, validators are immediately marked as current.
-		// their start time is current chain time
 
-		var (
-			potentialReward = uint64(0)
-			stakeDuration   = stakerTx.Duration()
-		)
-		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
-			currentSupply, err := e.State.GetCurrentSupply(stakerTx.SubnetID())
-			if err != nil {
-				return err
-			}
+	if !e.Config.IsContinuousStakingActivated(chainTime) {
+		return state.NewPendingStaker(txID, stakerTx)
+	}
 
-			rewardCfg, err := e.State.GetRewardConfig(stakerTx.SubnetID())
-			if err != nil {
-				return err
-			}
-			rewards := reward.NewCalculator(rewardCfg)
-
-			potentialReward = rewards.Calculate(
-				stakeDuration,
-				stakerTx.Weight(),
-				currentSupply,
-			)
-
-			updatedSupply := currentSupply + potentialReward
-			e.State.SetCurrentSupply(stakerTx.SubnetID(), updatedSupply)
-		}
-
-		newStaker, err := state.NewCurrentStaker(txID, stakerTx, chainTime, stakeDuration, potentialReward)
+	// Post Continuous Staking fork, validators are immediately marked as current.
+	// their start time is current chain time
+	var (
+		potentialReward = uint64(0)
+		stakeDuration   = stakerTx.Duration()
+	)
+	if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
+		currentSupply, err := e.State.GetCurrentSupply(stakerTx.SubnetID())
 		if err != nil {
-			return err
+			return nil, err
 		}
-		e.State.PutCurrentValidator(newStaker)
-		return nil
-	}
 
-	newStaker, err := state.NewPendingStaker(txID, stakerTx)
-	if err != nil {
-		return err
+		rewardCfg, err := e.State.GetRewardConfig(stakerTx.SubnetID())
+		if err != nil {
+			return nil, err
+		}
+		rewards := reward.NewCalculator(rewardCfg)
+
+		potentialReward = rewards.Calculate(
+			stakeDuration,
+			stakerTx.Weight(),
+			currentSupply,
+		)
+
+		updatedSupply := currentSupply + potentialReward
+		e.State.SetCurrentSupply(stakerTx.SubnetID(), updatedSupply)
 	}
-	e.State.PutPendingValidator(newStaker)
-	return nil
+	return state.NewCurrentStaker(txID, stakerTx, chainTime, stakeDuration, potentialReward)
 }

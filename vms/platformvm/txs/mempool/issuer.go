@@ -50,7 +50,11 @@ func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 }
 
 func (i *issuer) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 

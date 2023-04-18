@@ -28,6 +28,7 @@ func (r *remover) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 
 func (r *remover) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 

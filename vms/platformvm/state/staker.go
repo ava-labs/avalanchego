@@ -129,6 +129,16 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 	}, nil
 }
 
+func (s *Staker) IsPending() bool {
+	isPending := s.Priority == txs.PrimaryNetworkDelegatorApricotPendingPriority ||
+		s.Priority == txs.PrimaryNetworkValidatorPendingPriority ||
+		s.Priority == txs.PrimaryNetworkDelegatorBanffPendingPriority ||
+		s.Priority == txs.SubnetPermissionlessValidatorPendingPriority ||
+		s.Priority == txs.SubnetPermissionlessDelegatorPendingPriority ||
+		s.Priority == txs.SubnetPermissionedValidatorPendingPriority
+	return isPending
+}
+
 func RotateStakerTimesInPlace(s *Staker) {
 	var (
 		currEndTime = s.EndTime
