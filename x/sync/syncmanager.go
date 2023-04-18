@@ -362,6 +362,11 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
 }
 
+type pathAndID struct {
+	path merkledb.Path
+	id   ids.ID
+}
+
 // findNextKey attempts to find what key to query next based on the differences between
 // the proof of the last received key in the local trie vs proof for the last received key recently received by the sync manager.
 func (m *StateSyncManager) findNextKey(
@@ -387,12 +392,12 @@ func (m *StateSyncManager) findNextKey(
 	}
 
 	// Min element is the smallest path whose existence is implied by the remote proof.
-	theirImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
-		return p1.Compare(p2) < 0
+	theirImpliedKeys := btree.NewG(2, func(p1, p2 pathAndID) bool {
+		return p1.path.Compare(p2.path) < 0
 	})
 	// Min element is the smallest path whose existence is implied by the local proof.
-	ourImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
-		return p1.Compare(p2) < 0
+	ourImpliedKeys := btree.NewG(2, func(p1, p2 pathAndID) bool {
+		return p1.path.Compare(p2.path) < 0
 	})
 
 	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
@@ -412,7 +417,7 @@ func (m *StateSyncManager) findNextKey(
 		// and less than the range end path (if applicable).
 		for _, path := range paths {
 			if path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) < 0) {
+				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) <= 0) {
 				theirImpliedKeys.ReplaceOrInsert(path)
 			}
 		}
@@ -431,34 +436,33 @@ func (m *StateSyncManager) findNextKey(
 		// and less than the range end path (if applicable).
 		for _, path := range paths {
 			if path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) < 0) {
+				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) <= 0) {
 				ourImpliedKeys.ReplaceOrInsert(path)
 			}
 		}
 	}
 
-	// Find smallest key that is in theirImpliedKeys but not in ourImpliedKeys
-	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		if ourImpliedKeys.Has(minPath) {
-			theirImpliedKeys.DeleteMin()
+	for maxPath, ok := theirImpliedKeys.Max(); ok; maxPath, ok = theirImpliedKeys.Max() {
+		if !ourImpliedKeys.Has(maxPath) {
+			theirImpliedKeys.DeleteMax()
 			continue
 		}
 
 		// See if there's a key in ourImpliedKeys that is a suffix of minPath
 		suffixPathExists := false
-		ourImpliedKeys.DescendGreaterThan(minPath, func(item merkledb.Path) bool {
-			if item.HasPrefix(minPath) {
+		ourImpliedKeys.DescendGreaterThan(maxPath, func(item merkledb.Path) bool {
+			if item.HasPrefix(maxPath) {
 				suffixPathExists = true
 				return false
 			}
 			return true
 		})
 		if suffixPathExists {
-			theirImpliedKeys.DeleteMin()
+			theirImpliedKeys.DeleteMax()
 			continue
 		}
 
-		minPathBytes := minPath.Serialize().Value
+		minPathBytes := maxPath.Serialize().Value
 		if len(rangeEnd) > 0 && bytes.Compare(minPathBytes, rangeEnd) >= 0 {
 			return nil, nil // TODO should we continue? Delete such elements from trees?
 		}
