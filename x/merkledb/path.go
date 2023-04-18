@@ -44,11 +44,9 @@ func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
 	reducedSize := len(prefixValue) - 1
-	
+
 	// the input was invalid so just return false
-	if reducedSize < 0 ||
-		reducedSize >= len(prefixValue) ||
-		reducedSize >= len(s.Value) {
+	if reducedSize < 0 {
 		return false
 	}
 
