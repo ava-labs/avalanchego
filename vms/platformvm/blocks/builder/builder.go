@@ -148,7 +148,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	}
 
 	// Retrieved Preferred timestamp to make sure we correctly handle
-	// Continuous Staking for in the mempool
+	// Continuous Staking fork in the mempool
 	preferred, err := b.Preferred()
 	if err != nil {
 		return err

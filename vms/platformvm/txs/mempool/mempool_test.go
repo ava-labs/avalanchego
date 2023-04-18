@@ -175,6 +175,39 @@ func TestProposalTxsInMempool(t *testing.T) {
 	}
 }
 
+func TestContinuousStakingForkInMempool(t *testing.T) {
+	require := require.New(t)
+
+	forkTime := time.Now()
+	registerer := prometheus.NewRegistry()
+	mpool, err := NewMempool(&config.Config{
+		ContinuousStakingTime: forkTime,
+	}, &noopBlkTimer{}, "mempool", registerer)
+	require.NoError(err)
+
+	txs, err := createTestProposalTxs(1)
+	require.NoError(err)
+	tx := txs[0]
+
+	// insert pre fork
+	preForkTime := forkTime.Add(-1 * time.Second)
+	require.NoError(mpool.Add(tx, preForkTime))
+	require.True(mpool.HasStakerTx())
+	retrievedTx := mpool.PeekStakerTx()
+	require.Equal(tx, retrievedTx)
+
+	// insert post fork
+	postForkTime := forkTime.Add(time.Second)
+	require.Error(mpool.Add(tx, postForkTime), "should be marked as duplicated even across fork")
+	mpool.Remove(txs)
+	require.NoError(mpool.Add(tx, postForkTime))
+	require.False(mpool.HasStakerTx(), "post fork there should not be staker txs anymore")
+	require.True(mpool.HasTxs())
+	retrievedTxs := mpool.PeekTxs(math.MaxInt)
+	require.True(len(retrievedTxs) == 1)
+	require.Equal(retrievedTxs[0], tx)
+}
+
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
 	decisionTxs := make([]*txs.Tx, 0, count)
 	for i := uint32(0); i < uint32(count); i++ {

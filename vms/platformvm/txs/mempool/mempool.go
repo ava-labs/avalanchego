@@ -52,6 +52,9 @@ type Mempool interface {
 	EnableAdding()
 	DisableAdding()
 
+	// Add allows inserting a transaction in mempool.
+	// Timestamp is the chain tip time. It's needed to
+	// handle hard forks
 	Add(tx *txs.Tx, timestamp time.Time) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
