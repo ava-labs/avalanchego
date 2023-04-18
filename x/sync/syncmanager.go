@@ -397,7 +397,7 @@ func (m *StateSyncManager) findNextKey(
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(receivedProofNodes) - 1
 
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && result == nil {
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey == nil {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := receivedProofNodes[receivedProofNodeIndex]
 
