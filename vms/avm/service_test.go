@@ -131,9 +131,7 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 	sampledAddrsStr := []string{}
 
 	sampler := sampler.NewUniform()
-	if err := sampler.Initialize(uint64(len(addrs))); err != nil {
-		t.Fatal(err)
-	}
+	sampler.Initialize(uint64(len(addrs)))
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
 	indices, err := sampler.Sample(numAddrs)
