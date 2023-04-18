@@ -466,37 +466,34 @@ func (m *StateSyncManager) findNextKey(
 	// * We don't locally have the prefix
 	// * We have a different ID for the prefix
 	var (
-	// firstDiff    merkledb.Path
-	// firstDiffSet bool
+		firstDiff    merkledb.Path
+		firstDiffSet bool
 	)
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
 		local, ok := ourImpliedKeys.Get(minPath)
 		if !ok || local.id != minPath.id {
-			return minPath.path.Serialize().Value, nil
-			// firstDiff = minPath.path
-			// firstDiffSet = true
+			// return minPath.path.Serialize().Value, nil
+			firstDiff = minPath.path
+			firstDiffSet = true
+			break
 		}
 		theirImpliedKeys.DeleteMin()
 	}
-	return nil, nil
 
-	// for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
-	// 	if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
-	// 		break
-	// 	}
-	// 	if len(rangeEnd) > 0 && minPath.path.Compare(rangeEndPath) > 0 {
-	// 		break
-	// 	}
-	// 	remote, ok := theirImpliedKeys.Get(minPath)
-	// 	if !ok || remote.id != minPath.id {
-	// 		firstDiff = minPath.path
-	// 		firstDiffSet = true
-	// 	}
-	// 	ourImpliedKeys.DeleteMin()
-	// }
-	// if firstDiffSet {
-	// 	return firstDiff.Serialize().Value, nil
-	// }
+	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
+		if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
+			break
+		}
+		remote, ok := theirImpliedKeys.Get(minPath)
+		if !ok || remote.id != minPath.id {
+			firstDiff = minPath.path
+			firstDiffSet = true
+		}
+		ourImpliedKeys.DeleteMin()
+	}
+	if firstDiffSet {
+		return firstDiff.Serialize().Value, nil
+	}
 
 	return nil, nil
 
