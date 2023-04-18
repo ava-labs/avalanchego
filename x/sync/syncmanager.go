@@ -459,9 +459,11 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	rangeEndPath := merkledb.NewPath(rangeEnd)
-	var firstDiff merkledb.Path
-	firstDiffSet := false
+	var (
+		rangeEndPath = merkledb.NewPath(rangeEnd)
+		firstDiff    merkledb.Path
+		firstDiffSet = false
+	)
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
 		if minPath.path.Compare(rangeEndPath) > 0 {
 			break
@@ -489,7 +491,11 @@ func (m *StateSyncManager) findNextKey(
 		}
 		ourImpliedKeys.DeleteMin()
 	}
-	return firstDiff.Serialize().Value, nil
+
+	if firstDiffSet {
+		return firstDiff.Serialize().Value, nil
+	}
+	return nil, nil
 
 	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
 	// // if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
