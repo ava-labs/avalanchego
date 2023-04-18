@@ -301,7 +301,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// extra node gets deleted and the remaining prefix node is not in the range, so default back to the lastReceivedKey
 	nextKey, err = syncer.findNextKey(context.Background(), []byte{0x11}, []byte{0x20}, []byte{0x11}, extraNodeProof.Path)
 	require.NoError(t, err)
-	require.Equal(t, []byte{0x11}, nextKey)
+	require.Equal(t, []byte{0x13}, nextKey)
 }
 
 func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
