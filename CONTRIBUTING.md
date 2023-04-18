@@ -44,7 +44,9 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ```sh
 ./scripts/protobuf_codegen.sh
 ```
+
 - To add or remove an interface that needs a corresponding mock generated, add it to the mock file [here](./scripts/mocks.mockgen.txt). You can regenerate the mocks by running the following script.
+
 ```sh
 ./scripts/mock.gen.sh
 ```
