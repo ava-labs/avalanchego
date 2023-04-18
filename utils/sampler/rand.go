@@ -41,11 +41,11 @@ func (r *rng) Seed(seed int64) {
 	r.lock.Unlock()
 }
 
-// Uint64n returns a pseudo-random number in [0,n].
+// Uint64Inclusive returns a pseudo-random number in [0,n].
 //
 // Invariant: The result of this function is stored in chain state, so any
 // modifications are considered breaking.
-func (r *rng) Uint64n(n uint64) uint64 {
+func (r *rng) Uint64Inclusive(n uint64) uint64 {
 	switch {
 	// n+1 is power of two, so we can just mask
 	//

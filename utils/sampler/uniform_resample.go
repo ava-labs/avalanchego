@@ -64,7 +64,7 @@ func (s *uniformResample) Next() (uint64, error) {
 	}
 
 	for {
-		draw := s.rng.Uint64n(s.length - 1)
+		draw := s.rng.Uint64Inclusive(s.length - 1)
 		if s.drawn.Contains(draw) {
 			continue
 		}

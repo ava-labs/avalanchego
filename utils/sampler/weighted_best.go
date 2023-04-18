@@ -45,7 +45,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 	if totalWeight > 0 {
 		samples = make([]uint64, s.benchmarkIterations)
 		for i := range samples {
-			samples[i] = globalRNG.Uint64n(totalWeight - 1)
+			samples[i] = globalRNG.Uint64Inclusive(totalWeight - 1)
 		}
 	}
 

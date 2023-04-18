@@ -157,7 +157,7 @@ func TestRNG(t *testing.T) {
 				nums:      test.nums,
 			}
 			r := &rng{rng: source}
-			val := r.Uint64n(test.max)
+			val := r.Uint64Inclusive(test.max)
 			require.Equal(test.expected, val)
 			require.Empty(source.nums)
 
@@ -196,7 +196,7 @@ func FuzzRNG(f *testing.F) {
 			nums:      sourceNums,
 		}
 		r := &rng{rng: source}
-		val := r.Uint64n(max)
+		val := r.Uint64Inclusive(max)
 
 		stdSource := &testSTDSource{
 			onInvalid: t.SkipNow,

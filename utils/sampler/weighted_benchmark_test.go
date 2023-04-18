@@ -113,14 +113,14 @@ func WeightedPowBenchmarkSampler(
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(globalRNG.Uint64n(totalWeight - 1))
+		_, _ = s.Sample(globalRNG.Uint64Inclusive(totalWeight - 1))
 	}
 	return true
 }
 
 func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool {
 	weights := make([]uint64, size)
-	weights[0] = math.MaxUint64 - uint64(size+1)
+	weights[0] = math.MaxUint64 - uint64(size-1)
 	for i := 1; i < len(weights); i++ {
 		weights[i] = 1
 	}
@@ -132,7 +132,7 @@ func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool 
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(globalRNG.Uint64n(math.MaxUint64))
+		_, _ = s.Sample(globalRNG.Uint64Inclusive(math.MaxUint64 - 1))
 	}
 	return true
 }
@@ -153,7 +153,7 @@ func WeightedPowBenchmarkInitializer(
 
 func WeightedSingletonBenchmarkInitializer(b *testing.B, s Weighted, size int) {
 	weights := make([]uint64, size)
-	weights[0] = math.MaxUint64 - uint64(size+1)
+	weights[0] = math.MaxUint64 - uint64(size-1)
 	for i := 1; i < len(weights); i++ {
 		weights[i] = 1
 	}

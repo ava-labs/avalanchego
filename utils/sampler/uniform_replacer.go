@@ -76,7 +76,7 @@ func (s *uniformReplacer) Next() (uint64, error) {
 		return 0, errOutOfRange
 	}
 
-	draw := s.rng.Uint64n(s.length-1-s.drawsCount) + s.drawsCount
+	draw := s.rng.Uint64Inclusive(s.length-1-s.drawsCount) + s.drawsCount
 	ret := s.drawn.get(draw, draw)
 	s.drawn[draw] = s.drawn.get(s.drawsCount, s.drawsCount)
 	s.drawsCount++
