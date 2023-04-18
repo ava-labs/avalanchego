@@ -407,6 +407,7 @@ func (m *StateSyncManager) findNextKey(
 	})
 
 	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
+	rangeEndPath := merkledb.NewPath(rangeEnd)
 
 	for _, node := range receivedProofNodes {
 		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
@@ -428,7 +429,8 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
 				theirImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
@@ -453,7 +455,8 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
 				ourImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
@@ -463,14 +466,10 @@ func (m *StateSyncManager) findNextKey(
 	// * We don't locally have the prefix
 	// * We have a different ID for the prefix
 	var (
-		rangeEndPath = merkledb.NewPath(rangeEnd)
-		// firstDiff    merkledb.Path
-		// firstDiffSet bool
+	// firstDiff    merkledb.Path
+	// firstDiffSet bool
 	)
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		if len(rangeEnd) > 0 && minPath.path.Compare(rangeEndPath) > 0 {
-			return nil, nil
-		}
 		local, ok := ourImpliedKeys.Get(minPath)
 		if !ok || local.id != minPath.id {
 			return minPath.path.Serialize().Value, nil
