@@ -61,7 +61,8 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ```
 
 - Run unit tests
-```
+
+```sh
 ./scripts/build_test.sh
 ```
 
