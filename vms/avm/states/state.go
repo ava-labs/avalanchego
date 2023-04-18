@@ -101,9 +101,10 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	Close() error
+	// Deprecates statusDB and remove rejected and processing Txs from txDB
+	CleanupTxs() error
 
-	RemoveRejectedTxs() error
+	Close() error
 }
 
 /*
@@ -421,22 +422,10 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 		return *status, nil
 	}
 
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
+	if tx, err := s.GetTx(id); tx != nil && err == nil {
+		return choices.Accepted, nil
 	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-
-	s.statusCache.Put(id, &status)
-	return status, nil
+	return choices.Unknown, nil
 }
 
 // TODO: remove status support
@@ -579,44 +568,53 @@ func (s *state) writeStatuses() error {
 	return nil
 }
 
-func (s *state) rejectedTxs() ([]ids.ID, error) {
-	var txIDs []ids.ID
+func (s *state) CleanupTxs() error {
 	iter := s.statusDB.NewIterator()
+	defer iter.Release()
+
 	for iter.Next() {
 		key := iter.Key()
 		val := iter.Value()
-		valStatus, err := database.ParseUInt32(val)
-		if err != nil {
-			return []ids.ID{}, err
-		}
-		if choices.Status(valStatus) == choices.Rejected {
-			txID, err := ids.ToID(key)
-			if err != nil {
-				return []ids.ID{}, err
-			}
-			txIDs = append(txIDs, txID)
-			// remove txID from dbStatus
-			database.ClearPrefix(s.statusDB, s.statusDB, key)
-		}
-	}
-	return txIDs, nil
-}
 
-func (s *state) RemoveRejectedTxs() error {
-	txIDs, err := s.rejectedTxs()
-	if err != nil {
-		return err
-	}
-	for _, txID := range txIDs {
+		txID, err := ids.ToID(key)
+		if err != nil {
+			return err
+		}
 		tx, err := s.GetTx(txID)
 		if err != nil {
 			return err
 		}
-		// find UTXOID produced by the tx
-		UTXOs := tx.UTXOs()
-		// update utxoDB and utxoState accordingly
-		for _, UTXO := range UTXOs {
-			s.utxoState.DeleteUTXO(UTXO.InputID())
+
+		valStatus, err := database.ParseUInt32(val)
+		if err != nil {
+			return err
+		}
+		txStatus := choices.Status(valStatus)
+
+		switch txStatus {
+		case choices.Accepted:
+			// find UTXOs consumed by accepted tx
+			utxos := tx.Unsigned.InputUTXOs()
+			// remove all the UTXOs consumed by the tx
+			for _, UTXO := range utxos {
+				delete(s.modifiedUTXOs, UTXO.InputID())
+				if err := s.utxoState.DeleteUTXO(UTXO.InputID()); err != nil {
+					return err
+				}
+			}
+		default:
+			// remove all these transactions from map
+			delete(s.addedTxs, txID)
+			// remove all these transactions from cache
+			s.txCache.Evict(txID)
+			// remove all these transactions from db
+			if err := s.txDB.Delete(key); err != nil {
+				return err
+			}
+		}
+		s.statusCache.Evict(txID)
+		if err := s.statusDB.Delete(key); err != nil {
+			return err
 		}
 	}
 	return nil

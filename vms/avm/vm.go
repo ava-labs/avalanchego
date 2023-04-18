@@ -315,7 +315,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 	}
 
-	if err := vm.state.RemoveRejectedTxs(); err!= nil {
+	if err := vm.state.CleanupTxs(); err != nil {
 		return err
 	}
 

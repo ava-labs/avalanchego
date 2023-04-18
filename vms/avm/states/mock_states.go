@@ -767,15 +767,15 @@ func (mr *MockDiffMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 }
 
 // RemoveRejectedTxs mocks base method.
-func (m *MockState) RemoveRejectedTxs() error {
+func (m *MockState) CleanupTxs() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveRejectedTxs")
+	ret := m.ctrl.Call(m, "CleanupTxs")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RemoveRejectedTxs indicates an expected call of RemoveRejectedTxs.
-func (mr *MockStateMockRecorder) RemoveRejectedTxs() *gomock.Call {
+func (mr *MockStateMockRecorder) RemoveCleanupTxs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveRejectedTxs", reflect.TypeOf((*MockState)(nil).RemoveRejectedTxs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanupTxs", reflect.TypeOf((*MockState)(nil).CleanupTxs))
 }
