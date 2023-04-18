@@ -376,6 +376,10 @@ func (m *StateSyncManager) findNextKey(
 	lastReceivedKey []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
+	if len(rangeEnd) > 0 && bytes.Compare(lastReceivedKey, rangeEnd) >= 0 {
+		return nil, nil
+	}
+
 	localProof, err := m.config.SyncDB.GetProof(ctx, lastReceivedKey)
 	if err != nil {
 		return nil, err
@@ -453,35 +457,20 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
+	// Find greatest implied prefix such that:
+	// * We don't locally have the prefix
+	// * We have a different ID for the prefix
+	var result []byte
 	for maxPath, ok := theirImpliedKeys.Max(); ok; maxPath, ok = theirImpliedKeys.Max() {
-		if !ourImpliedKeys.Has(maxPath) {
+		local, ok := ourImpliedKeys.Get(maxPath)
+		if !ok || local.id != maxPath.id {
+			result = maxPath.path.Serialize().Value
 			theirImpliedKeys.DeleteMax()
 			continue
 		}
-
-		// See if there's a key in ourImpliedKeys that is a suffix of minPath
-		suffixPathExists := false
-		ourImpliedKeys.DescendGreaterThan(maxPath, func(item pathAndID) bool {
-			if item.path.HasPrefix(maxPath.path) {
-				suffixPathExists = true
-				return false
-			}
-			return true
-		})
-		if suffixPathExists {
-			theirImpliedKeys.DeleteMax()
-			continue
-		}
-
-		minPathBytes := maxPath.Serialize().Value
-		if len(rangeEnd) > 0 && bytes.Compare(minPathBytes, rangeEnd) >= 0 {
-			return nil, nil // TODO should we continue? Delete such elements from trees?
-		}
-		return minPathBytes, nil
 	}
-
-	if len(rangeEnd) > 0 && bytes.Compare(lastReceivedKey, rangeEnd) >= 0 {
-		return nil, nil
+	if len(result) > 0 {
+		return result, nil
 	}
 
 	return lastReceivedKey, nil
