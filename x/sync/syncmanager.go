@@ -407,7 +407,6 @@ func (m *StateSyncManager) findNextKey(
 	})
 
 	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
-	// rangeEndPath := merkledb.NewPath(rangeEnd)
 
 	for _, node := range receivedProofNodes {
 		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
@@ -429,7 +428,7 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) >= 0 {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 {
 				theirImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
@@ -454,28 +453,43 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) >= 0 {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 {
 				ourImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
 	}
 
-	// Find greatest implied prefix such that:
-	// * We don't locally have the prefix
-	// * We have a different ID for the prefix
+	rangeEndPath := merkledb.NewPath(rangeEnd)
+	var firstDiff merkledb.Path
+	firstDiffSet := false
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
+		if minPath.path.Compare(rangeEndPath) > 0 {
+			break
+		}
 		local, ok := ourImpliedKeys.Get(minPath)
 		if !ok || local.id != minPath.id {
-			firstDiffPath := minPath.path.Serialize().Value
-			if len(rangeEnd) > 0 && bytes.Compare(firstDiffPath, rangeEnd) > 0 {
-				return nil, nil
-			}
-			return firstDiffPath, nil
+			firstDiff = minPath.path
+			firstDiffSet = true
+			break
 		}
 		theirImpliedKeys.DeleteMin()
 	}
 
-	return nil, nil
+	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
+		if minPath.path.Compare(rangeEndPath) > 0 {
+			break
+		}
+		if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
+			break
+		}
+		remote, ok := theirImpliedKeys.Get(minPath)
+		if !ok || remote.id != minPath.id {
+			firstDiff = minPath.path
+			break
+		}
+		ourImpliedKeys.DeleteMin()
+	}
+	return firstDiff.Serialize().Value, nil
 
 	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
 	// // if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
