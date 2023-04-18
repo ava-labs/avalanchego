@@ -56,8 +56,10 @@ var (
 type Config struct {
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength int
-	NodeCacheSize int
+	HistoryLength             int
+	NodeCacheSize             int
+	IntermediateNodeCacheSize int
+	NotFoundNodeCacheSize     int
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -84,8 +86,10 @@ type Database struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache     onEvictCache[path, *node]
-	onEvictionErr utils.Atomic[error]
+	nodeCache             onEvictCache[path, *node]
+	intermediateNodeCache onEvictCache[path, *node]
+	notFoundNodeCache     onEvictCache[path, *node]
+	onEvictionErr         utils.Atomic[error]
 
 	// Stores change lists. Used to serve change proofs and construct
 	// historical views of the trie.
@@ -122,7 +126,13 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
+	trieDB.nodeCache = newOnEvictCache[path, *node](config.NodeCacheSize, func(n *node) error {
+		return nil
+	})
+	trieDB.intermediateNodeCache = newOnEvictCache[path](config.IntermediateNodeCacheSize, trieDB.onIntermediateNodeEviction)
+	trieDB.notFoundNodeCache = newOnEvictCache[path, *node](config.NotFoundNodeCacheSize, func(n *node) error {
+		return nil
+	})
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -697,12 +707,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
-func (db *Database) onEviction(node *node) error {
-	if node == nil || node.hasValue() {
-		// only persist intermediary nodes
-		return nil
-	}
-
+func (db *Database) onIntermediateNodeEviction(node *node) error {
 	nodeBytes, err := node.marshal()
 	if err != nil {
 		db.onEvictionErr.Set(err)
@@ -1179,12 +1184,29 @@ func (db *Database) putNodeInCache(key path, n *node) error {
 	// TODO Cache metrics
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
-	return db.nodeCache.Put(key, n)
+
+	db.notFoundNodeCache.Remove(key)
+	db.intermediateNodeCache.Remove(key)
+	db.nodeCache.Remove(key)
+	if n == nil {
+		return db.notFoundNodeCache.Put(key, nil)
+	}
+	if n.hasValue() {
+		return db.nodeCache.Put(key, n)
+	}
+	return db.intermediateNodeCache.Put(key, n)
 }
 
 func (db *Database) getNodeInCache(key path) (*node, bool) {
 	// TODO Cache metrics
+	if _, ok := db.notFoundNodeCache.Get(key); ok {
+		return nil, true
+	}
 	if node, ok := db.nodeCache.Get(key); ok {
+		return node, true
+	}
+
+	if node, ok := db.intermediateNodeCache.Get(key); ok {
 		return node, true
 	}
 	return nil, false

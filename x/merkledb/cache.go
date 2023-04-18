@@ -28,6 +28,13 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 }
 
 // Get an element from this cache.
+func (c *onEvictCache[K, V]) Remove(key K) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.lru.Delete(key)
+}
+
+// Get an element from this cache.
 func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
