@@ -4,8 +4,6 @@
 package merkledb
 
 import (
-	"bytes"
-
 	"golang.org/x/exp/slices"
 )
 
@@ -41,16 +39,6 @@ func (m Maybe[T]) IsNothing() bool {
 // Returns the value of [m].
 func (m Maybe[T]) Value() T {
 	return m.value
-}
-
-func MaybeByteSliceEquals(m1, m2 Maybe[[]byte]) bool {
-	if m1.hasValue != m2.hasValue {
-		return false
-	}
-	if !m1.hasValue {
-		return true
-	}
-	return bytes.Equal(m1.value, m2.value)
 }
 
 func Clone(m Maybe[[]byte]) Maybe[[]byte] {
