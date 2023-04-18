@@ -125,7 +125,7 @@ func verifyPath(t *testing.T, path1, path2 []ProofNode) {
 	require.Equal(t, len(path1), len(path2))
 	for i := range path1 {
 		require.True(t, bytes.Equal(path1[i].KeyPath.Value, path2[i].KeyPath.Value))
-		require.Equal(t, path1[i].KeyPath.HasOddNibbleLength, path2[i].KeyPath.HasOddNibbleLength)
+		require.Equal(t, path1[i].KeyPath.hasOddLength(), path2[i].KeyPath.hasOddLength())
 		require.True(t, bytes.Equal(path1[i].ValueOrHash.value, path2[i].ValueOrHash.value))
 		for childIndex := range path1[i].Children {
 			require.Equal(t, path1[i].Children[childIndex], path2[i].Children[childIndex])
@@ -613,7 +613,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal(t, []byte("value2"), proof.KeyValues[1].Value)
 
 	require.Equal(t, newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
-	require.Equal(t, SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, HasOddNibbleLength: true}, proof.EndProof[1].KeyPath)
+	require.Equal(t, SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
 	require.Equal(t, newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
 
 	err = proof.Verify(
@@ -1644,7 +1644,7 @@ func TestVerifyProofPath(t *testing.T) {
 			path: []ProofNode{
 				{KeyPath: newPath([]byte{1}).Serialize()},
 				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: SerializedPath{Value: []byte{1, 2, 240}, HasOddNibbleLength: true}, ValueOrHash: Some([]byte{1})},
+				{KeyPath: SerializedPath{Value: []byte{1, 2, 240}, NibbleLength: 5}, ValueOrHash: Some([]byte{1})},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrOddLengthWithValue,

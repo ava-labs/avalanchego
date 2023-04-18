@@ -78,7 +78,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then the value of the last proof node must match [proof.Value].
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if !lastNode.KeyPath.HasOddNibbleLength &&
+	if !lastNode.KeyPath.hasOddLength() &&
 		bytes.Equal(proof.Key, lastNode.KeyPath.Value) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
@@ -88,7 +88,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if (lastNode.KeyPath.HasOddNibbleLength || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
+	if (lastNode.KeyPath.hasOddLength() || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
 		!proof.Value.IsNothing() {
 		return ErrProofValueDoesntMatch
 	}
@@ -260,7 +260,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, key
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.HasOddNibbleLength && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
+		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
 			value, ok := keysValues[nodePath]
 			if !ok && !node.ValueOrHash.IsNothing() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -478,7 +478,7 @@ func verifyAllChangeProofKeyValuesPresent(
 
 		// Check the value of any node with a key that is within the range.
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.HasOddNibbleLength && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
+		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && nodePath.Compare(end) <= 0 {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -559,7 +559,7 @@ func verifyProofPath(proof []ProofNode, keyPath path) error {
 		nodeKey := proof[i].KeyPath
 
 		// intermediate nodes (nodes with odd nibble length) should never have a value associated with them
-		if nodeKey.HasOddNibbleLength && !proof[i].ValueOrHash.IsNothing() {
+		if nodeKey.hasOddLength() && !proof[i].ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 
@@ -578,7 +578,7 @@ func verifyProofPath(proof []ProofNode, keyPath path) error {
 	// check the last node for a value since the above loop doesn't check the last node
 	if len(proof) > 0 {
 		lastNode := proof[len(proof)-1]
-		if lastNode.KeyPath.HasOddNibbleLength && !lastNode.ValueOrHash.IsNothing() {
+		if lastNode.KeyPath.hasOddLength() && !lastNode.ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 	}

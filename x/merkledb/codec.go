@@ -811,7 +811,7 @@ func (c *codecImpl) encodeProofNode(pn ProofNode, dst io.Writer) error {
 }
 
 func (c *codecImpl) encodeSerializedPath(s SerializedPath, dst io.Writer) error {
-	if err := c.encodeInt(dst, s.NibbleLength()); err != nil {
+	if err := c.encodeInt(dst, s.NibbleLength); err != nil {
 		return err
 	}
 	_, err := dst.Write(s.Value)
@@ -827,16 +827,15 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		result SerializedPath
 		err    error
 	)
-	var nibbleLength int
-	if nibbleLength, err = c.decodeInt(src); err != nil {
+	if result.NibbleLength, err = c.decodeInt(src); err != nil {
 		return result, err
 	}
-	if nibbleLength < 0 {
+	if result.NibbleLength < 0 {
 		return result, errNegativeNibbleLength
 	}
-	pathBytesLen := nibbleLength >> 1
-	result.HasOddNibbleLength = nibbleLength%2 == 1
-	if result.HasOddNibbleLength {
+	pathBytesLen := result.NibbleLength >> 1
+	hasOddLen := result.hasOddLength()
+	if hasOddLen {
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
@@ -849,7 +848,7 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		}
 		return result, err
 	}
-	if result.HasOddNibbleLength {
+	if hasOddLen {
 		paddedNibble := result.Value[pathBytesLen-1] & 0x0F
 		if paddedNibble != 0 {
 			return result, errNonZeroNibblePadding
