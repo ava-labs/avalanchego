@@ -46,7 +46,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	}
 
 	return ProofNode{
-		KeyPath:     newPath(key).Serialize(),
+		KeyPath:     NewPath(key).Serialize(),
 		ValueOrHash: Some(val),
 		Children:    children,
 	}
@@ -199,7 +199,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
 
-			clonedGot := got.deserialize().Serialize()
+			clonedGot := got.Deserialize().Serialize()
 			require.Equal(got, clonedGot)
 		},
 	)
@@ -527,7 +527,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: newPath(childPathBytes),
+					compressedPath: NewPath(childPathBytes),
 					id:             childID,
 				}
 			}

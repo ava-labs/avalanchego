@@ -29,7 +29,7 @@ type dbNode struct {
 }
 
 type child struct {
-	compressedPath path
+	compressedPath Path
 	id             ids.ID
 }
 
@@ -37,14 +37,14 @@ type child struct {
 type node struct {
 	dbNode
 	id          ids.ID
-	key         path
+	key         Path
 	nodeBytes   []byte
 	valueDigest Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key path) *node {
+func newNode(parent *node, key Path) *node {
 	newNode := &node{
 		dbNode: dbNode{
 			children: make(map[byte]child, NodeBranchFactor),
@@ -58,7 +58,7 @@ func newNode(parent *node, key path) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key path, nodeBytes []byte) (*node, error) {
+func parseNode(key Path, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if _, err := Codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (n *node) addChild(child *node) {
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID) {
+func (n *node) addChildWithoutNode(index byte, compressedPath Path, childID ids.ID) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
@@ -158,9 +158,9 @@ func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.
 
 // Returns the path of the only child of this node.
 // Assumes this node has exactly one child.
-func (n *node) getSingleChildPath() path {
+func (n *node) getSingleChildPath() Path {
 	for index, entry := range n.children {
-		return n.key + path(index) + entry.compressedPath
+		return n.key + Path(index) + entry.compressedPath
 	}
 	return ""
 }

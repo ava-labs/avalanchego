@@ -67,7 +67,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, newPath(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, NewPath(proof.Key)); err != nil {
 		return err
 	}
 
@@ -101,7 +101,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all of the proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+	provenPath := proof.Path[len(proof.Path)-1].KeyPath.Deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
@@ -188,13 +188,13 @@ func (proof *RangeProof) Verify(
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
-	keyValues := make(map[path][]byte, len(proof.KeyValues))
+	keyValues := make(map[Path][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[newPath(keyValue.Key)] = keyValue.Value
+		keyValues[NewPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start)
-	largestPath := newPath(largestkey)
+	smallestPath := NewPath(start)
+	largestPath := NewPath(largestkey)
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -222,7 +222,7 @@ func (proof *RangeProof) Verify(
 
 	// Insert all key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(NewPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
@@ -251,12 +251,12 @@ func (proof *RangeProof) Verify(
 
 // Verify that all non-intermediate nodes in [proof] which have keys
 // in [[start], [end]] have the value given for that key in [keysValues].
-func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, keysValues map[path][]byte) error {
+func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end Path, keysValues map[Path][]byte) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
@@ -365,7 +365,7 @@ func (proof *ChangeProof) Verify(
 		return err
 	}
 
-	smallestPath := newPath(start)
+	smallestPath := NewPath(start)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -375,7 +375,7 @@ func (proof *ChangeProof) Verify(
 	// Find the greatest key in [proof.KeyValues] and [proof.DeletedKeys].
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := newPath(proof.getLargestKey(end))
+	largestPath := NewPath(proof.getLargestKey(end))
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
@@ -383,12 +383,12 @@ func (proof *ChangeProof) Verify(
 	}
 
 	// gather all key/values in the proof
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyValues)+len(proof.DeletedKeys))
+	keyValues := make(map[Path]Maybe[[]byte], len(proof.KeyValues)+len(proof.DeletedKeys))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[newPath(keyValue.Key)] = Some(keyValue.Value)
+		keyValues[NewPath(keyValue.Key)] = Some(keyValue.Value)
 	}
 	for _, key := range proof.DeletedKeys {
-		keyValues[newPath(key)] = Nothing[[]byte]()
+		keyValues[NewPath(key)] = Nothing[[]byte]()
 	}
 
 	// want to prevent commit writes to DB, but not prevent db reads
@@ -425,14 +425,14 @@ func (proof *ChangeProof) Verify(
 
 	// Insert the key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(NewPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}
 
 	// Remove the deleted keys from the trie.
 	for _, key := range proof.DeletedKeys {
-		if err := view.removeFromTrie(newPath(key)); err != nil {
+		if err := view.removeFromTrie(NewPath(key)); err != nil {
 			return err
 		}
 	}
@@ -465,15 +465,15 @@ func verifyAllChangeProofKeyValuesPresent(
 	ctx context.Context,
 	db *Database,
 	proof []ProofNode,
-	start path,
-	end path,
-	keysValues map[path]Maybe[[]byte],
+	start Path,
+	end Path,
+	keysValues map[Path]Maybe[[]byte],
 ) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Check the value of any node with a key that is within the range.
@@ -551,7 +551,7 @@ func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [keyBytes], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, keyPath path) error {
+func verifyProofPath(proof []ProofNode, keyPath Path) error {
 	provenKey := keyPath.Serialize()
 
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
@@ -617,8 +617,8 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	startPath path,
-	endPath path,
+	startPath Path,
+	endPath Path,
 ) error {
 	var (
 		hasLowerBound = len(startPath) > 0
@@ -627,7 +627,7 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.deserialize()
+		keyPath := proofNode.KeyPath.Deserialize()
 
 		if len(keyPath)&1 == 1 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key

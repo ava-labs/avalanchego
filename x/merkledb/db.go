@@ -84,7 +84,7 @@ type Database struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache     onEvictCache[path, *node]
+	nodeCache     onEvictCache[Path, *node]
 	onEvictionErr utils.Atomic[error]
 
 	// Stores change lists. Used to serve change proofs and construct
@@ -122,7 +122,7 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
+	trieDB.nodeCache = newOnEvictCache[Path](config.NodeCacheSize, trieDB.onEviction)
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -132,8 +132,8 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		values: map[path]*change[Maybe[[]byte]]{},
-		nodes:  map[path]*change[*node]{},
+		values: map[Path]*change[Maybe[[]byte]]{},
+		nodes:  map[Path]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.metadataDB.Get(cleanShutdownKey)
@@ -190,7 +190,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 		}
 
 		key := it.Key()
-		path := path(key)
+		path := Path(key)
 		value := it.Value()
 		n, err := parseNode(path, value)
 		if err != nil {
@@ -327,7 +327,7 @@ func (db *Database) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
+		values[i], errors[i] = db.getValueCopy(NewPath(key), false /*lock*/)
 	}
 	return values, errors
 }
@@ -338,12 +338,12 @@ func (db *Database) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValueCopy(newPath(key), true /*lock*/)
+	return db.getValueCopy(NewPath(key), true /*lock*/)
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *Database) getValueCopy(key path, lock bool) ([]byte, error) {
+func (db *Database) getValueCopy(key Path, lock bool) ([]byte, error) {
 	val, err := db.getValue(key, lock)
 	if err != nil {
 		return nil, err
@@ -355,7 +355,7 @@ func (db *Database) getValueCopy(key path, lock bool) ([]byte, error) {
 // Returns database.ErrNotFound if it doesn't exist.
 // If [lock], [db.lock]'s read lock is acquired.
 // Otherwise assumes [db.lock] is already held.
-func (db *Database) getValue(key path, lock bool) ([]byte, error) {
+func (db *Database) getValue(key Path, lock bool) ([]byte, error) {
 	if lock {
 		db.lock.RLock()
 		defer db.lock.RUnlock()
@@ -511,7 +511,7 @@ func (db *Database) GetChangeProof(
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
 	changedKeys := maps.Keys(changes.values)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
+	slices.SortFunc(changedKeys, func(i, j Path) bool {
 		return i.Compare(j) < 0
 	})
 
@@ -620,7 +620,7 @@ func (db *Database) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), false /*lock*/)
+	_, err := db.getValue(NewPath(k), false /*lock*/)
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -671,21 +671,21 @@ func (db *Database) NewIterator() database.Iterator {
 
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithStart(newPath(start).Bytes()),
+		nodeIter: db.nodeDB.NewIteratorWithStart(NewPath(start).Bytes()),
 		db:       db,
 	}
 }
 
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithPrefix(newPath(prefix).Bytes()),
+		nodeIter: db.nodeDB.NewIteratorWithPrefix(NewPath(prefix).Bytes()),
 		db:       db,
 	}
 }
 
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	startBytes := newPath(start).Bytes()
-	prefixBytes := newPath(prefix).Bytes()
+	startBytes := NewPath(start).Bytes()
+	prefixBytes := NewPath(prefix).Bytes()
 	return &iterator{
 		nodeIter: db.nodeDB.NewIteratorWithStartAndPrefix(startBytes, prefixBytes),
 		db:       db,
@@ -992,7 +992,7 @@ func (db *Database) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *Database) getEditableNode(key path) (*node, error) {
+func (db *Database) getEditableNode(key Path) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -1007,7 +1007,7 @@ func (db *Database) getEditableNode(key path) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *Database) getNode(key path) (*node, error) {
+func (db *Database) getNode(key Path) (*node, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -1175,14 +1175,14 @@ func (db *Database) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 }
 
 // Non-nil error is fatal -- [db] will close.
-func (db *Database) putNodeInCache(key path, n *node) error {
+func (db *Database) putNodeInCache(key Path, n *node) error {
 	// TODO Cache metrics
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
 	return db.nodeCache.Put(key, n)
 }
 
-func (db *Database) getNodeInCache(key path) (*node, bool) {
+func (db *Database) getNodeInCache(key Path) (*node, bool) {
 	// TODO Cache metrics
 	if node, ok := db.nodeCache.Get(key); ok {
 		return node, true

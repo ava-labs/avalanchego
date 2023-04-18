@@ -24,13 +24,13 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key path, lock bool) ([]byte, error)
+	getValue(key Path, lock bool) ([]byte, error)
 
 	// GetMerkleRoot returns the merkle root of the Trie
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 
 	// get an editable copy of the node with the given key path
-	getEditableNode(key path) (*node, error)
+	getEditableNode(key Path) (*node, error)
 
 	// GetProof generates a proof of the value associated with a particular key, or a proof of its absence from the trie
 	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)

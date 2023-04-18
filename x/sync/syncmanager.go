@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/google/btree"
 )
 
 const (
@@ -376,46 +376,64 @@ func (m *StateSyncManager) findNextKey(
 		return nil, err
 	}
 
-	localRoot := localProof.Path[0]
-	receivedRoot := receivedProofNodes[0]
-	rootsMatch := merkledb.MaybeByteSliceEquals(localRoot.ValueOrHash, receivedRoot.ValueOrHash)
-	rootsMatch = rootsMatch && localRoot.KeyPath.Equal(receivedRoot.KeyPath)
-	rootsMatch = rootsMatch && maps.Equal(localRoot.Children, receivedRoot.Children)
-	if rootsMatch {
-		// The roots match so we must have the same trie.
+	// If remote proof is an exclusion proof, remove the last node from it.
+	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
+		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
+	}
+
+	theirImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
+		return p1.Compare(p2) < 0
+	})
+	ourImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
+		return p1.Compare(p2) < 0
+	})
+
+	for _, node := range receivedProofNodes {
+		theirImpliedKeys.ReplaceOrInsert(node.KeyPath.Deserialize())
+		for idx := range node.Children {
+			childPath := node.KeyPath.AppendNibble(idx)
+			theirImpliedKeys.ReplaceOrInsert(childPath.Deserialize())
+		}
+	}
+
+	for _, node := range localProof.Path {
+		ourImpliedKeys.ReplaceOrInsert(node.KeyPath.Deserialize())
+		for idx := range node.Children {
+			childPath := node.KeyPath.AppendNibble(idx)
+			ourImpliedKeys.ReplaceOrInsert(childPath.Deserialize())
+		}
+	}
+
+	// Delete all implied keys <= lastReceivedKey
+	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
+	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
+		if minPath.Compare(lastReceivedPath) < 0 {
+			theirImpliedKeys.DeleteMin()
+			continue
+		}
+		break
+	}
+	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
+		if minPath.Compare(lastReceivedPath) < 0 {
+			ourImpliedKeys.DeleteMin()
+			continue
+		}
+		break
+	}
+
+	// Find smallest key that is in theirImpliedKeys but not in ourImpliedKeys
+	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
+		if !ourImpliedKeys.Has(minPath) {
+			return minPath.Serialize().Value, nil
+		}
+		theirImpliedKeys.DeleteMin()
+	}
+
+	if len(lastReceivedKey) > 0 && bytes.Compare(lastReceivedKey, rangeEnd) >= 0 {
 		return nil, nil
 	}
 
-	for i := 0; i < len(receivedProofNodes); i++ {
-		theirNode := receivedProofNodes[i]
-		theirNextNode := receivedProofNodes[i+1]
-		ourNode := localProof.Path[i]
-		ourNextNode := localProof.Path[i+1]
-
-		ourNextNodeIndex := ourNextNode.KeyPath.Value[len(ourNode.KeyPath.Value)]
-		ourNextNodeHash := ourNode.Children[ourNextNodeIndex]
-
-		theirNextNodeIndex := theirNextNode.KeyPath.Value[len(theirNode.KeyPath.Value)]
-		theirNextNodeHash := theirNode.Children[theirNextNodeIndex]
-
-		if ourNextNodeHash == theirNextNodeHash {
-			// Our proof and their proof have the same next node.
-			// The next key to query is the first difference in our children.
-			for j := theirNextNodeIndex; j < merkledb.NodeBranchFactor; j++ {
-				if ourNode.Children[j] != theirNode.Children[j] {
-					nextStartKey := make([]byte, len(theirNode.KeyPath.Value)+1)
-					copy(nextStartKey, theirNode.KeyPath.Value)
-					nextStartKey[len(theirNode.KeyPath.Value)] = byte(j)
-					return nextStartKey, nil
-				}
-			}
-		}
-
-		// Our proof and their proof have different next nodes.
-		// There must be a difference below here in the trie.
-	}
-
-	return nil, errors.New("TODO")
+	return lastReceivedKey, nil
 
 	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
 	// // if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
