@@ -405,39 +405,50 @@ func (m *StateSyncManager) findNextKey(
 	rangeEndPath := merkledb.NewPath(rangeEnd)
 
 	for _, node := range receivedProofNodes {
-		paths := make([]merkledb.Path, 0, len(node.Children)+1)
-		paths = append(paths, node.KeyPath.Deserialize())
+		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
+		pathAndIDs = append(pathAndIDs, pathAndID{
+			path: node.KeyPath.Deserialize(),
+			id:   ids.Empty,
+		})
 
-		for idx := range node.Children {
+		for idx, id := range node.Children {
 			childPath := node.KeyPath.AppendNibble(idx)
-			paths = append(paths, childPath.Deserialize())
+			pathAndIDs = append(pathAndIDs, pathAndID{
+				path: childPath.Deserialize(),
+				id:   id,
+			})
 		}
 
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
-		for _, path := range paths {
-			if path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) <= 0) {
-				theirImpliedKeys.ReplaceOrInsert(path)
+		for _, pathAndID := range pathAndIDs {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
+				theirImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
 	}
-
 	for _, node := range localProof.Path {
-		paths := make([]merkledb.Path, 0, len(node.Children)+1)
-		paths = append(paths, node.KeyPath.Deserialize())
+		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
+		pathAndIDs = append(pathAndIDs, pathAndID{
+			path: node.KeyPath.Deserialize(),
+			id:   ids.Empty,
+		})
 
-		for idx := range node.Children {
+		for idx, id := range node.Children {
 			childPath := node.KeyPath.AppendNibble(idx)
-			paths = append(paths, childPath.Deserialize())
+			pathAndIDs = append(pathAndIDs, pathAndID{
+				path: childPath.Deserialize(),
+				id:   id,
+			})
 		}
 
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
-		for _, path := range paths {
-			if path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) <= 0) {
-				ourImpliedKeys.ReplaceOrInsert(path)
+		for _, pathAndID := range pathAndIDs {
+			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
+				ourImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
 	}
@@ -450,8 +461,8 @@ func (m *StateSyncManager) findNextKey(
 
 		// See if there's a key in ourImpliedKeys that is a suffix of minPath
 		suffixPathExists := false
-		ourImpliedKeys.DescendGreaterThan(maxPath, func(item merkledb.Path) bool {
-			if item.HasPrefix(maxPath) {
+		ourImpliedKeys.DescendGreaterThan(maxPath, func(item pathAndID) bool {
+			if item.path.HasPrefix(maxPath.path) {
 				suffixPathExists = true
 				return false
 			}
