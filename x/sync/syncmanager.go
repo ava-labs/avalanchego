@@ -395,18 +395,18 @@ func (m *StateSyncManager) findNextKey(
 		localProof.Path = localProof.Path[:len(localProof.Path)-1]
 	}
 
-	// Min element is the smallest path whose existence is implied by the remote proof.
+	// Key prefixes implied by the remote proof.
 	theirImpliedKeys := btree.NewG(2, func(p1, p2 pathAndID) bool {
 		return p1.path.Compare(p2.path) < 0
 	})
-	// Min element is the smallest path whose existence is implied by the local proof.
+
+	// Key prefixes implied by the local proof.
 	ourImpliedKeys := btree.NewG(2, func(p1, p2 pathAndID) bool {
 		return p1.path.Compare(p2.path) < 0
 	})
 
 	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
-
-	rangeEndPath := merkledb.NewPath(rangeEnd)
+	// rangeEndPath := merkledb.NewPath(rangeEnd)
 
 	for _, node := range receivedProofNodes {
 		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
@@ -416,6 +416,8 @@ func (m *StateSyncManager) findNextKey(
 		})
 
 		for idx, id := range node.Children {
+			idx := idx
+			id := id
 			childPath := node.KeyPath.AppendNibble(idx)
 			pathAndIDs = append(pathAndIDs, pathAndID{
 				path: childPath.Deserialize(),
@@ -426,8 +428,7 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
+			if pathAndID.path.Compare(lastReceivedPath) >= 0 {
 				theirImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
@@ -440,6 +441,8 @@ func (m *StateSyncManager) findNextKey(
 		})
 
 		for idx, id := range node.Children {
+			idx := idx
+			id := id
 			childPath := node.KeyPath.AppendNibble(idx)
 			pathAndIDs = append(pathAndIDs, pathAndID{
 				path: childPath.Deserialize(),
@@ -450,8 +453,7 @@ func (m *StateSyncManager) findNextKey(
 		// Only consider paths greater than the last received path
 		// and less than the range end path (if applicable).
 		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
+			if pathAndID.path.Compare(lastReceivedPath) >= 0 {
 				ourImpliedKeys.ReplaceOrInsert(pathAndID)
 			}
 		}
@@ -469,11 +471,11 @@ func (m *StateSyncManager) findNextKey(
 			continue
 		}
 	}
-	if len(result) > 0 {
+	if len(result) > 0 && (len(rangeEnd) == 0 || bytes.Compare(result, rangeEnd) < 0) {
 		return result, nil
 	}
 
-	return lastReceivedKey, nil
+	return nil, nil
 
 	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
 	// // if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
