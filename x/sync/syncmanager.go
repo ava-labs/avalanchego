@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/google/btree"
@@ -412,7 +413,7 @@ func (m *StateSyncManager) findNextKey(
 		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
 		pathAndIDs = append(pathAndIDs, pathAndID{
 			path: node.KeyPath.Deserialize(),
-			id:   ids.Empty,
+			id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
 		})
 
 		for idx, id := range node.Children {
@@ -437,7 +438,7 @@ func (m *StateSyncManager) findNextKey(
 		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
 		pathAndIDs = append(pathAndIDs, pathAndID{
 			path: node.KeyPath.Deserialize(),
-			id:   ids.Empty,
+			id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
 		})
 
 		for idx, id := range node.Children {
@@ -462,17 +463,16 @@ func (m *StateSyncManager) findNextKey(
 	// Find greatest implied prefix such that:
 	// * We don't locally have the prefix
 	// * We have a different ID for the prefix
-	var result []byte
-	for maxPath, ok := theirImpliedKeys.Max(); ok; maxPath, ok = theirImpliedKeys.Max() {
-		local, ok := ourImpliedKeys.Get(maxPath)
-		if !ok || local.id != maxPath.id {
-			result = maxPath.path.Serialize().Value
-			theirImpliedKeys.DeleteMax()
-			continue
+	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
+		local, ok := ourImpliedKeys.Get(minPath)
+		if !ok || local.id != minPath.id {
+			firstDiffPath := minPath.path.Serialize().Value
+			if len(rangeEnd) > 0 && bytes.Compare(firstDiffPath, rangeEnd) > 0 {
+				return nil, nil
+			}
+			return firstDiffPath, nil
 		}
-	}
-	if len(result) > 0 && (len(rangeEnd) == 0 || bytes.Compare(result, rangeEnd) < 0) {
-		return result, nil
+		theirImpliedKeys.DeleteMin()
 	}
 
 	return nil, nil
