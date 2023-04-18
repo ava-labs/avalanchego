@@ -14,43 +14,43 @@ import (
 	"github.com/thepudds/fzgen/fuzzer"
 )
 
-type testRNGSource struct {
+type testSource struct {
 	onInvalid func()
 	nums      []uint64
 }
 
-func (r *testRNGSource) Seed(uint64) {
-	r.onInvalid()
+func (s *testSource) Seed(uint64) {
+	s.onInvalid()
 }
 
-func (r *testRNGSource) Uint64() uint64 {
-	if len(r.nums) == 0 {
-		r.onInvalid()
+func (s *testSource) Uint64() uint64 {
+	if len(s.nums) == 0 {
+		s.onInvalid()
 	}
-	num := r.nums[0]
-	r.nums = r.nums[1:]
+	num := s.nums[0]
+	s.nums = s.nums[1:]
 	return num
 }
 
-type testSTDRNGSource struct {
+type testSTDSource struct {
 	onInvalid func()
 	nums      []uint64
 }
 
-func (r *testSTDRNGSource) Seed(int64) {
-	r.onInvalid()
+func (s *testSTDSource) Seed(int64) {
+	s.onInvalid()
 }
 
-func (r *testSTDRNGSource) Int63() int64 {
-	return int64(r.Uint64() & (1<<63 - 1))
+func (s *testSTDSource) Int63() int64 {
+	return int64(s.Uint64() & (1<<63 - 1))
 }
 
-func (r *testSTDRNGSource) Uint64() uint64 {
-	if len(r.nums) == 0 {
-		r.onInvalid()
+func (s *testSTDSource) Uint64() uint64 {
+	if len(s.nums) == 0 {
+		s.onInvalid()
 	}
-	num := r.nums[0]
-	r.nums = r.nums[1:]
+	num := s.nums[0]
+	s.nums = s.nums[1:]
 	return num
 }
 
@@ -152,7 +152,7 @@ func TestRNG(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			require := require.New(t)
 
-			source := &testRNGSource{
+			source := &testSource{
 				onInvalid: t.FailNow,
 				nums:      test.nums,
 			}
@@ -165,7 +165,7 @@ func TestRNG(t *testing.T) {
 				return
 			}
 
-			stdSource := &testSTDRNGSource{
+			stdSource := &testSTDSource{
 				onInvalid: t.FailNow,
 				nums:      test.nums,
 			}
@@ -182,25 +182,25 @@ func FuzzRNG(f *testing.F) {
 		require := require.New(t)
 
 		var (
-			max       uint64
-			rngSource []uint64
+			max        uint64
+			sourceNums []uint64
 		)
 		fz := fuzzer.NewFuzzer(data)
-		fz.Fill(&max, &rngSource)
+		fz.Fill(&max, &sourceNums)
 		if max >= math.MaxInt64 {
 			t.SkipNow()
 		}
 
-		source := &testRNGSource{
+		source := &testSource{
 			onInvalid: t.SkipNow,
-			nums:      rngSource,
+			nums:      sourceNums,
 		}
 		r := &rng{rng: source}
 		val := r.Uint64n(max)
 
-		stdSource := &testSTDRNGSource{
+		stdSource := &testSTDSource{
 			onInvalid: t.SkipNow,
-			nums:      rngSource,
+			nums:      sourceNums,
 		}
 		mathRNG := rand.New(stdSource) //#nosec G404
 		stdVal := mathRNG.Int63n(int64(max + 1))

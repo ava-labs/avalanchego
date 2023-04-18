@@ -23,14 +23,14 @@ func Seed(seed int64) {
 	globalRNG.Seed(seed)
 }
 
-type rngSource interface {
+type source interface {
 	Seed(uint64)
 	Uint64() uint64
 }
 
 type rng struct {
 	lock sync.Mutex
-	rng  rngSource
+	rng  source
 }
 
 // Seed uses the provided seed value to initialize the generator to a
