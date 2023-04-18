@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/google/btree"
@@ -430,7 +429,7 @@ func (m *StateSyncManager) findNextKey(
 			pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
 			pathAndIDs = append(pathAndIDs, pathAndID{
 				path: node.KeyPath.Deserialize(),
-				id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
+				id:   ids.Empty, // TODO do we need a value here?
 			})
 
 			for idx, id := range node.Children {
