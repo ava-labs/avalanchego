@@ -378,7 +378,7 @@ func (m *StateSyncManager) findNextKey(
 	var result []byte
 	localIndex := len(localProofNodes) - 1
 	receivedIndex := len(receivedProofNodes) - 1
-	startKeyPath := merkledb.SerializedPath{Value: start}
+	startKeyPath := merkledb.SerializedPath{Value: start, NibbleLength: 2 * len(start)}
 
 	// Just return the start key when the proof nodes contain keys that are not prefixes of the start key
 	// this occurs mostly in change proofs where the largest returned key was a deleted key.
