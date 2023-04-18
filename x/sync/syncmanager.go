@@ -365,8 +365,8 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 // the proof of the last received key in the local trie vs proof for the last received key recently received by the sync manager.
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
-	rangeEnd []byte,
 	lastReceivedKey []byte,
+	rangeEnd []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
 	proofKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
