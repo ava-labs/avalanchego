@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -283,47 +282,55 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	var (
 		txID      = e.Tx.ID()
 		chainTime = e.State.GetTimestamp()
-		newStaker *state.Staker
-		err       error
 	)
 
+	if err := e.addStakerFromStakerTx(tx, chainTime); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
+func (e *StandardTxExecutor) addStakerFromStakerTx(
+	stakerTx txs.Staker,
+	chainTime time.Time,
+) error {
+	txID := e.Tx.ID()
 	if e.Config.IsContinuousStakingActivated(chainTime) {
 		// Post Continuous Staking fork, validators are immediately marked as current with:
 		// start time = current chain time
-		// end time = current chain time + (staker.EndTime - staker.StartTime)
-		stakeAmount := tx.Validator.Wght
-		stakeDuration := tx.Validator.Duration()
-		currentSupply, err := e.State.GetCurrentSupply(constants.PrimaryNetworkID)
+		currentSupply, err := e.State.GetCurrentSupply(stakerTx.SubnetID())
 		if err != nil {
 			return err
 		}
 
-		rewardCfg, err := e.State.GetRewardConfig(constants.PlatformChainID)
+		rewardCfg, err := e.State.GetRewardConfig(stakerTx.SubnetID())
 		if err != nil {
 			return err
 		}
 		rewards := reward.NewCalculator(rewardCfg)
 
+		stakeDuration := stakerTx.Duration()
 		potentialReward := rewards.Calculate(
 			stakeDuration,
-			stakeAmount,
+			stakerTx.Weight(),
 			currentSupply,
 		)
-		newStaker, err = state.NewCurrentStaker(txID, tx, chainTime, stakeDuration, potentialReward)
+		newStaker, err := state.NewCurrentStaker(txID, stakerTx, chainTime, stakeDuration, potentialReward)
 		if err != nil {
 			return err
 		}
 		e.State.PutCurrentValidator(newStaker)
-	} else {
-		newStaker, err = state.NewPendingStaker(txID, tx)
-		if err != nil {
-			return err
-		}
-		e.State.PutPendingValidator(newStaker)
+		return nil
 	}
 
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
+	newStaker, err := state.NewPendingStaker(txID, stakerTx)
+	if err != nil {
+		return err
+	}
+	e.State.PutPendingValidator(newStaker)
 	return nil
 }
 
