@@ -63,10 +63,10 @@ func (r *rng) Uint64n(n uint64) uint64 {
 		}
 		return v
 
-	// n is less than MaxUint64/2 so we can generate a number in the range
-	// [0, k*n] where k is the largest integer such that k*n is still less than
-	// MaxUint64/2. We can't easily find k such that k*n is still less than
-	// MaxUint64 because the calculation would overflow.
+	// n is less than MaxUint64/2 so we generate a number in the range
+	// [0, k*(n+1)) where k is the largest integer such that k*(n+1) is less
+	// than or equal to MaxUint64/2. We can't easily find k such that k*(n+1) is
+	// less than or equal to MaxUint64 because the calculation would overflow.
 	//
 	// ref: https://github.com/golang/go/blob/ce10e9d84574112b224eae88dc4e0f43710808de/src/math/rand/rand.go#L127-L132
 	default:

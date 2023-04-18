@@ -41,10 +41,6 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 		totalWeight = newWeight
 	}
 
-	if totalWeight > math.MaxInt64 {
-		return errWeightsTooLarge
-	}
-
 	samples := []uint64(nil)
 	if totalWeight > 0 {
 		samples = make([]uint64, s.benchmarkIterations)
