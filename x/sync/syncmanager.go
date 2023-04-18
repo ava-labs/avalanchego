@@ -419,8 +419,6 @@ func (m *StateSyncManager) findNextKey(
 		})
 
 		for idx, id := range node.Children {
-			idx := idx
-			id := id
 			childPath := node.KeyPath.AppendNibble(idx)
 			pathAndIDs = append(pathAndIDs, pathAndID{
 				path: childPath.Deserialize(),
@@ -445,8 +443,6 @@ func (m *StateSyncManager) findNextKey(
 		})
 
 		for idx, id := range node.Children {
-			idx := idx
-			id := id
 			childPath := node.KeyPath.AppendNibble(idx)
 			pathAndIDs = append(pathAndIDs, pathAndID{
 				path: childPath.Deserialize(),
