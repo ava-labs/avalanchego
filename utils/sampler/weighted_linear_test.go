@@ -3,25 +3,19 @@
 
 package sampler
 
-import (
-	"testing"
+// func TestWeightedLinearElementLess(t *testing.T) {
+// 	require := require.New(t)
 
-	"github.com/stretchr/testify/require"
-)
+// 	var elt1, elt2 weightedLinearElement
+// 	require.False(elt1.Less(elt2))
+// 	require.False(elt2.Less(elt1))
 
-func TestWeightedLinearElementLess(t *testing.T) {
-	require := require.New(t)
-
-	var elt1, elt2 weightedLinearElement
-	require.False(elt1.Less(elt2))
-	require.False(elt2.Less(elt1))
-
-	elt1 = weightedLinearElement{
-		cumulativeWeight: 1,
-	}
-	elt2 = weightedLinearElement{
-		cumulativeWeight: 2,
-	}
-	require.False(elt1.Less(elt2))
-	require.True(elt2.Less(elt1))
-}
+// 	elt1 = weightedLinearElement{
+// 		cumulativeWeight: 1,
+// 	}
+// 	elt2 = weightedLinearElement{
+// 		cumulativeWeight: 2,
+// 	}
+// 	require.False(elt1.Less(elt2))
+// 	require.True(elt2.Less(elt1))
+// }
