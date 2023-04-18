@@ -53,6 +53,8 @@ type NetworkClient interface {
 	AppRequestFailed(context.Context, ids.NodeID, uint32) error
 	Connected(context.Context, ids.NodeID, *version.Application) error
 	Disconnected(context.Context, ids.NodeID) error
+
+	Shutdown() // Shuts down the network client, fails all pending requests
 }
 
 type networkClient struct {
@@ -63,7 +65,8 @@ type networkClient struct {
 	activeRequests             *semaphore.Weighted        // controls maximum number of active outbound requests
 	peers                      *peerTracker               // tracking of peers & bandwidth
 	appSender                  common.AppSender           // AppSender for sending messages
-	log                        logging.Logger
+	log                        logging.Logger             // logger for this struct
+	closed                     bool                       // set to true on Shutdown, after which all operations are no-ops.
 }
 
 func NewNetworkClient(
@@ -88,6 +91,10 @@ func NewNetworkClient(
 func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	if c.closed {
+		return nil
+	}
 
 	c.log.Info(
 		"received AppResponse from peer",
@@ -120,6 +127,10 @@ func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, reques
 func (c *networkClient) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	if c.closed {
+		return nil
+	}
 
 	c.log.Info(
 		"received AppRequestFailed from peer",
@@ -208,6 +219,9 @@ func (c *networkClient) Request(ctx context.Context, nodeID ids.NodeID, request 
 // Returns an error if [appSender] is unable to make the request.
 // Assumes [c.lock] is held and unlocks [c.lock] before returning.
 func (c *networkClient) request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+	if c.closed {
+		return nil, nil
+	}
 	c.log.Debug("sending request to peer", zap.Stringer("nodeID", nodeID), zap.Int("requestLen", len(request)))
 	c.peers.TrackPeer(nodeID)
 
@@ -255,6 +269,10 @@ func (c *networkClient) Connected(_ context.Context, nodeID ids.NodeID, nodeVers
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if c.closed {
+		return nil
+	}
+
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping registering self as peer")
 		return nil
@@ -271,6 +289,10 @@ func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if c.closed {
+		return nil
+	}
+
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
 	return nil
@@ -281,9 +303,15 @@ func (c *networkClient) Shutdown() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// reset peers
+	// clean up any pending requests
+	for requestID, handler := range c.outstandingRequestHandlers {
+		handler.OnFailure() // make sure all waiting threads are unblocked
+		delete(c.outstandingRequestHandlers, requestID)
+	}
+
 	// TODO danlaine: should we call [Disconnected] on each peer?
-	c.peers = newPeerTracker(c.log)
+	c.peers = newPeerTracker(c.log) // reset peers
+	c.closed = true                 // mark network as closed
 }
 
 func (c *networkClient) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
