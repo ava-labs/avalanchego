@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // TODO: consider moving the network implementation to a separate package
@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -132,7 +132,7 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
-	if _, dropped := n.blkBuilder.GetDropReason(txID); dropped {
+	if reason := n.blkBuilder.GetDropReason(txID); reason != nil {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}

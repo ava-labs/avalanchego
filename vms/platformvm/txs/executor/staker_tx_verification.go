@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -126,7 +126,7 @@ func verifyAddValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkValidatorFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -179,7 +179,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(chainState, tx.Validator.Subnet, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue duplicate subnet validation for %s",
@@ -209,7 +209,7 @@ func verifyAddSubnetValidatorTx(
 		return errValidatorSubset
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.Validator.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func verifyAddSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddSubnetValidatorFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -266,7 +266,7 @@ func removeSubnetValidatorValidation(
 	if err != nil {
 		// It isn't a current or pending validator.
 		return nil, false, fmt.Errorf(
-			"%s %w of %s: %s",
+			"%s %w of %s: %v",
 			tx.NodeID,
 			errNotValidator,
 			tx.Subnet,
@@ -299,7 +299,7 @@ func removeSubnetValidatorValidation(
 			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
 		},
 	); err != nil {
-		return nil, false, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return nil, false, fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	return vdr, isCurrentValidator, nil
@@ -400,7 +400,7 @@ func verifyAddDelegatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkDelegatorFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -535,7 +535,7 @@ func verifyAddPermissionlessValidatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -715,7 +715,7 @@ func verifyAddPermissionlessDelegatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last

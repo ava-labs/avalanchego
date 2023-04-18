@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -434,7 +435,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %s", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %v", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {
@@ -694,7 +695,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++
@@ -723,7 +724,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{}
+	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++

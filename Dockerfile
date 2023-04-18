@@ -5,8 +5,8 @@
 # README.md
 # go.mod
 # ============= Compilation Stage ================
-FROM golang:1.18.5-buster AS builder
-RUN apt-get update && apt-get install -y --no-install-recommends bash=5.0-4 git=1:2.20.1-2+deb10u3 make=4.2.1-1.2 gcc=4:8.3.0-1 musl-dev=1.1.21-2 ca-certificates=20200601~deb10u2 linux-headers-amd64
+FROM golang:1.19.6-buster AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends bash=5.0-4 make=4.2.1-1.2 gcc=4:8.3.0-1 musl-dev=1.1.21-2 ca-certificates=20200601~deb10u2 linux-headers-amd64
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod

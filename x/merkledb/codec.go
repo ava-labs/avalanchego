@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -23,6 +23,7 @@ const (
 	minVarIntLen         = 1
 	boolLen              = 1
 	idLen                = hashing.HashLen
+	minCodecVersionLen   = minVarIntLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDeletedKeyLen     = minByteSliceLen
@@ -30,11 +31,11 @@ const (
 	minProofPathLen      = minVarIntLen
 	minKeyValueLen       = 2 * minByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minProofPathLen + minByteSliceLen
-	minChangeProofLen    = boolLen + 2*minProofPathLen + 2*minVarIntLen
-	minRangeProofLen     = 2*minProofPathLen + minVarIntLen
-	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minHashValuesLen     = minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
+	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen
+	minChangeProofLen    = minCodecVersionLen + +boolLen + 2*minProofPathLen + 2*minVarIntLen
+	minRangeProofLen     = minCodecVersionLen + +2*minProofPathLen + minVarIntLen
+	minDBNodeLen         = minCodecVersionLen + minMaybeByteSliceLen + minVarIntLen
+	minHashValuesLen     = minCodecVersionLen + minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
 	minProofNodeChildLen = minVarIntLen + idLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
 )
@@ -60,6 +61,7 @@ var (
 	errNonZeroNibblePadding   = errors.New("nibbles should be padded with 0s")
 	errExtraSpace             = errors.New("trailing buffer space")
 	errNegativeSliceLength    = errors.New("negative slice length")
+	errInvalidCodecVersion    = errors.New("invalid codec version")
 )
 
 // EncoderDecoder defines the interface needed by merkleDB to marshal
@@ -69,7 +71,6 @@ type EncoderDecoder interface {
 	Decoder
 }
 
-// TODO actually encode the version and remove version from the interface
 type Encoder interface {
 	EncodeProof(version uint16, p *Proof) ([]byte, error)
 	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
@@ -107,14 +108,20 @@ func (c *codecImpl) EncodeProof(version uint16, proof *Proof) ([]byte, error) {
 	}
 
 	if version != codecVersion {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
 	}
 
 	buf := &bytes.Buffer{}
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
 	if err := c.encodeProofPath(buf, proof.Path); err != nil {
 		return nil, err
 	}
 	if err := c.encodeByteSlice(buf, proof.Key); err != nil {
+		return nil, err
+	}
+	if err := c.encodeMaybeByteSlice(buf, proof.Value); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -126,14 +133,17 @@ func (c *codecImpl) EncodeChangeProof(version uint16, proof *ChangeProof) ([]byt
 	}
 
 	if version != codecVersion {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
 	}
 
 	buf := &bytes.Buffer{}
+
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
 	if err := c.encodeBool(buf, proof.HadRootsInHistory); err != nil {
 		return nil, err
 	}
-
 	if err := c.encodeProofPath(buf, proof.StartProof); err != nil {
 		return nil, err
 	}
@@ -166,10 +176,13 @@ func (c *codecImpl) EncodeRangeProof(version uint16, proof *RangeProof) ([]byte,
 	}
 
 	if version != codecVersion {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
 	}
 
 	buf := &bytes.Buffer{}
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
 	if err := c.encodeProofPath(buf, proof.StartProof); err != nil {
 		return nil, err
 	}
@@ -194,10 +207,13 @@ func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {
 	}
 
 	if version != codecVersion {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
 	}
 
 	buf := &bytes.Buffer{}
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
 	if err := c.encodeMaybeByteSlice(buf, n.value); err != nil {
 		return nil, err
 	}
@@ -228,10 +244,15 @@ func (c *codecImpl) encodeHashValues(version uint16, hv *hashValues) ([]byte, er
 	}
 
 	if version != codecVersion {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
 	}
 
 	buf := &bytes.Buffer{}
+
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
+
 	length := len(hv.Children)
 	if err := c.encodeInt(buf, length); err != nil {
 		return nil, err
@@ -270,11 +291,20 @@ func (c *codecImpl) DecodeProof(b []byte, proof *Proof) (uint16, error) {
 		err error
 		src = bytes.NewReader(b)
 	)
-
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if codecVersion != gotCodecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
 	if proof.Path, err = c.decodeProofPath(src); err != nil {
 		return 0, err
 	}
 	if proof.Key, err = c.decodeByteSlice(src); err != nil {
+		return 0, err
+	}
+	if proof.Value, err = c.decodeMaybeByteSlice(src); err != nil {
 		return 0, err
 	}
 	if src.Len() != 0 {
@@ -296,6 +326,13 @@ func (c *codecImpl) DecodeChangeProof(b []byte, proof *ChangeProof) (uint16, err
 		err error
 	)
 
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if gotCodecVersion != codecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
 	if proof.HadRootsInHistory, err = c.decodeBool(src); err != nil {
 		return 0, err
 	}
@@ -357,7 +394,13 @@ func (c *codecImpl) DecodeRangeProof(b []byte, proof *RangeProof) (uint16, error
 		src = bytes.NewReader(b)
 		err error
 	)
-
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if codecVersion != gotCodecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
 	if proof.StartProof, err = c.decodeProofPath(src); err != nil {
 		return 0, err
 	}
@@ -399,6 +442,14 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 		src = bytes.NewReader(b)
 		err error
 	)
+
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if codecVersion != gotCodecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
 
 	if n.value, err = c.decodeMaybeByteSlice(src); err != nil {
 		return 0, err
@@ -690,7 +741,7 @@ func (c *codecImpl) decodeProofNode(src *bytes.Reader) (ProofNode, error) {
 	if result.KeyPath, err = c.decodeSerializedPath(src); err != nil {
 		return result, err
 	}
-	if result.Value, err = c.decodeMaybeByteSlice(src); err != nil {
+	if result.ValueOrHash, err = c.decodeMaybeByteSlice(src); err != nil {
 		return result, err
 	}
 	numChildren, err := c.decodeInt(src)
@@ -731,7 +782,7 @@ func (c *codecImpl) encodeProofNode(pn ProofNode, dst io.Writer) error {
 	if err := c.encodeSerializedPath(pn.KeyPath, dst); err != nil {
 		return err
 	}
-	if err := c.encodeMaybeByteSlice(dst, pn.Value); err != nil {
+	if err := c.encodeMaybeByteSlice(dst, pn.ValueOrHash); err != nil {
 		return err
 	}
 	if err := c.encodeInt(dst, len(pn.Children)); err != nil {

@@ -1,11 +1,12 @@
 github.com/ava-labs/avalanchego/api/server=Server=api/server/mock_server.go
 github.com/ava-labs/avalanchego/chains/atomic=SharedMemory=chains/atomic/mock_shared_memory.go
+github.com/ava-labs/avalanchego/codec=Manager=codec/mock_manager.go
 github.com/ava-labs/avalanchego/database=Batch=database/mock_batch.go
 github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
 github.com/ava-labs/avalanchego/message=OutboundMsgBuilder=message/mock_outbound_message_builder.go
 github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
-github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=DAGVM=snow/engine/avalanche/vertex/mock_vm.go
+github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=LinearizableVM=snow/engine/avalanche/vertex/mock_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=BuildBlockWithContextChainVM=snow/engine/snowman/block/mocks/build_block_with_context_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/mocks/state_syncable_vm.go
@@ -23,6 +24,10 @@ github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/mock_user.go
+github.com/ava-labs/avalanchego/vms/avm/blocks=Block=vms/avm/blocks/mock_block.go
+github.com/ava-labs/avalanchego/vms/avm/metrics=Metrics=vms/avm/metrics/mock_metrics.go
+github.com/ava-labs/avalanchego/vms/avm/states=Chain,State,Diff=vms/avm/states/mock_states.go
+github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mock_mempool.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go

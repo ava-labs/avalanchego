@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -20,27 +20,28 @@ const (
 )
 
 var (
-	errWrongVMType                    = errors.New("wrong vm type")
-	errWrongTxType                    = errors.New("wrong tx type")
-	errWrongOpType                    = errors.New("wrong operation type")
-	errWrongUTXOType                  = errors.New("wrong utxo type")
-	errWrongInputType                 = errors.New("wrong input type")
-	errWrongCredentialType            = errors.New("wrong credential type")
-	errWrongOwnerType                 = errors.New("wrong owner type")
-	errWrongNumberOfUTXOs             = errors.New("wrong number of utxos for the operation")
-	errWrongMintCreated               = errors.New("wrong mint output created from the operation")
-	errTimelocked                     = errors.New("output is time locked")
-	errTooManySigners                 = errors.New("input has more signers than expected")
-	errTooFewSigners                  = errors.New("input has less signers than expected")
-	errInputOutputIndexOutOfBounds    = errors.New("input referenced a nonexistent address in the output")
-	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
-	errWrongSig                       = errors.New("wrong signature")
+	ErrWrongVMType                    = errors.New("wrong vm type")
+	ErrWrongTxType                    = errors.New("wrong tx type")
+	ErrWrongOpType                    = errors.New("wrong operation type")
+	ErrWrongUTXOType                  = errors.New("wrong utxo type")
+	ErrWrongInputType                 = errors.New("wrong input type")
+	ErrWrongCredentialType            = errors.New("wrong credential type")
+	ErrWrongOwnerType                 = errors.New("wrong owner type")
+	ErrMismatchedAmounts              = errors.New("utxo amount and input amount are not equal")
+	ErrWrongNumberOfUTXOs             = errors.New("wrong number of utxos for the operation")
+	ErrWrongMintCreated               = errors.New("wrong mint output created from the operation")
+	ErrTimelocked                     = errors.New("output is time locked")
+	ErrTooManySigners                 = errors.New("input has more signers than expected")
+	ErrTooFewSigners                  = errors.New("input has less signers than expected")
+	ErrInputOutputIndexOutOfBounds    = errors.New("input referenced a nonexistent address in the output")
+	ErrInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
+	ErrWrongSig                       = errors.New("wrong signature")
 )
 
 // Fx describes the secp256k1 feature extension
 type Fx struct {
 	VM           VM
-	SECPFactory  crypto.FactorySECP256K1R
+	SECPFactory  secp256k1.Factory
 	bootstrapped bool
 }
 
@@ -52,8 +53,10 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log := fx.VM.Logger()
 	log.Debug("initializing secp256k1 fx")
 
-	fx.SECPFactory = crypto.FactorySECP256K1R{
-		Cache: cache.LRU[ids.ID, *crypto.PublicKeySECP256K1R]{Size: defaultCacheSize},
+	fx.SECPFactory = secp256k1.Factory{
+		Cache: cache.LRU[ids.ID, *secp256k1.PublicKey]{
+			Size: defaultCacheSize,
+		},
 	}
 	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}
@@ -70,7 +73,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	vm, ok := vmIntf.(VM)
 	if !ok {
-		return errWrongVMType
+		return ErrWrongVMType
 	}
 	fx.VM = vm
 	return nil
@@ -89,19 +92,19 @@ func (fx *Fx) Bootstrapped() error {
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 	in, ok := inIntf.(*Input)
 	if !ok {
-		return errWrongInputType
+		return ErrWrongInputType
 	}
 	cred, ok := credIntf.(*Credential)
 	if !ok {
-		return errWrongCredentialType
+		return ErrWrongCredentialType
 	}
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
-		return errWrongOwnerType
+		return ErrWrongOwnerType
 	}
 	if err := verify.All(in, cred, owner); err != nil {
 		return err
@@ -112,22 +115,22 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 	op, ok := opIntf.(*MintOperation)
 	if !ok {
-		return errWrongOpType
+		return ErrWrongOpType
 	}
 	cred, ok := credIntf.(*Credential)
 	if !ok {
-		return errWrongCredentialType
+		return ErrWrongCredentialType
 	}
 	if len(utxosIntf) != 1 {
-		return errWrongNumberOfUTXOs
+		return ErrWrongNumberOfUTXOs
 	}
 	out, ok := utxosIntf[0].(*MintOutput)
 	if !ok {
-		return errWrongUTXOType
+		return ErrWrongUTXOType
 	}
 	return fx.verifyOperation(tx, op, cred, out)
 }
@@ -137,7 +140,7 @@ func (fx *Fx) verifyOperation(tx UnsignedTx, op *MintOperation, cred *Credential
 		return err
 	}
 	if !utxo.Equals(&op.MintOutput.OutputOwners) {
-		return errWrongMintCreated
+		return ErrWrongMintCreated
 	}
 	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
 }
@@ -145,19 +148,19 @@ func (fx *Fx) verifyOperation(tx UnsignedTx, op *MintOperation, cred *Credential
 func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 	in, ok := inIntf.(*TransferInput)
 	if !ok {
-		return errWrongInputType
+		return ErrWrongInputType
 	}
 	cred, ok := credIntf.(*Credential)
 	if !ok {
-		return errWrongCredentialType
+		return ErrWrongCredentialType
 	}
 	out, ok := utxoIntf.(*TransferOutput)
 	if !ok {
-		return errWrongUTXOType
+		return ErrWrongUTXOType
 	}
 	return fx.VerifySpend(tx, in, cred, out)
 }
@@ -167,7 +170,7 @@ func (fx *Fx) VerifySpend(utx UnsignedTx, in *TransferInput, cred *Credential, u
 	if err := verify.All(utxo, in, cred); err != nil {
 		return err
 	} else if utxo.Amt != in.Amt {
-		return fmt.Errorf("utxo amount and input amount should be same but are %d and %d", utxo.Amt, in.Amt)
+		return fmt.Errorf("%w: %d != %d", ErrMismatchedAmounts, utxo.Amt, in.Amt)
 	}
 
 	return fx.VerifyCredentials(utx, &in.Input, cred, &utxo.OutputOwners)
@@ -179,13 +182,13 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 	numSigs := len(in.SigIndices)
 	switch {
 	case out.Locktime > fx.VM.Clock().Unix():
-		return errTimelocked
+		return ErrTimelocked
 	case out.Threshold < uint32(numSigs):
-		return errTooManySigners
+		return ErrTooManySigners
 	case out.Threshold > uint32(numSigs):
-		return errTooFewSigners
+		return ErrTooFewSigners
 	case numSigs != len(cred.Sigs):
-		return errInputCredentialSignersMismatch
+		return ErrInputCredentialSignersMismatch
 	case !fx.bootstrapped: // disable signature verification during bootstrapping
 		return nil
 	}
@@ -194,7 +197,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 	for i, index := range in.SigIndices {
 		// Make sure the input references an address that exists
 		if index >= uint32(len(out.Addrs)) {
-			return errInputOutputIndexOutOfBounds
+			return ErrInputOutputIndexOutOfBounds
 		}
 		// Make sure each signature in the signature list is from an owner of
 		// the output being consumed
@@ -205,7 +208,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 		}
 		if expectedAddress := out.Addrs[index]; expectedAddress != pk.Address() {
 			return fmt.Errorf("%w: expected signature from %s but got from %s",
-				errWrongSig,
+				ErrWrongSig,
 				expectedAddress,
 				pk.Address())
 		}
@@ -219,7 +222,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 func (*Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
-		return nil, errWrongOwnerType
+		return nil, ErrWrongOwnerType
 	}
 	if err := owner.Verify(); err != nil {
 		return nil, err

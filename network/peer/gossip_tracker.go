@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -260,6 +260,7 @@ func (g *gossipTracker) ResetValidator(validatorID ids.NodeID) bool {
 }
 
 // AddKnown invariants:
+//
 //  1. [peerID] SHOULD only be a nodeID that has been tracked with
 //     StartTrackingPeer().
 func (g *gossipTracker) AddKnown(

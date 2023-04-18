@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -63,7 +62,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Ins:          []*avax.TransferableInput{},
 				},
 			},
-			Validator: validator.Validator{
+			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  1,
 				End:    1 + uint64(unsignedTransformTx.MinStakeDuration),
@@ -658,7 +657,7 @@ func TestGetValidatorRules(t *testing.T) {
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getValidatorRules(tt.backend, chainState, tt.subnetID)
 			if tt.expectedErr != nil {
-				require.ErrorIs(tt.expectedErr, err)
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.NoError(err)
@@ -777,7 +776,7 @@ func TestGetDelegatorRules(t *testing.T) {
 			chainState := tt.chainStateF(ctrl)
 			rules, err := getDelegatorRules(tt.backend, chainState, tt.subnetID)
 			if tt.expectedErr != nil {
-				require.ErrorIs(tt.expectedErr, err)
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.NoError(err)

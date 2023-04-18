@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements X-chain transfer tests.
@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	metricVtxProcessing = "avalanche_X_vtx_processing"
-	metricVtxAccepted   = "avalanche_X_vtx_accepted_count"
-	metricVtxRejected   = "avalanche_X_vtx_rejected_count"
+	metricVtxProcessing = "avalanche_X_avalanche_vtx_processing"
+	metricVtxAccepted   = "avalanche_X_avalanche_vtx_accepted_count"
+	metricVtxRejected   = "avalanche_X_avalanche_vtx_rejected_count"
 )
 
 const totalRounds = 50

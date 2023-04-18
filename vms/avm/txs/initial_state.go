@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	errNilInitialState  = errors.New("nil initial state is not valid")
-	errNilFxOutput      = errors.New("nil feature extension output is not valid")
-	errOutputsNotSorted = errors.New("outputs not sorted")
-	errUnknownFx        = errors.New("unknown feature extension")
+	ErrNilInitialState  = errors.New("nil initial state is not valid")
+	ErrNilFxOutput      = errors.New("nil feature extension output is not valid")
+	ErrOutputsNotSorted = errors.New("outputs not sorted")
+	ErrUnknownFx        = errors.New("unknown feature extension")
 
 	_ utils.Sortable[*InitialState] = (*InitialState)(nil)
 )
@@ -39,21 +39,21 @@ func (is *InitialState) InitCtx(ctx *snow.Context) {
 func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	switch {
 	case is == nil:
-		return errNilInitialState
+		return ErrNilInitialState
 	case is.FxIndex >= uint32(numFxs):
-		return errUnknownFx
+		return ErrUnknownFx
 	}
 
 	for _, out := range is.Outs {
 		if out == nil {
-			return errNilFxOutput
+			return ErrNilFxOutput
 		}
 		if err := out.Verify(); err != nil {
 			return err
 		}
 	}
 	if !isSortedState(is.Outs, c) {
-		return errOutputsNotSorted
+		return ErrOutputsNotSorted
 	}
 
 	return nil

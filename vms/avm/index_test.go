@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -23,7 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -104,7 +105,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.getUTXO(utxoID)
+			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -194,7 +195,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.getUTXO(utxoID)
+			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -264,7 +265,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	var inputUTXOs []*avax.UTXO //nolint:prealloc
 	for _, utxoID := range tx.Unsigned.InputUTXOs() {
-		utxo, err := vm.getUTXO(utxoID)
+		utxo, err := vm.dagState.GetUTXOFromID(utxoID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -347,7 +348,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.getUTXO(utxoID)
+			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -478,14 +479,14 @@ func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortI
 	}
 }
 
-func signTX(codec codec.Manager, tx *txs.Tx, key *crypto.PrivateKeySECP256K1R) error {
-	return tx.SignSECP256K1Fx(codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+func signTX(codec codec.Manager, tx *txs.Tx, key *secp256k1.PrivateKey) error {
+	return tx.SignSECP256K1Fx(codec, [][]*secp256k1.PrivateKey{{key}})
 }
 
 func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
+			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
 			Ins: []*avax.TransferableInput{{
 				UTXOID: utxoID,
@@ -584,12 +585,14 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 	}
 }
 
-// Sets up test tx IDs in DB in the following structure for the indexer to pick them up:
-// [address] prefix DB
-//		[assetID] prefix DB
-//			- "idx": 2
-//			- 0: txID1
-//			- 1: txID1
+// Sets up test tx IDs in DB in the following structure for the indexer to pick
+// them up:
+//
+//	[address] prefix DB
+//	  [assetID] prefix DB
+//	    - "idx": 2
+//	    - 0: txID1
+//	    - 1: txID1
 func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
 	var testTxs []ids.ID
 	for i := 0; i < txCount; i++ {

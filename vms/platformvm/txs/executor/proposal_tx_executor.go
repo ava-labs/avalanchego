@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 const (
@@ -47,10 +46,11 @@ type ProposalTxExecutor struct {
 	*Backend
 	Tx *txs.Tx
 	// [OnCommitState] is the state used for validation.
-	// In practice, both [OnCommitState] and [onAbortState] are
-	// identical when passed into this struct, so we could use either.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
+	//
+	// Invariant: Both [OnCommitState] and [OnAbortState] represent the same
+	//            state when provided to this struct.
 	OnCommitState state.Diff
 	// [OnAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
@@ -123,9 +123,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -136,9 +136,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -171,9 +171,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -184,9 +184,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, tx.Outs)
+	avax.Produce(e.OnAbortState, txID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -220,9 +220,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -233,9 +233,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -378,6 +378,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnAbortState.AddUTXO(utxo)
 		}
 
+		offset := 0
+
 		// Provide the reward here
 		if stakerToRemove.PotentialReward > 0 {
 			validationRewardsOwner := uStakerTx.ValidationRewardsOwner()
@@ -401,8 +403,54 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 			e.OnCommitState.AddUTXO(utxo)
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
+
+			offset++
 		}
 
+		// Provide the accrued delegatee rewards from successful delegations here.
+		delegateeReward, err := e.OnCommitState.GetDelegateeReward(
+			stakerToRemove.SubnetID,
+			stakerToRemove.NodeID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+		}
+
+		if delegateeReward > 0 {
+			delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
+			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+			if err != nil {
+				return fmt.Errorf("failed to create output: %w", err)
+			}
+			out, ok := outIntf.(verify.State)
+			if !ok {
+				return errInvalidState
+			}
+
+			onCommitUtxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(outputs) + len(stake) + offset),
+				},
+				Asset: stakeAsset,
+				Out:   out,
+			}
+			e.OnCommitState.AddUTXO(onCommitUtxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, onCommitUtxo)
+
+			onAbortUtxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID: tx.TxID,
+					// Note: There is no [offset] if the RewardValidatorTx is
+					// aborted, because the validator reward is not awarded.
+					OutputIndex: uint32(len(outputs) + len(stake)),
+				},
+				Asset: stakeAsset,
+				Out:   out,
+			}
+			e.OnAbortState.AddUTXO(onAbortUtxo)
+			e.OnAbortState.AddRewardUTXO(tx.TxID, onAbortUtxo)
+		}
 		// Invariant: A [txs.DelegatorTx] does not also implement the
 		//            [txs.ValidatorTx] interface.
 	case txs.DelegatorTx:
@@ -500,26 +548,54 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 		// Reward the delegatee here
 		if delegateeReward > 0 {
-			delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(len(outputs) + len(stake) + offset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
+			if vdrStaker.StartTime.After(e.Config.CortinaTime) {
+				previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+					vdrStaker.SubnetID,
+					vdrStaker.NodeID,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to get delegatee reward: %w", err)
+				}
 
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
+				// Invariant: The rewards calculator can never return a
+				//            [potentialReward] that would overflow the
+				//            accumulated rewards.
+				newDelegateeReward := previousDelegateeReward + delegateeReward
+
+				// For any validators starting after [CortinaTime], we defer rewarding the
+				// [delegateeReward] until their staking period is over.
+				err = e.OnCommitState.SetDelegateeReward(
+					vdrStaker.SubnetID,
+					vdrStaker.NodeID,
+					newDelegateeReward,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to update delegatee reward: %w", err)
+				}
+			} else {
+				// For any validators who started prior to [CortinaTime], we issue the
+				// [delegateeReward] immediately.
+				delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
+				outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+				if err != nil {
+					return fmt.Errorf("failed to create output: %w", err)
+				}
+				out, ok := outIntf.(verify.State)
+				if !ok {
+					return errInvalidState
+				}
+				utxo := &avax.UTXO{
+					UTXOID: avax.UTXOID{
+						TxID:        tx.TxID,
+						OutputIndex: uint32(len(outputs) + len(stake) + offset),
+					},
+					Asset: stakeAsset,
+					Out:   out,
+				}
+
+				e.OnCommitState.AddUTXO(utxo)
+				e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
+			}
 		}
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of

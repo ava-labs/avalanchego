@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -264,7 +264,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 		if vtx.time != nil {
 			now = vtx.time()
 		}
-		allowed := vtx.serializer.XChainMigrationTime
+		allowed := vtx.serializer.CortinaTime
 		if now.Before(allowed) {
 			return errStopVertexNotAllowedTimestamp
 		}

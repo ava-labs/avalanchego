@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -62,7 +63,7 @@ type Consensus interface {
 	// RecordPoll collects the results of a network poll. If a result has not
 	// been added, the result is dropped. Returns if a critical error has
 	// occurred.
-	RecordPoll(context.Context, ids.UniqueBag) error
+	RecordPoll(context.Context, bag.UniqueBag[ids.ID]) error
 
 	// Quiesce is guaranteed to return true if the instance is finalized. It
 	// may, but doesn't need to, return true if all processing vertices are

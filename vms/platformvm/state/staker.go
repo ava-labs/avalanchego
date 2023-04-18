@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -59,6 +59,7 @@ type Staker struct {
 }
 
 // A *Staker is considered to be less than another *Staker when:
+//
 //  1. If its NextTime is before the other's.
 //  2. If the NextTimes are the same, the *Staker with the lesser priority is the
 //     lesser one.

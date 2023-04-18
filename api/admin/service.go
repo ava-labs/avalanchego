@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -74,28 +74,40 @@ func NewService(config Config) (*common.HTTPHandler, error) {
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
 func (a *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: StartCPUProfiler called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "startCPUProfiler"),
+	)
 
 	return a.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
 func (a *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: StopCPUProfiler called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "stopCPUProfiler"),
+	)
 
 	return a.profiler.StopCPUProfiler()
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
 func (a *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: MemoryProfile called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "memoryProfile"),
+	)
 
 	return a.profiler.MemoryProfile()
 }
 
 // LockProfile runs a mutex profile writing to the specified file
 func (a *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: LockProfile called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "lockProfile"),
+	)
 
 	return a.profiler.LockProfile()
 }
@@ -108,7 +120,9 @@ type AliasArgs struct {
 
 // Alias attempts to alias an HTTP endpoint to a new name
 func (a *Admin) Alias(_ *http.Request, args *AliasArgs, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: Alias called",
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "alias"),
 		logging.UserString("endpoint", args.Endpoint),
 		logging.UserString("alias", args.Alias),
 	)
@@ -128,7 +142,9 @@ type AliasChainArgs struct {
 
 // AliasChain attempts to alias a chain to a new name
 func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: AliasChain called",
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "aliasChain"),
 		logging.UserString("chain", args.Chain),
 		logging.UserString("alias", args.Alias),
 	)
@@ -162,7 +178,9 @@ type GetChainAliasesReply struct {
 
 // GetChainAliases returns the aliases of the chain
 func (a *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
-	a.Log.Debug("Admin: GetChainAliases called",
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "getChainAliases"),
 		logging.UserString("chain", args.Chain),
 	)
 
@@ -177,7 +195,10 @@ func (a *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, repl
 
 // Stacktrace returns the current global stacktrace
 func (a *Admin) Stacktrace(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: Stacktrace called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "stacktrace"),
+	)
 
 	stacktrace := []byte(utils.GetStacktrace(true))
 	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
@@ -200,7 +221,9 @@ type SetLoggerLevelArgs struct {
 // If args.DisplayLevel == nil, doesn't set the display level of these loggers.
 // If args.DisplayLevel != nil, must be a valid string representation of a log level.
 func (a *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, _ *api.EmptyReply) error {
-	a.Log.Debug("Admin: SetLoggerLevel called",
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "setLoggerLevel"),
 		logging.UserString("loggerName", args.LoggerName),
 		zap.Stringer("logLevel", args.LogLevel),
 		zap.Stringer("displayLevel", args.DisplayLevel),
@@ -250,7 +273,9 @@ type GetLoggerLevelReply struct {
 
 // GetLogLevel returns the log level and display level of all loggers.
 func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
-	a.Log.Debug("Admin: GetLoggerLevels called",
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "getLoggerLevels"),
 		logging.UserString("loggerName", args.LoggerName),
 	)
 	reply.LoggerLevels = make(map[string]LogAndDisplayLevels)
@@ -281,7 +306,10 @@ func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply 
 
 // GetConfig returns the config that the node was started with.
 func (a *Admin) GetConfig(_ *http.Request, _ *struct{}, reply *interface{}) error {
-	a.Log.Debug("Admin: GetConfig called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "getConfig"),
+	)
 	*reply = a.NodeConfig
 	return nil
 }
@@ -296,7 +324,10 @@ type LoadVMsReply struct {
 
 // LoadVMs loads any new VMs available to the node and returns the added VMs.
 func (a *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error {
-	a.Log.Debug("Admin: LoadVMs called")
+	a.Log.Debug("API called",
+		zap.String("service", "admin"),
+		zap.String("method", "loadVMs"),
+	)
 
 	ctx := r.Context()
 	loadedVMs, failedVMs, err := a.VMRegistry.ReloadWithReadLock(ctx)

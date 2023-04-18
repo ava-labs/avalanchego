@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -52,6 +52,10 @@ func (dh *dummyHandler) onDoneBootstrapping(ctx context.Context, lastReqID uint3
 	return dh.startEngineF(ctx, lastReqID)
 }
 
+func noopStarter(context.Context, uint32) error {
+	return nil
+}
+
 func TestEngineShutdown(t *testing.T) {
 	_, _, engCfg := DefaultConfig()
 
@@ -64,7 +68,7 @@ func TestEngineShutdown(t *testing.T) {
 	}
 	engCfg.VM = vm
 
-	transitive, err := newTransitive(engCfg)
+	transitive, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +104,7 @@ func TestEngineAdd(t *testing.T) {
 
 	manager.CantEdge = false
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +249,7 @@ func TestEngineQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +557,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,7 +717,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 		TxsV:    []snowstorm.Tx{tx0},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -787,7 +791,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -865,7 +869,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -990,7 +994,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1084,7 +1088,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1169,7 +1173,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1303,7 +1307,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1460,7 +1464,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1541,7 +1545,7 @@ func TestEngineGetVertex(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1614,7 +1618,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1694,7 +1698,7 @@ func TestEnginePushGossip(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1784,7 +1788,7 @@ func TestEngineSingleQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1876,7 +1880,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1964,7 +1968,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	require.NoError(err)
 
 	err = te.Start(context.Background(), 0)
@@ -2062,7 +2066,7 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	require.NoError(err)
 
 	err = te.Start(context.Background(), 0)
@@ -2181,7 +2185,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2305,7 +2309,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2440,7 +2444,7 @@ func TestEngineMissingTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2547,7 +2551,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2630,7 +2634,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2710,7 +2714,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -2806,12 +2809,13 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2987,7 +2991,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -3068,6 +3071,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3106,13 +3110,14 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bootCfg.Ctx.Registerer = prometheus.NewRegistry()
+	bootCfg.Ctx.AvalancheRegisterer = prometheus.NewRegistry()
 
 	// re-register the Transitive
 	bootstrapper2, err := bootstrap.New(
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3152,7 +3157,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -3247,12 +3251,13 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3476,7 +3481,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3571,7 +3576,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3623,7 +3628,7 @@ func TestEngineGossip(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3726,7 +3731,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3870,7 +3875,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4014,7 +4019,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4136,7 +4141,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4256,7 +4261,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4420,7 +4425,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 		panic("should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4543,7 +4548,7 @@ func TestEngineIssue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4645,7 +4650,7 @@ func TestAbandonTx(t *testing.T) {
 
 	engCfg.VM = vm
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4777,7 +4782,7 @@ func TestSendMixedQuery(t *testing.T) {
 				engCfg.Params.Alpha = 12
 				engCfg.Params.MixedQueryNumPushVdr = 12
 				engCfg.Params.MixedQueryNumPushNonVdr = 11
-				te, err := newTransitive(engCfg)
+				te, err := newTransitive(engCfg, noopStarter)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -4958,7 +4963,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	require.NoError(err)
 	require.NoError(te.Start(context.Background(), 0))
 

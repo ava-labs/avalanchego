@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ipcs
@@ -14,6 +14,8 @@ import (
 var _ Client = (*client)(nil)
 
 // Client interface for interacting with the IPCS endpoint
+//
+// Deprecated: The IPCs API is deprecated. The Index API should be used instead.
 type Client interface {
 	// PublishBlockchain requests the node to begin publishing consensus and decision events
 	PublishBlockchain(ctx context.Context, chainID string, options ...rpc.Option) (*PublishBlockchainReply, error)
@@ -29,6 +31,8 @@ type client struct {
 }
 
 // NewClient returns a Client for interacting with the IPCS endpoint
+//
+// Deprecated: The IPCs API is deprecated. The Index API should be used instead.
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
 		uri + "/ext/ipcs",

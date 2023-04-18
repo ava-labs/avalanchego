@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -92,10 +91,6 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
-		return err
-	}
-
-	if err := staking.VerifyCertificate(cert); err != nil {
 		return err
 	}
 

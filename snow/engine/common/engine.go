@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -550,8 +550,9 @@ type InternalHandler interface {
 	// Halt this engine.
 	//
 	// This function will be called before the environment starts exiting. This
-	// function is slightly special, in that it does not expect the chain's
-	// context lock to be held before calling this function.
+	// function is special, in that it does not expect the chain's context lock
+	// to be held before calling this function. This function also does not
+	// require the engine to have been started.
 	Halt(context.Context)
 
 	// Shutdown this engine.

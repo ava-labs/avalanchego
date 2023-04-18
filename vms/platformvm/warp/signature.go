@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -24,6 +24,12 @@ var (
 )
 
 type Signature interface {
+	// NumSigners is the number of [bls.PublicKeys] that participated in the
+	// [Signature]. This is exposed because users of these signatures typically
+	// impose a verification fee that is a function of the number of
+	// signers.
+	NumSigners() (int, error)
+
 	// Verify that this signature was signed by at least [quorumNum]/[quorumDen]
 	// of the validators of [msg.SourceChainID] at [pChainHeight].
 	//
@@ -45,6 +51,19 @@ type BitSetSignature struct {
 	Signature [bls.SignatureLen]byte `serialize:"true"`
 }
 
+func (s *BitSetSignature) NumSigners() (int, error) {
+	// Parse signer bit vector
+	//
+	// We assert that the length of [signerIndices.Bytes()] is equal
+	// to [len(s.Signers)] to ensure that [s.Signers] does not have
+	// any unnecessary zero-padding to represent the [set.Bits].
+	signerIndices := set.BitsFromBytes(s.Signers)
+	if len(signerIndices.Bytes()) != len(s.Signers) {
+		return 0, ErrInvalidBitSet
+	}
+	return signerIndices.Len(), nil
+}
+
 func (s *BitSetSignature) Verify(
 	ctx context.Context,
 	msg *UnsignedMessage,
@@ -64,6 +83,10 @@ func (s *BitSetSignature) Verify(
 	}
 
 	// Parse signer bit vector
+	//
+	// We assert that the length of [signerIndices.Bytes()] is equal
+	// to [len(s.Signers)] to ensure that [s.Signers] does not have
+	// any unnecessary zero-padding to represent the [set.Bits].
 	signerIndices := set.BitsFromBytes(s.Signers)
 	if len(signerIndices.Bytes()) != len(s.Signers) {
 		return ErrInvalidBitSet
@@ -92,7 +115,7 @@ func (s *BitSetSignature) Verify(
 	// Parse the aggregate signature
 	aggSig, err := bls.SignatureFromBytes(s.Signature[:])
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrParseSignature, err)
+		return fmt.Errorf("%w: %v", ErrParseSignature, err)
 	}
 
 	// Create the aggregate public key

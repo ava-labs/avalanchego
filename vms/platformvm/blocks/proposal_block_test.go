@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -33,7 +32,7 @@ func TestNewBanffProposalBlock(t *testing.T) {
 				},
 			},
 			StakeOuts: []*avax.TransferableOutput{},
-			Validator: validator.Validator{},
+			Validator: txs.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},
 			},
@@ -75,7 +74,7 @@ func TestNewApricotProposalBlock(t *testing.T) {
 				},
 			},
 			StakeOuts: []*avax.TransferableOutput{},
-			Validator: validator.Validator{},
+			Validator: txs.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},
 			},

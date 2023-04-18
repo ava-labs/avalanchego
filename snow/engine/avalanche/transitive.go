@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -6,6 +6,7 @@ package avalanche
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -20,15 +21,20 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Engine = (*Transitive)(nil)
 
-func New(config Config) (Engine, error) {
-	return newTransitive(config)
+func New(
+	config Config,
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error,
+) (Engine, error) {
+	return newTransitive(config, startSnowmanConsensus)
 }
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -72,13 +78,18 @@ type Transitive struct {
 	// optimal number.
 	pendingTxs []snowstorm.Tx
 
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error
+
 	// A uniform sampler without replacement
 	uniformSampler sampler.Uniform
 
 	errs wrappers.Errs
 }
 
-func newTransitive(config Config) (*Transitive, error) {
+func newTransitive(
+	config Config,
+	startSnowmanConsensus func(ctx context.Context, lastReqID uint32) error,
+) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
 	acceptedFrontiers := tracker.NewAccepted()
@@ -99,12 +110,13 @@ func newTransitive(config Config) (*Transitive, error) {
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
-			config.Ctx.Registerer,
+			config.Ctx.AvalancheRegisterer,
 		),
-		uniformSampler: sampler.NewUniform(),
+		startSnowmanConsensus: startSnowmanConsensus,
+		uniformSampler:        sampler.NewUniform(),
 	}
 
-	return t, t.metrics.Initialize("", config.Ctx.Registerer)
+	return t, t.metrics.Initialize("", config.Ctx.AvalancheRegisterer)
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
@@ -112,6 +124,16 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
+
+	// If the chain is linearized, we should immediately drop all put messages.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex",
@@ -155,6 +177,16 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	// If the chain is linearized, we don't care that a get request failed, we
+	// have already moved into snowman consensus.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
@@ -182,6 +214,22 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	// If the chain is linearized, we don't care to attempt to issue any new
+	// vertices.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		// Immediately respond to the query with the stop vertex.
+		//
+		// Invariant: This is done here, because the Consensus instance may have
+		// never been initialized if bootstrapping accepted the stop vertex.
+		edge := t.Manager.Edge(ctx)
+		t.Sender.SendChits(ctx, nodeID, requestID, edge, edge)
+		return nil
+	}
+
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
 
@@ -195,6 +243,22 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	// If the chain is linearized, we don't care to attempt to issue any new
+	// vertices.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		// Immediately respond to the query with the stop vertex.
+		//
+		// Invariant: This is done here, because the Consensus instance may have
+		// never been initialized if bootstrapping accepted the stop vertex.
+		edge := t.Manager.Edge(ctx)
+		t.Sender.SendChits(ctx, nodeID, requestID, edge, edge)
+		return nil
+	}
+
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List(), t.Manager.Edge(ctx))
 
@@ -226,6 +290,15 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) error {
+	// If the chain is linearized, we don't care to apply any votes.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	t.acceptedFrontiers.SetAcceptedFrontier(nodeID, accepted)
 
 	v := &voter{
@@ -248,6 +321,15 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	// If the chain is linearized, we don't care to apply any votes.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	lastAccepted := t.acceptedFrontiers.AcceptedFrontier(nodeID)
 	return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 }
@@ -296,8 +378,23 @@ func (t *Transitive) Shutdown(ctx context.Context) error {
 }
 
 func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
+	// If the chain is linearized, we shouldn't be processing any messages from
+	// the VM anymore.
+	linearized, err := t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		return err
+	}
+	if linearized {
+		return nil
+	}
+
 	switch msg {
 	case common.PendingTxs:
+		// After the linearization, we shouldn't be building any new vertices
+		if cortinaTime, ok := version.CortinaTimes[t.Ctx.NetworkID]; ok && time.Now().After(cortinaTime) {
+			return nil
+		}
+
 		txs := t.VM.PendingTxs(ctx)
 		t.pendingTxs = append(t.pendingTxs, txs...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
@@ -364,7 +461,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %s", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %v", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {
@@ -614,7 +711,7 @@ func (t *Transitive) issueRepoll(ctx context.Context) {
 		return
 	}
 
-	vdrBag := ids.NodeIDBag{} // IDs of validators to be sampled
+	vdrBag := bag.Bag[ids.NodeID]{} // IDs of validators to be sampled
 	vdrBag.Add(vdrIDs...)
 
 	vdrList := vdrBag.List()

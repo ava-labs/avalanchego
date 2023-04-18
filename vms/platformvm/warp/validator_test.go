@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -139,7 +139,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			state := tt.stateF(ctrl)
 
 			vdrs, weight, err := GetCanonicalValidatorSet(context.Background(), state, pChainHeight, subnetID)
-			require.ErrorIs(tt.expectedErr, err)
+			require.ErrorIs(err, tt.expectedErr)
 			if err != nil {
 				return
 			}

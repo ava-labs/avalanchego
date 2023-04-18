@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -54,6 +54,10 @@ const (
 	HTTPAllowedOrigins                                 = "http-allowed-origins"
 	HTTPShutdownTimeoutKey                             = "http-shutdown-timeout"
 	HTTPShutdownWaitKey                                = "http-shutdown-wait"
+	HTTPReadTimeoutKey                                 = "http-read-timeout"
+	HTTPReadHeaderTimeoutKey                           = "http-read-header-timeout"
+	HTTPWriteTimeoutKey                                = "http-write-timeout"
+	HTTPIdleTimeoutKey                                 = "http-idle-timeout"
 	APIAuthRequiredKey                                 = "api-auth-required"
 	APIAuthPasswordKey                                 = "api-auth-password"
 	APIAuthPasswordFileKey                             = "api-auth-password-file"
@@ -94,7 +98,8 @@ const (
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
 	NetworkPingFrequencyKey                            = "network-ping-frequency"
 	NetworkMaxReconnectDelayKey                        = "network-max-reconnect-delay"
-	NetworkCompressionEnabledKey                       = "network-compression-enabled"
+	NetworkCompressionEnabledKey                       = "network-compression-enabled" // TODO this is deprecated. Eventually remove it and constants.DefaultNetworkCompressionEnabled
+	NetworkCompressionTypeKey                          = "network-compression-type"
 	NetworkMaxClockDifferenceKey                       = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                          = "network-allow-private-ips"
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"
@@ -127,7 +132,6 @@ const (
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
 	SnowMixedQueryNumPushVdrKey                        = "snow-mixed-query-num-push-vdr"
 	SnowMixedQueryNumPushNonVdrKey                     = "snow-mixed-query-num-push-non-vdr"
-	WhitelistedSubnetsKey                              = "whitelisted-subnets"
 	TrackSubnetsKey                                    = "track-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
 	InfoAPIEnabledKey                                  = "api-info-enabled"
@@ -139,6 +143,7 @@ const (
 	IpcsPathKey                                        = "ipcs-path"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
 	ConsensusGossipFrequencyKey                        = "consensus-gossip-frequency"
+	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
 	ConsensusGossipAcceptedFrontierNonValidatorSizeKey = "consensus-accepted-frontier-gossip-non-validator-size"
 	ConsensusGossipAcceptedFrontierPeerSizeKey         = "consensus-accepted-frontier-gossip-peer-size"
@@ -160,7 +165,6 @@ const (
 	RetryBootstrapKey                                  = "bootstrap-retry-enabled"
 	RetryBootstrapWarnFrequencyKey                     = "bootstrap-retry-warn-frequency"
 	PluginDirKey                                       = "plugin-dir"
-	PluginModeKey                                      = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey                = "bootstrap-beacon-connection-timeout"
 	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"
 	BootstrapAncestorsMaxContainersSentKey             = "bootstrap-ancestors-max-containers-sent"

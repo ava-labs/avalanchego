@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -280,7 +280,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.Subnet.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.Restart(ctx, true)
 	}
 	b.fetchETA.Set(0)
@@ -564,8 +564,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.ConsensusAcceptor,
-		b.Ctx.DecisionAcceptor,
+		b.Ctx.BlockAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
@@ -590,11 +589,11 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Config.Subnet.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		if !b.Config.SharedCfg.Restarted {
 			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {

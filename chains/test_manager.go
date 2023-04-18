@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -44,7 +44,9 @@ func (testManager) RemoveAliases(ids.ID) {}
 
 func (testManager) Shutdown() {}
 
-func (testManager) StartChainCreator(ChainParameters) {}
+func (testManager) StartChainCreator(ChainParameters) error {
+	return nil
+}
 
 func (testManager) SubnetID(ids.ID) (ids.ID, error) {
 	return ids.ID{}, nil

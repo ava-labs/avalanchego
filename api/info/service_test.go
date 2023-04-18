@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -61,7 +61,7 @@ func TestGetVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
@@ -78,7 +78,7 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
@@ -97,7 +97,7 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	vmIDs := []ids.ID{id1, id2}
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)

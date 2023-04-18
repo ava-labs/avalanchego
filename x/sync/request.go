@@ -1,4 +1,4 @@
-// (c) 2021-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -50,10 +50,11 @@ type Handler interface {
 }
 
 type RangeProofRequest struct {
-	Root  ids.ID `serialize:"true"`
-	Start []byte `serialize:"true"`
-	End   []byte `serialize:"true"`
-	Limit uint16 `serialize:"true"`
+	Root       ids.ID `serialize:"true"`
+	Start      []byte `serialize:"true"`
+	End        []byte `serialize:"true"`
+	KeyLimit   uint16 `serialize:"true"`
+	BytesLimit uint32 `serialize:"true"`
 }
 
 func (r *RangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, h Handler) error {
@@ -62,11 +63,12 @@ func (r *RangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, reque
 
 func (r RangeProofRequest) String() string {
 	return fmt.Sprintf(
-		"RangeProofRequest(Root=%s, Start=%s, End=%s, Limit=%d)",
+		"RangeProofRequest(Root=%s, Start=%s, End=%s, KeyLimit=%d, BytesLimit=%d)",
 		r.Root,
 		hex.EncodeToString(r.Start),
 		hex.EncodeToString(r.End),
-		r.Limit,
+		r.KeyLimit,
+		r.BytesLimit,
 	)
 }
 
@@ -77,7 +79,8 @@ type ChangeProofRequest struct {
 	EndingRoot   ids.ID `serialize:"true"`
 	Start        []byte `serialize:"true"`
 	End          []byte `serialize:"true"`
-	Limit        uint16 `serialize:"true"`
+	KeyLimit     uint16 `serialize:"true"`
+	BytesLimit   uint32 `serialize:"true"`
 }
 
 func (r *ChangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, h Handler) error {
@@ -86,11 +89,12 @@ func (r *ChangeProofRequest) Handle(ctx context.Context, nodeID ids.NodeID, requ
 
 func (r ChangeProofRequest) String() string {
 	return fmt.Sprintf(
-		"ChangeProofRequest(StartRoot=%s, EndRoot=%s, Start=%s, End=%s, Limit=%d)",
+		"ChangeProofRequest(StartRoot=%s, EndRoot=%s, Start=%s, End=%s, KeyLimit=%d, BytesLimit=%d)",
 		r.StartingRoot,
 		r.EndingRoot,
 		hex.EncodeToString(r.Start),
 		hex.EncodeToString(r.End),
-		r.Limit,
+		r.KeyLimit,
+		r.BytesLimit,
 	)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -35,7 +36,8 @@ import (
 var (
 	errClosed = errors.New("closed")
 
-	_ net.Listener = (*noopListener)(nil)
+	_ net.Listener    = (*noopListener)(nil)
+	_ subnets.Allower = (*nodeIDConnector)(nil)
 )
 
 type noopListener struct {
@@ -77,9 +79,10 @@ func NewTestNetwork(
 ) (Network, error) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
+		logging.NoLog{},
 		metrics,
 		"",
-		constants.DefaultNetworkCompressionEnabled,
+		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
 	)
 	if err != nil {
@@ -161,7 +164,7 @@ func NewTestNetwork(
 		},
 
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
-		CompressionEnabled:           constants.DefaultNetworkCompressionEnabled,
+		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              constants.DefaultNetworkAllowPrivateIPs,
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
@@ -245,4 +248,16 @@ func NewTestNetwork(
 		),
 		router,
 	)
+}
+
+type nodeIDConnector struct {
+	nodeID ids.NodeID
+}
+
+func newNodeIDConnector(nodeID ids.NodeID) *nodeIDConnector {
+	return &nodeIDConnector{nodeID: nodeID}
+}
+
+func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID, _ bool) bool {
+	return nodeID == f.nodeID
 }

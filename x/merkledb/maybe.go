@@ -1,7 +1,9 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
+
+import "golang.org/x/exp/slices"
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
@@ -35,4 +37,11 @@ func (m Maybe[T]) IsNothing() bool {
 // Returns the value of [m].
 func (m Maybe[T]) Value() T {
 	return m.value
+}
+
+func Clone(m Maybe[[]byte]) Maybe[[]byte] {
+	if !m.hasValue {
+		return Nothing[[]byte]()
+	}
+	return Some(slices.Clone(m.value))
 }

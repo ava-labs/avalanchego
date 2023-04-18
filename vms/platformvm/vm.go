@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -71,7 +72,7 @@ var (
 )
 
 type VM struct {
-	Factory
+	config.Config
 	blockbuilder.Builder
 
 	metrics            metrics.Metrics
@@ -102,9 +103,8 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
 
-	txBuilder         txbuilder.Builder
-	txExecutorBackend *txexecutor.Backend
-	manager           blockexecutor.Manager
+	txBuilder txbuilder.Builder
+	manager   blockexecutor.Manager
 }
 
 // Initialize this blockchain.
@@ -161,13 +161,14 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
+		&vm.bootstrapped,
 	)
 	if err != nil {
 		return err
 	}
 
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.state, vm.fx)
+	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 
@@ -181,7 +182,7 @@ func (vm *VM) Initialize(
 		utxoHandler,
 	)
 
-	vm.txExecutorBackend = &txexecutor.Backend{
+	txExecutorBackend := &txexecutor.Backend{
 		Config:       &vm.Config,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
@@ -203,13 +204,13 @@ func (vm *VM) Initialize(
 		mempool,
 		vm.metrics,
 		vm.state,
-		vm.txExecutorBackend,
+		txExecutorBackend,
 		vm.recentlyAccepted,
 	)
 	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
-		vm.txExecutorBackend,
+		txExecutorBackend,
 		vm.manager,
 		toEngine,
 		appSender,

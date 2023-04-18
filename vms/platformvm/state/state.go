@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -84,9 +85,9 @@ var (
 // execution.
 type Chain interface {
 	Stakers
-	UTXOAdder
-	UTXOGetter
-	UTXODeleter
+	avax.UTXOAdder
+	avax.UTXOGetter
+	avax.UTXODeleter
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
@@ -158,13 +159,13 @@ type stateBlk struct {
  * | |-. current
  * | | |-. validator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | |-. delegator
  * | | | '-. list
  * | | |   '-- txID -> potential reward
  * | | |-. subnetValidator
  * | | | '-. list
- * | | |   '-- txID -> uptime + potential reward or potential reward or nil
+ * | | |   '-- txID -> uptime + potential reward + potential delegatee reward
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> potential reward
@@ -213,12 +214,13 @@ type stateBlk struct {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	validatorUptimes
+	validatorState
 
-	cfg     *config.Config
-	ctx     *snow.Context
-	metrics metrics.Metrics
-	rewards reward.Calculator
+	cfg          *config.Config
+	ctx          *snow.Context
+	metrics      metrics.Metrics
+	rewards      reward.Calculator
+	bootstrapped *utils.Atomic[bool]
 
 	baseDB *versiondb.Database
 
@@ -341,6 +343,7 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
 	s, err := new(
 		db,
@@ -349,6 +352,7 @@ func New(
 		ctx,
 		metricsReg,
 		rewards,
+		bootstrapped,
 	)
 	if err != nil {
 		return nil, err
@@ -371,6 +375,7 @@ func new(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
 	blockCache, err := metercacher.New[ids.ID, *stateBlk](
 		"block_cache",
@@ -481,13 +486,14 @@ func new(
 	}
 
 	return &state{
-		validatorUptimes: newValidatorUptimes(),
+		validatorState: newValidatorState(),
 
-		cfg:     cfg,
-		ctx:     ctx,
-		metrics: metrics,
-		rewards: rewards,
-		baseDB:  baseDB,
+		cfg:          cfg,
+		ctx:          ctx,
+		metrics:      metrics,
+		rewards:      rewards,
+		bootstrapped: bootstrapped,
+		baseDB:       baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1108,21 +1114,22 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		uptimeBytes := validatorIt.Value()
-		uptime := &uptimeAndReward{
+		metadataBytes := validatorIt.Value()
+		metadata := &validatorMetadata{
 			txID: txID,
+			// Note: we don't provide [LastUpdated] here because we expect it to
+			// always be present on disk.
 		}
-		if _, err := txs.Codec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
-		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
 		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, uptime.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1132,7 +1139,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorUptimes.LoadUptime(staker.NodeID, staker.SubnetID, uptime)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -1153,34 +1160,18 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		uptimeReward := &uptimeAndReward{
+		metadataBytes := subnetValidatorIt.Value()
+		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
 			LastUpdated: uint64(stakerTx.StartTime().Unix()),
 		}
-		// Permissioned validators originally wrote their values as nil.
-		// With Banff we wrote the potential reward.
-		// We now write the uptime and reward together.
-		storedBytes := subnetValidatorIt.Value()
-		switch len(storedBytes) {
-		// no uptime or potential reward was stored
-		case 0:
-		// potential reward was stored and uptime was not
-		case database.Uint64Size:
-			uptimeReward.PotentialReward, err = database.ParseUInt64(storedBytes)
-			if err != nil {
-				return err
-			}
-		// both uptime and potential reward were stored
-		default:
-			if _, err := txs.Codec.Unmarshal(storedBytes, uptimeReward); err != nil {
-				return err
-			}
+		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
+			return err
 		}
-		uptimeReward.lastUpdated = time.Unix(int64(uptimeReward.LastUpdated), 0)
 
-		staker, err := NewCurrentStaker(txID, stakerTx, uptimeReward.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1189,7 +1180,7 @@ func (s *state) loadCurrentValidators() error {
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.validatorUptimes.LoadUptime(staker.NodeID, staker.SubnetID, uptimeReward)
+		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
 
 	delegatorIt := s.currentDelegatorList.NewIterator()
@@ -1333,7 +1324,7 @@ func (s *state) loadPendingValidators() error {
 }
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
-//            been called.
+// been called.
 func (s *state) initValidatorSets() error {
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
@@ -1348,6 +1339,9 @@ func (s *state) initValidatorSets() error {
 		return err
 	}
 
+	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
+	primaryValidators.RegisterCallbackListener(vl)
+
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
 
@@ -1361,6 +1355,9 @@ func (s *state) initValidatorSets() error {
 		if !s.cfg.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
+
+		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
+		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil
 }
@@ -1371,7 +1368,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
-		s.WriteUptimes(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
+		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList), // Must be called after writeCurrentStakers
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
@@ -1591,34 +1588,38 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			nodeID := nodeID
 
 			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorDeleted,
+				Decrease: validatorDiff.validatorStatus == deleted,
 			}
-			switch {
-			case validatorDiff.validatorAdded:
+			switch validatorDiff.validatorStatus {
+			case added:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
 
 				// The validator is being added.
-				vdr := &uptimeAndReward{
+				//
+				// Invariant: It's impossible for a delegator to have been
+				// rewarded in the same block that the validator was added.
+				metadata := &validatorMetadata{
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
-					UpDuration:      0,
-					LastUpdated:     uint64(staker.StartTime.Unix()),
-					PotentialReward: staker.PotentialReward,
+					UpDuration:               0,
+					LastUpdated:              uint64(staker.StartTime.Unix()),
+					PotentialReward:          staker.PotentialReward,
+					PotentialDelegateeReward: 0,
 				}
 
-				vdrBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, vdr)
+				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
 
-				if err = validatorDB.Put(staker.TxID[:], vdrBytes); err != nil {
+				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
-				s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
-			case validatorDiff.validatorDeleted:
+				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+			case deleted:
 				staker := validatorDiff.validator
 				weightDiff.Amount = staker.Weight
 
@@ -1638,7 +1639,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
-				s.validatorUptimes.DeleteUptime(nodeID, subnetID)
+				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -1678,7 +1679,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if weightDiff.Decrease {
 				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
-				if validatorDiff.validatorAdded {
+				if validatorDiff.validatorStatus == added {
 					staker := validatorDiff.validator
 					err = validators.Add(
 						s.cfg.Validators,
@@ -1776,13 +1777,13 @@ func writePendingDiff(
 	pendingDelegatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	if validatorDiff.validatorAdded {
+	switch validatorDiff.validatorStatus {
+	case added:
 		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
-	}
-	if validatorDiff.validatorDeleted {
+	case deleted:
 		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)

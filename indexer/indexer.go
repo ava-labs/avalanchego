@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -57,14 +57,15 @@ var (
 
 // Config for an indexer
 type Config struct {
-	DB                     database.Database
-	Log                    logging.Logger
-	IndexingEnabled        bool
-	AllowIncompleteIndex   bool
-	DecisionAcceptorGroup  snow.AcceptorGroup
-	ConsensusAcceptorGroup snow.AcceptorGroup
-	APIServer              server.PathAdder
-	ShutdownF              func()
+	DB                   database.Database
+	Log                  logging.Logger
+	IndexingEnabled      bool
+	AllowIncompleteIndex bool
+	BlockAcceptorGroup   snow.AcceptorGroup
+	TxAcceptorGroup      snow.AcceptorGroup
+	VertexAcceptorGroup  snow.AcceptorGroup
+	APIServer            server.PathAdder
+	ShutdownF            func()
 }
 
 // Indexer causes accepted containers for a given chain
@@ -80,18 +81,19 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
-		codec:                  codec.NewManager(codecMaxSize),
-		log:                    config.Log,
-		db:                     config.DB,
-		allowIncompleteIndex:   config.AllowIncompleteIndex,
-		indexingEnabled:        config.IndexingEnabled,
-		decisionAcceptorGroup:  config.DecisionAcceptorGroup,
-		consensusAcceptorGroup: config.ConsensusAcceptorGroup,
-		txIndices:              map[ids.ID]Index{},
-		vtxIndices:             map[ids.ID]Index{},
-		blockIndices:           map[ids.ID]Index{},
-		pathAdder:              config.APIServer,
-		shutdownF:              config.ShutdownF,
+		codec:                codec.NewManager(codecMaxSize),
+		log:                  config.Log,
+		db:                   config.DB,
+		allowIncompleteIndex: config.AllowIncompleteIndex,
+		indexingEnabled:      config.IndexingEnabled,
+		blockAcceptorGroup:   config.BlockAcceptorGroup,
+		txAcceptorGroup:      config.TxAcceptorGroup,
+		vertexAcceptorGroup:  config.VertexAcceptorGroup,
+		txIndices:            map[ids.ID]Index{},
+		vtxIndices:           map[ids.ID]Index{},
+		blockIndices:         map[ids.ID]Index{},
+		pathAdder:            config.APIServer,
+		shutdownF:            config.ShutdownF,
 	}
 
 	if err := indexer.codec.RegisterCodec(
@@ -139,10 +141,12 @@ type indexer struct {
 	// Chain ID --> index of txs of that chain (if applicable)
 	txIndices map[ids.ID]Index
 
+	// Notifies of newly accepted blocks
+	blockAcceptorGroup snow.AcceptorGroup
 	// Notifies of newly accepted transactions
-	decisionAcceptorGroup snow.AcceptorGroup
-	// Notifies of newly accepted blocks and vertices
-	consensusAcceptorGroup snow.AcceptorGroup
+	txAcceptorGroup snow.AcceptorGroup
+	// Notifies of newly accepted vertices
+	vertexAcceptorGroup snow.AcceptorGroup
 }
 
 // Assumes [ctx.Lock] is not held
@@ -260,9 +264,25 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 		return
 	}
 
+	index, err := i.registerChainHelper(chainID, blockPrefix, chainName, "block", i.blockAcceptorGroup)
+	if err != nil {
+		i.log.Fatal("failed to create index",
+			zap.String("chainName", chainName),
+			zap.String("endpoint", "block"),
+			zap.Error(err),
+		)
+		if err := i.close(); err != nil {
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
+		}
+		return
+	}
+	i.blockIndices[chainID] = index
+
 	switch vm.(type) {
 	case vertex.DAGVM:
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, chainName, "vtx", i.consensusAcceptorGroup)
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, chainName, "vtx", i.vertexAcceptorGroup)
 		if err != nil {
 			i.log.Fatal("couldn't create index",
 				zap.String("chainName", chainName),
@@ -278,7 +298,7 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, chainName, "tx", i.decisionAcceptorGroup)
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, chainName, "tx", i.txAcceptorGroup)
 		if err != nil {
 			i.log.Fatal("couldn't create index",
 				zap.String("chainName", chainName),
@@ -294,21 +314,6 @@ func (i *indexer) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm
 		}
 		i.txIndices[chainID] = txIndex
 	case block.ChainVM:
-		index, err := i.registerChainHelper(chainID, blockPrefix, chainName, "block", i.consensusAcceptorGroup)
-		if err != nil {
-			i.log.Fatal("failed to create index",
-				zap.String("chainName", chainName),
-				zap.String("endpoint", "block"),
-				zap.Error(err),
-			)
-			if err := i.close(); err != nil {
-				i.log.Error("failed to close indexer",
-					zap.Error(err),
-				)
-			}
-			return
-		}
-		i.blockIndices[chainID] = index
 	default:
 		vmType := fmt.Sprintf("%T", vm)
 		i.log.Error("got unexpected vm type",
@@ -382,19 +387,19 @@ func (i *indexer) close() error {
 	for chainID, txIndex := range i.txIndices {
 		errs.Add(
 			txIndex.Close(),
-			i.decisionAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.txAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, vtxIndex := range i.vtxIndices {
 		errs.Add(
 			vtxIndex.Close(),
-			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.vertexAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, blockIndex := range i.blockIndices {
 		errs.Add(
 			blockIndex.Close(),
-			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.blockAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	errs.Add(i.db.Close())

@@ -1,12 +1,12 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import (
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -37,29 +37,12 @@ func (t *BaseTx) Bytes() []byte {
 	return t.bytes
 }
 
-func (t *BaseTx) SyntacticVerify(
-	ctx *snow.Context,
-	c codec.Manager,
-	txFeeAssetID ids.ID,
-	txFee uint64,
-	_ uint64,
-	_ int,
-) error {
-	if t == nil {
-		return errNilTx
+func (t *BaseTx) InputIDs() set.Set[ids.ID] {
+	inputIDs := set.NewSet[ids.ID](len(t.Ins))
+	for _, in := range t.Ins {
+		inputIDs.Add(in.InputID())
 	}
-
-	if err := t.BaseTx.Verify(ctx); err != nil {
-		return err
-	}
-
-	return avax.VerifyTx(
-		txFee,
-		txFeeAssetID,
-		[][]*avax.TransferableInput{t.Ins},
-		[][]*avax.TransferableOutput{t.Outs},
-		c,
-	)
+	return inputIDs
 }
 
 func (t *BaseTx) Visit(v Visitor) error {

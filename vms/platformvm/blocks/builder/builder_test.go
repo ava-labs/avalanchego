@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,13 +24,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
+
+var errTestingDropped = errors.New("testing dropped")
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
@@ -84,14 +86,14 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A tx simply added to mempool is obviously not marked as dropped
 	require.NoError(env.mempool.Add(tx))
 	require.True(env.mempool.Has(txID))
-	_, isDropped := env.mempool.GetDropReason(txID)
-	require.False(isDropped)
+	reason := env.mempool.GetDropReason(txID)
+	require.NoError(reason)
 
 	// When a tx is marked as dropped, it is still available to allow re-issuance
-	env.mempool.MarkDropped(txID, "dropped for testing")
+	env.mempool.MarkDropped(txID, errTestingDropped)
 	require.True(env.mempool.Has(txID)) // still available
-	_, isDropped = env.mempool.GetDropReason(txID)
-	require.True(isDropped)
+	reason = env.mempool.GetDropReason(txID)
+	require.ErrorIs(reason, errTestingDropped)
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
@@ -99,8 +101,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require.NoError(env.mempool.Add(tx))
 
 	require.True(env.mempool.Has(txID))
-	_, isDropped = env.mempool.GetDropReason(txID)
-	require.False(isDropped)
+	reason = env.mempool.GetDropReason(txID)
+	require.NoError(reason)
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
@@ -325,7 +327,7 @@ func TestBuildBlock(t *testing.T) {
 					}},
 					Outs: []*avax.TransferableOutput{output},
 				}},
-				Validator: validator.Validator{
+				Validator: txs.Validator{
 					// Shouldn't be dropped
 					Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
 				},
@@ -336,7 +338,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][crypto.SECP256K1RSigLen]byte{{1, 3, 3, 7}},
+					Sigs: [][secp256k1.SignatureLen]byte{{1, 3, 3, 7}},
 				},
 			},
 		}}

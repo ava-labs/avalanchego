@@ -9,7 +9,7 @@
 # Dockerfile
 # README.md
 # go.mod
-FROM golang:1.18.5-buster
+FROM golang:1.19.6-buster
 
 RUN mkdir -p /go/src/github.com/ava-labs
 

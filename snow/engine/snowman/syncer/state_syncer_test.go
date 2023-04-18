@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -108,7 +108,6 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	commonCfg := common.Config{
 		Ctx:            snow.DefaultConsensusContextTest(),
-		Validators:     vdrs,
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          alpha,

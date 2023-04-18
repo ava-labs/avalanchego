@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package registry
@@ -36,9 +36,10 @@ type registerer interface {
 
 // VMRegistererConfig configures settings for VMRegisterer.
 type VMRegistererConfig struct {
-	APIServer server.Server
-	Log       logging.Logger
-	VMManager vms.Manager
+	APIServer    server.Server
+	Log          logging.Logger
+	VMFactoryLog logging.Logger
+	VMManager    vms.Manager
 }
 
 type vmRegisterer struct {
@@ -89,8 +90,7 @@ func (r *vmRegisterer) createStaticHandlers(
 	vmID ids.ID,
 	factory vms.Factory,
 ) (map[string]*common.HTTPHandler, error) {
-	// passing a nil ctx to the factory disables logging.
-	vm, err := factory.New(nil)
+	vm, err := factory.New(r.config.VMFactoryLog)
 	if err != nil {
 		return nil, err
 	}

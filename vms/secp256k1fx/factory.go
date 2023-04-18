@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -18,6 +18,6 @@ var (
 
 type Factory struct{}
 
-func (*Factory) New(*snow.Context) (interface{}, error) {
+func (*Factory) New(logging.Logger) (interface{}, error) {
 	return &Fx{}, nil
 }

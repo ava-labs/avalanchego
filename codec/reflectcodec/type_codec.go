@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package reflectcodec
@@ -52,16 +52,21 @@ type TypeCodec interface {
 // implementation for interface encoding.
 //
 // A few notes:
-// 1) We use "marshal" and "serialize" interchangeably, and "unmarshal" and "deserialize" interchangeably
-// 2) To include a field of a struct in the serialized form, add the tag `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
-// 3) These typed members of a struct may be serialized:
-//    bool, string, uint[8,16,32,64], int[8,16,32,64],
-//	  structs, slices, arrays, interface.
-//	  structs, slices and arrays can only be serialized if their constituent values can be.
-// 4) To marshal an interface, you must pass a pointer to the value
-// 5) To unmarshal an interface,  you must call codec.RegisterType([instance of the type that fulfills the interface]).
-// 6) Serialized fields must be exported
-// 7) nil slices are marshaled as empty slices
+//
+//  1. We use "marshal" and "serialize" interchangeably, and "unmarshal" and
+//     "deserialize" interchangeably
+//  2. To include a field of a struct in the serialized form, add the tag
+//     `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
+//  3. These typed members of a struct may be serialized:
+//     bool, string, uint[8,16,32,64], int[8,16,32,64],
+//     structs, slices, arrays, interface.
+//     structs, slices and arrays can only be serialized if their constituent
+//     values can be.
+//  4. To marshal an interface, you must pass a pointer to the value
+//  5. To unmarshal an interface, you must call
+//     codec.RegisterType([instance of the type that fulfills the interface]).
+//  6. Serialized fields must be exported
+//  7. nil slices are marshaled as empty slices
 type genericCodec struct {
 	typer       TypeCodec
 	maxSliceLen uint32
@@ -280,6 +285,12 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
 			return p.Err
+		}
+		if numElts == 0 {
+			// Returning here prevents execution of the (expensive) reflect
+			// calls below which check if the slice is []byte and, if it is,
+			// the call of value.Bytes()
+			return nil
 		}
 		// If this is a slice of bytes, manually pack the bytes rather
 		// than calling marshal on each byte. This improves performance.

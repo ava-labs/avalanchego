@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -48,6 +49,12 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
+	previouslyLinearized, err := v.t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		v.t.errs.Add(err)
+		return
+	}
+
 	for _, result := range results {
 		result := result
 		v.t.Ctx.Log.Debug("filtering poll results",
@@ -67,6 +74,38 @@ func (v *voter) Update(ctx context.Context) {
 			v.t.errs.Add(err)
 			return
 		}
+	}
+
+	linearized, err := v.t.Manager.StopVertexAccepted(ctx)
+	if err != nil {
+		v.t.errs.Add(err)
+		return
+	}
+
+	if linearized {
+		// We guard here to ensure we only call the underlying vm.Linearize and
+		// startSnowmanConsensus calls once.
+		if !previouslyLinearized {
+			// After the chain has been linearized, we will not be issuing any new
+			// vertices.
+			v.t.pendingTxs = nil
+			v.t.metrics.pendingTxs.Set(0)
+
+			// Invariant: The edge should only be the stop vertex after the
+			// linearization.
+			edge := v.t.Manager.Edge(ctx)
+			stopVertexID := edge[0]
+			if err := v.t.VM.Linearize(ctx, stopVertexID); err != nil {
+				v.t.errs.Add(err)
+				return
+			}
+			if err := v.t.startSnowmanConsensus(ctx, v.t.RequestID); err != nil {
+				v.t.errs.Add(err)
+			}
+		}
+		// If the chain has been linearized, there can't be any orphans, so we
+		// can exit here.
+		return
 	}
 
 	orphans := v.t.Consensus.Orphans()
@@ -100,7 +139,7 @@ func (v *voter) Update(ctx context.Context) {
 	v.t.repoll(ctx)
 }
 
-func (v *voter) bubbleVotes(ctx context.Context, votes ids.UniqueBag) (ids.UniqueBag, error) {
+func (v *voter) bubbleVotes(ctx context.Context, votes bag.UniqueBag[ids.ID]) (bag.UniqueBag[ids.ID], error) {
 	vertexHeap := vertex.NewHeap()
 	for vote, set := range votes {
 		vtx, err := v.t.Manager.GetVtx(ctx, vote)

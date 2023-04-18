@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -94,8 +94,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	require.NoError(t, err)
 
-	privKey := pk.(*crypto.PrivateKeySECP256K1R)
-	err = user.PutKeys(privKey, keys[0])
+	err = user.PutKeys(pk, keys[0])
 	require.NoError(t, err)
 }
 
@@ -173,11 +172,9 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	factory := crypto.FactorySECP256K1R{}
-	recipientKeyIntf, err := factory.NewPrivateKey()
+	factory := secp256k1.Factory{}
+	recipientKey, err := factory.NewPrivateKey()
 	require.NoError(err)
-
-	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	m := atomic.NewMemory(prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
 
@@ -222,7 +219,7 @@ func TestGetTxStatus(t *testing.T) {
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
 	require.NoError(err)
 
 	mutableSharedMemory.SharedMemory = oldSharedMemory
@@ -279,7 +276,7 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					nil,
 					"chain name",
-					[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+					[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -294,7 +291,7 @@ func TestGetTx(t *testing.T) {
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
-					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -306,7 +303,7 @@ func TestGetTx(t *testing.T) {
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
-					[]*crypto.PrivateKeySECP256K1R{keys[0]},
+					[]*secp256k1.PrivateKey{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
 				)
 			},
@@ -501,7 +498,7 @@ func TestGetStake(t *testing.T) {
 		delegatorEndTime,
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
@@ -550,7 +547,7 @@ func TestGetStake(t *testing.T) {
 		pendingStakerNodeID,
 		ids.GenerateTestShortID(),
 		0,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
@@ -626,26 +623,26 @@ func TestGetCurrentValidators(t *testing.T) {
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
-	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
 		validatorNodeID,
 		ids.GenerateTestShortID(),
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		[]*secp256k1.PrivateKey{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
 	require.NoError(err)
 
 	staker, err := state.NewCurrentStaker(
-		tx.ID(),
-		tx.Unsigned.(*txs.AddDelegatorTx),
+		delTx.ID(),
+		delTx.Unsigned.(*txs.AddDelegatorTx),
 		0,
 	)
 	require.NoError(err)
 
 	service.vm.state.PutCurrentDelegator(staker)
-	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.AddTx(delTx, status.Committed)
 	err = service.vm.state.Commit()
 	require.NoError(err)
 
@@ -687,6 +684,27 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
+
+	// Reward the delegator
+	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	require.NoError(err)
+	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.DeleteCurrentDelegator(staker)
+	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
+	require.NoError(service.vm.state.Commit())
+
+	// Call getValidators
+	response = GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	require.Equal(len(genesis.Validators), len(response.Validators))
+
+	for i := 0; i < len(response.Validators); i++ {
+		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
+		if vdr.NodeID != validatorNodeID {
+			continue
+		}
+		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
+	}
 }
 
 func TestGetTimestamp(t *testing.T) {
@@ -740,7 +758,7 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				nil,
 				"chain name",
-				[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				keys[0].PublicKey().Address(), // change addr
 			)
 			require.NoError(err)

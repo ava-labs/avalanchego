@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -11,9 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -32,7 +31,7 @@ var (
 	errUnknownOutputType     = errors.New("unknown output type")
 	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
-	emptySig [crypto.SECP256K1RSigLen]byte
+	emptySig [secp256k1.SignatureLen]byte
 
 	_ Signer = (*signer)(nil)
 )
@@ -262,13 +261,12 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
-	unsignedHash := hashing.ComputeHash256(unsignedBytes)
 
 	if expectedLen := len(txSigners); expectedLen != len(tx.Creds) {
 		tx.Creds = make([]*fxs.FxCredential, expectedLen)
 	}
 
-	sigCache := make(map[ids.ShortID][crypto.SECP256K1RSigLen]byte)
+	sigCache := make(map[ids.ShortID][secp256k1.SignatureLen]byte)
 	for credIndex, inputSigners := range txSigners {
 		fxCred := tx.Creds[credIndex]
 		if fxCred == nil {
@@ -294,7 +292,7 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 		}
 
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
-			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, expectedLen)
+			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
 		}
 
 		for sigIndex, signer := range inputSigners {
@@ -318,7 +316,7 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) 
 				continue
 			}
 
-			sig, err := signer.SignHash(unsignedHash)
+			sig, err := signer.Sign(unsignedBytes)
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}

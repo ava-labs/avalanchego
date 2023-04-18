@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -22,6 +22,7 @@ type StandardBlock struct {
 	// This block's height. The genesis block is at height 0.
 	Hght uint64 `serialize:"true" json:"height"`
 	Time uint64 `serialize:"true" json:"time"`
+	Root ids.ID `serialize:"true" json:"merkleRoot"`
 	// List of transactions contained in this block.
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 
@@ -60,6 +61,10 @@ func (b *StandardBlock) Height() uint64 {
 
 func (b *StandardBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
+}
+
+func (b *StandardBlock) MerkleRoot() ids.ID {
+	return b.Root
 }
 
 func (b *StandardBlock) Txs() []*txs.Tx {

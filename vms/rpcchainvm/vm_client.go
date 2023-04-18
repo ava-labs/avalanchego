@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -11,8 +11,6 @@ import (
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-
-	"github.com/hashicorp/go-plugin"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
@@ -89,7 +90,7 @@ var (
 type VMClient struct {
 	*chain.State
 	client         vmpb.VMClient
-	proc           *plugin.Client
+	runtime        runtime.Stopper
 	pid            int
 	processTracker resource.ProcessTracker
 
@@ -105,8 +106,6 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
-
-	ctx *snow.Context
 }
 
 // NewClient returns a VM connected to a remote VM
@@ -117,11 +116,10 @@ func NewClient(client vmpb.VMClient) *VMClient {
 }
 
 // SetProcess gives ownership of the server process to the client.
-func (vm *VMClient) SetProcess(ctx *snow.Context, proc *plugin.Client, processTracker resource.ProcessTracker) {
-	vm.ctx = ctx
-	vm.proc = proc
+func (vm *VMClient) SetProcess(runtime runtime.Stopper, pid int, processTracker resource.ProcessTracker) {
+	vm.runtime = runtime
 	vm.processTracker = processTracker
-	vm.pid = proc.ReattachConfig().Pid
+	vm.pid = pid
 	processTracker.TrackProcess(vm.pid)
 }
 
@@ -139,8 +137,6 @@ func (vm *VMClient) Initialize(
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
 	}
-
-	vm.ctx = chainCtx
 
 	// Register metrics
 	registerer := prometheus.NewRegistry()
@@ -161,7 +157,6 @@ func (vm *VMClient) Initialize(
 	versionedDBs := dbManager.GetDatabases()
 	versionedDBServers := make([]*vmpb.VersionedDBServer, len(versionedDBs))
 	for i, semDB := range versionedDBs {
-		db := rpcdb.NewServer(semDB.Database)
 		dbVersion := semDB.Version.String()
 		serverListener, err := grpcutils.NewListener()
 		if err != nil {
@@ -169,8 +164,8 @@ func (vm *VMClient) Initialize(
 		}
 		serverAddr := serverListener.Addr().String()
 
-		go grpcutils.Serve(serverListener, vm.getDBServerFunc(db))
-		vm.ctx.Log.Info("grpc: serving database",
+		go grpcutils.Serve(serverListener, vm.newDBServer(semDB.Database))
+		chainCtx.Log.Info("grpc: serving database",
 			zap.String("version", dbVersion),
 			zap.String("address", serverAddr),
 		)
@@ -195,8 +190,8 @@ func (vm *VMClient) Initialize(
 	}
 	serverAddr := serverListener.Addr().String()
 
-	go grpcutils.Serve(serverListener, vm.getInitServer)
-	vm.ctx.Log.Info("grpc: serving vm services",
+	go grpcutils.Serve(serverListener, vm.newInitServer())
+	chainCtx.Log.Info("grpc: serving vm services",
 		zap.String("address", serverAddr),
 	)
 
@@ -205,6 +200,7 @@ func (vm *VMClient) Initialize(
 		SubnetId:     chainCtx.SubnetID[:],
 		ChainId:      chainCtx.ChainID[:],
 		NodeId:       chainCtx.NodeID.Bytes(),
+		PublicKey:    bls.PublicKeyToBytes(chainCtx.PublicKey),
 		XChainId:     chainCtx.XChainID[:],
 		CChainId:     chainCtx.CChainID[:],
 		AvaxAssetId:  chainCtx.AVAXAssetID[:],
@@ -265,61 +261,44 @@ func (vm *VMClient) Initialize(
 	}
 	vm.State = chainState
 
-	return vm.ctx.Metrics.Register(multiGatherer)
+	return chainCtx.Metrics.Register(multiGatherer)
 }
 
-func (vm *VMClient) getDBServerFunc(db rpcdbpb.DatabaseServer) func(opts []grpc.ServerOption) *grpc.Server { // #nolint
-	return func(opts []grpc.ServerOption) *grpc.Server {
-		if len(opts) == 0 {
-			opts = append(opts, grpcutils.DefaultServerOptions...)
-		}
+func (vm *VMClient) newDBServer(db database.Database) *grpc.Server {
+	server := grpcutils.NewServer(
+		grpcutils.WithUnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()),
+		grpcutils.WithStreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()),
+	)
 
-		// Collect gRPC serving metrics
-		opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
-		opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
-
-		server := grpc.NewServer(opts...)
-
-		grpcHealth := health.NewServer()
-		// The server should use an empty string as the key for server's overall
-		// health status.
-		// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
-		grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
-
-		vm.serverCloser.Add(server)
-
-		// register database service
-		rpcdbpb.RegisterDatabaseServer(server, db)
-		// register health service
-		healthpb.RegisterHealthServer(server, grpcHealth)
-
-		// Ensure metric counters are zeroed on restart
-		grpc_prometheus.Register(server)
-
-		return server
-	}
-}
-
-func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
-	if len(opts) == 0 {
-		opts = append(opts, grpcutils.DefaultServerOptions...)
-	}
-
-	// Collect gRPC serving metrics
-	opts = append(opts, grpc.UnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()))
-	opts = append(opts, grpc.StreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()))
-
-	server := grpc.NewServer(opts...)
-
-	grpcHealth := health.NewServer()
-	// The server should use an empty string as the key for server's overall
-	// health status.
 	// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+	grpcHealth := health.NewServer()
 	grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
 	vm.serverCloser.Add(server)
 
-	// register the services
+	// Register services
+	rpcdbpb.RegisterDatabaseServer(server, rpcdb.NewServer(db))
+	healthpb.RegisterHealthServer(server, grpcHealth)
+
+	// Ensure metric counters are zeroed on restart
+	grpc_prometheus.Register(server)
+
+	return server
+}
+
+func (vm *VMClient) newInitServer() *grpc.Server {
+	server := grpcutils.NewServer(
+		grpcutils.WithUnaryInterceptor(vm.grpcServerMetrics.UnaryServerInterceptor()),
+		grpcutils.WithStreamInterceptor(vm.grpcServerMetrics.StreamServerInterceptor()),
+	)
+
+	// See https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+	grpcHealth := health.NewServer()
+	grpcHealth.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
+	vm.serverCloser.Add(server)
+
+	// Register services
 	messengerpb.RegisterMessengerServer(server, vm.messenger)
 	keystorepb.RegisterKeystoreServer(server, vm.keystore)
 	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
@@ -381,7 +360,8 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 		errs.Add(conn.Close())
 	}
 
-	vm.proc.Kill()
+	vm.runtime.Stop(ctx)
+
 	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
 }

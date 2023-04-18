@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -89,7 +90,7 @@ type kahnNode struct {
 	// inDegree is 0, then this node is a leaf
 	inDegree int
 	// votes for all the children of this node, so far
-	votes ids.Bag
+	votes bag.Bag[ids.ID]
 }
 
 // Used to track which children should receive votes
@@ -97,7 +98,7 @@ type votes struct {
 	// parentID is the parent of all the votes provided in the votes bag
 	parentID ids.ID
 	// votes for all the children of the parent
-	votes ids.Bag
+	votes bag.Bag[ids.ID]
 }
 
 func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64, rootTime time.Time) error {
@@ -252,7 +253,7 @@ func (ts *Topological) Preference() ids.ID {
 // The complexity of this function is:
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
-func (ts *Topological) RecordPoll(ctx context.Context, voteBag ids.Bag) error {
+func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) error {
 	// Register a new poll call
 	ts.pollNumber++
 
@@ -343,7 +344,7 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf blocks.
-func (ts *Topological) calculateInDegree(votes ids.Bag) {
+func (ts *Topological) calculateInDegree(votes bag.Bag[ids.ID]) {
 	// Clear the Kahn node set
 	maps.Clear(ts.kahnNodes)
 	// Clear the leaf set
@@ -590,12 +591,9 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionAcceptor.Accept / ConsensusAcceptor.Accept must be
-	// called before child.Accept to honor Acceptor.Accept's invariant.
-	if err := ts.ctx.DecisionAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
-		return err
-	}
-	if err := ts.ctx.ConsensusAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
+	// Note that BlockAcceptor.Accept must be called before child.Accept to
+	// honor Acceptor.Accept's invariant.
+	if err := ts.ctx.BlockAcceptor.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
 

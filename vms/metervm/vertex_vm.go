@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
@@ -19,18 +19,18 @@ import (
 )
 
 var (
-	_ vertex.DAGVM = (*vertexVM)(nil)
-	_ snowstorm.Tx = (*meterTx)(nil)
+	_ vertex.LinearizableVMWithEngine = (*vertexVM)(nil)
+	_ snowstorm.Tx                    = (*meterTx)(nil)
 )
 
-func NewVertexVM(vm vertex.DAGVM) vertex.DAGVM {
+func NewVertexVM(vm vertex.LinearizableVMWithEngine) vertex.LinearizableVMWithEngine {
 	return &vertexVM{
-		DAGVM: vm,
+		LinearizableVMWithEngine: vm,
 	}
 }
 
 type vertexVM struct {
-	vertex.DAGVM
+	vertex.LinearizableVMWithEngine
 	vertexMetrics
 	clock mockable.Clock
 }
@@ -64,7 +64,7 @@ func (vm *vertexVM) Initialize(
 	}
 	chainCtx.Metrics = optionalGatherer
 
-	return vm.DAGVM.Initialize(
+	return vm.LinearizableVMWithEngine.Initialize(
 		ctx,
 		chainCtx,
 		db,
@@ -79,7 +79,7 @@ func (vm *vertexVM) Initialize(
 
 func (vm *vertexVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
 	start := vm.clock.Time()
-	txs := vm.DAGVM.PendingTxs(ctx)
+	txs := vm.LinearizableVMWithEngine.PendingTxs(ctx)
 	end := vm.clock.Time()
 	vm.vertexMetrics.pending.Observe(float64(end.Sub(start)))
 	return txs
@@ -87,7 +87,7 @@ func (vm *vertexVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
 
 func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 	start := vm.clock.Time()
-	tx, err := vm.DAGVM.ParseTx(ctx, b)
+	tx, err := vm.LinearizableVMWithEngine.ParseTx(ctx, b)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
@@ -103,7 +103,7 @@ func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error)
 
 func (vm *vertexVM) GetTx(ctx context.Context, txID ids.ID) (snowstorm.Tx, error) {
 	start := vm.clock.Time()
-	tx, err := vm.DAGVM.GetTx(ctx, txID)
+	tx, err := vm.LinearizableVMWithEngine.GetTx(ctx, txID)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {

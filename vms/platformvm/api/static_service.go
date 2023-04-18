@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -116,14 +115,15 @@ type PermissionlessValidator struct {
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,
 	// if applicable.
-	DelegationRewardOwner *Owner                    `json:"delegationRewardOwner,omitempty"`
-	PotentialReward       *json.Uint64              `json:"potentialReward,omitempty"`
-	DelegationFee         json.Float32              `json:"delegationFee"`
-	ExactDelegationFee    *json.Uint32              `json:"exactDelegationFee,omitempty"`
-	Uptime                *json.Float32             `json:"uptime,omitempty"`
-	Connected             bool                      `json:"connected"`
-	Staked                []UTXO                    `json:"staked,omitempty"`
-	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
+	DelegationRewardOwner  *Owner                    `json:"delegationRewardOwner,omitempty"`
+	PotentialReward        *json.Uint64              `json:"potentialReward,omitempty"`
+	AccruedDelegateeReward *json.Uint64              `json:"accruedDelegateeReward,omitempty"`
+	DelegationFee          json.Float32              `json:"delegationFee"`
+	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Uptime                 *json.Float32             `json:"uptime,omitempty"`
+	Connected              bool                      `json:"connected"`
+	Staked                 []UTXO                    `json:"staked,omitempty"`
+	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
 	// The delegators delegating to this validator
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
@@ -307,7 +307,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
-			Validator: validator.Validator{
+			Validator: txs.Validator{
 				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),

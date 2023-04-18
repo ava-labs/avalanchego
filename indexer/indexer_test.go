@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -54,14 +54,15 @@ func (*apiServerMock) AddAliases(string, ...string) error {
 func TestNewIndexer(t *testing.T) {
 	require := require.New(t)
 	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   true,
-		Log:                    logging.NoLog{},
-		DB:                     memdb.New(),
-		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:              &apiServerMock{},
-		ShutdownF:              func() {},
+		IndexingEnabled:      true,
+		AllowIncompleteIndex: true,
+		Log:                  logging.NoLog{},
+		DB:                   memdb.New(),
+		BlockAcceptorGroup:   snow.NewAcceptorGroup(logging.NoLog{}),
+		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
+		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() {},
 	}
 
 	idxrIntf, err := NewIndexer(config)
@@ -81,8 +82,9 @@ func TestNewIndexer(t *testing.T) {
 	require.Len(idxr.txIndices, 0)
 	require.NotNil(idxr.vtxIndices)
 	require.Len(idxr.vtxIndices, 0)
-	require.NotNil(idxr.consensusAcceptorGroup)
-	require.NotNil(idxr.decisionAcceptorGroup)
+	require.NotNil(idxr.blockAcceptorGroup)
+	require.NotNil(idxr.txAcceptorGroup)
+	require.NotNil(idxr.vertexAcceptorGroup)
 	require.NotNil(idxr.shutdownF)
 	require.False(idxr.hasRunBefore)
 }
@@ -95,13 +97,14 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	shutdown := &sync.WaitGroup{}
 	shutdown.Add(1)
 	config := Config{
-		IndexingEnabled:        true,
-		Log:                    logging.NoLog{},
-		DB:                     db,
-		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:              &apiServerMock{},
-		ShutdownF:              shutdown.Done,
+		IndexingEnabled:     true,
+		Log:                 logging.NoLog{},
+		DB:                  db,
+		BlockAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		TxAcceptorGroup:     snow.NewAcceptorGroup(logging.NoLog{}),
+		VertexAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:           &apiServerMock{},
+		ShutdownF:           shutdown.Done,
 	}
 
 	idxrIntf, err := NewIndexer(config)
@@ -131,15 +134,17 @@ func TestIndexer(t *testing.T) {
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
+	server := &apiServerMock{}
 	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		DB:                     db,
-		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:              &apiServerMock{},
-		ShutdownF:              func() {},
+		IndexingEnabled:      true,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		DB:                   db,
+		BlockAcceptorGroup:   snow.NewAcceptorGroup(logging.NoLog{}),
+		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
+		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:            server,
+		ShutdownF:            func() {},
 	}
 
 	// Create indexer
@@ -169,7 +174,6 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.True(previouslyIndexed)
-	server := config.APIServer.(*apiServerMock)
 	require.EqualValues(1, server.timesCalled)
 	require.EqualValues("index/chain1", server.bases[0])
 	require.EqualValues("/block", server.endpoints[0])
@@ -185,7 +189,7 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	require.NoError(config.ConsensusAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
+	require.NoError(config.BlockAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
 
 	blkIdx := idxr.blockIndices[chain1Ctx.ChainID]
 	require.NotNil(blkIdx)
@@ -253,6 +257,8 @@ func TestIndexer(t *testing.T) {
 	container, err = blkIdx.GetLastAccepted()
 	require.NoError(err)
 	require.Equal(blkID, container.ID)
+	require.EqualValues(1, server.timesCalled) // block index for chain
+	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
 	chain2Ctx := snow.DefaultConsensusContextTest()
@@ -263,15 +269,15 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	dagVM := vertex.NewMockDAGVM(ctrl)
+	dagVM := vertex.NewMockLinearizableVM(ctrl)
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 	require.NoError(err)
-	server = config.APIServer.(*apiServerMock)
-	require.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
+	require.EqualValues(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
 	require.Contains(server.bases, "index/chain2")
+	require.Contains(server.endpoints, "/block")
 	require.Contains(server.endpoints, "/vtx")
 	require.Contains(server.endpoints, "/tx")
-	require.Len(idxr.blockIndices, 1)
+	require.Len(idxr.blockIndices, 2)
 	require.Len(idxr.txIndices, 1)
 	require.Len(idxr.vtxIndices, 1)
 
@@ -283,7 +289,7 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	require.NoError(config.ConsensusAcceptorGroup.Accept(chain2Ctx, vtxID, vtxBytes))
+	require.NoError(config.VertexAcceptorGroup.Accept(chain2Ctx, vtxID, vtxBytes))
 
 	vtxIdx := idxr.vtxIndices[chain2Ctx.ChainID]
 	require.NotNil(vtxIdx)
@@ -332,7 +338,7 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).AnyTimes()
 
-	require.NoError(config.DecisionAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
+	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	require.NotNil(txIdx)
@@ -409,14 +415,15 @@ func TestIncompleteIndex(t *testing.T) {
 
 	baseDB := memdb.New()
 	config := Config{
-		IndexingEnabled:        false,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		DB:                     versiondb.New(baseDB),
-		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:              &apiServerMock{},
-		ShutdownF:              func() {},
+		IndexingEnabled:      false,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		DB:                   versiondb.New(baseDB),
+		BlockAcceptorGroup:   snow.NewAcceptorGroup(logging.NoLog{}),
+		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
+		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() {},
 	}
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
@@ -492,14 +499,15 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	config := Config{
-		IndexingEnabled:        true,
-		AllowIncompleteIndex:   false,
-		Log:                    logging.NoLog{},
-		DB:                     db,
-		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
-		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
-		APIServer:              &apiServerMock{},
-		ShutdownF:              func() {},
+		IndexingEnabled:      true,
+		AllowIncompleteIndex: false,
+		Log:                  logging.NoLog{},
+		DB:                   db,
+		BlockAcceptorGroup:   snow.NewAcceptorGroup(logging.NoLog{}),
+		TxAcceptorGroup:      snow.NewAcceptorGroup(logging.NoLog{}),
+		VertexAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
+		APIServer:            &apiServerMock{},
+		ShutdownF:            func() {},
 	}
 
 	// Create indexer

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -14,14 +14,14 @@ import (
 
 // RPCChainVMProtocol should be bumped anytime changes are made which require
 // the plugin vm to upgrade to latest avalanchego release to be compatible.
-const RPCChainVMProtocol uint = 22
+const RPCChainVMProtocol uint = 25
 
 // These are globals that describe network upgrades and node versions
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 9,
-		Patch: 8,
+		Minor: 10,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -30,12 +30,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 9,
+		Minor: 10,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 8,
+		Minor: 9,
 		Patch: 0,
 	}
 
@@ -95,12 +95,11 @@ var (
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
-	XChainMigrationTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	CortinaTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
-	XChainMigrationDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
@@ -166,18 +165,18 @@ func GetBanffTime(networkID uint32) time.Time {
 	return BanffDefaultTime
 }
 
-func GetXChainMigrationTime(networkID uint32) time.Time {
-	if upgradeTime, exists := XChainMigrationTimes[networkID]; exists {
+func GetCortinaTime(networkID uint32) time.Time {
+	if upgradeTime, exists := CortinaTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return XChainMigrationDefaultTime
+	return CortinaDefaultTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetBanffTime(networkID),
+		GetCortinaTime(networkID),
 		PrevMinimumCompatibleVersion,
 	)
 }
