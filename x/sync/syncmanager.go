@@ -442,9 +442,9 @@ func (m *StateSyncManager) findNextKey(
 		// but leave this safeguard in place just in case.
 		// TODO: Figure out if there are scenarios where this can happen and fix
 		if proofKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
-			// the array access into lastReceivedKeyPath below this would fail, so default to the lastReceivedKey
-			result = lastReceivedKey
-			break
+			// The array access into lastReceivedKeyPath below this would fail so
+			// default to the lastReceivedKey + 0, which is the first possible key after lastReceivedKey.
+			return append(lastReceivedKey, 0), nil
 		}
 
 		// start looking for the extra nodes greater than the first nibble that is different
@@ -457,7 +457,8 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	// if the result is before or equal to the lastReceivedKey, then use the lastReceivedKey + 0, which is the first possible key after lastReceivedKey
+	// if the result is before or equal to the lastReceivedKey
+	// then use the lastReceivedKey + 0, which is the first possible key after lastReceivedKey
 	if result != nil && bytes.Compare(result, lastReceivedKey) <= 0 {
 		return append(lastReceivedKey, 0), nil
 	}
@@ -576,10 +577,10 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 			return
 		}
 
-		largestHandledKey = workItem.end
-
 		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey != nil {
+		if nextStartKey == nil {
+			largestHandledKey = workItem.end
+		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
 			largestHandledKey = nextStartKey
