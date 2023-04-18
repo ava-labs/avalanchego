@@ -443,7 +443,8 @@ func (m *StateSyncManager) findNextKey(
 		// TODO: Figure out if there are scenarios where this can happen and fix
 		if proofKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
 			// the array access into lastReceivedKeyPath below this would fail, so default to the lastReceivedKey
-			return lastReceivedKey, nil
+			result = lastReceivedKey
+			break
 		}
 
 		// start looking for the extra nodes greater than the first nibble that is different
@@ -456,9 +457,9 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	// if the result is before the lastReceivedKey, then use the lastReceivedKey since it is larger
-	if result != nil && bytes.Compare(result, lastReceivedKey) < 0 {
-		return lastReceivedKey, nil
+	// if the result is before or equal to the lastReceivedKey, then use the lastReceivedKey + 0, which is the first possible key after lastReceivedKey
+	if result != nil && bytes.Compare(result, lastReceivedKey) <= 0 {
+		return append(lastReceivedKey, 0), nil
 	}
 
 	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
