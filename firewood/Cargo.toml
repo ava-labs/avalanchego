@@ -14,9 +14,10 @@ description = "Firewood is an embedded key-value store, optimized to store block
 license-file = "../LICENSE.md"
 homepage = "https://avalabs.org"
 [dependencies]
-firewood-growth-ring = { version = "0.0.1", path = "../firewood-growth-ring", package = "firewood-growth-ring" }
-firewood-libaio = {version = "0.0.1", path = "../firewood-libaio", package = "firewood-libaio" }
-firewood-shale = { version = "0.0.1", path = "../firewood-shale", package = "firewood-shale" }
+aquamarine = "0.3.1"
+firewood-growth-ring = { version = "0.0.1", path = "../firewood-growth-ring" }
+firewood-libaio = {version = "0.0.1", path = "../firewood-libaio" }
+firewood-shale = { version = "0.0.1", path = "../firewood-shale" }
 enum-as-inner = "0.5.1"
 parking_lot = "0.12.1"
 rlp = "0.5.2"

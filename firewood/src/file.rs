@@ -6,8 +6,7 @@
 pub(crate) use std::os::unix::io::RawFd as Fd;
 use std::path::Path;
 
-extern crate firewood_growth_ring as growth_ring;
-use growth_ring::oflags;
+use growthring::oflags;
 use nix::errno::Errno;
 use nix::fcntl::{open, openat, OFlag};
 use nix::sys::stat::Mode;

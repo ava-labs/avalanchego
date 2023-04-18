@@ -20,10 +20,12 @@ use crate::account::{Account, AccountRLP, Blob, BlobStash};
 use crate::file;
 use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
 use crate::proof::{Proof, ProofError};
+use crate::storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester};
+pub use crate::storage::{buffer::DiskBufferConfig, WALConfig};
 use crate::storage::{
-    CachedSpace, DiskBuffer, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared,
+    AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared,
+    PAGE_SIZE_NBIT,
 };
-pub use crate::storage::{DiskBufferConfig, WALConfig};
 
 const MERKLE_META_SPACE: SpaceID = 0x0;
 const MERKLE_PAYLOAD_SPACE: SpaceID = 0x1;
@@ -400,7 +402,7 @@ impl DBRev {
 
 struct DBInner {
     latest: DBRev,
-    disk_requester: crate::storage::DiskBufferRequester,
+    disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
     staging: Universe<Rc<StoreRevMut>>,
     cached: Universe<Rc<CachedSpace>>,
@@ -450,7 +452,7 @@ impl DB {
         if reset {
             // initialize DBParams
             if cfg.payload_file_nbit < cfg.payload_regn_nbit
-                || cfg.payload_regn_nbit < crate::storage::PAGE_SIZE_NBIT
+                || cfg.payload_regn_nbit < PAGE_SIZE_NBIT
             {
                 return Err(DBError::InvalidParams);
             }
@@ -539,7 +541,7 @@ impl DB {
             .max_revisions(cfg.wal.max_revisions)
             .build();
         let (sender, inbound) = tokio::sync::mpsc::channel(cfg.buffer.max_buffered);
-        let disk_requester = crate::storage::DiskBufferRequester::new(sender);
+        let disk_requester = DiskBufferRequester::new(sender);
         let buffer = cfg.buffer.clone();
         let disk_thread = Some(std::thread::spawn(move || {
             let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
@@ -1058,7 +1060,6 @@ impl WriteBatch {
     /// Persist all changes to the DB. The atomicity of the [WriteBatch] guarantees all changes are
     /// either retained on disk or lost together during a crash.
     pub fn commit(mut self) {
-        use crate::storage::BufferWrite;
         let mut rev_inner = self.m.write();
         if self.root_hash_recalc {
             rev_inner.latest.root_hash().ok();
@@ -1153,7 +1154,7 @@ impl WriteBatch {
                     delta: blob_meta_pages,
                 },
             ],
-            crate::storage::AshRecord(
+            AshRecord(
                 [
                     (MERKLE_META_SPACE, merkle_meta_plain),
                     (MERKLE_PAYLOAD_SPACE, merkle_payload_plain),

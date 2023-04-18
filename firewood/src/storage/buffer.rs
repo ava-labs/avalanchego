@@ -1,0 +1,607 @@
+//! Disk buffer for staging in memory pages and flushing them to disk.
+use std::fmt::Debug;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::{cell::RefCell, collections::HashMap};
+
+use crate::storage::Fd;
+
+use super::{
+    Ash, AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WALConfig,
+    PAGE_SIZE_NBIT,
+};
+
+use aiofut::{AIOBuilder, AIOError, AIOManager};
+use growthring::{
+    wal::{RecoverPolicy, WALLoader, WALWriter},
+    walerror::WALError,
+    WALStoreAIO,
+};
+use shale::SpaceID;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
+use typed_builder::TypedBuilder;
+
+#[derive(Debug)]
+pub enum BufferCmd {
+    /// Initialize the WAL.
+    InitWAL(Fd, String),
+    /// Process a write batch against the underlying store.
+    WriteBatch(Vec<BufferWrite>, AshRecord),
+    /// Get a page from the disk buffer.
+    GetPage((SpaceID, u64), oneshot::Sender<Option<Arc<Page>>>),
+    CollectAsh(usize, oneshot::Sender<Vec<AshRecord>>),
+    /// Register a new space and add the files to a memory mapped pool.
+    RegCachedSpace(SpaceID, Arc<FilePool>),
+    /// Returns false if the
+    Shutdown,
+}
+
+/// Config for the disk buffer.
+#[derive(TypedBuilder, Clone, Debug)]
+pub struct DiskBufferConfig {
+    /// Maximum buffered disk buffer commands.
+    #[builder(default = 4096)]
+    pub max_buffered: usize,
+    /// Maximum number of pending pages.
+    #[builder(default = 65536)] // 256MB total size by default
+    pub max_pending: usize,
+    /// Maximum number of concurrent async I/O requests.
+    #[builder(default = 1024)]
+    pub max_aio_requests: u32,
+    /// Maximum number of async I/O responses that it polls for at a time.
+    #[builder(default = 128)]
+    pub max_aio_response: u16,
+    /// Maximum number of async I/O requests per submission.
+    #[builder(default = 128)]
+    pub max_aio_submit: usize,
+    /// Maximum number of concurrent async I/O requests in WAL.
+    #[builder(default = 256)]
+    pub wal_max_aio_requests: usize,
+    /// Maximum buffered WAL records.
+    #[builder(default = 1024)]
+    pub wal_max_buffered: usize,
+    /// Maximum batched WAL records per write.
+    #[builder(default = 4096)]
+    pub wal_max_batch: usize,
+}
+
+/// List of pages to write to disk.
+#[derive(Debug)]
+pub struct BufferWrite {
+    pub space_id: SpaceID,
+    pub delta: StoreDelta,
+}
+
+#[derive(Debug)]
+struct PendingPage {
+    staging_data: Arc<Page>,
+    file_nbit: u64,
+    staging_notifiers: Vec<Rc<Semaphore>>,
+    writing_notifiers: Vec<Rc<Semaphore>>,
+}
+
+/// Responsible for processing [`BufferCmd`]s from the [`DiskBufferRequester`]
+/// and managing the persistance of pages.
+pub struct DiskBuffer {
+    pending: HashMap<(SpaceID, u64), PendingPage>,
+    inbound: mpsc::Receiver<BufferCmd>,
+    fc_notifier: Option<oneshot::Sender<()>>,
+    fc_blocker: Option<oneshot::Receiver<()>>,
+    file_pools: [Option<Arc<FilePool>>; 255],
+    aiomgr: AIOManager,
+    local_pool: Rc<tokio::task::LocalSet>,
+    task_id: u64,
+    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
+    wal: Option<Rc<Mutex<WALWriter<WALStoreAIO>>>>,
+    cfg: DiskBufferConfig,
+    wal_cfg: WALConfig,
+}
+
+impl DiskBuffer {
+    /// Create a new aio managed disk buffer.
+    pub fn new(
+        inbound: mpsc::Receiver<BufferCmd>,
+        cfg: &DiskBufferConfig,
+        wal: &WALConfig,
+    ) -> Result<Self, AIOError> {
+        let aiomgr = AIOBuilder::default()
+            .max_events(cfg.max_aio_requests)
+            .max_nwait(cfg.max_aio_response)
+            .max_nbatched(cfg.max_aio_submit)
+            .build()
+            .map_err(|_| AIOError::OtherError)?;
+
+        Ok(Self {
+            pending: HashMap::new(),
+            cfg: cfg.clone(),
+            inbound,
+            fc_notifier: None,
+            fc_blocker: None,
+            file_pools: std::array::from_fn(|_| None),
+            aiomgr,
+            local_pool: Rc::new(tokio::task::LocalSet::new()),
+            task_id: 0,
+            tasks: Rc::new(RefCell::new(HashMap::new())),
+            wal: None,
+            wal_cfg: wal.clone(),
+        })
+    }
+
+    unsafe fn get_longlive_self(&mut self) -> &'static mut Self {
+        std::mem::transmute::<&mut Self, &'static mut Self>(self)
+    }
+
+    /// Add an pending pages to aio manager for processing by the local pool.
+    fn schedule_write(&mut self, page_key: (SpaceID, u64)) {
+        let p = self.pending.get(&page_key).unwrap();
+        let offset = page_key.1 << PAGE_SIZE_NBIT;
+        let fid = offset >> p.file_nbit;
+        let fmask = (1 << p.file_nbit) - 1;
+        let file = self.file_pools[page_key.0 as usize]
+            .as_ref()
+            .unwrap()
+            .get_file(fid)
+            .unwrap();
+        let fut = self.aiomgr.write(
+            file.get_fd(),
+            offset & fmask,
+            Box::new(*p.staging_data),
+            None,
+        );
+        let s = unsafe { self.get_longlive_self() };
+        self.start_task(async move {
+            let (res, _) = fut.await;
+            res.unwrap();
+            s.finish_write(page_key);
+        });
+    }
+
+    fn finish_write(&mut self, page_key: (SpaceID, u64)) {
+        use std::collections::hash_map::Entry::*;
+        match self.pending.entry(page_key) {
+            Occupied(mut e) => {
+                let slot = e.get_mut();
+                for notifier in std::mem::take(&mut slot.writing_notifiers) {
+                    notifier.add_permits(1)
+                }
+                if slot.staging_notifiers.is_empty() {
+                    e.remove();
+                    if self.pending.len() < self.cfg.max_pending {
+                        if let Some(notifier) = self.fc_notifier.take() {
+                            notifier.send(()).unwrap();
+                        }
+                    }
+                } else {
+                    assert!(slot.writing_notifiers.is_empty());
+                    std::mem::swap(&mut slot.writing_notifiers, &mut slot.staging_notifiers);
+                    // write again
+                    self.schedule_write(page_key);
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Initialize the WAL subsystem if it does not exists and attempts to replay the WAL if exists.
+    async fn init_wal(&mut self, rootfd: Fd, waldir: String) -> Result<(), WALError> {
+        let mut aiobuilder = AIOBuilder::default();
+        aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
+        let aiomgr = aiobuilder.build().map_err(|_| WALError::Other)?;
+        let store = WALStoreAIO::new(&waldir, false, Some(rootfd), Some(aiomgr))
+            .map_err(|_| WALError::Other)?;
+        let mut loader = WALLoader::new();
+        loader
+            .file_nbit(self.wal_cfg.file_nbit)
+            .block_nbit(self.wal_cfg.block_nbit)
+            .recover_policy(RecoverPolicy::Strict);
+        if self.wal.is_some() {
+            // already initialized
+            return Ok(());
+        }
+        let wal = loader
+            .load(
+                store,
+                |raw, _| {
+                    let batch = AshRecord::deserialize(raw);
+                    for (space_id, Ash { old, new }) in batch.0 {
+                        for (old, data) in old.into_iter().zip(new.into_iter()) {
+                            let offset = old.offset;
+                            let file_pool = self.file_pools[space_id as usize].as_ref().unwrap();
+                            let file_nbit = file_pool.get_file_nbit();
+                            let file_mask = (1 << file_nbit) - 1;
+                            let fid = offset >> file_nbit;
+                            nix::sys::uio::pwrite(
+                                file_pool
+                                    .get_file(fid)
+                                    .map_err(|_| WALError::Other)?
+                                    .get_fd(),
+                                &data,
+                                (offset & file_mask) as nix::libc::off_t,
+                            )
+                            .map_err(|_| WALError::Other)?;
+                        }
+                    }
+                    Ok(())
+                },
+                self.wal_cfg.max_revisions,
+            )
+            .await?;
+        self.wal = Some(Rc::new(Mutex::new(wal)));
+        Ok(())
+    }
+
+    async fn run_wal_queue(&mut self, mut writes: mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>) {
+        use std::collections::hash_map::Entry::*;
+        loop {
+            let mut bwrites = Vec::new();
+            let mut records = Vec::new();
+
+            if let Some((bw, ac)) = writes.recv().await {
+                records.push(ac);
+                bwrites.extend(bw);
+            } else {
+                break;
+            }
+            while let Ok((bw, ac)) = writes.try_recv() {
+                records.push(ac);
+                bwrites.extend(bw);
+                if records.len() >= self.cfg.wal_max_batch {
+                    break;
+                }
+            }
+            // first write to WAL
+            let ring_ids: Vec<_> =
+                futures::future::join_all(self.wal.as_ref().unwrap().lock().await.grow(records))
+                    .await
+                    .into_iter()
+                    .map(|ring| ring.map_err(|_| "WAL Error while writing").unwrap().1)
+                    .collect();
+            let sem = Rc::new(tokio::sync::Semaphore::new(0));
+            let mut npermit = 0;
+            for BufferWrite { space_id, delta } in bwrites {
+                for w in delta.0 {
+                    let page_key = (space_id, w.0);
+                    match self.pending.entry(page_key) {
+                        Occupied(mut e) => {
+                            let e = e.get_mut();
+                            e.staging_data = w.1.into();
+                            e.staging_notifiers.push(sem.clone());
+                            npermit += 1;
+                        }
+                        Vacant(e) => {
+                            let file_nbit = self.file_pools[page_key.0 as usize]
+                                .as_ref()
+                                .unwrap()
+                                .file_nbit;
+                            e.insert(PendingPage {
+                                staging_data: w.1.into(),
+                                file_nbit,
+                                staging_notifiers: Vec::new(),
+                                writing_notifiers: vec![sem.clone()],
+                            });
+                            npermit += 1;
+                            self.schedule_write(page_key);
+                        }
+                    }
+                }
+            }
+            let wal = self.wal.as_ref().unwrap().clone();
+            let max_revisions = self.wal_cfg.max_revisions;
+            self.start_task(async move {
+                let _ = sem.acquire_many(npermit).await.unwrap();
+                wal.lock()
+                    .await
+                    .peel(ring_ids, max_revisions)
+                    .await
+                    .map_err(|_| "WAL errore while pruning")
+                    .unwrap();
+            });
+            if self.pending.len() >= self.cfg.max_pending {
+                let (tx, rx) = oneshot::channel();
+                self.fc_notifier = Some(tx);
+                self.fc_blocker = Some(rx);
+            }
+        }
+    }
+
+    async fn process(
+        &mut self,
+        req: BufferCmd,
+        wal_in: &mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
+    ) -> bool {
+        match req {
+            BufferCmd::Shutdown => return false,
+            BufferCmd::InitWAL(rootfd, waldir) => {
+                if (self.init_wal(rootfd, waldir).await).is_err() {
+                    panic!("cannot initialize from WAL")
+                }
+            }
+            BufferCmd::GetPage(page_key, tx) => tx
+                .send(self.pending.get(&page_key).map(|e| e.staging_data.clone()))
+                .unwrap(),
+            BufferCmd::WriteBatch(writes, wal_writes) => {
+                wal_in.send((writes, wal_writes)).await.unwrap();
+            }
+            BufferCmd::CollectAsh(nrecords, tx) => {
+                // wait to ensure writes are paused for WAL
+                let ash = self
+                    .wal
+                    .as_ref()
+                    .unwrap()
+                    .clone()
+                    .lock()
+                    .await
+                    .read_recent_records(nrecords, &RecoverPolicy::Strict)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(AshRecord::deserialize)
+                    .collect();
+                tx.send(ash).unwrap();
+            }
+            BufferCmd::RegCachedSpace(space_id, files) => {
+                self.file_pools[space_id as usize] = Some(files)
+            }
+        }
+        true
+    }
+
+    /// Processes an async AIOFuture request against the local pool.
+    fn start_task<F: std::future::Future<Output = ()> + 'static>(&mut self, fut: F) {
+        let task_id = self.task_id;
+        self.task_id += 1;
+        let tasks = self.tasks.clone();
+        self.tasks.borrow_mut().insert(
+            task_id,
+            Some(self.local_pool.spawn_local(async move {
+                fut.await;
+                tasks.borrow_mut().remove(&task_id);
+            })),
+        );
+    }
+
+    #[tokio::main(flavor = "current_thread")]
+    pub async fn run(mut self) {
+        let wal_in = {
+            let (tx, rx) = mpsc::channel(self.cfg.wal_max_buffered);
+            let s = unsafe { self.get_longlive_self() };
+            self.start_task(s.run_wal_queue(rx));
+            tx
+        };
+        self.local_pool
+            .clone()
+            .run_until(async {
+                loop {
+                    if let Some(fc) = self.fc_blocker.take() {
+                        // flow control, wait until ready
+                        fc.await.unwrap();
+                    }
+                    let req = self.inbound.recv().await.unwrap();
+                    if !self.process(req, &wal_in).await {
+                        break;
+                    }
+                }
+                drop(wal_in);
+                let handles: Vec<_> = self
+                    .tasks
+                    .borrow_mut()
+                    .iter_mut()
+                    .map(|(_, task)| task.take().unwrap())
+                    .collect();
+                for h in handles {
+                    h.await.unwrap();
+                }
+            })
+            .await;
+    }
+}
+
+/// Communicates with the [`DiskBuffer`] over channels.
+#[cfg_attr(doc, aquamarine::aquamarine)]
+/// ```mermaid
+/// graph LR
+///     s([Caller]) --> a[[DiskBufferRequester]]
+///     r[[DiskBuffer]] --> f([Disk])
+///     subgraph rustc[Thread]
+///         r
+///     end
+///     subgraph rustc[Thread]
+///     a -. BufferCmd .-> r
+///     end
+/// ```
+#[derive(Clone, Debug)]
+pub struct DiskBufferRequester {
+    sender: mpsc::Sender<BufferCmd>,
+}
+
+impl Default for DiskBufferRequester {
+    fn default() -> Self {
+        Self {
+            sender: mpsc::channel(1).0,
+        }
+    }
+}
+
+impl DiskBufferRequester {
+    /// Create a new requester.
+    pub fn new(sender: mpsc::Sender<BufferCmd>) -> Self {
+        Self { sender }
+    }
+
+    /// Get a page from the buffer.
+    pub fn get_page(&self, space_id: SpaceID, pid: u64) -> Option<Arc<Page>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.sender
+            .blocking_send(BufferCmd::GetPage((space_id, pid), resp_tx))
+            .map_err(StoreError::Send)
+            .ok();
+        resp_rx.blocking_recv().unwrap()
+    }
+
+    /// Sends a batch of writes to the buffer.
+    pub fn write(&self, page_batch: Vec<BufferWrite>, write_batch: AshRecord) {
+        self.sender
+            .blocking_send(BufferCmd::WriteBatch(page_batch, write_batch))
+            .map_err(StoreError::Send)
+            .ok();
+    }
+
+    pub fn shutdown(&self) {
+        self.sender.blocking_send(BufferCmd::Shutdown).ok().unwrap()
+    }
+
+    /// Initialize the WAL.
+    pub fn init_wal(&self, waldir: &str, rootfd: Fd) {
+        self.sender
+            .blocking_send(BufferCmd::InitWAL(rootfd, waldir.to_string()))
+            .map_err(StoreError::Send)
+            .ok();
+    }
+
+    /// Collect the last N records from the WAL.
+    pub fn collect_ash(&self, nrecords: usize) -> Result<Vec<AshRecord>, StoreError<RecvError>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.sender
+            .blocking_send(BufferCmd::CollectAsh(nrecords, resp_tx))
+            .map_err(StoreError::Send)
+            .ok();
+        resp_rx.blocking_recv().map_err(StoreError::Receive)
+    }
+
+    /// Register a cached space to the buffer.
+    pub fn reg_cached_space(&self, space: &CachedSpace) {
+        let mut inner = space.inner.borrow_mut();
+        inner.disk_buffer = self.clone();
+        self.sender
+            .blocking_send(BufferCmd::RegCachedSpace(space.id(), inner.files.clone()))
+            .map_err(StoreError::Send)
+            .ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        file,
+        storage::{DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta},
+    };
+    use shale::MemStore;
+
+    const STATE_SPACE: SpaceID = 0x0;
+    #[test]
+    fn test_buffer() {
+        let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
+        let wal_cfg = WALConfig::builder().build();
+        let disk_requester = init_buffer(buf_cfg, wal_cfg);
+
+        let path = std::path::PathBuf::from(r"/tmp/firewood");
+        let (root_db_fd, reset) = crate::file::open_dir(path, true).unwrap();
+
+        // file descriptor of the state directory
+        let state_fd = file::touch_dir("state", root_db_fd).unwrap();
+        assert!(reset);
+        // create a new wal directory on top of root_db_fd
+        disk_requester.init_wal("wal", root_db_fd);
+
+        // create a new state cache which tracks on disk state.
+        let state_cache = Rc::new(
+            CachedSpace::new(
+                &StoreConfig::builder()
+                    .ncached_pages(1)
+                    .ncached_files(1)
+                    .space_id(STATE_SPACE)
+                    .file_nbit(1)
+                    .rootfd(state_fd)
+                    .build(),
+            )
+            .unwrap(),
+        );
+
+        // add an in memory cached space. this will allow us to write to the
+        // disk buffer then later persist the change to disk.
+        disk_requester.reg_cached_space(state_cache.as_ref());
+
+        // memory mapped store
+        let mut mut_store = StoreRevMut::new(state_cache.clone() as Rc<dyn MemStoreR>);
+
+        let change = b"this is a test";
+
+        // write to the in memory buffer not to disk
+        mut_store.write(0, change);
+        assert_eq!(mut_store.id(), STATE_SPACE);
+
+        // mutate the in memory buffer.
+        let change = b"this is another test";
+
+        // write to the in memory buffer (ash) not yet to disk
+        mut_store.write(0, change);
+        assert_eq!(mut_store.id(), STATE_SPACE);
+
+        // wal should have no records.
+        assert!(disk_requester.collect_ash(1).unwrap().is_empty());
+
+        // get RO view of the buffer from the beginning.
+        let view = mut_store.get_view(0, change.len() as u64).unwrap();
+        assert_eq!(view.as_deref(), change);
+
+        let (page_batch, write_batch) = create_batches(&mut_store);
+
+        // create a mutation request to the disk buffer by passing the page and write batch.
+        let d1 = disk_requester.clone();
+        std::thread::spawn(move || {
+            // wal is empty
+            assert!(d1.collect_ash(1).unwrap().is_empty());
+            // page is not yet persisted to disk.
+            assert!(d1.get_page(STATE_SPACE, 0).is_none());
+            d1.write(page_batch, write_batch);
+            // This is not ACID compliant write should not return before wal log is written to disk.
+            // If the sleep is removed the test will fail.
+            // TODO why is this so slow?
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            assert_eq!(d1.collect_ash(1).unwrap().len(), 1);
+            assert!(d1.get_page(STATE_SPACE, 0).is_some());
+        });
+
+        // wait for thread to finish
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        // state has been written to disk in the above thread wal should have 1 record.
+        assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
+    }
+
+    fn init_buffer(buf_cfg: DiskBufferConfig, wal_cfg: WALConfig) -> DiskBufferRequester {
+        let (sender, inbound) = tokio::sync::mpsc::channel(buf_cfg.max_buffered);
+        let disk_requester = DiskBufferRequester::new(sender);
+        std::thread::spawn(move || {
+            let disk_buffer = DiskBuffer::new(inbound, &buf_cfg, &wal_cfg).unwrap();
+            disk_buffer.run()
+        });
+        disk_requester
+    }
+
+    fn create_batches(rev_mut: &StoreRevMut) -> (Vec<BufferWrite>, AshRecord) {
+        let deltas = std::mem::replace(
+            &mut *rev_mut.deltas.borrow_mut(),
+            StoreRevMutDelta {
+                pages: HashMap::new(),
+                plain: Ash::new(),
+            },
+        );
+
+        // create a list of delta pages from existing in memory data.
+        let mut pages = Vec::new();
+        for (pid, page) in deltas.pages.into_iter() {
+            pages.push(DeltaPage(pid, page));
+        }
+        pages.sort_by_key(|p| p.0);
+
+        let page_batch = vec![BufferWrite {
+            space_id: STATE_SPACE,
+            delta: StoreDelta(pages),
+        }];
+
+        let write_batch = AshRecord([(STATE_SPACE, deltas.plain)].into());
+        (page_batch, write_batch)
+    }
+}

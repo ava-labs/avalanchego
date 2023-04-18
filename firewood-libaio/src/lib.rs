@@ -52,7 +52,7 @@ const LIBAIO_ENOMEM: libc::c_int = -libc::ENOMEM;
 const LIBAIO_ENOSYS: libc::c_int = -libc::ENOSYS;
 
 #[derive(Debug)]
-pub enum Error {
+pub enum AIOError {
     MaxEventsTooLarge,
     LowKernelRes,
     NotSupported,
@@ -72,15 +72,15 @@ impl std::ops::Deref for AIOContext {
 }
 
 impl AIOContext {
-    fn new(maxevents: u32) -> Result<Self, Error> {
+    fn new(maxevents: u32) -> Result<Self, AIOError> {
         let mut ctx = std::ptr::null_mut();
         unsafe {
             match abi::io_setup(maxevents as libc::c_int, &mut ctx) {
                 0 => Ok(()),
-                LIBAIO_EAGAIN => Err(Error::MaxEventsTooLarge),
-                LIBAIO_ENOMEM => Err(Error::LowKernelRes),
-                LIBAIO_ENOSYS => Err(Error::NotSupported),
-                _ => Err(Error::OtherError),
+                LIBAIO_EAGAIN => Err(AIOError::MaxEventsTooLarge),
+                LIBAIO_ENOMEM => Err(AIOError::LowKernelRes),
+                LIBAIO_ENOSYS => Err(AIOError::NotSupported),
+                _ => Err(AIOError::OtherError),
             }
             .map(|_| AIOContext(ctx))
         }
@@ -322,7 +322,7 @@ impl AIOBuilder {
 
     /// Build an AIOManager object based on the configuration (and auto-start the background IO
     /// scheduling thread).
-    pub fn build(&mut self) -> Result<AIOManager, Error> {
+    pub fn build(&mut self) -> Result<AIOManager, AIOError> {
         let (scheduler_in, scheduler_out) = new_batch_scheduler(self.max_nbatched);
         let (exit_s, exit_r) = crossbeam_channel::bounded(0);
 
@@ -365,7 +365,7 @@ impl AIOManager {
         exit_r: crossbeam_channel::Receiver<()>,
         max_nwait: u16,
         timeout: Option<u32>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), AIOError> {
         let n = self.notifier.clone();
         self.listener = Some(std::thread::spawn(move || {
             let mut timespec = timeout.map(|sec: u32| libc::timespec {
