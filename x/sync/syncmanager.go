@@ -430,6 +430,10 @@ func (m *StateSyncManager) findNextKey(
 			localIndex--
 		}
 
+		if startKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return start, nil
+		}
+
 		// the two nodes have different paths, so find where they branched
 		for nextKeyNibble := startKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
 			if _, ok := branchNode.Children[nextKeyNibble]; ok {
