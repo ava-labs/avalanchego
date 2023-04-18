@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -220,6 +221,48 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	_, err := client.SendAppRequest(ids.EmptyNodeID, []byte("hello there"))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot send request to empty nodeID")
+}
+
+func TestAppRequestOnShutdown(t *testing.T) {
+	var (
+		net    Network
+		wg     sync.WaitGroup
+		called bool
+	)
+	sender := testAppSender{
+		sendAppRequestFn: func(nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+			wg.Add(1)
+			go func() {
+				called = true
+				// shutdown the network here to ensure any outstanding requests are handled as failed
+				net.Shutdown()
+				wg.Done()
+			}() // this is on a goroutine to avoid a deadlock since calling Shutdown takes the lock.
+			return nil
+		},
+	}
+
+	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
+	crossChainCodecManager := buildCodec(t, ExampleCrossChainRequest{}, ExampleCrossChainResponse{})
+	net = NewNetwork(sender, codecManager, crossChainCodecManager, ids.EmptyNodeID, 1, 1)
+	client := NewNetworkClient(net)
+	nodeID := ids.GenerateTestNodeID()
+	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+
+	requestMessage := HelloRequest{Message: "this is a request"}
+	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
+		require.NoError(t, err)
+		responseBytes, _, err := client.SendAppRequestAny(defaultPeerVersion, requestBytes)
+		require.Error(t, err, ErrRequestFailed)
+		require.Nil(t, responseBytes)
+	}()
+	wg.Wait()
+	require.True(t, called)
 }
 
 func TestRequestMinVersion(t *testing.T) {
@@ -563,6 +606,47 @@ func TestCrossChainRequestRequestsRoutingAndResponse(t *testing.T) {
 	requestWg.Wait()
 	senderWg.Wait()
 	assert.Equal(t, totalCalls, int(atomic.LoadUint32(&callNum)))
+}
+
+func TestCrossChainRequestOnShutdown(t *testing.T) {
+	var (
+		net    Network
+		wg     sync.WaitGroup
+		called bool
+	)
+	sender := testAppSender{
+		sendCrossChainAppRequestFn: func(requestingChainID ids.ID, requestID uint32, requestBytes []byte) error {
+			wg.Add(1)
+			go func() {
+				called = true
+				// shutdown the network here to ensure any outstanding requests are handled as failed
+				net.Shutdown()
+				wg.Done()
+			}() // this is on a goroutine to avoid a deadlock since calling Shutdown takes the lock.
+			return nil
+		},
+	}
+	codecManager := buildCodec(t, TestMessage{})
+	crossChainCodecManager := buildCodec(t, ExampleCrossChainRequest{}, ExampleCrossChainResponse{})
+	net = NewNetwork(sender, codecManager, crossChainCodecManager, ids.EmptyNodeID, 1, 1)
+	client := NewNetworkClient(net)
+
+	exampleCrossChainRequest := ExampleCrossChainRequest{
+		Message: "hello this is an example request",
+	}
+	chainID := ids.ID(ethcommon.BytesToHash([]byte{1, 2, 3, 4, 5}))
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		crossChainRequest, err := buildCrossChainRequest(crossChainCodecManager, exampleCrossChainRequest)
+		require.NoError(t, err)
+		responseBytes, err := client.SendCrossChainRequest(chainID, crossChainRequest)
+		require.ErrorIs(t, err, ErrRequestFailed)
+		require.Nil(t, responseBytes)
+	}()
+	wg.Wait()
+	require.True(t, called)
 }
 
 func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
