@@ -604,9 +604,6 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	var (
-		startTime = time.Time{}
-		endTime   = startTime.Add(defaultMinStakingDuration)
-
 		nodeID        = ids.GenerateTestNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
@@ -614,8 +611,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		uint64(time.Time{}.Unix()),
+		uint64(time.Time{}.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
@@ -711,18 +708,15 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	rewardAddress := ids.GenerateTestShortID()
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		uint64(time.Time{}.Unix()),
+		uint64(time.Time{}.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
-		rewardAddress,
+		ids.GenerateTestShortID(), // rewardAddress
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
@@ -741,7 +735,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.Error(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -866,8 +860,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.Error(err, database.ErrNotFound)
 
-	// Verify that new validator NOT in pending validator set
-	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
+	// Verify that new validator NOT in validator set
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
