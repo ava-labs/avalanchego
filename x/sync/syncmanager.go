@@ -393,10 +393,10 @@ func (m *StateSyncManager) findNextKey(
 
 	var nextKey []byte
 
-	// walk up the two proof paths until a difference is found
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(receivedProofNodes) - 1
 
+	// traverse the two proofs from the deepest nodes up to the root until a difference is found
 	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey == nil {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := receivedProofNodes[receivedProofNodeIndex]
@@ -405,6 +405,7 @@ func (m *StateSyncManager) findNextKey(
 		// alternateNode is the proof node from the other proof with the same key/depth if it exists, nil otherwise.
 		var currentNode, alternateNode *merkledb.ProofNode
 
+		// select the deepest proof node from the two proofs
 		switch {
 		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
 			{
@@ -428,7 +429,7 @@ func (m *StateSyncManager) findNextKey(
 			}
 		}
 
-		// we only want to look at keys greater than the proofKey, so find the next larger nibble
+		// we only want to look at the children with keys greater than the proofKey, so find the next larger nibble
 		startingChildNibble := byte(0)
 		if currentNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
 			startingChildNibble = proofKeyPath.NibbleVal(currentNode.KeyPath.NibbleLength) + 1
