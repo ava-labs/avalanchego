@@ -18,7 +18,7 @@ To start developing on AvalancheGo, you'll need a few things installed.
 
 - Changes from the community that are cosmetic in nature and do not add anything substantial to the stability, functionality, or testability of `avalanchego` will generally not be accepted.
 
-### Other
+### Making an Issue
 
 - Check that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
 - If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
