@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -19,7 +20,8 @@ import (
 var (
 	_ Diff = (*diff)(nil)
 
-	ErrMissingParentState = errors.New("missing parent state")
+	ErrMissingParentState     = errors.New("missing parent state")
+	errIsNotTransformSubnetTx = errors.New("is not a transform subnet tx")
 )
 
 type Diff interface {
@@ -420,7 +422,31 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 	if !ok {
 		return reward.Config{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.GetRewardConfig(subnetID)
+
+	primaryNetworkCfg, err := parentState.GetRewardConfig(subnetID)
+	if err != nil {
+		return reward.Config{}, err
+	}
+
+	if subnetID == constants.PrimaryNetworkID {
+		return primaryNetworkCfg, nil
+	}
+
+	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
+	if err != nil {
+		return reward.Config{}, err
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return reward.Config{}, errIsNotTransformSubnetTx
+	}
+
+	return reward.Config{
+		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+		MinConsumptionRate: transformSubnet.MinConsumptionRate,
+		MintingPeriod:      primaryNetworkCfg.MintingPeriod,
+		SupplyCap:          transformSubnet.MaximumSupply,
+	}, nil
 }
 
 func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {

@@ -797,10 +797,26 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 }
 
 func (s *state) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
-	if subnetID != constants.PrimaryNetworkID {
-		return reward.Config{}, errors.New("not yet implemented")
+	primaryNetworkCfg := s.cfg.RewardConfig
+	if subnetID == constants.PrimaryNetworkID {
+		return primaryNetworkCfg, nil
 	}
-	return s.cfg.RewardConfig, nil
+
+	transformSubnetIntf, err := s.GetSubnetTransformation(subnetID)
+	if err != nil {
+		return reward.Config{}, err
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return reward.Config{}, errIsNotTransformSubnetTx
+	}
+
+	return reward.Config{
+		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+		MinConsumptionRate: transformSubnet.MinConsumptionRate,
+		MintingPeriod:      primaryNetworkCfg.MintingPeriod,
+		SupplyCap:          transformSubnet.MaximumSupply,
+	}, nil
 }
 
 func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
