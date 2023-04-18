@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -95,6 +96,10 @@ type network struct {
 	peers                      *peerTracker                       // tracking of peers & bandwidth
 	appStats                   stats.RequestHandlerStats          // Provide request handler metrics
 	crossChainStats            stats.RequestHandlerStats          // Provide cross chain request handler metrics
+
+	// Set to true when Shutdown is called, after which all operations on this
+	// struct are no-ops.
+	closed utils.Atomic[bool]
 }
 
 func NewNetwork(appSender common.AppSender, codec codec.Manager, crossChainCodec codec.Manager, self ids.NodeID, maxActiveAppRequests int64, maxActiveCrossChainRequests int64) Network {
@@ -160,6 +165,10 @@ func (n *network) SendAppRequest(nodeID ids.NodeID, request []byte, responseHand
 // Returns an error if [appSender] is unable to make the request.
 // Assumes write lock is held
 func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
 	n.peers.TrackPeer(nodeID)
 
@@ -196,6 +205,10 @@ func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler 
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	// generate requestID
 	requestID := n.requestIDGen
 	n.requestIDGen++
@@ -218,6 +231,10 @@ func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler 
 // Send a CrossChainAppResponse to [chainID] in response to a valid message using the same
 // [requestID] before the deadline.
 func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.CrossChainRequest
@@ -258,6 +275,10 @@ func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChai
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
@@ -281,6 +302,10 @@ func (n *network) CrossChainAppResponse(ctx context.Context, respondingChainID i
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
@@ -302,6 +327,10 @@ func (n *network) CrossChainAppResponse(ctx context.Context, respondingChainID i
 // sends a response back to the sender if length of response returned by the handler is >0
 // expects the deadline to not have been passed
 func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.Request
@@ -341,6 +370,10 @@ func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID ui
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	log.Debug("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
 
 	handler, exists := n.markRequestFulfilled(requestID)
@@ -365,6 +398,10 @@ func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID ui
 func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
+	if n.closed.Get() {
+		return nil
+	}
 
 	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
 
@@ -419,6 +456,10 @@ func (n *network) markRequestFulfilled(requestID uint32) (message.ResponseHandle
 
 // Gossip sends given gossip message to peers
 func (n *network) Gossip(gossip []byte) error {
+	if n.closed.Get() {
+		return nil
+	}
+
 	return n.appSender.SendAppGossip(context.TODO(), gossip)
 }
 
@@ -426,6 +467,10 @@ func (n *network) Gossip(gossip []byte) error {
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error if request could not be parsed as message.Request or when the requestHandler returns an error
 func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+	if n.closed.Get() {
+		return nil
+	}
+
 	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
 		log.Debug("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
@@ -443,6 +488,10 @@ func (n *network) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *v
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	if nodeID == n.self {
 		log.Debug("skipping registering self as peer")
 		return nil
@@ -458,6 +507,10 @@ func (n *network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	if n.closed.Get() {
+		return nil
+	}
+
 	n.peers.Disconnected(nodeID)
 	return nil
 }
@@ -468,12 +521,13 @@ func (n *network) Shutdown() {
 	defer n.lock.Unlock()
 
 	// clean up any pending requests
-	for requestID := range n.outstandingRequestHandlers {
+	for requestID, handler := range n.outstandingRequestHandlers {
+		_ = handler.OnFailure() // make sure all waiting threads are unblocked
 		delete(n.outstandingRequestHandlers, requestID)
 	}
 
-	// reset peers
-	n.peers = NewPeerTracker()
+	n.peers = NewPeerTracker() // reset peers
+	n.closed.Set(true)         // mark network as closed
 }
 
 func (n *network) SetGossipHandler(handler message.GossipHandler) {

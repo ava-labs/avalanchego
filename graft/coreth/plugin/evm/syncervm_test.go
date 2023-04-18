@@ -232,6 +232,40 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	testSyncerVM(t, vmSetup, test)
 }
 
+func TestVMShutdownWhileSyncing(t *testing.T) {
+	var (
+		lock    sync.Mutex
+		vmSetup *syncVMSetup
+	)
+	reqCount := 0
+	test := syncTest{
+		syncableInterval:   256,
+		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
+		syncMode:           block.StateSyncStatic,
+		responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
+			lock.Lock()
+			defer lock.Unlock()
+
+			reqCount++
+			// Shutdown the VM after 50 requests to interrupt the sync
+			if reqCount == 50 {
+				// Note this verifies the VM shutdown does not time out while syncing.
+				require.NoError(t, vmSetup.syncerVM.Shutdown(context.Background()))
+			} else if reqCount < 50 {
+				syncerVM.AppResponse(context.Background(), nodeID, requestID, response)
+			}
+		},
+		expectedErr: context.Canceled,
+	}
+	vmSetup = createSyncServerAndClientVMs(t, test)
+	defer func() {
+		require.NoError(t, vmSetup.serverVM.Shutdown(context.Background()))
+	}()
+
+	// Perform sync resulting in early termination.
+	testSyncerVM(t, vmSetup, test)
+}
+
 func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	var (
 		serverVM, syncerVM *VM
