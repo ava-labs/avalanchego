@@ -459,42 +459,46 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
+	// Find greatest implied prefix such that:
+	// * We don't locally have the prefix
+	// * We have a different ID for the prefix
 	var (
 		rangeEndPath = merkledb.NewPath(rangeEnd)
-		firstDiff    merkledb.Path
-		firstDiffSet = false
+		// firstDiff    merkledb.Path
+		// firstDiffSet bool
 	)
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		if minPath.path.Compare(rangeEndPath) > 0 {
-			break
+		if len(rangeEnd) > 0 && minPath.path.Compare(rangeEndPath) > 0 {
+			return nil, nil
 		}
 		local, ok := ourImpliedKeys.Get(minPath)
 		if !ok || local.id != minPath.id {
-			firstDiff = minPath.path
-			firstDiffSet = true
-			break
+			return minPath.path.Serialize().Value, nil
+			// firstDiff = minPath.path
+			// firstDiffSet = true
 		}
 		theirImpliedKeys.DeleteMin()
 	}
+	return nil, nil
 
-	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
-		if minPath.path.Compare(rangeEndPath) > 0 {
-			break
-		}
-		if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
-			break
-		}
-		remote, ok := theirImpliedKeys.Get(minPath)
-		if !ok || remote.id != minPath.id {
-			firstDiff = minPath.path
-			break
-		}
-		ourImpliedKeys.DeleteMin()
-	}
+	// for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
+	// 	if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
+	// 		break
+	// 	}
+	// 	if len(rangeEnd) > 0 && minPath.path.Compare(rangeEndPath) > 0 {
+	// 		break
+	// 	}
+	// 	remote, ok := theirImpliedKeys.Get(minPath)
+	// 	if !ok || remote.id != minPath.id {
+	// 		firstDiff = minPath.path
+	// 		firstDiffSet = true
+	// 	}
+	// 	ourImpliedKeys.DeleteMin()
+	// }
+	// if firstDiffSet {
+	// 	return firstDiff.Serialize().Value, nil
+	// }
 
-	if firstDiffSet {
-		return firstDiff.Serialize().Value, nil
-	}
 	return nil, nil
 
 	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
