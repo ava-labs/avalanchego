@@ -469,28 +469,30 @@ func (m *StateSyncManager) findNextKey(
 		firstDiff    merkledb.Path
 		firstDiffSet bool
 	)
-	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		local, ok := ourImpliedKeys.Get(minPath)
-		if !ok || local.id != minPath.id {
+	theirImpliedKeys.Ascend(func(pathAndID pathAndID) bool {
+		local, ok := ourImpliedKeys.Get(pathAndID)
+		if !ok || local.id != pathAndID.id {
 			// return minPath.path.Serialize().Value, nil
-			firstDiff = minPath.path
+			firstDiff = pathAndID.path
 			firstDiffSet = true
-			break
+			return false
 		}
-		theirImpliedKeys.DeleteMin()
-	}
+		return true
+	})
 
-	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
-		if firstDiffSet && minPath.path.Compare(firstDiff) >= 0 {
-			break
+	ourImpliedKeys.Ascend(func(pathAndID pathAndID) bool {
+		if firstDiffSet && pathAndID.path.Compare(firstDiff) >= 0 {
+			return false
 		}
-		remote, ok := theirImpliedKeys.Get(minPath)
-		if !ok || remote.id != minPath.id {
-			firstDiff = minPath.path
+		remote, ok := theirImpliedKeys.Get(pathAndID)
+		if !ok || remote.id != pathAndID.id {
+			firstDiff = pathAndID.path
 			firstDiffSet = true
+			return false
 		}
-		ourImpliedKeys.DeleteMin()
-	}
+		return true
+	})
+
 	if firstDiffSet {
 		return firstDiff.Serialize().Value, nil
 	}
