@@ -479,13 +479,22 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	var (
+		txID      = e.Tx.ID()
+		chainTime = e.State.GetTimestamp()
+	)
+
+	staker, err := e.addStakerFromStakerTx(tx, chainTime)
 	if err != nil {
 		return err
 	}
 
-	e.State.PutPendingDelegator(newStaker)
+	if staker.IsPending() {
+		e.State.PutPendingDelegator(staker)
+	} else {
+		e.State.PutCurrentDelegator(staker)
+	}
+
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 

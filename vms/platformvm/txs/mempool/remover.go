@@ -70,6 +70,7 @@ func (r *remover) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx
 
 func (r *remover) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 

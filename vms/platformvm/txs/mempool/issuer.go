@@ -98,6 +98,10 @@ func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx)
 }
 
 func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
