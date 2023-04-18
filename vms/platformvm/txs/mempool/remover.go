@@ -63,6 +63,7 @@ func (r *remover) TransformSubnetTx(*txs.TransformSubnetTx) error {
 
 func (r *remover) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	r.m.removeStakerTx(r.tx)
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 

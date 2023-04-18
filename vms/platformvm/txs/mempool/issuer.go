@@ -85,7 +85,11 @@ func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	if i.m.cfg.IsContinuousStakingActivated(i.timestamp) {
+		i.m.addDecisionTx(i.tx)
+	} else {
+		i.m.addStakerTx(i.tx)
+	}
 	return nil
 }
 

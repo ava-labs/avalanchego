@@ -425,16 +425,16 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
-	if err != nil {
+	var (
+		txID      = e.Tx.ID()
+		chainTime = e.State.GetTimestamp()
+	)
+	if err := e.addStakerFromStakerTx(tx, chainTime); err != nil {
 		return err
 	}
 
-	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
