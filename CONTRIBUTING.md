@@ -56,7 +56,8 @@ To start developing on AvalancheGo, you'll need a few things installed.
 #### Local
 
 - Build the avalanchego binary
-```
+
+```sh
 ./scripts/build.sh
 ```
 
