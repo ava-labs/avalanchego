@@ -6,7 +6,7 @@ use crate::proof::Proof;
 use enum_as_inner::EnumAsInner;
 use once_cell::unsync::OnceCell;
 use sha3::Digest;
-use shale::{MemStore, MummyItem, ObjPtr, ObjRef, ShaleError, ShaleStore};
+use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
 
 use std::cell::Cell;
 use std::cmp;
@@ -57,11 +57,11 @@ impl std::ops::Deref for Hash {
     }
 }
 
-impl MummyItem for Hash {
-    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+impl Storable for Hash {
+    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearMemStoreError)?;
+            .ok_or(ShaleError::LinearCachedStoreError)?;
         Ok(Self(
             raw.as_deref()[..Self::MSIZE as usize].try_into().unwrap(),
         ))
@@ -477,13 +477,13 @@ impl Node {
     const ETH_RLP_LONG_BIT: u8 = 1 << 2;
 }
 
-impl MummyItem for Node {
-    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+impl Storable for Node {
+    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let dec_err = |_| ShaleError::DecodeError;
         const META_SIZE: u64 = 32 + 1 + 1;
         let meta_raw = mem
             .get_view(addr, META_SIZE)
-            .ok_or(ShaleError::LinearMemStoreError)?;
+            .ok_or(ShaleError::LinearCachedStoreError)?;
         let attrs = meta_raw.as_deref()[32];
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
@@ -502,7 +502,7 @@ impl MummyItem for Node {
                 let branch_header_size = NBRANCH as u64 * 8 + 4;
                 let node_raw = mem
                     .get_view(addr + META_SIZE, branch_header_size)
-                    .ok_or(ShaleError::LinearMemStoreError)?;
+                    .ok_or(ShaleError::LinearCachedStoreError)?;
                 let mut cur = Cursor::new(node_raw.as_deref());
                 let mut chd = [None; NBRANCH];
                 let mut buff = [0; 8];
@@ -522,7 +522,7 @@ impl MummyItem for Node {
                 } else {
                     Some(Data(
                         mem.get_view(addr + META_SIZE + branch_header_size, raw_len)
-                            .ok_or(ShaleError::LinearMemStoreError)?
+                            .ok_or(ShaleError::LinearCachedStoreError)?
                             .as_deref(),
                     ))
                 };
@@ -537,7 +537,7 @@ impl MummyItem for Node {
                     let mut buff = [0_u8; 1];
                     let rlp_len_raw = mem
                         .get_view(offset + cur_rlp_len, 1)
-                        .ok_or(ShaleError::LinearMemStoreError)?;
+                        .ok_or(ShaleError::LinearCachedStoreError)?;
                     cur = Cursor::new(rlp_len_raw.as_deref());
                     cur.read_exact(&mut buff)
                         .map_err(|_| ShaleError::DecodeError)?;
@@ -546,7 +546,7 @@ impl MummyItem for Node {
                     if rlp_len != 0 {
                         let rlp_raw = mem
                             .get_view(offset + cur_rlp_len, rlp_len)
-                            .ok_or(ShaleError::LinearMemStoreError)?;
+                            .ok_or(ShaleError::LinearCachedStoreError)?;
                         let rlp: Vec<u8> = rlp_raw.as_deref()[0..].to_vec();
                         *chd_rlp = Some(rlp);
                         cur_rlp_len += rlp_len
@@ -567,7 +567,7 @@ impl MummyItem for Node {
                 let ext_header_size = 1 + 8;
                 let node_raw = mem
                     .get_view(addr + META_SIZE, ext_header_size)
-                    .ok_or(ShaleError::LinearMemStoreError)?;
+                    .ok_or(ShaleError::LinearCachedStoreError)?;
                 let mut cur = Cursor::new(node_raw.as_deref());
                 let mut buff = [0; 8];
                 cur.read_exact(&mut buff[..1])
@@ -578,7 +578,7 @@ impl MummyItem for Node {
                 let ptr = u64::from_le_bytes(buff);
                 let nibbles: Vec<_> = to_nibbles(
                     &mem.get_view(addr + META_SIZE + ext_header_size, path_len)
-                        .ok_or(ShaleError::LinearMemStoreError)?
+                        .ok_or(ShaleError::LinearCachedStoreError)?
                         .as_deref(),
                 )
                 .collect();
@@ -587,7 +587,7 @@ impl MummyItem for Node {
                 let mut buff = [0_u8; 1];
                 let rlp_len_raw = mem
                     .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
-                    .ok_or(ShaleError::LinearMemStoreError)?;
+                    .ok_or(ShaleError::LinearCachedStoreError)?;
                 cur = Cursor::new(rlp_len_raw.as_deref());
                 cur.read_exact(&mut buff)
                     .map_err(|_| ShaleError::DecodeError)?;
@@ -595,7 +595,7 @@ impl MummyItem for Node {
                 let rlp: Option<Vec<u8>> = if rlp_len != 0 {
                     let rlp_raw = mem
                         .get_view(addr + META_SIZE + ext_header_size + path_len + 1, rlp_len)
-                        .ok_or(ShaleError::LinearMemStoreError)?;
+                        .ok_or(ShaleError::LinearCachedStoreError)?;
                     Some(rlp_raw.as_deref()[0..].to_vec())
                 } else {
                     None
@@ -611,7 +611,7 @@ impl MummyItem for Node {
                 let leaf_header_size = 1 + 4;
                 let node_raw = mem
                     .get_view(addr + META_SIZE, leaf_header_size)
-                    .ok_or(ShaleError::LinearMemStoreError)?;
+                    .ok_or(ShaleError::LinearCachedStoreError)?;
                 let mut cur = Cursor::new(node_raw.as_deref());
                 let mut buff = [0; 4];
                 cur.read_exact(&mut buff[..1])
@@ -622,7 +622,7 @@ impl MummyItem for Node {
                 let data_len = u32::from_le_bytes(buff) as u64;
                 let remainder = mem
                     .get_view(addr + META_SIZE + leaf_header_size, path_len + data_len)
-                    .ok_or(ShaleError::LinearMemStoreError)?;
+                    .ok_or(ShaleError::LinearCachedStoreError)?;
                 let nibbles: Vec<_> =
                     to_nibbles(&remainder.as_deref()[..path_len as usize]).collect();
                 let (path, _) = PartialPath::decode(nibbles);

@@ -4,7 +4,7 @@ use std::ops::Deref;
 use bencher::{benchmark_group, benchmark_main, Bencher};
 use firewood::merkle::{Hash, Merkle, HASH_SIZE};
 use firewood_shale::{
-    compact::CompactSpaceHeader, MemStore, MummyItem, MummyObj, ObjPtr, PlainMem,
+    compact::CompactSpaceHeader, CachedStore, ObjPtr, PlainMem, Storable, StoredView,
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
@@ -30,7 +30,7 @@ fn bench_insert(b: &mut Bencher) {
     const TEST_MEM_SIZE: u64 = 20_000_000;
     let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
-    let merkle_payload_header_ref = MummyObj::ptr_to_obj(
+    let merkle_payload_header_ref = StoredView::ptr_to_obj(
         &PlainMem::new(2 * firewood_shale::compact::CompactHeader::MSIZE, 9),
         merkle_payload_header,
         firewood_shale::compact::CompactHeader::MSIZE,

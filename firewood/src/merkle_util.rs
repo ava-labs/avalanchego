@@ -4,7 +4,7 @@
 use crate::merkle::*;
 use crate::proof::Proof;
 use crate::{dynamic_mem::DynamicMem, proof::ProofError};
-use shale::{compact::CompactSpaceHeader, MemStore, MummyObj, ObjPtr};
+use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, StoredView};
 use std::rc::Rc;
 
 use thiserror::Error;
@@ -124,7 +124,7 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
         &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED)),
     );
     let compact_header =
-        MummyObj::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
+        StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
     let mem_meta = Rc::new(dm);
     let mem_payload = Rc::new(DynamicMem::new(compact_size, 0x1));
 

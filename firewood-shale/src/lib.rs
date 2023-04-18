@@ -13,7 +13,7 @@ pub mod util;
 
 #[derive(Debug)]
 pub enum ShaleError {
-    LinearMemStoreError,
+    LinearCachedStoreError,
     DecodeError,
     ObjRefAlreadyInUse,
     ObjPtrInvalid,
@@ -42,7 +42,7 @@ impl std::fmt::Debug for DiskWrite {
 }
 
 /// A handle that pins and provides a readable access to a portion of the linear memory image.
-pub trait MemView {
+pub trait CachedView {
     type DerefReturn: Deref<Target = [u8]>;
     fn as_deref(&self) -> Self::DerefReturn;
 }
@@ -51,15 +51,18 @@ pub trait MemView {
 /// backed by a cached/memory-mapped pool of the accessed intervals from the underlying linear
 /// persistent store. Reads could trigger disk reads to bring data into memory, but writes will
 /// *only* be visible in memory (it does not write back to the disk).
-pub trait MemStore: Debug {
+pub trait CachedStore: Debug {
     /// Returns a handle that pins the `length` of bytes starting from `offset` and makes them
     /// directly accessible.
-    fn get_view(&self, offset: u64, length: u64)
-        -> Option<Box<dyn MemView<DerefReturn = Vec<u8>>>>;
+    fn get_view(
+        &self,
+        offset: u64,
+        length: u64,
+    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>>;
     /// Returns a handle that allows shared access to the store.
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn MemStore>>>;
+    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>>;
     /// Write the `change` to the portion of the linear space starting at `offset`. The change
-    /// should be immediately visible to all `MemView` associated to this linear space.
+    /// should be immediately visible to all `CachedView` associated to this linear space.
     fn write(&mut self, offset: u64, change: &[u8]);
     /// Returns the identifier of this storage space.
     fn id(&self) -> SpaceID;
@@ -129,10 +132,10 @@ impl<T: ?Sized> ObjPtr<T> {
 pub trait TypedView<T: ?Sized>: Deref<Target = T> {
     /// Get the offset of the initial byte in the linear space.
     fn get_offset(&self) -> u64;
-    /// Access it as a [MemStore] object.
-    fn get_mem_store(&self) -> &dyn MemStore;
-    /// Access it as a mutable MemStore object
-    fn get_mut_mem_store(&mut self) -> &mut dyn MemStore;
+    /// Access it as a [CachedStore] object.
+    fn get_mem_store(&self) -> &dyn CachedStore;
+    /// Access it as a mutable CachedStore object
+    fn get_mut_mem_store(&mut self) -> &mut dyn CachedStore;
     /// Estimate the serialized length of the current type content. It should not be smaller than
     /// the actually length.
     fn estimate_mem_image(&self) -> Option<u64>;
@@ -143,12 +146,12 @@ pub trait TypedView<T: ?Sized>: Deref<Target = T> {
     /// could change.
     fn write(&mut self) -> &mut T;
     /// Returns if the typed content is memory-mapped (i.e., all changes through `write` are auto
-    /// reflected in the underlying [MemStore]).
+    /// reflected in the underlying [CachedStore]).
     fn is_mem_mapped(&self) -> bool;
 }
 
 /// A wrapper of `TypedView` to enable writes. The direct construction (by [Obj::from_typed_view]
-/// or [MummyObj::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
+/// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
 /// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [ObjPtr]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 pub struct Obj<T: ?Sized> {
@@ -189,7 +192,7 @@ impl<T: ?Sized> Obj<T> {
                 let mut new_value = vec![0; new_value_len as usize];
                 self.value.write_mem_image(&mut new_value);
                 let offset = self.value.get_offset();
-                let bx: &mut dyn MemStore = self.value.get_mut_mem_store();
+                let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
                 bx.write(offset, &new_value);
             }
         }
@@ -270,10 +273,10 @@ pub trait ShaleStore<T> {
 /// A stored item type that can be decoded from or encoded to on-disk raw bytes. An efficient
 /// implementation could be directly transmuting to/from a POD struct. But sometimes necessary
 /// compression/decompression is needed to reduce disk I/O and facilitate faster in-memory access.
-pub trait MummyItem {
+pub trait Storable {
     fn dehydrated_len(&self) -> u64;
     fn dehydrate(&self, to: &mut [u8]);
-    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError>
+    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
     fn is_mem_mapped(&self) -> bool {
@@ -281,38 +284,37 @@ pub trait MummyItem {
     }
 }
 
-pub fn to_dehydrated(item: &dyn MummyItem) -> Vec<u8> {
+pub fn to_dehydrated(item: &dyn Storable) -> Vec<u8> {
     let mut buff = vec![0; item.dehydrated_len() as usize];
     item.dehydrate(&mut buff);
     buff
 }
 
-/// Reference implementation of [TypedView]. It takes any type that implements [MummyItem] and
-/// should be useful for most applications.
-pub struct MummyObj<T> {
+/// Reference implementation of [TypedView]. It takes any type that implements [Storable]
+pub struct StoredView<T: Storable> {
     decoded: T,
-    mem: Box<dyn DerefMut<Target = dyn MemStore>>,
+    mem: Box<dyn DerefMut<Target = dyn CachedStore>>,
     offset: u64,
     len_limit: u64,
 }
 
-impl<T> Deref for MummyObj<T> {
+impl<T: Storable> Deref for StoredView<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.decoded
     }
 }
 
-impl<T: MummyItem> TypedView<T> for MummyObj<T> {
+impl<T: Storable> TypedView<T> for StoredView<T> {
     fn get_offset(&self) -> u64 {
         self.offset
     }
 
-    fn get_mem_store(&self) -> &dyn MemStore {
+    fn get_mem_store(&self) -> &dyn CachedStore {
         &**self.mem
     }
 
-    fn get_mut_mem_store(&mut self) -> &mut dyn MemStore {
+    fn get_mut_mem_store(&mut self) -> &mut dyn CachedStore {
         &mut **self.mem
     }
 
@@ -337,14 +339,16 @@ impl<T: MummyItem> TypedView<T> for MummyObj<T> {
     }
 }
 
-impl<T: MummyItem + 'static> MummyObj<T> {
+impl<T: Storable + 'static> StoredView<T> {
     #[inline(always)]
-    fn new<U: MemStore>(offset: u64, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
+    fn new<U: CachedStore>(offset: u64, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::hydrate(offset, space)?;
         Ok(Self {
             offset,
             decoded,
-            mem: space.get_shared().ok_or(ShaleError::LinearMemStoreError)?,
+            mem: space
+                .get_shared()
+                .ok_or(ShaleError::LinearCachedStoreError)?,
             len_limit,
         })
     }
@@ -354,18 +358,20 @@ impl<T: MummyItem + 'static> MummyObj<T> {
         offset: u64,
         len_limit: u64,
         decoded: T,
-        space: &dyn MemStore,
+        space: &dyn CachedStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
             decoded,
-            mem: space.get_shared().ok_or(ShaleError::LinearMemStoreError)?,
+            mem: space
+                .get_shared()
+                .ok_or(ShaleError::LinearCachedStoreError)?,
             len_limit,
         })
     }
 
     #[inline(always)]
-    pub fn ptr_to_obj<U: MemStore>(
+    pub fn ptr_to_obj<U: CachedStore>(
         store: &U,
         ptr: ObjPtr<T>,
         len_limit: u64,
@@ -379,7 +385,7 @@ impl<T: MummyItem + 'static> MummyObj<T> {
 
     #[inline(always)]
     pub fn item_to_obj(
-        store: &dyn MemStore,
+        store: &dyn CachedStore,
         addr: u64,
         len_limit: u64,
         decoded: T,
@@ -390,22 +396,24 @@ impl<T: MummyItem + 'static> MummyObj<T> {
     }
 }
 
-impl<T> MummyObj<T> {
+impl<T: Storable> StoredView<T> {
     fn new_from_slice(
         offset: u64,
         len_limit: u64,
         decoded: T,
-        space: &dyn MemStore,
+        space: &dyn CachedStore,
     ) -> Result<Self, ShaleError> {
         Ok(Self {
             offset,
             decoded,
-            mem: space.get_shared().ok_or(ShaleError::LinearMemStoreError)?,
+            mem: space
+                .get_shared()
+                .ok_or(ShaleError::LinearCachedStoreError)?,
             len_limit,
         })
     }
 
-    pub fn slice<U: MummyItem + 'static>(
+    pub fn slice<U: Storable + 'static>(
         s: &Obj<T>,
         offset: u64,
         length: u64,
@@ -415,7 +423,7 @@ impl<T> MummyObj<T> {
         if s.dirty.is_some() {
             return Err(ShaleError::SliceError);
         }
-        let r = Box::new(MummyObj::new_from_slice(
+        let r = Box::new(StoredView::new_from_slice(
             addr_,
             length,
             decoded,
@@ -432,7 +440,7 @@ impl<T> ObjPtr<T> {
     const MSIZE: u64 = 8;
 }
 
-impl<T> MummyItem for ObjPtr<T> {
+impl<T> Storable for ObjPtr<T> {
     fn dehydrated_len(&self) -> u64 {
         Self::MSIZE
     }
@@ -444,10 +452,10 @@ impl<T> MummyItem for ObjPtr<T> {
             .unwrap();
     }
 
-    fn hydrate<U: MemStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
+    fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearMemStoreError)?;
+            .ok_or(ShaleError::LinearCachedStoreError)?;
         let addrdyn = raw.deref();
         let addrvec = addrdyn.as_deref();
         Ok(Self::new_from_addr(u64::from_le_bytes(
@@ -456,9 +464,9 @@ impl<T> MummyItem for ObjPtr<T> {
     }
 }
 
-/// Purely volatile, vector-based implementation for [MemStore]. This is good for testing or trying
+/// Purely volatile, vector-based implementation for [CachedStore]. This is good for testing or trying
 /// out stuff (persistent data structures) built on [ShaleStore] in memory, without having to write
-/// your own [MemStore] implementation.
+/// your own [CachedStore] implementation.
 #[derive(Debug)]
 pub struct PlainMem {
     space: Rc<RefCell<Vec<u8>>>,
@@ -474,12 +482,12 @@ impl PlainMem {
     }
 }
 
-impl MemStore for PlainMem {
+impl CachedStore for PlainMem {
     fn get_view(
         &self,
         offset: u64,
         length: u64,
-    ) -> Option<Box<dyn MemView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let offset = offset as usize;
         let length = length as usize;
         if offset + length > self.space.borrow().len() {
@@ -496,7 +504,7 @@ impl MemStore for PlainMem {
         }
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn MemStore>>> {
+    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
         Some(Box::new(PlainMemShared(Self {
             space: self.space.clone(),
             id: self.id,
@@ -530,13 +538,13 @@ impl DerefMut for PlainMemShared {
 }
 
 impl Deref for PlainMemShared {
-    type Target = dyn MemStore;
-    fn deref(&self) -> &(dyn MemStore + 'static) {
+    type Target = dyn CachedStore;
+    fn deref(&self) -> &(dyn CachedStore + 'static) {
         &self.0
     }
 }
 
-impl MemView for PlainMemView {
+impl CachedView for PlainMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {

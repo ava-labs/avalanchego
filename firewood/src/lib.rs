@@ -72,17 +72,17 @@
 //! layout/representation of the data on disk from the actual logical data structure it retains:
 //!
 //! - Linear, memory-like space: the [shale](https://crates.io/crates/shale) crate from an academic
-//!   project (CedrusDB) code offers a `MemStore` abstraction for a (64-bit) byte-addressable space
+//!   project (CedrusDB) code offers a `CachedStore` abstraction for a (64-bit) byte-addressable space
 //!   that abstracts away the intricate method that actually persists the in-memory data on the
-//!   secondary storage medium (e.g., hard drive). The implementor of `MemStore` will provide the
-//!   functions to give the user of `MemStore` an illusion that the user is operating upon a
+//!   secondary storage medium (e.g., hard drive). The implementor of `CachedStore` will provide the
+//!   functions to give the user of `CachedStore` an illusion that the user is operating upon a
 //!   byte-addressable memory space. It is just a "magical" array of bytes one can view and change
 //!   that is mirrored to the disk. In reality, the linear space will be chunked into files under a
 //!   directory, but the user does not have to even know about this.
 //!
 //! - Persistent item storage stash: `ShaleStore` trait from `shale` defines a pool of typed
 //!   objects that are persisted on disk but also made accessible in memory transparently. It is
-//!   built on top of `MemStore` by defining how "items" of the given type are laid out, allocated
+//!   built on top of `CachedStore` by defining how "items" of the given type are laid out, allocated
 //!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
 //!   basic implementation in `shale` crate, but one can always define his/her own `ShaleStore`).
 //!
@@ -99,7 +99,7 @@
 //! </p>
 //!
 //! Given the abstraction, one can easily realize the fact that the actual data that affect the
-//! state of the data structure (trie) is what the linear space (`MemStore`) keeps track of, that is,
+//! state of the data structure (trie) is what the linear space (`CachedStore`) keeps track of, that is,
 //! a flat but conceptually large byte vector. In other words, given a valid byte vector as the
 //! content of the linear space, the higher level data structure can be *uniquely* determined, there
 //! is nothing more (except for some auxiliary data that are kept for performance reasons, such as caching)
@@ -107,7 +107,7 @@
 //! separate the logical data from its physical representation, greatly simplifies the storage
 //! management, and allows reusing the code. It is still a very versatile abstraction, as in theory
 //! any persistent data could be stored this way -- sometimes you need to swap in a different
-//! `MemShale` or `MemStore` implementation, but without having to touch the code for the persisted
+//! `MemShale` or `CachedStore` implementation, but without having to touch the code for the persisted
 //! data structure.
 //!
 //! ## Page-based Shadowing and Revisions
@@ -117,7 +117,7 @@
 //! space. The writes may overlap and some frequent writes are even done to the same spot in the
 //! space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
 //! virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
-//! dirty pages in some `MemStore` instantiation (see `storage::StoreRevMut`). When a
+//! dirty pages in some `CachedStore` instantiation (see `storage::StoreRevMut`). When a
 //! [`db::WriteBatch`] commits, both the recorded interval writes and the aggregated in-memory
 //! dirty pages induced by this write batch are taken out from the linear space. Although they are
 //! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,

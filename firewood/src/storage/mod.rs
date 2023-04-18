@@ -9,8 +9,9 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
+use shale::{CachedStore, CachedView, SpaceID};
+
 use nix::fcntl::{flock, FlockArg};
-use shale::{MemStore, MemView, SpaceID};
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
@@ -333,22 +334,22 @@ impl StoreRevShared {
     }
 }
 
-impl MemStore for StoreRevShared {
+impl CachedStore for StoreRevShared {
     fn get_view(
         &self,
         offset: u64,
         length: u64,
-    ) -> Option<Box<dyn MemView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let data = self.0.get_slice(offset, length)?;
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn MemStore>>> {
+    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
         Some(Box::new(StoreShared(self.clone())))
     }
 
     fn write(&mut self, _offset: u64, _change: &[u8]) {
-        // StoreRevShared is a read-only view version of MemStore
+        // StoreRevShared is a read-only view version of CachedStore
         // Writes could be induced by lazy hashing and we can just ignore those
     }
 
@@ -369,7 +370,7 @@ impl Deref for StoreRef {
     }
 }
 
-impl MemView for StoreRef {
+impl CachedView for StoreRef {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
@@ -377,16 +378,16 @@ impl MemView for StoreRef {
     }
 }
 
-struct StoreShared<S: Clone + MemStore>(S);
+struct StoreShared<S: Clone + CachedStore>(S);
 
-impl<S: Clone + MemStore + 'static> Deref for StoreShared<S> {
-    type Target = dyn MemStore;
-    fn deref(&self) -> &(dyn MemStore + 'static) {
+impl<S: Clone + CachedStore + 'static> Deref for StoreShared<S> {
+    type Target = dyn CachedStore;
+    fn deref(&self) -> &(dyn CachedStore + 'static) {
         &self.0
     }
 }
 
-impl<S: Clone + MemStore + 'static> DerefMut for StoreShared<S> {
+impl<S: Clone + CachedStore + 'static> DerefMut for StoreShared<S> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -447,12 +448,12 @@ impl StoreRevMut {
     }
 }
 
-impl MemStore for StoreRevMut {
+impl CachedStore for StoreRevMut {
     fn get_view(
         &self,
         offset: u64,
         length: u64,
-    ) -> Option<Box<dyn MemView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let data = if length == 0 {
             Vec::new()
         } else {
@@ -491,7 +492,7 @@ impl MemStore for StoreRevMut {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn MemStore>>> {
+    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
         Some(Box::new(StoreShared(self.clone())))
     }
 

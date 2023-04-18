@@ -487,7 +487,7 @@ mod tests {
         file,
         storage::{DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta},
     };
-    use shale::MemStore;
+    use shale::CachedStore;
 
     const STATE_SPACE: SpaceID = 0x0;
     #[test]

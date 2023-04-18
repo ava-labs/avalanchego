@@ -9,7 +9,7 @@ use shale::*;
 
 pub type SpaceID = u8;
 
-/// Purely volatile, dynamically allocated vector-based implementation for [MemStore]. This is similar to
+/// Purely volatile, dynamically allocated vector-based implementation for [CachedStore]. This is similar to
 /// [PlainMem]. The only difference is, when [write] dynamically allocate more space if original space is
 /// not enough.
 #[derive(Debug)]
@@ -31,12 +31,12 @@ impl DynamicMem {
     }
 }
 
-impl MemStore for DynamicMem {
+impl CachedStore for DynamicMem {
     fn get_view(
         &self,
         offset: u64,
         length: u64,
-    ) -> Option<Box<dyn MemView<DerefReturn = Vec<u8>>>> {
+    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let offset = offset as usize;
         let length = length as usize;
         let size = offset + length;
@@ -54,7 +54,7 @@ impl MemStore for DynamicMem {
         }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn MemStore>>> {
+    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
         Some(Box::new(DynamicMemShared(Self {
             space: self.space.clone(),
             id: self.id,
@@ -93,8 +93,8 @@ impl Deref for DynamicMemView {
 }
 
 impl Deref for DynamicMemShared {
-    type Target = dyn MemStore;
-    fn deref(&self) -> &(dyn MemStore + 'static) {
+    type Target = dyn CachedStore;
+    fn deref(&self) -> &(dyn CachedStore + 'static) {
         &self.0
     }
 }
@@ -105,7 +105,7 @@ impl DerefMut for DynamicMemShared {
     }
 }
 
-impl MemView for DynamicMemView {
+impl CachedView for DynamicMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {

@@ -6,7 +6,7 @@ use std::io::{Cursor, Write};
 
 use crate::merkle::{Hash, Node, ValueTransformer};
 use primitive_types::U256;
-use shale::{MemStore, MummyItem, ObjPtr, ObjRef, ShaleError, ShaleStore};
+use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
 
 pub struct Account {
     pub nonce: u64,
@@ -98,16 +98,16 @@ pub enum Blob {
     Code(Vec<u8>),
 }
 
-impl MummyItem for Blob {
+impl Storable for Blob {
     // currently there is only one variant of Blob: Code
-    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, 4)
-            .ok_or(ShaleError::LinearMemStoreError)?;
+            .ok_or(ShaleError::LinearCachedStoreError)?;
         let len = u32::from_le_bytes(raw.as_deref()[..].try_into().unwrap()) as u64;
         let bytes = mem
             .get_view(addr + 4, len)
-            .ok_or(ShaleError::LinearMemStoreError)?;
+            .ok_or(ShaleError::LinearCachedStoreError)?;
         Ok(Self::Code(bytes.as_deref()))
     }
 

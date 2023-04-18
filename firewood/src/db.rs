@@ -13,7 +13,7 @@ use std::thread::JoinHandle;
 use bytemuck::{cast_slice, AnyBitPattern};
 use parking_lot::{Mutex, RwLock};
 use primitive_types::U256;
-use shale::{compact::CompactSpaceHeader, MemStore, MummyItem, MummyObj, ObjPtr, SpaceID};
+use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceID, Storable, StoredView};
 use typed_builder::TypedBuilder;
 
 use crate::account::{Account, AccountRLP, Blob, BlobStash};
@@ -194,11 +194,11 @@ impl DBHeader {
     }
 }
 
-impl MummyItem for DBHeader {
-    fn hydrate<T: MemStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
+impl Storable for DBHeader {
+    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(shale::ShaleError::LinearMemStoreError)?;
+            .ok_or(shale::ShaleError::LinearCachedStoreError)?;
         let acc_root = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
         let kv_root = u64::from_le_bytes(raw.as_deref()[8..].try_into().unwrap());
         Ok(Self {
@@ -613,14 +613,14 @@ impl DB {
             let blob_meta_ref = staging.blob.meta.as_ref();
 
             (
-                MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
-                MummyObj::ptr_to_obj(
+                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                StoredView::ptr_to_obj(
                     merkle_meta_ref,
                     merkle_payload_header,
                     shale::compact::CompactHeader::MSIZE,
                 )
                 .unwrap(),
-                MummyObj::ptr_to_obj(
+                StoredView::ptr_to_obj(
                     blob_meta_ref,
                     blob_payload_header,
                     shale::compact::CompactHeader::MSIZE,
@@ -816,14 +816,14 @@ impl DB {
             let blob_meta_ref = &space.blob.meta;
 
             (
-                MummyObj::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
-                MummyObj::ptr_to_obj(
+                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                StoredView::ptr_to_obj(
                     merkle_meta_ref,
                     merkle_payload_header,
                     shale::compact::CompactHeader::MSIZE,
                 )
                 .unwrap(),
-                MummyObj::ptr_to_obj(
+                StoredView::ptr_to_obj(
                     blob_meta_ref,
                     blob_payload_header,
                     shale::compact::CompactHeader::MSIZE,
