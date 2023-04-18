@@ -14,6 +14,8 @@ import (
 var globalRNG = newRNG()
 
 func newRNG() *rng {
+	// We don't use a cryptographically secure source of randomness here, as
+	// there's no need to ensure a truly random sampling.
 	source := prng.NewMT19937()
 	source.Seed(uint64(time.Now().UnixNano()))
 	return &rng{rng: source}
