@@ -102,6 +102,8 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	Close() error
+
+	RemoveRejectedTxs() error
 }
 
 /*
@@ -572,6 +574,49 @@ func (s *state) writeStatuses() error {
 		s.statusCache.Put(id, &status)
 		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
 			return fmt.Errorf("failed to add status: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) rejectedTxs() ([]ids.ID, error) {
+	var txIDs []ids.ID
+	iter := s.statusDB.NewIterator()
+	for iter.Next() {
+		key := iter.Key()
+		val := iter.Value()
+		valStatus, err := database.ParseUInt32(val)
+		if err != nil {
+			return []ids.ID{}, err
+		}
+		if choices.Status(valStatus) == choices.Rejected {
+			txID, err := ids.ToID(key)
+			if err != nil {
+				return []ids.ID{}, err
+			}
+			txIDs = append(txIDs, txID)
+			// remove txID from dbStatus
+			database.ClearPrefix(s.statusDB, s.statusDB, key)
+		}
+	}
+	return txIDs, nil
+}
+
+func (s *state) RemoveRejectedTxs() error {
+	txIDs, err := s.rejectedTxs()
+	if err != nil {
+		return err
+	}
+	for _, txID := range txIDs {
+		tx, err := s.GetTx(txID)
+		if err != nil {
+			return err
+		}
+		// find UTXOID produced by the tx
+		UTXOs := tx.UTXOs()
+		// update utxoDB and utxoState accordingly
+		for _, UTXO := range UTXOs {
+			s.utxoState.DeleteUTXO(UTXO.InputID())
 		}
 	}
 	return nil
