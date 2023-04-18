@@ -36,14 +36,15 @@ func (s SerializedPath) deserialize() path {
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
-	if s.NibbleLength < prefix.NibbleLength {
+	prefixValue := prefix.Value
+	prefixLength := len(prefix.Value)
+	if s.NibbleLength < prefix.NibbleLength || len(s.Value) < prefixLength {
 		return false
 	}
-	prefixValue := prefix.Value
 	if !prefix.hasOddLength() {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
-	reducedSize := len(prefixValue) - 1
+	reducedSize := prefixLength - 1
 
 	// the input was invalid so just return false
 	if reducedSize < 0 {
