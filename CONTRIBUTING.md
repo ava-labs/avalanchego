@@ -68,7 +68,8 @@ To start developing on AvalancheGo, you'll need a few things installed.
 ```
 
 - Run the linter
-```
+
+```sh
 ./scripts/lint.sh
 ```
 
