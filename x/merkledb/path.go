@@ -44,9 +44,14 @@ func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
 	reducedSize := len(prefixValue) - 1
-	if reducedSize < 0 {
+	
+	// the input was invalid so just return false
+	if reducedSize < 0 ||
+		reducedSize >= len(prefixValue) ||
+		reducedSize >= len(s.Value) {
 		return false
 	}
+
 	// grab the last nibble in the prefix and serialized path
 	prefixRemainder := prefixValue[reducedSize] >> 4
 	valueRemainder := s.Value[reducedSize] >> 4
