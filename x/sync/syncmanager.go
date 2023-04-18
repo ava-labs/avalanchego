@@ -381,55 +381,91 @@ func (m *StateSyncManager) findNextKey(
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
 	}
 
+	// If local proof is an exclusion proof, remove the last node from it.
+	if bytes.Compare(localProof.Path[len(localProof.Path)-1].KeyPath.Value, lastReceivedKey) > 0 {
+		localProof.Path = localProof.Path[:len(localProof.Path)-1]
+	}
+
+	// Min element is the smallest path whose existence is implied by the remote proof.
 	theirImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
 		return p1.Compare(p2) < 0
 	})
+	// Min element is the smallest path whose existence is implied by the local proof.
 	ourImpliedKeys := btree.NewG(2, func(p1, p2 merkledb.Path) bool {
 		return p1.Compare(p2) < 0
 	})
 
+	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
+
+	rangeEndPath := merkledb.NewPath(rangeEnd)
+
 	for _, node := range receivedProofNodes {
-		theirImpliedKeys.ReplaceOrInsert(node.KeyPath.Deserialize())
+		paths := make([]merkledb.Path, 0, len(node.Children)+1)
+		paths = append(paths, node.KeyPath.Deserialize())
+
 		for idx := range node.Children {
 			childPath := node.KeyPath.AppendNibble(idx)
-			theirImpliedKeys.ReplaceOrInsert(childPath.Deserialize())
+			paths = append(paths, childPath.Deserialize())
+		}
+
+		// Only consider paths greater than the last received path
+		// and less than the range end path (if applicable).
+		for _, path := range paths {
+			if path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) < 0) {
+				theirImpliedKeys.ReplaceOrInsert(path)
+			}
 		}
 	}
 
 	for _, node := range localProof.Path {
-		ourImpliedKeys.ReplaceOrInsert(node.KeyPath.Deserialize())
+		paths := make([]merkledb.Path, 0, len(node.Children)+1)
+		paths = append(paths, node.KeyPath.Deserialize())
+
 		for idx := range node.Children {
 			childPath := node.KeyPath.AppendNibble(idx)
-			ourImpliedKeys.ReplaceOrInsert(childPath.Deserialize())
+			paths = append(paths, childPath.Deserialize())
 		}
-	}
 
-	// Delete all implied keys <= lastReceivedKey
-	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
-	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		if minPath.Compare(lastReceivedPath) < 0 {
-			theirImpliedKeys.DeleteMin()
-			continue
+		// Only consider paths greater than the last received path
+		// and less than the range end path (if applicable).
+		for _, path := range paths {
+			if path.Compare(lastReceivedPath) > 0 &&
+				(len(rangeEnd) == 0 || path.Compare(rangeEndPath) < 0) {
+				ourImpliedKeys.ReplaceOrInsert(path)
+			}
 		}
-		break
-	}
-	for minPath, ok := ourImpliedKeys.Min(); ok; minPath, ok = ourImpliedKeys.Min() {
-		if minPath.Compare(lastReceivedPath) < 0 {
-			ourImpliedKeys.DeleteMin()
-			continue
-		}
-		break
 	}
 
 	// Find smallest key that is in theirImpliedKeys but not in ourImpliedKeys
 	for minPath, ok := theirImpliedKeys.Min(); ok; minPath, ok = theirImpliedKeys.Min() {
-		if !ourImpliedKeys.Has(minPath) {
-			return minPath.Serialize().Value, nil
+		if ourImpliedKeys.Has(minPath) {
+			theirImpliedKeys.DeleteMin()
+			continue
 		}
-		theirImpliedKeys.DeleteMin()
+
+		// See if there's a key in ourImpliedKeys that is a suffix of minPath
+		suffixPathExists := false
+		ourImpliedKeys.DescendGreaterThan(minPath, func(item merkledb.Path) bool {
+			if item.HasPrefix(minPath) {
+				suffixPathExists = true
+				return false
+			}
+			return true
+		})
+		if suffixPathExists {
+			theirImpliedKeys.DeleteMin()
+			continue
+		}
+
+		minPathBytes := minPath.Serialize().Value
+		if len(rangeEnd) > 0 && bytes.Compare(minPathBytes, rangeEnd) >= 0 {
+			return nil, nil // TODO should we continue? Delete such elements from trees?
+		}
+		return minPathBytes, nil
 	}
 
-	if len(lastReceivedKey) > 0 && bytes.Compare(lastReceivedKey, rangeEnd) >= 0 {
+	if len(rangeEnd) > 0 && bytes.Compare(lastReceivedKey, rangeEnd) >= 0 {
 		return nil, nil
 	}
 
