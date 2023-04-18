@@ -386,11 +386,13 @@ func (m *StateSyncManager) findNextKey(
 		return nil, err
 	}
 
+	// TODO should we just mark this key-value pair as deleted in [theirImpliedKeys]?
 	// If remote proof is an exclusion proof, remove the last node from it.
 	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
 	}
 
+	// TODO should we just mark this key-value pair as deleted in [ourImpliedKeys]?
 	// If local proof is an exclusion proof, remove the last node from it.
 	if bytes.Compare(localProof.Path[len(localProof.Path)-1].KeyPath.Value, lastReceivedKey) > 0 {
 		localProof.Path = localProof.Path[:len(localProof.Path)-1]
@@ -472,7 +474,6 @@ func (m *StateSyncManager) findNextKey(
 	theirImpliedKeys.Ascend(func(pathAndID pathAndID) bool {
 		local, ok := ourImpliedKeys.Get(pathAndID)
 		if !ok || local.id != pathAndID.id {
-			// return minPath.path.Serialize().Value, nil
 			firstDiff = pathAndID.path
 			firstDiffSet = true
 			return false
