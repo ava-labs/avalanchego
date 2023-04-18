@@ -206,6 +206,10 @@ func TestContinuousStakingForkInMempool(t *testing.T) {
 	retrievedTxs := mpool.PeekTxs(math.MaxInt)
 	require.True(len(retrievedTxs) == 1)
 	require.Equal(retrievedTxs[0], tx)
+
+	// remove post fork
+	mpool.Remove(retrievedTxs)
+	require.False(mpool.HasTxs())
 }
 
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
