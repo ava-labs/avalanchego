@@ -110,8 +110,7 @@ type Chain interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
 
-	GetConfig() (*config.Config, error)
-	CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
+	GetRewardConfig(subnetID ids.ID) (reward.Config, error)
 }
 
 type State interface {
@@ -797,12 +796,11 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 	}
 }
 
-func (s *state) GetConfig() (*config.Config, error) {
-	return s.cfg, nil
-}
-
-func (s *state) CalculateReward(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
-	return s.rewards.Calculate(stakedDuration, stakedAmount, currentSupply)
+func (s *state) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
+	if subnetID != constants.PrimaryNetworkID {
+		return reward.Config{}, errors.New("not yet implemented")
+	}
+	return s.cfg.RewardConfig, nil
 }
 
 func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {

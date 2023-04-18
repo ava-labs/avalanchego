@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -297,7 +298,13 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 			return err
 		}
 
-		potentialReward := e.State.CalculateReward(
+		rewardCfg, err := e.State.GetRewardConfig(constants.PlatformChainID)
+		if err != nil {
+			return err
+		}
+		rewards := reward.NewCalculator(rewardCfg)
+
+		potentialReward := rewards.Calculate(
 			stakeDuration,
 			stakeAmount,
 			currentSupply,

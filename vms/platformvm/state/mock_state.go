@@ -17,7 +17,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	reward "github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -186,34 +186,21 @@ func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBatch", reflect.TypeOf((*MockState)(nil).CommitBatch))
 }
 
-// CalculateReward mocks base method.
-func (m *MockState) CalculateReward(arg0 time.Duration, arg1, arg2 uint64) uint64 {
+// GetRewardConfig mocks base method.
+func (m *MockState) GetRewardConfig(arg0 ids.ID) (reward.Config, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateReward", arg0, arg1, arg2)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// CalculateReward indicates an expected call of CalculateReward.
-func (mr *MockStateMockRecorder) CalculateReward(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateReward", reflect.TypeOf((*MockChain)(nil).CalculateReward), arg0, arg1, arg2)
-}
-
-// Config mocks base method.
-func (m *MockState) GetConfig() (*config.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Config")
-	ret0, _ := ret[0].(*config.Config)
+	ret := m.ctrl.Call(m, "GetRewardConfig", arg0)
+	ret0, _ := ret[0].(reward.Config)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Config indicates an expected call of Config.
-func (mr *MockStateMockRecorder) GetConfig() *gomock.Call {
+// GetRewardConfig indicates an expected call of GetRewardConfig.
+func (mr *MockStateMockRecorder) GetRewardConfig(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockChain)(nil).GetConfig))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardConfig", reflect.TypeOf((*MockChain)(nil).GetRewardConfig), arg0)
 }
+
 
 // DeleteCurrentDelegator mocks base method.
 func (m *MockState) DeleteCurrentDelegator(arg0 *Staker) {

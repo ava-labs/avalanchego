@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -84,9 +83,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
@@ -123,9 +120,7 @@ func TestDiffPendingValidator(t *testing.T) {
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
@@ -167,9 +162,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	}
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -218,9 +211,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	}
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -263,9 +254,7 @@ func TestDiffSubnet(t *testing.T) {
 	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -295,9 +284,7 @@ func TestDiffChain(t *testing.T) {
 	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -336,9 +323,7 @@ func TestDiffTx(t *testing.T) {
 	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -388,9 +373,7 @@ func TestDiffRewardUTXO(t *testing.T) {
 	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -435,9 +418,7 @@ func TestDiffUTXO(t *testing.T) {
 	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
-	// Called in NewDiff
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetConfig().Return(&config.Config{}, nil)
+	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()

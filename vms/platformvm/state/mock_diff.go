@@ -13,7 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	config "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	reward "github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -128,20 +128,6 @@ func (mr *MockDiffMockRecorder) Apply(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockDiff)(nil).Apply), arg0)
 }
 
-// CalculateReward mocks base method.
-func (m *MockDiff) CalculateReward(arg0 time.Duration, arg1, arg2 uint64) uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateReward", arg0, arg1, arg2)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// CalculateReward indicates an expected call of CalculateReward.
-func (mr *MockDiffMockRecorder) CalculateReward(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateReward", reflect.TypeOf((*MockDiff)(nil).CalculateReward), arg0, arg1, arg2)
-}
-
 // DeleteCurrentDelegator mocks base method.
 func (m *MockDiff) DeleteCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -215,21 +201,6 @@ func (m *MockDiff) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 func (mr *MockDiffMockRecorder) GetChains(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChains", reflect.TypeOf((*MockDiff)(nil).GetChains), arg0)
-}
-
-// GetConfig mocks base method.
-func (m *MockDiff) GetConfig() (*config.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConfig")
-	ret0, _ := ret[0].(*config.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetConfig indicates an expected call of GetConfig.
-func (mr *MockDiffMockRecorder) GetConfig() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfig", reflect.TypeOf((*MockDiff)(nil).GetConfig))
 }
 
 // GetCurrentDelegatorIterator mocks base method.
@@ -350,6 +321,21 @@ func (m *MockDiff) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, e
 func (mr *MockDiffMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockDiff)(nil).GetPendingValidator), arg0, arg1)
+}
+
+// GetRewardConfig mocks base method.
+func (m *MockDiff) GetRewardConfig(arg0 ids.ID) (reward.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRewardConfig", arg0)
+	ret0, _ := ret[0].(reward.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRewardConfig indicates an expected call of GetRewardConfig.
+func (mr *MockDiffMockRecorder) GetRewardConfig(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardConfig", reflect.TypeOf((*MockDiff)(nil).GetRewardConfig), arg0)
 }
 
 // GetRewardUTXOs mocks base method.
