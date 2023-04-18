@@ -391,84 +391,86 @@ func (m *StateSyncManager) findNextKey(
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
-	var result []byte
+	var nextKey []byte
+
+	// walk up the two proof paths until a difference is found
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(receivedProofNodes) - 1
 
-	// walk up the two proof paths until a difference is found
-	for receivedProofNodeIndex >= 0 && result == nil {
-		localNode := localProofNodes[localProofNodeIndex]
-		receivedNode := receivedProofNodes[receivedProofNodeIndex]
-		// the two nodes have the same key
-		if localNode.KeyPath.Equal(receivedNode.KeyPath) {
-			startingChildIndex := byte(0)
-			if localNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
-				startingChildIndex = proofKeyPath.NibbleVal(localNode.KeyPath.NibbleLength)
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && result == nil {
+		localProofNode := localProofNodes[localProofNodeIndex]
+		receivedProofNode := receivedProofNodes[receivedProofNodeIndex]
+
+		// Current node is the proof node with the longest key (deepest in the trie).
+		// alternateNode is the proof node from the other proof with the same key/depth if it exists, nil otherwise.
+		var currentNode, alternateNode *merkledb.ProofNode
+
+		switch {
+		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
+			{
+				// there was a branch node in the received proof that isn't in the local proof
+				currentNode = &receivedProofNode
+				receivedProofNodeIndex--
 			}
-			// the two nodes have the same path, so ensure that all children have matching ids
-			for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
-				receivedChildID, receiveOk := receivedNode.Children[childIndex]
-				localChildID, localOk := localNode.Children[childIndex]
-				// if they both don't have a child or have matching children, continue
-				if (receiveOk || localOk) && receivedChildID != localChildID {
-					result = localNode.KeyPath.AppendNibble(childIndex).Value
-					break
-				}
+		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
+			{
+				// there was a branch node in the local proof that isn't in the received proof
+				currentNode = &localProofNode
+				localProofNodeIndex--
 			}
-			if result != nil {
-				break
+		default:
+			{
+				currentNode = &localProofNode
+				alternateNode = &receivedProofNode
+				localProofNodeIndex--
+				receivedProofNodeIndex--
 			}
-			// only want to move both indexes when they have equal keys
-			localProofNodeIndex--
-			receivedProofNodeIndex--
-			continue
 		}
 
-		// the two nodes have different paths, so find where they branched
-		var branchNode merkledb.ProofNode
-
-		// The proof node with the longer path indicates has a new branch under it.
-		if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
-			// The received proof has an extra node due to a branch that is not present locally
-			branchNode = receivedNode
-			receivedProofNodeIndex--
-		} else {
-			// The local proof has an extra node due to a branch that was not present in the received proof
-			branchNode = localNode
-			localProofNodeIndex--
+		// we only want to look at keys greater than the proofKey, so find the next larger nibble
+		startingChildNibble := byte(0)
+		if currentNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
+			startingChildNibble = proofKeyPath.NibbleVal(currentNode.KeyPath.NibbleLength) + 1
 		}
 
-		// I believe the exclusion proof checks at the beginning of this function should prevent this
-		// but leave this safeguard in place just in case.
-		// TODO: Figure out if there are scenarios where this can happen and fix
-		if proofKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
-			// The array access into lastReceivedKeyPath below this would fail so
-			// default to the lastReceivedKey + 0, which is the first possible key after lastReceivedKey.
-			return append(lastReceivedKey, 0), nil
-		}
-
-		// start looking for the extra nodes greater than the first nibble that is different
-		differentNibble := proofKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength)
-		for nextKeyNibble := differentNibble + 1; nextKeyNibble < 16; nextKeyNibble++ {
-			if _, ok := branchNode.Children[nextKeyNibble]; ok {
-				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
-				break
-			}
+		if childIndex, hasDifference := findChildDifference(currentNode, alternateNode, startingChildNibble); hasDifference {
+			nextKey = currentNode.KeyPath.AppendNibble(childIndex).Value
+			break
 		}
 	}
 
 	// if the result is before or equal to the lastReceivedKey
-	// then use the lastReceivedKey + 0, which is the first possible key after lastReceivedKey
-	if result != nil && bytes.Compare(result, lastReceivedKey) <= 0 {
+	// then use the lastReceivedKey + 0, which is the next largest key after lastReceivedKey
+	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		return append(lastReceivedKey, 0), nil
 	}
 
 	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
-	if len(rangeEnd) > 0 && bytes.Compare(result, rangeEnd) >= 0 {
+	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
 		return nil, nil
 	}
 
-	return result, nil
+	return nextKey, nil
+}
+
+func findChildDifference(node1, node2 *merkledb.ProofNode, startByte byte) (byte, bool) {
+	var (
+		child1, child2 ids.ID
+		ok1, ok2       bool
+	)
+	for childIndex := startByte; childIndex < 16; childIndex++ {
+		if node1 != nil {
+			child1, ok1 = node1.Children[childIndex]
+		}
+		if node2 != nil {
+			child2, ok2 = node2.Children[childIndex]
+		}
+		// if they both don't have a child or have matching children, continue
+		if (ok1 || ok2) && child1 != child2 {
+			return childIndex, true
+		}
+	}
+	return 0, false
 }
 
 func (m *StateSyncManager) Error() error {
