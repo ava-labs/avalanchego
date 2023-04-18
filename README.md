@@ -1,5 +1,8 @@
 # Firewood: non-archival blockchain key-value store with hyper-fast recent state retrieval.
 
+[![Latest version](https://img.shields.io/crates/v/firewood.svg)](https://crates.io/crates/firewood)
+[![Ecosystem license](https://img.shields.io/badge/License-Ecosystem-blue.svg)](./LICENSE.md)
+
 > :warning: firewood is alpha-level software and is not ready for production
 > use. Do not use firewood to store production data. See the
 > [license](./LICENSE.md) for more information regarding firewood usage.
