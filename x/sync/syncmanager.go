@@ -411,51 +411,43 @@ func (m *StateSyncManager) findNextKey(
 	lastReceivedPath := merkledb.NewPath(lastReceivedKey)
 	rangeEndPath := merkledb.NewPath(rangeEnd)
 
-	for _, node := range receivedProofNodes {
-		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
-		pathAndIDs = append(pathAndIDs, pathAndID{
-			path: node.KeyPath.Deserialize(),
-			id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
-		})
-
-		for idx, id := range node.Children {
-			childPath := node.KeyPath.AppendNibble(idx)
-			pathAndIDs = append(pathAndIDs, pathAndID{
-				path: childPath.Deserialize(),
-				id:   id,
-			})
-		}
-
-		// Only consider paths greater than the last received path
-		// and less than the range end path (if applicable).
-		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
-				theirImpliedKeys.ReplaceOrInsert(pathAndID)
-			}
-		}
+	type proofAndTree struct {
+		proof []merkledb.ProofNode
+		tree  *btree.BTreeG[pathAndID]
 	}
-	for _, node := range localProof.Path {
-		pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
-		pathAndIDs = append(pathAndIDs, pathAndID{
-			path: node.KeyPath.Deserialize(),
-			id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
-		})
 
-		for idx, id := range node.Children {
-			childPath := node.KeyPath.AppendNibble(idx)
+	for _, proofAndTree := range []proofAndTree{
+		{
+			proof: receivedProofNodes,
+			tree:  theirImpliedKeys,
+		},
+		{
+			proof: localProof.Path,
+			tree:  ourImpliedKeys,
+		},
+	} {
+		for _, node := range proofAndTree.proof {
+			pathAndIDs := make([]pathAndID, 0, len(node.Children)+1)
 			pathAndIDs = append(pathAndIDs, pathAndID{
-				path: childPath.Deserialize(),
-				id:   id,
+				path: node.KeyPath.Deserialize(),
+				id:   ids.ID(hashing.ComputeHash256Array(node.ValueOrHash.Value())), // TODO fix
 			})
-		}
 
-		// Only consider paths greater than the last received path
-		// and less than the range end path (if applicable).
-		for _, pathAndID := range pathAndIDs {
-			if pathAndID.path.Compare(lastReceivedPath) > 0 &&
-				(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
-				ourImpliedKeys.ReplaceOrInsert(pathAndID)
+			for idx, id := range node.Children {
+				childPath := node.KeyPath.AppendNibble(idx)
+				pathAndIDs = append(pathAndIDs, pathAndID{
+					path: childPath.Deserialize(),
+					id:   id,
+				})
+			}
+
+			// Only consider paths greater than the last received path
+			// and less than the range end path (if applicable).
+			for _, pathAndID := range pathAndIDs {
+				if pathAndID.path.Compare(lastReceivedPath) > 0 &&
+					(len(rangeEnd) == 0 || pathAndID.path.Compare(rangeEndPath) <= 0) {
+					proofAndTree.tree.ReplaceOrInsert(pathAndID)
+				}
 			}
 		}
 	}
