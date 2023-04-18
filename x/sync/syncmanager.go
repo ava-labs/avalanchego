@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -370,98 +371,142 @@ func (m *StateSyncManager) findNextKey(
 	lastReceivedKey []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
-	lastReceivedKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
-
-	// If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
-	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
-	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
-		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
-		// if the new last proof key is before the start of the range, then fallback to the lastReceivedKey as the next key
-		if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, rangeStart) < 0 {
-			return lastReceivedKey, nil
-		}
-		lastReceivedKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
-	}
-
-	proofOfStart, err := m.config.SyncDB.GetProof(ctx, lastReceivedKeyPath.Value)
+	localProof, err := m.config.SyncDB.GetProof(ctx, lastReceivedKey)
 	if err != nil {
 		return nil, err
 	}
-	localProofNodes := proofOfStart.Path
 
-	// If the received key had an odd length, then the proof generated might be for the even length version of the key (since getProof takes []byte).
-	// If that is the case, then remove that last node so that the proof is just for the odd nibble length version of the key
-	if lastReceivedKeyPath.NibbleLength%2 == 1 && !lastReceivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
-		localProofNodes = localProofNodes[:len(localProofNodes)-1]
-	}
-
-	var result []byte
-	localIndex := len(localProofNodes) - 1
-	receivedIndex := len(receivedProofNodes) - 1
-
-	// walk up the node paths until a difference is found
-	for receivedIndex >= 0 && result == nil {
-		localNode := localProofNodes[localIndex]
-		receivedNode := receivedProofNodes[receivedIndex]
-		// the two nodes have the same key
-		if localNode.KeyPath.Equal(receivedNode.KeyPath) {
-			startingChildIndex := byte(0)
-			if localNode.KeyPath.NibbleLength < lastReceivedKeyPath.NibbleLength {
-				startingChildIndex = lastReceivedKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
-			}
-			// the two nodes have the same path, so ensure that all children have matching ids
-			for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
-				receivedChildID, receiveOk := receivedNode.Children[childIndex]
-				localChildID, localOk := localNode.Children[childIndex]
-				// if they both don't have a child or have matching children, continue
-				if (receiveOk || localOk) && receivedChildID != localChildID {
-					result = localNode.KeyPath.AppendNibble(childIndex).Value
-					break
-				}
-			}
-			if result != nil {
-				break
-			}
-			// only want to move both indexes when they have equal keys
-			localIndex--
-			receivedIndex--
-			continue
-		}
-
-		var branchNode merkledb.ProofNode
-
-		if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
-			// the received proof has an extra node due to a branch that is not present locally
-			branchNode = receivedNode
-			receivedIndex--
-		} else {
-			// the local proof has an extra node due to a branch that was not present in the received proof
-			branchNode = localNode
-			localIndex--
-		}
-
-		// I believe the exclusion proof checks at the beginning of this function should prevent this
-		// but leave this safeguard in place just in case.
-		// TODO: Figure out if there are scenarios where this can happen and fix
-		if lastReceivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
-			// the array access into lastReceivedKeyPath below this would fail, so default to the lastReceivedKey
-			return lastReceivedKey, nil
-		}
-
-		// the two nodes have different paths, so find where they branched
-		for nextKeyNibble := lastReceivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
-			if _, ok := branchNode.Children[nextKeyNibble]; ok {
-				result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
-				break
-			}
-		}
-	}
-
-	if result == nil || (len(rangeEnd) > 0 && bytes.Compare(result, rangeEnd) >= 0) {
+	localRoot := localProof.Path[0]
+	receivedRoot := receivedProofNodes[0]
+	rootsMatch := merkledb.MaybeByteSliceEquals(localRoot.ValueOrHash, receivedRoot.ValueOrHash)
+	rootsMatch = rootsMatch && localRoot.KeyPath.Equal(receivedRoot.KeyPath)
+	rootsMatch = rootsMatch && maps.Equal(localRoot.Children, receivedRoot.Children)
+	if rootsMatch {
+		// The roots match so we must have the same trie.
 		return nil, nil
 	}
 
-	return result, nil
+	for i := 0; i < len(receivedProofNodes); i++ {
+		theirNode := receivedProofNodes[i]
+		theirNextNode := receivedProofNodes[i+1]
+		ourNode := localProof.Path[i]
+		ourNextNode := localProof.Path[i+1]
+
+		ourNextNodeIndex := ourNextNode.KeyPath.Value[len(ourNode.KeyPath.Value)]
+		ourNextNodeHash := ourNode.Children[ourNextNodeIndex]
+
+		theirNextNodeIndex := theirNextNode.KeyPath.Value[len(theirNode.KeyPath.Value)]
+		theirNextNodeHash := theirNode.Children[theirNextNodeIndex]
+
+		if ourNextNodeHash == theirNextNodeHash {
+			// Our proof and their proof have the same next node.
+			// The next key to query is the first difference in our children.
+			for j := theirNextNodeIndex; j < merkledb.NodeBranchFactor; j++ {
+				if ourNode.Children[j] != theirNode.Children[j] {
+					nextStartKey := make([]byte, len(theirNode.KeyPath.Value)+1)
+					copy(nextStartKey, theirNode.KeyPath.Value)
+					nextStartKey[len(theirNode.KeyPath.Value)] = byte(j)
+					return nextStartKey, nil
+				}
+			}
+		}
+
+		// Our proof and their proof have different next nodes.
+		// There must be a difference below here in the trie.
+	}
+
+	return nil, errors.New("TODO")
+
+	// // If the received proof's last node has a key is after the lastReceivedKey, this is an exclusion proof.
+	// // if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
+	// if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
+	// 	receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
+	// 	// if the new last proof key is before the start of the range, then fallback to the lastReceivedKey as the next key
+	// 	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, rangeStart) < 0 {
+	// 		return lastReceivedKey, nil
+	// 	}
+	// 	lastReceivedKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
+	// }
+
+	// proofOfStart, err := m.config.SyncDB.GetProof(ctx, lastReceivedKeyPath.Value)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// localProofNodes := proofOfStart.Path
+
+	// // If the received key had an odd length, then the proof generated might be for the even length version of the key (since getProof takes []byte).
+	// // If that is the case, then remove that last node so that the proof is just for the odd nibble length version of the key
+	// if lastReceivedKeyPath.NibbleLength%2 == 1 && !lastReceivedKeyPath.Equal(localProofNodes[len(localProofNodes)-1].KeyPath) {
+	// 	localProofNodes = localProofNodes[:len(localProofNodes)-1]
+	// }
+
+	// var result []byte
+	// localIndex := len(localProofNodes) - 1
+	// receivedIndex := len(receivedProofNodes) - 1
+
+	// // walk up the node paths until a difference is found
+	// for receivedIndex >= 0 && result == nil {
+	// 	localNode := localProofNodes[localIndex]
+	// 	receivedNode := receivedProofNodes[receivedIndex]
+	// 	// the two nodes have the same key
+	// 	if localNode.KeyPath.Equal(receivedNode.KeyPath) {
+	// 		startingChildIndex := byte(0)
+	// 		if localNode.KeyPath.NibbleLength < lastReceivedKeyPath.NibbleLength {
+	// 			startingChildIndex = lastReceivedKeyPath.NibbleVal(localNode.KeyPath.NibbleLength) + 1
+	// 		}
+	// 		// the two nodes have the same path, so ensure that all children have matching ids
+	// 		for childIndex := startingChildIndex; childIndex < 16; childIndex++ {
+	// 			receivedChildID, receiveOk := receivedNode.Children[childIndex]
+	// 			localChildID, localOk := localNode.Children[childIndex]
+	// 			// if they both don't have a child or have matching children, continue
+	// 			if (receiveOk || localOk) && receivedChildID != localChildID {
+	// 				result = localNode.KeyPath.AppendNibble(childIndex).Value
+	// 				break
+	// 			}
+	// 		}
+	// 		if result != nil {
+	// 			break
+	// 		}
+	// 		// only want to move both indexes when they have equal keys
+	// 		localIndex--
+	// 		receivedIndex--
+	// 		continue
+	// 	}
+
+	// 	var branchNode merkledb.ProofNode
+
+	// 	if receivedNode.KeyPath.NibbleLength > localNode.KeyPath.NibbleLength {
+	// 		// the received proof has an extra node due to a branch that is not present locally
+	// 		branchNode = receivedNode
+	// 		receivedIndex--
+	// 	} else {
+	// 		// the local proof has an extra node due to a branch that was not present in the received proof
+	// 		branchNode = localNode
+	// 		localIndex--
+	// 	}
+
+	// 	// I believe the exclusion proof checks at the beginning of this function should prevent this
+	// 	// but leave this safeguard in place just in case.
+	// 	// TODO: Figure out if there are scenarios where this can happen and fix
+	// 	if lastReceivedKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+	// 		// the array access into lastReceivedKeyPath below this would fail, so default to the lastReceivedKey
+	// 		return lastReceivedKey, nil
+	// 	}
+
+	// 	// the two nodes have different paths, so find where they branched
+	// 	for nextKeyNibble := lastReceivedKeyPath.NibbleVal(branchNode.KeyPath.NibbleLength) + 1; nextKeyNibble < 16; nextKeyNibble++ {
+	// 		if _, ok := branchNode.Children[nextKeyNibble]; ok {
+	// 			result = branchNode.KeyPath.AppendNibble(nextKeyNibble).Value
+	// 			break
+	// 		}
+	// 	}
+	// }
+
+	// if result == nil || (len(rangeEnd) > 0 && bytes.Compare(result, rangeEnd) >= 0) {
+	// 	return nil, nil
+	// }
+
+	// return result, nil
 }
 
 func (m *StateSyncManager) Error() error {
