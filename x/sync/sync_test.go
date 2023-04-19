@@ -35,11 +35,11 @@ type mockClient struct {
 }
 
 func (client *mockClient) GetChangeProof(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-	return client.db.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.Limit))
+	return client.db.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
 }
 
 func (client *mockClient) GetRangeProof(ctx context.Context, request *RangeProofRequest) (*merkledb.RangeProof, error) {
-	return client.db.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.Limit))
+	return client.db.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -507,7 +507,19 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		err = syncer.StartSyncing(context.Background())
 		require.NoError(t, err)
 
-		time.Sleep(15 * time.Millisecond)
+		// Wait until we've processed some work
+		// before updating the sync target.
+		require.Eventually(
+			t,
+			func() bool {
+				syncer.workLock.Lock()
+				defer syncer.workLock.Unlock()
+
+				return syncer.processedWork.Len() > 0
+			},
+			5*time.Second,
+			5*time.Millisecond,
+		)
 		syncer.Close()
 
 		newSyncer, err := NewStateSyncManager(StateSyncConfig{
@@ -561,7 +573,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-			return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.Limit))
+			return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -614,13 +626,13 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, request *RangeProofRequest) (*merkledb.RangeProof, error) {
 				<-updatedRootChan
-				return dbToSync.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.Limit))
+				return dbToSync.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
-				return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.Limit))
+				return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
 			},
 		).AnyTimes()
 
