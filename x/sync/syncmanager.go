@@ -371,9 +371,9 @@ func (m *StateSyncManager) findNextKey(
 ) ([]byte, error) {
 	proofKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
 
-	// If the received proof's last node has a key that is after the lastReceivedKey, this is an exclusion proof.
+	// If the received proof's last node isn't a prefix or equal to lastReceivedKey, then this is an exclusion proof.
 	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
-	if bytes.Compare(receivedProofNodes[len(receivedProofNodes)-1].KeyPath.Value, lastReceivedKey) > 0 {
+	if !proofKeyPath.HasPrefix(receivedProofNodes[len(receivedProofNodes)-1].KeyPath) {
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
 		// update the proofKeyPath to be for the prefix
 		proofKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
@@ -412,7 +412,7 @@ func (m *StateSyncManager) findNextKey(
 				// there was a branch node in the received proof that isn't in the local proof
 				// see if the received proof node has children not present in the local proof
 				deepestNode = &receivedProofNode
-				
+
 				// we have dealt with this received node, so move on to the next received node
 				receivedProofNodeIndex--
 			}
