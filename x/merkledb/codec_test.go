@@ -403,9 +403,9 @@ func FuzzCodecChangeProofDeterministic(f *testing.F) {
 
 			keyChanges := newKeyChanges(r, numChangedKeys)
 			for i := uint(0); i < numDeletedKeys; i++ {
-				delete := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(delete)              // #nosec G404
-				keyChanges = append(keyChanges, KeyChange{Key: delete})
+				keyToDelete := make([]byte, r.Intn(32)) // #nosec G404
+				_, _ = r.Read(keyToDelete)              // #nosec G404
+				keyChanges = append(keyChanges, KeyChange{Key: keyToDelete})
 			}
 
 			proof := ChangeProof{
