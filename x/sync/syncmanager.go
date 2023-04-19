@@ -465,7 +465,7 @@ func (m *StateSyncManager) findNextKey(
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		return append(lastReceivedKey, 0), nil
 	}
-	
+
 	return nextKey, nil
 }
 
