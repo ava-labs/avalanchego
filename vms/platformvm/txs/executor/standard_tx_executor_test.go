@@ -420,7 +420,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errValidatorSubset)
+		require.ErrorIs(err, ErrValidatorSubset)
 	}
 
 	{
@@ -495,7 +495,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errNotValidator)
+		require.ErrorIs(err, ErrNotValidator)
 	}
 
 	staker, err := state.NewCurrentStaker(
@@ -537,7 +537,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errValidatorSubset)
+		require.ErrorIs(err, ErrValidatorSubset)
 	}
 
 	{
@@ -563,7 +563,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errValidatorSubset)
+		require.ErrorIs(err, ErrValidatorSubset)
 	}
 
 	{
@@ -617,7 +617,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errTimestampNotBeforeStartTime)
+		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
 	// reset the timestamp
@@ -672,7 +672,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errDuplicateValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
 	env.state.DeleteCurrentValidator(staker)
@@ -814,7 +814,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errDuplicateValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 }
 
@@ -853,7 +853,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errTimestampNotBeforeStartTime)
+		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
 	{
@@ -879,7 +879,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errFutureStakeTime)
+		require.ErrorIs(err, ErrFutureStakeTime)
 	}
 
 	{
@@ -916,7 +916,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errAlreadyValidator)
+		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
 	{
@@ -952,7 +952,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errAlreadyValidator)
+		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
 	{
@@ -987,7 +987,7 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errFlowCheckFailed)
+		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
 }
 
@@ -1183,7 +1183,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			expectedErr: errNotValidator,
+			expectedErr: ErrNotValidator,
 		},
 		{
 			name: "validator is permissionless",
@@ -1211,7 +1211,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			expectedErr: errRemovePermissionlessValidator,
+			expectedErr: ErrRemovePermissionlessValidator,
 		},
 		{
 			name: "tx has no credentials",
@@ -1329,7 +1329,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			expectedErr: errFlowCheckFailed,
+			expectedErr: ErrFlowCheckFailed,
 		},
 	}
 
@@ -1553,7 +1553,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(errFlowCheckFailed)
+				).Return(ErrFlowCheckFailed)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1571,7 +1571,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			err: errFlowCheckFailed,
+			err: ErrFlowCheckFailed,
 		},
 		{
 			name: "valid tx",

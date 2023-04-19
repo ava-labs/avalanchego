@@ -629,7 +629,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 		if !ok {
-			return errIsNotTransformSubnetTx
+			return ErrIsNotTransformSubnetTx
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator

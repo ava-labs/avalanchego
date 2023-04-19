@@ -223,7 +223,7 @@ func GetRewardsCalculator(
 	}
 	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 	if !ok {
-		return nil, errIsNotTransformSubnetTx
+		return nil, ErrIsNotTransformSubnetTx
 	}
 
 	return reward.NewCalculator(reward.Config{
