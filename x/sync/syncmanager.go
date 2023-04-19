@@ -444,7 +444,7 @@ func (m *StateSyncManager) findNextKey(
 		startingChildNibble := byte(0)
 
 		// If the deepest node has a key shorter than the key being proven,
-		// so look at the next nibble of the proof key to determine which children have larger keys
+		// look at the next nibble of the proof key to determine which children have larger keys
 		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
 			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
 		}
