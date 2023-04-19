@@ -477,7 +477,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startByte byte) (byte
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startByte; childIndex < 16; childIndex++ {
+	for childIndex := startByte; childIndex < merkledb.NodeBranchFactor; childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}
