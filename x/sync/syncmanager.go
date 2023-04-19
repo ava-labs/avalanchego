@@ -408,50 +408,43 @@ func (m *StateSyncManager) findNextKey(
 		// select the deepest proof node from the two proofs
 		switch {
 		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
-			{
-				// there was a branch node in the received proof that isn't in the local proof
-				// see if the received proof node has children not present in the local proof
-				deepestNode = &receivedProofNode
+			// there was a branch node in the received proof that isn't in the local proof
+			// see if the received proof node has children not present in the local proof
+			deepestNode = &receivedProofNode
 
-				// we have dealt with this received node, so move on to the next received node
-				receivedProofNodeIndex--
-			}
+			// we have dealt with this received node, so move on to the next received node
+			receivedProofNodeIndex--
+
 		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
-			{
-				// there was a branch node in the local proof that isn't in the received proof
-				// see if the local proof node has children not present in the received proof
-				deepestNode = &localProofNode
+			// there was a branch node in the local proof that isn't in the received proof
+			// see if the local proof node has children not present in the received proof
+			deepestNode = &localProofNode
 
-				// we have dealt with this local node, so move on to the next local node
-				localProofNodeIndex--
-			}
+			// we have dealt with this local node, so move on to the next local node
+			localProofNodeIndex--
+
 		default:
-			{
-				// the two nodes are at the same depth
-				// see if any of the children present in the local proof node are different
-				// from the children in the received proof node
-				deepestNode = &localProofNode
-				deepestNodeFromOtherProof = &receivedProofNode
+			// the two nodes are at the same depth
+			// see if any of the children present in the local proof node are different
+			// from the children in the received proof node
+			deepestNode = &localProofNode
+			deepestNodeFromOtherProof = &receivedProofNode
 
-				// we have dealt with this local node and received node, so move on to the next nodes
-				localProofNodeIndex--
-				receivedProofNodeIndex--
-			}
+			// we have dealt with this local node and received node, so move on to the next nodes
+			localProofNodeIndex--
+			receivedProofNodeIndex--
 		}
 
 		// We only want to look at the children with keys greater than the proofKey.
-		// So find the next largest nibble at this key depth
-		var startingChildNibble byte
-
 		// The proof key has the deepest node's key as a prefix,
 		// so only the next nibble of the proof key needs to be considered.
-		if deepestNode.KeyPath.NibbleLength == proofKeyPath.NibbleLength {
-			// If the deepest node has the same key as the key being proven,
-			// then all of its children have keys greater than the proof key, so we can start at byte 0
-			startingChildNibble = 0
-		} else {
-			// The deepest node has a key shorter than the key being proven,
-			// so look at the next nibble of the proof key to determine which children have larger keys
+		// If the deepest node has the same key as the key being proven,
+		// then all of its children have keys greater than the proof key, so we can start at byte 0
+		startingChildNibble := byte(0)
+
+		// If the deepest node has a key shorter than the key being proven,
+		// so look at the next nibble of the proof key to determine which children have larger keys
+		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
 			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
 		}
 
@@ -475,6 +468,8 @@ func (m *StateSyncManager) findNextKey(
 	return nextKey, nil
 }
 
+// findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
+// a bool indicating if any difference was found
 func findChildDifference(node1, node2 *merkledb.ProofNode, startByte byte) (byte, bool) {
 	var (
 		child1, child2 ids.ID
@@ -487,11 +482,13 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startByte byte) (byte
 		if node2 != nil {
 			child2, ok2 = node2.Children[childIndex]
 		}
-		// if they both don't have a child or have matching children, continue
+		// if one node has a child and the other doesn't or the children ids don't match,
+		// return the current child index as the first difference
 		if (ok1 || ok2) && child1 != child2 {
 			return childIndex, true
 		}
 	}
+	// there were no differences found
 	return 0, false
 }
 
