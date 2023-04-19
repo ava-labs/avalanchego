@@ -743,7 +743,13 @@ func verifyAddPermissionlessDelegatorTx(
 	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	txID := sTx.ID()
-	newStaker, err := state.NewPendingStaker(txID, tx)
+	var newStaker *state.Staker
+	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		// potential reward does not matter
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.Duration(), 0)
+	} else {
+		newStaker, err = state.NewPendingStaker(txID, tx)
+	}
 	if err != nil {
 		return err
 	}
