@@ -386,7 +386,7 @@ func (m *StateSyncManager) findNextKey(
 	// for now, just fallback to using the start key, which is always correct.
 	// TODO: determine a more accurate nextKey in this scenario
 	if !startKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !startKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
-		return start, nil
+		return append(start, 0), nil
 	}
 
 	// walk up the node paths until a difference is found
@@ -431,7 +431,7 @@ func (m *StateSyncManager) findNextKey(
 		}
 
 		if startKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
-			return start, nil
+			return append(start, 0), nil
 		}
 
 		// the two nodes have different paths, so find where they branched
