@@ -9,6 +9,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,6 +38,8 @@ func noopStarter(context.Context, uint32) error {
 }
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+	require := require.New(t)
+
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -63,18 +67,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", ctx.AvalancheRegisterer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
@@ -95,9 +94,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	}
 
 	avaGetHandler, err := getter.New(manager, commonConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	return Config{
 		Config:        commonConfig,
@@ -109,8 +106,11 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	}, peer, sender, manager, vm
 }
 
-// Three vertices in the accepted frontier. None have parents. No need to fetch anything
+// Three vertices in the accepted frontier. None have parents. No need to fetch
+// anything
 func TestBootstrapperSingleFrontier(t *testing.T) {
+	require := require.New(t)
+
 	config, _, _, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
@@ -158,14 +158,10 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
@@ -178,7 +174,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		case vtxID2:
 			return vtx2, nil
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
@@ -191,31 +187,25 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
 			return vtx2, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil {
-		t.Fatal(err)
-	}
-
-	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx2.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choices.Accepted, vtx2.Status())
 }
 
 // Accepted frontier has one vertex, which has one vertex as a dependency.
-// Requests again and gets an unexpected vertex.
-// Requests again and gets the expected vertex and an additional vertex that should not be accepted.
+// Requests again and gets an unexpected vertex. Requests again and gets the
+// expected vertex and an additional vertex that should not be accepted.
 func TestBootstrapperByzantineResponses(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
@@ -265,17 +255,12 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID1}
-
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
@@ -283,7 +268,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		case vtxID0:
 			return nil, errUnknownVertex
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
@@ -291,13 +276,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		switch {
-		case vdr != peerID:
-			t.Fatalf("Should have requested vertex from %s, requested from %s",
-				peerID, vdr)
-		case vtxID != vtxID0:
-			t.Fatalf("should have requested vtx0")
-		}
+		require.Equal(peerID, vdr)
+		require.Equal(vtxID0, vtxID)
+
 		*requestID = reqID
 		reqVtxID = vtxID
 	}
@@ -313,27 +294,18 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		case bytes.Equal(vtxBytes, vtxBytes2):
 			vtx2.StatusV = choices.Processing
 			return vtx2, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0
-		t.Fatal(err)
-	} else if reqVtxID != vtxID0 {
-		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0
+	require.Equal(vtxID0, reqVtxID)
 
 	oldReqID := *requestID
-	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})
-	switch {
-	case err != nil: // send unexpected vertex
-		t.Fatal(err)
-	case *requestID == oldReqID:
-		t.Fatal("should have issued new request")
-	case reqVtxID != vtxID0:
-		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
+	require.NotEqual(oldReqID, *requestID)                                                       // should have sent a new request
 
 	oldReqID = *requestID
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -343,32 +315,23 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		case vtxID0:
 			return vtx0, nil
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
 
-	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2}); err != nil { // send expected vertex and vertex that should not be accepted
-		t.Fatal(err)
-	}
-
-	switch {
-	case *requestID != oldReqID:
-		t.Fatal("should not have issued new request")
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	}
-	if vtx2.Status() == choices.Accepted {
-		t.Fatalf("Vertex should not have been accepted")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
+	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choices.Processing, vtx2.Status())
 }
 
 // Vertex has a dependency and tx has a dependency
 func TestBootstrapperTxDependencies(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -447,14 +410,10 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID1}
 
@@ -464,9 +423,10 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			return vtx0, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
@@ -475,28 +435,20 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		case vtxID0:
 			return nil, errUnknownVertex
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
 
 	reqIDPtr := new(uint32)
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
-		}
-		switch vtxID {
-		case vtxID0:
-		default:
-			t.Fatal(errUnknownVertex)
-		}
+		require.Equal(peerID, vdr)
+		require.Equal(vtxID0, vtxID)
 
 		*reqIDPtr = reqID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0
 
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -505,35 +457,24 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
 			return vtx0, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
-		t.Fatal(err)
-	}
-
-	if config.Ctx.State.Get().State != snow.NormalOp {
-		t.Fatalf("Should have finished bootstrapping")
-	}
-	if tx0.Status() != choices.Accepted {
-		t.Fatalf("Tx should be accepted")
-	}
-	if tx1.Status() != choices.Accepted {
-		t.Fatalf("Tx should be accepted")
-	}
-
-	if vtx0.Status() != choices.Accepted {
-		t.Fatalf("Vertex should be accepted")
-	}
-	if vtx1.Status() != choices.Accepted {
-		t.Fatalf("Vertex should be accepted")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, tx0.Status())
+	require.Equal(choices.Accepted, tx1.Status())
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
 }
 
 // Unfulfilled tx dependency
 func TestBootstrapperMissingTxDependency(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
@@ -595,14 +536,10 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID1}
 
@@ -613,7 +550,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		case vtxID0:
 			return nil, errUnknownVertex
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
@@ -624,53 +561,34 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
 			return vtx0, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 
 	reqIDPtr := new(uint32)
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
-		}
-		switch {
-		case vtxID == vtxID0:
-		default:
-			t.Fatalf("Requested wrong vertex")
-		}
+		require.Equal(peerID, vdr)
+		require.Equal(vtxID0, vtxID)
 
 		*reqIDPtr = reqID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx1
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx1
 
-	if err := bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
-		t.Fatal(err)
-	}
-
-	if config.Ctx.State.Get().State != snow.NormalOp {
-		t.Fatalf("Bootstrapping should have finished")
-	}
-	if tx0.Status() != choices.Unknown { // never saw this tx
-		t.Fatalf("Tx should be unknown")
-	}
-	if tx1.Status() != choices.Processing { // can't accept because we don't have tx0
-		t.Fatalf("Tx should be processing")
-	}
-
-	if vtx0.Status() != choices.Accepted {
-		t.Fatalf("Vertex should be accepted")
-	}
-	if vtx1.Status() != choices.Processing { // can't accept because we don't have tx1 accepted
-		t.Fatalf("Vertex should be processing")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Unknown, tx0.Status())
+	require.Equal(choices.Processing, tx1.Status())
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Processing, vtx1.Status())
 }
 
 // Ancestors only contains 1 of the two needed vertices; have to issue another GetAncestors
 func TestBootstrapperIncompleteAncestors(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
@@ -720,17 +638,12 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID2}
-
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID == vtxID0:
@@ -740,7 +653,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		case vtxID == vtxID2:
 			return vtx2, nil
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
@@ -749,63 +662,43 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
 			return vtx0, nil
-
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			vtx1.StatusV = choices.Processing
 			return vtx1, nil
 		case bytes.Equal(vtxBytes, vtxBytes2):
 			return vtx2, nil
+		default:
+			require.FailNow(errParsedUnknownVertex.Error())
+			panic(errParsedUnknownVertex)
 		}
-		t.Fatal(errParsedUnknownVertex)
-		return nil, errParsedUnknownVertex
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
-		}
-		switch vtxID {
-		case vtxID1, vtxID0:
-		default:
-			t.Fatal(errUnknownVertex)
-		}
+		require.Equal(peerID, vdr)
+		require.Contains([]ids.ID{vtxID1, vtxID0}, vtxID)
+
 		*reqIDPtr = reqID
 		requested = vtxID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx1
-		t.Fatal(err)
-	} else if requested != vtxID1 {
-		t.Fatal("requested wrong vtx")
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx1
+	require.Equal(vtxID1, requested)
 
-	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})
-	switch {
-	case err != nil: // Provide vtx1; should request vtx0
-		t.Fatal(err)
-	case bs.Context().State.Get().State == snow.NormalOp:
-		t.Fatalf("should not have finished")
-	case requested != vtxID0:
-		t.Fatal("should hae requested vtx0")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
+	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
+	require.Equal(vtxID0, requested)
 
-	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})
-	switch {
-	case err != nil: // Provide vtx0; can finish now
-		t.Fatal(err)
-	case bs.Context().State.Get().State != snow.NormalOp:
-		t.Fatal("should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatal("should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatal("should be accepted")
-	case vtx2.Status() != choices.Accepted:
-		t.Fatal("should be accepted")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
+	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choices.Accepted, vtx2.Status())
 }
 
 func TestBootstrapperFinalized(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
@@ -844,17 +737,12 @@ func TestBootstrapperFinalized(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1}
-
 	parsedVtx0 := false
 	parsedVtx1 := false
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -870,7 +758,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			}
 			return nil, errUnknownVertex
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 	}
@@ -884,52 +772,37 @@ func TestBootstrapperFinalized(t *testing.T) {
 			vtx1.StatusV = choices.Processing
 			parsedVtx1 = true
 			return vtx1, nil
+		default:
+			require.FailNow(errUnknownVertex.Error())
+			panic(errUnknownVertex)
 		}
-		t.Fatal(errUnknownVertex)
-		return nil, errUnknownVertex
 	}
 
 	requestIDs := map[ids.ID]uint32{}
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
-		}
+		require.Equal(peerID, vdr)
+
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0 and vtx1
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0 and vtx1
+	require.Contains(requestIDs, vtxID1)
 
-	reqID, ok := requestIDs[vtxID1]
-	if !ok {
-		t.Fatalf("should have requested vtx1")
-	}
+	reqID := requestIDs[vtxID1]
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}))
+	require.Contains(requestIDs, vtxID0)
 
-	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
-		t.Fatal(err)
-	}
-
-	reqID, ok = requestIDs[vtxID0]
-	if !ok {
-		t.Fatalf("should have requested vtx0")
-	}
-
-	err = bs.GetAncestorsFailed(context.Background(), peerID, reqID)
-	switch {
-	case err != nil:
-		t.Fatal(err)
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	}
+	reqID = requestIDs[vtxID0]
+	require.NoError(bs.GetAncestorsFailed(context.Background(), peerID, reqID))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
 }
 
 // Test that Ancestors accepts the parents of the first vertex returned
 func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.Empty.Prefix(0)
@@ -979,17 +852,12 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	acceptedIDs := []ids.ID{vtxID2}
-
 	parsedVtx0 := false
 	parsedVtx1 := false
 	parsedVtx2 := false
@@ -999,18 +867,16 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			if parsedVtx0 {
 				return vtx0, nil
 			}
-			return nil, errUnknownVertex
 		case vtxID1:
 			if parsedVtx1 {
 				return vtx1, nil
 			}
-			return nil, errUnknownVertex
 		case vtxID2:
 			if parsedVtx2 {
 				return vtx2, nil
 			}
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 		return nil, errUnknownVertex
@@ -1029,45 +895,33 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			vtx2.StatusV = choices.Processing
 			parsedVtx2 = true
 			return vtx2, nil
+		default:
+			require.FailNow(errUnknownVertex.Error())
+			panic(errUnknownVertex)
 		}
-		t.Fatal(errUnknownVertex)
-		return nil, errUnknownVertex
 	}
 
 	requestIDs := map[ids.ID]uint32{}
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
-		}
+		require.Equal(peerID, vdr)
+
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx2
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx2
+	require.Contains(requestIDs, vtxID2)
 
-	reqID, ok := requestIDs[vtxID2]
-	if !ok {
-		t.Fatalf("should have requested vtx2")
-	}
-
-	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}); err != nil {
-		t.Fatal(err)
-	}
-
-	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx2.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	}
+	reqID := requestIDs[vtxID2]
+	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choices.Accepted, vtx2.Status())
 }
 
 func TestRestartBootstrapping(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, manager, vm := newConfig(t)
 
 	vtxID0 := ids.GenerateTestID()
@@ -1150,18 +1004,12 @@ func TestRestartBootstrapping(t *testing.T) {
 		},
 		noopStarter,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*bootstrapper)
-	if !ok {
-		t.Fatal("unexpected bootstrapper type")
-	}
+	require.NoError(err)
+
+	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
-	if err := bs.Start(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.Start(context.Background(), 0))
 
 	parsedVtx0 := false
 	parsedVtx1 := false
@@ -1175,12 +1023,10 @@ func TestRestartBootstrapping(t *testing.T) {
 			if parsedVtx0 {
 				return vtx0, nil
 			}
-			return nil, errUnknownVertex
 		case vtxID1:
 			if parsedVtx1 {
 				return vtx1, nil
 			}
-			return nil, errUnknownVertex
 		case vtxID2:
 			if parsedVtx2 {
 				return vtx2, nil
@@ -1198,7 +1044,7 @@ func TestRestartBootstrapping(t *testing.T) {
 				return vtx5, nil
 			}
 		default:
-			t.Fatal(errUnknownVertex)
+			require.FailNow(errUnknownVertex.Error())
 			panic(errUnknownVertex)
 		}
 		return nil, errUnknownVertex
@@ -1229,98 +1075,49 @@ func TestRestartBootstrapping(t *testing.T) {
 			vtx5.StatusV = choices.Processing
 			parsedVtx5 = true
 			return vtx5, nil
+		default:
+			require.FailNow(errUnknownVertex.Error())
+			panic(errUnknownVertex)
 		}
-		t.Fatal(errUnknownVertex)
-		return nil, errUnknownVertex
 	}
 
 	requestIDs := map[ids.ID]uint32{}
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
-		}
+		require.Equal(peerID, vdr)
+
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), []ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{vtxID3, vtxID4})) // should request vtx3 and vtx4
+	require.Contains(requestIDs, vtxID3)
+	require.Contains(requestIDs, vtxID4)
 
-	vtx3ReqID, ok := requestIDs[vtxID3]
-	if !ok {
-		t.Fatal("should have requested vtx4")
-	}
-	_, ok = requestIDs[vtxID4]
-	if !ok {
-		t.Fatal("should have requested vtx4")
-	}
+	vtx3ReqID := requestIDs[vtxID3]
+	require.NoError(bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}))
+	require.Contains(requestIDs, vtxID1)
+	require.True(bs.OutstandingRequests.RemoveAny(vtxID4))
+	require.True(bs.OutstandingRequests.RemoveAny(vtxID1))
 
-	if err := bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}); err != nil {
-		t.Fatal(err)
-	}
-
-	_, ok = requestIDs[vtxID1]
-	if !ok {
-		t.Fatal("should have requested vtx1")
-	}
-
-	if removed := bs.OutstandingRequests.RemoveAny(vtxID4); !removed {
-		t.Fatal("expected to find outstanding requested for vtx4")
-	}
-
-	if removed := bs.OutstandingRequests.RemoveAny(vtxID1); !removed {
-		t.Fatal("expected to find outstanding requested for vtx1")
-	}
 	bs.needToFetch.Clear()
 	requestIDs = map[ids.ID]uint32{}
 
-	if err := bs.ForceAccepted(context.Background(), []ids.ID{vtxID5, vtxID3}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{vtxID5, vtxID3}))
+	require.Contains(requestIDs, vtxID1)
+	require.Contains(requestIDs, vtxID4)
+	require.Contains(requestIDs, vtxID5)
+	require.NotContains(requestIDs, vtxID3)
 
-	vtx1ReqID, ok := requestIDs[vtxID1]
-	if !ok {
-		t.Fatal("should have re-requested vtx1 from pending on prior run")
-	}
-	_, ok = requestIDs[vtxID4]
-	if !ok {
-		t.Fatal("should have re-requested vtx4 from pending on prior run")
-	}
-	vtx5ReqID, ok := requestIDs[vtxID5]
-	if !ok {
-		t.Fatal("should have requested vtx5")
-	}
-	if _, ok := requestIDs[vtxID3]; ok {
-		t.Fatal("should not have re-requested vtx3 since it has been processed")
-	}
+	vtx5ReqID := requestIDs[vtxID5]
+	require.NoError(bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}))
+	require.Contains(requestIDs, vtxID0)
 
-	if err := bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}); err != nil {
-		t.Fatal(err)
-	}
-
-	_, ok = requestIDs[vtxID0]
-	if !ok {
-		t.Fatal("should have requested vtx0 after ancestors ended prior to it")
-	}
-
-	if err := bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
-		t.Fatal(err)
-	}
-
-	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case vtx0.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx1.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx2.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx3.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx4.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	case vtx5.Status() != choices.Accepted:
-		t.Fatalf("Vertex should be accepted")
-	}
+	vtx1ReqID := requestIDs[vtxID1]
+	require.NoError(bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, vtx0.Status())
+	require.Equal(choices.Accepted, vtx1.Status())
+	require.Equal(choices.Accepted, vtx2.Status())
+	require.Equal(choices.Accepted, vtx3.Status())
+	require.Equal(choices.Accepted, vtx4.Status())
+	require.Equal(choices.Accepted, vtx5.Status())
 }
