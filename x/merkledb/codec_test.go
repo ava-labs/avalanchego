@@ -59,6 +59,9 @@ func newKeyChanges(r *rand.Rand, num uint) []KeyChange {
 		_, _ = r.Read(key)              // #nosec G404
 		val := make([]byte, r.Intn(32)) // #nosec G404
 		_, _ = r.Read(val)              // #nosec G404
+		if len(val) == 0 {
+			val = nil
+		}
 		keyChanges[i] = KeyChange{
 			Key:   key,
 			Value: Some(val),
@@ -384,6 +387,7 @@ func FuzzCodecChangeProofDeterministic(f *testing.F) {
 			randSeed int,
 			hadRootsInHistory bool,
 			numProofNodes uint,
+			numChangedKeys uint,
 			numDeletedKeys uint,
 		) {
 			require := require.New(t)
@@ -397,7 +401,7 @@ func FuzzCodecChangeProofDeterministic(f *testing.F) {
 				endProofNodes[i] = newRandomProofNode(r)
 			}
 
-			keyChanges := newKeyChanges(r, numProofNodes)
+			keyChanges := newKeyChanges(r, numChangedKeys)
 			for i := uint(0); i < numDeletedKeys; i++ {
 				delete := make([]byte, r.Intn(32)) // #nosec G404
 				_, _ = r.Read(delete)              // #nosec G404
