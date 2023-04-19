@@ -73,7 +73,7 @@ func (s *uniformReplacer) Reset() {
 
 func (s *uniformReplacer) Next() (uint64, error) {
 	if s.drawsCount >= s.length {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 
 	draw := s.rng.Uint64Inclusive(s.length-1-s.drawsCount) + s.drawsCount
