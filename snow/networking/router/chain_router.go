@@ -79,7 +79,7 @@ type ChainRouter struct {
 	benched        map[ids.NodeID]set.Set[ids.ID]
 	criticalChains set.Set[ids.ID]
 	stakingEnabled bool
-	onFatal        func(exitCode int)
+	cancel         context.CancelFunc
 	metrics        *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
@@ -100,7 +100,7 @@ func (cr *ChainRouter) Initialize(
 	criticalChains set.Set[ids.ID],
 	stakingEnabled bool,
 	trackedSubnets set.Set[ids.ID],
-	onFatal func(exitCode int),
+	cancel context.CancelFunc,
 	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
@@ -112,7 +112,7 @@ func (cr *ChainRouter) Initialize(
 	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
 	cr.stakingEnabled = stakingEnabled
-	cr.onFatal = onFatal
+	cr.cancel = cancel
 	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
@@ -654,8 +654,8 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 		chain.Context().Log.Warn("timed out while shutting down")
 	}
 
-	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
-		go cr.onFatal(1)
+	if cr.cancel != nil && cr.criticalChains.Contains(chainID) {
+		cr.cancel()
 	}
 }
 

@@ -34,7 +34,7 @@ type Router interface {
 		criticalChains set.Set[ids.ID],
 		stakingEnabled bool,
 		trackedSubnets set.Set[ids.ID],
-		onFatal func(exitCode int),
+		cancel context.CancelFunc,
 		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,

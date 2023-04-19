@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -78,7 +79,7 @@ type Indexer interface {
 }
 
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
-func NewIndexer(config Config, cancel func()) (Indexer, error) {
+func NewIndexer(config Config, cancel context.CancelFunc) (Indexer, error) {
 	indexer := &indexer{
 		codec:                codec.NewManager(codecMaxSize),
 		log:                  config.Log,
@@ -144,8 +145,7 @@ type indexer struct {
 	// Notifies of newly accepted vertices
 	vertexAcceptorGroup snow.AcceptorGroup
 
-	// called on close
-	cancel func()
+	cancel context.CancelFunc
 }
 
 // Assumes [ctx.Lock] is not held

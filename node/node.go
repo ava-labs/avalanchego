@@ -204,8 +204,9 @@ type Node struct {
 
 	criticalChains set.Set[ids.ID]
 
-	indexerCtx      context.Context
-	chainManagerCtx context.Context
+	// Global context used to propagate fatal events
+	nodeCtx context.Context
+	cancel  context.CancelFunc
 }
 
 // New returns an instance of Node
@@ -214,6 +215,8 @@ func New(
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) (*Node, error) {
+	nodeCtx, cancel := context.WithCancel(context.Background())
+
 	metricsRegisterer := prometheus.NewRegistry()
 	metricsGatherer := metrics.NewMultiGatherer()
 
@@ -229,6 +232,7 @@ func New(
 
 	vmFactoryLog, err := logFactory.Make("vm-factory")
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("problem creating vm logger: %w", err)
 	}
 
@@ -241,12 +245,14 @@ func New(
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
 		if err := beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
+			cancel()
 			return nil, err
 		}
 	}
 
 	tracer, err := trace.New(config.TraceConfig)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("couldn't initialize tracer: %w", err)
 	}
 
@@ -276,6 +282,7 @@ func New(
 	} else {
 		authWrapper, err := auth.New(logger, "auth", config.APIAuthConfig.APIAuthPassword)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 
@@ -283,6 +290,7 @@ func New(
 		logger.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
 		authService, err := authWrapper.CreateHandler()
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 		handler := &common.HTTPHandler{
@@ -305,9 +313,11 @@ func New(
 			authWrapper,
 		)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 		if err := apiServer.AddRoute(handler, &sync.RWMutex{}, "auth", ""); err != nil {
+			cancel()
 			return nil, err
 		}
 	}
@@ -317,18 +327,21 @@ func New(
 			"been disabled")
 	} else {
 		if err := metricsGatherer.Register(constants.PlatformName, metricsRegisterer); err != nil {
+			cancel()
 			return nil, err
 		}
 
 		// Current state of process metrics.
 		processCollector := collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})
 		if err := metricsRegisterer.Register(processCollector); err != nil {
+			cancel()
 			return nil, err
 		}
 
 		// Go process metrics using debug.GCStats.
 		goCollector := collectors.NewGoCollector()
 		if err := metricsRegisterer.Register(goCollector); err != nil {
+			cancel()
 			return nil, err
 		}
 
@@ -346,6 +359,7 @@ func New(
 			"metrics",
 			"",
 		); err != nil {
+			cancel()
 			return nil, err
 		}
 	}
@@ -373,6 +387,7 @@ func New(
 		)
 	}
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -381,6 +396,7 @@ func New(
 		metricsRegisterer,
 	)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -400,19 +416,23 @@ func New(
 		err = db.Put(genesisHashKey, rawGenesisHash)
 	}
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	genesisHash, err := ids.ToID(rawGenesisHash)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	expectedGenesisHash, err := ids.ToID(rawExpectedGenesisHash)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	if genesisHash != expectedGenesisHash {
+		cancel()
 		return nil, fmt.Errorf("db contains invalid genesis hash. DB Genesis: %s Generated Genesis: %s", genesisHash, expectedGenesisHash)
 	}
 
@@ -421,6 +441,7 @@ func New(
 	keystore := keystore.New(logger, keystoreDB)
 	keystoreHandler, err := keystore.CreateHandler()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	if !config.KeystoreAPIEnabled {
@@ -432,6 +453,7 @@ func New(
 			Handler:     keystoreHandler,
 		}
 		if err := apiServer.AddRoute(handler, &sync.RWMutex{}, "keystore", ""); err != nil {
+			cancel()
 			return nil, err
 		}
 	}
@@ -452,6 +474,7 @@ func New(
 		config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
@@ -469,6 +492,7 @@ func New(
 
 	resourceTracker, err := tracker.NewResourceTracker(metricsRegisterer, resourceManager, &meter.ContinuousFactory{}, config.SystemTrackerProcessingHalflife)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -478,6 +502,7 @@ func New(
 	currentIPPort := config.IPPort.IPPort()
 	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", currentIPPort.Port))
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	// Wrap listener so it will only accept a certain number of incoming connections per second
@@ -512,6 +537,7 @@ func New(
 			config.DisabledStakingWeight,
 		)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 
@@ -555,6 +581,7 @@ func New(
 	// initialize gossip tracker
 	gossipTracker, err := peer.NewGossipTracker(metricsRegisterer, networkNamespace)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -566,6 +593,7 @@ func New(
 
 	tlsKey, ok := config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
+		cancel()
 		return nil, errInvalidTLSKey
 	}
 
@@ -573,6 +601,7 @@ func New(
 	if config.NetworkConfig.TLSKeyLogFile != "" {
 		tlsKeyLogWriterCloser, err = perms.Create(config.NetworkConfig.TLSKeyLogFile, perms.ReadWrite)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 		logger.Warn("TLS key logging is enabled",
@@ -610,6 +639,7 @@ func New(
 		consensusRouter,
 	)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -623,6 +653,7 @@ func New(
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
 			if err := config.VMAliaser.Alias(vmID, alias); err != nil {
+				cancel()
 				return nil, err
 			}
 		}
@@ -630,12 +661,14 @@ func New(
 
 	createAVMTx, err := genesis.VMGenesis(config.GenesisBytes, constants.AVMID)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	xChainID := createAVMTx.ID()
 
 	createEVMTx, err := genesis.VMGenesis(config.GenesisBytes, constants.EVMID)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	cChainID := createEVMTx.ID()
@@ -652,6 +685,7 @@ func New(
 
 	health, err := health.New(logger, metricsRegisterer)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -663,10 +697,27 @@ func New(
 		metricsRegisterer,
 	)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
-	chainManagerCtx, chainManagerCancel := context.WithCancel(context.Background())
+	// Routes incoming messages from peers to the appropriate chain
+	if err := consensusRouter.Initialize(
+		nodeID,
+		logger,
+		timeoutManager,
+		config.ConsensusShutdownTimeout,
+		criticalChains,
+		config.EnableStaking,
+		config.TrackedSubnets,
+		cancel,
+		config.RouterHealthConfig,
+		"requests",
+		metricsRegisterer,
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize chain router: %w", err)
+	}
+
 	chainManager := chains.New(&chains.ManagerConfig{
 		StakingEnabled:                          config.EnableStaking,
 		StakingCert:                             config.StakingTLSCert,
@@ -711,7 +762,7 @@ func New(
 		TracingEnabled:                          config.TraceConfig.Enabled,
 		Tracer:                                  tracer,
 		ChainDataDir:                            config.ChainDataDir,
-	}, chainManagerCancel)
+	}, cancel)
 
 	logger.Info("initializing VMs")
 
@@ -845,7 +896,6 @@ func New(
 	}
 
 	txIndexerDB := prefixdb.New(indexerDBPrefix, db)
-	indexerCtx, indexerCancel := context.WithCancel(context.Background())
 	indexer, err := indexer.NewIndexer(indexer.Config{
 		IndexingEnabled:      config.IndexAPIEnabled,
 		AllowIncompleteIndex: config.IndexAllowIncomplete,
@@ -855,7 +905,7 @@ func New(
 		TxAcceptorGroup:      txAcceptorGroup,
 		VertexAcceptorGroup:  vertexAcceptorGroup,
 		APIServer:            apiServer,
-	}, indexerCancel)
+	}, cancel)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create index for txs: %w", err)
 	}
@@ -940,8 +990,8 @@ func New(
 		timeoutManager:        timeoutManager,
 		criticalChains:        criticalChains,
 		benchlistManager:      benchlistManager,
-		indexerCtx:            indexerCtx,
-		chainManagerCtx:       chainManagerCtx,
+		nodeCtx:               nodeCtx,
+		cancel:                cancel,
 	}, nil
 }
 
@@ -951,12 +1001,11 @@ func (n *Node) Start() error {
 	go func() {
 		for {
 			select {
-			case <-n.indexerCtx.Done():
+			// Shutdown the node if we hit a fatal error
+			case <-n.nodeCtx.Done():
 				n.Shutdown(1)
 				return
-			case <-n.chainManagerCtx.Done():
-				n.Shutdown(1)
-				return
+			default:
 			}
 		}
 	}()
@@ -974,23 +1023,6 @@ func (n *Node) Start() error {
 	})
 
 	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
-
-	// Routes incoming messages from peers to the appropriate chain
-	if err := n.consensusRouter.Initialize(
-		n.ID,
-		n.Log,
-		n.timeoutManager,
-		n.Config.ConsensusShutdownTimeout,
-		n.criticalChains,
-		n.Config.EnableStaking,
-		n.Config.TrackedSubnets,
-		n.Shutdown,
-		n.Config.RouterHealthConfig,
-		"requests",
-		n.MetricsRegisterer,
-	); err != nil {
-		return fmt.Errorf("couldn't initialize chain router: %w", err)
-	}
 
 	// Notify subscribers when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)
@@ -1253,6 +1285,7 @@ func (n *Node) shutdown() {
 	n.Log.Info("shutting down node",
 		zap.Int("exitCode", n.ExitCode()),
 	)
+	n.cancel()
 
 	// Passes if the node is not shutting down
 	shuttingDownCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
