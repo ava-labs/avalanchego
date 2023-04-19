@@ -48,9 +48,8 @@ type Gossiper interface {
 
 // pushGossiper is used to gossip transactions to the network
 type pushGossiper struct {
-	ctx                  *snow.Context
-	gossipActivationTime time.Time
-	config               Config
+	ctx    *snow.Context
+	config Config
 
 	client        peer.NetworkClient
 	blockchain    *core.BlockChain
@@ -77,26 +76,21 @@ type pushGossiper struct {
 // createGossiper constructs and returns a pushGossiper or noopGossiper
 // based on whether vm.chainConfig.ApricotPhase4BlockTimestamp is set
 func (vm *VM) createGossiper(stats GossipStats) Gossiper {
-	if vm.chainConfig.ApricotPhase4BlockTimestamp == nil {
-		return &noopGossiper{}
-	}
-
 	net := &pushGossiper{
-		ctx:                  vm.ctx,
-		gossipActivationTime: time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0),
-		config:               vm.config,
-		client:               vm.client,
-		blockchain:           vm.blockChain,
-		txPool:               vm.txPool,
-		atomicMempool:        vm.mempool,
-		ethTxsToGossipChan:   make(chan []*types.Transaction),
-		ethTxsToGossip:       make(map[common.Hash]*types.Transaction),
-		shutdownChan:         vm.shutdownChan,
-		shutdownWg:           &vm.shutdownWg,
-		recentAtomicTxs:      &cache.LRU[ids.ID, interface{}]{Size: recentCacheSize},
-		recentEthTxs:         &cache.LRU[common.Hash, interface{}]{Size: recentCacheSize},
-		codec:                vm.networkCodec,
-		stats:                stats,
+		ctx:                vm.ctx,
+		config:             vm.config,
+		client:             vm.client,
+		blockchain:         vm.blockChain,
+		txPool:             vm.txPool,
+		atomicMempool:      vm.mempool,
+		ethTxsToGossipChan: make(chan []*types.Transaction),
+		ethTxsToGossip:     make(map[common.Hash]*types.Transaction),
+		shutdownChan:       vm.shutdownChan,
+		shutdownWg:         &vm.shutdownWg,
+		recentAtomicTxs:    &cache.LRU[ids.ID, interface{}]{Size: recentCacheSize},
+		recentEthTxs:       &cache.LRU[common.Hash, interface{}]{Size: recentCacheSize},
+		codec:              vm.networkCodec,
+		stats:              stats,
 	}
 	net.awaitEthTxGossip()
 	return net
@@ -269,14 +263,6 @@ func (n *pushGossiper) awaitEthTxGossip() {
 }
 
 func (n *pushGossiper) GossipAtomicTxs(txs []*Tx) error {
-	if time.Now().Before(n.gossipActivationTime) {
-		log.Trace(
-			"not gossiping atomic tx before the gossiping activation time",
-			"txs", txs,
-		)
-		return nil
-	}
-
 	errs := wrappers.Errs{}
 	for _, tx := range txs {
 		errs.Add(n.gossipAtomicTx(tx))
@@ -405,14 +391,6 @@ func (n *pushGossiper) gossipEthTxs(force bool) (int, error) {
 // NOTE: We never return a non-nil error from this function but retain the
 // option to do so in case it becomes useful.
 func (n *pushGossiper) GossipEthTxs(txs []*types.Transaction) error {
-	if time.Now().Before(n.gossipActivationTime) {
-		log.Trace(
-			"not gossiping eth txs before the gossiping activation time",
-			"len(txs)", len(txs),
-		)
-		return nil
-	}
-
 	select {
 	case n.ethTxsToGossipChan <- txs:
 	case <-n.shutdownChan:
@@ -536,15 +514,5 @@ func (h *GossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip
 		}
 		h.stats.IncEthTxsGossipReceivedNew()
 	}
-	return nil
-}
-
-// noopGossiper should be used when gossip communication is not supported
-type noopGossiper struct{}
-
-func (n *noopGossiper) GossipAtomicTxs([]*Tx) error {
-	return nil
-}
-func (n *noopGossiper) GossipEthTxs([]*types.Transaction) error {
 	return nil
 }
