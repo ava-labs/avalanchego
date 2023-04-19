@@ -410,18 +410,22 @@ func (m *StateSyncManager) findNextKey(
 		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
 			{
 				// there was a branch node in the received proof that isn't in the local proof
+				// see if the received proof node has children not present in the local proof
 				deepestNode = &receivedProofNode
 				receivedProofNodeIndex--
 			}
 		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
 			{
 				// there was a branch node in the local proof that isn't in the received proof
+				// see if the local proof node has children not present in the received proof
 				deepestNode = &localProofNode
 				localProofNodeIndex--
 			}
 		default:
 			{
-				// the two nodes are at the same depth, so compare them
+				// the two nodes are at the same depth
+				// see if any of the children present in the local proof node are different
+				// from the children in the received proof node
 				deepestNode = &localProofNode
 				deepestNodeFromOtherProof = &receivedProofNode
 				localProofNodeIndex--
@@ -429,9 +433,19 @@ func (m *StateSyncManager) findNextKey(
 			}
 		}
 
-		// we only want to look at the children with keys greater than the proofKey, so find the next larger nibble
-		startingChildNibble := byte(0)
-		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
+		// We only want to look at the children with keys greater than the proofKey.
+		// So find the next largest nibble at this key depth
+		var startingChildNibble byte
+
+		// The proof key has the deepest node's key as a prefix,
+		// so only the next nibble of the proof key needs to be considered.
+		if deepestNode.KeyPath.NibbleLength == proofKeyPath.NibbleLength {
+			// If the deepest node has the same key as the key being proven,
+			// then all of its children have keys greater than the proof key, so we can start at byte 0
+			startingChildNibble = 0
+		} else {
+			// The deepest node has a key shorter than the key being proven,
+			// so look at the next nibble of the proof key to determine which children have larger keys
 			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
 		}
 
