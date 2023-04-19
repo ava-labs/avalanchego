@@ -1261,8 +1261,7 @@ func (n *Node) shutdown() {
 		}, errShuttingDown
 	})
 
-	err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag)
-	if err != nil {
+	if err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag); err != nil {
 		n.Log.Debug("couldn't register shuttingDown health check",
 			zap.Error(err),
 		)
