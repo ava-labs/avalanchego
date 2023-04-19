@@ -455,15 +455,16 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
-	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
-		return nil, nil
-	}
-
 	// if the result is before or equal to the lastReceivedKey
 	// then use the lastReceivedKey + 0, which is the next largest key after lastReceivedKey
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		return append(lastReceivedKey, 0), nil
+		nextKey = lastReceivedKey
+		nextKey = append(nextKey, 0)
+	}
+
+	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
+	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
+		return nil, nil
 	}
 
 	return nextKey, nil
