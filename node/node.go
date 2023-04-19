@@ -628,28 +628,6 @@ func New(
 		}
 	}
 
-	chainIDs := make([]ids.ID, len(config.IPCDefaultChainIDs))
-	for i, chainID := range config.IPCDefaultChainIDs {
-		id, err := ids.FromString(chainID)
-		if err != nil {
-			return nil, err
-		}
-		chainIDs[i] = id
-	}
-
-	chainIPCs, err := ipcs.NewChainIPCs(
-		logger,
-		config.IPCPath,
-		config.NetworkID,
-		blockAcceptorGroup,
-		txAcceptorGroup,
-		vertexAcceptorGroup,
-		chainIDs,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	createAVMTx, err := genesis.VMGenesis(config.GenesisBytes, constants.AVMID)
 	if err != nil {
 		return nil, err
@@ -664,17 +642,6 @@ func New(
 
 	benchlistManager := benchlist.NewManager(config.BenchlistConfig, consensusRouter, validatorManager, config.EnableStaking)
 
-	// Manages network timeouts
-	timeoutManager, err := timeout.NewManager(
-		&config.AdaptiveTimeoutConfig,
-		benchlistManager,
-		"requests",
-		metricsRegisterer,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	// If any of these chains die, the node shuts down
 	criticalChains := set.Set[ids.ID]{}
 	criticalChains.Add(
@@ -684,6 +651,17 @@ func New(
 	)
 
 	health, err := health.New(logger, metricsRegisterer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Manages network timeouts
+	timeoutManager, err := timeout.NewManager(
+		&config.AdaptiveTimeoutConfig,
+		benchlistManager,
+		"requests",
+		metricsRegisterer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -867,8 +845,7 @@ func New(
 	}
 
 	txIndexerDB := prefixdb.New(indexerDBPrefix, db)
-
-	indexerCtx, indexerCancelF := context.WithCancel(context.Background())
+	indexerCtx, indexerCancel := context.WithCancel(context.Background())
 	indexer, err := indexer.NewIndexer(indexer.Config{
 		IndexingEnabled:      config.IndexAPIEnabled,
 		AllowIncompleteIndex: config.IndexAllowIncomplete,
@@ -878,7 +855,7 @@ func New(
 		TxAcceptorGroup:      txAcceptorGroup,
 		VertexAcceptorGroup:  vertexAcceptorGroup,
 		APIServer:            apiServer,
-	}, indexerCancelF)
+	}, indexerCancel)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create index for txs: %w", err)
 	}
@@ -896,6 +873,28 @@ func New(
 			config.ProfilerConfig.Freq,
 			config.ProfilerConfig.MaxNumFiles,
 		)
+	}
+
+	chainIDs := make([]ids.ID, len(config.IPCDefaultChainIDs))
+	for i, chainID := range config.IPCDefaultChainIDs {
+		id, err := ids.FromString(chainID)
+		if err != nil {
+			return nil, err
+		}
+		chainIDs[i] = id
+	}
+
+	chainIPCs, err := ipcs.NewChainIPCs(
+		logger,
+		config.IPCPath,
+		config.NetworkID,
+		blockAcceptorGroup,
+		txAcceptorGroup,
+		vertexAcceptorGroup,
+		chainIDs,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Node{
