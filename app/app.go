@@ -55,7 +55,6 @@ type App interface {
 }
 
 func New(config node.Config) (App, error) {
-	// we want to create the logger after the plugin has started the app
 	logFactory := logging.NewFactory(config.LoggingConfig)
 	log, err := logFactory.Make("main")
 

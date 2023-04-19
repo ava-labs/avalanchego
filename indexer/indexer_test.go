@@ -93,7 +93,6 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	require := require.New(t)
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
-
 	config := Config{
 		IndexingEnabled:     true,
 		Log:                 logging.NoLog{},
