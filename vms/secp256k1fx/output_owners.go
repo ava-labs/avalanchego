@@ -57,7 +57,7 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 }
 
 // Fields returns JSON keys in a map that can be used with marshal JSON
-// to serialise OutputOwners struct
+// to serialize OutputOwners struct
 func (out *OutputOwners) Fields() (map[string]interface{}, error) {
 	addrsLen := len(out.Addrs)
 
