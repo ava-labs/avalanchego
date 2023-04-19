@@ -260,6 +260,8 @@ func (a *app) Start() error {
 // Stop attempts to shutdown the currently running node. This function will
 // return immediately.
 func (a *app) Stop() error {
+	defer a.logFactory.Close()
+
 	a.node.Shutdown(0)
 	return nil
 }
