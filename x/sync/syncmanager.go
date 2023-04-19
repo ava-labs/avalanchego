@@ -401,7 +401,7 @@ func (m *StateSyncManager) findNextKey(
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := receivedProofNodes[receivedProofNodeIndex]
 
-		// deepest node is the proof node with the longest key (deepest in the trie).
+		// deepest node is the proof node with the longest key (deepest in the trie) in the two proofs that hasn't been handled yet.
 		// deepestNodeFromOtherProof is the proof node from the other proof with the same key/depth if it exists, nil otherwise.
 		var deepestNode, deepestNodeFromOtherProof *merkledb.ProofNode
 
