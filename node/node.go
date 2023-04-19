@@ -1002,7 +1002,6 @@ func (n *Node) Start() error {
 		// Shutdown the node if we hit a fatal error
 		<-n.nodeCtx.Done()
 		n.Shutdown(1)
-		return
 	}()
 
 	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
