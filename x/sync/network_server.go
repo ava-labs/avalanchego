@@ -184,7 +184,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
 		// the proof size was too large, try to shrink it
-		keyLimit = uint16(len(changeProof.KeyValues)+len(changeProof.DeletedKeys)) / 2
+		keyLimit = uint16(len(changeProof.KeyChanges)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
