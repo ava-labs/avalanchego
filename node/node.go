@@ -999,15 +999,10 @@ func New(
 // Returns when the node exits.
 func (n *Node) Start() error {
 	go func() {
-		for {
-			select {
-			// Shutdown the node if we hit a fatal error
-			case <-n.nodeCtx.Done():
-				n.Shutdown(1)
-				return
-			default:
-			}
-		}
+		// Shutdown the node if we hit a fatal error
+		<-n.nodeCtx.Done()
+		n.Shutdown(1)
+		return
 	}()
 
 	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)

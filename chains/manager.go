@@ -250,11 +250,11 @@ type manager struct {
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
 
-	cancel func()
+	cancel context.CancelFunc
 }
 
 // New returns a new Manager
-func New(config *ManagerConfig, cancel func()) Manager {
+func New(config *ManagerConfig, cancel context.CancelFunc) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,

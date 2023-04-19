@@ -108,7 +108,7 @@ func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2, arg3 in
 // Dispatch mocks base method.
 func (m *MockServer) Dispatch() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start")
+	ret := m.ctrl.Call(m, "Dispatch")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -116,7 +116,7 @@ func (m *MockServer) Dispatch() error {
 // Dispatch indicates an expected call of Dispatch.
 func (mr *MockServerMockRecorder) Dispatch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockServer)(nil).Dispatch))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockServer)(nil).Dispatch))
 }
 
 // DispatchTLS mocks base method.
