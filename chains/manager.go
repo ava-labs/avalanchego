@@ -222,6 +222,9 @@ type ManagerConfig struct {
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
 
+	// Targets CPU usage for this node.
+	CPUTargeter timetracker.Targeter
+
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
@@ -821,6 +824,7 @@ func (m *manager) createAvalancheChain(
 		m.ConsensusGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
+		m.CPUTargeter,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
 	)
@@ -1177,6 +1181,7 @@ func (m *manager) createSnowmanChain(
 		m.ConsensusGossipFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
+		m.CPUTargeter,
 		subnetConnector,
 		sb,
 	)

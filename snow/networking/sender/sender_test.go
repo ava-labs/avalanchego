@@ -119,6 +119,12 @@ func TestTimeout(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	targeter := tracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -126,6 +132,7 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		testThreadPoolSize,
 		resourceTracker,
+		targeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -393,6 +400,12 @@ func TestReliableMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	targeter := tracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -400,6 +413,7 @@ func TestReliableMessages(t *testing.T) {
 		1,
 		testThreadPoolSize,
 		resourceTracker,
+		targeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -542,6 +556,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	targeter := tracker.NewMockTargeter(ctrl)
+	targeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -549,6 +569,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		targeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)

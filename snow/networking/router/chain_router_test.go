@@ -1,6 +1,5 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-
 package router
 
 import (
@@ -87,6 +86,12 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -94,6 +99,7 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -223,6 +229,12 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -230,6 +242,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -380,6 +393,11 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -387,6 +405,7 @@ func TestRouterTimeout(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -849,6 +868,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -856,6 +881,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -1140,6 +1166,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -1147,6 +1179,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		sb,
 	)
@@ -1290,6 +1323,11 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	requesterHandler, err := handler.New(
 		requester,
 		vdrs,
@@ -1297,6 +1335,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(requester.NodeID, subnets.Config{}),
 	)
@@ -1315,6 +1354,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(responder.NodeID, subnets.Config{}),
 	)
@@ -1557,6 +1597,11 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	h, err := handler.New(
 		ctx,
 		vdrs,
@@ -1564,6 +1609,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		sb,
 	)

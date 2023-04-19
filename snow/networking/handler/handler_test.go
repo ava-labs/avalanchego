@@ -49,6 +49,12 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -56,6 +62,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -144,6 +151,12 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -151,6 +164,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -235,6 +249,12 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -242,6 +262,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		1,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -315,6 +336,12 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -322,6 +349,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -385,14 +413,15 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		meter.ContinuousFactory{},
 		time.Second,
 	)
+	require.NoError(t, err)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	connector := validators.NewMockSubnetConnector(ctrl)
 
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := ids.GenerateTestID()
+	cpuTargeter := tracker.NewMockTargeter(ctrl)
+	cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
 
-	require.NoError(t, err)
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -400,6 +429,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
+		cpuTargeter,
 		connector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
@@ -437,6 +467,9 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	}
 
 	handler.Start(context.Background(), false)
+
+	nodeID := ids.GenerateTestNodeID()
+	subnetID := ids.GenerateTestID()
 
 	// Handler should call subnet connector when ConnectedSubnet message is received
 	var wg sync.WaitGroup
@@ -563,6 +596,12 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				time.Second,
 			)
 			require.NoError(t, err)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			cpuTargeter := tracker.NewMockTargeter(ctrl)
+			cpuTargeter.EXPECT().TargetUsage(gomock.Any()).Return(float64(1)).AnyTimes()
+
 			handler, err := New(
 				ctx,
 				vdrs,
@@ -570,6 +609,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
+				cpuTargeter,
 				validators.UnhandledSubnetConnector,
 				subnets.New(ids.EmptyNodeID, subnets.Config{}),
 			)

@@ -747,6 +747,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
+		CPUTargeter:                             n.cpuTargeter,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		TracingEnabled:                          n.Config.TraceConfig.Enabled,
 		Tracer:                                  n.tracer,

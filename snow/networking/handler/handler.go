@@ -92,6 +92,9 @@ type handler struct {
 	// Tracks cpu/disk usage caused by each peer.
 	resourceTracker tracker.ResourceTracker
 
+	// Tracks how much cpu a peer should use.
+	cpuTargeter tracker.Targeter
+
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [syncMessageQueue].
 	syncMessageQueue MessageQueue
@@ -122,6 +125,7 @@ func New(
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
+	cpuTargeter tracker.Targeter,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 ) (Handler, error) {
@@ -136,6 +140,7 @@ func New(
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
+		cpuTargeter:      cpuTargeter,
 		subnetConnector:  subnetConnector,
 		subnetAllower:    subnet,
 	}
@@ -147,11 +152,12 @@ func New(
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
 	}
 	cpuTracker := resourceTracker.CPUTracker()
-	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler", h.ctx.Registerer, message.SynchronousOps)
+	h.syncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.cpuTargeter, "handler", h.ctx.Registerer, message.SynchronousOps)
 	if err != nil {
 		return nil, fmt.Errorf("initializing sync message queue errored with: %w", err)
 	}
-	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, h.validators, cpuTracker, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+	h.asyncMessageQueue, err = NewMessageQueue(h.ctx.Log, cpuTracker, h.cpuTargeter, "handler_async", h.ctx.Registerer, message.AsynchronousOps)
+
 	if err != nil {
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}

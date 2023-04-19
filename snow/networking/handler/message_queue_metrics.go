@@ -17,32 +17,49 @@ type messageQueueMetrics struct {
 	len               prometheus.Gauge
 	nodesWithMessages prometheus.Gauge
 	numExcessiveCPU   prometheus.Counter
+	bucketLengths     *prometheus.GaugeVec
 }
 
-func (m *messageQueueMetrics) initialize(
+func newMessageQueueMetrics(
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
-) error {
+) (*messageQueueMetrics, error) {
 	namespace := fmt.Sprintf("%s_%s", metricsNamespace, "unprocessed_msgs")
-	m.len = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "len",
-		Help:      "Messages ready to be processed",
-	})
-	m.nodesWithMessages = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "nodes",
-		Help:      "Nodes from which there are at least 1 message ready to be processed",
-	})
-	m.numExcessiveCPU = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "excessive_cpu",
-		Help:      "Times we deferred handling a message from a node because the node was using excessive CPU",
-	})
+	m := &messageQueueMetrics{
+		len: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "len",
+			Help:      "Messages ready to be processed",
+		}),
+		nodesWithMessages: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "nodes",
+			Help:      "Nodes from which there are at least 1 message ready to be processed",
+		}),
+		numExcessiveCPU: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "excessive_cpu",
+			Help:      "Times we deferred handling a message from a node because the node was using excessive CPU",
+		}),
+		bucketLengths: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "bucket_length",
+				Help:      "Number of nodes in each bucket",
+			},
+			[]string{"bucket_index"},
+		),
+		ops: make(map[message.Op]prometheus.Gauge, len(ops)),
+	}
 
 	errs := wrappers.Errs{}
-	m.ops = make(map[message.Op]prometheus.Gauge, len(ops))
+	errs.Add(
+		metricsRegisterer.Register(m.len),
+		metricsRegisterer.Register(m.nodesWithMessages),
+		metricsRegisterer.Register(m.numExcessiveCPU),
+		metricsRegisterer.Register(m.bucketLengths),
+	)
 
 	for _, op := range ops {
 		opStr := op.String()
@@ -54,11 +71,5 @@ func (m *messageQueueMetrics) initialize(
 		m.ops[op] = opMetric
 		errs.Add(metricsRegisterer.Register(opMetric))
 	}
-
-	errs.Add(
-		metricsRegisterer.Register(m.len),
-		metricsRegisterer.Register(m.nodesWithMessages),
-		metricsRegisterer.Register(m.numExcessiveCPU),
-	)
-	return errs.Err
+	return m, errs.Err
 }
