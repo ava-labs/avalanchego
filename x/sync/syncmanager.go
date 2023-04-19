@@ -438,7 +438,7 @@ func (m *StateSyncManager) findNextKey(
 		// We only want to look at the children with keys greater than the proofKey.
 		// The proof key has the deepest node's key as a prefix,
 		// so only the next nibble of the proof key needs to be considered.
-		
+
 		// If the deepest node has the same key as the key being proven,
 		// then all of its children have keys greater than the proof key, so we can start at byte 0
 		startingChildNibble := byte(0)
@@ -458,7 +458,7 @@ func (m *StateSyncManager) findNextKey(
 	// if the result is before or equal to the lastReceivedKey
 	// then use the lastReceivedKey + 0, which is the next largest key after lastReceivedKey
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		return append(lastReceivedKey, 0), nil
+		nextKey = append(lastReceivedKey, 0)
 	}
 
 	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
