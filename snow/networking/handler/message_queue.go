@@ -203,7 +203,7 @@ func (m *messageQueue) Shutdown() {
 }
 
 // canPop will return true for at least one message in [m.msgs]
-func (m *messageQueue) canPop(msg message.InboundMessage) bool {
+func (*messageQueue) canPop(msg message.InboundMessage) bool {
 	// Disable excessive CPU rate limiting
 	return true
 	// // Always pop connected and disconnected messages.

@@ -55,9 +55,9 @@ type MessageQueue interface {
 type throttledMessageQueue struct {
 	onFailed SendFailedCallback
 	// [id] of the peer we're sending messages to
-	id                   ids.NodeID
-	log                  logging.Logger
-	outboundMsgThrottler throttling.OutboundMsgThrottler
+	id  ids.NodeID
+	log logging.Logger
+	// outboundMsgThrottler throttling.OutboundMsgThrottler
 
 	// Signalled when a message is added to the queue and when Close() is
 	// called.
@@ -76,15 +76,15 @@ func NewThrottledMessageQueue(
 	onFailed SendFailedCallback,
 	id ids.NodeID,
 	log logging.Logger,
-	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	_ throttling.OutboundMsgThrottler,
 ) MessageQueue {
 	return &throttledMessageQueue{
-		onFailed:             onFailed,
-		id:                   id,
-		log:                  log,
-		outboundMsgThrottler: outboundMsgThrottler,
-		cond:                 sync.NewCond(&sync.Mutex{}),
-		queue:                buffer.NewUnboundedDeque[message.OutboundMessage](initialQueueSize),
+		onFailed: onFailed,
+		id:       id,
+		log:      log,
+		// outboundMsgThrottler: outboundMsgThrottler,
+		cond:  sync.NewCond(&sync.Mutex{}),
+		queue: buffer.NewUnboundedDeque[message.OutboundMessage](initialQueueSize),
 	}
 }
 
@@ -101,16 +101,16 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	}
 
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
-	if !q.outboundMsgThrottler.Acquire(msg, q.id) {
-		q.log.Debug(
-			"dropping outgoing message",
-			zap.String("reason", "rate-limiting"),
-			zap.Stringer("messageOp", msg.Op()),
-			zap.Stringer("nodeID", q.id),
-		)
-		q.onFailed.SendFailed(msg)
-		return false
-	}
+	// if !q.outboundMsgThrottler.Acquire(msg, q.id) {
+	// 	q.log.Debug(
+	// 		"dropping outgoing message",
+	// 		zap.String("reason", "rate-limiting"),
+	// 		zap.Stringer("messageOp", msg.Op()),
+	// 		zap.Stringer("nodeID", q.id),
+	// 	)
+	// 	q.onFailed.SendFailed(msg)
+	// 	return false
+	// }
 
 	// Invariant: must call q.outboundMsgThrottler.Release(msg, q.id) when [msg]
 	// is popped or, if this queue closes before [msg] is popped, when this
@@ -120,13 +120,13 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	defer q.cond.L.Unlock()
 
 	if q.closed {
-		q.log.Debug(
+		q.log.Info(
 			"dropping outgoing message",
 			zap.String("reason", "closed queue"),
 			zap.Stringer("messageOp", msg.Op()),
 			zap.Stringer("nodeID", q.id),
 		)
-		q.outboundMsgThrottler.Release(msg, q.id)
+		// q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 		return false
 	}
@@ -170,7 +170,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 func (q *throttledMessageQueue) pop() message.OutboundMessage {
 	msg, _ := q.queue.PopLeft()
 
-	q.outboundMsgThrottler.Release(msg, q.id)
+	// q.outboundMsgThrottler.Release(msg, q.id)
 	return msg
 }
 
@@ -186,7 +186,7 @@ func (q *throttledMessageQueue) Close() {
 
 	for q.queue.Len() > 0 {
 		msg, _ := q.queue.PopLeft()
-		q.outboundMsgThrottler.Release(msg, q.id)
+		// q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 	}
 	q.queue = nil
