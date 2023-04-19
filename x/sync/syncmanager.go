@@ -412,6 +412,8 @@ func (m *StateSyncManager) findNextKey(
 				// there was a branch node in the received proof that isn't in the local proof
 				// see if the received proof node has children not present in the local proof
 				deepestNode = &receivedProofNode
+				
+				// we have dealt with this received node, so move on to the next received node
 				receivedProofNodeIndex--
 			}
 		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
@@ -419,6 +421,8 @@ func (m *StateSyncManager) findNextKey(
 				// there was a branch node in the local proof that isn't in the received proof
 				// see if the local proof node has children not present in the received proof
 				deepestNode = &localProofNode
+
+				// we have dealt with this local node, so move on to the next local node
 				localProofNodeIndex--
 			}
 		default:
@@ -428,6 +432,8 @@ func (m *StateSyncManager) findNextKey(
 				// from the children in the received proof node
 				deepestNode = &localProofNode
 				deepestNodeFromOtherProof = &receivedProofNode
+
+				// we have dealt with this local node and received node, so move on to the next nodes
 				localProofNodeIndex--
 				receivedProofNodeIndex--
 			}
