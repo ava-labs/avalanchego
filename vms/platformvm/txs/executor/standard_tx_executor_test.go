@@ -392,7 +392,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(ContinuousStakingFork)
+	env := newEnvironment(BanffFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -997,8 +997,8 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 	var (
 		nodeID            = ids.GenerateTestNodeID()
 		validatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Time{}
-		dummyEndTime      = time.Time{}.Add(validatorDuration)
+		dummyStartTime    = time.Unix(0, 0)
+		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
 	)
 
 	addValTx, err := env.txBuilder.NewAddValidatorTx(

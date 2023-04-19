@@ -14,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ btree.LessFunc[*Staker] = (*Staker).Less
+var (
+	_ btree.LessFunc[*Staker] = (*Staker).Less
+
+	StakerZeroTime = time.Unix(0, 0)
+)
 
 // StakerIterator defines an interface for iterating over a set of stakers.
 type StakerIterator interface {
@@ -81,6 +85,10 @@ func (s *Staker) Less(than *Staker) bool {
 	}
 
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
+}
+
+func (s *Staker) Duration() time.Duration {
+	return s.EndTime.Sub(s.StartTime)
 }
 
 func NewCurrentStaker(

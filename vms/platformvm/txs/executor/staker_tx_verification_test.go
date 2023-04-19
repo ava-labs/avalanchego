@@ -64,8 +64,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
-				Start:  1,
-				End:    1 + uint64(unsignedTransformTx.MinStakeDuration),
+				Start:  uint64(0),
+				End:    uint64(unsignedTransformTx.MinStakeDuration),
 				Wght:   unsignedTransformTx.MinValidatorStake,
 			},
 			Subnet: subnetID,
@@ -99,6 +99,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -116,7 +119,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			name: "not bootstrapped",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
@@ -132,35 +138,15 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "start time too early",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
-					Bootstrapped: bootstrapped,
-				}
-			},
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				state := state.NewMockChain(ctrl)
-				state.EXPECT().GetTimestamp().Return(verifiedTx.StartTime())
-				return state
-			},
-			sTxF: func() *txs.Tx {
-				return &verifiedSignedTx
-			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
-				return &verifiedTx
-			},
-			expectedErr: errTimestampNotBeforeStartTime,
-		},
-		{
 			name: "weight too low",
 			backendF: func(*gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -186,7 +172,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -212,7 +201,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -239,7 +231,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -257,8 +252,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 				// Note the duration is 1 less than the minimum
-				tx.Validator.Start = 1
-				tx.Validator.End = uint64(unsignedTransformTx.MinStakeDuration)
+				tx.Validator.Start = 0
+				tx.Validator.End = uint64(unsignedTransformTx.MinStakeDuration) - 1
 				return &tx
 			},
 			expectedErr: errStakeTooShort,
@@ -269,7 +264,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -287,8 +285,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 				// Note the duration is more than the maximum
-				tx.Validator.Start = 1
-				tx.Validator.End = 2 + uint64(unsignedTransformTx.MaxStakeDuration)
+				tx.Validator.Start = 0
+				tx.Validator.End = 1 + uint64(unsignedTransformTx.MaxStakeDuration)
 				return &tx
 			},
 			expectedErr: errStakeTooLong,
@@ -299,7 +297,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -331,7 +332,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -357,7 +361,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -369,8 +376,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				// Validator time isn't subset of primary network validator time
 				primaryNetworkVdr := &state.Staker{
-					StartTime: verifiedTx.StartTime().Add(time.Second),
-					EndTime:   verifiedTx.EndTime(),
+					StartTime: verifiedTx.StartTime(),
+					EndTime:   verifiedTx.EndTime().Add(-1 * time.Second),
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
@@ -403,6 +410,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
+						ContinuousStakingTime: time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -430,56 +438,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		{
-			name: "starts too far in the future",
-			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-
-				flowChecker := utxo.NewMockVerifier(ctrl)
-				flowChecker.EXPECT().VerifySpend(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).Return(nil)
-
-				return &Backend{
-					FlowChecker: flowChecker,
-					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
-					},
-					Ctx:          snow.DefaultContextTest(),
-					Bootstrapped: bootstrapped,
-				}
-			},
-			stateF: func(ctrl *gomock.Controller) state.Chain {
-				mockState := state.NewMockChain(ctrl)
-				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
-				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
-				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
-				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
-				primaryNetworkVdr := &state.Staker{
-					StartTime: time.Unix(0, 0),
-					EndTime:   mockable.MaxTime,
-				}
-				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
-				return mockState
-			},
-			sTxF: func() *txs.Tx {
-				return &verifiedSignedTx
-			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
-				// Note this copies [verifiedTx]
-				tx := verifiedTx
-				tx.Validator.Start = uint64(MaxFutureStartTime.Seconds()) + 1
-				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration)
-				return &tx
-			},
-			expectedErr: errFutureStakeTime,
-		},
-		{
 			name: "success",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
@@ -499,6 +457,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
+						ContinuousStakingTime: time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,

@@ -39,7 +39,6 @@ import (
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -286,8 +285,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					0,
+					uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,

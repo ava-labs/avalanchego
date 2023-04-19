@@ -106,7 +106,7 @@ var (
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
-	ContinuousStakingDefaultTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
+	ContinuousStakingDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
