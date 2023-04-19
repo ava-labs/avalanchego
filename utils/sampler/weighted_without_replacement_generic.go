@@ -21,9 +21,7 @@ func (s *weightedWithoutReplacementGeneric) Initialize(weights []uint64) error {
 		}
 		totalWeight = newWeight
 	}
-	if err := s.u.Initialize(totalWeight); err != nil {
-		return err
-	}
+	s.u.Initialize(totalWeight)
 	return s.w.Initialize(weights)
 }
 
