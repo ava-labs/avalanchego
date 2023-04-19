@@ -138,7 +138,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				return state.NewMockChain(ctrl)
 			},
-			expectedErr: errEndOfTime,
+			expectedErr: ErrEndOfTime,
 		},
 		{
 			name:      "no stakers",
@@ -493,7 +493,7 @@ func TestBuildBlock(t *testing.T) {
 			expectedBlkF: func(*require.Assertions) blocks.Block {
 				return nil
 			},
-			expectedErr: errNoPendingBlocks,
+			expectedErr: ErrNoPendingBlocks,
 		},
 		{
 			name: "should advance time",
