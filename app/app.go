@@ -57,6 +57,9 @@ type App interface {
 func New(config node.Config) (App, error) {
 	logFactory := logging.NewFactory(config.LoggingConfig)
 	log, err := logFactory.Make("main")
+	if err != nil {
+		return nil, err
+	}
 
 	node, err := node.New(&config, log, logFactory)
 	if err != nil {

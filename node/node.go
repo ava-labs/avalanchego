@@ -97,8 +97,6 @@ var (
 type Node struct {
 	// Router that is used to handle incoming consensus messages
 	consensusRouter router.Router
-	chainConfigs    map[string]chains.ChainConfig
-	vmAliaser       ids.Aliaser
 
 	Log          logging.Logger
 	VMFactoryLog logging.Logger
@@ -132,6 +130,9 @@ type Node struct {
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
+
+	// Manages valdiator benching
+	benchlistManager benchlist.Manager
 
 	uptimeCalculator uptime.LockedCalculator
 
@@ -202,8 +203,6 @@ type Node struct {
 	timeoutManager timeout.Manager
 
 	criticalChains set.Set[ids.ID]
-
-	benchlistManager benchlist.Manager
 
 	indexerCtx      context.Context
 	chainManagerCtx context.Context
@@ -305,6 +304,9 @@ func New(
 			config.HTTPConfig.HTTPConfig,
 			authWrapper,
 		)
+		if err != nil {
+			return nil, err
+		}
 		if err := apiServer.AddRoute(handler, &sync.RWMutex{}, "auth", ""); err != nil {
 			return nil, err
 		}
@@ -607,6 +609,9 @@ func New(
 		dialer.NewDialer(constants.NetworkType, config.NetworkConfig.DialerConfig, logger),
 		consensusRouter,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	blockAcceptorGroup := snow.NewAcceptorGroup(logger)
 	txAcceptorGroup := snow.NewAcceptorGroup(logger)
