@@ -37,6 +37,19 @@ func getNodes(networkID uint32) []node {
 				nodeID: "NodeID-6rsqgkg4F1i3SBjzj4tS5ucQWH7JMEouj",
 			},
 		}
+	case constants.CaminoID:
+		return []node{
+			// Camino Foundation
+			{
+				ip:     "34.79.120.198",
+				nodeID: "NodeID-MUTNPmSqwWtchZhVvkWRfF8SUK8FtfnwP",
+			},
+			// Chain4Travel
+			{
+				ip:     "34.147.107.229",
+				nodeID: "NodeID-KumZcRwRSAE7CUkFE18ZLMnPsCVDpQXz8",
+			},
+		}
 	default:
 		return nil
 	}
