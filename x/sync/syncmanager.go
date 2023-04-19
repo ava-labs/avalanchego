@@ -401,29 +401,29 @@ func (m *StateSyncManager) findNextKey(
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := receivedProofNodes[receivedProofNodeIndex]
 
-		// Current node is the proof node with the longest key (deepest in the trie).
-		// alternateNode is the proof node from the other proof with the same key/depth if it exists, nil otherwise.
-		var currentNode, alternateNode *merkledb.ProofNode
+		// deepest node is the proof node with the longest key (deepest in the trie).
+		// deepestNodeFromOtherProof is the proof node from the other proof with the same key/depth if it exists, nil otherwise.
+		var deepestNode, deepestNodeFromOtherProof *merkledb.ProofNode
 
 		// select the deepest proof node from the two proofs
 		switch {
 		case receivedProofNode.KeyPath.NibbleLength > localProofNode.KeyPath.NibbleLength:
 			{
 				// there was a branch node in the received proof that isn't in the local proof
-				currentNode = &receivedProofNode
+				deepestNode = &receivedProofNode
 				receivedProofNodeIndex--
 			}
 		case localProofNode.KeyPath.NibbleLength > receivedProofNode.KeyPath.NibbleLength:
 			{
 				// there was a branch node in the local proof that isn't in the received proof
-				currentNode = &localProofNode
+				deepestNode = &localProofNode
 				localProofNodeIndex--
 			}
 		default:
 			{
 				// the two nodes are at the same depth, so compare them
-				currentNode = &localProofNode
-				alternateNode = &receivedProofNode
+				deepestNode = &localProofNode
+				deepestNodeFromOtherProof = &receivedProofNode
 				localProofNodeIndex--
 				receivedProofNodeIndex--
 			}
@@ -431,12 +431,12 @@ func (m *StateSyncManager) findNextKey(
 
 		// we only want to look at the children with keys greater than the proofKey, so find the next larger nibble
 		startingChildNibble := byte(0)
-		if currentNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
-			startingChildNibble = proofKeyPath.NibbleVal(currentNode.KeyPath.NibbleLength) + 1
+		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
+			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
 		}
 
-		if childIndex, hasDifference := findChildDifference(currentNode, alternateNode, startingChildNibble); hasDifference {
-			nextKey = currentNode.KeyPath.AppendNibble(childIndex).Value
+		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
+			nextKey = deepestNode.KeyPath.AppendNibble(childIndex).Value
 			break
 		}
 	}
