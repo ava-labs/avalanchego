@@ -1028,7 +1028,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			ErrNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 2, repeated address and repeated sig",
@@ -1061,7 +1061,7 @@ func TestVerifyPermission(t *testing.T) {
 				Threshold: 2,
 				Addrs:     []ids.ShortID{addr, addr2},
 			},
-			ErrNotSortedUnique,
+			ErrInputIndicesNotSortedUnique,
 		},
 		{
 			"threshold 1, 1 sig, index out of bounds",

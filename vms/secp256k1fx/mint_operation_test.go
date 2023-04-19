@@ -49,7 +49,7 @@ func TestMintOperationVerify(t *testing.T) {
 				MintOutput:     validMintOutput,
 				TransferOutput: validTransferOutput,
 			},
-			expectedErr: ErrNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name: "invalid mint output",

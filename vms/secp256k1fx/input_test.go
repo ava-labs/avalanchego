@@ -23,12 +23,12 @@ func TestInputVerifyNil(t *testing.T) {
 		{
 			name:        "not sorted",
 			in:          &Input{SigIndices: []uint32{2, 1}},
-			expectedErr: ErrNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "not unique",
 			in:          &Input{SigIndices: []uint32{2, 2}},
-			expectedErr: ErrNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "passes verification",

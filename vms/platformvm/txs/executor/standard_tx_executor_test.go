@@ -710,7 +710,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, secp256k1fx.ErrNotSortedUnique)
+		require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 	}
 
 	{
