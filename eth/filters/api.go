@@ -65,10 +65,10 @@ type FilterAPI struct {
 }
 
 // NewFilterAPI returns a new FilterAPI instance.
-func NewFilterAPI(system *FilterSystem, lightMode bool) *FilterAPI {
+func NewFilterAPI(system *FilterSystem) *FilterAPI {
 	api := &FilterAPI{
 		sys:     system,
-		events:  NewEventSystem(system, lightMode),
+		events:  NewEventSystem(system),
 		filters: make(map[rpc.ID]*filter),
 		timeout: system.cfg.Timeout,
 	}
