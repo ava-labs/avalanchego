@@ -505,14 +505,16 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
 	chainTime time.Time,
 ) (*state.Staker, error) {
-	txID := e.Tx.ID()
+	// Pre Continuous Staking fork, stakers are added as pending first, them promoted
+	// to current when chainTime reach their start time.
+	// Post Continuous Staking fork, stakers are immediately marked as current.
+	// their start time is current chain time.
 
+	txID := e.Tx.ID()
 	if !e.Config.IsContinuousStakingActivated(chainTime) {
 		return state.NewPendingStaker(txID, stakerTx)
 	}
 
-	// Post Continuous Staking fork, validators are immediately marked as current.
-	// their start time is current chain time
 	var (
 		potentialReward = uint64(0)
 		stakeDuration   = stakerTx.Duration()

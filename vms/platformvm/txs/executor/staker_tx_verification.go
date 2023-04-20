@@ -121,9 +121,6 @@ func verifyAddValidatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		// Following ContinuousStaking fork activation, AddValidatorTx.StartTime
-		// won't be considered. Only duration will matter (i.e.
-		// AddValidatorTx.EndTime - AddValidatorTx.StartTime).
 		if startTime != state.StakerZeroTime {
 			return nil, fmt.Errorf(
 				"%w: %s",
@@ -145,6 +142,10 @@ func verifyAddValidatorTx(
 
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
+	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
+	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
+	// (start time is zero). I didn't bother guarding the check (which must be the
+	// last one made).
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return nil, errFutureStakeTime
@@ -184,9 +185,6 @@ func verifyAddSubnetValidatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		// Following ContinuousStaking fork activation, AddValidatorTx.StartTime
-		// won't be considered. Only duration will matter (i.e.
-		// AddValidatorTx.EndTime - AddValidatorTx.StartTime) which is validated above.
 		if startTime != state.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
@@ -262,6 +260,10 @@ func verifyAddSubnetValidatorTx(
 
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
+	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
+	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
+	// (start time is zero). I didn't bother guarding the check (which must be the
+	// last one made).
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return errFutureStakeTime
@@ -453,6 +455,10 @@ func verifyAddDelegatorTx(
 
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
+	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
+	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
+	// (start time is zero). I didn't bother guarding the check (which must be the
+	// last one made).
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return nil, errFutureStakeTime
@@ -481,7 +487,7 @@ func verifyAddPermissionlessValidatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != time.Unix(0, 0) {
+		if startTime != state.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
 				errStartTimeMustBeZero,
@@ -602,6 +608,10 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
+	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
+	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
+	// (start time is zero). I didn't bother guarding the check (which must be the
+	// last one made).
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return errFutureStakeTime
@@ -798,6 +808,10 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Make sure the tx doesn't start too far in the future. This is done last
 	// to allow the verifier visitor to explicitly check for this error.
+	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
+	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
+	// (start time is zero). I didn't bother guarding the check (which must be the
+	// last one made).
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return errFutureStakeTime
