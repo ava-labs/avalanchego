@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -91,6 +92,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
+	_ = nodeID
+	_ = addMinStakeValidator
+	_ = addMaxStakeValidator
+	_ = currentTimestamp
+
 	type test struct {
 		description   string
 		stakeAmount   uint64
@@ -101,48 +107,36 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		feeKeys       []*secp256k1.PrivateKey
 		setup         func(*environment)
 		AP3Time       time.Time
-		shouldErr     bool
+		expectedErr   error
 	}
 
 	tests := []test{
 		{
-			description:   "validator stops validating primary network earlier than subnet",
+			description:   "validator stops validating earlier than delegator",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()),
+			startTime:     uint64(defaultValidateStartTime.Unix()) + 1,
 			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrOverDelegated,
 		},
 		{
-			description:   fmt.Sprintf("validator should not be added more than (%s) in the future", MaxFutureStartTime),
+			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
 			stakeAmount:   dummyH.config.MinDelegatorStake,
 			startTime:     uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime * 2).Unix()),
+			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
 			nodeID:        nodeID,
 			rewardAddress: rewardAddress,
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrFutureStakeTime,
 		},
 		{
-			description:   "end time is after the primary network end time",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()),
-			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
-		},
-		{
-			description:   "validator not in the current or pending validator sets of the subnet",
+			description:   "validator not in the current or pending validator sets",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
 			startTime:     uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
 			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
@@ -151,10 +145,10 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   database.ErrNotFound,
 		},
 		{
-			description:   "validator starts validating subnet before primary network",
+			description:   "delegator starts before validator",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
 			startTime:     newValidatorStartTime - 1, // start validating subnet before primary network
 			endTime:       newValidatorEndTime,
@@ -163,10 +157,10 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrOverDelegated,
 		},
 		{
-			description:   "validator stops validating primary network before subnet",
+			description:   "delegator stops before validator",
 			stakeAmount:   dummyH.config.MinDelegatorStake,
 			startTime:     newValidatorStartTime,
 			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
@@ -175,7 +169,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrOverDelegated,
 		},
 		{
 			description:   "valid",
@@ -187,10 +181,10 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     false,
+			expectedErr:   nil,
 		},
 		{
-			description:   "starts validating at current timestamp",
+			description:   "starts delegating at current timestamp",
 			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
 			startTime:     uint64(currentTimestamp.Unix()),           // start time
 			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
@@ -199,16 +193,16 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrTimestampNotBeforeStartTime,
 		},
 		{
 			description:   "tx fee paying key has no funds",
-			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()),   // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
-			nodeID:        nodeID,                                    // node ID
-			rewardAddress: rewardAddress,                             // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]}, // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,             // weight
+			startTime:     uint64(defaultValidateStartTime.Unix()) + 1, // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),       // end time
+			nodeID:        nodeID,                                      // node ID
+			rewardAddress: rewardAddress,                               // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},   // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
@@ -223,8 +217,8 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				err = target.state.Commit()
 				require.NoError(t, err)
 			},
-			AP3Time:   defaultGenesisTime,
-			shouldErr: true,
+			AP3Time:     defaultGenesisTime,
+			expectedErr: ErrFlowCheckFailed,
 		},
 		{
 			description:   "over delegation before AP3",
@@ -236,7 +230,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultValidateEndTime,
-			shouldErr:     false,
+			expectedErr:   nil,
 		},
 		{
 			description:   "over delegation after AP3",
@@ -248,7 +242,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMaxStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			expectedErr:   ErrOverDelegated,
 		},
 	}
 
@@ -289,11 +283,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			if tt.shouldErr {
-				require.Error(err)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
