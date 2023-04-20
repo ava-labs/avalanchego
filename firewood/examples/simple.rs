@@ -1,8 +1,10 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#[cfg(feature = "eth")]
 use firewood::db::{DBConfig, WALConfig, DB};
 
+#[cfg(feature = "eth")]
 fn print_states(db: &DB) {
     println!("======");
     for account in ["ted", "alice"] {
@@ -25,7 +27,15 @@ fn print_states(db: &DB) {
     }
 }
 
+#[cfg(not(feature = "eth"))]
+fn main() {
+    println!("To run this example, you must enable to eth feature.");
+    println!("For more information on features, see:");
+    println!("https://doc.rust-lang.org/cargo/reference/features.html");
+}
+
 /// cargo run --example simple
+#[cfg(feature = "eth")]
 fn main() {
     let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
     {

@@ -77,6 +77,7 @@ impl CachedStore for DynamicMem {
     }
 }
 
+#[derive(Debug)]
 struct DynamicMemView {
     offset: usize,
     length: usize,

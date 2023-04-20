@@ -1,7 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+#[cfg(feature = "eth")]
 use crate::account::BlobError;
+
 use crate::db::DBError;
 use crate::merkle::*;
 use crate::merkle_util::*;
@@ -39,6 +41,7 @@ pub enum ProofError {
     EmptyRange,
     ForkLeft,
     ForkRight,
+    #[cfg(feature = "eth")]
     BlobStoreError(BlobError),
     SystemError(Errno),
     InvalidRootHash,
@@ -59,6 +62,7 @@ impl From<DBError> for ProofError {
         match d {
             DBError::InvalidParams => ProofError::InvalidProof,
             DBError::Merkle(e) => ProofError::InvalidNode(e),
+            #[cfg(feature = "eth")]
             DBError::Blob(e) => ProofError::BlobStoreError(e),
             DBError::System(e) => ProofError::SystemError(e),
             DBError::KeyNotFound => ProofError::InvalidEdgeKeys,
@@ -86,6 +90,7 @@ impl fmt::Display for ProofError {
             ProofError::EmptyRange => write!(f, "empty range"),
             ProofError::ForkLeft => write!(f, "fork left"),
             ProofError::ForkRight => write!(f, "fork right"),
+            #[cfg(feature = "eth")]
             ProofError::BlobStoreError(e) => write!(f, "blob store error: {e:?}"),
             ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
             ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
