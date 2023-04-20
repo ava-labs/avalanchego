@@ -683,9 +683,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	// We select a random sample of validators to gossip to avoid starving out a
 	// validator from being gossiped for an extended period of time.
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(unknownValidators))); err != nil {
-		return nil, err
-	}
+	s.Initialize(uint64(len(unknownValidators)))
 
 	// Calculate the unknown information we need to send to this peer.
 	validatorIPs := make([]ips.ClaimedIPPort, 0, int(n.config.PeerListNumValidatorIPs))
