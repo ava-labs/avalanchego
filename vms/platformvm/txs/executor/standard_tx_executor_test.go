@@ -167,123 +167,119 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
-		description   string
-		stakeAmount   uint64
-		startTime     uint64
-		endTime       uint64
-		nodeID        ids.NodeID
-		rewardAddress ids.ShortID
-		feeKeys       []*secp256k1.PrivateKey
-		setup         func(*environment)
-		AP3Time       time.Time
-		shouldErr     bool
+		description          string
+		stakeAmount          uint64
+		startTime            uint64
+		endTime              uint64
+		nodeID               ids.NodeID
+		rewardAddress        ids.ShortID
+		feeKeys              []*secp256k1.PrivateKey
+		setup                func(*environment)
+		AP3Time              time.Time
+		expectedExecutionErr error
+		expectedMempoolErr   error
 	}
 
 	tests := []test{
 		{
-			description:   "validator stops validating primary network earlier than subnet",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()),
-			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "validator stops validating earlier than delegator",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            uint64(defaultValidateStartTime.Unix()) + 1,
+			endTime:              uint64(defaultValidateEndTime.Unix()) + 1,
+			nodeID:               nodeID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                nil,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrOverDelegated,
+			expectedMempoolErr:   ErrOverDelegated,
 		},
 		{
-			description:   fmt.Sprintf("validator should not be added more than (%s) in the future", MaxFutureStartTime),
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:       uint64(currentTimestamp.Add(MaxFutureStartTime * 2).Unix()),
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
+			endTime:              uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
+			nodeID:               nodeID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                nil,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrFutureStakeTime,
+			expectedMempoolErr:   nil,
 		},
 		{
-			description:   "end time is after the primary network end time",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Unix()),
-			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID:        nodeID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "validator not in the current or pending validator sets",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
+			endTime:              uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                nil,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: database.ErrNotFound,
+			expectedMempoolErr:   database.ErrNotFound,
 		},
 		{
-			description:   "validator not in the current or pending validator sets of the subnet",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
-			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "delegator starts before validator",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            newValidatorStartTime - 1, // start validating subnet before primary network
+			endTime:              newValidatorEndTime,
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                addMinStakeValidator,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrOverDelegated,
+			expectedMempoolErr:   ErrOverDelegated,
 		},
 		{
-			description:   "validator starts validating subnet before primary network",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime - 1, // start validating subnet before primary network
-			endTime:       newValidatorEndTime,
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "delegator stops before validator",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            newValidatorStartTime,
+			endTime:              newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                addMinStakeValidator,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrOverDelegated,
+			expectedMempoolErr:   ErrOverDelegated,
 		},
 		{
-			description:   "validator stops validating primary network before subnet",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime,
-			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "valid",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            newValidatorStartTime, // same start time as for primary network
+			endTime:              newValidatorEndTime,   // same end time as for primary network
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                addMinStakeValidator,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: nil,
+			expectedMempoolErr:   nil,
 		},
 		{
-			description:   "valid",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMinStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     false,
-		},
-		{
-			description:   "starts validating at current timestamp",
-			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
-			startTime:     uint64(currentTimestamp.Unix()),           // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
-			nodeID:        nodeID,                                    // node ID
-			rewardAddress: rewardAddress,                             // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
-			setup:         nil,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "starts delegating at current timestamp",
+			stakeAmount:          dummyH.config.MinDelegatorStake,           // weight
+			startTime:            uint64(currentTimestamp.Unix()),           // start time
+			endTime:              uint64(defaultValidateEndTime.Unix()),     // end time
+			nodeID:               nodeID,                                    // node ID
+			rewardAddress:        rewardAddress,                             // Reward Address
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
+			setup:                nil,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrTimestampNotBeforeStartTime,
+			expectedMempoolErr:   ErrTimestampNotBeforeStartTime,
 		},
 		{
 			description:   "tx fee paying key has no funds",
-			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()),   // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),     // end time
-			nodeID:        nodeID,                                    // node ID
-			rewardAddress: rewardAddress,                             // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]}, // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,             // weight
+			startTime:     uint64(defaultValidateStartTime.Unix()) + 1, // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),       // end time
+			nodeID:        nodeID,                                      // node ID
+			rewardAddress: rewardAddress,                               // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},   // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
@@ -298,32 +294,35 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				err = target.state.Commit()
 				require.NoError(t, err)
 			},
-			AP3Time:   defaultGenesisTime,
-			shouldErr: true,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrFlowCheckFailed,
+			expectedMempoolErr:   ErrFlowCheckFailed,
 		},
 		{
-			description:   "over delegation before AP3",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMaxStakeValidator,
-			AP3Time:       defaultValidateEndTime,
-			shouldErr:     false,
+			description:          "over delegation before AP3",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            newValidatorStartTime, // same start time as for primary network
+			endTime:              newValidatorEndTime,   // same end time as for primary network
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                addMaxStakeValidator,
+			AP3Time:              defaultValidateEndTime,
+			expectedExecutionErr: nil,
+			expectedMempoolErr:   nil,
 		},
 		{
-			description:   "over delegation after AP3",
-			stakeAmount:   dummyH.config.MinDelegatorStake,
-			startTime:     newValidatorStartTime, // same start time as for primary network
-			endTime:       newValidatorEndTime,   // same end time as for primary network
-			nodeID:        newValidatorID,
-			rewardAddress: rewardAddress,
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
-			setup:         addMaxStakeValidator,
-			AP3Time:       defaultGenesisTime,
-			shouldErr:     true,
+			description:          "over delegation after AP3",
+			stakeAmount:          dummyH.config.MinDelegatorStake,
+			startTime:            newValidatorStartTime, // same start time as for primary network
+			endTime:              newValidatorEndTime,   // same end time as for primary network
+			nodeID:               newValidatorID,
+			rewardAddress:        rewardAddress,
+			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
+			setup:                addMaxStakeValidator,
+			AP3Time:              defaultGenesisTime,
+			expectedExecutionErr: ErrOverDelegated,
+			expectedMempoolErr:   ErrOverDelegated,
 		},
 	}
 
@@ -362,11 +361,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			if tt.shouldErr {
-				require.Error(err)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, tt.expectedExecutionErr)
 
 			mempoolExecutor := MempoolTxVerifier{
 				Backend:       &freshTH.backend,
@@ -375,11 +370,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&mempoolExecutor)
-			if tt.shouldErr {
-				require.Error(err)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, tt.expectedMempoolErr)
 		})
 	}
 }
