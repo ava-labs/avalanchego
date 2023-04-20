@@ -39,11 +39,11 @@ func SortTransferableInputs(ins []*TransferableInput) {
 	sort.Sort(&innerSortTransferableInputs{ins: ins})
 }
 
-type innerSortTransferableTimedUTXOs struct {
-	utxos []*TimedUTXO
+type innerSortTransferableUTXOs struct {
+	utxos []*UTXO
 }
 
-func (utxos *innerSortTransferableTimedUTXOs) Less(i, j int) bool {
+func (utxos *innerSortTransferableUTXOs) Less(i, j int) bool {
 	iID, iIndex := utxos.utxos[i].InputSource()
 	jID, jIndex := utxos.utxos[j].InputSource()
 
@@ -57,15 +57,15 @@ func (utxos *innerSortTransferableTimedUTXOs) Less(i, j int) bool {
 	}
 }
 
-func (utxos *innerSortTransferableTimedUTXOs) Len() int {
+func (utxos *innerSortTransferableUTXOs) Len() int {
 	return len(utxos.utxos)
 }
 
-func (utxos *innerSortTransferableTimedUTXOs) Swap(i, j int) {
+func (utxos *innerSortTransferableUTXOs) Swap(i, j int) {
 	utxos.utxos[j], utxos.utxos[i] = utxos.utxos[i], utxos.utxos[j]
 }
 
-// SortTransferableTimedUTXOs sorts the utxos based on the utxoid
-func SortTransferableTimedUTXOs(utxos []*TimedUTXO) {
-	sort.Sort(&innerSortTransferableTimedUTXOs{utxos: utxos})
+// SortTransferableUTXOs sorts the utxos based on the utxoid
+func SortTransferableUTXOs(utxos []*UTXO) {
+	sort.Sort(&innerSortTransferableUTXOs{utxos: utxos})
 }

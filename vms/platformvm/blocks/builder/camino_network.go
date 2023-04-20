@@ -62,5 +62,11 @@ func (n *caminoNetwork) CrossChainAppRequest(_ context.Context, chainID ids.ID, 
 	n.ctx.Lock.Lock()
 	defer n.ctx.Lock.Unlock()
 
-	return n.blkBuilder.AddUnverifiedTx(tx)
+	if err := n.blkBuilder.AddUnverifiedTx(tx); err != nil {
+		n.ctx.Log.Error("caminoCrossChainAppRequest couldn't add rewardsImportTx to mempool", zap.Error(err))
+		// we don't want fatal here: its better to have network running
+		// and try to repair stalled reward imports, than crash the whole network
+	}
+
+	return nil
 }

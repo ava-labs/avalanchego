@@ -1215,6 +1215,8 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 			return fmt.Errorf("there are %d inputs and %d utxos: %w", len(tx.Ins), len(utxos), errInputsUTXOSMismatch)
 		}
 
+		avax.SortTransferableUTXOs(utxos)
+
 		for i, in := range tx.Ins {
 			utxo := utxos[i]
 
