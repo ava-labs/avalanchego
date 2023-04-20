@@ -214,8 +214,7 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 
 func (v *putCurrentValidatorCommand) String() string {
 	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
-	// TODO ABENEGIA: replace v.EndTime.Sub(v.StartTime) with v.Duration once it is duly set in generator
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.StakingPeriod)
 }
 
 var genPutCurrentValidatorCommand = state.StakerGenerator(state.CurrentValidator, nil, nil, math.MaxUint64).Map(
@@ -548,8 +547,7 @@ func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res co
 
 func (v *putCurrentDelegatorCommand) String() string {
 	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
-	// TODO ABENEGIA: replace v.EndTime.Sub(v.StartTime) with v.Duration once it is duly set in generator
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.StakingPeriod)
 }
 
 var genPutCurrentDelegatorCommand = state.StakerGenerator(state.CurrentDelegator, nil, nil, 1000).Map(

@@ -57,7 +57,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	duration := tx.StakingPeriod()
 
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
@@ -167,7 +167,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	duration := tx.StakingPeriod()
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -230,7 +230,7 @@ func verifyAddSubnetValidatorTx(
 
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		primaryNetworkValDuration := primaryNetworkValidator.EndTime.Sub(primaryNetworkValidator.StartTime)
-		if tx.Validator.Duration() > primaryNetworkValDuration {
+		if tx.StakingPeriod() > primaryNetworkValDuration {
 			return errValidatorSubset
 		}
 	} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
@@ -356,7 +356,7 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	duration := tx.Validator.Duration()
+	duration := tx.StakingPeriod()
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
@@ -423,7 +423,7 @@ func verifyAddDelegatorTx(
 	var newStaker *state.Staker
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.Duration(), 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.StakingPeriod(), 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
@@ -511,7 +511,7 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	duration := tx.StakingPeriod()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
@@ -574,7 +574,7 @@ func verifyAddPermissionlessValidatorTx(
 		}
 
 		if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-			if tx.Validator.Duration() > primaryNetworkValidator.Duration {
+			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
 				return errValidatorSubset
 			}
 		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
@@ -707,7 +707,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	duration := tx.Validator.Duration()
+	duration := tx.StakingPeriod()
 	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
@@ -755,7 +755,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var newStaker *state.Staker
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.Duration(), 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.StakingPeriod(), 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}

@@ -21,8 +21,8 @@ func TestValidatorBoundedBy(t *testing.T) {
 	require := require.New(t)
 
 	// case 1: a starts, a finishes, b starts, b finishes
-	aStartTime := uint64(0)
-	aEndTIme := uint64(1)
+	aStartTime := uint64(1)
+	aEndTIme := uint64(2)
 	a := &Validator{
 		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  aStartTime,
@@ -30,8 +30,8 @@ func TestValidatorBoundedBy(t *testing.T) {
 		Wght:   defaultWeight,
 	}
 
-	bStartTime := uint64(2)
-	bEndTime := uint64(3)
+	bStartTime := uint64(3)
+	bEndTime := uint64(4)
 	b := &Validator{
 		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  bStartTime,
@@ -42,50 +42,50 @@ func TestValidatorBoundedBy(t *testing.T) {
 	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 2: a starts, b starts, a finishes, b finishes
-	a.Start = 0
-	b.Start = 1
-	a.End = 2
-	b.End = 3
+	a.Start = 1
+	b.Start = 2
+	a.End = 3
+	b.End = 4
 	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 3: a starts, b starts, b finishes, a finishes
-	a.Start = 0
-	b.Start = 1
-	b.End = 2
-	a.End = 3
+	a.Start = 1
+	b.Start = 2
+	b.End = 3
+	a.End = 4
 	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.True(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 4: b starts, a starts, a finishes, b finishes
-	b.Start = 0
-	a.Start = 1
-	a.End = 2
-	b.End = 3
+	b.Start = 1
+	a.Start = 2
+	a.End = 3
+	b.End = 4
 	require.True(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 5: b starts, b finishes, a starts, a finishes
-	b.Start = 0
-	b.End = 1
-	a.Start = 2
-	a.End = 3
+	b.Start = 1
+	b.End = 2
+	a.Start = 3
+	a.End = 4
 	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 6: b starts, a starts, b finishes, a finishes
-	b.Start = 0
-	a.Start = 1
-	b.End = 2
-	a.End = 3
+	b.Start = 1
+	a.Start = 2
+	b.End = 3
+	a.End = 4
 	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 3: a starts, b starts, b finishes, a finishes
-	a.Start = 0
-	b.Start = 0
-	b.End = 1
-	a.End = 1
+	a.Start = 1
+	b.Start = 1
+	b.End = 2
+	a.End = 2
 	require.True(a.BoundedBy(b.StartTime(), b.EndTime()))
 	require.True(b.BoundedBy(a.StartTime(), a.EndTime()))
 }

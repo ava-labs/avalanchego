@@ -50,7 +50,7 @@ type Staker interface {
 	PublicKey() (*bls.PublicKey, bool, error)
 	StartTime() time.Time
 	EndTime() time.Time
-	Duration() time.Duration
+	StakingPeriod() time.Duration
 	Weight() uint64
 	PendingPriority() Priority
 	CurrentPriority() Priority

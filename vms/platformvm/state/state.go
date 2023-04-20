@@ -1046,8 +1046,8 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", vdrTx.Unsigned)
 		}
 
-		stakeAmount := tx.Validator.Wght
-		stakeDuration := tx.Validator.Duration()
+		stakeAmount := tx.Weight()
+		stakeDuration := tx.StakingPeriod()
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -1063,7 +1063,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), tx.Duration(), potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), tx.StakingPeriod(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1162,7 +1162,7 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.Duration(), metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.StakingPeriod(), metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1204,7 +1204,7 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.Duration(), metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.StakingPeriod(), metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1245,7 +1245,7 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.Duration(), potentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), stakerTx.StakingPeriod(), potentialReward)
 			if err != nil {
 				return err
 			}

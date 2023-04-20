@@ -263,7 +263,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.Validator.Duration(),
+		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -273,7 +273,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
-		addDelTx.Validator.Duration(),
+		addDelTx.StakingPeriod(),
 		1000000,
 	)
 	require.NoError(err)
@@ -394,7 +394,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.Validator.Duration(),
+		addValTx.StakingPeriod(),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -405,7 +405,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
-		addDelTx.Validator.Duration(),
+		addDelTx.StakingPeriod(),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -621,7 +621,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.Validator.Duration(),
+		addValTx.StakingPeriod(),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -632,7 +632,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
-		addDelTx.Validator.Duration(),
+		addDelTx.StakingPeriod(),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -788,7 +788,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.Validator.Duration(),
+		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -798,7 +798,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
-		addDelTx.Validator.Duration(),
+		addDelTx.StakingPeriod(),
 		1000000,
 	)
 	require.NoError(err)

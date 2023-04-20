@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -37,11 +38,17 @@ func (v *Validator) StartTime() time.Time {
 
 // EndTime is the time that this validator will leave the validator set
 func (v *Validator) EndTime() time.Time {
+	if v.Start == 0 {
+		return mockable.MaxTime
+	}
 	return time.Unix(int64(v.End), 0)
 }
 
-// Duration is the amount of time that this validator will be in the validator set
-func (v *Validator) Duration() time.Duration {
+// StakingPeriod is the amount of time that this validator will be in the validator set
+func (v *Validator) StakingPeriod() time.Duration {
+	if v.Start == 0 {
+		return time.Duration(v.End) * time.Second
+	}
 	return v.EndTime().Sub(v.StartTime())
 }
 

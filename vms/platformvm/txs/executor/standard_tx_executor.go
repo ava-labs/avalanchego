@@ -517,7 +517,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 
 	var (
 		potentialReward = uint64(0)
-		stakeDuration   = stakerTx.Duration()
+		stakeDuration   = stakerTx.StakingPeriod()
 	)
 	if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
 		currentSupply, err := e.State.GetCurrentSupply(stakerTx.SubnetID())

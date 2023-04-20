@@ -376,9 +376,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				// Validator time isn't subset of primary network validator time
 				primaryNetworkVdr := &state.Staker{
-					StartTime: verifiedTx.StartTime(),
-					Duration:  verifiedTx.Duration() - 1,
-					EndTime:   verifiedTx.EndTime().Add(-1 * time.Second),
+					StartTime:     verifiedTx.StartTime(),
+					StakingPeriod: verifiedTx.StakingPeriod() - 1,
+					EndTime:       verifiedTx.EndTime().Add(-1 * time.Second),
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
@@ -424,9 +424,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				primaryNetworkVdr := &state.Staker{
-					StartTime: verifiedTx.StartTime(),
-					Duration:  verifiedTx.Duration(),
-					EndTime:   verifiedTx.EndTime(),
+					StartTime:     verifiedTx.StartTime(),
+					StakingPeriod: verifiedTx.StakingPeriod(),
+					EndTime:       verifiedTx.EndTime(),
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
@@ -472,9 +472,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				primaryNetworkVdr := &state.Staker{
-					StartTime: time.Unix(0, 0),
-					Duration:  state.StakerMaxDuration,
-					EndTime:   mockable.MaxTime,
+					StartTime:     time.Unix(0, 0),
+					StakingPeriod: state.StakerMaxDuration,
+					EndTime:       mockable.MaxTime,
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState

@@ -53,10 +53,10 @@ type Staker struct {
 	// StartTime does not change during a staker lifetime.
 	StartTime time.Time
 
-	// Duration is the time the staker will stake.
-	// Note that it's not necessarily true that Duration == EndTime - StartTime.
-	// Duration does not change during a staker lifetime.
-	Duration time.Duration
+	// StakingPeriod is the time the staker will stake.
+	// Note that it's not necessarily true that StakingPeriod == EndTime - StartTime.
+	// StakingPeriod does not change during a staker lifetime.
+	StakingPeriod time.Duration
 
 	// StartTime is the time this staker exits the current validators set.
 	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
@@ -132,7 +132,7 @@ func NewCurrentStaker(
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
 		StartTime:       startTime,
-		Duration:        stakingDuration,
+		StakingPeriod:   stakingDuration,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
@@ -147,16 +147,16 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 	}
 	startTime := staker.StartTime()
 	return &Staker{
-		TxID:      txID,
-		NodeID:    staker.NodeID(),
-		PublicKey: publicKey,
-		SubnetID:  staker.SubnetID(),
-		Weight:    staker.Weight(),
-		StartTime: startTime,
-		EndTime:   staker.EndTime(),
-		Duration:  staker.Duration(),
-		NextTime:  startTime,
-		Priority:  staker.PendingPriority(),
+		TxID:          txID,
+		NodeID:        staker.NodeID(),
+		PublicKey:     publicKey,
+		SubnetID:      staker.SubnetID(),
+		Weight:        staker.Weight(),
+		StartTime:     startTime,
+		EndTime:       staker.EndTime(),
+		StakingPeriod: staker.StakingPeriod(),
+		NextTime:      startTime,
+		Priority:      staker.PendingPriority(),
 	}, nil
 }
 
@@ -171,5 +171,5 @@ func (s *Staker) IsPending() bool {
 }
 
 func RotateStakerInPlace(s *Staker) {
-	s.NextTime = s.NextTime.Add(s.Duration)
+	s.NextTime = s.NextTime.Add(s.StakingPeriod)
 }

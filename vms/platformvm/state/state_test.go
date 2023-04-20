@@ -677,7 +677,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			NodeID:          ids.GenerateTestNodeID(),
 			Weight:          uint64(i + 1),
 			StartTime:       startTime.Add(time.Duration(i) * time.Second),
-			Duration:        duration,
+			StakingPeriod:   duration,
 			EndTime:         endTime.Add(time.Duration(i) * time.Second),
 			PotentialReward: uint64(i + 1),
 		}

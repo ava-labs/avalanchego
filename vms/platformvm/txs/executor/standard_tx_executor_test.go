@@ -125,7 +125,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.Validator.Duration(),
+			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.Validator.Duration(),
+			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -507,7 +507,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.Validator.Duration(),
+		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -648,7 +648,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
-		addSubnetValTx.Validator.Duration(),
+		addSubnetValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -795,7 +795,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			subnetTx.ID(),
 			addSubnetValTx,
 			addSubnetValTx.StartTime(),
-			addSubnetValTx.Validator.Duration(),
+			addSubnetValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)
@@ -927,7 +927,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.Validator.Duration(),
+			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)
@@ -1030,8 +1030,8 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 
 	require.Equal(addValTx.ID(), val.TxID)
 	require.Equal(env.state.GetTimestamp(), val.StartTime)
-	require.Equal(validatorDuration, val.Duration)
-	require.Equal(val.StartTime.Add(val.Duration), val.EndTime)
+	require.Equal(validatorDuration, val.StakingPeriod)
+	require.Equal(val.StartTime.Add(val.StakingPeriod), val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

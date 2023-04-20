@@ -227,7 +227,7 @@ func newTestStaker() *Staker {
 		SubnetID:        ids.GenerateTestID(),
 		Weight:          1,
 		StartTime:       startTime,
-		Duration:        duration,
+		StakingPeriod:   duration,
 		EndTime:         endTime,
 		PotentialReward: 1,
 
