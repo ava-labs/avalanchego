@@ -481,12 +481,12 @@ func (m *StateSyncManager) findNextKey(
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
 // a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startByte byte) (byte, bool) {
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
 	var (
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startByte; childIndex < merkledb.NodeBranchFactor; childIndex++ {
+	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}
