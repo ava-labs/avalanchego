@@ -414,7 +414,7 @@ func TestNewManagerFromNoDBs(t *testing.T) {
 	require := require.New(t)
 	// Should error if no dbs are given
 	_, err := NewManagerFromDBs(nil)
-	require.Error(err)
+	require.ErrorIs(err, errNoDBs)
 }
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
@@ -447,5 +447,5 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 				},
 			},
 		})
-	require.Error(err)
+	require.ErrorIs(err, errNonSortedAndUniqueDBs)
 }

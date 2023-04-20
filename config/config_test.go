@@ -24,10 +24,9 @@ import (
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
-		configs    map[string]string
-		upgrades   map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		configs  map[string]string
+		upgrades map[string]string
+		expected map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
 			configs:  map[string]string{},
@@ -85,14 +84,7 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Parse config
 			require.Equal(root, v.GetString(ChainConfigDirKey))
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				if err != nil {
-					require.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				require.NoError(err)
-			}
+			require.NoError(err)
 			require.Equal(test.expected, chainConfigs)
 		})
 	}
@@ -100,32 +92,34 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 
 func TestGetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
-		structure  string
-		file       map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		structure   string
+		file        map[string]string
+		expectedErr error
+		expected    map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
-			structure:  "/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"cdir is file ": {
-			structure:  "/",
-			file:       map[string]string{"cdir": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"cdir": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"chain subdir not exist": {
-			structure: "/cdir/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+			structure:   "/cdir/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{},
 		},
 		"full structure": {
-			structure: "/cdir/C/",
-			file:      map[string]string{"config.ex": "hello"},
-			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			structure:   "/cdir/C/",
+			file:        map[string]string{"config.ex": "hello"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
@@ -150,14 +144,8 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
-			switch {
-			case len(test.errMessage) > 0:
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			default:
-				require.NoError(err)
-				require.Equal(test.expected, chainConfigs)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, chainConfigs)
 		})
 	}
 }
@@ -183,7 +171,6 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 func TestGetChainConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
 		fullConfigs map[string]chains.ChainConfig
-		errMessage  string
 		expected    map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
@@ -244,14 +231,7 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 			// Parse config
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				if err != nil {
-					require.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				require.NoError(err)
-			}
+			require.NoError(err)
 			require.Equal(test.expected, chainConfigs)
 		})
 	}

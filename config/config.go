@@ -86,6 +86,7 @@ var (
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
+	errCannotReadDirectory           = errors.New("cannot read directory")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
@@ -1008,7 +1009,7 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	}
 	if v.IsSet(configKey) {
 		// user specified a config dir explicitly, but dir does not exist.
-		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+		return "", fmt.Errorf("%w: %s", errCannotReadDirectory, cleanPath)
 	}
 	return "", nil
 }
