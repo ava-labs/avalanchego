@@ -92,11 +92,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
-	_ = nodeID
-	_ = addMinStakeValidator
-	_ = addMaxStakeValidator
-	_ = currentTimestamp
-
 	type test struct {
 		description   string
 		stakeAmount   uint64
