@@ -24,7 +24,7 @@ type Network struct {
 
 func (n *Network) shuffleConsumers() {
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(n.consumers)))
+	s.Initialize(uint64(len(n.consumers)))
 	indices, _ := s.Sample(len(n.consumers))
 	consumers := []*TestTx(nil)
 	for _, index := range indices {
@@ -56,7 +56,7 @@ func (n *Network) Initialize(
 	for len(colors) > 0 {
 		selected := []ids.ID{}
 		s := sampler.NewUniform()
-		_ = s.Initialize(uint64(len(colors)))
+		s.Initialize(uint64(len(colors)))
 		size := len(colors)
 		if size > colorsPerConsumer {
 			size = colorsPerConsumer
@@ -134,12 +134,12 @@ func (n *Network) Round() error {
 	}
 
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(n.running)))
+	s.Initialize(uint64(len(n.running)))
 	runningInd, _ := s.Next()
 
 	running := n.running[runningInd]
 
-	_ = s.Initialize(uint64(len(n.nodes)))
+	s.Initialize(uint64(len(n.nodes)))
 	indices, _ := s.Sample(n.params.K)
 	sampledColors := bag.Bag[ids.ID]{}
 	sampledColors.SetThreshold(n.params.Alpha)
