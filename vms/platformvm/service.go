@@ -2238,7 +2238,8 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 type GetStakeArgs struct {
 	api.JSONAddresses
-	Encoding formatting.Encoding `json:"encoding"`
+	ValidatorsOnly bool                `json:"validatorsOnly"`
+	Encoding       formatting.Encoding `json:"encoding"`
 }
 
 // GetStakeReply is the response from calling GetStake.
@@ -2288,6 +2289,10 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
 
+		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+			continue
+		}
+
 		tx, _, err := s.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
@@ -2304,6 +2309,10 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 
 	for pendingStakerIterator.Next() { // Iterates over pending stakers
 		staker := pendingStakerIterator.Value()
+
+		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+			continue
+		}
 
 		tx, _, err := s.vm.state.GetTx(staker.TxID)
 		if err != nil {
