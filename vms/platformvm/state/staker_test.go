@@ -166,6 +166,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	require.Equal(subnetID, staker.SubnetID)
 	require.Equal(weight, staker.Weight)
 	require.Equal(startTime, staker.StartTime)
+	require.Equal(duration, staker.Duration)
 	require.Equal(endTime, staker.EndTime)
 	require.Equal(potentialReward, staker.PotentialReward)
 	require.Equal(endTime, staker.NextTime)
@@ -191,6 +192,7 @@ func TestNewPendingStaker(t *testing.T) {
 	weight := uint64(12345)
 	startTime := time.Now()
 	endTime := time.Now()
+	duration := endTime.Sub(startTime)
 	pendingPriority := txs.SubnetPermissionedValidatorPendingPriority
 
 	stakerTx := txs.NewMockStaker(ctrl)
@@ -199,6 +201,7 @@ func TestNewPendingStaker(t *testing.T) {
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
 	stakerTx.EXPECT().Weight().Return(weight)
 	stakerTx.EXPECT().StartTime().Return(startTime)
+	stakerTx.EXPECT().Duration().Return(duration)
 	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().PendingPriority().Return(pendingPriority)
 
@@ -211,6 +214,7 @@ func TestNewPendingStaker(t *testing.T) {
 	require.Equal(subnetID, staker.SubnetID)
 	require.Equal(weight, staker.Weight)
 	require.Equal(startTime, staker.StartTime)
+	require.Equal(duration, staker.Duration)
 	require.Equal(endTime, staker.EndTime)
 	require.Zero(staker.PotentialReward)
 	require.Equal(startTime, staker.NextTime)

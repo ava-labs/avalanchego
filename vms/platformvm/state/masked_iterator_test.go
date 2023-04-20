@@ -233,7 +233,7 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 		s := parentStakers[idx]
 
 		cpy := s
-		RotateStakerTimesInPlace(&cpy)
+		RotateStakerInPlace(&cpy)
 		updatedStakers[s.TxID] = &cpy
 	}
 

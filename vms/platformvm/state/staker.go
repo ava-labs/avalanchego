@@ -5,6 +5,7 @@ package state
 
 import (
 	"bytes"
+	"math"
 	"time"
 
 	"github.com/google/btree"
@@ -17,7 +18,8 @@ import (
 var (
 	_ btree.LessFunc[*Staker] = (*Staker).Less
 
-	StakerZeroTime = time.Unix(0, 0)
+	StakerZeroTime                  = time.Unix(0, 0)
+	StakerMaxDuration time.Duration = math.MaxInt64 // time.Duration underlying type is currently int64
 )
 
 // StakerIterator defines an interface for iterating over a set of stakers.
@@ -39,19 +41,42 @@ type StakerIterator interface {
 // delegator in the current and pending validator sets.
 // Invariant: Staker's size is bounded to prevent OOM DoS attacks.
 type Staker struct {
-	TxID            ids.ID
-	NodeID          ids.NodeID
-	PublicKey       *bls.PublicKey
-	SubnetID        ids.ID
-	Weight          uint64
-	StartTime       time.Time
-	EndTime         time.Time
+	TxID      ids.ID
+	NodeID    ids.NodeID
+	PublicKey *bls.PublicKey
+	SubnetID  ids.ID
+	Weight    uint64
+
+	// StartTime is the time this staker enters the current validators set.
+	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
+	// Post ContinuousStakingFork StartTime is set to chain time when Add*Tx is accepted.
+	// StartTime does not change during a staker lifetime.
+	StartTime time.Time
+
+	// Duration is the time the staker will stake.
+	// Note that it's not necessarily true that Duration == EndTime - StartTime.
+	// Duration does not change during a staker lifetime.
+	Duration time.Duration
+
+	// StartTime is the time this staker exits the current validators set.
+	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
+	// Post ContinuousStakingFork StartTime is set initially to mockable.MaxTime. An
+	// explicit StopStaking transaction with set it to a finite value.
+	// EndTime may change during a staker lifetime.
+	EndTime time.Time
+
 	PotentialReward uint64
 
-	// NextTime is the next time this staker will be moved from a validator set.
-	// If the staker is in the pending validator set, NextTime will equal
-	// StartTime. If the staker is in the current validator set, NextTime will
-	// equal EndTime.
+	// Pre ContinuousStaking Fork, NextTime is the next time this staker will be
+	// moved into/out of the validator set. Specifically
+	// a. If staker is pending, NextTime equals StartTime, i.e. the time the staker
+	// will enter the current validators set.
+	// b. If staker is current, NextTime equals EndTime, i.e. the time the staker
+	// will exit the current validators set (and will be possibly rewarded).
+	// Post ContinuousStaking Fork, NextTime is the next time the staker will be
+	// evaluated for reward. Stakers are marked as current as soon as their creation
+	// tx is accepted. Also they will automatically restake until a StopStaking tx is issued.
+	// TODO ABENEGIA: consider renaming NextTime to NextRewardTime
 	NextTime time.Time
 
 	// Priority specifies how to break ties between stakers with the same
@@ -87,10 +112,6 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func (s *Staker) Duration() time.Duration {
-	return s.EndTime.Sub(s.StartTime)
-}
-
 func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.Staker,
@@ -111,6 +132,7 @@ func NewCurrentStaker(
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
 		StartTime:       startTime,
+		Duration:        stakingDuration,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
@@ -132,6 +154,7 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 		Weight:    staker.Weight(),
 		StartTime: startTime,
 		EndTime:   staker.EndTime(),
+		Duration:  staker.Duration(),
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
@@ -147,17 +170,6 @@ func (s *Staker) IsPending() bool {
 	return isPending
 }
 
-func RotateStakerTimesInPlace(s *Staker) {
-	var (
-		currEndTime = s.EndTime
-		duration    = s.EndTime.Sub(s.StartTime)
-	)
-
-	s.StartTime = currEndTime
-	s.EndTime = currEndTime.Add(duration)
-	if s.NextTime == currEndTime {
-		s.NextTime = s.EndTime
-	} else {
-		s.NextTime = s.StartTime
-	}
+func RotateStakerInPlace(s *Staker) {
+	s.NextTime = s.NextTime.Add(s.Duration)
 }

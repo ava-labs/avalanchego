@@ -219,13 +219,15 @@ func TestDiffStakersDelegator(t *testing.T) {
 
 func newTestStaker() *Staker {
 	startTime := time.Now().Round(time.Second)
-	endTime := startTime.Add(28 * 24 * time.Hour)
+	duration := 28 * 24 * time.Hour
+	endTime := startTime.Add(duration)
 	return &Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          ids.GenerateTestNodeID(),
 		SubnetID:        ids.GenerateTestID(),
 		Weight:          1,
 		StartTime:       startTime,
+		Duration:        duration,
 		EndTime:         endTime,
 		PotentialReward: 1,
 

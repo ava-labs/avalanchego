@@ -215,6 +215,7 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 func (v *putCurrentValidatorCommand) String() string {
 	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+	// TODO ABENEGIA: replace v.EndTime.Sub(v.StartTime) with v.Duration once it is duly set in generator
 }
 
 var genPutCurrentValidatorCommand = state.StakerGenerator(state.CurrentValidator, nil, nil, math.MaxUint64).Map(
@@ -279,7 +280,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	// 4. Rotate staker times and update the staker
 	updatedStaker := *staker
-	state.RotateStakerTimesInPlace(&updatedStaker)
+	state.RotateStakerInPlace(&updatedStaker)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -317,7 +318,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	state.RotateStakerTimesInPlace(&updatedStaker)
+	state.RotateStakerInPlace(&updatedStaker)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -548,6 +549,7 @@ func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res co
 func (v *putCurrentDelegatorCommand) String() string {
 	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+	// TODO ABENEGIA: replace v.EndTime.Sub(v.StartTime) with v.Duration once it is duly set in generator
 }
 
 var genPutCurrentDelegatorCommand = state.StakerGenerator(state.CurrentDelegator, nil, nil, 1000).Map(
@@ -604,7 +606,7 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. Rotate delegator times and update the staker
 	updatedDelegator := *delegator
-	state.RotateStakerTimesInPlace(&updatedDelegator)
+	state.RotateStakerInPlace(&updatedDelegator)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -641,7 +643,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	state.RotateStakerTimesInPlace(&updatedDelegator)
+	state.RotateStakerInPlace(&updatedDelegator)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 

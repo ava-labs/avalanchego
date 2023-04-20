@@ -24,7 +24,7 @@ func StakerGenerator(
 	prio StakerGeneratorPriorityType,
 	subnet *ids.ID,
 	nodeID *ids.NodeID,
-	maxWeight uint64, // helps avoiding overflowS in delegator tests
+	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
 	return genStakerTimeData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
@@ -46,6 +46,7 @@ func StakerGenerator(
 				"SubnetID":        genStakerSubnetID,
 				"Weight":          gen.UInt64Range(0, maxWeight),
 				"StartTime":       gen.Const(macro.StartTime),
+				"Duration":        gen.Const(macro.Duration),
 				"EndTime":         gen.Const(macro.EndTime),
 				"PotentialReward": gen.UInt64(),
 				"NextTime":        gen.Const(macro.NextTime),
@@ -130,6 +131,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 // 3. NextTime == StartTime for pending priorities
 type stakerTimeData struct {
 	StartTime time.Time
+	Duration  time.Duration
 	EndTime   time.Time
 	Priority  txs.Priority
 	NextTime  time.Time
@@ -142,11 +144,13 @@ func genStakerTimeData(prio StakerGeneratorPriorityType) gopter.Gen {
 
 			var (
 				startTime = micro.StartTime
-				endTime   = micro.StartTime.Add(time.Duration(micro.Duration * int64(time.Hour)))
+				duration  = time.Duration(micro.Duration * int64(time.Hour))
+				endTime   = micro.StartTime.Add(duration)
 				priority  = micro.Priority
 			)
 
 			startTimeGen := gen.Const(startTime)
+			durationGen := gen.Const(duration)
 			endTimeGen := gen.Const(endTime)
 			priorityGen := gen.Const(priority)
 			var nextTimeGen gopter.Gen
@@ -162,6 +166,7 @@ func genStakerTimeData(prio StakerGeneratorPriorityType) gopter.Gen {
 
 			return gen.Struct(reflect.TypeOf(stakerTimeData{}), map[string]gopter.Gen{
 				"StartTime": startTimeGen,
+				"Duration":  durationGen,
 				"EndTime":   endTimeGen,
 				"Priority":  priorityGen,
 				"NextTime":  nextTimeGen,

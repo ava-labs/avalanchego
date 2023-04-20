@@ -163,7 +163,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 			// to avoid in-place modification of stakers already stored in store,
 			// as it must be done in prod code.
 			updatedStaker := s
-			state.RotateStakerTimesInPlace(&updatedStaker)
+			state.RotateStakerInPlace(&updatedStaker)
 
 			err = store.UpdateCurrentValidator(&updatedStaker)
 			if err != nil {
@@ -429,7 +429,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 				// to avoid in-place modification of stakers already stored in store,
 				// as it must be done in prod code.
 				updatedStaker := del
-				state.RotateStakerTimesInPlace(&updatedStaker)
+				state.RotateStakerInPlace(&updatedStaker)
 
 				err = store.UpdateCurrentDelegator(&updatedStaker)
 				if err != nil {

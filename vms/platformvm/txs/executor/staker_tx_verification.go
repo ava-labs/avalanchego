@@ -574,7 +574,7 @@ func verifyAddPermissionlessValidatorTx(
 		}
 
 		if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-			if tx.Validator.Duration() > primaryNetworkValidator.Duration() {
+			if tx.Validator.Duration() > primaryNetworkValidator.Duration {
 				return errValidatorSubset
 			}
 		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {

@@ -88,9 +88,11 @@ func (utxo UTXO) Less(other UTXO) bool {
 type Staker struct {
 	TxID      ids.ID      `json:"txID"`
 	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
-	Weight    json.Uint64 `json:"weight"`
-	NodeID    ids.NodeID  `json:"nodeID"`
+	// TODO ABENEGIA: consider adding Duration here too, since
+	// endTime may be +infinity for continuous stakers
+	EndTime json.Uint64 `json:"endTime"`
+	Weight  json.Uint64 `json:"weight"`
+	NodeID  ids.NodeID  `json:"nodeID"`
 
 	// Deprecated: Use Weight instead
 	// TODO: remove [StakeAmount] after enough time for dependencies to update

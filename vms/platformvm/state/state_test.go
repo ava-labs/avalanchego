@@ -667,7 +667,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		numNodes  = 3
 		subnetID  = ids.GenerateTestID()
 		startTime = time.Now()
-		endTime   = startTime.Add(24 * time.Hour)
+		duration  = 24 * time.Hour
+		endTime   = startTime.Add(duration)
 		stakers   = make([]Staker, numNodes)
 	)
 	for i := 0; i < numNodes; i++ {
@@ -676,6 +677,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			NodeID:          ids.GenerateTestNodeID(),
 			Weight:          uint64(i + 1),
 			StartTime:       startTime.Add(time.Duration(i) * time.Second),
+			Duration:        duration,
 			EndTime:         endTime.Add(time.Duration(i) * time.Second),
 			PotentialReward: uint64(i + 1),
 		}

@@ -1030,7 +1030,8 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 
 	require.Equal(addValTx.ID(), val.TxID)
 	require.Equal(env.state.GetTimestamp(), val.StartTime)
-	require.Equal(val.StartTime.Add(validatorDuration), val.EndTime)
+	require.Equal(validatorDuration, val.Duration)
+	require.Equal(val.StartTime.Add(val.Duration), val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
