@@ -282,7 +282,7 @@ func (s *Ethereum) APIs() []rpc.API {
 			Name:      "eth",
 		}, {
 			Namespace: "eth",
-			Service:   filters.NewFilterAPI(filterSystem, false /* isLightClient */),
+			Service:   filters.NewFilterAPI(filterSystem),
 			Name:      "eth-filter",
 		}, {
 			Namespace: "admin",
