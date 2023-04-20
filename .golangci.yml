@@ -66,6 +66,7 @@ linters-settings:
     # Forbid the following identifiers (list of regexp).
     forbid:
       - 'require\.Error$(# ErrorIs should be used instead)?'
+      - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
     exclude_godoc_examples: false
   # https://golangci-lint.run/usage/linters#gosec
   gosec:
