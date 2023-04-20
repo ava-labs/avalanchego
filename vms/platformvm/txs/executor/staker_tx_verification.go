@@ -306,8 +306,7 @@ func removeSubnetValidatorValidation(
 		)
 	}
 
-	if vdr.Priority != txs.SubnetPermissionedValidatorCurrentPriority &&
-		vdr.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+	if !vdr.Priority.IsPermissionedValidator() {
 		return nil, false, errRemovePermissionlessValidator
 	}
 
@@ -774,8 +773,7 @@ func verifyAddPermissionlessDelegatorTx(
 		//            AddSubnetValidatorTx. AddSubnetValidatorTx is the only
 		//            permissioned validator, so we verify this delegator is
 		//            pointing to a permissionless validator.
-		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			validator.Priority == txs.SubnetPermissionedValidatorPendingPriority {
+		if validator.Priority.IsPermissionedValidator() {
 			return errDelegateToPermissionedValidator
 		}
 
