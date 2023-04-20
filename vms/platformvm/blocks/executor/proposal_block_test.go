@@ -127,7 +127,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(err)
 
 	block := env.blkManager.NewBlock(statelessProposalBlock)
-	require.Error(block.Verify(context.Background()))
+
+	err = block.Verify(context.Background())
+	require.ErrorIs(err, errIncorrectBlockHeight)
 
 	// valid
 	statelessProposalBlock, err = blocks.NewApricotProposalBlock(
@@ -262,11 +264,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errIncorrectBlockHeight)
 	}
 
 	{
-		// wrong version
+		// wrong block version
 		statelessProposalBlock, err := blocks.NewApricotProposalBlock(
 			parentID,
 			banffParentBlk.Height()+1,
@@ -275,7 +278,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errApricotBlockIssuedAfterFork)
 	}
 
 	{
@@ -289,14 +293,16 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errChildBlockEarlierThanParent)
 	}
 
 	{
 		// wrong timestamp, violated synchrony bound
-		beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
+		initClkTime := env.clk.Time()
+		env.clk.Set(parentTime.Add(-executor.SyncBound))
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
-			beyondSyncBoundTimeStamp,
+			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
@@ -304,7 +310,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, executor.ErrChildBlockBeyondSyncBound)
+		env.clk.Set(initClkTime)
 	}
 
 	{
@@ -319,7 +327,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, executor.ErrChildBlockAfterStakerChangeTime)
 	}
 
 	{
@@ -339,7 +348,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, executor.ErrAdvanceTimeTxIssuedAfterBanff)
 	}
 
 	{
@@ -354,7 +364,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 		statelessProposalBlock.Transactions = []*txs.Tx{blkTx}
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.ErrorIs(block.Verify(context.Background()), errBanffProposalBlockWithMultipleTransactions)
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errBanffProposalBlockWithMultipleTransactions)
 	}
 
 	{

@@ -23,11 +23,11 @@ type MempoolTxVerifier struct {
 }
 
 func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*MempoolTxVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (v *MempoolTxVerifier) AddValidatorTx(tx *txs.AddValidatorTx) error {
