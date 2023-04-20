@@ -882,7 +882,6 @@ func TestRewardValidatorTx_Slashing(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			r := require.New(t)
 			ctrl := gomock.NewController(t)
 

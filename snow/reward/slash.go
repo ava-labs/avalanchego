@@ -34,7 +34,7 @@ type Slasher interface {
 		subnetID ids.ID,
 		metricName string,
 	) error
-	// Slashed returns whether or not [nodeID] is slashed for [subnetID] for the
+	// Slashed returns whether [nodeID] is slashed for [subnetID] for the
 	// staking cycle corresponding to [txID] on the P-Chain.
 	Slashed(nodeID ids.NodeID, txID ids.ID, subnetID ids.ID) (bool, error)
 	// Reset resets the slashed status of [nodeID] on [subnetID] for the staking
@@ -99,8 +99,7 @@ func (s *SlashDB) Slash(
 	m.Observe(1)
 
 	subnetDB := prefixdb.New(subnetID[:], s.db)
-	key := append(nodeID[:], txID[:]...)
-
+	key := key(nodeID, txID)
 	return subnetDB.Put(key, nil)
 }
 
@@ -110,14 +109,17 @@ func (s *SlashDB) Slashed(
 	subnetID ids.ID,
 ) (bool, error) {
 	subnetDB := prefixdb.New(subnetID[:], s.db)
-	key := append(nodeID[:], txID[:]...)
-
+	key := key(nodeID, txID)
 	return subnetDB.Has(key)
 }
 
 func (s *SlashDB) Reset(nodeID ids.NodeID, txID ids.ID, subnetID ids.ID) error {
 	subnetDB := prefixdb.New(subnetID[:], s.db)
-	key := append(nodeID[:], txID[:]...)
+	key := key(nodeID, txID)
 
 	return subnetDB.Delete(key)
+}
+
+func key(nodeID ids.NodeID, txID ids.ID) []byte {
+	return append(nodeID[:], txID[:]...)
 }
