@@ -99,7 +99,7 @@ var (
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
-	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	CortinaDefaultTime = time.Date(2023, time.April, 20, 20, 0, 0, 0, time.UTC)
 )
 
 func init() {
