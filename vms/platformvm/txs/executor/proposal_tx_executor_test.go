@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -888,7 +887,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
-			nodeID,
+			ids.GenerateTestNodeID(),
 			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -917,6 +916,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, database.ErrNotFound)
+		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
 }
