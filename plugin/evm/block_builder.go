@@ -17,16 +17,6 @@ import (
 )
 
 const (
-	// waitBlockTime is the amount of time to wait for BuildBlock to be
-	// called by the engine before deciding whether or not to gossip the
-	// transaction that triggered the PendingTxs message to the engine.
-	//
-	// This is done to reduce contention in the network when there is no
-	// preferred producer. If we did not wait here, we may gossip a new
-	// transaction to a peer while building a block that will conflict with
-	// whatever the peer makes.
-	waitBlockTime = 100 * time.Millisecond
-
 	// Minimum amount of time to wait after building a block before attempting to build a block
 	// a second time without changing the contents of the mempool.
 	minBlockBuildingRetryDelay = 500 * time.Millisecond
@@ -168,9 +158,6 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				b.signalTxsReady()
 
 				if b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
-					// Give time for this node to build a block before attempting to
-					// gossip
-					time.Sleep(waitBlockTime)
 					// [GossipEthTxs] will block unless [gossiper.ethTxsToGossipChan] (an
 					// unbuffered channel) is listened on
 					if err := b.gossiper.GossipEthTxs(ethTxsEvent.Txs); err != nil {
@@ -186,9 +173,6 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 				newTxs := b.mempool.GetNewTxs()
 				if b.gossiper != nil && len(newTxs) > 0 {
-					// Give time for this node to build a block before attempting to
-					// gossip
-					time.Sleep(waitBlockTime)
 					if err := b.gossiper.GossipAtomicTxs(newTxs); err != nil {
 						log.Warn(
 							"failed to gossip new atomic transactions",
