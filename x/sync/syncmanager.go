@@ -361,32 +361,37 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
 }
 
-// findNextKey attempts to find what key to query next based on the differences between
-// the proof of the last received key in the local trie vs proof for the last received key recently received by the sync manager.
+// findNextKey attempts to find the first key larger than the lastReceivedKey that is different in the local merkle vs the merkle that is being synced.
+// Returns the first key with a difference in the range (lastReceivedKey, rangeEnd), or nil if no difference was found in the range
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
 	rangeEnd []byte,
 	receivedProofNodes []merkledb.ProofNode,
 ) ([]byte, error) {
+	// We want the first key larger than the lastReceivedKey.
+	// This is done by taking two proofs for the same key (one that was just received as part of a proof, and one from the local db)
+	// and traversing them from the deepest key to the shortest key.
+	// For each node in these proofs, compare if the children of that node exist or have the same id in the other proof.
 	proofKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
 
-	// If the received proof's last node isn't a prefix of or equal to lastReceivedKey, then this is an exclusion proof.
-	// if it is an exclusion proof, then we can remove the last node to get a valid proof for some prefix of the lastReceivedKey
+	// If the received proof is an exclusion proof, the last node may be for a key that is after the lastReceivedKey.
+	// If the last received node's key is after the lastReceivedKey, it can be removed to obtain a valid proof for a prefix of the lastReceivedKey
 	if !proofKeyPath.HasPrefix(receivedProofNodes[len(receivedProofNodes)-1].KeyPath) {
 		receivedProofNodes = receivedProofNodes[:len(receivedProofNodes)-1]
 		// update the proofKeyPath to be for the prefix
 		proofKeyPath = receivedProofNodes[len(receivedProofNodes)-1].KeyPath
 	}
 
+	// get a proof for the same key as the received proof from the local db
 	localProofOfKey, err := m.config.SyncDB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
 		return nil, err
 	}
 	localProofNodes := localProofOfKey.Path
 
-	// There may be an extra node if the received proof was an exclusion proof.
-	// Remove this extra node if it exists.
+	// The local proof may also be an exclusion proof with an extra node.
+	// Remove this extra node if it exists to get a proof of the same key as the received proof
 	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].KeyPath) {
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
@@ -439,34 +444,38 @@ func (m *StateSyncManager) findNextKey(
 		// The proof key has the deepest node's key as a prefix,
 		// so only the next nibble of the proof key needs to be considered.
 
-		// If the deepest node has the same key as the key being proven,
-		// then all of its children have keys greater than the proof key, so we can start at byte 0
+		// If the deepest node has the same key as proofKeyPath,
+		// then all of its children have keys greater than the proof key, so we can start at the 0 nibble
 		startingChildNibble := byte(0)
 
 		// If the deepest node has a key shorter than the key being proven,
-		// look at the next nibble of the proof key to determine which children have larger keys
+		// we can look at the next nibble of the proof key to determine which of that node's children have keys larger than proofKeyPath.
+		// Any child with a nibble greater than the proofKeyPath's nibble at that index will have a larger key
 		if deepestNode.KeyPath.NibbleLength < proofKeyPath.NibbleLength {
 			startingChildNibble = proofKeyPath.NibbleVal(deepestNode.KeyPath.NibbleLength) + 1
 		}
 
+		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
 			nextKey = deepestNode.KeyPath.AppendNibble(childIndex).Value
 			break
 		}
 	}
 
-	// if the result is before or equal to the lastReceivedKey
-	// then use the lastReceivedKey + 0, which is the next largest key after lastReceivedKey
+	// If the nextKey is before or equal to the lastReceivedKey
+	// then we couldn't find a better answer than the lastReceivedKey.
+	// Set the nextKey to lastReceivedKey + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		nextKey = lastReceivedKey
 		nextKey = append(nextKey, 0)
 	}
 
-	// if the result is larger than the end of the range, return nil to signal that there is no next key in range
+	// If the nextKey is larger than the end of the range, return nil to signal that there is no next key in range
 	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
 		return nil, nil
 	}
 
+	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
 	return nextKey, nil
 }
 
