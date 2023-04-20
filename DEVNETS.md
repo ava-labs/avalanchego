@@ -130,7 +130,7 @@ avalanchego_config:
 
 For example, update the following `coreth_chain_config` to enable local transaction:
 
-```bash
+```yaml
 coreth_chain_config:
   ...
   local-txs-enabled: true
@@ -158,7 +158,7 @@ avalancheup-aws apply \
 
 That is, `apply` creates AWS resources, whereas `delete` destroys after testing is done.
 
-Spinning up a 100-node network takes about 20 minutes, from start to finish.
+Spinning up a 100-node network takes about 20 minutes from start to finish.
 
 ### Step 6: Simulate Network Upgrades
 
