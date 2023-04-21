@@ -1,6 +1,6 @@
 [package]
 name = "firewood"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 authors = [
      "Ted Yin (@Determinant) <ted@avalabs.org>",
@@ -13,27 +13,29 @@ authors = [
 description = "Firewood is an embedded key-value store, optimized to store blockchain state."
 license-file = "../LICENSE.md"
 homepage = "https://avalabs.org"
+readme = "../README.md"
+
 [dependencies]
 aquamarine = "0.3.1"
-firewood-growth-ring = { version = "0.0.1", path = "../firewood-growth-ring" }
-firewood-libaio = {version = "0.0.1", path = "../firewood-libaio" }
-firewood-shale = { version = "0.0.1", path = "../firewood-shale" }
+async-trait = "0.1.57"
+bytemuck = { version = "1.13.1", features = ["derive"] }
 enum-as-inner = "0.5.1"
-parking_lot = "0.12.1"
-rlp = "0.5.2"
-sha3 = "0.10.2"
-once_cell = "1.13.1"
+firewood-growth-ring = { version = "0.0.2", path = "../firewood-growth-ring" }
+firewood-libaio = {version = "0.0.2", path = "../firewood-libaio" }
+firewood-shale = { version = "0.0.2", path = "../firewood-shale" }
+futures = "0.3.24"
 hex = "0.4.3"
 lru = "0.10.0"
 nix = "0.26.1"
-typed-builder = "0.14.0"
-tokio = { version = "1.21.1", features = ["rt", "sync", "macros"] }
-futures = "0.3.24"
+once_cell = "1.13.1"
+parking_lot = "0.12.1"
 primitive-types = { version = "0.12.0", features = ["impl-rlp"] }
+rlp = "0.5.2"
 serde = { version = "1.0", features = ["derive"] }
+sha3 = "0.10.2"
 thiserror = "1.0.38"
-async-trait = "0.1.57"
-bytemuck = { version = "1.13.1", features = ["derive"] }
+tokio = { version = "1.21.1", features = ["rt", "sync", "macros"] }
+typed-builder = "0.14.0"
 
 [dev-dependencies]
 criterion = "0.4.0"
