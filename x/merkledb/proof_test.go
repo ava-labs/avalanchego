@@ -21,9 +21,11 @@ func getBasicDB() (*Database, error) {
 		context.Background(),
 		memdb.New(),
 		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 1000,
-			NodeCacheSize: 1000,
+			Tracer:                    newNoopTracer(),
+			HistoryLength:             1000,
+			NodeCacheSize:             1000,
+			IntermediateNodeCacheSize: 1000,
+			NotFoundNodeCacheSize:     1000,
 		},
 		&mockMetrics{},
 	)

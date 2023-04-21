@@ -863,9 +863,11 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				context.Background(),
 				memdb.New(),
 				Config{
-					Tracer:        newNoopTracer(),
-					HistoryLength: 0,
-					NodeCacheSize: minCacheSize,
+					Tracer:                    newNoopTracer(),
+					HistoryLength:             0,
+					NodeCacheSize:             minCacheSize,
+					IntermediateNodeCacheSize: minCacheSize,
+					NotFoundNodeCacheSize:     minCacheSize,
 				},
 				&mockMetrics{},
 			)
