@@ -95,7 +95,6 @@ func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.Staker,
 	startTime time.Time,
-	stakingDuration time.Duration,
 	potentialReward uint64,
 ) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
@@ -103,6 +102,7 @@ func NewCurrentStaker(
 		return nil, err
 	}
 
+	stakingDuration := staker.Duration()
 	endTime := startTime.Add(stakingDuration)
 	return &Staker{
 		TxID:            txID,
@@ -135,16 +135,6 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
-}
-
-func (s *Staker) IsPending() bool {
-	isPending := s.Priority == txs.PrimaryNetworkDelegatorApricotPendingPriority ||
-		s.Priority == txs.PrimaryNetworkValidatorPendingPriority ||
-		s.Priority == txs.PrimaryNetworkDelegatorBanffPendingPriority ||
-		s.Priority == txs.SubnetPermissionlessValidatorPendingPriority ||
-		s.Priority == txs.SubnetPermissionlessDelegatorPendingPriority ||
-		s.Priority == txs.SubnetPermissionedValidatorPendingPriority
-	return isPending
 }
 
 func RotateStakerTimesInPlace(s *Staker) {
