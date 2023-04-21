@@ -608,7 +608,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.KeyPath.AppendNibble(byte(childIdx)),
+					key: node.KeyPath.AppendNibble(childIdx),
 					id:  childID,
 				})
 			}
@@ -619,7 +619,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.KeyPath.AppendNibble(byte(childIdx)),
+					key: node.KeyPath.AppendNibble(childIdx),
 					id:  childID,
 				})
 			}
