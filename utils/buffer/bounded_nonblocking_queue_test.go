@@ -14,7 +14,7 @@ func TestNewBoundedQueue(t *testing.T) {
 
 	// Case: maxSize < 1
 	_, err := NewBoundedQueue[bool](0, nil)
-	require.Error(err)
+	require.ErrorIs(err, errInvalidMaxSize)
 
 	// Case: maxSize == 1 and nil onEvict
 	b, err := NewBoundedQueue[bool](1, nil)
