@@ -482,6 +482,12 @@ impl DiskBufferRequester {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        path::{Path, PathBuf},
+        thread,
+        time::Duration,
+    };
+
     use super::*;
     use crate::{
         file,
@@ -491,13 +497,19 @@ mod tests {
 
     const STATE_SPACE: SpaceID = 0x0;
     #[test]
+    #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
     fn test_buffer() {
+        let tmpdb = [
+            &std::env::var("CARGO_TARGET_DIR").unwrap_or("/tmp".to_string()),
+            "sender_api_test_db",
+        ];
+
         let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
         let wal_cfg = WALConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
-        let path = std::path::PathBuf::from(r"/tmp/firewood");
-        let (root_db_fd, reset) = crate::file::open_dir(path, true).unwrap();
+        let (root_db_fd, reset) =
+            crate::file::open_dir(&tmpdb.into_iter().collect::<PathBuf>(), true).unwrap();
 
         // file descriptor of the state directory
         let state_fd = file::touch_dir("state", root_db_fd).unwrap();
@@ -550,23 +562,27 @@ mod tests {
 
         // create a mutation request to the disk buffer by passing the page and write batch.
         let d1 = disk_requester.clone();
-        std::thread::spawn(move || {
+        let write_thread_handle = std::thread::spawn(move || {
             // wal is empty
             assert!(d1.collect_ash(1).unwrap().is_empty());
             // page is not yet persisted to disk.
             assert!(d1.get_page(STATE_SPACE, 0).is_none());
             d1.write(page_batch, write_batch);
-            // This is not ACID compliant write should not return before wal log is written to disk.
-            // If the sleep is removed the test will fail.
-            // TODO why is this so slow?
-            std::thread::sleep(std::time::Duration::from_millis(5));
-            assert_eq!(d1.collect_ash(1).unwrap().len(), 1);
-            assert!(d1.get_page(STATE_SPACE, 0).is_some());
         });
+        // wait for the write to complete.
+        write_thread_handle.join().unwrap();
+        // This is not ACID compliant, write should not return before WAL log
+        // is written to disk.
+        assert!([
+            &tmpdb.into_iter().collect::<String>(),
+            "wal",
+            "00000000.log"
+        ]
+        .iter()
+        .collect::<PathBuf>()
+        .exists());
 
-        // wait for thread to finish
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        // state has been written to disk in the above thread wal should have 1 record.
+        // verify
         assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
     }
 
