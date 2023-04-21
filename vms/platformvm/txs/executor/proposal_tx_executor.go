@@ -711,6 +711,9 @@ func canDelegate(
 	if delegator.StartTime.Before(validator.StartTime) {
 		return false, nil
 	}
+	if delegator.StakingPeriod > validator.StakingPeriod {
+		return false, nil
+	}
 	if delegator.EndTime.After(validator.EndTime) {
 		return false, nil
 	}

@@ -229,8 +229,8 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		primaryNetworkValDuration := primaryNetworkValidator.EndTime.Sub(primaryNetworkValidator.StartTime)
-		if tx.StakingPeriod() > primaryNetworkValDuration {
+		if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod ||
+			tx.EndTime().After(primaryNetworkValidator.EndTime) {
 			return errValidatorSubset
 		}
 	} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
@@ -574,7 +574,8 @@ func verifyAddPermissionlessValidatorTx(
 		}
 
 		if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
+			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod ||
+				tx.EndTime().After(primaryNetworkValidator.EndTime) {
 				return errValidatorSubset
 			}
 		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
