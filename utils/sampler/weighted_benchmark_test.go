@@ -4,15 +4,12 @@
 package sampler
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"testing"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
-
-var errOverflow = errors.New("overflow error")
 
 // BenchmarkAllWeightedSampling
 func BenchmarkAllWeightedSampling(b *testing.B) {
@@ -97,9 +94,6 @@ func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 		}
 		totalWeight = newWeight
 	}
-	if totalWeight > math.MaxInt64 {
-		return 0, nil, errOverflow
-	}
 	return totalWeight, weights, nil
 }
 
@@ -119,14 +113,14 @@ func WeightedPowBenchmarkSampler(
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(globalRNG.Int63n(int64(totalWeight))))
+		_, _ = s.Sample(globalRNG.Uint64Inclusive(totalWeight - 1))
 	}
 	return true
 }
 
 func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool {
 	weights := make([]uint64, size)
-	weights[0] = uint64(math.MaxInt64 - size + 1)
+	weights[0] = math.MaxUint64 - uint64(size-1)
 	for i := 1; i < len(weights); i++ {
 		weights[i] = 1
 	}
@@ -138,7 +132,7 @@ func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool 
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(globalRNG.Int63n(math.MaxInt64)))
+		_, _ = s.Sample(globalRNG.Uint64Inclusive(math.MaxUint64 - 1))
 	}
 	return true
 }
@@ -159,7 +153,7 @@ func WeightedPowBenchmarkInitializer(
 
 func WeightedSingletonBenchmarkInitializer(b *testing.B, s Weighted, size int) {
 	weights := make([]uint64, size)
-	weights[0] = uint64(math.MaxInt64 - size + 1)
+	weights[0] = math.MaxUint64 - uint64(size-1)
 	for i := 1; i < len(weights); i++ {
 		weights[i] = 1
 	}
