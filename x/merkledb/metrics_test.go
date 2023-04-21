@@ -24,7 +24,6 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 			HistoryLength:             300,
 			NodeCacheSize:             minCacheSize,
 			IntermediateNodeCacheSize: minCacheSize,
-			NotFoundNodeCacheSize:     minCacheSize,
 		},
 	)
 	require.NoError(t, err)

@@ -59,7 +59,6 @@ type Config struct {
 	HistoryLength             int
 	NodeCacheSize             int
 	IntermediateNodeCacheSize int
-	NotFoundNodeCacheSize     int
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -130,9 +129,6 @@ func newDatabase(
 		return nil
 	})
 	trieDB.intermediateNodeCache = newOnEvictCache[path](config.IntermediateNodeCacheSize, trieDB.onIntermediateNodeEviction)
-	trieDB.notFoundNodeCache = newOnEvictCache[path, *node](config.NotFoundNodeCacheSize, func(n *node) error {
-		return nil
-	})
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -708,6 +704,10 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
 func (db *Database) onIntermediateNodeEviction(node *node) error {
+	if node == nil {
+		return nil
+	}
+
 	nodeBytes, err := node.marshal()
 	if err != nil {
 		db.onEvictionErr.Set(err)

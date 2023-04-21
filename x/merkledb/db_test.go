@@ -198,7 +198,6 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 			HistoryLength:             300,
 			NodeCacheSize:             minCacheSize,
 			IntermediateNodeCacheSize: minCacheSize,
-			NotFoundNodeCacheSize:     minCacheSize,
 		},
 	)
 	require.NoError(t, err)
@@ -869,7 +868,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 					HistoryLength:             0,
 					NodeCacheSize:             minCacheSize,
 					IntermediateNodeCacheSize: minCacheSize,
-					NotFoundNodeCacheSize:     minCacheSize,
 				},
 				&mockMetrics{},
 			)

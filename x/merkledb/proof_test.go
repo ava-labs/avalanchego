@@ -25,7 +25,6 @@ func getBasicDB() (*Database, error) {
 			HistoryLength:             1000,
 			NodeCacheSize:             1000,
 			IntermediateNodeCacheSize: 1000,
-			NotFoundNodeCacheSize:     1000,
 		},
 		&mockMetrics{},
 	)
