@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
@@ -500,6 +501,236 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
 		require.NoError(t, err)
 		require.Equal(t, nextKey, lastKey)
+	}
+}
+
+// Test findNextKey by computing the expected result in a naive, inefficient
+// way and comparing it to the actual resulthy
+func TestFindNextKeyRandom(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) //nolint:gosec
+	require := require.New(t)
+
+	// Create a "remote" database and "local" database
+	remoteDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		merkledb.Config{
+			Tracer:        newNoopTracer(),
+			HistoryLength: defaultRequestKeyLimit,
+			NodeCacheSize: defaultRequestKeyLimit,
+		},
+	)
+	require.NoError(err)
+
+	localDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		merkledb.Config{
+			Tracer:        newNoopTracer(),
+			HistoryLength: defaultRequestKeyLimit,
+			NodeCacheSize: defaultRequestKeyLimit,
+		},
+	)
+	require.NoError(err)
+
+	var (
+		numProofsToTest  = 1_000
+		numKeyValues     = 1_000
+		maxKeyLen        = 256
+		maxValLen        = 256
+		maxRangeStartLen = 8
+		maxRangeEndLen   = 8
+		maxProofLen      = 128
+	)
+
+	// Put random keys into the databases
+	for _, db := range []database.Database{remoteDB, localDB} {
+		for i := 0; i < numKeyValues; i++ {
+			key := make([]byte, rand.Intn(maxKeyLen))
+			_, _ = rand.Read(key)
+			val := make([]byte, rand.Intn(maxValLen))
+			err := db.Put(key, val)
+			require.NoError(err)
+		}
+	}
+
+	// Repeatedly generate end proofs from the remote database and compare
+	// the result of findNextKey to the expected result.
+	for proofIndex := 0; proofIndex < numProofsToTest; proofIndex++ {
+		// Generate a proof for a random key
+		var (
+			rangeStart []byte
+			rangeEnd   []byte
+		)
+		for rangeStart == nil || bytes.Compare(rangeStart, rangeEnd) == 1 {
+			rangeStart = make([]byte, rand.Intn(maxRangeStartLen)+1)
+			_, _ = rand.Read(rangeStart)
+			rangeEnd = make([]byte, rand.Intn(maxRangeEndLen)+1)
+			_, _ = rand.Read(rangeEnd)
+		}
+
+		remoteProof, err := remoteDB.GetRangeProof(
+			context.Background(),
+			rangeStart,
+			rangeEnd,
+			rand.Intn(maxProofLen)+1,
+		)
+		require.NoError(err)
+
+		if len(remoteProof.KeyValues) == 0 {
+			continue
+		}
+		lastReceivedKey := remoteProof.KeyValues[len(remoteProof.KeyValues)-1].Key
+
+		// Commit the proof to the local database as we do
+		// in the actual syncer.
+		err = localDB.CommitRangeProof(
+			context.Background(),
+			rangeStart,
+			remoteProof,
+		)
+		require.NoError(err)
+
+		localProof, err := localDB.GetProof(
+			context.Background(),
+			lastReceivedKey,
+		)
+		require.NoError(err)
+
+		type keyAndID struct {
+			key merkledb.SerializedPath
+			id  ids.ID
+		}
+
+		// Set of key prefix/ID pairs proven by the remote database's proof.
+		remoteKeyIDs := []keyAndID{}
+
+		for _, node := range remoteProof.EndProof {
+			for childIdx, childID := range node.Children {
+				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
+					key: node.KeyPath.AppendNibble(byte(childIdx)),
+					id:  childID,
+				})
+			}
+		}
+
+		// Set of key prefix/ID pairs proven by the local database's proof.
+		localKeyIDs := []keyAndID{}
+		for _, node := range localProof.Path {
+			for childIdx, childID := range node.Children {
+				localKeyIDs = append(localKeyIDs, keyAndID{
+					key: node.KeyPath.AppendNibble(byte(childIdx)),
+					id:  childID,
+				})
+			}
+		}
+
+		// Sort in ascending order by key prefix.
+		serializedPathLess := func(i, j keyAndID) bool {
+			return bytes.Compare(i.key.Value, j.key.Value) < 0 ||
+				(bytes.Equal(i.key.Value, j.key.Value) &&
+					i.key.NibbleLength < j.key.NibbleLength)
+		}
+		slices.SortFunc(remoteKeyIDs, serializedPathLess)
+		slices.SortFunc(localKeyIDs, serializedPathLess)
+
+		// Filter out keys that are before the last received key
+		findBounds := func(keyIDs []keyAndID) (int, int) {
+			firstIdxInRange := len(keyIDs)
+			firstIdxInRangeFound := false
+			firstIdxOutOfRange := len(keyIDs)
+			for i, keyID := range keyIDs {
+				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) >= 0 {
+					firstIdxInRange = i
+					firstIdxInRangeFound = true
+					continue
+				}
+				if bytes.Compare(keyID.key.Value, rangeEnd) > 0 {
+					firstIdxOutOfRange = i
+					break
+				}
+			}
+			return firstIdxInRange, firstIdxOutOfRange
+		}
+
+		remoteFirstIdxInRange, remoteFirstIdxOutOfRange := findBounds(remoteKeyIDs)
+		remoteKeyIDs = remoteKeyIDs[remoteFirstIdxInRange:remoteFirstIdxOutOfRange]
+
+		localFirstIdxInRange, localFirstIdxOutOfRange := findBounds(localKeyIDs)
+		localKeyIDs = localKeyIDs[localFirstIdxInRange:localFirstIdxOutOfRange]
+
+		// Find first diff
+		var smallestDiffKeyAndID keyAndID
+		for _, remoteKeyID := range remoteKeyIDs {
+			presentInOtherProof := false
+			for _, localKeyID := range localKeyIDs {
+				if serializedPathLess(remoteKeyID, localKeyID) {
+					// [localKeyIDs] is sorted, and [remoteKeyIDs] is less than
+					// [remoteKeyID], so [localKeyID] is less than all the remaining
+					// elements in [localKeyIDs].
+					break
+				}
+				if remoteKeyID.key.Equal(localKeyID.key) {
+					if remoteKeyID.id == localKeyID.id {
+						presentInOtherProof = true
+					}
+					break
+				}
+			}
+			if !presentInOtherProof {
+				// We found a difference between the key/ID pairs in the two proofs.
+				smallestDiffKeyAndID = remoteKeyID
+				break
+			}
+		}
+		for _, localKeyID := range localKeyIDs {
+			presentInOtherProof := false
+			for _, remoteKeyID := range remoteKeyIDs {
+				if serializedPathLess(localKeyID, remoteKeyID) {
+					// [remoteKeyIDs] is sorted, and [localKeyID] is less than
+					// [remoteKeyID], so [localKeyID] is less than all the remaining
+					// elements in [remoteKeyIDs].
+					break
+				}
+
+				if localKeyID.key.Equal(remoteKeyID.key) {
+					if localKeyID.id == remoteKeyID.id {
+						presentInOtherProof = true
+					}
+					break
+				}
+			}
+			if !presentInOtherProof && serializedPathLess(localKeyID, smallestDiffKeyAndID) {
+				// We found an earlier difference between the key/ID pairs in the two proofs.
+				// Since the proofs are sorted, this is the first difference.
+				smallestDiffKeyAndID = localKeyID
+				break
+			}
+		}
+
+		// Get the actual value from the syncer
+		syncer, err := NewStateSyncManager(StateSyncConfig{
+			SyncDB:                localDB,
+			Client:                &mockClient{db: nil},
+			TargetRoot:            ids.GenerateTestID(),
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		})
+		require.NoError(err)
+
+		gotFirstDiff, err := syncer.findNextKey(
+			context.Background(),
+			lastReceivedKey,
+			rangeEnd,
+			remoteProof.EndProof,
+		)
+		require.NoError(err)
+
+		if bytes.Compare(smallestDiffKeyAndID.key.Value, rangeEnd) >= 0 {
+			require.Nil(gotFirstDiff)
+		} else {
+			require.Equal(smallestDiffKeyAndID.key.Value, gotFirstDiff)
+		}
 	}
 }
 
