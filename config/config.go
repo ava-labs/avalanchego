@@ -86,6 +86,9 @@ var (
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
+	errCannotReadDirectory           = errors.New("cannot read directory")
+	errUnmarshalling                 = errors.New("unmarshalling failed")
+	errFileDoesNotExist              = errors.New("file does not exist")
 )
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
@@ -952,7 +955,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 		if !exists {
 			if v.IsSet(fileKey) {
-				return nil, fmt.Errorf("%s file does not exist in %v", name, aliasFilePath)
+				return nil, fmt.Errorf("%w: %s", errFileDoesNotExist, aliasFilePath)
 			}
 			return nil, nil
 		}
@@ -965,7 +968,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 	aliasMap := make(map[ids.ID][]string)
 	if err := json.Unmarshal(fileBytes, &aliasMap); err != nil {
-		return nil, fmt.Errorf("problem unmarshaling %s: %w", name, err)
+		return nil, fmt.Errorf("%w on %s: %s", errUnmarshalling, name, err)
 	}
 	return aliasMap, nil
 }
@@ -1008,7 +1011,7 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	}
 	if v.IsSet(configKey) {
 		// user specified a config dir explicitly, but dir does not exist.
-		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+		return "", fmt.Errorf("%w: %s", errCannotReadDirectory, cleanPath)
 	}
 	return "", nil
 }
@@ -1161,7 +1164,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", errUnmarshalling, err)
 		}
 
 		if err := config.Valid(); err != nil {

@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -155,31 +156,41 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				return false
 			}
 
+			// Add the changes from this commit to [combinedChanges].
 			for key, valueChange := range item.values {
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
 					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
+					// The key is in the range [start, end].
 					if existing, ok := combinedChanges.values[key]; ok {
+						// A change to this key already exists in [combinedChanges].
 						existing.after = valueChange.after
+						if existing.before.hasValue == existing.after.hasValue &&
+							bytes.Equal(existing.before.value, existing.after.value) {
+							// The change to this key is a no-op, so remove it from [combinedChanges].
+							delete(combinedChanges.values, key)
+							sortedKeys.Delete(key)
+						}
 					} else {
 						combinedChanges.values[key] = &change[Maybe[[]byte]]{
 							before: valueChange.before,
 							after:  valueChange.after,
 						}
+						sortedKeys.ReplaceOrInsert(key)
 					}
-					sortedKeys.ReplaceOrInsert(key)
-				}
-			}
-
-			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for sortedKeys.Len() > maxLength {
-				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					delete(combinedChanges.values, greatestKey)
 				}
 			}
 
 			return true
 		},
 	)
+
+	// Keep only the smallest [maxLength] items in [combinedChanges.values].
+	for sortedKeys.Len() > maxLength {
+		if greatestKey, found := sortedKeys.DeleteMax(); found {
+			delete(combinedChanges.values, greatestKey)
+		}
+	}
+
 	return combinedChanges, nil
 }
 
