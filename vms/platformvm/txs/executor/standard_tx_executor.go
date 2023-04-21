@@ -289,7 +289,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	if staker.IsPending() {
+	if staker.Priority.IsPending() {
 		e.State.PutPendingValidator(staker)
 	} else {
 		e.State.PutCurrentValidator(staker)
@@ -320,7 +320,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	if staker.IsPending() {
+	if staker.Priority.IsPending() {
 		e.State.PutPendingValidator(staker)
 	} else {
 		e.State.PutCurrentValidator(staker)
@@ -350,7 +350,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	if staker.IsPending() {
+	if staker.Priority.IsPending() {
 		e.State.PutPendingDelegator(staker)
 	} else {
 		e.State.PutCurrentDelegator(staker)
@@ -458,7 +458,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	if staker.IsPending() {
+	if staker.Priority.IsPending() {
 		e.State.PutPendingValidator(staker)
 	} else {
 		e.State.PutCurrentValidator(staker)
@@ -489,7 +489,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	if staker.IsPending() {
+	if staker.Priority.IsPending() {
 		e.State.PutPendingDelegator(staker)
 	} else {
 		e.State.PutCurrentDelegator(staker)
