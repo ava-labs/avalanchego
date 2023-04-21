@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -19,14 +18,13 @@ import (
 )
 
 const (
-	defaultLeafRequestLimit = 1024
-	maxTokenWaitTime        = 5 * time.Second
+	defaultRequestKeyLimit      = maxKeyValuesLimit
+	defaultRequestByteSizeLimit = maxByteSizeLimit
 )
 
 var (
 	ErrAlreadyStarted             = errors.New("cannot start a StateSyncManager that has already been started")
 	ErrAlreadyClosed              = errors.New("StateSyncManager is closed")
-	ErrNotEnoughBytes             = errors.New("less bytes read than the specified length")
 	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
 	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
@@ -262,7 +260,8 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			EndingRoot:   rootID,
 			Start:        workItem.start,
 			End:          workItem.end,
-			Limit:        defaultLeafRequestLimit,
+			KeyLimit:     defaultRequestKeyLimit,
+			BytesLimit:   defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -315,10 +314,11 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&RangeProofRequest{
-			Root:  rootID,
-			Start: workItem.start,
-			End:   workItem.end,
-			Limit: defaultLeafRequestLimit,
+			Root:       rootID,
+			Start:      workItem.start,
+			End:        workItem.end,
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 	)
 	if err != nil {
@@ -372,7 +372,7 @@ func (m *StateSyncManager) findNextKey(
 	// for now, just fallback to using the start key, which is always correct.
 	// TODO: determine a more accurate nextKey in this scenario
 	if !startKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !startKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
-		return start, nil
+		return append(start, 0), nil
 	}
 
 	// walk up the node paths until a difference is found
@@ -414,6 +414,10 @@ func (m *StateSyncManager) findNextKey(
 			// the local proof has an extra node due to a branch that was not present in the received proof
 			branchNode = localNode
 			localIndex--
+		}
+
+		if startKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return append(start, 0), nil
 		}
 
 		// the two nodes have different paths, so find where they branched
