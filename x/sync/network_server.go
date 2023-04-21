@@ -16,16 +16,30 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-// Maximum number of key-value pairs to return in a proof.
-// This overrides any other Limit specified in a RangeProofRequest
-// or ChangeProofRequest if the given Limit is greater.
-const maxKeyValuesLimit = 1024
+const (
+	// Maximum number of key-value pairs to return in a proof.
+	// This overrides any other Limit specified in a RangeProofRequest
+	// or ChangeProofRequest if the given Limit is greater.
+	maxKeyValuesLimit = 2048
+	// Estimated max overhead, in bytes, of putting a proof into a message.
+	// We use this to ensure that the proof we generate is not too large to fit in a message.
+	// TODO: refine this estimate. This is almost certainly a large overestimate.
+	estimatedMessageOverhead = 4 * units.KiB
+	maxByteSizeLimit         = constants.DefaultMaxMessageSize - estimatedMessageOverhead
+	endProofSizeBufferAmount = 2 * units.KiB
+)
 
-var _ Handler = (*NetworkServer)(nil)
+var (
+	_ Handler = (*NetworkServer)(nil)
+
+	ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
+)
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
@@ -45,7 +59,7 @@ func NewNetworkServer(appSender common.AppSender, db *merkledb.Database, log log
 // Never returns errors as they are considered fatal.
 // Sends a response back to the sender if length of response returned by the handler > 0.
 func (s *NetworkServer) AppRequest(
-	_ context.Context,
+	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
 	deadline time.Time,
@@ -87,11 +101,10 @@ func (s *NetworkServer) AppRequest(
 		return nil
 	}
 
-	// TODO danlaine: Why don't we use the passed in context instead of [context.Background()]?
-	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
+	ctx, cancel := context.WithDeadline(ctx, bufferedDeadline)
 	defer cancel()
 
-	err := req.Handle(handleCtx, nodeID, requestID, s)
+	err := req.Handle(ctx, nodeID, requestID, s)
 	if err != nil && !isTimeout(err) {
 		// log unexpected errors instead of returning them, since they are fatal.
 		s.log.Warn(
@@ -125,7 +138,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *ChangeProofRequest,
 ) error {
-	if req.Limit == 0 || req.EndingRoot == ids.Empty || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
+	if req.BytesLimit == 0 || req.KeyLimit == 0 || req.EndingRoot == ids.Empty || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -136,32 +149,44 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	}
 
 	// override limit if it is greater than maxKeyValuesLimit
-	limit := req.Limit
-	if limit > maxKeyValuesLimit {
-		limit = maxKeyValuesLimit
+	keyLimit := req.KeyLimit
+	if keyLimit > maxKeyValuesLimit {
+		keyLimit = maxKeyValuesLimit
+	}
+	bytesLimit := int(req.BytesLimit)
+	if bytesLimit > maxByteSizeLimit {
+		bytesLimit = maxByteSizeLimit
 	}
 
-	changeProof, err := s.db.GetChangeProof(ctx, req.StartingRoot, req.EndingRoot, req.Start, req.End, int(limit))
-	if err != nil {
-		// handle expected errors so clients cannot cause servers to spam warning logs.
-		if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
-			s.log.Debug(
-				"dropping invalid change proof request",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("req", req),
-				zap.Error(err),
-			)
-			return nil // dropping request
+	// attempt to get a proof within the bytes limit
+	for keyLimit > 0 {
+		changeProof, err := s.db.GetChangeProof(ctx, req.StartingRoot, req.EndingRoot, req.Start, req.End, int(keyLimit))
+		if err != nil {
+			// handle expected errors so clients cannot cause servers to spam warning logs.
+			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
+				s.log.Debug(
+					"dropping invalid change proof request",
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Stringer("req", req),
+					zap.Error(err),
+				)
+				return nil // dropping request
+			}
+			return err
 		}
-		return err
-	}
 
-	proofBytes, err := merkledb.Codec.EncodeChangeProof(Version, changeProof)
-	if err != nil {
-		return err
+		proofBytes, err := merkledb.Codec.EncodeChangeProof(Version, changeProof)
+		if err != nil {
+			return err
+		}
+		if len(proofBytes) < bytesLimit {
+			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+		}
+		// the proof size was too large, try to shrink it
+		keyLimit = uint16(len(changeProof.KeyValues)+len(changeProof.DeletedKeys)) / 2
 	}
-	return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+	return ErrMinProofSizeIsTooLarge
 }
 
 // Generates a range proof and sends it to [nodeID].
@@ -172,7 +197,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *RangeProofRequest,
 ) error {
-	if req.Limit == 0 || req.Root == ids.Empty || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
+	if req.BytesLimit == 0 || req.KeyLimit == 0 || req.Root == ids.Empty || (len(req.End) > 0 && bytes.Compare(req.Start, req.End) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -183,30 +208,40 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	}
 
 	// override limit if it is greater than maxKeyValuesLimit
-	limit := req.Limit
-	if limit > maxKeyValuesLimit {
-		limit = maxKeyValuesLimit
+	keyLimit := req.KeyLimit
+	if keyLimit > maxKeyValuesLimit {
+		keyLimit = maxKeyValuesLimit
 	}
-
-	rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, int(limit))
-	if err != nil {
-		// handle expected errors so clients cannot cause servers to spam warning logs.
-		if errors.Is(err, merkledb.ErrRootIDNotPresent) {
-			s.log.Debug(
-				"dropping invalid range proof request",
-				zap.Stringer("nodeID", nodeID),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("req", req),
-				zap.Error(err),
-			)
-			return nil // dropping request
+	bytesLimit := int(req.BytesLimit)
+	if bytesLimit > maxByteSizeLimit {
+		bytesLimit = maxByteSizeLimit
+	}
+	for keyLimit > 0 {
+		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, req.Root, req.Start, req.End, int(keyLimit))
+		if err != nil {
+			// handle expected errors so clients cannot cause servers to spam warning logs.
+			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
+				s.log.Debug(
+					"dropping invalid range proof request",
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Stringer("req", req),
+					zap.Error(err),
+				)
+				return nil // dropping request
+			}
+			return err
 		}
-		return err
-	}
 
-	proofBytes, err := merkledb.Codec.EncodeRangeProof(Version, rangeProof)
-	if err != nil {
-		return err
+		proofBytes, err := merkledb.Codec.EncodeRangeProof(Version, rangeProof)
+		if err != nil {
+			return err
+		}
+		if len(proofBytes) < bytesLimit {
+			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+		}
+		// the proof size was too large, try to shrink it
+		keyLimit = uint16(len(rangeProof.KeyValues)) / 2
 	}
-	return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+	return ErrMinProofSizeIsTooLarge
 }
