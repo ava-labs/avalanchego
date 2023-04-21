@@ -5,6 +5,7 @@ package state
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -132,7 +134,7 @@ func TestStakerLess(t *testing.T) {
 	}
 }
 
-func TestNewCurrentStaker(t *testing.T) {
+func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -172,6 +174,54 @@ func TestNewCurrentStaker(t *testing.T) {
 	require.Equal(endTime, staker.EndTime)
 	require.Equal(potentialReward, staker.PotentialReward)
 	require.Equal(endTime, staker.NextTime)
+	require.Equal(currentPriority, staker.Priority)
+
+	stakerTx.EXPECT().PublicKey().Return(nil, false, errCustom)
+
+	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	require.ErrorIs(err, errCustom)
+}
+
+func TestNewCurrentStaker(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	txID := ids.GenerateTestID()
+	nodeID := ids.GenerateTestNodeID()
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	publicKey := bls.PublicFromSecretKey(sk)
+	subnetID := ids.GenerateTestID()
+	weight := uint64(12345)
+	startTime := time.Unix(rand.Int63(), 0)                                 // #nosec G404
+	duration := time.Duration(rand.Int63n(365 * 24 * 60 * 60 * 1000000000)) // #nosec G404
+	endTime := mockable.MaxTime
+	potentialReward := uint64(54321)
+	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
+
+	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx.EXPECT().EndTime().Return(endTime)
+	stakerTx.EXPECT().StakingPeriod().Return(duration)
+	stakerTx.EXPECT().NodeID().Return(nodeID)
+	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
+	stakerTx.EXPECT().SubnetID().Return(subnetID)
+	stakerTx.EXPECT().Weight().Return(weight)
+	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
+
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	require.NotNil(staker)
+	require.NoError(err)
+	require.Equal(txID, staker.TxID)
+	require.Equal(nodeID, staker.NodeID)
+	require.Equal(publicKey, staker.PublicKey)
+	require.Equal(subnetID, staker.SubnetID)
+	require.Equal(weight, staker.Weight)
+	require.Equal(startTime, staker.StartTime)
+	require.Equal(duration, staker.StakingPeriod)
+	require.Equal(endTime, staker.EndTime)
+	require.Equal(potentialReward, staker.PotentialReward)
+	require.Equal(startTime.Add(duration), staker.NextTime)
 	require.Equal(currentPriority, staker.Priority)
 
 	stakerTx.EXPECT().PublicKey().Return(nil, false, errCustom)
