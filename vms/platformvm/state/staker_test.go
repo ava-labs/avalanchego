@@ -151,6 +151,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
 	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)

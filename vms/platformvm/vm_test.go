@@ -1302,19 +1302,21 @@ func TestCreateSubnet(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
-	// fast forward clock to time validator should stop validating
-	endTime := vm.clock.Time().Add(defaultMinStakingDuration)
-	vm.clock.Set(endTime)
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
+	// TODO ABENEGIA: Post continuous staking fork, staking won't stop
+	// until a stop staking tx is issued. Such a tx is still to be added.
+	// // fast forward clock to time validator should stop validating
+	// endTime := vm.clock.Time().Add(defaultMinStakingDuration)
+	// vm.clock.Set(endTime)
+	// blk, err = vm.Builder.BuildBlock(context.Background())
+	// require.NoError(err)
+	// require.NoError(blk.Verify(context.Background()))
+	// require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
+	// _, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
+	// require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
+	// _, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	// require.ErrorIs(err, database.ErrNotFound)
 }
 
 // test asset import

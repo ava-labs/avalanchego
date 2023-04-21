@@ -124,7 +124,6 @@ func NewCurrentStaker(
 		return nil, err
 	}
 
-	endTime := startTime.Add(stakingDuration)
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),
@@ -133,9 +132,9 @@ func NewCurrentStaker(
 		Weight:          staker.Weight(),
 		StartTime:       startTime,
 		StakingPeriod:   stakingDuration,
-		EndTime:         endTime,
+		EndTime:         staker.EndTime(),
 		PotentialReward: potentialReward,
-		NextTime:        endTime,
+		NextTime:        startTime.Add(stakingDuration),
 		Priority:        staker.CurrentPriority(),
 	}, nil
 }
