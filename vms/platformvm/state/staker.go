@@ -116,7 +116,6 @@ func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.Staker,
 	startTime time.Time,
-	stakingDuration time.Duration,
 	potentialReward uint64,
 ) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
@@ -124,6 +123,7 @@ func NewCurrentStaker(
 		return nil, err
 	}
 
+	stakingPeriod := staker.StakingPeriod()
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),
@@ -131,10 +131,10 @@ func NewCurrentStaker(
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
 		StartTime:       startTime,
-		StakingPeriod:   stakingDuration,
+		StakingPeriod:   stakingPeriod,
 		EndTime:         staker.EndTime(),
 		PotentialReward: potentialReward,
-		NextTime:        startTime.Add(stakingDuration),
+		NextTime:        startTime.Add(stakingPeriod),
 		Priority:        staker.CurrentPriority(),
 	}, nil
 }

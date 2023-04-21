@@ -98,6 +98,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
+		NextTime:  chainTime,
 	})
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
@@ -107,6 +108,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
+		NextTime:  chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
@@ -633,7 +635,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					addStaker0.ID(),
 					addValTx,
 					addValTx.StartTime(),
-					addValTx.StakingPeriod(),
 					0,
 				)
 				require.NoError(err)
@@ -732,7 +733,6 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		tx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
-		addSubnetValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -793,7 +793,6 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -907,7 +906,6 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				addStaker0.ID(),
 				addValTx,
 				addValTx.StartTime(),
-				addValTx.StakingPeriod(),
 				0,
 			)
 			require.NoError(err)
@@ -994,7 +992,6 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -1090,7 +1087,6 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -1183,7 +1179,6 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -1278,7 +1273,6 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)

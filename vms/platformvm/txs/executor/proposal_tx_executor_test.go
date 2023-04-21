@@ -50,7 +50,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -82,7 +81,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -432,7 +430,6 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -590,7 +587,6 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
-		addSubnetValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -753,7 +749,6 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			subnetTx.ID(),
 			addSubnetValTx,
 			addSubnetValTx.StartTime(),
-			addSubnetValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)
@@ -901,7 +896,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)

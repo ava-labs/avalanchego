@@ -423,7 +423,7 @@ func verifyAddDelegatorTx(
 	var newStaker *state.Staker
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.StakingPeriod(), 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
@@ -755,7 +755,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var newStaker *state.Staker
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, tx.StakingPeriod(), 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}

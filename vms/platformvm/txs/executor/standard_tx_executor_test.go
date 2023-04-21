@@ -126,7 +126,6 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -158,7 +157,6 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(t, err)
@@ -508,7 +506,6 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
-		addValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -649,7 +646,6 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
-		addSubnetValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
@@ -796,7 +792,6 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			subnetTx.ID(),
 			addSubnetValTx,
 			addSubnetValTx.StartTime(),
-			addSubnetValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)
@@ -928,7 +923,6 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			addValTx.StartTime(),
-			addValTx.StakingPeriod(),
 			0,
 		)
 		require.NoError(err)

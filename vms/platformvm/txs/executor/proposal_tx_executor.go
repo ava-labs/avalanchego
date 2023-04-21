@@ -331,11 +331,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	// Verify that the chain's timestamp is the validator's end time
 	currentChainTime := e.OnCommitState.GetTimestamp()
-	if !stakerToRemove.EndTime.Equal(currentChainTime) {
+	if !stakerToRemove.NextTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"attempting to remove TxID: %s before their end time %s",
 			tx.TxID,
-			stakerToRemove.EndTime,
+			stakerToRemove.NextTime,
 		)
 	}
 

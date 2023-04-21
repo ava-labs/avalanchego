@@ -612,7 +612,6 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 		tx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
-		addSubnetValTx.StakingPeriod(),
 		0,
 	)
 	require.NoError(err)
