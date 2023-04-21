@@ -425,6 +425,9 @@ func (e *CaminoStandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
+	if err := locked.VerifyNoLocks(tx.ImportedInputs, nil); err != nil {
+		return err
+	}
 
 	return e.StandardTxExecutor.ImportTx(tx)
 }
