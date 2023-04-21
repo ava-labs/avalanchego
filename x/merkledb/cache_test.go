@@ -24,8 +24,8 @@ func TestNewOnEvictCache(t *testing.T) {
 
 	cache := newOnEvictCache[int](maxSize, onEviction)
 	require.Equal(maxSize, cache.maxSize)
-	require.NotNil(cache.lru)
-	require.Equal(0, cache.lru.Len())
+	require.NotNil(cache.fifo)
+	require.Equal(0, cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
 	err := cache.onEviction(0)
@@ -35,7 +35,7 @@ func TestNewOnEvictCache(t *testing.T) {
 
 // Test the functionality of the cache when the onEviction function
 // never returns an error.
-// Note this test assumes the internal cache is an LRU cache.
+// Note this test assumes the internal cache is a FIFO cache
 func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require := require.New(t)
 
@@ -55,7 +55,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	// Put key
 	err := cache.Put(0, 0)
 	require.NoError(err)
-	require.Equal(1, cache.lru.Len())
+	require.Equal(1, cache.fifo.Len())
 
 	// Get key
 	val, ok := cache.Get(0)
@@ -70,21 +70,21 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	for i := 1; i < maxSize; i++ {
 		err := cache.Put(i, i)
 		require.NoError(err)
-		require.Equal(i+1, cache.lru.Len())
+		require.Equal(i+1, cache.fifo.Len())
 	}
 	require.Len(evicted, 0)
 
-	// Cache has [0,1,2] from LRU --> MRU
+	// Cache has [0,1,2]
 
-	// Put another key. This should evict the LRU key (0).
+	// Put another key. This should evict the oldest inserted key (0).
 	err = cache.Put(maxSize, maxSize)
 	require.NoError(err)
-	require.Equal(maxSize, cache.lru.Len())
+	require.Equal(maxSize, cache.fifo.Len())
 	require.Len(evicted, 1)
 	require.Equal(0, evicted[0])
 
-	// Cache has [1,2,3] from LRU --> MRU
-	iter := cache.lru.NewIterator()
+	// Cache has [1,2,3]
+	iter := cache.fifo.NewIterator()
 	require.True(iter.Next())
 	require.Equal(1, iter.Key())
 	require.Equal(1, iter.Value())
@@ -107,57 +107,57 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 		require.Equal(i, val)
 	}
 
-	// Cache has [3,2,1] from LRU --> MRU
-	iter = cache.lru.NewIterator()
+	// Cache has [1,2,3]
+	iter = cache.fifo.NewIterator()
+	require.True(iter.Next())
+	require.Equal(1, iter.Key())
+	require.Equal(1, iter.Value())
+	require.True(iter.Next())
+	require.Equal(2, iter.Key())
+	require.Equal(2, iter.Value())
 	require.True(iter.Next())
 	require.Equal(3, iter.Key())
 	require.Equal(3, iter.Value())
-	require.True(iter.Next())
-	require.Equal(2, iter.Key())
-	require.Equal(2, iter.Value())
-	require.True(iter.Next())
-	require.Equal(1, iter.Key())
-	require.Equal(1, iter.Value())
 	require.False(iter.Next())
 
-	// Put another key to evict the LRU key (3).
+	// Put another key to evict the oldest inserted key (1).
 	err = cache.Put(maxSize+1, maxSize+1)
 	require.NoError(err)
-	require.Equal(maxSize, cache.lru.Len())
+	require.Equal(maxSize, cache.fifo.Len())
 	require.Len(evicted, 2)
-	require.Equal(3, evicted[1])
+	require.Equal(1, evicted[1])
 
-	// Cache has [2,1,4] from LRU --> MRU
-	iter = cache.lru.NewIterator()
+	// Cache has [2,3,4]
+	iter = cache.fifo.NewIterator()
 	require.True(iter.Next())
 	require.Equal(2, iter.Key())
 	require.Equal(2, iter.Value())
 	require.True(iter.Next())
-	require.Equal(1, iter.Key())
-	require.Equal(1, iter.Value())
+	require.Equal(3, iter.Key())
+	require.Equal(3, iter.Value())
 	require.True(iter.Next())
 	require.Equal(4, iter.Key())
 	require.Equal(4, iter.Value())
 	require.False(iter.Next())
 
-	// 3 should no longer be in the cache
-	_, ok = cache.Get(3)
+	// 1 should no longer be in the cache
+	_, ok = cache.Get(1)
 	require.False(ok)
 
 	err = cache.Flush()
 	require.NoError(err)
 
 	// Cache should be empty
-	require.Equal(0, cache.lru.Len())
+	require.Equal(0, cache.fifo.Len())
 	require.Len(evicted, 5)
-	require.Equal(evicted, []int{0, 3, 2, 1, 4})
-	require.Equal(0, cache.lru.Len())
+	require.Equal([]int{0, 1, 2, 3, 4}, evicted)
+	require.Equal(0, cache.fifo.Len())
 	require.Equal(maxSize, cache.maxSize) // Should be unchanged
 }
 
 // Test the functionality of the cache when the onEviction function
 // returns an error.
-// Note this test assumes the internal cache is an LRU cache.
+// Note this test assumes the cache is FIFO.
 func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
@@ -179,17 +179,19 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	for i := 0; i < maxSize; i++ {
 		err := cache.Put(i, i)
 		require.NoError(err)
-		require.Equal(i+1, cache.lru.Len())
+		require.Equal(i+1, cache.fifo.Len())
 	}
 
-	// Put another key. This should evict the LRU key (0)
+	// Cache has [0,1]
+
+	// Put another key. This should evict the first key (0)
 	// and return an error since 0 is even.
 	err := cache.Put(maxSize, maxSize)
 	require.ErrorIs(err, errTest)
 
-	// Cache should still have correct state [1,2]
+	// Cache has [1,2]
 	require.Equal(evicted, []int{0})
-	require.Equal(maxSize, cache.lru.Len())
+	require.Equal(maxSize, cache.fifo.Len())
 	_, ok := cache.Get(0)
 	require.False(ok)
 	_, ok = cache.Get(1)
@@ -202,7 +204,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	require.ErrorIs(err, errTest)
 
 	// Should still be empty.
-	require.Equal(0, cache.lru.Len())
+	require.Equal(0, cache.fifo.Len())
 	require.Equal(evicted, []int{0, 1, 2})
 	_, ok = cache.Get(0)
 	require.False(ok)

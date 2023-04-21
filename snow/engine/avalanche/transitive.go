@@ -345,9 +345,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
-		return err // Should never happen
-	}
+	t.uniformSampler.Initialize(uint64(len(edge)))
 	indices, err := t.uniformSampler.Sample(1)
 	if err != nil {
 		return err // Also should never really happen because the edge has positive length
@@ -734,9 +732,7 @@ func (t *Transitive) issueBatch(ctx context.Context, txs []snowstorm.Tx) error {
 	// Randomly select parents of this vertex from among the virtuous set
 	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
 	numVirtuousIDs := len(virtuousIDs)
-	if err := t.uniformSampler.Initialize(uint64(numVirtuousIDs)); err != nil {
-		return err
-	}
+	t.uniformSampler.Initialize(uint64(numVirtuousIDs))
 
 	indices, err := t.uniformSampler.Sample(numVirtuousIDs)
 	if err != nil {

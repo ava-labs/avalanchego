@@ -4,8 +4,6 @@
 package sampler
 
 import (
-	"math"
-
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -19,21 +17,17 @@ import (
 //
 // Sampling is performed in O(count) time and O(count) space.
 type uniformResample struct {
-	rng       rng
-	seededRNG rng
+	rng       *rng
+	seededRNG *rng
 	length    uint64
 	drawn     set.Set[uint64]
 }
 
-func (s *uniformResample) Initialize(length uint64) error {
-	if length > math.MaxInt64 {
-		return errOutOfRange
-	}
+func (s *uniformResample) Initialize(length uint64) {
 	s.rng = globalRNG
 	s.seededRNG = newRNG()
 	s.length = length
 	s.drawn.Clear()
-	return nil
 }
 
 func (s *uniformResample) Sample(count int) ([]uint64, error) {
@@ -70,7 +64,7 @@ func (s *uniformResample) Next() (uint64, error) {
 	}
 
 	for {
-		draw := uint64(s.rng.Int63n(int64(s.length)))
+		draw := s.rng.Uint64Inclusive(s.length - 1)
 		if s.drawn.Contains(draw) {
 			continue
 		}
