@@ -24,7 +24,7 @@ func TestGenesisChainData(t *testing.T) {
 			networkID: constants.CaminoID,
 			vmTest: vmTest{
 				vmIDs:      []ids.ID{constants.AVMID, constants.EVMID},
-				expectedID: []string{"yMQo4UEa2Gkk6aSmifkUuBsystV1iu1NppatvoYz6yCDnRjiq", "RinAZCjd5Dm4wk1FBWiXiiSW2VZkjzgNyR7nNBRkuCvG9zRkJ"},
+				expectedID: []string{"4Y8KXHrpNRiRBAC3nC6mMzGiE19Rnnwh2rUQ6RU7HdMhvfkS3", "2qv12ysjDcdVpJvz3xSaPduX4XhkQNGXafLvvJFLrJgVF7CSjU"},
 			},
 		},
 	}
