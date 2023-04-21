@@ -636,9 +636,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Filter out keys that are before the last received key
 		findBounds := func(keyIDs []keyAndID) (int, int) {
-			firstIdxInRange := len(keyIDs)
-			firstIdxInRangeFound := false
-			firstIdxOutOfRange := len(keyIDs)
+			var (
+				firstIdxInRange      = len(keyIDs)
+				firstIdxInRangeFound = false
+				firstIdxOutOfRange   = len(keyIDs)
+			)
 			for i, keyID := range keyIDs {
 				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) >= 0 {
 					firstIdxInRange = i
@@ -659,52 +661,36 @@ func TestFindNextKeyRandom(t *testing.T) {
 		localFirstIdxInRange, localFirstIdxOutOfRange := findBounds(localKeyIDs)
 		localKeyIDs = localKeyIDs[localFirstIdxInRange:localFirstIdxOutOfRange]
 
-		// Find first diff
-		var smallestDiffKeyAndID keyAndID
-		for _, remoteKeyID := range remoteKeyIDs {
-			presentInOtherProof := false
-			for _, localKeyID := range localKeyIDs {
-				if serializedPathLess(remoteKeyID, localKeyID) {
-					// [localKeyIDs] is sorted, and [remoteKeyIDs] is less than
-					// [remoteKeyID], so [localKeyID] is less than all the remaining
-					// elements in [localKeyIDs].
-					break
-				}
-				if remoteKeyID.key.Equal(localKeyID.key) {
-					if remoteKeyID.id == localKeyID.id {
-						presentInOtherProof = true
-					}
-					break
-				}
+		// Find smallest difference between the set of key/ID pairs proven by
+		// the remote/local proofs.
+		var (
+			smallestDiffKey merkledb.SerializedPath
+			foundDiff       bool
+		)
+		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
+			// See if the keys are different.
+			smaller, bigger := remoteKeyIDs[i], localKeyIDs[i]
+			if serializedPathLess(localKeyIDs[i], remoteKeyIDs[i]) {
+				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
-			if !presentInOtherProof {
-				// We found a difference between the key/ID pairs in the two proofs.
-				smallestDiffKeyAndID = remoteKeyID
+
+			if !smaller.key.Equal(bigger.key) {
+				smallestDiffKey = smaller.key
+				foundDiff = true
+				break
+			}
+			// The keys are the same. See if the IDs are different.
+			if smaller.id != bigger.id {
+				smallestDiffKey = smaller.key // Keys are same so either is fine
+				foundDiff = true
 				break
 			}
 		}
-		for _, localKeyID := range localKeyIDs {
-			presentInOtherProof := false
-			for _, remoteKeyID := range remoteKeyIDs {
-				if serializedPathLess(localKeyID, remoteKeyID) {
-					// [remoteKeyIDs] is sorted, and [localKeyID] is less than
-					// [remoteKeyID], so [localKeyID] is less than all the remaining
-					// elements in [remoteKeyIDs].
-					break
-				}
-
-				if localKeyID.key.Equal(remoteKeyID.key) {
-					if localKeyID.id == remoteKeyID.id {
-						presentInOtherProof = true
-					}
-					break
-				}
-			}
-			if !presentInOtherProof && serializedPathLess(localKeyID, smallestDiffKeyAndID) {
-				// We found an earlier difference between the key/ID pairs in the two proofs.
-				// Since the proofs are sorted, this is the first difference.
-				smallestDiffKeyAndID = localKeyID
-				break
+		if !foundDiff {
+			if len(remoteKeyIDs) < len(localKeyIDs) {
+				smallestDiffKey = localKeyIDs[len(remoteKeyIDs)].key
+			} else if len(remoteKeyIDs) > len(localKeyIDs) {
+				smallestDiffKey = remoteKeyIDs[len(localKeyIDs)].key
 			}
 		}
 
@@ -726,10 +712,10 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		require.NoError(err)
 
-		if bytes.Compare(smallestDiffKeyAndID.key.Value, rangeEnd) >= 0 {
+		if bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0 {
 			require.Nil(gotFirstDiff)
 		} else {
-			require.Equal(smallestDiffKeyAndID.key.Value, gotFirstDiff)
+			require.Equal(smallestDiffKey.Value, gotFirstDiff)
 		}
 	}
 }
