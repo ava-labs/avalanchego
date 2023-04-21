@@ -194,9 +194,11 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 		context.Background(),
 		memDB,
 		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
+			Tracer:                    newNoopTracer(),
+			HistoryLength:             300,
+			NodeCacheSize:             minCacheSize,
+			IntermediateNodeCacheSize: minCacheSize,
+			NotFoundNodeCacheSize:     minCacheSize,
 		},
 	)
 	require.NoError(t, err)

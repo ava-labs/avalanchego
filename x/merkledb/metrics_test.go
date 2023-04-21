@@ -20,9 +20,11 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 		context.Background(),
 		memdb.New(),
 		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
+			Tracer:                    newNoopTracer(),
+			HistoryLength:             300,
+			NodeCacheSize:             minCacheSize,
+			IntermediateNodeCacheSize: minCacheSize,
+			NotFoundNodeCacheSize:     minCacheSize,
 		},
 	)
 	require.NoError(t, err)

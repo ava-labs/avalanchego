@@ -1185,23 +1185,18 @@ func (db *Database) putNodeInCache(key path, n *node) error {
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
 
-	db.notFoundNodeCache.Remove(key)
-	db.intermediateNodeCache.Remove(key)
-	db.nodeCache.Remove(key)
-	if n == nil {
-		return db.notFoundNodeCache.Put(key, nil)
-	}
-	if n.hasValue() {
+	if n != nil && n.hasValue() {
+		// ensure the node is only in one cache
+		db.intermediateNodeCache.Remove(key)
 		return db.nodeCache.Put(key, n)
 	}
+	// ensure the node is only in one cache
+	db.nodeCache.Remove(key)
 	return db.intermediateNodeCache.Put(key, n)
 }
 
 func (db *Database) getNodeInCache(key path) (*node, bool) {
 	// TODO Cache metrics
-	if _, ok := db.notFoundNodeCache.Get(key); ok {
-		return nil, true
-	}
 	if node, ok := db.nodeCache.Get(key); ok {
 		return node, true
 	}
