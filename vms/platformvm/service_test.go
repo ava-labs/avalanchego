@@ -432,10 +432,10 @@ func TestGetStake(t *testing.T) {
 		addrsStrs = append(addrsStrs, addr)
 
 		args := GetStakeArgs{
-			api.JSONAddresses{
+			JSONAddresses: api.JSONAddresses{
 				Addresses: []string{addr},
 			},
-			formatting.Hex,
+			Encoding: formatting.Hex,
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
@@ -460,10 +460,10 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for multiple addresses
 	args := GetStakeArgs{
-		api.JSONAddresses{
+		JSONAddresses: api.JSONAddresses{
 			Addresses: addrsStrs,
 		},
-		formatting.Hex,
+		Encoding: formatting.Hex,
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))

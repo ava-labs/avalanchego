@@ -34,22 +34,28 @@ func (s SerializedPath) deserialize() path {
 	return result[:len(result)-s.NibbleLength&1]
 }
 
-// Returns true iff [prefix] is a prefix of [s] or equal to it.
+// HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.
 func (s SerializedPath) HasPrefix(prefix SerializedPath) bool {
-	if len(s.Value) < len(prefix.Value) {
+	prefixValue := prefix.Value
+	prefixLength := len(prefix.Value)
+	if s.NibbleLength < prefix.NibbleLength || len(s.Value) < prefixLength {
 		return false
 	}
-	prefixValue := prefix.Value
 	if !prefix.hasOddLength() {
 		return bytes.HasPrefix(s.Value, prefixValue)
 	}
-	reducedSize := len(prefixValue) - 1
+	reducedSize := prefixLength - 1
+
+	// the input was invalid so just return false
+	if reducedSize < 0 {
+		return false
+	}
 
 	// grab the last nibble in the prefix and serialized path
 	prefixRemainder := prefixValue[reducedSize] >> 4
 	valueRemainder := s.Value[reducedSize] >> 4
-	prefixValue = prefixValue[:reducedSize]
-	return bytes.HasPrefix(s.Value, prefixValue) && valueRemainder == prefixRemainder
+	// s has prefix if the last nibbles are equal and s has every byte but the last of prefix as a prefix
+	return valueRemainder == prefixRemainder && bytes.HasPrefix(s.Value, prefixValue[:reducedSize])
 }
 
 // Returns true iff [prefix] is a prefix of [s] but not equal to it.
