@@ -5,7 +5,10 @@ package sampler
 
 // Uniform samples values without replacement in the provided range
 type Uniform interface {
-	Initialize(sampleRange uint64) error
+	Initialize(sampleRange uint64)
+	// Sample returns length numbers in the range [0,sampleRange). If there
+	// aren't enough numbers in the range, an error is returned. If length is
+	// negative the implementation may panic.
 	Sample(length int) ([]uint64, error)
 
 	Seed(int64)
