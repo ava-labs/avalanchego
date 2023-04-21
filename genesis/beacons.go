@@ -41,12 +41,12 @@ func getNodes(networkID uint32) []node {
 		return []node{
 			// Camino Foundation
 			{
-				ip:     "34.79.120.198",
+				ip:     "34.79.120.198:9651",
 				nodeID: "NodeID-MUTNPmSqwWtchZhVvkWRfF8SUK8FtfnwP",
 			},
 			// Chain4Travel
 			{
-				ip:     "34.147.107.229",
+				ip:     "34.147.107.229:9651",
 				nodeID: "NodeID-KumZcRwRSAE7CUkFE18ZLMnPsCVDpQXz8",
 			},
 		}
