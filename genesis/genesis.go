@@ -118,7 +118,7 @@ func validateInitialStakedFunds(config *Config) error {
 func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig) error {
 	if networkID != config.NetworkID {
 		return fmt.Errorf(
-			"%w both %d and %d",
+			"%w: expected %d but config contains %d",
 			errConflictingNetworkIDs,
 			networkID,
 			config.NetworkID,
