@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 var _ Client = &mockClient{}
@@ -34,12 +36,24 @@ type mockClient struct {
 	db *merkledb.Database
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-	return client.db.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
+func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
+	startRoot, err := ids.ToID(request.StartRoot)
+	if err != nil {
+		return nil, err
+	}
+	endRoot, err := ids.ToID(request.EndRoot)
+	if err != nil {
+		return nil, err
+	}
+	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
 }
 
-func (client *mockClient) GetRangeProof(ctx context.Context, request *RangeProofRequest) (*merkledb.RangeProof, error) {
-	return client.db.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.KeyLimit))
+func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+	root, err := ids.ToID(request.Root)
+	if err != nil {
+		return nil, err
+	}
+	return client.db.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -567,13 +581,17 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 
 	client := NewMockClient(ctrl)
 	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *RangeProofRequest) (*merkledb.RangeProof, error) {
+		func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
 			return nil, errInvalidRangeProof
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-			return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
+		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
+			startRoot, err := ids.ToID(request.StartRoot)
+			require.NoError(err)
+			endRoot, err := ids.ToID(request.EndRoot)
+			require.NoError(err)
+			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -624,15 +642,21 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		updatedRootChan <- struct{}{}
 		client := NewMockClient(ctrl)
 		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *RangeProofRequest) (*merkledb.RangeProof, error) {
+			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
 				<-updatedRootChan
-				return dbToSync.GetRangeProofAtRoot(ctx, request.Root, request.Start, request.End, int(request.KeyLimit))
+				root, err := ids.ToID(request.Root)
+				require.NoError(err)
+				return dbToSync.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
+			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
-				return dbToSync.GetChangeProof(ctx, request.StartingRoot, request.EndingRoot, request.Start, request.End, int(request.KeyLimit))
+				startRoot, err := ids.ToID(request.StartRoot)
+				require.NoError(err)
+				endRoot, err := ids.ToID(request.EndRoot)
+				require.NoError(err)
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
 			},
 		).AnyTimes()
 
