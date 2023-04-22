@@ -28,12 +28,12 @@ func TestNewImportTx(t *testing.T) {
 	}()
 
 	type test struct {
-		description        string
-		sourceChainID      ids.ID
-		sharedMemory       atomic.SharedMemory
-		sourceKeys         []*secp256k1.PrivateKey
-		timestamp          time.Time
-		expectedBuildError error
+		description   string
+		sourceChainID ids.ID
+		sharedMemory  atomic.SharedMemory
+		sourceKeys    []*secp256k1.PrivateKey
+		timestamp     time.Time
+		expectedErr   error
 	}
 
 	factory := secp256k1.Factory{}
@@ -104,8 +104,8 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
 				},
 			),
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			expectedBuildError: utxo.ErrInsufficientFunds,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			expectedErr: utxo.ErrInsufficientFunds,
 		},
 		{
 			description:   "can barely pay fee",
@@ -116,8 +116,8 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			expectedBuildError: nil,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			expectedErr: nil,
 		},
 		{
 			description:   "attempting to import from C-chain",
@@ -128,9 +128,9 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          env.config.ApricotPhase5Time,
-			expectedBuildError: nil,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			timestamp:   env.config.ApricotPhase5Time,
+			expectedErr: nil,
 		},
 		{
 			description:   "attempting to import non-avax from X-chain",
@@ -142,9 +142,9 @@ func TestNewImportTx(t *testing.T) {
 					customAssetID:       1,
 				},
 			),
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          env.config.BanffTime,
-			expectedBuildError: nil,
+			sourceKeys:  []*secp256k1.PrivateKey{sourceKey},
+			timestamp:   env.config.BanffTime,
+			expectedErr: nil,
 		},
 	}
 
@@ -160,8 +160,8 @@ func TestNewImportTx(t *testing.T) {
 				tt.sourceKeys,
 				ids.ShortEmpty,
 			)
-			require.ErrorIs(err, tt.expectedBuildError)
-			if tt.expectedBuildError != nil {
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr != nil {
 				return
 			}
 			require.NoError(err)
