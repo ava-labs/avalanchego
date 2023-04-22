@@ -38,11 +38,11 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/tyler-smith/go-bip39 v1.0.2
 	github.com/urfave/cli/v2 v2.10.2
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+	golang.org/x/crypto v0.1.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.5.0
 	golang.org/x/text v0.7.0
-	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	golang.org/x/time v0.1.0
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
 

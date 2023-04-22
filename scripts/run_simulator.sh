@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# This script runs a 30s load simulation using RPC_ENDPOINTS environment variable to specify
+# which RPC endpoints to hit.
+
 set -e
 
 echo "Beginning simulator script"
@@ -22,18 +25,18 @@ run_simulator() {
     #################################
     echo "building simulator"
     pushd ./cmd/simulator
-    go install -v .
+    go build -o ./simulator main/*.go
     echo 
 
     popd
     echo "running simulator from $PWD"
-    simulator \
-        --rpc-endpoints=$RPC_ENDPOINTS \
-        --keys=./cmd/simulator/.simulator/keys \
+    ./cmd/simulator/simulator \
+        --endpoints=$RPC_ENDPOINTS \
+        --key-dir=./cmd/simulator/.simulator/keys \
         --timeout=30s \
-        --concurrency=10 \
-        --base-fee=300 \
-        --priority-fee=100
+        --workers=1 \
+        --max-fee-cap=300 \
+        --max-tip-cap=100
 }
 
 run_simulator

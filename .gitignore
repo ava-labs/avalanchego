@@ -46,6 +46,7 @@ bin/
 build/
 
 cmd/simulator/.simulator/*
+cmd/simulator/simulator
 
 # goreleaser
 dist/
