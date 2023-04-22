@@ -104,7 +104,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.Error(err, "should've failed verification because proposed timestamp same as current timestamp")
+	require.ErrorIs(err, ErrChildBlockNotAfterParent)
 }
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
@@ -138,7 +138,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should've failed verification because proposed timestamp is after pending validator start time")
+		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
 	}
 
 	err = shutdownEnvironment(env)
@@ -172,7 +172,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.Error(err, "should've failed verification because proposed timestamp is after pending validator start time")
+		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
 	}
 }
 
@@ -891,7 +891,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, errAdvanceTimeTxIssuedAfterBanff)
+	require.ErrorIs(err, ErrAdvanceTimeTxIssuedAfterBanff)
 }
 
 // Ensure marshaling/unmarshaling works

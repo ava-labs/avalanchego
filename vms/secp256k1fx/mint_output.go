@@ -16,7 +16,7 @@ type MintOutput struct {
 func (out *MintOutput) Verify() error {
 	switch {
 	case out == nil:
-		return errNilOutput
+		return ErrNilOutput
 	default:
 		return out.OutputOwners.Verify()
 	}
