@@ -197,7 +197,6 @@
 #[cfg(feature = "eth")]
 pub(crate) mod account;
 pub mod db;
-pub mod dynamic_mem;
 pub(crate) mod file;
 pub mod merkle;
 pub mod merkle_util;

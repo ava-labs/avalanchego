@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::merkle::*;
-use crate::proof::Proof;
-use crate::{dynamic_mem::DynamicMem, proof::ProofError};
+use crate::proof::{Proof, ProofError};
+use shale::cached::DynamicMem;
 use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, StoredView};
 use std::rc::Rc;
 

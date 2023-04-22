@@ -1982,6 +1982,8 @@ pub fn compare(a: &[u8], b: &[u8]) -> cmp::Ordering {
 
 #[cfg(test)]
 mod test {
+    use shale::cached::PlainMem;
+
     use super::*;
     use std::ops::Deref;
 
@@ -2043,7 +2045,7 @@ mod test {
 
     #[test]
     fn test_hydrate() {
-        let mut store = shale::PlainMem::new(HASH_SIZE as u64, 0u8);
+        let mut store = PlainMem::new(HASH_SIZE as u64, 0u8);
         store.write(0, ZERO_HASH.deref());
         assert_eq!(Hash::hydrate(0, &store).unwrap(), ZERO_HASH);
     }
@@ -2073,7 +2075,7 @@ mod test {
             bytes.resize(node.dehydrated_len() as usize, 0);
             node.dehydrate(&mut bytes);
 
-            let mut mem = shale::PlainMem::new(bytes.len() as u64, 0x0);
+            let mut mem = PlainMem::new(bytes.len() as u64, 0x0);
             mem.write(0, &bytes);
             println!("{bytes:?}");
             let node_ = Node::hydrate(0, &mem).unwrap();

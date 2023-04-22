@@ -1,5 +1,4 @@
-use std::borrow::BorrowMut;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::UnsafeCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Debug;
@@ -8,6 +7,7 @@ use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+pub mod cached;
 pub mod compact;
 pub mod util;
 
@@ -461,94 +461,6 @@ impl<T> Storable for ObjPtr<T> {
         Ok(Self::new_from_addr(u64::from_le_bytes(
             addrvec.try_into().unwrap(),
         )))
-    }
-}
-
-/// Purely volatile, vector-based implementation for [CachedStore]. This is good for testing or trying
-/// out stuff (persistent data structures) built on [ShaleStore] in memory, without having to write
-/// your own [CachedStore] implementation.
-#[derive(Debug)]
-pub struct PlainMem {
-    space: Rc<RefCell<Vec<u8>>>,
-    id: SpaceID,
-}
-
-impl PlainMem {
-    pub fn new(size: u64, id: SpaceID) -> Self {
-        let mut space: Vec<u8> = Vec::new();
-        space.resize(size as usize, 0);
-        let space = Rc::new(RefCell::new(space));
-        Self { space, id }
-    }
-}
-
-impl CachedStore for PlainMem {
-    fn get_view(
-        &self,
-        offset: u64,
-        length: u64,
-    ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
-        let offset = offset as usize;
-        let length = length as usize;
-        if offset + length > self.space.borrow().len() {
-            None
-        } else {
-            Some(Box::new(PlainMemView {
-                offset,
-                length,
-                mem: Self {
-                    space: self.space.clone(),
-                    id: self.id,
-                },
-            }))
-        }
-    }
-
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
-        Some(Box::new(PlainMemShared(Self {
-            space: self.space.clone(),
-            id: self.id,
-        })))
-    }
-
-    fn write(&mut self, offset: u64, change: &[u8]) {
-        let offset = offset as usize;
-        let length = change.len();
-        let mut vect = self.space.deref().borrow_mut();
-        vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
-    }
-
-    fn id(&self) -> SpaceID {
-        self.id
-    }
-}
-
-struct PlainMemView {
-    offset: usize,
-    length: usize,
-    mem: PlainMem,
-}
-
-struct PlainMemShared(PlainMem);
-
-impl DerefMut for PlainMemShared {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.borrow_mut()
-    }
-}
-
-impl Deref for PlainMemShared {
-    type Target = dyn CachedStore;
-    fn deref(&self) -> &(dyn CachedStore + 'static) {
-        &self.0
-    }
-}
-
-impl CachedView for PlainMemView {
-    type DerefReturn = Vec<u8>;
-
-    fn as_deref(&self) -> Self::DerefReturn {
-        self.mem.space.borrow()[self.offset..self.offset + self.length].to_vec()
     }
 }
 

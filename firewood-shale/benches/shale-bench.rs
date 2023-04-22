@@ -2,7 +2,7 @@ use bencher::{benchmark_group, benchmark_main, Bencher};
 
 extern crate firewood_shale as shale;
 use rand::Rng;
-use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, PlainMem, StoredView};
+use shale::{cached::PlainMem, compact::CompactSpaceHeader, CachedStore, ObjPtr, StoredView};
 
 fn get_view(b: &mut Bencher) {
     const SIZE: u64 = 2_000_000;

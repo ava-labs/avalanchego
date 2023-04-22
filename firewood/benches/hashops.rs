@@ -4,7 +4,7 @@ use std::ops::Deref;
 use bencher::{benchmark_group, benchmark_main, Bencher};
 use firewood::merkle::{Hash, Merkle, HASH_SIZE};
 use firewood_shale::{
-    compact::CompactSpaceHeader, CachedStore, ObjPtr, PlainMem, Storable, StoredView,
+    cached::PlainMem, compact::CompactSpaceHeader, CachedStore, ObjPtr, Storable, StoredView,
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
@@ -18,7 +18,7 @@ fn bench_dehydrate(b: &mut Bencher) {
 }
 
 fn bench_hydrate(b: &mut Bencher) {
-    let mut store = firewood_shale::PlainMem::new(HASH_SIZE as u64, 0u8);
+    let mut store = PlainMem::new(HASH_SIZE as u64, 0u8);
     store.write(0, ZERO_HASH.deref());
 
     b.iter(|| {
