@@ -1056,11 +1056,10 @@ func (n *Node) initHealthAPI() error {
 
 		var err error
 		if availableMemoryBytes < n.Config.RequiredAvailableMemory {
-			n.Log.Fatal("low on memory. Shutting down...",
+			n.Log.Error("critically low on memory",
 				zap.Uint64("usedMemory", usedMemoryBytes),
 				zap.Uint64("availableMemory", availableMemoryBytes),
 			)
-			go n.Shutdown(1)
 			err = fmt.Errorf(
 				"remaining available memory (%d) is below minimum required available memory (%d) when using (%d)",
 				availableMemoryBytes,

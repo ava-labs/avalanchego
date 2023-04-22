@@ -1207,7 +1207,7 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 }
 
 // getMemoryConfig returns:
-// - requiredAvailableMemory under which the node will shutdown
+// - requiredAvailableMemory under which the node may shutdown
 // - warningThresholdAvailableMemory under which the node report unhealthy
 func getMemoryConfig(v *viper.Viper) (uint64, uint64, error) {
 	requiredAvailableMemory := v.GetUint64(SystemTrackerRequiredAvailableMemoryKey)
@@ -1225,7 +1225,7 @@ func getMemoryConfig(v *viper.Viper) (uint64, uint64, error) {
 }
 
 // getDiskSpaceConfig returns:
-// - requiredAvailableDiskSpace under which the node will shutdown
+// - requiredAvailableDiskSpace under which the node may shutdown
 // - warningThresholdAvailableDiskSpace under which the node report unhealthy
 func getDiskSpaceConfig(v *viper.Viper) (uint64, uint64, error) {
 	requiredAvailableDiskSpace := v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
