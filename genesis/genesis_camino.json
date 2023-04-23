@@ -108,7 +108,22 @@
         "platformAllocations": [
           {
             "amount": 100000000000,
-            "memo": "ID:'2', Bucket:'01 ADMIN', Type: 'unlocked'"
+            "memo": "ID: 2, Bucket: 01 ADMIN, Type: unlocked"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-camino1trnm3zntdjs7h63ccapsgmj598umh2xs0qcwyh",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000,
+            "memo": "ID: 3, Bucket: 01 ADMIN, Type: unlocked"
           }
         ]
       },
@@ -125,7 +140,7 @@
             "amount": 36150000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'3', Bucket:'02 Founders'"
+            "memo": "ID: 4, Bucket: 02 Founders"
           }
         ]
       },
@@ -142,7 +157,7 @@
             "amount": 11550000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'4', Bucket:'02 Founders'"
+            "memo": "ID: 5, Bucket: 02 Founders"
           }
         ]
       },
@@ -159,7 +174,7 @@
             "amount": 2800000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'5', Bucket:'02 Founders'"
+            "memo": "ID: 6, Bucket: 02 Founders"
           }
         ]
       },
@@ -176,7 +191,7 @@
             "amount": 11550000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'6', Bucket:'02 Founders'"
+            "memo": "ID: 7, Bucket: 02 Founders"
           }
         ]
       },
@@ -193,7 +208,7 @@
             "amount": 2800000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'7', Bucket:'02 Founders'"
+            "memo": "ID: 8, Bucket: 02 Founders"
           }
         ]
       },
@@ -210,7 +225,7 @@
             "amount": 3000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'8', Bucket:'02 Founders'"
+            "memo": "ID: 9, Bucket: 02 Founders"
           }
         ]
       },
@@ -227,7 +242,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'9', Bucket:'02 Founders'"
+            "memo": "ID: 10, Bucket: 02 Founders"
           }
         ]
       },
@@ -244,7 +259,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'10', Bucket:'02 Founders'"
+            "memo": "ID: 11, Bucket: 02 Founders"
           }
         ]
       },
@@ -261,7 +276,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'11', Bucket:'02 Founders'"
+            "memo": "ID: 12, Bucket: 02 Founders"
           }
         ]
       },
@@ -279,7 +294,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'12', Bucket:'03 Seed'"
+            "memo": "ID: 13, Bucket: 03 Seed"
           }
         ]
       },
@@ -297,7 +312,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'13', Bucket:'03 Seed'"
+            "memo": "ID: 14, Bucket: 03 Seed"
           }
         ]
       },
@@ -315,7 +330,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'14', Bucket:'03 Seed'"
+            "memo": "ID: 15, Bucket: 03 Seed"
           }
         ]
       },
@@ -333,7 +348,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'15', Bucket:'03 Seed'"
+            "memo": "ID: 16, Bucket: 03 Seed"
           }
         ]
       },
@@ -351,7 +366,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'16', Bucket:'03 Seed'"
+            "memo": "ID: 17, Bucket: 03 Seed"
           }
         ]
       },
@@ -371,7 +386,7 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "Seed 3 Years 0%",
-            "memo": "ID:'17', Bucket:'03 Seed'"
+            "memo": "ID: 18, Bucket: 03 Seed"
           }
         ]
       },
@@ -388,7 +403,7 @@
             "amount": 1150000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'18', Bucket:'04 Team'"
+            "memo": "ID: 19, Bucket: 04 Team"
           }
         ]
       },
@@ -405,7 +420,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'19', Bucket:'04 Team'"
+            "memo": "ID: 20, Bucket: 04 Team"
           }
         ]
       },
@@ -422,7 +437,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'20', Bucket:'04 Team'"
+            "memo": "ID: 21, Bucket: 04 Team"
           }
         ]
       },
@@ -439,7 +454,7 @@
             "amount": 135000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'21', Bucket:'04 Team'"
+            "memo": "ID: 22, Bucket: 04 Team"
           }
         ]
       },
@@ -456,7 +471,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'22', Bucket:'04 Team'"
+            "memo": "ID: 23, Bucket: 04 Team"
           }
         ]
       },
@@ -473,7 +488,7 @@
             "amount": 1207000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'23', Bucket:'04 Team'"
+            "memo": "ID: 24, Bucket: 04 Team"
           }
         ]
       },
@@ -490,7 +505,7 @@
             "amount": 3600000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'24', Bucket:'04 Team'"
+            "memo": "ID: 25, Bucket: 04 Team"
           }
         ]
       },
@@ -507,7 +522,7 @@
             "amount": 3600000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'25', Bucket:'04 Team'"
+            "memo": "ID: 26, Bucket: 04 Team"
           }
         ]
       },
@@ -524,7 +539,7 @@
             "amount": 3600000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'26', Bucket:'04 Team'"
+            "memo": "ID: 27, Bucket: 04 Team"
           }
         ]
       },
@@ -541,7 +556,7 @@
             "amount": 215000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'27', Bucket:'04 Team'"
+            "memo": "ID: 28, Bucket: 04 Team"
           }
         ]
       },
@@ -558,7 +573,7 @@
             "amount": 250000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'28', Bucket:'04 Team'"
+            "memo": "ID: 29, Bucket: 04 Team"
           }
         ]
       },
@@ -577,7 +592,7 @@
             "validatorDuration": 32832000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'29', Bucket:'04 Team'"
+            "memo": "ID: 30, Bucket: 04 Team"
           }
         ]
       },
@@ -594,7 +609,7 @@
             "amount": 250000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'30', Bucket:'04 Team'"
+            "memo": "ID: 31, Bucket: 04 Team"
           }
         ]
       },
@@ -611,7 +626,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'31', Bucket:'05 Advisor'"
+            "memo": "ID: 32, Bucket: 05 Advisor"
           }
         ]
       },
@@ -628,7 +643,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'32', Bucket:'05 Advisor'"
+            "memo": "ID: 33, Bucket: 05 Advisor"
           }
         ]
       },
@@ -645,7 +660,7 @@
             "amount": 300000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'33', Bucket:'05 Advisor'"
+            "memo": "ID: 34, Bucket: 05 Advisor"
           }
         ]
       },
@@ -662,7 +677,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'34', Bucket:'05 Advisor'"
+            "memo": "ID: 35, Bucket: 05 Advisor"
           }
         ]
       },
@@ -679,7 +694,7 @@
             "amount": 300000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'35', Bucket:'05 Advisor'"
+            "memo": "ID: 36, Bucket: 05 Advisor"
           }
         ]
       },
@@ -696,7 +711,7 @@
             "amount": 300000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'36', Bucket:'05 Advisor'"
+            "memo": "ID: 37, Bucket: 05 Advisor"
           }
         ]
       },
@@ -713,7 +728,7 @@
             "amount": 1000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'37', Bucket:'05 Advisor'"
+            "memo": "ID: 38, Bucket: 05 Advisor"
           }
         ]
       },
@@ -730,7 +745,7 @@
             "amount": 18600000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Undeposit 5 Years 0%",
-            "memo": "ID:'38', Bucket:'05 Advisor'"
+            "memo": "ID: 39, Bucket: 05 Advisor"
           }
         ]
       },
@@ -745,7 +760,7 @@
         "platformAllocations": [
           {
             "amount": 1500000000000000,
-            "memo": "ID:'39', Bucket:'05 Advisor', Type: 'unlocked'"
+            "memo": "ID: 40, Bucket: 05 Advisor, Type: unlocked"
           }
         ]
       },
@@ -762,7 +777,7 @@
             "amount": 50000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'40', Bucket:'06 dApp Incentive'"
+            "memo": "ID: 41, Bucket: 06 dApp Incentive"
           }
         ]
       },
@@ -779,7 +794,7 @@
             "amount": 75000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Undeposit 5 Years 0%",
-            "memo": "ID:'41', Bucket:'06 dApp Incentive'"
+            "memo": "ID: 42, Bucket: 06 dApp Incentive"
           }
         ]
       },
@@ -794,7 +809,7 @@
         "platformAllocations": [
           {
             "amount": 75000000000000000,
-            "memo": "ID:'42', Bucket:'06 dApp Incentive', Type: 'unlocked'"
+            "memo": "ID: 43, Bucket: 06 dApp Incentive, Type: unlocked"
           }
         ]
       },
@@ -811,7 +826,7 @@
             "amount": 45000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Undeposit 5 Years 0%",
-            "memo": "ID:'43', Bucket:'07 IEO'"
+            "memo": "ID: 44, Bucket: 07 IEO"
           }
         ]
       },
@@ -826,7 +841,7 @@
         "platformAllocations": [
           {
             "amount": 30000000000000000,
-            "memo": "ID:'44', Bucket:'07 IEO', Type: 'unlocked'"
+            "memo": "ID: 45, Bucket: 07 IEO, Type: unlocked"
           }
         ]
       },
@@ -843,7 +858,7 @@
             "amount": 25000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Undeposit 5 Years 0%",
-            "memo": "ID:'45', Bucket:'08 Marketing'"
+            "memo": "ID: 46, Bucket: 08 Marketing"
           }
         ]
       },
@@ -858,7 +873,7 @@
         "platformAllocations": [
           {
             "amount": 25000000000000000,
-            "memo": "ID:'46', Bucket:'08 Marketing', Type: 'unlocked'"
+            "memo": "ID: 47, Bucket: 08 Marketing, Type: unlocked"
           }
         ]
       },
@@ -872,10 +887,10 @@
         },
         "platformAllocations": [
           {
-            "amount": 241067110000000000,
+            "amount": 241067010000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'47', Bucket:'09 Reserve'"
+            "memo": "ID: 48, Bucket: 09 Reserve"
           }
         ]
       },
@@ -890,7 +905,7 @@
         "platformAllocations": [
           {
             "amount": 20000000000,
-            "memo": "ID:'48', Bucket:'09 Reserve', Type: 'unlocked'"
+            "memo": "ID: 49, Bucket: 09 Reserve, Type: unlocked"
           }
         ]
       },
@@ -905,7 +920,7 @@
         "platformAllocations": [
           {
             "amount": 20000000000,
-            "memo": "ID:'49', Bucket:'09 Reserve', Type: 'unlocked'"
+            "memo": "ID: 50, Bucket: 09 Reserve, Type: unlocked"
           }
         ]
       },
@@ -924,7 +939,7 @@
             "validatorDuration": 63072000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'50', Bucket:'10 Chain4Travel AG Initial Validator'"
+            "memo": "ID: 51, Bucket: 10 Chain4Travel AG Initial Validator"
           }
         ]
       },
@@ -943,7 +958,7 @@
             "validatorDuration": 63936000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Team 5 Years 0%",
-            "memo": "ID:'51', Bucket:'11 Camino Network Foundation Initial Validator'"
+            "memo": "ID: 52, Bucket: 11 Camino Network Foundation Initial Validator"
           }
         ]
       },
@@ -958,7 +973,7 @@
         "platformAllocations": [
           {
             "amount": 75000000000000000,
-            "memo": "ID:'52', Bucket:'12 SecondSale', Type: 'unlocked'"
+            "memo": "ID: 53, Bucket: 12 SecondSale, Type: unlocked"
           }
         ]
       },
@@ -975,7 +990,7 @@
             "amount": 40000000000000000,
             "depositDuration": 157680000,
             "depositOfferMemo": "Undeposit 5 Years 0%",
-            "memo": "ID:'53', Bucket:'13 Team '"
+            "memo": "ID: 54, Bucket: 13 Team "
           }
         ]
       },
@@ -990,7 +1005,7 @@
         "platformAllocations": [
           {
             "amount": 15200000000000000,
-            "memo": "ID:'54', Bucket:'13 Team ', Type: 'unlocked'"
+            "memo": "ID: 55, Bucket: 13 Team , Type: unlocked"
           }
         ]
       },
@@ -1008,12 +1023,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'55', Bucket:'14 Presale'"
+            "memo": "ID: 56, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'55', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 56, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1031,12 +1046,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'56', Bucket:'14 Presale'"
+            "memo": "ID: 57, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'56', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 57, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1054,12 +1069,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'57', Bucket:'14 Presale'"
+            "memo": "ID: 58, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'57', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 58, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1077,12 +1092,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'58', Bucket:'14 Presale'"
+            "memo": "ID: 59, Bucket: 14 Presale"
           },
           {
             "amount": 400000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'58', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 59, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1100,12 +1115,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'59', Bucket:'14 Presale'"
+            "memo": "ID: 60, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'59', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 60, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1123,12 +1138,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'60', Bucket:'14 Presale'"
+            "memo": "ID: 61, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'60', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 61, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1146,12 +1161,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'61', Bucket:'14 Presale'"
+            "memo": "ID: 62, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'61', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 62, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1169,12 +1184,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'62', Bucket:'14 Presale'"
+            "memo": "ID: 63, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'62', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 63, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1192,12 +1207,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'63', Bucket:'14 Presale'"
+            "memo": "ID: 64, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'63', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 64, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1215,12 +1230,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'64', Bucket:'14 Presale'"
+            "memo": "ID: 65, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'64', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 65, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1238,12 +1253,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'65', Bucket:'14 Presale'"
+            "memo": "ID: 66, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'65', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 66, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1263,12 +1278,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'66', Bucket:'14 Presale'"
+            "memo": "ID: 67, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'66', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 67, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1286,12 +1301,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'67', Bucket:'14 Presale'"
+            "memo": "ID: 68, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'67', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 68, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1309,12 +1324,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'68', Bucket:'14 Presale'"
+            "memo": "ID: 69, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'68', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 69, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1332,12 +1347,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'69', Bucket:'14 Presale'"
+            "memo": "ID: 70, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'69', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 70, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1355,12 +1370,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'70', Bucket:'14 Presale'"
+            "memo": "ID: 71, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'70', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 71, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1378,12 +1393,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'71', Bucket:'14 Presale'"
+            "memo": "ID: 72, Bucket: 14 Presale"
           },
           {
             "amount": 600000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'71', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 72, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1401,12 +1416,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'72', Bucket:'14 Presale'"
+            "memo": "ID: 73, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'72', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 73, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1424,12 +1439,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'73', Bucket:'14 Presale'"
+            "memo": "ID: 74, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'73', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 74, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1447,12 +1462,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'74', Bucket:'14 Presale'"
+            "memo": "ID: 75, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'74', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 75, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1470,12 +1485,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'75', Bucket:'14 Presale'"
+            "memo": "ID: 76, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'75', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 76, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1493,12 +1508,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'76', Bucket:'14 Presale'"
+            "memo": "ID: 77, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'76', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 77, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1516,12 +1531,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'77', Bucket:'14 Presale'"
+            "memo": "ID: 78, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'77', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 78, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1539,12 +1554,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'78', Bucket:'14 Presale'"
+            "memo": "ID: 79, Bucket: 14 Presale"
           },
           {
             "amount": 250000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'78', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 79, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1562,12 +1577,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'79', Bucket:'14 Presale'"
+            "memo": "ID: 80, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'79', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 80, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1585,12 +1600,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'80', Bucket:'14 Presale'"
+            "memo": "ID: 81, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'80', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 81, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1608,12 +1623,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'81', Bucket:'14 Presale'"
+            "memo": "ID: 82, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'81', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 82, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1631,12 +1646,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'82', Bucket:'14 Presale'"
+            "memo": "ID: 83, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'82', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 83, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1656,12 +1671,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'83', Bucket:'14 Presale'"
+            "memo": "ID: 84, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'83', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 84, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1679,12 +1694,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'84', Bucket:'14 Presale'"
+            "memo": "ID: 85, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'84', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 85, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1702,12 +1717,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'85', Bucket:'14 Presale'"
+            "memo": "ID: 86, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'85', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 86, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1725,12 +1740,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'86', Bucket:'14 Presale'"
+            "memo": "ID: 87, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'86', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 87, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1748,12 +1763,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'87', Bucket:'14 Presale'"
+            "memo": "ID: 88, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'87', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 88, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1771,12 +1786,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'88', Bucket:'14 Presale'"
+            "memo": "ID: 89, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'88', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 89, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1794,12 +1809,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'89', Bucket:'14 Presale'"
+            "memo": "ID: 90, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'89', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 90, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1817,12 +1832,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'90', Bucket:'14 Presale'"
+            "memo": "ID: 91, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'90', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 91, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1840,12 +1855,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'91', Bucket:'14 Presale'"
+            "memo": "ID: 92, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'91', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 92, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1863,12 +1878,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'92', Bucket:'14 Presale'"
+            "memo": "ID: 93, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'92', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 93, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1886,12 +1901,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'93', Bucket:'14 Presale'"
+            "memo": "ID: 94, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'93', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 94, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1909,12 +1924,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'94', Bucket:'14 Presale'"
+            "memo": "ID: 95, Bucket: 14 Presale"
           },
           {
             "amount": 10000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'94', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 95, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1932,12 +1947,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'95', Bucket:'14 Presale'"
+            "memo": "ID: 96, Bucket: 14 Presale"
           },
           {
             "amount": 300000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'95', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 96, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1946,7 +1961,7 @@
         "avaxAddr": "X-camino1xfj26sj8yjtzu632hwryw6k5k8q4t4a8h3jt65",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -1955,12 +1970,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'96', Bucket:'14 Presale'"
+            "memo": "ID: 97, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'96', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 97, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -1978,12 +1993,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'97', Bucket:'14 Presale'"
+            "memo": "ID: 98, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'97', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 98, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2001,12 +2016,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'98', Bucket:'14 Presale'"
+            "memo": "ID: 99, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'98', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 99, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2024,12 +2039,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'99', Bucket:'14 Presale'"
+            "memo": "ID: 100, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'99', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 100, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2047,12 +2062,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'100', Bucket:'14 Presale'"
+            "memo": "ID: 101, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'100', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 101, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2070,12 +2085,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'101', Bucket:'14 Presale'"
+            "memo": "ID: 102, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'101', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 102, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2093,12 +2108,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'102', Bucket:'14 Presale'"
+            "memo": "ID: 103, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'102', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 103, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2116,12 +2131,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'103', Bucket:'14 Presale'"
+            "memo": "ID: 104, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'103', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 104, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2139,12 +2154,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'104', Bucket:'14 Presale'"
+            "memo": "ID: 105, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'104', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 105, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2162,12 +2177,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'105', Bucket:'14 Presale'"
+            "memo": "ID: 106, Bucket: 14 Presale"
           },
           {
             "amount": 6000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'105', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 106, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2185,12 +2200,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'106', Bucket:'14 Presale'"
+            "memo": "ID: 107, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'106', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 107, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2208,12 +2223,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'107', Bucket:'14 Presale'"
+            "memo": "ID: 108, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'107', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 108, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2231,12 +2246,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'108', Bucket:'14 Presale'"
+            "memo": "ID: 109, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'108', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 109, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2254,12 +2269,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'109', Bucket:'14 Presale'"
+            "memo": "ID: 110, Bucket: 14 Presale"
           },
           {
             "amount": 300000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'109', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 110, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2277,12 +2292,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'110', Bucket:'14 Presale'"
+            "memo": "ID: 111, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'110', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 111, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2300,12 +2315,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'111', Bucket:'14 Presale'"
+            "memo": "ID: 112, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'111', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 112, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2323,12 +2338,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'112', Bucket:'14 Presale'"
+            "memo": "ID: 113, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'112', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 113, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2346,12 +2361,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'113', Bucket:'14 Presale'"
+            "memo": "ID: 114, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'113', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 114, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2369,12 +2384,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'114', Bucket:'14 Presale'"
+            "memo": "ID: 115, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'114', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 115, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2392,12 +2407,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'115', Bucket:'14 Presale'"
+            "memo": "ID: 116, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'115', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 116, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2415,12 +2430,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'116', Bucket:'14 Presale'"
+            "memo": "ID: 117, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'116', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 117, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2438,12 +2453,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'117', Bucket:'14 Presale'"
+            "memo": "ID: 118, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'117', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 118, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2461,12 +2476,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'118', Bucket:'14 Presale'"
+            "memo": "ID: 119, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'118', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 119, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2484,12 +2499,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'119', Bucket:'14 Presale'"
+            "memo": "ID: 120, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'119', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 120, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2507,12 +2522,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'120', Bucket:'14 Presale'"
+            "memo": "ID: 121, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'120', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 121, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2530,12 +2545,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'121', Bucket:'14 Presale'"
+            "memo": "ID: 122, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'121', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 122, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2553,12 +2568,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'122', Bucket:'14 Presale'"
+            "memo": "ID: 123, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'122', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 123, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2567,7 +2582,7 @@
         "avaxAddr": "X-camino15esv7xd09h2y0fltt83zxgqtzw9xxprkfu0u3m",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -2576,12 +2591,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'123', Bucket:'14 Presale'"
+            "memo": "ID: 124, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'123', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 124, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2599,12 +2614,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'124', Bucket:'14 Presale'"
+            "memo": "ID: 125, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'124', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 125, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2619,17 +2634,15 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
-            "nodeID": "NodeID-8UfSECBBuFwPAupRQHYFZLUZaQvbpmAoB",
-            "validatorDuration": 30758400,
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'125', Bucket:'14 Presale'"
+            "memo": "ID: 126, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'125', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 126, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2647,12 +2660,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'126', Bucket:'14 Presale'"
+            "memo": "ID: 127, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'126', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 127, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2661,7 +2674,7 @@
         "avaxAddr": "X-camino1m56g7kzpyvwlcc3mzz9rs5x4u3xuqasqu4y73k",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -2670,12 +2683,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'127', Bucket:'14 Presale'"
+            "memo": "ID: 128, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'127', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 128, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2693,12 +2706,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'128', Bucket:'14 Presale'"
+            "memo": "ID: 129, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'128', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 129, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2716,12 +2729,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'129', Bucket:'14 Presale'"
+            "memo": "ID: 130, Bucket: 14 Presale"
           },
           {
             "amount": 4000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'129', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 130, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2739,12 +2752,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'130', Bucket:'14 Presale'"
+            "memo": "ID: 131, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'130', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 131, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2762,12 +2775,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'131', Bucket:'14 Presale'"
+            "memo": "ID: 132, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'131', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 132, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2785,12 +2798,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'132', Bucket:'14 Presale'"
+            "memo": "ID: 133, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'132', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 133, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2808,12 +2821,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'133', Bucket:'14 Presale'"
+            "memo": "ID: 134, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'133', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 134, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2831,12 +2844,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'134', Bucket:'14 Presale'"
+            "memo": "ID: 135, Bucket: 14 Presale"
           },
           {
             "amount": 250000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'134', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 135, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2854,12 +2867,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'135', Bucket:'14 Presale'"
+            "memo": "ID: 136, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'135', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 136, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2877,12 +2890,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'136', Bucket:'14 Presale'"
+            "memo": "ID: 137, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'136', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 137, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2900,12 +2913,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'137', Bucket:'14 Presale'"
+            "memo": "ID: 138, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'137', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 138, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2923,12 +2936,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'138', Bucket:'14 Presale'"
+            "memo": "ID: 139, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'138', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 139, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2946,12 +2959,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'139', Bucket:'14 Presale'"
+            "memo": "ID: 140, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'139', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 140, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2969,12 +2982,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'140', Bucket:'14 Presale'"
+            "memo": "ID: 141, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'140', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 141, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -2992,12 +3005,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'141', Bucket:'14 Presale'"
+            "memo": "ID: 142, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'141', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 142, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3015,12 +3028,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'142', Bucket:'14 Presale'"
+            "memo": "ID: 143, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'142', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 143, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3038,12 +3051,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'143', Bucket:'14 Presale'"
+            "memo": "ID: 144, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'143', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 144, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3061,12 +3074,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'144', Bucket:'14 Presale'"
+            "memo": "ID: 145, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'144', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 145, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3084,12 +3097,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'145', Bucket:'14 Presale'"
+            "memo": "ID: 146, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'145', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 146, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3107,12 +3120,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'146', Bucket:'14 Presale'"
+            "memo": "ID: 147, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'146', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 147, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3130,12 +3143,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'147', Bucket:'14 Presale'"
+            "memo": "ID: 148, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'147', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 148, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3153,12 +3166,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'148', Bucket:'14 Presale'"
+            "memo": "ID: 149, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'148', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 149, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3178,12 +3191,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'149', Bucket:'14 Presale'"
+            "memo": "ID: 150, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'149', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 150, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3201,12 +3214,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'150', Bucket:'14 Presale'"
+            "memo": "ID: 151, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'150', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 151, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3224,12 +3237,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'151', Bucket:'14 Presale'"
+            "memo": "ID: 152, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'151', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 152, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3247,12 +3260,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'152', Bucket:'14 Presale'"
+            "memo": "ID: 153, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'152', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 153, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3270,12 +3283,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'153', Bucket:'14 Presale'"
+            "memo": "ID: 154, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'153', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 154, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3293,12 +3306,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'154', Bucket:'14 Presale'"
+            "memo": "ID: 155, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'154', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 155, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3316,12 +3329,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'155', Bucket:'14 Presale'"
+            "memo": "ID: 156, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'155', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 156, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3339,12 +3352,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'156', Bucket:'14 Presale'"
+            "memo": "ID: 157, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'156', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 157, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3362,12 +3375,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'157', Bucket:'14 Presale'"
+            "memo": "ID: 158, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'157', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 158, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3385,12 +3398,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'158', Bucket:'14 Presale'"
+            "memo": "ID: 159, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'158', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 159, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3408,12 +3421,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'159', Bucket:'14 Presale'"
+            "memo": "ID: 160, Bucket: 14 Presale"
           },
           {
             "amount": 3000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'159', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 160, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3431,12 +3444,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'160', Bucket:'14 Presale'"
+            "memo": "ID: 161, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'160', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 161, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3454,12 +3467,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'161', Bucket:'14 Presale'"
+            "memo": "ID: 162, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'161', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 162, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3477,12 +3490,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'162', Bucket:'14 Presale'"
+            "memo": "ID: 163, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'162', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 163, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3500,12 +3513,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'163', Bucket:'14 Presale'"
+            "memo": "ID: 164, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'163', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 164, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3523,12 +3536,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'164', Bucket:'14 Presale'"
+            "memo": "ID: 165, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'164', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 165, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3546,12 +3559,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'165', Bucket:'14 Presale'"
+            "memo": "ID: 166, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'165', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 166, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3569,12 +3582,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'166', Bucket:'14 Presale'"
+            "memo": "ID: 167, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'166', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 167, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3583,7 +3596,7 @@
         "avaxAddr": "X-camino1enn02mahvwyrjdca5htg9rydqrnksscmtffz5m",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -3592,12 +3605,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'167', Bucket:'14 Presale'"
+            "memo": "ID: 168, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'167', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 168, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3615,12 +3628,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'168', Bucket:'14 Presale'"
+            "memo": "ID: 169, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'168', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 169, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3638,12 +3651,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'169', Bucket:'14 Presale'"
+            "memo": "ID: 170, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'169', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 170, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3661,12 +3674,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'170', Bucket:'14 Presale'"
+            "memo": "ID: 171, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'170', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 171, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3684,12 +3697,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'171', Bucket:'14 Presale'"
+            "memo": "ID: 172, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'171', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 172, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3707,12 +3720,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'172', Bucket:'14 Presale'"
+            "memo": "ID: 173, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'172', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 173, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3730,12 +3743,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'173', Bucket:'14 Presale'"
+            "memo": "ID: 174, Bucket: 14 Presale"
           },
           {
             "amount": 25000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'173', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 174, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3753,12 +3766,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'174', Bucket:'14 Presale'"
+            "memo": "ID: 175, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'174', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 175, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3778,12 +3791,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'175', Bucket:'14 Presale'"
+            "memo": "ID: 176, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'175', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 176, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3798,15 +3811,17 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
+            "nodeID": "NodeID-EkLRSFqEx5gqaExwNisrvL9X4tmRd9KnL",
+            "validatorDuration": 30758400,
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'176', Bucket:'14 Presale'"
+            "memo": "ID: 177, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'176', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 177, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3826,12 +3841,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'177', Bucket:'14 Presale'"
+            "memo": "ID: 178, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'177', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 178, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3849,12 +3864,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'178', Bucket:'14 Presale'"
+            "memo": "ID: 179, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'178', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 179, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3872,12 +3887,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'179', Bucket:'14 Presale'"
+            "memo": "ID: 180, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'179', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 180, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3895,12 +3910,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'180', Bucket:'14 Presale'"
+            "memo": "ID: 181, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'180', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 181, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3918,12 +3933,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'181', Bucket:'14 Presale'"
+            "memo": "ID: 182, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'181', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 182, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3941,12 +3956,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'182', Bucket:'14 Presale'"
+            "memo": "ID: 183, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'182', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 183, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3964,12 +3979,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'183', Bucket:'14 Presale'"
+            "memo": "ID: 184, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'183', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 184, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -3987,12 +4002,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'184', Bucket:'14 Presale'"
+            "memo": "ID: 185, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'184', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 185, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4010,12 +4025,12 @@
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
-            "memo": "ID:'185', Bucket:'14 Presale'"
+            "memo": "ID: 186, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'185', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 186, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4033,12 +4048,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'186', Bucket:'14 Presale'"
+            "memo": "ID: 187, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'186', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 187, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4056,12 +4071,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'187', Bucket:'14 Presale'"
+            "memo": "ID: 188, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'187', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 188, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4079,12 +4094,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'188', Bucket:'14 Presale'"
+            "memo": "ID: 189, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'188', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 189, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4102,12 +4117,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'189', Bucket:'14 Presale'"
+            "memo": "ID: 190, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'189', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 190, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4125,12 +4140,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'190', Bucket:'14 Presale'"
+            "memo": "ID: 191, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'190', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 191, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4148,12 +4163,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'191', Bucket:'14 Presale'"
+            "memo": "ID: 192, Bucket: 14 Presale"
           },
           {
             "amount": 6000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'191', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 192, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4171,12 +4186,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'192', Bucket:'14 Presale'"
+            "memo": "ID: 193, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'192', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 193, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4194,12 +4209,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'193', Bucket:'14 Presale'"
+            "memo": "ID: 194, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'193', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 194, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4217,12 +4232,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'194', Bucket:'14 Presale'"
+            "memo": "ID: 195, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'194', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 195, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4240,12 +4255,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'195', Bucket:'14 Presale'"
+            "memo": "ID: 196, Bucket: 14 Presale"
           },
           {
             "amount": 5000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'195', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 196, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4263,12 +4278,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'196', Bucket:'14 Presale'"
+            "memo": "ID: 197, Bucket: 14 Presale"
           },
           {
             "amount": 250000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'196', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 197, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4286,12 +4301,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'197', Bucket:'14 Presale'"
+            "memo": "ID: 198, Bucket: 14 Presale"
           },
           {
             "amount": 20000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'197', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 198, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4309,12 +4324,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'198', Bucket:'14 Presale'"
+            "memo": "ID: 199, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'198', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 199, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4332,12 +4347,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'199', Bucket:'14 Presale'"
+            "memo": "ID: 200, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'199', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 200, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4355,12 +4370,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'200', Bucket:'14 Presale'"
+            "memo": "ID: 201, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'200', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 201, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4378,12 +4393,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'201', Bucket:'14 Presale'"
+            "memo": "ID: 202, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'201', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 202, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4401,12 +4416,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'202', Bucket:'14 Presale'"
+            "memo": "ID: 203, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'202', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 203, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4424,12 +4439,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'203', Bucket:'14 Presale'"
+            "memo": "ID: 204, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'203', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 204, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4449,12 +4464,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'204', Bucket:'14 Presale'"
+            "memo": "ID: 205, Bucket: 14 Presale"
           },
           {
             "amount": 20000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'204', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 205, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4472,12 +4487,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'205', Bucket:'14 Presale'"
+            "memo": "ID: 206, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'205', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 206, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4495,12 +4510,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'206', Bucket:'14 Presale'"
+            "memo": "ID: 207, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'206', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 207, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4518,12 +4533,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'207', Bucket:'14 Presale'"
+            "memo": "ID: 208, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'207', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 208, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4541,12 +4556,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'208', Bucket:'14 Presale'"
+            "memo": "ID: 209, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'208', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 209, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4564,12 +4579,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'209', Bucket:'14 Presale'"
+            "memo": "ID: 210, Bucket: 14 Presale"
           },
           {
             "amount": 2500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'209', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 210, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4587,12 +4602,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'210', Bucket:'14 Presale'"
+            "memo": "ID: 211, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'210', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 211, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4601,7 +4616,7 @@
         "avaxAddr": "X-camino1qql75cyftxtf923vny3qr9hkmdayyny6ltw4v3",
         "xAmount": 0,
         "addressStates": {
-          "consortiumMember": true,
+          "consortiumMember": false,
           "kycVerified": true
         },
         "platformAllocations": [
@@ -4610,12 +4625,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'211', Bucket:'14 Presale'"
+            "memo": "ID: 212, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'211', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 212, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4633,12 +4648,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'212', Bucket:'14 Presale'"
+            "memo": "ID: 213, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'212', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 213, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4658,12 +4673,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'213', Bucket:'14 Presale'"
+            "memo": "ID: 214, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'213', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 214, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4681,12 +4696,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'214', Bucket:'14 Presale'"
+            "memo": "ID: 215, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'214', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 215, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4704,12 +4719,12 @@
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
-            "memo": "ID:'215', Bucket:'14 Presale'"
+            "memo": "ID: 216, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'215', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 216, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4727,12 +4742,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'216', Bucket:'14 Presale'"
+            "memo": "ID: 217, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'216', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 217, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4750,12 +4765,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'217', Bucket:'14 Presale'"
+            "memo": "ID: 218, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'217', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 218, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4773,12 +4788,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'218', Bucket:'14 Presale'"
+            "memo": "ID: 219, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'218', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 219, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4796,12 +4811,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'219', Bucket:'14 Presale'"
+            "memo": "ID: 220, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'219', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 220, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4819,12 +4834,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'220', Bucket:'14 Presale'"
+            "memo": "ID: 221, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'220', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 221, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4842,12 +4857,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'221', Bucket:'14 Presale'"
+            "memo": "ID: 222, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'221', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 222, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4865,12 +4880,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'222', Bucket:'14 Presale'"
+            "memo": "ID: 223, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'222', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 223, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4888,12 +4903,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'223', Bucket:'14 Presale'"
+            "memo": "ID: 224, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'223', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 224, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4911,12 +4926,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'224', Bucket:'14 Presale'"
+            "memo": "ID: 225, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'224', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 225, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4934,12 +4949,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'225', Bucket:'14 Presale'"
+            "memo": "ID: 226, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'225', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 226, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4957,12 +4972,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'226', Bucket:'14 Presale'"
+            "memo": "ID: 227, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'226', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 227, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -4980,12 +4995,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'227', Bucket:'14 Presale'"
+            "memo": "ID: 228, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'227', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 228, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5003,12 +5018,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'228', Bucket:'14 Presale'"
+            "memo": "ID: 229, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'228', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 229, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5026,12 +5041,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'229', Bucket:'14 Presale'"
+            "memo": "ID: 230, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'229', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 230, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5049,12 +5064,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'230', Bucket:'14 Presale'"
+            "memo": "ID: 231, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'230', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 231, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5072,12 +5087,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'231', Bucket:'14 Presale'"
+            "memo": "ID: 232, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'231', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 232, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5095,12 +5110,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'232', Bucket:'14 Presale'"
+            "memo": "ID: 233, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'232', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 233, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5118,12 +5133,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'233', Bucket:'14 Presale'"
+            "memo": "ID: 234, Bucket: 14 Presale"
           },
           {
             "amount": 150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'233', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 234, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5141,12 +5156,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'234', Bucket:'14 Presale'"
+            "memo": "ID: 235, Bucket: 14 Presale"
           },
           {
             "amount": 10000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'234', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 235, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5164,12 +5179,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'235', Bucket:'14 Presale'"
+            "memo": "ID: 236, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'235', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 236, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5187,12 +5202,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'236', Bucket:'14 Presale'"
+            "memo": "ID: 237, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'236', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 237, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5210,12 +5225,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'237', Bucket:'14 Presale'"
+            "memo": "ID: 238, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'237', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 238, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5233,12 +5248,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'238', Bucket:'14 Presale'"
+            "memo": "ID: 239, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'238', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 239, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5256,12 +5271,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'239', Bucket:'14 Presale'"
+            "memo": "ID: 240, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'239', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 240, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5279,12 +5294,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'240', Bucket:'14 Presale'"
+            "memo": "ID: 241, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'240', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 241, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5302,12 +5317,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'241', Bucket:'14 Presale'"
+            "memo": "ID: 242, Bucket: 14 Presale"
           },
           {
             "amount": 4000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'241', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 242, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5325,12 +5340,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'242', Bucket:'14 Presale'"
+            "memo": "ID: 243, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'242', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 243, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5348,12 +5363,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'243', Bucket:'14 Presale'"
+            "memo": "ID: 244, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'243', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 244, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5371,12 +5386,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'244', Bucket:'14 Presale'"
+            "memo": "ID: 245, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'244', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 245, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5394,12 +5409,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'245', Bucket:'14 Presale'"
+            "memo": "ID: 246, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'245', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 246, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5417,12 +5432,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'246', Bucket:'14 Presale'"
+            "memo": "ID: 247, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'246', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 247, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5440,12 +5455,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'247', Bucket:'14 Presale'"
+            "memo": "ID: 248, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'247', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 248, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5463,12 +5478,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'248', Bucket:'14 Presale'"
+            "memo": "ID: 249, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'248', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 249, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5486,12 +5501,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'249', Bucket:'14 Presale'"
+            "memo": "ID: 250, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'249', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 250, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5511,12 +5526,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'250', Bucket:'14 Presale'"
+            "memo": "ID: 251, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'250', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 251, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5534,12 +5549,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'251', Bucket:'14 Presale'"
+            "memo": "ID: 252, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'251', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 252, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5557,12 +5572,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'252', Bucket:'14 Presale'"
+            "memo": "ID: 253, Bucket: 14 Presale"
           },
           {
             "amount": 2500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'252', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 253, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5580,12 +5595,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'253', Bucket:'14 Presale'"
+            "memo": "ID: 254, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'253', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 254, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5603,12 +5618,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'254', Bucket:'14 Presale'"
+            "memo": "ID: 255, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'254', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 255, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5626,12 +5641,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'255', Bucket:'14 Presale'"
+            "memo": "ID: 256, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'255', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 256, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5649,12 +5664,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'256', Bucket:'14 Presale'"
+            "memo": "ID: 257, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'256', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 257, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5672,12 +5687,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'257', Bucket:'14 Presale'"
+            "memo": "ID: 258, Bucket: 14 Presale"
           },
           {
             "amount": 250000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'257', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 258, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5695,12 +5710,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'258', Bucket:'14 Presale'"
+            "memo": "ID: 259, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'258', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 259, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5718,12 +5733,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'259', Bucket:'14 Presale'"
+            "memo": "ID: 260, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'259', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 260, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5741,12 +5756,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'260', Bucket:'14 Presale'"
+            "memo": "ID: 261, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'260', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 261, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5764,12 +5779,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'261', Bucket:'14 Presale'"
+            "memo": "ID: 262, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'261', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 262, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5787,12 +5802,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'262', Bucket:'14 Presale'"
+            "memo": "ID: 263, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'262', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 263, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5810,12 +5825,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'263', Bucket:'14 Presale'"
+            "memo": "ID: 264, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'263', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 264, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5833,12 +5848,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'264', Bucket:'14 Presale'"
+            "memo": "ID: 265, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'264', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 265, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5856,12 +5871,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'265', Bucket:'14 Presale'"
+            "memo": "ID: 266, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'265', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 266, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5879,12 +5894,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'266', Bucket:'14 Presale'"
+            "memo": "ID: 267, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'266', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 267, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5902,12 +5917,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'267', Bucket:'14 Presale'"
+            "memo": "ID: 268, Bucket: 14 Presale"
           },
           {
             "amount": 4000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'267', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 268, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5925,12 +5940,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'268', Bucket:'14 Presale'"
+            "memo": "ID: 269, Bucket: 14 Presale"
           },
           {
             "amount": 2500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'268', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 269, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5948,12 +5963,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'269', Bucket:'14 Presale'"
+            "memo": "ID: 270, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'269', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 270, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5971,12 +5986,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'270', Bucket:'14 Presale'"
+            "memo": "ID: 271, Bucket: 14 Presale"
           },
           {
             "amount": 750000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'270', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 271, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -5994,12 +6009,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'271', Bucket:'14 Presale'"
+            "memo": "ID: 272, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'271', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 272, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6017,12 +6032,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'272', Bucket:'14 Presale'"
+            "memo": "ID: 273, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'272', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 273, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6040,12 +6055,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'273', Bucket:'14 Presale'"
+            "memo": "ID: 274, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'273', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 274, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6063,12 +6078,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'274', Bucket:'14 Presale'"
+            "memo": "ID: 275, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'274', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 275, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6086,12 +6101,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'275', Bucket:'14 Presale'"
+            "memo": "ID: 276, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'275', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 276, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6109,12 +6124,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'276', Bucket:'14 Presale'"
+            "memo": "ID: 277, Bucket: 14 Presale"
           },
           {
             "amount": 1500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'276', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 277, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6132,12 +6147,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'277', Bucket:'14 Presale'"
+            "memo": "ID: 278, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'277', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 278, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6155,12 +6170,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'278', Bucket:'14 Presale'"
+            "memo": "ID: 279, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'278', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 279, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6178,12 +6193,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'279', Bucket:'14 Presale'"
+            "memo": "ID: 280, Bucket: 14 Presale"
           },
           {
             "amount": 500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'279', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 280, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6201,12 +6216,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'280', Bucket:'14 Presale'"
+            "memo": "ID: 281, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'280', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 281, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6224,12 +6239,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'281', Bucket:'14 Presale'"
+            "memo": "ID: 282, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'281', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 282, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6247,12 +6262,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'282', Bucket:'14 Presale'"
+            "memo": "ID: 283, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'282', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 283, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6270,12 +6285,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'283', Bucket:'14 Presale'"
+            "memo": "ID: 284, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'283', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 284, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6293,12 +6308,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'284', Bucket:'14 Presale'"
+            "memo": "ID: 285, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'284', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 285, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6316,12 +6331,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'285', Bucket:'14 Presale'"
+            "memo": "ID: 286, Bucket: 14 Presale"
           },
           {
             "amount": 700000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'285', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 286, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6339,12 +6354,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'286', Bucket:'14 Presale'"
+            "memo": "ID: 287, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'286', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 287, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6362,12 +6377,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'287', Bucket:'14 Presale'"
+            "memo": "ID: 288, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'287', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 288, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6385,12 +6400,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'288', Bucket:'14 Presale'"
+            "memo": "ID: 289, Bucket: 14 Presale"
           },
           {
             "amount": 2000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'288', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 289, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6408,12 +6423,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'289', Bucket:'14 Presale'"
+            "memo": "ID: 290, Bucket: 14 Presale"
           },
           {
             "amount": 15000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'289', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 290, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6431,12 +6446,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'290', Bucket:'14 Presale'"
+            "memo": "ID: 291, Bucket: 14 Presale"
           },
           {
             "amount": 300000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'290', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 291, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6454,12 +6469,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'291', Bucket:'14 Presale'"
+            "memo": "ID: 292, Bucket: 14 Presale"
           },
           {
             "amount": 2500000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'291', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 292, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6477,12 +6492,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'292', Bucket:'14 Presale'"
+            "memo": "ID: 293, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'292', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 293, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6500,12 +6515,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'293', Bucket:'14 Presale'"
+            "memo": "ID: 294, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'293', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 294, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6523,12 +6538,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'294', Bucket:'14 Presale'"
+            "memo": "ID: 295, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'294', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 295, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6546,12 +6561,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'295', Bucket:'14 Presale'"
+            "memo": "ID: 296, Bucket: 14 Presale"
           },
           {
             "amount": 200000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'295', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 296, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6569,12 +6584,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'296', Bucket:'14 Presale'"
+            "memo": "ID: 297, Bucket: 14 Presale"
           },
           {
             "amount": 10000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'296', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 297, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6592,12 +6607,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'297', Bucket:'14 Presale'"
+            "memo": "ID: 298, Bucket: 14 Presale"
           },
           {
             "amount": 10000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'297', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 298, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6615,12 +6630,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'298', Bucket:'14 Presale'"
+            "memo": "ID: 299, Bucket: 14 Presale"
           },
           {
             "amount": 1150000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'298', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 299, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6638,12 +6653,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'299', Bucket:'14 Presale'"
+            "memo": "ID: 300, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'299', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 300, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6661,12 +6676,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'300', Bucket:'14 Presale'"
+            "memo": "ID: 301, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'300', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 301, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6686,12 +6701,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'301', Bucket:'14 Presale'"
+            "memo": "ID: 302, Bucket: 14 Presale"
           },
           {
             "amount": 1000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'301', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 302, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6709,12 +6724,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'302', Bucket:'14 Presale'"
+            "memo": "ID: 303, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'302', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 303, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6732,12 +6747,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'303', Bucket:'14 Presale'"
+            "memo": "ID: 304, Bucket: 14 Presale"
           },
           {
             "amount": 10000000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'303', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 304, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       },
@@ -6755,12 +6770,12 @@
             "depositDuration": 173448000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 5 Years 10%",
-            "memo": "ID:'304', Bucket:'14 Presale'"
+            "memo": "ID: 305, Bucket: 14 Presale"
           },
           {
             "amount": 100000000000,
             "timestampOffset": 5270400,
-            "memo": "ID:'304', Bucket:'14 Presale', Type: 'unlocked incentive'"
+            "memo": "ID: 305, Bucket: 14 Presale, Type: unlocked incentive"
           }
         ]
       }
