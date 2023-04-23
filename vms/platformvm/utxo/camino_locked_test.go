@@ -511,10 +511,36 @@ func TestVerifyLockUTXOs(t *testing.T) {
 		ins              []*avax.TransferableInput
 		outs             []*avax.TransferableOutput
 		creds            []verify.Verifiable
+		mintedAmount     uint64
 		burnedAmount     uint64
 		appliedLockState locked.State
 		expectedErr      error
 	}{
+		"OK (no lock): produced + fee == consumed + minted": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 11, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners1, existingTxID, ids.Empty),
+				generateTestOut(assetID, 11, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, existingTxID, ids.Empty),
+			},
+			mintedAmount:     4,
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      nil,
+		},
 		"OK (no lock): produced + fee == consumed": {
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
@@ -607,6 +633,33 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				generateTestOut(assetID, 5, outputOwners2, existingTxID, ids.Empty),
 				generateTestOut(assetID, 5, outputOwners2, existingTxID, locked.ThisTxID),
 			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      nil,
+		},
+		"OK (lock): produced + fee == consumed + minted": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 10, outputOwners1, existingTxID, locked.ThisTxID),
+				generateTestOut(assetID, 13, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, existingTxID, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, existingTxID, locked.ThisTxID),
+			},
+			mintedAmount:     4,
 			burnedAmount:     2,
 			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
 			appliedLockState: locked.StateBonded,
@@ -716,6 +769,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				test.ins,
 				test.outs,
 				test.creds,
+				test.mintedAmount,
 				test.burnedAmount,
 				assetID,
 				test.appliedLockState,

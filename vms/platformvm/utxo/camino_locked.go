@@ -139,7 +139,7 @@ type CaminoVerifier interface {
 	// Arguments:
 	// - [ins] and [outs] are the inputs and outputs of [tx].
 	// - [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// - [ins] must have at least [burnedAmount] more than the [outs].
+	// - [ins] must have at least ([mintedAmount] - [burnedAmount]) less than the [outs].
 	// - [assetID] is id of allowed asset, ins/outs with other assets will return error
 	// - [appliedLockState] are lockState that was applied to [ins] lockState to produce [outs]
 	//
@@ -150,6 +150,7 @@ type CaminoVerifier interface {
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
+		mintedAmount uint64,
 		burnedAmount uint64,
 		assetID ids.ID,
 		appliedLockState locked.State,
@@ -758,6 +759,7 @@ func (h *handler) VerifyLock(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
+	mintedAmount uint64,
 	burnedAmount uint64,
 	assetID ids.ID,
 	appliedLockState locked.State,
@@ -775,7 +777,7 @@ func (h *handler) VerifyLock(
 		utxos[index] = utxo
 	}
 
-	return h.VerifyLockUTXOs(tx, utxos, ins, outs, creds, burnedAmount, assetID, appliedLockState)
+	return h.VerifyLockUTXOs(tx, utxos, ins, outs, creds, mintedAmount, burnedAmount, assetID, appliedLockState)
 }
 
 func (h *handler) VerifyLockUTXOs(
@@ -784,6 +786,7 @@ func (h *handler) VerifyLockUTXOs(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
+	mintedAmount uint64,
 	burnedAmount uint64,
 	assetID ids.ID,
 	appliedLockState locked.State,
@@ -822,6 +825,7 @@ func (h *handler) VerifyLockUTXOs(
 	// if appliedLockState == bond, then otherLockTxID is depositTxID and vice versa
 	// ownerID -> otherLockTxID -> amount
 	consumed := make(map[ids.ID]map[ids.ID]uint64)
+	consumed[ids.Empty] = map[ids.ID]uint64{ids.Empty: mintedAmount} // TODO @evlekth simplify with dedicated var
 
 	for index, input := range ins {
 		utxo := utxos[index] // The UTXO consumed by [input]

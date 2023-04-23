@@ -38,6 +38,7 @@ var (
 	errWrongTxType      = errors.New("wrong transaction type")
 	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 	errNoUTXOsForImport = errors.New("no utxos for import")
+	errWrongOutType     = errors.New("wrong output type")
 )
 
 type CaminoBuilder interface {
@@ -71,10 +72,7 @@ type CaminoTxBuilder interface {
 	) (*txs.Tx, error)
 
 	NewClaimTx(
-		depositTxIDs []ids.ID,
-		claimableOwnerIDs []ids.ID,
-		amountToClaim []uint64,
-		claimType txs.ClaimType,
+		claimables []txs.ClaimAmount,
 		claimTo *secp256k1fx.OutputOwners,
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
@@ -394,10 +392,7 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 }
 
 func (b *caminoBuilder) NewClaimTx(
-	depositTxIDs []ids.ID,
-	claimableOwnerIDs []ids.ID,
-	amountToClaim []uint64,
-	claimType txs.ClaimType,
+	claimables []txs.ClaimAmount,
 	claimTo *secp256k1fx.OutputOwners,
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
@@ -416,39 +411,47 @@ func (b *caminoBuilder) NewClaimTx(
 	}
 
 	kc := secp256k1fx.NewKeychain(keys...)
-	claimableSignersKC := secp256k1fx.NewKeychain()
 
-	for _, depositTxID := range depositTxIDs {
-		depositRewardsOwner, err := getDepositRewardsOwner(b.state, depositTxID)
-		if err != nil {
-			return nil, err
+	for i, txClaimable := range claimables {
+		var owner *secp256k1fx.OutputOwners
+		switch txClaimable.Type {
+		case txs.ClaimTypeActiveDepositReward:
+			owner, err = getDepositRewardsOwner(b.state, txClaimable.ID)
+			if err != nil {
+				return nil, err
+			}
+
+		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:
+			treasuryClaimable, err := b.state.GetClaimable(txClaimable.ID)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't get claimable for ownerID %s: %w", txClaimable.ID, err)
+			}
+			owner = treasuryClaimable.Owner
 		}
 
-		_, signers, able := kc.Match(depositRewardsOwner, b.clk.Unix())
+		indices, claimableSigners, able := kc.Match(owner, b.clk.Unix())
 		if !able {
 			return nil, errKeyMissing
 		}
 
-		for _, signer := range signers {
-			claimableSignersKC.Add(signer)
-		}
-	}
+		signers = append(signers, claimableSigners)
+		claimables[i].OwnerAuth = &secp256k1fx.Input{SigIndices: indices}
 
-	for _, ownerID := range claimableOwnerIDs {
-		claimable, err := b.state.GetClaimable(ownerID)
+		outIntf, err := b.fx.CreateOutput(txClaimable.Amount, claimTo)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get claimable for ownerID %s: %w", ownerID, err)
+			return nil, fmt.Errorf("failed to create reward output: %w", err)
 		}
-
-		_, signers, able := kc.Match(claimable.Owner, b.clk.Unix())
-		if !able {
-			return nil, errKeyMissing
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, errWrongOutType
 		}
-		for _, signer := range signers {
-			claimableSignersKC.Add(signer)
-		}
+		outs = append(outs, &avax.TransferableOutput{
+			Asset: avax.Asset{ID: b.ctx.AVAXAssetID},
+			Out:   out,
+		})
 	}
-	signers = append(signers, claimableSignersKC.Keys)
+
+	avax.SortTransferableOutputs(outs, txs.Codec)
 
 	utx := &txs.ClaimTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -457,11 +460,7 @@ func (b *caminoBuilder) NewClaimTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		DepositTxIDs:      depositTxIDs,
-		ClaimableOwnerIDs: claimableOwnerIDs,
-		ClaimedAmounts:    amountToClaim,
-		ClaimType:         claimType,
-		ClaimTo:           claimTo,
+		Claimables: claimables,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

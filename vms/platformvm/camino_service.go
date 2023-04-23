@@ -475,16 +475,20 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 	return nil
 }
 
+type ClaimedAmount struct {
+	DepositTxID    ids.ID            `json:"depositTxID"`
+	ClaimableOwner platformapi.Owner `json:"claimableOwner"`
+	Amount         uint64            `json:"amount"`
+	ClaimType      txs.ClaimType     `json:"claimType"`
+}
+
 type ClaimArgs struct {
 	api.UserPass
 	api.JSONFromAddrs
 
-	DepositTxIDs    []ids.ID            `json:"depositTxIDs"`
-	ClaimableOwners []platformapi.Owner `json:"claimableOwners"`
-	AmountToClaim   []uint64            `json:"amountToClaim"`
-	ClaimType       txs.ClaimType       `json:"claimType"`
-	ClaimTo         platformapi.Owner   `json:"claimTo"`
-	Change          platformapi.Owner   `json:"change"`
+	Claimables []ClaimedAmount   `json:"claimables"`
+	ClaimTo    platformapi.Owner `json:"claimTo"`
+	Change     platformapi.Owner `json:"change"`
 }
 
 // Claim issues an ClaimTx
@@ -506,25 +510,31 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		return err
 	}
 
-	claimableOwnerIDs := make([]ids.ID, len(args.ClaimableOwners))
-	for i := range args.ClaimableOwners {
-		claimableOwner, err := s.getOutputOwner(&args.ClaimableOwners[i])
-		if err != nil {
-			return fmt.Errorf("failed to parse api owner to secp owner: %w", err)
+	claimables := make([]txs.ClaimAmount, len(args.Claimables))
+	for i := range args.Claimables {
+		switch args.Claimables[i].ClaimType {
+		case txs.ClaimTypeActiveDepositReward:
+			claimables[i].ID = args.Claimables[i].DepositTxID
+		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:
+			claimableOwner, err := s.getOutputOwner(&args.Claimables[i].ClaimableOwner)
+			if err != nil {
+				return fmt.Errorf("failed to parse api owner to secp owner: %w", err)
+			}
+			ownerID, err := txs.GetOwnerID(claimableOwner)
+			if err != nil {
+				return fmt.Errorf("failed to calculate ownerID from owner: %w", err)
+			}
+			claimables[i].ID = ownerID
+		default:
+			return txs.ErrWrongClaimType
 		}
-		ownerID, err := txs.GetOwnerID(claimableOwner)
-		if err != nil {
-			return fmt.Errorf("failed to calculate ownerID from owner: %w", err)
-		}
-		claimableOwnerIDs[i] = ownerID
+		claimables[i].Amount = args.Claimables[i].Amount
+		claimables[i].Type = args.Claimables[i].ClaimType
 	}
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewClaimTx(
-		args.DepositTxIDs,
-		claimableOwnerIDs,
-		args.AmountToClaim,
-		args.ClaimType,
+		claimables,
 		claimTo,
 		privKeys,
 		change,

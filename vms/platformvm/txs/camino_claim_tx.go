@@ -10,51 +10,48 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
 var (
 	_ UnsignedTx = (*ClaimTx)(nil)
 
-	errNoDepositsOrClaimables = errors.New("no deposit txs with rewards or claimables to claim")
-	errNonUniqueDepositTxID   = errors.New("non-unique deposit tx id")
-	errNonUniqueOwnerID       = errors.New("non-unique owner id")
-	errWrongClaimedAmount     = errors.New("zero claimed amount or amounts len doesn't match ownerIDs len")
-	errWrongClaimType         = errors.New("wrong claim type")
-
-	ClaimTypeValidatorReward      ClaimType = 0b01
-	ClaimTypeExpiredDepositReward ClaimType = 0b10
-	ClaimTypeAll                  ClaimType = 0b11
+	errNoClaimables         = errors.New("no deposit txs with rewards or claimables to claim")
+	errNonUniqueClaimableID = errors.New("non-unique deposit tx id or claimable owner id")
+	errZeroClaimedAmount    = errors.New("zero claimed amount")
+	errBadClaimableAuth     = errors.New("bad claimable auth")
+	ErrWrongClaimType       = errors.New("wrong claim type")
 )
 
 type ClaimType uint64
+
+const (
+	ClaimTypeValidatorReward ClaimType = iota
+	ClaimTypeExpiredDepositReward
+	ClaimTypeAllTreasury
+	ClaimTypeActiveDepositReward
+)
+
+type ClaimAmount struct {
+	// If Type is ClaimTypeActiveDepositReward, then it is DepositTxID.
+	// Otherwise it is ownerID of claimable owner (validator rewards, expired deposit rewards),
+	// where ownerID is hash256 of owners structure (secp256k1fx.OutputOwners, for example).
+	ID ids.ID `serialize:"true" json:"id"`
+	// Enum defining what is claimed
+	Type ClaimType `serialize:"true" json:"type"`
+	// Amount that will be claimed
+	Amount uint64 `serialize:"true" json:"amount"`
+	// Auth that will be used to verify credential for claimable owner.
+	OwnerAuth verify.Verifiable `serialize:"true" json:"ownerAuth"`
+}
 
 // ClaimTx is an unsigned ClaimTx
 type ClaimTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
-	// IDs of deposit txs which will be used to claim rewards
-	DepositTxIDs []ids.ID `serialize:"true" json:"depositTxIDs"`
-	// Owner ids of claimables owners (validator rewards, expired deposit unclaimed rewards).
-	// ID is hash256 of owners structure (secp256k1fx.OutputOwners, for example)
-	ClaimableOwnerIDs []ids.ID `serialize:"true" json:"claimableOwnerIDs"`
-	// How much tokens will be claimed for corresponding claimableOwnerIDs
-	ClaimedAmounts []uint64 `serialize:"true" json:"claimedAmounts"`
-	// Bitfield defining which type of claimables will be claimed
-	ClaimType ClaimType `serialize:"true" json:"claimType"`
-	// Reward and claimables outputs will be minted to this owner, unless all of its fields has zero-values.
-	// If it is empty, deposit rewards will be minted for depositTx.RewardsOwner
-	// and claimables will be minted for claimable owners.
-	ClaimTo fx.Owner `serialize:"true" json:"claimTo"`
-}
-
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [ClaimTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
-func (tx *ClaimTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
-	tx.ClaimTo.InitCtx(ctx)
+	// Array, describing what types and amounts of claimables.
+	Claimables []ClaimAmount `serialize:"true" json:"claimables"`
 }
 
 // SyntacticVerify returns nil if [tx] is valid
@@ -64,35 +61,29 @@ func (tx *ClaimTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case len(tx.DepositTxIDs) == 0 && len(tx.ClaimableOwnerIDs) == 0:
-		return errNoDepositsOrClaimables
-	case len(tx.ClaimableOwnerIDs) != len(tx.ClaimedAmounts):
-		return errWrongClaimedAmount
-	case len(tx.ClaimableOwnerIDs) != 0 && (tx.ClaimType == 0 || tx.ClaimType > ClaimTypeAll):
-		return errWrongClaimType
+	case len(tx.Claimables) == 0:
+		return errNoClaimables
 	}
 
-	uniqueIDs := set.NewSet[ids.ID](len(tx.DepositTxIDs))
-	for _, depositTxID := range tx.DepositTxIDs {
-		if _, ok := uniqueIDs[depositTxID]; ok {
-			return errNonUniqueDepositTxID
+	uniqueIDs := set.NewSet[ids.ID](len(tx.Claimables))
+	for i, claimable := range tx.Claimables {
+		if claimable.Amount == 0 {
+			return errZeroClaimedAmount
 		}
-		uniqueIDs.Add(depositTxID)
-	}
-
-	uniqueIDs = set.NewSet[ids.ID](len(tx.ClaimableOwnerIDs))
-	for _, ownerID := range tx.ClaimableOwnerIDs {
-		if _, ok := uniqueIDs[ownerID]; ok {
-			return errNonUniqueOwnerID
+		if claimable.Type > ClaimTypeActiveDepositReward {
+			return ErrWrongClaimType
 		}
-		uniqueIDs.Add(ownerID)
+		if _, ok := uniqueIDs[claimable.ID]; ok {
+			return errNonUniqueClaimableID
+		}
+		if err := claimable.OwnerAuth.Verify(); err != nil {
+			return fmt.Errorf("%w (claimable[%d].OwnerAuth): %s", errBadClaimableAuth, i, err)
+		}
+		uniqueIDs.Add(claimable.ID)
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
-	}
-	if err := tx.ClaimTo.Verify(); err != nil {
-		return fmt.Errorf("failed to verify DepositRewardsOwner: %w", err)
 	}
 
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {

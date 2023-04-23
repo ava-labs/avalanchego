@@ -59,17 +59,17 @@ func (mr *MockVerifierMockRecorder) Unlock(arg0, arg1, arg2 interface{}) *gomock
 }
 
 // VerifyLock mocks base method.
-func (m *MockVerifier) VerifyLock(arg0 txs.UnsignedTx, arg1 state.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID, arg7 locked.State) error {
+func (m *MockVerifier) VerifyLock(arg0 txs.UnsignedTx, arg1 state.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 uint64, arg7 ids.ID, arg8 locked.State) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyLock", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	ret := m.ctrl.Call(m, "VerifyLock", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifyLock indicates an expected call of VerifyLock.
-func (mr *MockVerifierMockRecorder) VerifyLock(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
+func (mr *MockVerifierMockRecorder) VerifyLock(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyLock", reflect.TypeOf((*MockVerifier)(nil).VerifyLock), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyLock", reflect.TypeOf((*MockVerifier)(nil).VerifyLock), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 }
 
 // VerifySpend mocks base method.

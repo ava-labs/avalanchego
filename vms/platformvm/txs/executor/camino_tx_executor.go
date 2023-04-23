@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -58,7 +57,6 @@ var (
 	errNodeNotRegistered            = errors.New("no address registered for this node")
 	errNotNodeOwner                 = errors.New("node is registered for another address")
 	errNodeAlreadyRegistered        = errors.New("node is already registered")
-	errDepositCredentialMissmatch   = errors.New("deposit credential isn't matching")
 	errClaimableCredentialMissmatch = errors.New("claimable credential isn't matching")
 	errDepositNotFound              = errors.New("deposit not found")
 	errNotSECPOwner                 = errors.New("owner is not *secp256k1fx.OutputOwners")
@@ -215,6 +213,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 			tx.Ins,
 			tx.Outs,
 			e.Tx.Creds,
+			0,
 			e.Backend.Config.AddPrimaryNetworkValidatorFee,
 			e.Backend.Ctx.AVAXAssetID,
 			locked.StateBonded,
@@ -665,6 +664,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
+		0,
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateDeposited,
@@ -824,7 +824,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 
 	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't get camino config: %w", err)
 	}
 
 	if !caminoConfig.LockModeBondDeposit {
@@ -835,208 +835,165 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		return err
 	}
 
-	// BaseTx / fee check
+	// Common vars
+
+	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
+	txID := e.Tx.ID()
+	claimedAmount := uint64(0)
+	claimableCreds := e.Tx.Creds[len(e.Tx.Creds)-len(tx.Claimables):]
+
+	for i, txClaimable := range tx.Claimables {
+		switch txClaimable.Type {
+		case txs.ClaimTypeActiveDepositReward:
+			// Getting deposit tx
+
+			signedDepositTx, txStatus, err := e.State.GetTx(txClaimable.ID)
+			if err != nil {
+				return fmt.Errorf("%w: %s", errDepositNotFound, err)
+			}
+			if txStatus != status.Committed {
+				return fmt.Errorf("%w: %s", errDepositNotFound, "tx is not committed")
+			}
+			depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
+			if !ok {
+				return fmt.Errorf("%w: %s", errDepositNotFound, errWrongTxType)
+			}
+
+			// Checking deposit signatures
+
+			depositRewardsOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return errNotSECPOwner
+			}
+
+			if err := e.Fx.VerifyMultisigPermission(
+				tx,
+				txClaimable.OwnerAuth,
+				claimableCreds[i],
+				depositRewardsOwner,
+				e.State,
+			); err != nil {
+				return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
+			}
+
+			// Checking claimed amount
+
+			deposit, err := e.State.GetDeposit(txClaimable.ID)
+			if err != nil {
+				return fmt.Errorf("%w: %s", errDepositNotFound, err)
+			}
+
+			depositOffer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+			if err != nil {
+				return fmt.Errorf("couldn't get deposit offer: %w", err)
+			}
+
+			claimableReward := deposit.ClaimableReward(depositOffer, currentTimestamp)
+			if claimableReward < txClaimable.Amount {
+				return errWrongClaimedAmount
+			}
+
+			claimedAmount, err = math.Add64(claimedAmount, txClaimable.Amount)
+			if err != nil {
+				return fmt.Errorf("couldn't calculate total claimedAmount: %w", err)
+			}
+
+			// Updating deposit
+
+			e.State.ModifyDeposit(txClaimable.ID, &deposits.Deposit{
+				DepositOfferID:      deposit.DepositOfferID,
+				UnlockedAmount:      deposit.UnlockedAmount,
+				ClaimedRewardAmount: deposit.ClaimedRewardAmount + txClaimable.Amount,
+				Start:               deposit.Start,
+				Duration:            deposit.Duration,
+				Amount:              deposit.Amount,
+			})
+
+		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:
+			// Checking claimables signatures
+
+			treasuryClaimable, err := e.State.GetClaimable(txClaimable.ID)
+			if err == database.ErrNotFound {
+				// tx.ClaimedAmount[i] > 0, so we'r trying to claim more, than available
+				return fmt.Errorf("no claimable found for the ownerID (%s): %w", txClaimable.ID, errWrongClaimedAmount)
+			} else if err != nil {
+				return fmt.Errorf("couldn't get claimable: %w", err)
+			}
+
+			if err := e.Fx.VerifyMultisigPermission(
+				tx,
+				txClaimable.OwnerAuth,
+				claimableCreds[i],
+				treasuryClaimable.Owner,
+				e.State,
+			); err != nil {
+				return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
+			}
+
+			// Checking claimed amount
+
+			amountToClaim := txClaimable.Amount
+			newClaimableValidatorReward := treasuryClaimable.ValidatorReward
+			newClaimableExpiredDepositReward := treasuryClaimable.ExpiredDepositReward
+
+			if txClaimable.Type == txs.ClaimTypeValidatorReward || txClaimable.Type == txs.ClaimTypeAllTreasury {
+				if amountToClaim > newClaimableValidatorReward {
+					amountToClaim -= newClaimableValidatorReward
+					newClaimableValidatorReward = 0
+				} else {
+					newClaimableValidatorReward -= amountToClaim
+					amountToClaim = 0
+				}
+			}
+
+			if txClaimable.Type == txs.ClaimTypeExpiredDepositReward || txClaimable.Type == txs.ClaimTypeAllTreasury {
+				if amountToClaim > newClaimableExpiredDepositReward {
+					amountToClaim -= newClaimableExpiredDepositReward
+					newClaimableExpiredDepositReward = 0
+				} else {
+					newClaimableExpiredDepositReward -= amountToClaim
+					amountToClaim = 0
+				}
+			}
+
+			if amountToClaim > 0 {
+				return errWrongClaimedAmount
+			}
+
+			claimedAmount, err = math.Add64(claimedAmount, txClaimable.Amount)
+			if err != nil {
+				return fmt.Errorf("couldn't calculate total claimedAmount: %w", err)
+			}
+
+			// Updating claimable
+
+			var newClaimable *state.Claimable
+			if newClaimableExpiredDepositReward != 0 || newClaimableValidatorReward != 0 {
+				newClaimable = &state.Claimable{
+					Owner:                treasuryClaimable.Owner,
+					ValidatorReward:      newClaimableValidatorReward,
+					ExpiredDepositReward: newClaimableExpiredDepositReward,
+				}
+			}
+			e.State.SetClaimable(txClaimable.ID, newClaimable)
+		}
+	}
+
+	// BaseTx check (fee, reward outs)
 
 	if err := e.FlowChecker.VerifyLock(
 		tx,
 		e.State,
 		tx.Ins,
 		tx.Outs,
-		e.Tx.Creds[:len(e.Tx.Creds)-1],
+		e.Tx.Creds[:len(e.Tx.Creds)-len(tx.Claimables)],
+		claimedAmount,
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
-
-	// Common vars
-
-	currentTimestamp := uint64(e.State.GetTimestamp().Unix())
-	claimableCredential := []verify.Verifiable{e.Tx.Creds[len(e.Tx.Creds)-1]}
-	txID := e.Tx.ID()
-
-	newClaimTo := false
-	if secpOwner, ok := tx.ClaimTo.(*secp256k1fx.OutputOwners); !ok {
-		return errNotSECPOwner
-	} else if len(secpOwner.Addrs) != 0 {
-		newClaimTo = true
-	}
-
-	// Checking deposits sigs and creating reward outputs
-
-	mintedOutsCount := 0
-
-	for _, depositTxID := range tx.DepositTxIDs {
-		// getting deposit tx
-
-		signedDepositTx, txStatus, err := e.State.GetTx(depositTxID)
-		if err != nil {
-			return fmt.Errorf("%w: %s", errDepositNotFound, err)
-		}
-		if txStatus != status.Committed {
-			return fmt.Errorf("%w: %s", errDepositNotFound, "tx is not committed")
-		}
-		depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-		if !ok {
-			return fmt.Errorf("%w: %s", errDepositNotFound, errWrongTxType)
-		}
-
-		// checking deposit signatures
-
-		depositRewardsOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
-		if !ok {
-			return errNotSECPOwner
-		}
-
-		if err := e.Fx.VerifyMultisigUnorderedPermission(
-			tx,
-			claimableCredential,
-			depositRewardsOwner,
-			e.State,
-		); err != nil {
-			return fmt.Errorf("%w: %s", errDepositCredentialMissmatch, err)
-		}
-
-		// creating reward output, if there is any
-
-		deposit, err := e.State.GetDeposit(depositTxID)
-		if err != nil {
-			return fmt.Errorf("%w: %s", errDepositNotFound, err)
-		}
-
-		depositOffer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
-		if err != nil {
-			return err
-		}
-
-		claimableReward := deposit.ClaimableReward(depositOffer, currentTimestamp)
-		if claimableReward > 0 {
-			claimTo := depositTx.RewardsOwner
-			if newClaimTo {
-				claimTo = tx.ClaimTo
-			}
-
-			outIntf, err := e.Fx.CreateOutput(claimableReward, claimTo)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return errInvalidState
-			}
-
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        txID,
-					OutputIndex: uint32(len(tx.Outs) + mintedOutsCount),
-				},
-				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
-				Out:   out,
-			}
-			mintedOutsCount++
-
-			e.State.AddUTXO(utxo)
-			e.State.AddRewardUTXO(depositTxID, utxo)
-			e.State.ModifyDeposit(depositTxID, &deposits.Deposit{
-				DepositOfferID:      deposit.DepositOfferID,
-				UnlockedAmount:      deposit.UnlockedAmount,
-				ClaimedRewardAmount: deposit.ClaimedRewardAmount + claimableReward,
-				Start:               deposit.Start,
-				Duration:            deposit.Duration,
-				Amount:              deposit.Amount,
-			})
-		}
-	}
-
-	// Checking claimables sigs and claimable amounts,
-	// updating claimables in state, minting reward utxos and adding them to state
-
-	for i, ownerID := range tx.ClaimableOwnerIDs {
-		claimable, err := e.State.GetClaimable(ownerID)
-		if err == database.ErrNotFound {
-			// tx.ClaimedAmount[i] > 0, so we'r trying to claim more, than available
-			return fmt.Errorf("no claimable found for the ownerID (%s): %w", ownerID, errWrongClaimedAmount)
-		} else if err != nil {
-			return err
-		}
-
-		if err := e.Fx.VerifyMultisigUnorderedPermission(
-			tx,
-			claimableCredential,
-			claimable.Owner,
-			e.State,
-		); err != nil {
-			return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
-		}
-
-		amountToClaim := tx.ClaimedAmounts[i]
-		newClaimableValidatorReward := claimable.ValidatorReward
-		newClaimableExpiredDepositReward := claimable.ExpiredDepositReward
-
-		if tx.ClaimType&txs.ClaimTypeValidatorReward != 0 {
-			if amountToClaim > newClaimableValidatorReward {
-				amountToClaim -= newClaimableValidatorReward
-				newClaimableValidatorReward = 0
-			} else {
-				newClaimableValidatorReward -= amountToClaim
-				amountToClaim = 0
-			}
-		}
-
-		if tx.ClaimType&txs.ClaimTypeExpiredDepositReward != 0 {
-			if amountToClaim > newClaimableExpiredDepositReward {
-				amountToClaim -= newClaimableExpiredDepositReward
-				newClaimableExpiredDepositReward = 0
-			} else {
-				newClaimableExpiredDepositReward -= amountToClaim
-				amountToClaim = 0
-			}
-		}
-
-		if amountToClaim > 0 {
-			return errWrongClaimedAmount
-		}
-
-		var claimTo fx.Owner = claimable.Owner
-		if newClaimTo {
-			claimTo = tx.ClaimTo
-		}
-
-		outIntf, err := e.Fx.CreateOutput(tx.ClaimedAmounts[i], claimTo)
-		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
-		}
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return errInvalidState
-		}
-
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(tx.Outs) + mintedOutsCount),
-			},
-			Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
-			Out:   out,
-		}
-		mintedOutsCount++
-
-		e.State.AddUTXO(utxo)
-		e.State.AddRewardUTXO(txID, utxo)
-
-		var newClaimable *state.Claimable
-		if newClaimableExpiredDepositReward != 0 || newClaimableValidatorReward != 0 {
-			newClaimable = &state.Claimable{
-				Owner:                claimable.Owner,
-				ValidatorReward:      newClaimableValidatorReward,
-				ExpiredDepositReward: newClaimableExpiredDepositReward,
-			}
-		}
-		e.State.SetClaimable(ownerID, newClaimable)
-	}
-
-	// Consuming / producing fee utxos
 
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -1135,6 +1092,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds[:len(e.Tx.Creds)-2], // base tx creds
+		0,
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
@@ -1362,6 +1320,7 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 			tx.Ins,
 			tx.Outs,
 			e.Tx.Creds,
+			0,
 			e.Backend.Config.TxFee,
 			e.Backend.Ctx.AVAXAssetID,
 			locked.StateUnlocked,
