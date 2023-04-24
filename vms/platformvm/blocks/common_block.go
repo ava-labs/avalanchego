@@ -16,17 +16,17 @@ type CommonBlock struct {
 	// This block's height. The genesis block is at height 0.
 	Hght uint64 `serialize:"true" json:"height"`
 
-	id    ids.ID
+	MyID  ids.ID `json:"id"`
 	bytes []byte
 }
 
 func (b *CommonBlock) initialize(bytes []byte) {
-	b.id = hashing.ComputeHash256Array(bytes)
+	b.MyID = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 }
 
 func (b *CommonBlock) ID() ids.ID {
-	return b.id
+	return b.MyID
 }
 
 func (b *CommonBlock) Parent() ids.ID {
