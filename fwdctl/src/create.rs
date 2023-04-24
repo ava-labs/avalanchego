@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Error, Result};
 use clap::{value_parser, Args};
 use firewood::db::{DBConfig, DBRevConfig, DiskBufferConfig, WALConfig, DB};
 use log;
@@ -262,11 +262,7 @@ pub fn run(opts: &Options) -> Result<()> {
     let db_config = initialize_db_config(opts);
     log::debug!("database configuration parameters: \n{:?}\n", db_config);
 
-    match DB::new::<&str>(opts.name.as_ref(), &db_config) {
-        Ok(_) => {
-            println!("created firewood database in {:?}", opts.name);
-            Ok(())
-        }
-        Err(_) => Err(anyhow!("error creating database")),
-    }
+    DB::new::<&str>(opts.name.as_ref(), &db_config).map_err(Error::msg)?;
+    println!("created firewood database in {:?}", opts.name);
+    Ok(())
 }

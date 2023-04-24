@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use clap::Args;
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{DBConfig, DBError, WALConfig, DB};
 use log;
 use std::str;
 
@@ -30,10 +30,7 @@ pub fn run(opts: &Options) -> Result<()> {
         .truncate(false)
         .wal(WALConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
-        Ok(db) => db,
-        Err(_) => return Err(anyhow!("db not available")),
-    };
+    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
 
     match db.kv_get(opts.key.as_bytes()) {
         Ok(val) => {
@@ -43,10 +40,11 @@ pub fn run(opts: &Options) -> Result<()> {
             };
             println!("{:?}", s);
             if val.is_empty() {
-                return Err(anyhow!("no value found for key"));
+                bail!("no value found for key");
             }
             Ok(())
         }
-        Err(_) => Err(anyhow!("key not found")),
+        Err(DBError::KeyNotFound) => bail!("key not found"),
+        Err(e) => bail!(e),
     }
 }

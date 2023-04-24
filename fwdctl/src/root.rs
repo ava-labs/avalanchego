@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Error, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
@@ -26,17 +26,9 @@ pub fn run(opts: &Options) -> Result<()> {
         .truncate(false)
         .wal(WALConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
-        Ok(db) => db,
-        Err(_) => return Err(anyhow!("db not available")),
-    };
+    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
 
-    match db.kv_root_hash() {
-        Ok(root) => {
-            // TODO: collect root into hex encoded string
-            println!("{:X?}", *root);
-            Ok(())
-        }
-        Err(_) => Err(anyhow!("root hash not found")),
-    }
+    let root = db.kv_root_hash().map_err(Error::msg)?;
+    println!("{:X?}", *root);
+    Ok(())
 }

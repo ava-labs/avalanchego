@@ -1,16 +1,16 @@
 use anyhow::{anyhow, Result};
 use assert_cmd::Command;
+
 use predicates::prelude::*;
 use serial_test::serial;
+
 use std::fs::remove_dir_all;
 
 const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
-
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
-    if let Err(e) = remove_dir_all(FIREWOOD_TEST_DB_NAME) {
+    if let Err(e) = remove_dir_all(tmpdb::path()) {
         eprintln!("failed to delete testing dir: {e}");
         return Err(anyhow!(e));
     }
@@ -38,7 +38,7 @@ fn fwdctl_prints_version() -> Result<()> {
 fn fwdctl_creates_database() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
-        .arg(FIREWOOD_TEST_DB_NAME)
+        .arg(tmpdb::path())
         .assert()
         .success();
 
@@ -53,7 +53,7 @@ fn fwdctl_insert_successful() -> Result<()> {
     // Create db
     Command::cargo_bin(PRG)?
         .arg("create")
-        .arg(FIREWOOD_TEST_DB_NAME)
+        .arg(tmpdb::path())
         .assert()
         .success();
 
@@ -62,7 +62,8 @@ fn fwdctl_insert_successful() -> Result<()> {
         .arg("insert")
         .args(["year"])
         .args(["2023"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));
@@ -78,7 +79,7 @@ fn fwdctl_get_successful() -> Result<()> {
     // Create db and insert data
     Command::cargo_bin(PRG)?
         .arg("create")
-        .args([FIREWOOD_TEST_DB_NAME])
+        .args([tmpdb::path()])
         .assert()
         .success();
 
@@ -86,7 +87,8 @@ fn fwdctl_get_successful() -> Result<()> {
         .arg("insert")
         .args(["year"])
         .args(["2023"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));
@@ -95,7 +97,8 @@ fn fwdctl_get_successful() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("get")
         .args(["year"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("2023"));
@@ -110,7 +113,7 @@ fn fwdctl_get_successful() -> Result<()> {
 fn fwdctl_delete_successful() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
-        .arg(FIREWOOD_TEST_DB_NAME)
+        .arg(tmpdb::path())
         .assert()
         .success();
 
@@ -118,7 +121,8 @@ fn fwdctl_delete_successful() -> Result<()> {
         .arg("insert")
         .args(["year"])
         .args(["2023"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));
@@ -127,7 +131,8 @@ fn fwdctl_delete_successful() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("delete")
         .args(["year"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("key year deleted successfully"));
@@ -142,7 +147,7 @@ fn fwdctl_delete_successful() -> Result<()> {
 fn fwdctl_root_hash() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
-        .arg(FIREWOOD_TEST_DB_NAME)
+        .arg(tmpdb::path())
         .assert()
         .success();
 
@@ -150,7 +155,8 @@ fn fwdctl_root_hash() -> Result<()> {
         .arg("insert")
         .args(["year"])
         .args(["2023"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));
@@ -158,7 +164,8 @@ fn fwdctl_root_hash() -> Result<()> {
     // Get root
     Command::cargo_bin(PRG)?
         .arg("root")
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::is_empty().not());
@@ -173,7 +180,7 @@ fn fwdctl_root_hash() -> Result<()> {
 fn fwdctl_dump() -> Result<()> {
     Command::cargo_bin(PRG)?
         .arg("create")
-        .arg(FIREWOOD_TEST_DB_NAME)
+        .arg(tmpdb::path())
         .assert()
         .success();
 
@@ -181,7 +188,8 @@ fn fwdctl_dump() -> Result<()> {
         .arg("insert")
         .args(["year"])
         .args(["2023"])
-        .args(["--db", FIREWOOD_TEST_DB_NAME])
+        .args(["--db"])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));
@@ -189,7 +197,7 @@ fn fwdctl_dump() -> Result<()> {
     // Get root
     Command::cargo_bin(PRG)?
         .arg("dump")
-        .args([FIREWOOD_TEST_DB_NAME])
+        .args([tmpdb::path()])
         .assert()
         .success()
         .stdout(predicate::str::is_empty().not());
@@ -197,4 +205,56 @@ fn fwdctl_dump() -> Result<()> {
     fwdctl_delete_db().map_err(|e| anyhow!(e))?;
 
     Ok(())
+}
+
+// A module to create a temporary database name for use in
+// tests. The directory will be one of:
+// - cargo's compile-time CARGO_TARGET_TMPDIR, if that exists
+// - the value of the TMPDIR environment, if that is set, or
+// - fallback to /tmp
+
+// using cargo's CARGO_TARGET_TMPDIR ensures that multiple runs
+// of this in different directories will have different databases
+
+mod tmpdb {
+    use std::{
+        ffi,
+        path::{Path, PathBuf},
+    };
+
+    use lazy_static::lazy_static;
+
+    const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
+    const TARGET_TMP_DIR: Option<&str> = option_env!("CARGO_TARGET_TMPDIR");
+
+    #[derive(Debug)]
+    pub struct DbPath {
+        path: PathBuf,
+    }
+
+    impl AsRef<ffi::OsStr> for DbPath {
+        fn as_ref(&self) -> &ffi::OsStr {
+            self.path.as_os_str()
+        }
+    }
+    impl AsRef<Path> for DbPath {
+        fn as_ref(&self) -> &Path {
+            &self.path
+        }
+    }
+    lazy_static! {
+        static ref DBPATH: DbPath = {
+            let path = [
+                TARGET_TMP_DIR.unwrap_or(&std::env::var("TMPDIR").unwrap_or("/tmp".to_string())),
+                FIREWOOD_TEST_DB_NAME,
+            ]
+            .iter()
+            .collect::<PathBuf>();
+            DbPath { path }
+        };
+    }
+
+    pub fn path() -> &'static DbPath {
+        &DBPATH
+    }
 }

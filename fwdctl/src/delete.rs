@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
@@ -29,18 +29,10 @@ pub fn run(opts: &Options) -> Result<()> {
         .truncate(false)
         .wal(WALConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
-        Ok(db) => db,
-        Err(_) => return Err(anyhow!("error opening database")),
-    };
-
-    if let Ok((wb, _)) = db
-        .new_writebatch()
-        .kv_remove(opts.key.clone())
-        .map_err(Error::msg)
-    {
-        wb.commit()
-    }
+    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
+    db.new_writebatch()
+        .kv_remove(&opts.key)
+        .map_err(Error::msg)?;
     println!("key {} deleted successfully", opts.key);
     Ok(())
 }

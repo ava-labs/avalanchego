@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Error, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
@@ -24,14 +24,7 @@ pub fn run(opts: &Options) -> Result<()> {
         .truncate(false)
         .wal(WALConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
-        Ok(db) => db,
-        Err(_) => return Err(anyhow!("db not available")),
-    };
-
-    let mut stdout = std::io::stdout();
-    if db.kv_dump(&mut stdout).is_err() {
-        return Err(anyhow!("database dump not successful"));
-    }
-    Ok(())
+    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
+    db.kv_dump(&mut std::io::stdout().lock())
+        .map_err(Error::msg)
 }

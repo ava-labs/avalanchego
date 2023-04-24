@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use clap::Args;
 use firewood::db::{DBConfig, WALConfig, DB};
 use log;
@@ -38,17 +38,11 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    let x = match db
+    let insertion_batch = db
         .new_writebatch()
         .kv_insert(opts.key.clone(), opts.value.bytes().collect())
-    {
-        Ok(insertion) => {
-            insertion.commit();
-            println!("{}", opts.key);
-
-            Ok(())
-        }
-        Err(_) => return Err(anyhow!("error inserting key/value pair into the database")),
-    };
-    x
+        .map_err(Error::msg)?;
+    insertion_batch.commit();
+    println!("{}", opts.key);
+    Ok(())
 }
