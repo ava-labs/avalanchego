@@ -184,9 +184,9 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
+	currentChainTime := chainState.GetTimestamp()
 	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
 		if startTime != state.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
@@ -196,11 +196,11 @@ func verifyAddSubnetValidatorTx(
 		}
 	} else {
 		// Ensure the proposed validator starts after the current timestamp
-		if !currentTimestamp.Before(startTime) {
+		if !currentChainTime.Before(startTime) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
+				currentChainTime,
 				startTime,
 			)
 		}
@@ -239,9 +239,16 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod ||
-			tx.EndTime().After(primaryNetworkValidator.EndTime) {
+	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
+		if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
+			return ErrValidatorSubset
+		}
+
+		// TODO ABENEGIA: we assume that the subnet validator may be accepted
+		// if its primary network counterpart will validate for at least another
+		// period. We may change this
+		candidateEndTime := currentChainTime.Add(tx.StakingPeriod())
+		if candidateEndTime.After(primaryNetworkValidator.EndTime) {
 			return ErrValidatorSubset
 		}
 	} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
@@ -275,7 +282,7 @@ func verifyAddSubnetValidatorTx(
 	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
 	// (start time is zero). I didn't bother guarding the check (which must be the
 	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+	maxStartTime := currentChainTime.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return ErrFutureStakeTime
 	}
@@ -495,9 +502,9 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
+	currentChainTime := chainState.GetTimestamp()
 	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
 		if startTime != state.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
@@ -507,11 +514,11 @@ func verifyAddPermissionlessValidatorTx(
 		}
 	} else {
 		// Ensure the proposed validator starts after the current time
-		if !currentTimestamp.Before(startTime) {
+		if !currentChainTime.Before(startTime) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
+				currentChainTime,
 				startTime,
 			)
 		}
@@ -584,9 +591,16 @@ func verifyAddPermissionlessValidatorTx(
 			)
 		}
 
-		if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod ||
-				tx.EndTime().After(primaryNetworkValidator.EndTime) {
+		if backend.Config.IsContinuousStakingActivated(currentChainTime) {
+			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
+				return ErrValidatorSubset
+			}
+
+			// TODO ABENEGIA: we assume that the subnet validator may be accepted
+			// if its primary network counterpart will validate for at least another
+			// period. We may change this
+			candidateEndTime := currentChainTime.Add(tx.StakingPeriod())
+			if candidateEndTime.After(primaryNetworkValidator.EndTime) {
 				return ErrValidatorSubset
 			}
 		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
@@ -624,7 +638,7 @@ func verifyAddPermissionlessValidatorTx(
 	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
 	// (start time is zero). I didn't bother guarding the check (which must be the
 	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+	maxStartTime := currentChainTime.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return ErrFutureStakeTime
 	}
