@@ -23,9 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -71,7 +70,8 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	)
 	require.NoError(err)
 	block := env.blkManager.NewBlock(apricotChildBlk)
-	require.Error(block.Verify(context.Background()))
+	err = block.Verify(context.Background())
+	require.ErrorIs(err, errIncorrectBlockHeight)
 
 	// valid height
 	apricotChildBlk, err = blocks.NewApricotStandardBlock(
@@ -123,7 +123,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
-	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
+	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
 	currentStakerIt := state.NewMockStakerIterator(ctrl)
@@ -187,7 +187,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errApricotBlockIssuedAfterFork)
 	}
 
 	{
@@ -201,7 +202,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errIncorrectBlockHeight)
 	}
 
 	{
@@ -215,21 +217,25 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errChildBlockEarlierThanParent)
 	}
 
 	{
 		// wrong timestamp, violated synchrony bound
-		childTimestamp := parentTime.Add(txexecutor.SyncBound).Add(time.Second)
+		initClkTime := env.clk.Time()
+		env.clk.Set(parentTime.Add(-executor.SyncBound))
 		banffChildBlk, err := blocks.NewBanffStandardBlock(
-			childTimestamp,
+			parentTime.Add(time.Second),
 			banffParentBlk.ID(),
 			banffParentBlk.Height()+1,
 			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, executor.ErrChildBlockBeyondSyncBound)
+		env.clk.Set(initClkTime)
 	}
 
 	{
@@ -243,7 +249,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.Error(block.Verify(context.Background()))
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, executor.ErrChildBlockAfterStakerChangeTime)
 	}
 
 	{

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -16,7 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-var _ blocks.Visitor = (*acceptor)(nil)
+var (
+	_ blocks.Visitor = (*acceptor)(nil)
+
+	errMissingBlockState = errors.New("missing state of block")
+)
 
 // acceptor handles the logic for accepting a block.
 // All errors returned by this struct are fatal and should result in the chain
@@ -144,7 +149,7 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
@@ -232,7 +237,7 @@ func (a *acceptor) optionBlock(b, parent blocks.Block) error {
 
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
 		return err
@@ -270,7 +275,7 @@ func (a *acceptor) standardBlock(b blocks.Block) error {
 
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
+		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
 
 	// Update the state to reflect the changes made in [onAcceptState].
