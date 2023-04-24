@@ -38,6 +38,7 @@ var (
 	errEncodeTransferables    = errors.New("can't encode transferables as string")
 	errWrongOwnerType         = errors.New("wrong owner type")
 	errSerializeOwners        = errors.New("can't serialize owners")
+	errWrongTxType            = errors.New("wrong transaction type")
 )
 
 // CaminoService defines the API calls that can be made to the platform chain
@@ -249,9 +250,9 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 		return err
 	}
 
-	change, err := s.getOutputOwner(&args.Change)
+	change, err := s.secpOwnerFromAPI(&args.Change)
 	if err != nil {
-		return err
+		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
 	targetAddr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
@@ -366,14 +367,14 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		return errNoKeys
 	}
 
-	to, err := s.getOutputOwner(&args.To)
+	to, err := s.secpOwnerFromAPI(&args.To)
 	if err != nil {
 		return err
 	}
 
-	change, err := s.getOutputOwner(&args.Change)
+	change, err := s.secpOwnerFromAPI(&args.Change)
 	if err != nil {
-		return err
+		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
 	ins, outs, signers, owners, err := s.vm.txBuilder.Lock(
@@ -444,9 +445,9 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 		return err
 	}
 
-	change, err := s.getOutputOwner(&args.Change)
+	change, err := s.secpOwnerFromAPI(&args.Change)
 	if err != nil {
-		return err
+		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
 	// Parse the consortium member address.
@@ -500,12 +501,12 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		return err
 	}
 
-	change, err := s.getOutputOwner(&args.Change)
+	change, err := s.secpOwnerFromAPI(&args.Change)
 	if err != nil {
-		return err
+		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
-	claimTo, err := s.getOutputOwner(&args.ClaimTo)
+	claimTo, err := s.secpOwnerFromAPI(&args.ClaimTo)
 	if err != nil {
 		return err
 	}
@@ -516,7 +517,7 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		case txs.ClaimTypeActiveDepositReward:
 			claimables[i].ID = args.Claimables[i].DepositTxID
 		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:
-			claimableOwner, err := s.getOutputOwner(&args.Claimables[i].ClaimableOwner)
+			claimableOwner, err := s.secpOwnerFromAPI(&args.Claimables[i].ClaimableOwner)
 			if err != nil {
 				return fmt.Errorf("failed to parse api owner to secp owner: %w", err)
 			}
@@ -569,12 +570,12 @@ func (s *CaminoService) Transfer(_ *http.Request, args *TransferArgs, reply *api
 		return err
 	}
 
-	change, err := s.getOutputOwner(&args.Change)
+	change, err := s.secpOwnerFromAPI(&args.Change)
 	if err != nil {
-		return err
+		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
-	transferTo, err := s.getOutputOwner(&args.TransferTo)
+	transferTo, err := s.secpOwnerFromAPI(&args.TransferTo)
 	if err != nil {
 		return err
 	}
@@ -630,61 +631,69 @@ func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSON
 	return nil
 }
 
+type APIClaimable struct {
+	ValidatorRewards      uint64 `json:"validatorRewards"`
+	ExpiredDepositRewards uint64 `json:"expiredDepositRewards"`
+}
+
 type GetClaimablesArgs struct {
-	platformapi.Owner
+	Owners []platformapi.Owner `json:"owners"`
 }
 
 type GetClaimablesReply struct {
-	ValidatorRewards      uint64 `json:"validatorRewards"`
-	ExpiredDepositRewards uint64 `json:"expiredDepositRewards"`
+	Claimables []APIClaimable `json:"claimables"`
 }
 
 // GetClaimables returns the amount of claimable tokens for given owner
 func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, response *GetClaimablesReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetClaimables called")
 
-	claimableOwner, err := s.getOutputOwner(&args.Owner)
-	if err != nil {
-		return err
-	}
+	response.Claimables = make([]APIClaimable, len(args.Owners))
+	for i := range args.Owners {
+		claimableOwner, err := s.secpOwnerFromAPI(&args.Owners[i])
+		if err != nil {
+			return err
+		}
 
-	ownerID, err := txs.GetOwnerID(claimableOwner)
-	if err != nil {
-		return err
-	}
+		ownerID, err := txs.GetOwnerID(claimableOwner)
+		if err != nil {
+			return err
+		}
 
-	claimable, err := s.vm.state.GetClaimable(ownerID)
-	if err == database.ErrNotFound {
-		claimable = &state.Claimable{}
-	} else if err != nil {
-		return err
-	}
+		claimable, err := s.vm.state.GetClaimable(ownerID)
+		if err == database.ErrNotFound {
+			claimable = &state.Claimable{}
+		} else if err != nil {
+			return err
+		}
 
-	response.ValidatorRewards = claimable.ValidatorReward
-	response.ExpiredDepositRewards = claimable.ExpiredDepositReward
+		response.Claimables[i].ValidatorRewards = claimable.ValidatorReward
+		response.Claimables[i].ExpiredDepositRewards = claimable.ExpiredDepositReward
+	}
 
 	return nil
 }
 
 type APIDeposit struct {
-	DepositTxID         ids.ID `json:"depositTxID"`
-	DepositOfferID      ids.ID `json:"depositOfferID"`
-	UnlockedAmount      uint64 `json:"unlockedAmount"`
-	ClaimedRewardAmount uint64 `json:"claimedRewardAmount"`
-	Start               uint64 `json:"start"`
-	Duration            uint32 `json:"duration"`
-	Amount              uint64 `json:"amount"`
+	DepositTxID         ids.ID            `json:"depositTxID"`
+	DepositOfferID      ids.ID            `json:"depositOfferID"`
+	UnlockedAmount      utilsjson.Uint64  `json:"unlockedAmount"`
+	ClaimedRewardAmount utilsjson.Uint64  `json:"claimedRewardAmount"`
+	Start               utilsjson.Uint64  `json:"start"`
+	Duration            uint32            `json:"duration"`
+	Amount              utilsjson.Uint64  `json:"amount"`
+	RewardOwner         platformapi.Owner `json:"rewardOwner"`
 }
 
 func APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) *APIDeposit {
 	return &APIDeposit{
 		DepositTxID:         depositTxID,
 		DepositOfferID:      deposit.DepositOfferID,
-		UnlockedAmount:      deposit.UnlockedAmount,
-		ClaimedRewardAmount: deposit.ClaimedRewardAmount,
-		Start:               deposit.Start,
+		UnlockedAmount:      utilsjson.Uint64(deposit.UnlockedAmount),
+		ClaimedRewardAmount: utilsjson.Uint64(deposit.ClaimedRewardAmount),
+		Start:               utilsjson.Uint64(deposit.Start),
 		Duration:            deposit.Duration,
-		Amount:              deposit.Amount,
+		Amount:              utilsjson.Uint64(deposit.Amount),
 	}
 }
 
@@ -713,14 +722,33 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 		if err != nil {
 			return err
 		}
+
+		signedDepositTx, _, err := s.vm.state.GetTx(args.DepositTxIDs[i])
+		if err != nil {
+			return err
+		}
+		depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
+		if !ok {
+			return errWrongTxType
+		}
+		rewardOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return errWrongOwnerType
+		}
+		apiRewardOwner, err := s.apiOwnerFromSECP(rewardOwner)
+		if err != nil {
+			return err
+		}
+
 		reply.AvailableRewards[i] = deposit.ClaimableReward(offer, reply.Timestamp)
 		reply.Deposits[i] = APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
+		reply.Deposits[i].RewardOwner = *apiRewardOwner
 	}
 	return nil
 }
 
 // GetHeight returns the height of the last accepted block
-func (s *Service) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
+func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetLastAcceptedBlock called")
 
 	ctx := r.Context()
@@ -831,23 +859,40 @@ func (s *Service) getFakeKeys(from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP
 	return keys, nil
 }
 
-func (s *Service) getOutputOwner(args *platformapi.Owner) (*secp256k1fx.OutputOwners, error) {
-	if len(args.Addresses) > 0 {
-		ret := &secp256k1fx.OutputOwners{
-			Locktime:  uint64(args.Locktime),
-			Threshold: uint32(args.Threshold),
+func (s *CaminoService) secpOwnerFromAPI(apiOwner *platformapi.Owner) (*secp256k1fx.OutputOwners, error) {
+	if len(apiOwner.Addresses) > 0 {
+		secpOwner := &secp256k1fx.OutputOwners{
+			Locktime:  uint64(apiOwner.Locktime),
+			Threshold: uint32(apiOwner.Threshold),
+			Addrs:     make([]ids.ShortID, len(apiOwner.Addresses)),
 		}
-		for _, addr := range args.Addresses {
-			if addrBytes, err := avax.ParseServiceAddress(s.addrManager, addr); err != nil {
-				return nil, fmt.Errorf(errInvalidChangeAddr, err)
-			} else {
-				ret.Addrs = append(ret.Addrs, addrBytes)
+		for i := range apiOwner.Addresses {
+			addr, err := avax.ParseServiceAddress(s.addrManager, apiOwner.Addresses[i])
+			if err != nil {
+				return nil, err
 			}
+			secpOwner.Addrs[i] = addr
 		}
-		ret.Sort()
-		return ret, nil
+		secpOwner.Sort()
+		return secpOwner, nil
 	}
 	return nil, nil
+}
+
+func (s *CaminoService) apiOwnerFromSECP(secpOwner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {
+	apiOwner := &platformapi.Owner{
+		Locktime:  utilsjson.Uint64(secpOwner.Locktime),
+		Threshold: utilsjson.Uint32(secpOwner.Threshold),
+		Addresses: make([]string, len(secpOwner.Addrs)),
+	}
+	for i := range secpOwner.Addrs {
+		addr, err := s.addrManager.FormatLocalAddress(secpOwner.Addrs[i])
+		if err != nil {
+			return nil, err
+		}
+		apiOwner.Addresses[i] = addr
+	}
+	return apiOwner, nil
 }
 
 type GetAllDepositOffersArgs struct {
