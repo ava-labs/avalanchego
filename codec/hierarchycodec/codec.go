@@ -89,7 +89,7 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 
 	valType := reflect.TypeOf(val)
 	if _, exists := c.typeToTypeID[valType]; exists {
-		return fmt.Errorf("type %v has already been registered", valType)
+		return fmt.Errorf("%w: %v", codec.ErrDuplicateType, valType)
 	}
 
 	valTypeID := typeID{
@@ -142,7 +142,11 @@ func (c *hierarchyCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type
 	}
 	// Ensure type actually does implement the interface
 	if !implementingType.Implements(valueType) {
-		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %s does not implement interface %s", implementingType, valueType)
+		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %s %w %s",
+			implementingType,
+			codec.ErrDoesNotImplementInterface,
+			valueType,
+		)
 	}
 	return reflect.New(implementingType).Elem(), nil // instance of the proper type
 }

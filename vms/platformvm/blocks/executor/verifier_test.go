@@ -496,7 +496,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Verify the block.
 	err = blk.Visit(verifier)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
