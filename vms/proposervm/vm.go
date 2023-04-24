@@ -226,7 +226,7 @@ func (vm *VM) Initialize(
 func (vm *VM) Shutdown(ctx context.Context) error {
 	vm.onShutdown()
 
-	if err := vm.db.Commit(); err != nil {
+	if err := vm.db.Commit(ctx); err != nil {
 		return err
 	}
 	return vm.ChainVM.Shutdown(ctx)
@@ -456,10 +456,10 @@ func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 			if err := vm.State.DeleteLastAccepted(); err != nil {
 				return err
 			}
-			if err := vm.State.DeleteCheckpoint(); err != nil {
+			if err := vm.State.DeleteCheckpoint(ctx); err != nil {
 				return err
 			}
-			return vm.db.Commit()
+			return vm.db.Commit(ctx)
 		}
 		if err != nil {
 			return err
@@ -470,12 +470,12 @@ func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 		// If the inner block is accepted, then we don't need to revert any more
 		// blocks.
 		if shouldBeAccepted.Status() == choices.Accepted {
-			return vm.db.Commit()
+			return vm.db.Commit(ctx)
 		}
 
 		// Mark the last accepted block as processing - rather than accepted.
 		lastAccepted.setStatus(choices.Processing)
-		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+		if err := vm.State.PutBlock(ctx, lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
 			return err
 		}
 
@@ -548,7 +548,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return err
 		}
-		return vm.db.Commit()
+		return vm.db.Commit(ctx)
 	}
 
 	newProLastAcceptedID, err := vm.State.GetBlockIDAtHeight(innerLastAcceptedHeight)
@@ -559,7 +559,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
 		return err
 	}
-	return vm.db.Commit()
+	return vm.db.Commit(ctx)
 }
 
 func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
@@ -662,7 +662,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		return block, nil
 	}
 
-	statelessBlock, status, err := vm.State.GetBlock(blkID)
+	statelessBlock, status, err := vm.State.GetBlock(ctx, blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -701,8 +701,8 @@ func (vm *VM) getPreForkBlock(ctx context.Context, blkID ids.ID) (*preForkBlock,
 	}, err
 }
 
-func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
-	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
+func (vm *VM) storePostForkBlock(ctx context.Context, blk PostForkBlock) error {
+	if err := vm.State.PutBlock(ctx, blk.getStatelessBlk(), blk.Status()); err != nil {
 		return err
 	}
 	height := blk.Height()
@@ -710,7 +710,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
 		return err
 	}
-	return vm.db.Commit()
+	return vm.db.Commit(ctx)
 }
 
 func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Context, postFork PostForkBlock) error {

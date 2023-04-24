@@ -8,6 +8,7 @@
 package state
 
 import (
+	"context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -40,31 +41,31 @@ func (m *MockState) EXPECT() *MockStateMockRecorder {
 }
 
 // Commit mocks base method.
-func (m *MockState) Commit() error {
+func (m *MockState) Commit(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit")
+	ret := m.ctrl.Call(m, "Commit", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Commit indicates an expected call of Commit.
-func (mr *MockStateMockRecorder) Commit() *gomock.Call {
+func (mr *MockStateMockRecorder) Commit(arg0 interface{} ) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit), arg0)
 }
 
 // DeleteCheckpoint mocks base method.
-func (m *MockState) DeleteCheckpoint() error {
+func (m *MockState) DeleteCheckpoint(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCheckpoint")
+	ret := m.ctrl.Call(m, "DeleteCheckpoint", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteCheckpoint indicates an expected call of DeleteCheckpoint.
-func (mr *MockStateMockRecorder) DeleteCheckpoint() *gomock.Call {
+func (mr *MockStateMockRecorder) DeleteCheckpoint(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCheckpoint", reflect.TypeOf((*MockState)(nil).DeleteCheckpoint))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCheckpoint", reflect.TypeOf((*MockState)(nil).DeleteCheckpoint), arg0)
 }
 
 // DeleteLastAccepted mocks base method.
@@ -82,9 +83,9 @@ func (mr *MockStateMockRecorder) DeleteLastAccepted() *gomock.Call {
 }
 
 // GetBlock mocks base method.
-func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, choices.Status, error) {
+func (m *MockState) GetBlock(arg0 context.Context, arg1 ids.ID) (block.Block, choices.Status, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", arg0)
+	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
 	ret0, _ := ret[0].(block.Block)
 	ret1, _ := ret[1].(choices.Status)
 	ret2, _ := ret[2].(error)
@@ -92,9 +93,9 @@ func (m *MockState) GetBlock(arg0 ids.ID) (block.Block, choices.Status, error) {
 }
 
 // GetBlock indicates an expected call of GetBlock.
-func (mr *MockStateMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockState)(nil).GetBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockState)(nil).GetBlock), arg0, arg1)
 }
 
 // GetBlockIDAtHeight mocks base method.
@@ -158,17 +159,17 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 }
 
 // PutBlock mocks base method.
-func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
+func (m *MockState) PutBlock(arg0 context.Context, arg1 block.Block, arg2 choices.Status) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutBlock", arg0, arg1)
+	ret := m.ctrl.Call(m, "PutBlock", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PutBlock indicates an expected call of PutBlock.
-func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) PutBlock(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1, arg2)
 }
 
 // SetBlockIDAtHeight mocks base method.

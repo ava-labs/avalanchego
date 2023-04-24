@@ -23,13 +23,13 @@ type preForkBlock struct {
 }
 
 func (b *preForkBlock) Accept(ctx context.Context) error {
-	if err := b.acceptOuterBlk(); err != nil {
+	if err := b.acceptOuterBlk(ctx); err != nil {
 		return err
 	}
 	return b.acceptInnerBlk(ctx)
 }
 
-func (*preForkBlock) acceptOuterBlk() error {
+func (*preForkBlock) acceptOuterBlk(context.Context) error {
 	return nil
 }
 

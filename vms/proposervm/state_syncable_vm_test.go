@@ -204,7 +204,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
@@ -286,7 +286,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
@@ -371,7 +371,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -441,7 +441,7 @@ func TestParseStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -501,7 +501,7 @@ func TestStateSummaryAccept(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -575,7 +575,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.storePostForkBlock(context.Background(), proBlk))
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)

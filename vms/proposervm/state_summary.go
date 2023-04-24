@@ -55,7 +55,7 @@ func (s *stateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 	// We store the full proposerVM block associated with the summary
 	// and update height index with it, so that state sync could resume
 	// after a shutdown.
-	if err := s.block.acceptOuterBlk(); err != nil {
+	if err := s.block.acceptOuterBlk(ctx); err != nil {
 		return block.StateSyncSkipped, err
 	}
 

@@ -2400,7 +2400,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Parse a block.
 	// Not in the VM's state so need to parse it.
-	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
+	state.EXPECT().GetBlock(context.Background(), blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowman.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)

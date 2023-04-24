@@ -30,13 +30,13 @@ func (b *postForkOption) Timestamp() time.Time {
 }
 
 func (b *postForkOption) Accept(ctx context.Context) error {
-	if err := b.acceptOuterBlk(); err != nil {
+	if err := b.acceptOuterBlk(ctx); err != nil {
 		return err
 	}
 	return b.acceptInnerBlk(ctx)
 }
 
-func (b *postForkOption) acceptOuterBlk() error {
+func (b *postForkOption) acceptOuterBlk(ctx context.Context) error {
 	// Update in-memory references
 	b.status = choices.Accepted
 	b.vm.lastAcceptedHeight = b.Height()
@@ -48,7 +48,7 @@ func (b *postForkOption) acceptOuterBlk() error {
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	return b.vm.storePostForkBlock(b)
+	return b.vm.storePostForkBlock(ctx, b)
 }
 
 func (b *postForkOption) acceptInnerBlk(ctx context.Context) error {

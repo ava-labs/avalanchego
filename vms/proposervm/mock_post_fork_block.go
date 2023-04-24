@@ -183,17 +183,17 @@ func (mr *MockPostForkBlockMockRecorder) acceptInnerBlk(arg0 interface{}) *gomoc
 }
 
 // acceptOuterBlk mocks base method.
-func (m *MockPostForkBlock) acceptOuterBlk() error {
+func (m *MockPostForkBlock) acceptOuterBlk(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "acceptOuterBlk")
+	ret := m.ctrl.Call(m, "acceptOuterBlk", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // acceptOuterBlk indicates an expected call of acceptOuterBlk.
-func (mr *MockPostForkBlockMockRecorder) acceptOuterBlk() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) acceptOuterBlk(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "acceptOuterBlk", reflect.TypeOf((*MockPostForkBlock)(nil).acceptOuterBlk))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "acceptOuterBlk", reflect.TypeOf((*MockPostForkBlock)(nil).acceptOuterBlk), arg0)
 }
 
 // buildChild mocks base method.

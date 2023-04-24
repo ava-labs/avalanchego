@@ -24,13 +24,13 @@ type postForkBlock struct {
 // 2) Persists this block in storage
 // 3) Calls Reject() on siblings of this block and their descendants.
 func (b *postForkBlock) Accept(ctx context.Context) error {
-	if err := b.acceptOuterBlk(); err != nil {
+	if err := b.acceptOuterBlk(ctx); err != nil {
 		return err
 	}
 	return b.acceptInnerBlk(ctx)
 }
 
-func (b *postForkBlock) acceptOuterBlk() error {
+func (b *postForkBlock) acceptOuterBlk(ctx context.Context) error {
 	// Update in-memory references
 	b.status = choices.Accepted
 	b.vm.lastAcceptedTime = b.Timestamp()
@@ -43,7 +43,7 @@ func (b *postForkBlock) acceptOuterBlk() error {
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	return b.vm.storePostForkBlock(b)
+	return b.vm.storePostForkBlock(ctx, b)
 }
 
 func (b *postForkBlock) acceptInnerBlk(ctx context.Context) error {

@@ -48,7 +48,7 @@ type Block interface {
 	// without propagating any changes to the innerVM.
 	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance of outer
 	// and inner blocks.
-	acceptOuterBlk() error
+	acceptOuterBlk(context.Context) error
 	acceptInnerBlk(context.Context) error
 
 	verifyPreForkChild(ctx context.Context, child *preForkBlock) error
