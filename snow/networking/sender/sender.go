@@ -1143,7 +1143,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes, accepted []ids.ID) {
+func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// If [nodeID] is myself, send this message directly
@@ -1152,8 +1152,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		inMsg := message.InboundChits(
 			s.ctx.ChainID,
 			requestID,
-			votes,
-			accepted,
+			preferredID,
+			acceptedID,
 			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -1161,13 +1161,14 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes, accepted)
+	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, acceptedID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.ChitsOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", votes),
+			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("acceptedID", acceptedID),
 			zap.Error(err),
 		)
 		return
@@ -1188,7 +1189,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", votes),
+			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("acceptedID", acceptedID),
 		)
 	}
 }

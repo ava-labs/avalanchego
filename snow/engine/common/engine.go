@@ -390,8 +390,8 @@ type ChitsHandler interface {
 		ctx context.Context,
 		validatorID ids.NodeID,
 		requestID uint32,
-		preferredContainerIDs []ids.ID,
-		acceptedContainerIDs []ids.ID,
+		preferredID ids.ID,
+		acceptedID ids.ID,
 	) error
 
 	// Notify this engine that a query it issued has failed.
