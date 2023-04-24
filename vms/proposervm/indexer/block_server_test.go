@@ -40,7 +40,7 @@ func (tsb *TestBlockServer) GetFullPostForkBlock(ctx context.Context, blkID ids.
 	return nil, errGetWrappingBlk
 }
 
-func (tsb *TestBlockServer) Commit() error {
+func (tsb *TestBlockServer) Commit(context.Context) error {
 	if tsb.CommitF != nil {
 		return tsb.CommitF()
 	}

@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -26,8 +27,8 @@ var (
 )
 
 type BlockState interface {
-	GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
-	PutBlock(blk block.Block, status choices.Status) error
+	GetBlock(ctx context.Context, blkID ids.ID) (block.Block, choices.Status, error)
+	PutBlock(ctx context.Context, blk block.Block, status choices.Status) error
 }
 
 type blockState struct {
@@ -65,7 +66,7 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	}, err
 }
 
-func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error) {
+func (s *blockState) GetBlock(ctx context.Context, blkID ids.ID) (block.Block, choices.Status, error) {
 	if blk, found := s.blkCache.Get(blkID); found {
 		if blk == nil {
 			return nil, choices.Unknown, database.ErrNotFound
@@ -73,7 +74,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 		return blk.block, blk.Status, nil
 	}
 
-	blkWrapperBytes, err := s.db.Get(blkID[:])
+	blkWrapperBytes, err := s.db.Get(ctx, blkID[:])
 	if err == database.ErrNotFound {
 		s.blkCache.Put(blkID, nil)
 		return nil, choices.Unknown, database.ErrNotFound
@@ -102,7 +103,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	return blk, blkWrapper.Status, nil
 }
 
-func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
+func (s *blockState) PutBlock(ctx context.Context, blk block.Block, status choices.Status) error {
 	blkWrapper := blockWrapper{
 		Block:  blk.Bytes(),
 		Status: status,
@@ -116,5 +117,5 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 
 	blkID := blk.ID()
 	s.blkCache.Put(blkID, &blkWrapper)
-	return s.db.Put(blkID[:], bytes)
+	return s.db.Put(ctx, blkID[:], bytes)
 }

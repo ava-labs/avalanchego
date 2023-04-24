@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -38,19 +39,19 @@ func (s *chainState) SetLastAccepted(blkID ids.ID) error {
 		return nil
 	}
 	s.lastAccepted = blkID
-	return s.db.Put(lastAcceptedKey, blkID[:])
+	return s.db.Put(context.TODO(), lastAcceptedKey, blkID[:])
 }
 
 func (s *chainState) DeleteLastAccepted() error {
 	s.lastAccepted = ids.Empty
-	return s.db.Delete(lastAcceptedKey)
+	return s.db.Delete(context.TODO(), lastAcceptedKey)
 }
 
 func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	if s.lastAccepted != ids.Empty {
 		return s.lastAccepted, nil
 	}
-	lastAcceptedBytes, err := s.db.Get(lastAcceptedKey)
+	lastAcceptedBytes, err := s.db.Get(context.TODO(), lastAcceptedKey)
 	if err != nil {
 		return ids.ID{}, err
 	}

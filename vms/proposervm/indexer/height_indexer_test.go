@@ -49,7 +49,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(context.Background(), postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -129,7 +129,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(context.Background(), postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -213,7 +213,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(storedState.PutBlock(context.Background(), postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{

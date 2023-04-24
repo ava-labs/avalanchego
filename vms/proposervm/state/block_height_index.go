@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -44,7 +45,7 @@ type HeightIndexBatchSupport interface {
 
 	GetCheckpoint() (ids.ID, error)
 	SetCheckpoint(blkID ids.ID) error
-	DeleteCheckpoint() error
+	DeleteCheckpoint(ctx context.Context) error
 }
 
 // HeightIndex contains mapping of blockHeights to accepted proposer block IDs
@@ -111,6 +112,6 @@ func (hi *heightIndex) SetCheckpoint(blkID ids.ID) error {
 	return database.PutID(hi.metadataDB, checkpointKey, blkID)
 }
 
-func (hi *heightIndex) DeleteCheckpoint() error {
-	return hi.metadataDB.Delete(checkpointKey)
+func (hi *heightIndex) DeleteCheckpoint(ctx context.Context) error {
+	return hi.metadataDB.Delete(ctx, checkpointKey)
 }

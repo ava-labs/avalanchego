@@ -104,7 +104,7 @@ func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 	if err := hi.doRepair(ctx, startBlkID, startHeight); err != nil {
 		return fmt.Errorf("could not repair height index: %w", err)
 	}
-	if err := hi.flush(); err != nil {
+	if err := hi.flush(ctx); err != nil {
 		return fmt.Errorf("could not write final height index update: %w", err)
 	}
 	return nil
@@ -126,7 +126,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, l
 		}
 
 		processingStart := time.Now()
-		currentAcceptedBlk, _, err := hi.state.GetBlock(currentProBlkID)
+		currentAcceptedBlk, _, err := hi.state.GetBlock(ctx, currentProBlkID)
 		if err == database.ErrNotFound {
 			// We have visited all the proposerVM blocks. Because we previously
 			// verified that we needed to perform a repair, we know that this
@@ -136,7 +136,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, l
 			if err := hi.state.SetForkHeight(forkHeight); err != nil {
 				return err
 			}
-			if err := hi.state.DeleteCheckpoint(); err != nil {
+			if err := hi.state.DeleteCheckpoint(ctx); err != nil {
 				return err
 			}
 			hi.MarkRepaired(true)
@@ -161,7 +161,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, l
 				return err
 			}
 
-			if err := hi.flush(); err != nil {
+			if err := hi.flush(ctx); err != nil {
 				return err
 			}
 
@@ -199,9 +199,9 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, l
 }
 
 // flush writes the commits to the underlying DB
-func (hi *heightIndexer) flush() error {
-	if err := hi.state.Commit(); err != nil {
+func (hi *heightIndexer) flush(ctx context.Context) error {
+	if err := hi.state.Commit(ctx); err != nil {
 		return err
 	}
-	return hi.server.Commit()
+	return hi.server.Commit(ctx)
 }
