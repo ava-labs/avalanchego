@@ -19,15 +19,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
-		configs    map[string]string
-		upgrades   map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		configs  map[string]string
+		upgrades map[string]string
+		expected map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
 			configs:  map[string]string{},
@@ -85,14 +85,7 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Parse config
 			require.Equal(root, v.GetString(ChainConfigDirKey))
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				if err != nil {
-					require.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				require.NoError(err)
-			}
+			require.NoError(err)
 			require.Equal(test.expected, chainConfigs)
 		})
 	}
@@ -100,32 +93,34 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 
 func TestGetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
-		structure  string
-		file       map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		structure   string
+		file        map[string]string
+		expectedErr error
+		expected    map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
-			structure:  "/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"cdir is file ": {
-			structure:  "/",
-			file:       map[string]string{"cdir": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"cdir": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"chain subdir not exist": {
-			structure: "/cdir/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+			structure:   "/cdir/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{},
 		},
 		"full structure": {
-			structure: "/cdir/C/",
-			file:      map[string]string{"config.ex": "hello"},
-			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			structure:   "/cdir/C/",
+			file:        map[string]string{"config.ex": "hello"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
@@ -150,14 +145,8 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
-			switch {
-			case len(test.errMessage) > 0:
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			default:
-				require.NoError(err)
-				require.Equal(test.expected, chainConfigs)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, chainConfigs)
 		})
 	}
 }
@@ -183,7 +172,6 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 func TestGetChainConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
 		fullConfigs map[string]chains.ChainConfig
-		errMessage  string
 		expected    map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
@@ -244,14 +232,7 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 			// Parse config
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				if err != nil {
-					require.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				require.NoError(err)
-			}
+			require.NoError(err)
 			require.Equal(test.expected, chainConfigs)
 		})
 	}
@@ -259,14 +240,14 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 func TestGetVMAliasesFromFile(t *testing.T) {
 	tests := map[string]struct {
-		givenJSON  string
-		expected   map[ids.ID][]string
-		errMessage string
+		givenJSON   string
+		expected    map[ids.ID][]string
+		expectedErr error
 	}{
 		"wrong vm id": {
-			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
-			expected:   nil,
-			errMessage: "problem unmarshaling vm aliases",
+			givenJSON:   `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:    nil,
+			expectedErr: errUnmarshalling,
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -279,7 +260,7 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 				m[id2] = []string{"vm3", "vm4"}
 				return m
 			}(),
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
@@ -293,27 +274,22 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 			setupFile(t, root, "aliases.json", test.givenJSON)
 			v := setupViper(configFilePath)
 			vmAliases, err := getVMAliases(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			} else {
-				require.NoError(err)
-				require.Equal(test.expected, vmAliases)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, vmAliases)
 		})
 	}
 }
 
 func TestGetVMAliasesFromFlag(t *testing.T) {
 	tests := map[string]struct {
-		givenJSON  string
-		expected   map[ids.ID][]string
-		errMessage string
+		givenJSON   string
+		expected    map[ids.ID][]string
+		expectedErr error
 	}{
 		"wrong vm id": {
-			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
-			expected:   nil,
-			errMessage: "problem unmarshaling vm aliases",
+			givenJSON:   `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:    nil,
+			expectedErr: errUnmarshalling,
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -326,7 +302,7 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 				m[id2] = []string{"vm3", "vm4"}
 				return m
 			}(),
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
@@ -340,13 +316,8 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 			v.Set(VMAliasesContentKey, encodedFileContent)
 
 			vmAliases, err := getVMAliases(v)
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			} else {
-				require.NoError(err)
-				require.Equal(test.expected, vmAliases)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, vmAliases)
 		})
 	}
 }
@@ -380,9 +351,8 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 	configFilePath := setupConfigJSON(t, root, configJSON)
 	v := setupViper(configFilePath)
 	vmAliases, err := getVMAliases(v)
+	require.ErrorIs(err, errFileDoesNotExist)
 	require.Nil(vmAliases)
-	require.Error(err)
-	require.Contains(err.Error(), "vm aliases file does not exist")
 
 	// do not set it explicitly
 	configJSON = "{}"
@@ -394,11 +364,14 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 }
 
 func TestGetSubnetConfigsFromFile(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
 	tests := map[string]struct {
-		givenJSON  string
-		testF      func(*require.Assertions, map[ids.ID]subnets.Config)
-		errMessage string
-		fileName   string
+		fileName    string
+		givenJSON   string
+		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
+		expectedErr error
 	}{
 		"wrong config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
@@ -406,7 +379,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
-			errMessage: "invalid character",
+			expectedErr: errUnmarshalling,
 		},
 		"subnet is not tracked": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
@@ -414,6 +387,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"wrong extension": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
@@ -421,6 +395,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
@@ -428,7 +403,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
-			errMessage: "fails the condition that: alpha <= k",
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
@@ -444,7 +419,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 		"gossip config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
@@ -458,27 +433,26 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.K)
 				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
+
 			root := t.TempDir()
 			subnetPath := filepath.Join(root, "subnets")
+
 			configJSON := fmt.Sprintf(`{%q: %q}`, SubnetConfigDirKey, subnetPath)
 			configFilePath := setupConfigJSON(t, root, configJSON)
-			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-			require.NoError(err)
+
 			setupFile(t, subnetPath, test.fileName, test.givenJSON)
+
 			v := setupViper(configFilePath)
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			} else {
-				require.NoError(err)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr == nil {
 				test.testF(require, subnetConfigs)
 			}
 		})
@@ -486,17 +460,20 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 }
 
 func TestGetSubnetConfigsFromFlags(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
 	tests := map[string]struct {
-		givenJSON  string
-		testF      func(*require.Assertions, map[ids.ID]subnets.Config)
-		errMessage string
+		givenJSON   string
+		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
+		expectedErr error
 	}{
 		"no configs": {
 			givenJSON: `{}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
@@ -508,12 +485,14 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				// should respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
 			},
+			expectedErr: nil,
 		},
 		"subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"invalid consensus parameters": {
 			givenJSON: `{
@@ -527,7 +506,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
-			errMessage: "fails the condition that: alpha <= k",
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 		"correct config": {
 			givenJSON: `{
@@ -552,15 +531,14 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
-			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-			require.NoError(err)
+
 			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
 
 			// build viper config
@@ -568,11 +546,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			v.Set(SubnetConfigContentKey, encodedFileContent)
 
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
-			if len(test.errMessage) > 0 {
-				require.Error(err)
-				require.Contains(err.Error(), test.errMessage)
-			} else {
-				require.NoError(err)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr == nil {
 				test.testF(require, subnetConfigs)
 			}
 		})

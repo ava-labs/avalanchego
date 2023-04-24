@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func Test_Server_GetRangeProof(t *testing.T) {
@@ -27,7 +29,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		request                  *RangeProofRequest
+		request                  *syncpb.RangeProofRequest
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
@@ -35,8 +37,8 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		proofNil                 bool
 	}{
 		"proof too large": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 1000,
 			},
@@ -44,24 +46,24 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			expectedErr: ErrMinProofSizeIsTooLarge,
 		},
 		"byteslimit is 0": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
 			proofNil: true,
 		},
 		"keylimit is 0": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
 			proofNil: true,
 		},
 		"keys out of order": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 				Start:      []byte{1},
@@ -70,16 +72,16 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			proofNil: true,
 		},
 		"key limit too large": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   2 * defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
 		"bytes limit too large": {
-			request: &RangeProofRequest{
-				Root:       smallTrieRoot,
+			request: &syncpb.RangeProofRequest{
+				Root:       smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
@@ -127,7 +129,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				require.LessOrEqual(len(proofResult.KeyValues), test.expectedResponseLen)
 			}
 
-			bytes, err := merkledb.Codec.EncodeRangeProof(Version, proofResult)
+			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proofResult)
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
@@ -180,7 +182,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		request                  *ChangeProofRequest
+		request                  *syncpb.ChangeProofRequest
 		expectedErr              error
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
@@ -188,49 +190,49 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		proofNil                 bool
 	}{
 		"byteslimit is 0": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   0,
+			request: &syncpb.ChangeProofRequest{
+				StartRoot:  startRoot[:],
+				EndRoot:    endRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: 0,
 			},
 			proofNil: true,
 		},
 		"keylimit is 0": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   0,
+			request: &syncpb.ChangeProofRequest{
+				StartRoot:  startRoot[:],
+				EndRoot:    endRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: 0,
 			},
 			proofNil: true,
 		},
 		"keys out of order": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   defaultRequestByteSizeLimit,
-				Start:        []byte{1},
-				End:          []byte{0},
+			request: &syncpb.ChangeProofRequest{
+				StartRoot:  startRoot[:],
+				EndRoot:    endRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+				Start:      []byte{1},
+				End:        []byte{0},
 			},
 			proofNil: true,
 		},
 		"key limit too large": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     2 * defaultRequestKeyLimit,
-				BytesLimit:   defaultRequestByteSizeLimit,
+			request: &syncpb.ChangeProofRequest{
+				StartRoot:  startRoot[:],
+				EndRoot:    endRoot[:],
+				KeyLimit:   2 * defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
 		"bytes limit too large": {
-			request: &ChangeProofRequest{
-				StartingRoot: startRoot,
-				EndingRoot:   endRoot,
-				KeyLimit:     defaultRequestKeyLimit,
-				BytesLimit:   2 * defaultRequestByteSizeLimit,
+			request: &syncpb.ChangeProofRequest{
+				StartRoot:  startRoot[:],
+				EndRoot:    endRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
@@ -276,7 +278,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				require.LessOrEqual(len(proofResult.KeyValues)+len(proofResult.DeletedKeys), test.expectedResponseLen)
 			}
 
-			bytes, err := merkledb.Codec.EncodeChangeProof(Version, proofResult)
+			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proofResult)
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
