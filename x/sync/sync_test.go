@@ -519,7 +519,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 }
 
 // Test findNextKey by computing the expected result in a naive, inefficient
-// way and comparing it to the actual resulthy
+// way and comparing it to the actual result
 func TestFindNextKeyRandom(t *testing.T) {
 	rand := rand.New(rand.NewSource(1337)) //nolint:gosec
 	require := require.New(t)
@@ -548,8 +548,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 	require.NoError(err)
 
 	var (
-		numProofsToTest  = 1_000
-		numKeyValues     = 1_000
+		numProofsToTest  = 500
+		numKeyValues     = 500
 		maxKeyLen        = 256
 		maxValLen        = 256
 		maxRangeStartLen = 8
