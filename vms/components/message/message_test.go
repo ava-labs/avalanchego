@@ -37,5 +37,6 @@ func TestBuildParseProto(t *testing.T) {
 
 	// Parse invalid message
 	_, err = Parse([]byte{1, 3, 3, 7})
-	require.Error(err)
+	// Can't parse as proto so it falls back to using avalanchego's codec
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }
