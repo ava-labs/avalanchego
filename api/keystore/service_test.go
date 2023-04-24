@@ -5,6 +5,7 @@ package keystore
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -205,7 +206,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := db.Put([]byte("hello"), []byte("world")); err != nil {
+		if err := db.Put(context.Background(), []byte("hello"), []byte("world")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -215,7 +216,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if val, err := db.Get([]byte("hello")); err != nil {
+		if val, err := db.Get(context.Background(), []byte("hello")); err != nil {
 			t.Fatal(err)
 		} else if !bytes.Equal(val, []byte("world")) {
 			t.Fatalf("Should have read '%s' from the db", "world")
@@ -247,7 +248,7 @@ func TestServiceExportImport(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := db.Put([]byte("hello"), []byte("world")); err != nil {
+			if err := db.Put(context.Background(), []byte("hello"), []byte("world")); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -315,7 +316,7 @@ func TestServiceExportImport(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if val, err := db.Get([]byte("hello")); err != nil {
+			if val, err := db.Get(context.Background(), []byte("hello")); err != nil {
 				t.Fatal(err)
 			} else if !bytes.Equal(val, []byte("world")) {
 				t.Fatalf("Should have read '%s' from the db", "world")
@@ -369,7 +370,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				return err
 			}
 
-			return db.Put([]byte("hello"), []byte("world"))
+			return db.Put(context.Background(), []byte("hello"), []byte("world"))
 		},
 		request: &api.UserPass{Username: testUser, Password: password},
 		want:    &api.EmptyReply{},

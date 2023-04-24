@@ -138,17 +138,17 @@ type bootstrapper struct {
 	awaitingTimeout bool
 }
 
-func (b *bootstrapper) Clear() error {
-	if err := b.VtxBlocked.Clear(); err != nil {
+func (b *bootstrapper) Clear(ctx context.Context) error {
+	if err := b.VtxBlocked.Clear(ctx); err != nil {
 		return err
 	}
-	if err := b.TxBlocked.Clear(); err != nil {
+	if err := b.TxBlocked.Clear(ctx); err != nil {
 		return err
 	}
-	if err := b.VtxBlocked.Commit(); err != nil {
+	if err := b.VtxBlocked.Commit(ctx); err != nil {
 		return err
 	}
-	return b.TxBlocked.Commit()
+	return b.TxBlocked.Commit(ctx)
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in
@@ -529,10 +529,10 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 		}
 	}
 
-	if err := b.TxBlocked.Commit(); err != nil {
+	if err := b.TxBlocked.Commit(ctx); err != nil {
 		return err
 	}
-	if err := b.VtxBlocked.Commit(); err != nil {
+	if err := b.VtxBlocked.Commit(ctx); err != nil {
 		return err
 	}
 

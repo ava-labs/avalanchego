@@ -69,7 +69,7 @@ func (s *Server) Indexed(
 }
 
 func (s *Server) Apply(
-	_ context.Context,
+	ctx context.Context,
 	req *sharedmemorypb.ApplyRequest,
 ) (*sharedmemorypb.ApplyResponse, error) {
 	requests := make(map[ids.ID]*atomic.Requests, len(req.Requests))
@@ -97,12 +97,12 @@ func (s *Server) Apply(
 	for i, reqBatch := range req.Batches {
 		batch := s.db.NewBatch()
 		for _, putReq := range reqBatch.Puts {
-			if err := batch.Put(putReq.Key, putReq.Value); err != nil {
+			if err := batch.Put(ctx, putReq.Key, putReq.Value); err != nil {
 				return nil, err
 			}
 		}
 		for _, deleteReq := range reqBatch.Deletes {
-			if err := batch.Delete(deleteReq.Key); err != nil {
+			if err := batch.Delete(ctx, deleteReq.Key); err != nil {
 				return nil, err
 			}
 		}

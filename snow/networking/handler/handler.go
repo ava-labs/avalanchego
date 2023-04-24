@@ -198,7 +198,7 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 	}
 
 	// drop bootstrap state from previous runs before starting state sync
-	return engines.StateSyncer, engines.Bootstrapper.Clear()
+	return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
 }
 
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {

@@ -22,9 +22,9 @@ func (vm *VM) GetFullPostForkBlock(ctx context.Context, blkID ids.ID) (snowman.B
 	return vm.getPostForkBlock(ctx, blkID)
 }
 
-func (vm *VM) Commit() error {
+func (vm *VM) Commit(ctx context.Context) error {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	return vm.db.Commit()
+	return vm.db.Commit(ctx)
 }

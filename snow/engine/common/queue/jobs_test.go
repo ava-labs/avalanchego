@@ -92,7 +92,7 @@ func TestPushAndExecute(t *testing.T) {
 
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
-	has, err := jobs.Has(jobID)
+	has, err := jobs.Has(context.Background(), jobID)
 	require.NoError(err)
 	require.False(has)
 
@@ -100,11 +100,11 @@ func TestPushAndExecute(t *testing.T) {
 	require.True(pushed)
 	require.NoError(err)
 
-	has, err = jobs.Has(jobID)
+	has, err = jobs.Has(context.Background(), jobID)
 	require.NoError(err)
 	require.True(has)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
@@ -113,7 +113,7 @@ func TestPushAndExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	has, err = jobs.Has(jobID)
+	has, err = jobs.Has(context.Background(), jobID)
 	require.NoError(err)
 	require.True(has)
 
@@ -130,7 +130,7 @@ func TestPushAndExecute(t *testing.T) {
 	require.NoError(err)
 	require.Equal(1, count)
 
-	has, err = jobs.Has(jobID)
+	has, err = jobs.Has(context.Background(), jobID)
 	require.NoError(err)
 	require.False(has)
 
@@ -233,7 +233,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
@@ -267,7 +267,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	require.False(pushed)
 	require.NoError(err)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
@@ -296,7 +296,7 @@ func TestMissingJobs(t *testing.T) {
 	jobs.AddMissingID(job0ID)
 	jobs.AddMissingID(job1ID)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	numMissingIDs := jobs.NumMissingIDs()
@@ -313,7 +313,7 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs.RemoveMissingID(job1ID)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
@@ -489,13 +489,13 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.NoError(err)
 	require.EqualValues(2, jobs.state.numJobs)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
 	require.NoError(err)
 
-	err = jobs.Commit()
+	err = jobs.Commit(context.Background())
 	require.NoError(err)
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
@@ -546,11 +546,11 @@ func TestClearAll(t *testing.T) {
 		}
 	}
 
-	require.NoError(jobs.Clear())
-	hasJob0, err := jobs.Has(job0.ID())
+	require.NoError(jobs.Clear(context.Background()))
+	hasJob0, err := jobs.Has(context.Background(), job0.ID())
 	require.NoError(err)
 	require.False(hasJob0)
-	hasJob1, err := jobs.Has(job1.ID())
+	hasJob1, err := jobs.Has(context.Background(), job1.ID())
 	require.NoError(err)
 	require.False(hasJob1)
 }

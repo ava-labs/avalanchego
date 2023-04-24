@@ -88,7 +88,7 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batches ...database
 		fb := filteredBatch{
 			writes: make(map[string][]byte),
 		}
-		if err := batch.Replay(&fb); err != nil {
+		if err := batch.Replay(context.TODO(), &fb); err != nil {
 			return err
 		}
 		req.Batches[i] = &sharedmemorypb.Batch{

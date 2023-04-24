@@ -65,8 +65,8 @@ func (j *Jobs) SetParser(parser Parser) error {
 	return nil
 }
 
-func (j *Jobs) Has(jobID ids.ID) (bool, error) {
-	return j.state.HasJob(jobID)
+func (j *Jobs) Has(ctx context.Context, jobID ids.ID) (bool, error) {
+	return j.state.HasJob(ctx, jobID)
 }
 
 // Returns how many pending jobs are waiting in the queue.
@@ -78,7 +78,7 @@ func (j *Jobs) PendingJobs() uint64 {
 // if [job] was already in the queue.
 func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
-	if has, err := j.state.HasJob(jobID); err != nil {
+	if has, err := j.state.HasJob(ctx, jobID); err != nil {
 		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
 	} else if has {
 		return false, nil
@@ -89,14 +89,14 @@ func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 		return false, err
 	}
 	// Store this job into the database.
-	if err := j.state.PutJob(job); err != nil {
+	if err := j.state.PutJob(ctx, job); err != nil {
 		return false, fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
 		for depID := range deps {
-			if err := j.state.AddDependency(depID, jobID); err != nil {
+			if err := j.state.AddDependency(ctx, depID, jobID); err != nil {
 				return false, fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 			}
 		}
@@ -104,7 +104,7 @@ func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 	}
 	// This job doesn't have any dependencies, so it should be placed onto the
 	// executable stack.
-	if err := j.state.AddRunnableJob(jobID); err != nil {
+	if err := j.state.AddRunnableJob(ctx, jobID); err != nil {
 		return false, fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
 	}
 	return true, nil
@@ -165,7 +165,7 @@ func (j *Jobs) ExecuteAll(
 			return 0, fmt.Errorf("failed to execute job %s due to %w", jobID, err)
 		}
 
-		dependentIDs, err := j.state.RemoveDependencies(jobID)
+		dependentIDs, err := j.state.RemoveDependencies(ctx, jobID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to remove blocking jobs for %s due to %w", jobID, err)
 		}
@@ -182,11 +182,11 @@ func (j *Jobs) ExecuteAll(
 			if hasMissingDeps {
 				continue
 			}
-			if err := j.state.AddRunnableJob(dependentID); err != nil {
+			if err := j.state.AddRunnableJob(ctx, dependentID); err != nil {
 				return 0, fmt.Errorf("failed to add %s as a runnable job due to %w", dependentID, err)
 			}
 		}
-		if err := j.Commit(); err != nil {
+		if err := j.Commit(ctx); err != nil {
 			return 0, err
 		}
 
@@ -232,13 +232,13 @@ func (j *Jobs) ExecuteAll(
 	return numExecuted, nil
 }
 
-func (j *Jobs) Clear() error {
-	return j.state.Clear()
+func (j *Jobs) Clear(ctx context.Context) error {
+	return j.state.Clear(ctx)
 }
 
 // Commit the versionDB to the underlying database.
-func (j *Jobs) Commit() error {
-	return j.db.Commit()
+func (j *Jobs) Commit(ctx context.Context) error {
+	return j.db.Commit(ctx)
 }
 
 type JobsWithMissing struct {
@@ -275,8 +275,8 @@ func (jm *JobsWithMissing) SetParser(ctx context.Context, parser Parser) error {
 	return jm.cleanRunnableStack(ctx)
 }
 
-func (jm *JobsWithMissing) Clear() error {
-	if err := jm.state.RemoveMissingJobIDs(jm.missingIDs); err != nil {
+func (jm *JobsWithMissing) Clear(ctx context.Context) error {
+	if err := jm.state.RemoveMissingJobIDs(ctx, jm.missingIDs); err != nil {
 		return err
 	}
 
@@ -284,22 +284,22 @@ func (jm *JobsWithMissing) Clear() error {
 	jm.addToMissingIDs.Clear()
 	jm.removeFromMissingIDs.Clear()
 
-	return jm.Jobs.Clear()
+	return jm.Jobs.Clear(ctx)
 }
 
-func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
+func (jm *JobsWithMissing) Has(ctx context.Context, jobID ids.ID) (bool, error) {
 	if jm.missingIDs.Contains(jobID) {
 		return false, nil
 	}
 
-	return jm.Jobs.Has(jobID)
+	return jm.Jobs.Has(ctx, jobID)
 }
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
 func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
-	if has, err := jm.Has(jobID); err != nil {
+	if has, err := jm.Has(ctx, jobID); err != nil {
 		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
 	} else if has {
 		return false, nil
@@ -310,14 +310,14 @@ func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 		return false, err
 	}
 	// Store this job into the database.
-	if err := jm.state.PutJob(job); err != nil {
+	if err := jm.state.PutJob(ctx, job); err != nil {
 		return false, fmt.Errorf("failed to write job due to %w", err)
 	}
 
 	if deps.Len() != 0 {
 		// This job needs to block on a set of dependencies.
 		for depID := range deps {
-			if err := jm.state.AddDependency(depID, jobID); err != nil {
+			if err := jm.state.AddDependency(ctx, depID, jobID); err != nil {
 				return false, fmt.Errorf("failed to add blocking for depID %s, jobID %s", depID, jobID)
 			}
 		}
@@ -325,7 +325,7 @@ func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	}
 	// This job doesn't have any dependencies, so it should be placed onto the
 	// executable stack.
-	if err := jm.state.AddRunnableJob(jobID); err != nil {
+	if err := jm.state.AddRunnableJob(ctx, jobID); err != nil {
 		return false, fmt.Errorf("failed to add %s as a runnable job due to %w", jobID, err)
 	}
 	return true, nil
@@ -362,20 +362,20 @@ func (jm *JobsWithMissing) NumMissingIDs() int {
 }
 
 // Commit the versionDB to the underlying database.
-func (jm *JobsWithMissing) Commit() error {
+func (jm *JobsWithMissing) Commit(ctx context.Context) error {
 	if jm.addToMissingIDs.Len() != 0 {
-		if err := jm.state.AddMissingJobIDs(jm.addToMissingIDs); err != nil {
+		if err := jm.state.AddMissingJobIDs(ctx, jm.addToMissingIDs); err != nil {
 			return err
 		}
 		jm.addToMissingIDs.Clear()
 	}
 	if jm.removeFromMissingIDs.Len() != 0 {
-		if err := jm.state.RemoveMissingJobIDs(jm.removeFromMissingIDs); err != nil {
+		if err := jm.state.RemoveMissingJobIDs(ctx, jm.removeFromMissingIDs); err != nil {
 			return err
 		}
 		jm.removeFromMissingIDs.Clear()
 	}
-	return jm.Jobs.Commit()
+	return jm.Jobs.Commit(ctx)
 }
 
 // cleanRunnableStack iterates over the jobs on the runnable stack and resets any job
@@ -412,14 +412,14 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 		}
 
 		// If the job has missing dependencies, remove it from the runnable stack
-		if err := jm.state.runnableJobIDs.Delete(jobIDBytes); err != nil {
+		if err := jm.state.runnableJobIDs.Delete(ctx, jobIDBytes); err != nil {
 			return fmt.Errorf("failed to delete jobID from runnable stack due to: %w", err)
 		}
 
 		// Add the missing dependencies to the set that needs to be fetched.
 		jm.AddMissingID(deps.List()...)
 		for depID := range deps {
-			if err := jm.state.AddDependency(depID, jobID); err != nil {
+			if err := jm.state.AddDependency(ctx, depID, jobID); err != nil {
 				return fmt.Errorf("failed to add blocking for depID %s, jobID %s while cleaning the runnable stack", depID, jobID)
 			}
 		}
@@ -428,7 +428,7 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		runnableJobsIter.Error(),
-		jm.Commit(),
+		jm.Commit(ctx),
 	)
 	return errs.Err
 }

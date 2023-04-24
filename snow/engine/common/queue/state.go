@@ -102,7 +102,7 @@ func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
 	return numJobs, err
 }
 
-func (s *state) Clear() error {
+func (s *state) Clear(ctx context.Context) error {
 	var (
 		runJobsIter  = s.runnableJobIDs.NewIterator()
 		jobsIter     = s.jobsDB.NewIterator()
@@ -118,7 +118,7 @@ func (s *state) Clear() error {
 
 	// clear runnableJobIDs
 	for runJobsIter.Next() {
-		if err := s.runnableJobIDs.Delete(runJobsIter.Key()); err != nil {
+		if err := s.runnableJobIDs.Delete(ctx, runJobsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -126,7 +126,7 @@ func (s *state) Clear() error {
 	// clear jobs
 	s.jobsCache.Flush()
 	for jobsIter.Next() {
-		if err := s.jobsDB.Delete(jobsIter.Key()); err != nil {
+		if err := s.jobsDB.Delete(ctx, jobsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -134,14 +134,14 @@ func (s *state) Clear() error {
 	// clear dependencies
 	s.dependentsCache.Flush()
 	for depsIter.Next() {
-		if err := s.dependenciesDB.Delete(depsIter.Key()); err != nil {
+		if err := s.dependenciesDB.Delete(ctx, depsIter.Key()); err != nil {
 			return err
 		}
 	}
 
 	// clear missing jobs IDs
 	for missJobsIter.Next() {
-		if err := s.missingJobIDs.Delete(missJobsIter.Key()); err != nil {
+		if err := s.missingJobIDs.Delete(ctx, missJobsIter.Key()); err != nil {
 			return err
 		}
 	}
@@ -163,8 +163,8 @@ func (s *state) Clear() error {
 }
 
 // AddRunnableJob adds [jobID] to the runnable queue
-func (s *state) AddRunnableJob(jobID ids.ID) error {
-	return s.runnableJobIDs.Put(jobID[:], nil)
+func (s *state) AddRunnableJob(ctx context.Context, jobID ids.ID) error {
+	return s.runnableJobIDs.Put(ctx, jobID[:], nil)
 }
 
 // HasRunnableJob returns true if there is a job that can be run on the queue
@@ -179,7 +179,7 @@ func (s *state) RemoveRunnableJob(ctx context.Context) (Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.runnableJobIDs.Delete(jobIDBytes); err != nil {
+	if err := s.runnableJobIDs.Delete(ctx, jobIDBytes); err != nil {
 		return nil, err
 	}
 
@@ -192,7 +192,7 @@ func (s *state) RemoveRunnableJob(ctx context.Context) (Job, error) {
 		return nil, err
 	}
 
-	if err := s.jobsDB.Delete(jobIDBytes); err != nil {
+	if err := s.jobsDB.Delete(ctx, jobIDBytes); err != nil {
 		return job, err
 	}
 
@@ -206,13 +206,13 @@ func (s *state) RemoveRunnableJob(ctx context.Context) (Job, error) {
 }
 
 // PutJob adds the job to the queue
-func (s *state) PutJob(job Job) error {
+func (s *state) PutJob(ctx context.Context, job Job) error {
 	id := job.ID()
 	if s.cachingEnabled {
 		s.jobsCache.Put(id, job)
 	}
 
-	if err := s.jobsDB.Put(id[:], job.Bytes()); err != nil {
+	if err := s.jobsDB.Put(ctx, id[:], job.Bytes()); err != nil {
 		return err
 	}
 
@@ -221,13 +221,13 @@ func (s *state) PutJob(job Job) error {
 }
 
 // HasJob returns true if the job [id] is in the queue
-func (s *state) HasJob(id ids.ID) (bool, error) {
+func (s *state) HasJob(ctx context.Context, id ids.ID) (bool, error) {
 	if s.cachingEnabled {
 		if _, exists := s.jobsCache.Get(id); exists {
 			return true, nil
 		}
 	}
-	return s.jobsDB.Has(id[:])
+	return s.jobsDB.Has(ctx, id[:])
 }
 
 // GetJob returns the job [id]
@@ -237,7 +237,7 @@ func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 			return job, nil
 		}
 	}
-	jobBytes, err := s.jobsDB.Get(id[:])
+	jobBytes, err := s.jobsDB.Get(ctx, id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -249,14 +249,14 @@ func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 }
 
 // AddDependency adds [dependent] as blocking on [dependency] being completed
-func (s *state) AddDependency(dependency, dependent ids.ID) error {
+func (s *state) AddDependency(ctx context.Context, dependency, dependent ids.ID) error {
 	dependentsDB := s.getDependentsDB(dependency)
-	return dependentsDB.Put(dependent[:], nil)
+	return dependentsDB.Put(ctx, dependent[:], nil)
 }
 
 // RemoveDependencies removes the set of IDs that are blocking on the completion
 // of [dependency] from the database and returns them.
-func (s *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
+func (s *state) RemoveDependencies(ctx context.Context, dependency ids.ID) ([]ids.ID, error) {
 	dependentsDB := s.getDependentsDB(dependency)
 	iterator := dependentsDB.NewIterator()
 	defer iterator.Release()
@@ -264,7 +264,7 @@ func (s *state) RemoveDependencies(dependency ids.ID) ([]ids.ID, error) {
 	dependents := []ids.ID(nil)
 	for iterator.Next() {
 		dependentKey := iterator.Key()
-		if err := dependentsDB.Delete(dependentKey); err != nil {
+		if err := dependentsDB.Delete(ctx, dependentKey); err != nil {
 			return nil, err
 		}
 		dependent, err := ids.ToID(dependentKey)
@@ -282,20 +282,20 @@ func (s *state) DisableCaching() {
 	s.cachingEnabled = false
 }
 
-func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
+func (s *state) AddMissingJobIDs(ctx context.Context, missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
-		if err := s.missingJobIDs.Put(missingID[:], nil); err != nil {
+		if err := s.missingJobIDs.Put(ctx, missingID[:], nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *state) RemoveMissingJobIDs(missingIDs set.Set[ids.ID]) error {
+func (s *state) RemoveMissingJobIDs(ctx context.Context, missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
-		if err := s.missingJobIDs.Delete(missingID[:]); err != nil {
+		if err := s.missingJobIDs.Delete(ctx, missingID[:]); err != nil {
 			return err
 		}
 	}

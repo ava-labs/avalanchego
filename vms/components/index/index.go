@@ -5,6 +5,7 @@ package index
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -136,7 +137,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
 			var idx uint64
-			idxBytes, err := assetPrefixDB.Get(idxKey)
+			idxBytes, err := assetPrefixDB.Get(context.TODO(), idxKey)
 			switch err {
 			case nil:
 				// index is found, parse stored [idxBytes]
@@ -156,7 +157,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 				zap.Uint64("index", idx),
 				zap.Stringer("txID", txID),
 			)
-			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
+			if err := assetPrefixDB.Put(context.TODO(), idxBytes, txID[:]); err != nil {
 				return fmt.Errorf("failed to write txID while indexing %s: %w", txID, err)
 			}
 
@@ -164,7 +165,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
 
-			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
+			if err := assetPrefixDB.Put(context.TODO(), idxKey, idxBytes); err != nil {
 				return fmt.Errorf("failed to write index txID while indexing %s: %w", txID, err)
 			}
 		}

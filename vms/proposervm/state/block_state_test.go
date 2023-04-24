@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"crypto"
 	"testing"
 	"time"
@@ -44,21 +45,21 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	)
 	a.NoError(err)
 
-	_, _, err = bs.GetBlock(b.ID())
+	_, _, err = bs.GetBlock(context.TODO(), b.ID())
 	a.Equal(database.ErrNotFound, err)
 
-	_, _, err = bs.GetBlock(b.ID())
+	_, _, err = bs.GetBlock(context.TODO(), b.ID())
 	a.Equal(database.ErrNotFound, err)
 
-	err = bs.PutBlock(b, choices.Accepted)
+	err = bs.PutBlock(context.TODO(), b, choices.Accepted)
 	a.NoError(err)
 
-	fetchedBlock, fetchedStatus, err := bs.GetBlock(b.ID())
+	fetchedBlock, fetchedStatus, err := bs.GetBlock(context.TODO(), b.ID())
 	a.NoError(err)
 	a.Equal(choices.Accepted, fetchedStatus)
 	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 
-	fetchedBlock, fetchedStatus, err = bs.GetBlock(b.ID())
+	fetchedBlock, fetchedStatus, err = bs.GetBlock(context.TODO(), b.ID())
 	a.NoError(err)
 	a.Equal(choices.Accepted, fetchedStatus)
 	a.Equal(b.Bytes(), fetchedBlock.Bytes())

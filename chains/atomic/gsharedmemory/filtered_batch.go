@@ -4,6 +4,7 @@
 package gsharedmemory
 
 import (
+	"context"
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"

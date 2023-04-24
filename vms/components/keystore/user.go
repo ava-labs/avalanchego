@@ -4,6 +4,7 @@
 package keystore
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -63,7 +64,7 @@ func NewUserFromDB(db *encdb.Database) User {
 
 func (u *user) GetAddresses() ([]ids.ShortID, error) {
 	// Get user's addresses
-	addressBytes, err := u.db.Get(addressesKey)
+	addressBytes, err := u.db.Get(context.TODO(), addressesKey)
 	if err == database.ErrNotFound {
 		// If user has no addresses, return empty list
 		return nil, nil
@@ -81,7 +82,7 @@ func (u *user) PutKeys(privKeys ...*secp256k1.PrivateKey) error {
 	toStore := make([]*secp256k1.PrivateKey, 0, len(privKeys))
 	for _, privKey := range privKeys {
 		address := privKey.PublicKey().Address() // address the privKey controls
-		hasAddress, err := u.db.Has(address.Bytes())
+		hasAddress, err := u.db.Has(context.TODO(), address.Bytes())
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func (u *user) PutKeys(privKeys ...*secp256k1.PrivateKey) error {
 	for _, privKey := range toStore {
 		address := privKey.PublicKey().Address() // address the privKey controls
 		// Address --> private key
-		if err := u.db.Put(address.Bytes(), privKey.Bytes()); err != nil {
+		if err := u.db.Put(context.TODO(), address.Bytes(), privKey.Bytes()); err != nil {
 			return err
 		}
 		addresses = append(addresses, address)
@@ -117,11 +118,11 @@ func (u *user) PutKeys(privKeys ...*secp256k1.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	return u.db.Put(addressesKey, addressBytes)
+	return u.db.Put(context.TODO(), addressesKey, addressBytes)
 }
 
 func (u *user) GetKey(address ids.ShortID) (*secp256k1.PrivateKey, error) {
-	bytes, err := u.db.Get(address.Bytes())
+	bytes, err := u.db.Get(context.TODO(), address.Bytes())
 	if err != nil {
 		return nil, err
 	}

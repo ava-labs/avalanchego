@@ -4,6 +4,7 @@
 package grpcutils
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -61,7 +62,7 @@ func TestWaitForReady(t *testing.T) {
 
 	db := rpcdb.NewClient(pb.NewDatabaseClient(conn))
 
-	err = db.Put([]byte("foo"), []byte("bar"))
+	err = db.Put(context.Background(), []byte("foo"), []byte("bar"))
 	require.NoError(err)
 
 	noWaitListener, err := NewListener()
@@ -80,7 +81,7 @@ func TestWaitForReady(t *testing.T) {
 
 	db = rpcdb.NewClient(pb.NewDatabaseClient(noWaitConn))
 
-	err = db.Put([]byte("foo"), []byte("bar"))
+	err = db.Put(context.Background(), []byte("foo"), []byte("bar"))
 	status, ok := status.FromError(err)
 	require.True(ok)
 	require.Equal(codes.Unavailable, status.Code())

@@ -4,6 +4,7 @@
 package avax
 
 import (
+	"context"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -126,7 +127,7 @@ func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
 		return utxo, nil
 	}
 
-	bytes, err := s.utxoDB.Get(utxoID[:])
+	bytes, err := s.utxoDB.Get(context.Background(), utxoID[:])
 	if err == database.ErrNotFound {
 		s.utxoCache.Put(utxoID, nil)
 		return nil, database.ErrNotFound
@@ -153,7 +154,7 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 
 	utxoID := utxo.InputID()
 	s.utxoCache.Put(utxoID, utxo)
-	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
+	if err := s.utxoDB.Put(context.Background(), utxoID[:], utxoBytes); err != nil {
 		return err
 	}
 
@@ -165,7 +166,7 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	addresses := addressable.Addresses()
 	for _, addr := range addresses {
 		indexList := s.getIndexDB(addr)
-		if err := indexList.Put(utxoID[:], nil); err != nil {
+		if err := indexList.Put(context.Background(), utxoID[:], nil); err != nil {
 			return err
 		}
 	}
@@ -182,7 +183,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	}
 
 	s.utxoCache.Put(utxoID, nil)
-	if err := s.utxoDB.Delete(utxoID[:]); err != nil {
+	if err := s.utxoDB.Delete(context.Background(), utxoID[:]); err != nil {
 		return err
 	}
 
@@ -194,7 +195,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	addresses := addressable.Addresses()
 	for _, addr := range addresses {
 		indexList := s.getIndexDB(addr)
-		if err := indexList.Delete(utxoID[:]); err != nil {
+		if err := indexList.Delete(context.Background(), utxoID[:]); err != nil {
 			return err
 		}
 	}

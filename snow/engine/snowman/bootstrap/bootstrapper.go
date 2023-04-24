@@ -403,11 +403,11 @@ func (b *bootstrapper) markUnavailable(nodeID ids.NodeID) {
 	}
 }
 
-func (b *bootstrapper) Clear() error {
-	if err := b.Config.Blocked.Clear(); err != nil {
+func (b *bootstrapper) Clear(ctx context.Context) error {
+	if err := b.Config.Blocked.Clear(ctx); err != nil {
 		return err
 	}
-	return b.Config.Blocked.Commit()
+	return b.Config.Blocked.Commit(ctx)
 }
 
 // process a series of consecutive blocks starting at [blk].
@@ -428,7 +428,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			// guaranteed to continue processing from this state when the
 			// bootstrapper is restarted.
 			b.Blocked.AddMissingID(blkID)
-			return b.Blocked.Commit()
+			return b.Blocked.Commit(ctx)
 		}
 
 		b.Blocked.RemoveMissingID(blkID)
@@ -443,7 +443,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		blkHeight := blk.Height()
 		if status == choices.Accepted || blkHeight <= b.startingHeight {
 			// We can stop traversing, as we have reached the accepted frontier
-			if err := b.Blocked.Commit(); err != nil {
+			if err := b.Blocked.Commit(ctx); err != nil {
 				return err
 			}
 			return b.checkFinish(ctx)
@@ -470,7 +470,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		if !pushed {
 			// We can stop traversing, as we have reached a block that we
 			// previously pushed onto the jobs queue
-			if err := b.Blocked.Commit(); err != nil {
+			if err := b.Blocked.Commit(ctx); err != nil {
 				return err
 			}
 			return b.checkFinish(ctx)
@@ -531,7 +531,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			return err
 		}
 
-		if err := b.Blocked.Commit(); err != nil {
+		if err := b.Blocked.Commit(ctx); err != nil {
 			return err
 		}
 		return b.checkFinish(ctx)

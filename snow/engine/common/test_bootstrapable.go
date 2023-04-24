@@ -33,7 +33,7 @@ func (b *BootstrapableTest) Default(cant bool) {
 	b.CantForceAccepted = cant
 }
 
-func (b *BootstrapableTest) Clear() error {
+func (b *BootstrapableTest) Clear(context.Context) error {
 	if b.ClearF != nil {
 		return b.ClearF()
 	} else if b.CantClear {

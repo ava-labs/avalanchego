@@ -37,7 +37,7 @@ func (vm *VM) GetAncestors(
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit
 	for {
-		blk, err := vm.getStatelessBlk(blkID)
+		blk, err := vm.getStatelessBlk(ctx, blkID)
 		if err != nil {
 			// maybe we have hit the proposerVM fork here?
 			break
@@ -133,7 +133,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		statelessBlk := statelessBlockDesc.block
 		blkID := statelessBlk.ID()
 
-		_, status, err := vm.State.GetBlock(blkID)
+		_, status, err := vm.State.GetBlock(ctx, blkID)
 		if err == database.ErrNotFound {
 			status = choices.Processing
 		} else if err != nil {
@@ -169,10 +169,10 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	return blocks, nil
 }
 
-func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
+func (vm *VM) getStatelessBlk(ctx context.Context, blkID ids.ID) (statelessblock.Block, error) {
 	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
 		return currentBlk.getStatelessBlk(), nil
 	}
-	statelessBlock, _, err := vm.State.GetBlock(blkID)
+	statelessBlock, _, err := vm.State.GetBlock(ctx, blkID)
 	return statelessBlock, err
 }

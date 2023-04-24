@@ -456,10 +456,10 @@ func (n *Node) initDatabase() error {
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
-	rawGenesisHash, err := n.DB.Get(genesisHashKey)
+	rawGenesisHash, err := n.DB.Get(context.TODO(), genesisHashKey)
 	if err == database.ErrNotFound {
 		rawGenesisHash = rawExpectedGenesisHash
-		err = n.DB.Put(genesisHashKey, rawGenesisHash)
+		err = n.DB.Put(context.TODO(), genesisHashKey, rawGenesisHash)
 	}
 	if err != nil {
 		return err
