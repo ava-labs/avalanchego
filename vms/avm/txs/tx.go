@@ -47,7 +47,7 @@ type Tx struct {
 	Unsigned UnsignedTx          `serialize:"true" json:"unsignedTx"`
 	Creds    []*fxs.FxCredential `serialize:"true" json:"credentials"` // The credentials of this transaction
 
-	MyID  ids.ID `json:"id"`
+	TxID  ids.ID `json:"id"`
 	bytes []byte
 }
 
@@ -68,14 +68,14 @@ func (t *Tx) Initialize(c codec.Manager) error {
 }
 
 func (t *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
-	t.MyID = hashing.ComputeHash256Array(signedBytes)
+	t.TxID = hashing.ComputeHash256Array(signedBytes)
 	t.bytes = signedBytes
 	t.Unsigned.SetBytes(unsignedBytes)
 }
 
 // ID returns the unique ID of this tx
 func (t *Tx) ID() ids.ID {
-	return t.MyID
+	return t.TxID
 }
 
 // Bytes returns the binary representation of this tx
