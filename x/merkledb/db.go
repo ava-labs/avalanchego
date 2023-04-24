@@ -124,7 +124,7 @@ func newDatabase(
 	// disk as they are evicted from the cache.
 	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
 
-	root, err := trieDB.initializeRootIfNeeded()
+	root, err := trieDB.initializeRootIfNeeded(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func newDatabase(
 		nodes:  map[path]*change[*node]{},
 	})
 
-	shutdownType, err := trieDB.metadataDB.Get(cleanShutdownKey)
+	shutdownType, err := trieDB.metadataDB.Get(ctx, cleanShutdownKey)
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
@@ -152,7 +152,7 @@ func newDatabase(
 	}
 
 	// mark that the db has not yet been cleanly closed
-	err = trieDB.metadataDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
+	err = trieDB.metadataDB.Put(ctx, cleanShutdownKey, didNotHaveCleanShutdown)
 	return trieDB, err
 }
 
@@ -160,7 +160,7 @@ func newDatabase(
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *Database) rebuild(ctx context.Context) error {
 	db.root = newNode(nil, RootPath)
-	if err := db.nodeDB.Delete(rootKey); err != nil {
+	if err := db.nodeDB.Delete(ctx, rootKey); err != nil {
 		return err
 	}
 	it := db.nodeDB.NewIterator()
@@ -203,7 +203,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 			}
 			currentViewSize++
 		}
-		if err := db.nodeDB.Delete(key); err != nil {
+		if err := db.nodeDB.Delete(ctx, key); err != nil {
 			return err
 		}
 	}
@@ -213,7 +213,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 	if err := currentView.commitToDB(ctx); err != nil {
 		return err
 	}
-	return db.nodeDB.Compact(nil, nil)
+	return db.nodeDB.Compact(ctx, nil, nil)
 }
 
 // New returns a new merkle database.
@@ -258,8 +258,8 @@ func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *R
 	return view.commitToDB(ctx)
 }
 
-func (db *Database) Compact(start []byte, limit []byte) error {
-	return db.nodeDB.Compact(start, limit)
+func (db *Database) Compact(ctx context.Context, start []byte, limit []byte) error {
+	return db.nodeDB.Compact(ctx, start, limit)
 }
 
 func (db *Database) Close() error {
@@ -294,21 +294,21 @@ func (db *Database) Close() error {
 		return err
 	}
 
-	if err := db.nodeDB.Commit(); err != nil {
+	if err := db.nodeDB.Commit(context.TODO()); err != nil {
 		return err
 	}
 
 	// Successfully wrote intermediate nodes.
-	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
+	return db.metadataDB.Put(context.TODO(), cleanShutdownKey, hadCleanShutdown)
 }
 
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(ctx context.Context, key []byte) error {
 	// this is a duplicate because the database interface doesn't support
 	// contexts, which are used for tracing
-	return db.Remove(context.Background(), key)
+	return db.Remove(ctx, key)
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(ctx context.Context, key []byte) ([]byte, error) {
 	// this is a duplicate because the database interface doesn't support
 	// contexts, which are used for tracing
 	return db.GetValue(context.Background(), key)
@@ -612,7 +612,7 @@ func (db *Database) NewPreallocatedView(estimatedSize int) (TrieView, error) {
 	return newView, nil
 }
 
-func (db *Database) Has(k []byte) (bool, error) {
+func (db *Database) Has(_ context.Context, k []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -713,7 +713,7 @@ func (db *Database) onEviction(node *node) error {
 		return err
 	}
 
-	if err := db.nodeDB.Put(node.key.Bytes(), nodeBytes); err != nil {
+	if err := db.nodeDB.Put(context.TODO(), node.key.Bytes(), nodeBytes); err != nil {
 		db.onEvictionErr.Set(err)
 		_ = db.nodeDB.Close()
 		go db.Close()
@@ -723,8 +723,8 @@ func (db *Database) onEviction(node *node) error {
 }
 
 // Inserts the key/value pair into the db.
-func (db *Database) Put(k, v []byte) error {
-	return db.Insert(context.Background(), k, v)
+func (db *Database) Put(ctx context.Context, k, v []byte) error {
+	return db.Insert(ctx, k, v)
 }
 
 func (db *Database) Remove(ctx context.Context, key []byte) error {
@@ -810,7 +810,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// commit any outstanding cache evicted nodes.
 	// Note that we do this here because below we may Abort
 	// [db.nodeDB], which would cause us to lose these changes.
-	if err := db.nodeDB.Commit(); err != nil {
+	if err := db.nodeDB.Commit(ctx); err != nil {
 		return err
 	}
 
@@ -818,7 +818,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			db.metrics.IOKeyWrite()
-			if err := db.nodeDB.Delete(key.Bytes()); err != nil {
+			if err := db.nodeDB.Delete(ctx, key.Bytes()); err != nil {
 				db.nodeDB.Abort()
 				nodesSpan.End()
 				return err
@@ -838,7 +838,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 				return err
 			}
 
-			if err := db.nodeDB.Put(key.Bytes(), nodeBytes); err != nil {
+			if err := db.nodeDB.Put(ctx, key.Bytes(), nodeBytes); err != nil {
 				db.nodeDB.Abort()
 				nodesSpan.End()
 				return err
@@ -848,7 +848,7 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	nodesSpan.End()
 
 	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
-	err := db.nodeDB.Commit()
+	err := db.nodeDB.Commit(ctx)
 	commitSpan.End()
 	if err != nil {
 		db.nodeDB.Abort()
@@ -906,9 +906,9 @@ func (db *Database) invalidateChildrenExcept(exception *trieView) {
 	}
 }
 
-func (db *Database) initializeRootIfNeeded() (ids.ID, error) {
+func (db *Database) initializeRootIfNeeded(ctx context.Context) (ids.ID, error) {
 	// ensure that root exists
-	nodeBytes, err := db.nodeDB.Get(rootKey)
+	nodeBytes, err := db.nodeDB.Get(ctx, rootKey)
 	if err == nil {
 		// Root already exists, so parse it and set the in-mem copy
 		db.root, err = parseNode(RootPath, nodeBytes)
@@ -937,11 +937,11 @@ func (db *Database) initializeRootIfNeeded() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	if err := db.nodeDB.Put(rootKey, rootBytes); err != nil {
+	if err := db.nodeDB.Put(ctx, rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, db.nodeDB.Commit()
+	return db.root.id, db.nodeDB.Commit(ctx)
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
@@ -1025,7 +1025,7 @@ func (db *Database) getNode(key path) (*node, error) {
 
 	db.metrics.DBNodeCacheMiss()
 	db.metrics.IOKeyRead()
-	rawBytes, err := db.nodeDB.Get(key.Bytes())
+	rawBytes, err := db.nodeDB.Get(context.TODO(), key.Bytes())
 	if err != nil {
 		if err == database.ErrNotFound {
 			// Cache the miss.

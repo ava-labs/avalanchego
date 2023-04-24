@@ -4,6 +4,7 @@
 package atomic
 
 import (
+	"context"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -156,10 +157,10 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 
 	// Commit the operations on shared memory atomically with the contents of
 	// [batches].
-	batch, err := vdb.CommitBatch()
+	batch, err := vdb.CommitBatch(context.TODO())
 	if err != nil {
 		return err
 	}
 
-	return WriteAll(batch, batches...)
+	return WriteAll(context.TODO(), batch, batches...)
 }

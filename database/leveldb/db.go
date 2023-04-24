@@ -270,24 +270,24 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 }
 
 // Has returns if the key is set in the database
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(_ context.Context, key []byte) (bool, error) {
 	has, err := db.DB.Has(key, nil)
 	return has, updateError(err)
 }
 
 // Get returns the value the key maps to in the database
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(_ context.Context, key []byte) ([]byte, error) {
 	value, err := db.DB.Get(key, nil)
 	return value, updateError(err)
 }
 
 // Put sets the value of the provided key to the provided value
-func (db *Database) Put(key []byte, value []byte) error {
+func (db *Database) Put(_ context.Context, key []byte, value []byte) error {
 	return updateError(db.DB.Put(key, value, nil))
 }
 
 // Delete removes the key from the database
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(_ context.Context, key []byte) error {
 	return updateError(db.DB.Delete(key, nil))
 }
 
@@ -348,7 +348,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // A nil start is treated as a key before all keys in the DB.
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
-func (db *Database) Compact(start []byte, limit []byte) error {
+func (db *Database) Compact(_ context.Context, start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
@@ -376,14 +376,14 @@ type batch struct {
 }
 
 // Put the value into the batch for later writing
-func (b *batch) Put(key, value []byte) error {
+func (b *batch) Put(_ context.Context, key, value []byte) error {
 	b.Batch.Put(key, value)
 	b.size += len(key) + len(value) + levelDBByteOverhead
 	return nil
 }
 
 // Delete the key during writing
-func (b *batch) Delete(key []byte) error {
+func (b *batch) Delete(_ context.Context, key []byte) error {
 	b.Batch.Delete(key)
 	b.size += len(key) + levelDBByteOverhead
 	return nil
@@ -406,7 +406,7 @@ func (b *batch) Reset() {
 }
 
 // Replay the batch contents.
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
+func (b *batch) Replay(ctx context.Context, w database.KeyValueWriterDeleter) error {
 	replay := &replayer{writerDeleter: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
@@ -429,14 +429,14 @@ func (r *replayer) Put(key, value []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writerDeleter.Put(key, value)
+	r.err = r.writerDeleter.Put(context.TODO(), key, value)
 }
 
 func (r *replayer) Delete(key []byte) {
 	if r.err != nil {
 		return
 	}
-	r.err = r.writerDeleter.Delete(key)
+	r.err = r.writerDeleter.Delete(context.TODO(), key)
 }
 
 type iter struct {

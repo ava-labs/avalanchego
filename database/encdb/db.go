@@ -54,31 +54,31 @@ func New(password []byte, db database.Database) (*Database, error) {
 	}, manager.RegisterCodec(codecVersion, c)
 }
 
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(ctx context.Context, key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.closed {
 		return false, database.ErrClosed
 	}
-	return db.db.Has(key)
+	return db.db.Has(ctx, key)
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.closed {
 		return nil, database.ErrClosed
 	}
-	encVal, err := db.db.Get(key)
+	encVal, err := db.db.Get(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 	return db.decrypt(encVal)
 }
 
-func (db *Database) Put(key, value []byte) error {
+func (db *Database) Put(ctx context.Context, key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -90,17 +90,17 @@ func (db *Database) Put(key, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return db.db.Put(key, encValue)
+	return db.db.Put(ctx, key, encValue)
 }
 
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(ctx context.Context, key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
 	if db.closed {
 		return database.ErrClosed
 	}
-	return db.db.Delete(key)
+	return db.db.Delete(ctx, key)
 }
 
 func (db *Database) NewBatch() database.Batch {
@@ -137,14 +137,14 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(start, limit []byte) error {
+func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
 	if db.closed {
 		return database.ErrClosed
 	}
-	return db.db.Compact(start, limit)
+	return db.db.Compact(ctx, start, limit)
 }
 
 func (db *Database) Close() error {
@@ -182,7 +182,7 @@ type batch struct {
 	ops []database.BatchOp
 }
 
-func (b *batch) Put(key, value []byte) error {
+func (b *batch) Put(ctx context.Context, key, value []byte) error {
 	b.ops = append(b.ops, database.BatchOp{
 		Key:   slices.Clone(key),
 		Value: slices.Clone(value),
@@ -191,15 +191,15 @@ func (b *batch) Put(key, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return b.Batch.Put(key, encValue)
+	return b.Batch.Put(ctx, key, encValue)
 }
 
-func (b *batch) Delete(key []byte) error {
+func (b *batch) Delete(ctx context.Context, key []byte) error {
 	b.ops = append(b.ops, database.BatchOp{
 		Key:    slices.Clone(key),
 		Delete: true,
 	})
-	return b.Batch.Delete(key)
+	return b.Batch.Delete(ctx, key)
 }
 
 func (b *batch) Write() error {
@@ -224,13 +224,13 @@ func (b *batch) Reset() {
 }
 
 // Replay replays the batch contents.
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
+func (b *batch) Replay(ctx context.Context, w database.KeyValueWriterDeleter) error {
 	for _, op := range b.ops {
 		if op.Delete {
-			if err := w.Delete(op.Key); err != nil {
+			if err := w.Delete(ctx, op.Key); err != nil {
 				return err
 			}
-		} else if err := w.Put(op.Key, op.Value); err != nil {
+		} else if err := w.Put(ctx, op.Key, op.Value); err != nil {
 			return err
 		}
 	}

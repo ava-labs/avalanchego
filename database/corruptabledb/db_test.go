@@ -38,24 +38,24 @@ func TestCorruption(t *testing.T) {
 	value := []byte("world")
 	tests := map[string]func(db database.Database) error{
 		"corrupted has": func(db database.Database) error {
-			_, err := db.Has(key)
+			_, err := db.Has(context.Background(), key)
 			return err
 		},
 		"corrupted get": func(db database.Database) error {
-			_, err := db.Get(key)
+			_, err := db.Get(context.Background(), key)
 			return err
 		},
 		"corrupted put": func(db database.Database) error {
-			return db.Put(key, value)
+			return db.Put(context.Background(), key, value)
 		},
 		"corrupted delete": func(db database.Database) error {
-			return db.Delete(key)
+			return db.Delete(context.Background(), key)
 		},
 		"corrupted batch": func(db database.Database) error {
 			corruptableBatch := db.NewBatch()
 			require.NotNil(t, corruptableBatch)
 
-			err := corruptableBatch.Put(key, value)
+			err := corruptableBatch.Put(context.Background(), key, value)
 			require.NoError(t, err)
 
 			return corruptableBatch.Write()

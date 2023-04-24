@@ -26,7 +26,7 @@ var (
 // committed.
 type Commitable interface {
 	// Commit writes all the queued operations to the underlying data structure.
-	Commit() error
+	Commit(ctx context.Context) error
 }
 
 // Database implements the Database interface by living on top of another
@@ -53,7 +53,7 @@ func New(db database.Database) *Database {
 	}
 }
 
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(ctx context.Context, key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -63,10 +63,10 @@ func (db *Database) Has(key []byte) (bool, error) {
 	if val, has := db.mem[string(key)]; has {
 		return !val.delete, nil
 	}
-	return db.db.Has(key)
+	return db.db.Has(ctx, key)
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -79,10 +79,10 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		}
 		return slices.Clone(val.value), nil
 	}
-	return db.db.Get(key)
+	return db.db.Get(ctx, key)
 }
 
-func (db *Database) Put(key, value []byte) error {
+func (db *Database) Put(_ context.Context, key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -93,7 +93,7 @@ func (db *Database) Put(key, value []byte) error {
 	return nil
 }
 
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(_ context.Context, key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -152,14 +152,14 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(start, limit []byte) error {
+func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
 	if db.mem == nil {
 		return database.ErrClosed
 	}
-	return db.db.Compact(start, limit)
+	return db.db.Compact(ctx, start, limit)
 }
 
 // SetDatabase changes the underlying database to the specified database
@@ -185,11 +185,11 @@ func (db *Database) GetDatabase() database.Database {
 }
 
 // Commit writes all the operations of this database to the underlying database
-func (db *Database) Commit() error {
+func (db *Database) Commit(ctx context.Context) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	batch, err := db.commitBatch()
+	batch, err := db.commitBatch(ctx)
 	if err != nil {
 		return err
 	}
@@ -217,16 +217,16 @@ func (db *Database) abort() {
 // Calling Write() on the returned batch causes the puts/deletes to be
 // written to the underlying database. The returned batch should be written before
 // future calls to this DB unless the batch will never be written.
-func (db *Database) CommitBatch() (database.Batch, error) {
+func (db *Database) CommitBatch(ctx context.Context) (database.Batch, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	return db.commitBatch()
+	return db.commitBatch(ctx)
 }
 
 // Put all of the puts/deletes in memory into db.batch
 // and return the batch
-func (db *Database) commitBatch() (database.Batch, error) {
+func (db *Database) commitBatch(ctx context.Context) (database.Batch, error) {
 	if db.mem == nil {
 		return nil, database.ErrClosed
 	}
@@ -234,10 +234,10 @@ func (db *Database) commitBatch() (database.Batch, error) {
 	db.batch.Reset()
 	for key, value := range db.mem {
 		if value.delete {
-			if err := db.batch.Delete([]byte(key)); err != nil {
+			if err := db.batch.Delete(ctx, []byte(key)); err != nil {
 				return nil, err
 			}
-		} else if err := db.batch.Put([]byte(key), value.value); err != nil {
+		} else if err := db.batch.Put(ctx, []byte(key), value.value); err != nil {
 			return nil, err
 		}
 	}

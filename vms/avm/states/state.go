@@ -4,6 +4,7 @@
 package states
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -265,7 +266,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	txBytes, err := s.txDB.Get(txID[:])
+	txBytes, err := s.txDB.Get(context.TODO(), txID[:])
 	if err == database.ErrNotFound {
 		s.txCache.Put(txID, nil)
 		return nil, database.ErrNotFound
@@ -327,7 +328,7 @@ func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
 		return blk, nil
 	}
 
-	blkBytes, err := s.blockDB.Get(blkID[:])
+	blkBytes, err := s.blockDB.Get(context.TODO(), blkID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blkID, nil)
 		return nil, database.ErrNotFound
@@ -384,11 +385,11 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 }
 
 func (s *state) IsInitialized() (bool, error) {
-	return s.singletonDB.Has(isInitializedKey)
+	return s.singletonDB.Has(context.TODO(), isInitializedKey)
 }
 
 func (s *state) SetInitialized() error {
-	return s.singletonDB.Put(isInitializedKey, nil)
+	return s.singletonDB.Put(context.TODO(), isInitializedKey, nil)
 }
 
 func (s *state) GetLastAccepted() ids.ID {
@@ -459,7 +460,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	if err := s.write(); err != nil {
 		return nil, err
 	}
-	return s.db.CommitBatch()
+	return s.db.CommitBatch(context.TODO())
 }
 
 func (s *state) Close() error {
@@ -513,7 +514,7 @@ func (s *state) writeTxs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		if err := s.txDB.Put(context.TODO(), txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
@@ -540,7 +541,7 @@ func (s *state) writeBlocks() error {
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, blk)
-		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+		if err := s.blockDB.Put(context.TODO(), blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to add block: %w", err)
 		}
 	}

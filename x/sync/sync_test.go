@@ -219,7 +219,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 		// add an extra value to sync db past the last key returned
 		newKey := midPoint(lastKey, nil)
-		err = db.Put(newKey, []byte{1})
+		err = db.Put(context.Background(), newKey, []byte{1})
 		require.NoError(t, err)
 
 		// create a range endpoint that is before the newly added key, but after the last key
@@ -294,7 +294,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 		midpoint := midPoint(lastKey, nil)
 
-		err = db.Put(midpoint, []byte{1})
+		err = db.Put(context.Background(), midpoint, []byte{1})
 		require.NoError(t, err)
 
 		// next key at prefix of newly added point
@@ -304,10 +304,10 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		require.True(t, isPrefix(midpoint, nextKey))
 
-		err = db.Delete(midpoint)
+		err = db.Delete(context.Background(), midpoint)
 		require.NoError(t, err)
 
-		err = dbToSync.Put(midpoint, []byte{1})
+		err = dbToSync.Put(context.Background(), midpoint, []byte{1})
 		require.NoError(t, err)
 
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, lastKey, 500)
@@ -374,10 +374,10 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		// local db has a different child than remote db
 		lastKey = append(lastKey, 16)
-		err = db.Put(lastKey, []byte{1})
+		err = db.Put(context.Background(), lastKey, []byte{1})
 		require.NoError(t, err)
 
-		err = dbToSync.Put(lastKey, []byte{2})
+		err = dbToSync.Put(context.Background(), lastKey, []byte{2})
 		require.NoError(t, err)
 
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
@@ -437,19 +437,19 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(t, err)
 
-			err = db.Put(addkey, val)
+			err = db.Put(context.Background(), addkey, val)
 			require.NoError(t, err)
 
-			err = dbToSync.Put(addkey, val)
+			err = dbToSync.Put(context.Background(), addkey, val)
 			require.NoError(t, err)
 
 			addNilkey := make([]byte, r.Intn(50))
 			_, err = r.Read(addNilkey)
 			require.NoError(t, err)
-			err = db.Put(addNilkey, nil)
+			err = db.Put(context.Background(), addNilkey, nil)
 			require.NoError(t, err)
 
-			err = dbToSync.Put(addNilkey, nil)
+			err = dbToSync.Put(context.Background(), addNilkey, nil)
 			require.NoError(t, err)
 
 			deleteKeyStart := make([]byte, r.Intn(50))
@@ -458,9 +458,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				err = dbToSync.Delete(it.Key())
+				err = dbToSync.Delete(context.Background(), it.Key())
 				require.NoError(t, err)
-				err = db.Delete(it.Key())
+				err = db.Delete(context.Background(), it.Key())
 				require.NoError(t, err)
 			}
 			require.NoError(t, it.Error())
@@ -654,7 +654,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			err = dbToSync.Put(key, val)
+			err = dbToSync.Put(context.Background(), key, val)
 			require.NoError(err)
 
 			deleteKeyStart := make([]byte, r.Intn(50))
@@ -663,7 +663,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				err = dbToSync.Delete(it.Key())
+				err = dbToSync.Delete(context.Background(), it.Key())
 				require.NoError(err)
 			}
 			require.NoError(it.Error())
@@ -804,7 +804,7 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		}
 		allKeys = append(allKeys, key)
 		seenKeys[string(key)] = struct{}{}
-		if err = batch.Put(key, value); err != nil {
+		if err = batch.Put(context.Background(), key, value); err != nil {
 			return db, nil, err
 		}
 		i++

@@ -27,21 +27,21 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value"))
 	require.NoError(t, err)
 
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyWriteCount)
 	require.Equal(t, int64(3), db.metrics.(*mockMetrics).hashCount)
 
-	err = db.Delete([]byte("key"))
+	err = db.Delete(context.Background(), []byte("key"))
 	require.NoError(t, err)
 
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
 	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
 	require.Equal(t, int64(4), db.metrics.(*mockMetrics).hashCount)
 
-	_, err = db.Get([]byte("key2"))
+	_, err = db.Get(context.Background(), []byte("key2"))
 	require.ErrorIs(t, err, database.ErrNotFound)
 
 	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyReadCount)
@@ -62,13 +62,13 @@ func Test_Metrics_Initialize(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value"))
 	require.NoError(t, err)
 
-	val, err := db.Get([]byte("key"))
+	val, err := db.Get(context.Background(), []byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value"), val)
 
-	err = db.Delete([]byte("key"))
+	err = db.Delete(context.Background(), []byte("key"))
 	require.NoError(t, err)
 }

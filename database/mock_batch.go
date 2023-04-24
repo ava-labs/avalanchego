@@ -8,6 +8,7 @@
 package database
 
 import (
+	"context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -37,17 +38,17 @@ func (m *MockBatch) EXPECT() *MockBatchMockRecorder {
 }
 
 // Delete mocks base method.
-func (m *MockBatch) Delete(arg0 []byte) error {
+func (m *MockBatch) Delete(arg0 context.Context, arg1 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", arg0)
+	ret := m.ctrl.Call(m, "Delete", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockBatchMockRecorder) Delete(arg0 interface{}) *gomock.Call {
+func (mr *MockBatchMockRecorder) Delete(arg0,  arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockBatch)(nil).Delete), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockBatch)(nil).Delete), arg0, arg1)
 }
 
 // Inner mocks base method.
@@ -65,17 +66,17 @@ func (mr *MockBatchMockRecorder) Inner() *gomock.Call {
 }
 
 // Put mocks base method.
-func (m *MockBatch) Put(arg0, arg1 []byte) error {
+func (m *MockBatch) Put(arg0 context.Context, arg1, arg2 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", arg0, arg1)
+	ret := m.ctrl.Call(m, "Put", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockBatchMockRecorder) Put(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockBatchMockRecorder) Put(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockBatch)(nil).Put), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockBatch)(nil).Put), arg0, arg1, arg2)
 }
 
 // Replay mocks base method.

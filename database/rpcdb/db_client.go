@@ -36,8 +36,8 @@ func NewClient(client rpcdbpb.DatabaseClient) *DatabaseClient {
 }
 
 // Has attempts to return if the database has a key with the provided value.
-func (db *DatabaseClient) Has(key []byte) (bool, error) {
-	resp, err := db.client.Has(context.Background(), &rpcdbpb.HasRequest{
+func (db *DatabaseClient) Has(ctx context.Context, key []byte) (bool, error) {
+	resp, err := db.client.Has(ctx, &rpcdbpb.HasRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -47,8 +47,8 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 }
 
 // Get attempts to return the value that was mapped to the key that was provided
-func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
-	resp, err := db.client.Get(context.Background(), &rpcdbpb.GetRequest{
+func (db *DatabaseClient) Get(ctx context.Context, key []byte) ([]byte, error) {
+	resp, err := db.client.Get(ctx, &rpcdbpb.GetRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -58,8 +58,8 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 }
 
 // Put attempts to set the value this key maps to
-func (db *DatabaseClient) Put(key, value []byte) error {
-	resp, err := db.client.Put(context.Background(), &rpcdbpb.PutRequest{
+func (db *DatabaseClient) Put(ctx context.Context, key, value []byte) error {
+	resp, err := db.client.Put(ctx, &rpcdbpb.PutRequest{
 		Key:   key,
 		Value: value,
 	})
@@ -70,8 +70,8 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 }
 
 // Delete attempts to remove any mapping from the key
-func (db *DatabaseClient) Delete(key []byte) error {
-	resp, err := db.client.Delete(context.Background(), &rpcdbpb.DeleteRequest{
+func (db *DatabaseClient) Delete(ctx context.Context, key []byte) error {
+	resp, err := db.client.Delete(ctx, &rpcdbpb.DeleteRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -112,8 +112,8 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 }
 
 // Compact attempts to optimize the space utilization in the provided range
-func (db *DatabaseClient) Compact(start, limit []byte) error {
-	resp, err := db.client.Compact(context.Background(), &rpcdbpb.CompactRequest{
+func (db *DatabaseClient) Compact(ctx context.Context, start, limit []byte) error {
+	resp, err := db.client.Compact(ctx, &rpcdbpb.CompactRequest{
 		Start: start,
 		Limit: limit,
 	})

@@ -34,41 +34,41 @@ func New(db database.Database) *Database {
 }
 
 // Has returns if the key is set in the database
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(ctx context.Context, key []byte) (bool, error) {
 	if err := db.corrupted(); err != nil {
 		return false, err
 	}
-	has, err := db.Database.Has(key)
+	has, err := db.Database.Has(ctx, key)
 	return has, db.handleError(err)
 }
 
 // Get returns the value the key maps to in the database
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(ctx context.Context, key []byte) ([]byte, error) {
 	if err := db.corrupted(); err != nil {
 		return nil, err
 	}
-	value, err := db.Database.Get(key)
+	value, err := db.Database.Get(ctx, key)
 	return value, db.handleError(err)
 }
 
 // Put sets the value of the provided key to the provided value
-func (db *Database) Put(key []byte, value []byte) error {
+func (db *Database) Put(ctx context.Context, key []byte, value []byte) error {
 	if err := db.corrupted(); err != nil {
 		return err
 	}
-	return db.handleError(db.Database.Put(key, value))
+	return db.handleError(db.Database.Put(ctx, key, value))
 }
 
 // Delete removes the key from the database
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(ctx context.Context, key []byte) error {
 	if err := db.corrupted(); err != nil {
 		return err
 	}
-	return db.handleError(db.Database.Delete(key))
+	return db.handleError(db.Database.Delete(ctx, key))
 }
 
-func (db *Database) Compact(start []byte, limit []byte) error {
-	return db.handleError(db.Database.Compact(start, limit))
+func (db *Database) Compact(ctx context.Context, start []byte, limit []byte) error {
+	return db.handleError(db.Database.Compact(ctx, start, limit))
 }
 
 func (db *Database) Close() error {

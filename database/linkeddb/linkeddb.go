@@ -4,6 +4,7 @@
 package linkeddb
 
 import (
+	"context"
 	"sync"
 
 	"golang.org/x/exp/maps"
@@ -75,32 +76,32 @@ func NewDefault(db database.Database) LinkedDB {
 	return New(db, defaultCacheSize)
 }
 
-func (ldb *linkedDB) Has(key []byte) (bool, error) {
+func (ldb *linkedDB) Has(ctx context.Context, key []byte) (bool, error) {
 	ldb.lock.RLock()
 	defer ldb.lock.RUnlock()
 
-	return ldb.db.Has(nodeKey(key))
+	return ldb.db.Has(ctx, nodeKey(key))
 }
 
-func (ldb *linkedDB) Get(key []byte) ([]byte, error) {
+func (ldb *linkedDB) Get(ctx context.Context, key []byte) ([]byte, error) {
 	ldb.lock.RLock()
 	defer ldb.lock.RUnlock()
 
-	node, err := ldb.getNode(key)
+	node, err := ldb.getNode(ctx, key)
 	return node.Value, err
 }
 
-func (ldb *linkedDB) Put(key, value []byte) error {
+func (ldb *linkedDB) Put(ctx context.Context, key, value []byte) error {
 	ldb.lock.Lock()
 	defer ldb.lock.Unlock()
 
 	ldb.resetBatch()
 
 	// If the key already has a node in the list, update that node.
-	existingNode, err := ldb.getNode(key)
+	existingNode, err := ldb.getNode(ctx, key)
 	if err == nil {
 		existingNode.Value = slices.Clone(value)
-		if err := ldb.putNode(key, existingNode); err != nil {
+		if err := ldb.putNode(ctx, key, existingNode); err != nil {
 			return err
 		}
 		return ldb.writeBatch()
@@ -113,13 +114,13 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	newHead := node{Value: slices.Clone(value)}
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
-		oldHead, err := ldb.getNode(headKey)
+		oldHead, err := ldb.getNode(ctx, headKey)
 		if err != nil {
 			return err
 		}
 		oldHead.HasPrevious = true
 		oldHead.Previous = key
-		if err := ldb.putNode(headKey, oldHead); err != nil {
+		if err := ldb.putNode(ctx, headKey, oldHead); err != nil {
 			return err
 		}
 
@@ -128,7 +129,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	} else if err != database.ErrNotFound {
 		return err
 	}
-	if err := ldb.putNode(key, newHead); err != nil {
+	if err := ldb.putNode(ctx, key, newHead); err != nil {
 		return err
 	}
 	if err := ldb.putHeadKey(key); err != nil {
@@ -137,11 +138,11 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	return ldb.writeBatch()
 }
 
-func (ldb *linkedDB) Delete(key []byte) error {
+func (ldb *linkedDB) Delete(ctx context.Context, key []byte) error {
 	ldb.lock.Lock()
 	defer ldb.lock.Unlock()
 
-	currentNode, err := ldb.getNode(key)
+	currentNode, err := ldb.getNode(ctx, key)
 	if err == database.ErrNotFound {
 		return nil
 	}
@@ -152,31 +153,31 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	ldb.resetBatch()
 
 	// We're trying to delete this node.
-	if err := ldb.deleteNode(key); err != nil {
+	if err := ldb.deleteNode(ctx, key); err != nil {
 		return err
 	}
 
 	switch {
 	case currentNode.HasPrevious:
 		// We aren't modifying the head.
-		previousNode, err := ldb.getNode(currentNode.Previous)
+		previousNode, err := ldb.getNode(ctx, currentNode.Previous)
 		if err != nil {
 			return err
 		}
 		previousNode.HasNext = currentNode.HasNext
 		previousNode.Next = currentNode.Next
-		if err := ldb.putNode(currentNode.Previous, previousNode); err != nil {
+		if err := ldb.putNode(ctx, currentNode.Previous, previousNode); err != nil {
 			return err
 		}
 		if currentNode.HasNext {
 			// We aren't modifying the tail.
-			nextNode, err := ldb.getNode(currentNode.Next)
+			nextNode, err := ldb.getNode(ctx, currentNode.Next)
 			if err != nil {
 				return err
 			}
 			nextNode.HasPrevious = true
 			nextNode.Previous = currentNode.Previous
-			if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+			if err := ldb.putNode(ctx, currentNode.Next, nextNode); err != nil {
 				return err
 			}
 		}
@@ -190,13 +191,13 @@ func (ldb *linkedDB) Delete(key []byte) error {
 		if err := ldb.putHeadKey(currentNode.Next); err != nil {
 			return err
 		}
-		nextNode, err := ldb.getNode(currentNode.Next)
+		nextNode, err := ldb.getNode(ctx, currentNode.Next)
 		if err != nil {
 			return err
 		}
 		nextNode.HasPrevious = false
 		nextNode.Previous = nil
-		if err := ldb.putNode(currentNode.Next, nextNode); err != nil {
+		if err := ldb.putNode(ctx, currentNode.Next, nextNode); err != nil {
 			return err
 		}
 	}
@@ -226,7 +227,7 @@ func (ldb *linkedDB) Head() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	head, err := ldb.getNode(headKey)
+	head, err := ldb.getNode(context.TODO(), headKey)
 	return headKey, head.Value, err
 }
 
@@ -241,7 +242,7 @@ func (ldb *linkedDB) NewIterator() database.Iterator {
 // order.
 // If [start] is not in the list, starts iterating from the list head.
 func (ldb *linkedDB) NewIteratorWithStart(start []byte) database.Iterator {
-	hasStartKey, err := ldb.Has(start)
+	hasStartKey, err := ldb.Has(context.TODO(), start)
 	if err == nil && hasStartKey {
 		return &iterator{
 			ldb:         ldb,
@@ -265,7 +266,7 @@ func (ldb *linkedDB) getHeadKey() ([]byte, error) {
 		}
 		return nil, database.ErrNotFound
 	}
-	headKey, err := ldb.db.Get(headKey)
+	headKey, err := ldb.db.Get(context.TODO(), headKey)
 	if err == nil {
 		ldb.headKeyIsSynced = true
 		ldb.headKeyExists = true
@@ -284,16 +285,16 @@ func (ldb *linkedDB) putHeadKey(key []byte) error {
 	ldb.headKeyIsUpdated = true
 	ldb.updatedHeadKeyExists = true
 	ldb.updatedHeadKey = key
-	return ldb.batch.Put(headKey, key)
+	return ldb.batch.Put(context.TODO(), headKey, key)
 }
 
 func (ldb *linkedDB) deleteHeadKey() error {
 	ldb.headKeyIsUpdated = true
 	ldb.updatedHeadKeyExists = false
-	return ldb.batch.Delete(headKey)
+	return ldb.batch.Delete(context.TODO(), headKey)
 }
 
-func (ldb *linkedDB) getNode(key []byte) (node, error) {
+func (ldb *linkedDB) getNode(ctx context.Context, key []byte) (node, error) {
 	// If the ldb read lock is held, then there needs to be additional
 	// synchronization here to avoid racy behavior.
 	ldb.cacheLock.Lock()
@@ -307,7 +308,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 		return *n, nil
 	}
 
-	nodeBytes, err := ldb.db.Get(nodeKey(key))
+	nodeBytes, err := ldb.db.Get(ctx, nodeKey(key))
 	if err == database.ErrNotFound {
 		ldb.nodeCache.Put(keyStr, nil)
 		return node{}, err
@@ -323,18 +324,18 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	return n, err
 }
 
-func (ldb *linkedDB) putNode(key []byte, n node) error {
+func (ldb *linkedDB) putNode(ctx context.Context, key []byte, n node) error {
 	ldb.updatedNodes[string(key)] = &n
 	nodeBytes, err := c.Marshal(codecVersion, n)
 	if err != nil {
 		return err
 	}
-	return ldb.batch.Put(nodeKey(key), nodeBytes)
+	return ldb.batch.Put(ctx, nodeKey(key), nodeBytes)
 }
 
-func (ldb *linkedDB) deleteNode(key []byte) error {
+func (ldb *linkedDB) deleteNode(ctx context.Context, key []byte) error {
 	ldb.updatedNodes[string(key)] = nil
-	return ldb.batch.Delete(nodeKey(key))
+	return ldb.batch.Delete(ctx, nodeKey(key))
 }
 
 func (ldb *linkedDB) resetBatch() {
@@ -396,7 +397,7 @@ func (it *iterator) Next() bool {
 		it.nextKey = headKey
 	}
 
-	nextNode, err := it.ldb.getNode(it.nextKey)
+	nextNode, err := it.ldb.getNode(context.TODO(), it.nextKey)
 	if err == database.ErrNotFound {
 		it.exhausted = true
 		it.key = nil

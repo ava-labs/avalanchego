@@ -7,7 +7,10 @@
 
 package database
 
-import "golang.org/x/exp/slices"
+import (
+	"context"
+	"golang.org/x/exp/slices"
+)
 
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
@@ -26,7 +29,7 @@ type Batch interface {
 
 	// Replay replays the batch contents in the same order they were written
 	// to the batch.
-	Replay(w KeyValueWriterDeleter) error
+	Replay(ctx context.Context, w KeyValueWriterDeleter) error
 
 	// Inner returns a Batch writing to the inner database, if one exists. If
 	// this batch is already writing to the base DB, then itself should be
@@ -52,7 +55,7 @@ type BatchOps struct {
 	size int
 }
 
-func (b *BatchOps) Put(key, value []byte) error {
+func (b *BatchOps) Put(_ context.Context, key, value []byte) error {
 	b.Ops = append(b.Ops, BatchOp{
 		Key:   slices.Clone(key),
 		Value: slices.Clone(value),
@@ -61,7 +64,7 @@ func (b *BatchOps) Put(key, value []byte) error {
 	return nil
 }
 
-func (b *BatchOps) Delete(key []byte) error {
+func (b *BatchOps) Delete(_ context.Context, key []byte) error {
 	b.Ops = append(b.Ops, BatchOp{
 		Key:    slices.Clone(key),
 		Delete: true,
@@ -79,13 +82,13 @@ func (b *BatchOps) Reset() {
 	b.size = 0
 }
 
-func (b *BatchOps) Replay(w KeyValueWriterDeleter) error {
+func (b *BatchOps) Replay(ctx context.Context, w KeyValueWriterDeleter) error {
 	for _, op := range b.Ops {
 		if op.Delete {
-			if err := w.Delete(op.Key); err != nil {
+			if err := w.Delete(ctx, op.Key); err != nil {
 				return err
 			}
-		} else if err := w.Put(op.Key, op.Value); err != nil {
+		} else if err := w.Put(ctx, op.Key, op.Value); err != nil {
 			return err
 		}
 	}

@@ -29,9 +29,9 @@ func newNoopTracer() trace.Tracer {
 func Test_MerkleDB_Get_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+	require.NoError(t, db.Put(context.Background(), []byte{0}, []byte{0, 1, 2}))
 
-	val, err := db.Get([]byte{0})
+	val, err := db.Get(context.Background(), []byte{0})
 	require.NoError(t, err)
 	n, err := db.getNode(newPath([]byte{0}))
 	require.NoError(t, err)
@@ -44,7 +44,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+	require.NoError(t, db.Put(context.Background(), []byte{0}, []byte{0, 1, 2}))
 
 	vals, errs := db.GetValues(context.Background(), [][]byte{{0}})
 	require.Len(t, errs, 1)
@@ -177,11 +177,11 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	_ = memDB.Close()
 
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("1"))
+	err = batch.Put(context.Background(), []byte("key1"), []byte("1"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key2"), []byte("2"))
+	err = batch.Put(context.Background(), []byte("key2"), []byte("2"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key3"), []byte("3"))
+	err = batch.Put(context.Background(), []byte("key3"), []byte("3"))
 	require.NoError(t, err)
 	err = batch.Write()
 	// batch fails
@@ -202,10 +202,10 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	require.NoError(t, err)
 
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("1"))
+	err = batch.Put(context.Background(), []byte("key1"), []byte("1"))
 	require.NoError(t, err)
 
-	err = batch.Put([]byte("key2"), []byte("2"))
+	err = batch.Put(context.Background(), []byte("key2"), []byte("2"))
 	require.NoError(t, err)
 
 	require.NoError(t, err)
@@ -214,7 +214,7 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 
 	batch = db.NewBatch()
 	// force key2 to be inserted into the cache as not found
-	err = batch.Delete([]byte("key2"))
+	err = batch.Delete(context.Background(), []byte("key2"))
 	require.NoError(t, err)
 	err = batch.Write()
 	require.NoError(t, err)
@@ -222,12 +222,12 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	_ = memDB.Close()
 
 	// still works because key1 is read from cache
-	value, err := db.Get([]byte("key1"))
+	value, err := db.Get(context.Background(), []byte("key1"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("1"), value)
 
 	// still returns missing instead of closed because key2 is read from cache
-	_, err = db.Get([]byte("key2"))
+	_, err = db.Get(context.Background(), []byte("key2"))
 	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
@@ -259,11 +259,11 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("1"))
+	err = batch.Put(context.Background(), []byte("key1"), []byte("1"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key2"), []byte("2"))
+	err = batch.Put(context.Background(), []byte("key2"), []byte("2"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key3"), []byte("3"))
+	err = batch.Put(context.Background(), []byte("key3"), []byte("3"))
 	require.NoError(t, err)
 	err = batch.Write()
 	require.NoError(t, err)
@@ -277,7 +277,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	err = freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof)
 	require.NoError(t, err)
 
-	value, err := freshDB.Get([]byte("key2"))
+	value, err := freshDB.Get(context.Background(), []byte("key2"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("2"), value)
 
@@ -292,11 +292,11 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("1"))
+	err = batch.Put(context.Background(), []byte("key1"), []byte("1"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key2"), []byte("2"))
+	err = batch.Put(context.Background(), []byte("key2"), []byte("2"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key3"), []byte("3"))
+	err = batch.Put(context.Background(), []byte("key3"), []byte("3"))
 	require.NoError(t, err)
 	err = batch.Write()
 	require.NoError(t, err)
@@ -307,13 +307,13 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	freshDB, err := getBasicDB()
 	require.NoError(t, err)
 	batch = freshDB.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("3"))
+	err = batch.Put(context.Background(), []byte("key1"), []byte("3"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key2"), []byte("4"))
+	err = batch.Put(context.Background(), []byte("key2"), []byte("4"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key3"), []byte("5"))
+	err = batch.Put(context.Background(), []byte("key3"), []byte("5"))
 	require.NoError(t, err)
-	err = batch.Put([]byte("key25"), []byte("5"))
+	err = batch.Put(context.Background(), []byte("key25"), []byte("5"))
 	require.NoError(t, err)
 	err = batch.Write()
 	require.NoError(t, err)
@@ -321,7 +321,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	err = freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof)
 	require.NoError(t, err)
 
-	value, err := freshDB.Get([]byte("key2"))
+	value, err := freshDB.Get(context.Background(), []byte("key2"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("2"), value)
 
@@ -359,12 +359,12 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key0"), nil)
+	err = batch.Put(context.Background(), []byte("key0"), nil)
 	require.NoError(t, err)
 	err = batch.Write()
 	require.NoError(t, err)
 
-	value, err := db.Get([]byte("key0"))
+	value, err := db.Get(context.Background(), []byte("key0"))
 	require.NoError(t, err)
 	require.Nil(t, value)
 
@@ -378,15 +378,15 @@ func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
 	require.NoError(t, err)
 
 	// value hasn't been inserted so shouldn't exist
-	value, err := db.Get([]byte("key"))
+	value, err := db.Get(context.Background(), []byte("key"))
 	require.Error(t, err)
 	require.Equal(t, database.ErrNotFound, err)
 	require.Nil(t, value)
 
-	err = db.Put([]byte("key"), []byte("value"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value"))
 	require.NoError(t, err)
 
-	value, err = db.Get([]byte("key"))
+	value, err = db.Get(context.Background(), []byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value"), value)
 }
@@ -403,17 +403,17 @@ func Test_MerkleDB_Overwrite(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value0"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value0"))
 	require.NoError(t, err)
 
-	value, err := db.Get([]byte("key"))
+	value, err := db.Get(context.Background(), []byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value0"), value)
 
-	err = db.Put([]byte("key"), []byte("value1"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value1"))
 	require.NoError(t, err)
 
-	value, err = db.Get([]byte("key"))
+	value, err = db.Get(context.Background(), []byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value1"), value)
 }
@@ -422,17 +422,17 @@ func Test_MerkleDB_Delete(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value0"))
+	err = db.Put(context.Background(), []byte("key"), []byte("value0"))
 	require.NoError(t, err)
 
-	value, err := db.Get([]byte("key"))
+	value, err := db.Get(context.Background(), []byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value0"), value)
 
-	err = db.Delete([]byte("key"))
+	err = db.Delete(context.Background(), []byte("key"))
 	require.NoError(t, err)
 
-	value, err = db.Get([]byte("key"))
+	value, err = db.Get(context.Background(), []byte("key"))
 	require.ErrorIs(t, err, database.ErrNotFound)
 	require.Nil(t, value)
 }
@@ -441,7 +441,7 @@ func Test_MerkleDB_DeleteMissingKey(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 
-	err = db.Delete([]byte("key"))
+	err = db.Delete(context.Background(), []byte("key"))
 	require.NoError(t, err)
 }
 
@@ -514,9 +514,9 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
-	err = db.Put([]byte{1}, []byte{1})
+	err = db.Put(context.Background(), []byte{1}, []byte{1})
 	require.NoError(err)
-	err = db.Put([]byte{2}, []byte{2})
+	err = db.Put(context.Background(), []byte{2}, []byte{2})
 	require.NoError(err)
 
 	// Make a view and inser/delete a key-value pair.
@@ -554,12 +554,12 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the key-value pairs are correct.
-	_, err = db.Get([]byte{1})
+	_, err = db.Get(context.Background(), []byte{1})
 	require.ErrorIs(err, database.ErrNotFound)
-	value, err := db.Get([]byte{2})
+	value, err := db.Get(context.Background(), []byte{2})
 	require.NoError(err)
 	require.Equal([]byte{2}, value)
-	value, err = db.Get([]byte{3})
+	value, err = db.Get(context.Background(), []byte{3})
 	require.NoError(err)
 	require.Equal([]byte{3}, value)
 
@@ -772,12 +772,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		require.LessOrEqual(i, len(rt))
 		switch step.op {
 		case opUpdate:
-			err := currentBatch.Put(step.key, step.value)
+			err := currentBatch.Put(context.Background(), step.key, step.value)
 			require.NoError(err)
 			currentValues[newPath(step.key)] = step.value
 			delete(deleteValues, newPath(step.key))
 		case opDelete:
-			err := currentBatch.Delete(step.key)
+			err := currentBatch.Delete(context.Background(), step.key)
 			require.NoError(err)
 			deleteValues[newPath(step.key)] = struct{}{}
 			delete(currentValues, newPath(step.key))
@@ -847,7 +847,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			deleteValues = map[path]struct{}{}
 			currentBatch = db.NewBatch()
 		case opGet:
-			v, err := db.Get(step.key)
+			v, err := db.Get(context.Background(), step.key)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}

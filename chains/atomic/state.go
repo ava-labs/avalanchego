@@ -5,6 +5,7 @@ package atomic
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -82,7 +83,7 @@ func (s *state) SetValue(e *Element) error {
 		if !value.Present {
 			// This was previously optimistically deleted from the database, so
 			// it should be immediately removed.
-			return s.valueDB.Delete(e.Key)
+			return s.valueDB.Delete(context.TODO(), e.Key)
 		}
 
 		// This key was written twice, which is invalid
@@ -96,7 +97,7 @@ func (s *state) SetValue(e *Element) error {
 	for _, trait := range e.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
 		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Put(e.Key, nil); err != nil {
+		if err := traitList.Put(context.TODO(), e.Key, nil); err != nil {
 			return err
 		}
 	}
@@ -111,7 +112,7 @@ func (s *state) SetValue(e *Element) error {
 	if err != nil {
 		return err
 	}
-	return s.valueDB.Put(e.Key, valueBytes)
+	return s.valueDB.Put(context.TODO(), e.Key, valueBytes)
 }
 
 // RemoveValue removes [key] from the state.
@@ -155,7 +156,7 @@ func (s *state) RemoveValue(key []byte) error {
 		if err != nil {
 			return err
 		}
-		return s.valueDB.Put(key, valueBytes)
+		return s.valueDB.Put(context.TODO(), key, valueBytes)
 	}
 
 	// Don't allow the removal of something that was already removed.
@@ -167,17 +168,17 @@ func (s *state) RemoveValue(key []byte) error {
 	for _, trait := range value.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
 		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Delete(key); err != nil {
+		if err := traitList.Delete(context.TODO(), key); err != nil {
 			return err
 		}
 	}
-	return s.valueDB.Delete(key)
+	return s.valueDB.Delete(context.TODO(), key)
 }
 
 // loadValue retrieves the dbElement corresponding to [key] from the value
 // database.
 func (s *state) loadValue(key []byte) (*dbElement, error) {
-	valueBytes, err := s.valueDB.Get(key)
+	valueBytes, err := s.valueDB.Get(context.TODO(), key)
 	if err != nil {
 		return nil, err
 	}

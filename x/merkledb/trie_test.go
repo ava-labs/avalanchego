@@ -273,7 +273,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	err = trie.CommitToDB(context.Background())
 	require.NoError(t, err)
 	p := newPath([]byte("key"))
-	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
+	rawBytes, err := dbTrie.nodeDB.Get(context.Background(), p.Bytes())
 	require.NoError(t, err)
 	node, err := parseNode(p, rawBytes)
 	require.NoError(t, err)
@@ -287,7 +287,7 @@ func Test_Trie_InsertAndRetrieve(t *testing.T) {
 	trie := Trie(dbTrie)
 
 	// value hasn't been inserted so shouldn't exist
-	value, err := dbTrie.Get([]byte("key"))
+	value, err := dbTrie.Get(context.Background(), []byte("key"))
 	require.Error(t, err)
 	require.Equal(t, database.ErrNotFound, err)
 	require.Nil(t, value)

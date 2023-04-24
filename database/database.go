@@ -8,6 +8,7 @@
 package database
 
 import (
+	"context"
 	"io"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -18,13 +19,13 @@ type KeyValueReader interface {
 	// Has retrieves if a key is present in the key-value data store.
 	//
 	// Note: [key] is safe to modify and read after calling Has.
-	Has(key []byte) (bool, error)
+	Has(ctx context.Context, key []byte) (bool, error)
 
 	// Get retrieves the given key if it's present in the key-value data store.
 	//
 	// Note: [key] is safe to modify and read after calling Get.
 	// The returned byte slice is safe to read, but cannot be modified.
-	Get(key []byte) ([]byte, error)
+	Get(ctx context.Context, key []byte) ([]byte, error)
 }
 
 // KeyValueWriter wraps the Put method of a backing data store.
@@ -37,7 +38,7 @@ type KeyValueWriter interface {
 	// it may be nil or an empty slice.
 	//
 	// Similarly, a nil [key] is treated the same as an empty slice.
-	Put(key []byte, value []byte) error
+	Put(ctx context.Context, key []byte, value []byte) error
 }
 
 // KeyValueDeleter wraps the Delete method of a backing data store.
@@ -45,7 +46,7 @@ type KeyValueDeleter interface {
 	// Delete removes the key from the key-value data store.
 	//
 	// Note: [key] is safe to modify and read after calling Delete.
-	Delete(key []byte) error
+	Delete(ctx context.Context, key []byte) error
 }
 
 // KeyValueReaderWriter allows read/write acccess to a backing data store.
@@ -80,7 +81,7 @@ type Compacter interface {
 	// Therefore if both are nil then it will compact entire DB.
 	//
 	// Note: [start] and [limit] are safe to modify and read after calling Compact.
-	Compact(start []byte, limit []byte) error
+	Compact(ctx context.Context, start []byte, limit []byte) error
 }
 
 // Database contains all the methods required to allow handling different

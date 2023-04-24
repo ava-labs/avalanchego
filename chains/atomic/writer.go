@@ -4,18 +4,19 @@
 package atomic
 
 import (
+	"context"
 	"github.com/ava-labs/avalanchego/database"
 )
 
 // WriteAll writes all of the batches to the underlying database of baseBatch.
 // Assumes all batches have the same underlying database.
-func WriteAll(baseBatch database.Batch, batches ...database.Batch) error {
+func WriteAll(ctx context.Context, baseBatch database.Batch, batches ...database.Batch) error {
 	baseBatch = baseBatch.Inner()
 	// Replay the inner batches onto [baseBatch] so that it includes all DB
 	// operations as they would be applied to the base database.
 	for _, batch := range batches {
 		batch = batch.Inner()
-		if err := batch.Replay(baseBatch); err != nil {
+		if err := batch.Replay(ctx, baseBatch); err != nil {
 			return err
 		}
 	}

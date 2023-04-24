@@ -4,6 +4,7 @@
 package database
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -21,11 +22,11 @@ const (
 var errWrongSize = errors.New("value has unexpected size")
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
-	return db.Put(key, val[:])
+	return db.Put(context.TODO(), key, val[:])
 }
 
 func GetID(db KeyValueReader, key []byte) (ids.ID, error) {
-	b, err := db.Get(key)
+	b, err := db.Get(context.TODO(), key)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -38,11 +39,11 @@ func ParseID(b []byte) (ids.ID, error) {
 
 func PutUInt64(db KeyValueWriter, key []byte, val uint64) error {
 	b := PackUInt64(val)
-	return db.Put(key, b)
+	return db.Put(context.TODO(), key, b)
 }
 
 func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
-	b, err := db.Get(key)
+	b, err := db.Get(context.TODO(), key)
 	if err != nil {
 		return 0, err
 	}
@@ -64,11 +65,11 @@ func ParseUInt64(b []byte) (uint64, error) {
 
 func PutUInt32(db KeyValueWriter, key []byte, val uint32) error {
 	b := PackUInt32(val)
-	return db.Put(key, b)
+	return db.Put(context.TODO(), key, b)
 }
 
 func GetUInt32(db KeyValueReader, key []byte) (uint32, error) {
-	b, err := db.Get(key)
+	b, err := db.Get(context.TODO(), key)
 	if err != nil {
 		return 0, err
 	}
@@ -93,11 +94,11 @@ func PutTimestamp(db KeyValueWriter, key []byte, val time.Time) error {
 	if err != nil {
 		return err
 	}
-	return db.Put(key, valBytes)
+	return db.Put(context.TODO(), key, valBytes)
 }
 
 func GetTimestamp(db KeyValueReader, key []byte) (time.Time, error) {
-	b, err := db.Get(key)
+	b, err := db.Get(context.TODO(), key)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -114,13 +115,13 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 
 func PutBool(db KeyValueWriter, key []byte, b bool) error {
 	if b {
-		return db.Put(key, []byte{1})
+		return db.Put(context.TODO(), key, []byte{1})
 	}
-	return db.Put(key, []byte{0})
+	return db.Put(context.TODO(), key, []byte{0})
 }
 
 func GetBool(db KeyValueReader, key []byte) (bool, error) {
-	b, err := db.Get(key)
+	b, err := db.Get(context.TODO(), key)
 	switch {
 	case err != nil:
 		return false, err
@@ -171,7 +172,7 @@ func ClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) er
 
 	for iterator.Next() {
 		key := iterator.Key()
-		if err := deleterDB.Delete(key); err != nil {
+		if err := deleterDB.Delete(context.TODO(), key); err != nil {
 			return err
 		}
 	}

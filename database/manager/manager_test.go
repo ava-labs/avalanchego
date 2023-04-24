@@ -4,6 +4,7 @@
 package manager
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -204,8 +205,8 @@ func TestPrefixDBManager(t *testing.T) {
 	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
 	v1 := []byte{'w', 'u', 'r', 's', 't'}
 
-	require.NoError(db0.Put(k0, v0))
-	require.NoError(db1.Put(k1, v1))
+	require.NoError(db0.Put(context.Background(), k0, v0))
+	require.NoError(db1.Put(context.Background(), k1, v1))
 	require.NoError(db0.Close())
 	require.NoError(db1.Close())
 
@@ -219,11 +220,11 @@ func TestPrefixDBManager(t *testing.T) {
 	m0 := m.NewPrefixDBManager(prefix0)
 	m1 := m0.NewPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Database.Get(k0)
+	val, err := m0.Current().Database.Get(context.Background(), k0)
 	require.NoError(err)
 	require.Equal(v0, val)
 
-	val, err = m1.Current().Database.Get(k1)
+	val, err = m1.Current().Database.Get(context.Background(), k1)
 	require.NoError(err)
 	require.Equal(v1, val)
 }
@@ -244,8 +245,8 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
 	v1 := []byte{'w', 'u', 'r', 's', 't'}
 
-	require.NoError(db0.Put(k0, v0))
-	require.NoError(db1.Put(k1, v1))
+	require.NoError(db0.Put(context.Background(), k0, v0))
+	require.NoError(db1.Put(context.Background(), k1, v1))
 	require.NoError(db0.Close())
 	require.NoError(db1.Close())
 
@@ -259,11 +260,11 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	m0 := m.NewNestedPrefixDBManager(prefix0)
 	m1 := m0.NewNestedPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Database.Get(k0)
+	val, err := m0.Current().Database.Get(context.Background(), k0)
 	require.NoError(err)
 	require.Equal(v0, val)
 
-	val, err = m1.Current().Database.Get(k1)
+	val, err = m1.Current().Database.Get(context.Background(), k1)
 	require.NoError(err)
 	require.Equal(v1, val)
 }

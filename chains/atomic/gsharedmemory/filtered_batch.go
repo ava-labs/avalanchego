@@ -14,14 +14,14 @@ type filteredBatch struct {
 	deletes set.Set[string]
 }
 
-func (b *filteredBatch) Put(key []byte, value []byte) error {
+func (b *filteredBatch) Put(_ context.Context, key []byte, value []byte) error {
 	keyStr := string(key)
 	b.deletes.Remove(keyStr)
 	b.writes[keyStr] = value
 	return nil
 }
 
-func (b *filteredBatch) Delete(key []byte) error {
+func (b *filteredBatch) Delete(_ context.Context, key []byte) error {
 	keyStr := string(key)
 	delete(b.writes, keyStr)
 	b.deletes.Add(keyStr)

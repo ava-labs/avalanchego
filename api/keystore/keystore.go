@@ -4,6 +4,7 @@
 package keystore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -199,7 +200,7 @@ func (ks *keystore) CreateUser(username, pw string) error {
 		return err
 	}
 
-	if err := ks.userDB.Put([]byte(username), passwordBytes); err != nil {
+	if err := ks.userDB.Put(context.TODO(), []byte(username), passwordBytes); err != nil {
 		return err
 	}
 	ks.usernameToPassword[username] = passwordHash
@@ -231,7 +232,7 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 
 	userNameBytes := []byte(username)
 	userBatch := ks.userDB.NewBatch()
-	if err := userBatch.Delete(userNameBytes); err != nil {
+	if err := userBatch.Delete(context.TODO(), userNameBytes); err != nil {
 		return err
 	}
 
@@ -242,7 +243,7 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	defer it.Release()
 
 	for it.Next() {
-		if err := dataBatch.Delete(it.Key()); err != nil {
+		if err := dataBatch.Delete(context.TODO(), it.Key()); err != nil {
 			return err
 		}
 	}
@@ -251,7 +252,7 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 		return err
 	}
 
-	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+	if err := atomic.WriteAll(context.TODO(), dataBatch, userBatch); err != nil {
 		return err
 	}
 
@@ -307,19 +308,19 @@ func (ks *keystore) ImportUser(username, pw string, userBytes []byte) error {
 	}
 
 	userBatch := ks.userDB.NewBatch()
-	if err := userBatch.Put([]byte(username), usrBytes); err != nil {
+	if err := userBatch.Put(context.TODO(), []byte(username), usrBytes); err != nil {
 		return err
 	}
 
 	userDataDB := prefixdb.New([]byte(username), ks.bcDB)
 	dataBatch := userDataDB.NewBatch()
 	for _, kvp := range userData.Data {
-		if err := dataBatch.Put(kvp.Key, kvp.Value); err != nil {
+		if err := dataBatch.Put(context.TODO(), kvp.Key, kvp.Value); err != nil {
 			return fmt.Errorf("error on database put: %w", err)
 		}
 	}
 
-	if err := atomic.WriteAll(dataBatch, userBatch); err != nil {
+	if err := atomic.WriteAll(context.TODO(), dataBatch, userBatch); err != nil {
 		return err
 	}
 	ks.usernameToPassword[username] = &userData.Hash
@@ -372,7 +373,7 @@ func (ks *keystore) getPassword(username string) (*password.Hash, error) {
 	}
 
 	// The user is not in memory; try the database
-	userBytes, err := ks.userDB.Get([]byte(username))
+	userBytes, err := ks.userDB.Get(context.TODO(), []byte(username))
 	if err == database.ErrNotFound {
 		// The user doesn't exist
 		return nil, nil

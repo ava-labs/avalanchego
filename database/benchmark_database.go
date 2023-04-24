@@ -4,6 +4,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -65,7 +66,7 @@ func BenchmarkGet(b *testing.B, db Database, name string, keys, values [][]byte)
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_db.get", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
-			if err := db.Put(key, value); err != nil {
+			if err := db.Put(context.Background(), key, value); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -74,7 +75,7 @@ func BenchmarkGet(b *testing.B, db Database, name string, keys, values [][]byte)
 
 		// Reads b.N values from the db
 		for i := 0; i < b.N; i++ {
-			if _, err := db.Get(keys[i%count]); err != nil {
+			if _, err := db.Get(context.Background(), keys[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Get %s", err)
 			}
 		}
@@ -91,7 +92,7 @@ func BenchmarkPut(b *testing.B, db Database, name string, keys, values [][]byte)
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_db.put", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		// Writes b.N values to the db
 		for i := 0; i < b.N; i++ {
-			if err := db.Put(keys[i%count], values[i%count]); err != nil {
+			if err := db.Put(context.Background(), keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -109,7 +110,7 @@ func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]by
 		// Writes random values of size _size_ to the database
 		for i, key := range keys {
 			value := values[i]
-			if err := db.Put(key, value); err != nil {
+			if err := db.Put(context.Background(), key, value); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -118,7 +119,7 @@ func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]by
 
 		// Deletes b.N values from the db
 		for i := 0; i < b.N; i++ {
-			if err := db.Delete(keys[i%count]); err != nil {
+			if err := db.Delete(context.Background(), keys[i%count]); err != nil {
 				b.Fatalf("Unexpected error in Delete %s", err)
 			}
 		}
@@ -135,7 +136,7 @@ func BenchmarkBatchPut(b *testing.B, db Database, name string, keys, values [][]
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_batch.put", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		batch := db.NewBatch()
 		for i := 0; i < b.N; i++ {
-			if err := batch.Put(keys[i%count], values[i%count]); err != nil {
+			if err := batch.Put(context.Background(), keys[i%count], values[i%count]); err != nil {
 				b.Fatalf("Unexpected error in batch.Put: %s", err)
 			}
 		}
@@ -152,7 +153,7 @@ func BenchmarkBatchDelete(b *testing.B, db Database, name string, keys, values [
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_batch.delete", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		batch := db.NewBatch()
 		for i := 0; i < b.N; i++ {
-			if err := batch.Delete(keys[i%count]); err != nil {
+			if err := batch.Delete(context.Background(), keys[i%count]); err != nil {
 				b.Fatalf("Unexpected error in batch.Delete: %s", err)
 			}
 		}
@@ -171,7 +172,7 @@ func BenchmarkBatchWrite(b *testing.B, db Database, name string, keys, values []
 		for i, key := range keys {
 			value := values[i]
 
-			if err := batch.Put(key, value); err != nil {
+			if err := batch.Put(context.Background(), key, value); err != nil {
 				b.Fatalf("Unexpected error in batch.Put: %s", err)
 			}
 		}
@@ -196,7 +197,7 @@ func BenchmarkParallelGet(b *testing.B, db Database, name string, keys, values [
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_db.get_parallel", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
-			if err := db.Put(key, value); err != nil {
+			if err := db.Put(context.Background(), key, value); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -205,7 +206,7 @@ func BenchmarkParallelGet(b *testing.B, db Database, name string, keys, values [
 
 		b.RunParallel(func(pb *testing.PB) {
 			for i := 0; pb.Next(); i++ {
-				if _, err := db.Get(keys[i%count]); err != nil {
+				if _, err := db.Get(context.Background(), keys[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Get %s", err)
 				}
 			}
@@ -224,7 +225,7 @@ func BenchmarkParallelPut(b *testing.B, db Database, name string, keys, values [
 		b.RunParallel(func(pb *testing.PB) {
 			// Write N values to the db
 			for i := 0; pb.Next(); i++ {
-				if err := db.Put(keys[i%count], values[i%count]); err != nil {
+				if err := db.Put(context.Background(), keys[i%count], values[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Put %s", err)
 				}
 			}
@@ -242,7 +243,7 @@ func BenchmarkParallelDelete(b *testing.B, db Database, name string, keys, value
 	b.Run(fmt.Sprintf("%s_%d_pairs_%d_keys_%d_values_db.delete_parallel", name, count, len(keys[0]), len(values[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
-			if err := db.Put(key, value); err != nil {
+			if err := db.Put(context.Background(), key, value); err != nil {
 				b.Fatalf("Unexpected error in Put %s", err)
 			}
 		}
@@ -251,7 +252,7 @@ func BenchmarkParallelDelete(b *testing.B, db Database, name string, keys, value
 		b.RunParallel(func(pb *testing.PB) {
 			// Deletes b.N values from the db
 			for i := 0; pb.Next(); i++ {
-				if err := db.Delete(keys[i%count]); err != nil {
+				if err := db.Delete(context.Background(), keys[i%count]); err != nil {
 					b.Fatalf("Unexpected error in Delete %s", err)
 				}
 			}

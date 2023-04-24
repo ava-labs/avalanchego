@@ -63,7 +63,7 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(_ context.Context, key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -74,7 +74,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return ok, nil
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(_ context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -87,7 +87,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return nil, database.ErrNotFound
 }
 
-func (db *Database) Put(key []byte, value []byte) error {
+func (db *Database) Put(_ context.Context, key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -98,7 +98,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	return nil
 }
 
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(_ context.Context, key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
@@ -155,7 +155,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(_, _ []byte) error {
+func (db *Database) Compact(_ context.Context, _, _ []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

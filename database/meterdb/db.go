@@ -39,9 +39,9 @@ func New(
 	}, err
 }
 
-func (db *Database) Has(key []byte) (bool, error) {
+func (db *Database) Has(ctx context.Context, key []byte) (bool, error) {
 	start := db.clock.Time()
-	has, err := db.db.Has(key)
+	has, err := db.db.Has(ctx, key)
 	end := db.clock.Time()
 	db.readSize.Observe(float64(len(key)))
 	db.has.Observe(float64(end.Sub(start)))
@@ -49,9 +49,9 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return has, err
 }
 
-func (db *Database) Get(key []byte) ([]byte, error) {
+func (db *Database) Get(ctx context.Context, key []byte) ([]byte, error) {
 	start := db.clock.Time()
-	value, err := db.db.Get(key)
+	value, err := db.db.Get(ctx, key)
 	end := db.clock.Time()
 	db.readSize.Observe(float64(len(key) + len(value)))
 	db.get.Observe(float64(end.Sub(start)))
@@ -59,9 +59,9 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
-func (db *Database) Put(key, value []byte) error {
+func (db *Database) Put(ctx context.Context, key, value []byte) error {
 	start := db.clock.Time()
-	err := db.db.Put(key, value)
+	err := db.db.Put(ctx, key, value)
 	end := db.clock.Time()
 	db.writeSize.Observe(float64(len(key) + len(value)))
 	db.put.Observe(float64(end.Sub(start)))
@@ -69,9 +69,9 @@ func (db *Database) Put(key, value []byte) error {
 	return err
 }
 
-func (db *Database) Delete(key []byte) error {
+func (db *Database) Delete(ctx context.Context, key []byte) error {
 	start := db.clock.Time()
-	err := db.db.Delete(key)
+	err := db.db.Delete(ctx, key)
 	end := db.clock.Time()
 	db.writeSize.Observe(float64(len(key)))
 	db.delete.Observe(float64(end.Sub(start)))
@@ -116,9 +116,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	return it
 }
 
-func (db *Database) Compact(start, limit []byte) error {
+func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
 	startTime := db.clock.Time()
-	err := db.db.Compact(start, limit)
+	err := db.db.Compact(ctx, start, limit)
 	end := db.clock.Time()
 	db.compact.Observe(float64(end.Sub(startTime)))
 	return err
@@ -145,18 +145,18 @@ type batch struct {
 	db    *Database
 }
 
-func (b *batch) Put(key, value []byte) error {
+func (b *batch) Put(ctx context.Context, key, value []byte) error {
 	start := b.db.clock.Time()
-	err := b.batch.Put(key, value)
+	err := b.batch.Put(ctx, key, value)
 	end := b.db.clock.Time()
 	b.db.bPut.Observe(float64(end.Sub(start)))
 	b.db.bPutSize.Observe(float64(len(key) + len(value)))
 	return err
 }
 
-func (b *batch) Delete(key []byte) error {
+func (b *batch) Delete(ctx context.Context, key []byte) error {
 	start := b.db.clock.Time()
-	err := b.batch.Delete(key)
+	err := b.batch.Delete(ctx, key)
 	end := b.db.clock.Time()
 	b.db.bDelete.Observe(float64(end.Sub(start)))
 	b.db.bDeleteSize.Observe(float64(len(key)))
@@ -189,9 +189,9 @@ func (b *batch) Reset() {
 	b.db.bReset.Observe(float64(end.Sub(start)))
 }
 
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
+func (b *batch) Replay(ctx context.Context, w database.KeyValueWriterDeleter) error {
 	start := b.db.clock.Time()
-	err := b.batch.Replay(w)
+	err := b.batch.Replay(ctx, w)
 	end := b.db.clock.Time()
 	b.db.bReplay.Observe(float64(end.Sub(start)))
 	return err

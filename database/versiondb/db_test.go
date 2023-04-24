@@ -5,6 +5,7 @@ package versiondb
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -35,11 +36,11 @@ func TestIterate(t *testing.T) {
 	key2 := []byte("z")
 	value2 := []byte("world2")
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
 	}
 
-	if err := db.Commit(); err != nil {
+	if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on db.Commit: %s", err)
 	}
 
@@ -65,7 +66,7 @@ func TestIterate(t *testing.T) {
 		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
 	}
 
-	if err := db.Put(key2, value2); err != nil {
+	if err := db.Put(context.Background(), key2, value2); err != nil {
 		t.Fatalf("Unexpected error on database.Put: %s", err)
 	}
 
@@ -97,7 +98,7 @@ func TestIterate(t *testing.T) {
 		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
 	}
 
-	if err := db.Delete(key1); err != nil {
+	if err := db.Delete(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on database.Delete: %s", err)
 	}
 
@@ -123,9 +124,9 @@ func TestIterate(t *testing.T) {
 		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
 	}
 
-	if err := db.Commit(); err != nil {
+	if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on database.Commit: %s", err)
-	} else if err := db.Put(key2, value1); err != nil {
+	} else if err := db.Put(context.Background(), key2, value1); err != nil {
 		t.Fatalf("Unexpected error on database.Put: %s", err)
 	}
 
@@ -151,9 +152,9 @@ func TestIterate(t *testing.T) {
 		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
 	}
 
-	if err := db.Commit(); err != nil {
+	if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on database.Commit: %s", err)
-	} else if err := db.Put(key1, value2); err != nil {
+	} else if err := db.Put(context.Background(), key1, value2); err != nil {
 		t.Fatalf("Unexpected error on database.Put: %s", err)
 	}
 
@@ -190,26 +191,26 @@ func TestCommit(t *testing.T) {
 	baseDB := memdb.New()
 	db := New(baseDB)
 
-	if err := db.Commit(); err != nil {
+	if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on db.Commit: %s", err)
 	}
 
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
 	}
 
-	if err := db.Commit(); err != nil {
+	if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on db.Commit: %s", err)
 	}
 
-	if value, err := db.Get(key1); err != nil {
+	if value, err := db.Get(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, value1) {
 		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if value, err := baseDB.Get(key1); err != nil {
+	} else if value, err := baseDB.Get(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, value1) {
 		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
@@ -223,11 +224,11 @@ func TestCommitClosed(t *testing.T) {
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
 	} else if err := db.Close(); err != nil {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
-	} else if err := db.Commit(); err != database.ErrClosed {
+	} else if err := db.Commit(context.Background()); err != database.ErrClosed {
 		t.Fatalf("Expected %s on db.Commit", database.ErrClosed)
 	}
 }
@@ -241,9 +242,9 @@ func TestCommitClosedWrite(t *testing.T) {
 
 	baseDB.Close()
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
-	} else if err := db.Commit(); err != database.ErrClosed {
+	} else if err := db.Commit(context.Background()); err != database.ErrClosed {
 		t.Fatalf("Expected %s on db.Commit", database.ErrClosed)
 	}
 }
@@ -256,9 +257,9 @@ func TestCommitClosedDelete(t *testing.T) {
 
 	baseDB.Close()
 
-	if err := db.Delete(key1); err != nil {
+	if err := db.Delete(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
-	} else if err := db.Commit(); err != database.ErrClosed {
+	} else if err := db.Commit(context.Background()); err != database.ErrClosed {
 		t.Fatalf("Expected %s on db.Commit", database.ErrClosed)
 	}
 }
@@ -270,15 +271,15 @@ func TestAbort(t *testing.T) {
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
 	}
 
-	if value, err := db.Get(key1); err != nil {
+	if value, err := db.Get(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, value1) {
 		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if has, err := baseDB.Has(key1); err != nil {
+	} else if has, err := baseDB.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
@@ -286,11 +287,11 @@ func TestAbort(t *testing.T) {
 
 	db.Abort()
 
-	if has, err := db.Has(key1); err != nil {
+	if has, err := db.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
-	} else if has, err := baseDB.Has(key1); err != nil {
+	} else if has, err := baseDB.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
@@ -304,21 +305,21 @@ func TestCommitBatch(t *testing.T) {
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	if err := db.Put(key1, value1); err != nil {
+	if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
-	} else if has, err := baseDB.Has(key1); err != nil {
+	} else if has, err := baseDB.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("Unexpected result of db.Has: %v", has)
 	}
 
-	batch, err := db.CommitBatch()
+	batch, err := db.CommitBatch(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error on db.CommitBatch: %s", err)
 	}
 	db.Abort()
 
-	if has, err := db.Has(key1); err != nil {
+	if has, err := db.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("Unexpected result of db.Has: %v", has)
@@ -326,11 +327,11 @@ func TestCommitBatch(t *testing.T) {
 		t.Fatalf("Unexpected error on batch.Write: %s", err)
 	}
 
-	if value, err := db.Get(key1); err != nil {
+	if value, err := db.Get(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, value1) {
 		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
-	} else if value, err := baseDB.Get(key1); err != nil {
+	} else if value, err := baseDB.Get(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Get: %s", err)
 	} else if !bytes.Equal(value, value1) {
 		t.Fatalf("db.Get Returned: 0x%x ; Expected: 0x%x", value, value1)
@@ -351,15 +352,15 @@ func TestSetDatabase(t *testing.T) {
 
 	if db.GetDatabase() != newDB {
 		t.Fatalf("Unexpected database from db.GetDatabase")
-	} else if err := db.Put(key1, value1); err != nil {
+	} else if err := db.Put(context.Background(), key1, value1); err != nil {
 		t.Fatalf("Unexpected error on db.Put: %s", err)
-	} else if err := db.Commit(); err != nil {
+	} else if err := db.Commit(context.Background()); err != nil {
 		t.Fatalf("Unexpected error on db.Commit: %s", err)
-	} else if has, err := baseDB.Has(key1); err != nil {
+	} else if has, err := baseDB.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if has {
 		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, false)
-	} else if has, err := newDB.Has(key1); err != nil {
+	} else if has, err := newDB.Has(context.Background(), key1); err != nil {
 		t.Fatalf("Unexpected error on db.Has: %s", err)
 	} else if !has {
 		t.Fatalf("db.Has Returned: %v ; Expected: %v", has, true)

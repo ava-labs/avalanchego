@@ -4,6 +4,7 @@
 package atomic
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -228,15 +229,15 @@ func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, 
 func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
 	require := require.New(t)
 
-	err := db.Put([]byte{1}, []byte{2})
+	err := db.Put(context.Background(), []byte{1}, []byte{2})
 	require.NoError(err)
 
 	batch := db.NewBatch()
 
-	err = batch.Put([]byte{0}, []byte{1})
+	err = batch.Put(context.Background(), []byte{0}, []byte{1})
 	require.NoError(err)
 
-	err = batch.Delete([]byte{1})
+	err = batch.Delete(context.Background(), []byte{1})
 	require.NoError(err)
 
 	err = sm0.Apply(
@@ -248,11 +249,11 @@ func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ Shared
 	)
 	require.NoError(err)
 
-	val, err := db.Get([]byte{0})
+	val, err := db.Get(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{1}, val)
 
-	has, err := db.Has([]byte{1})
+	has, err := db.Has(context.Background(), []byte{1})
 	require.NoError(err)
 	require.False(has)
 }
@@ -260,15 +261,15 @@ func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ Shared
 func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
 	require := require.New(t)
 
-	err := db.Put([]byte{1}, []byte{2})
+	err := db.Put(context.Background(), []byte{1}, []byte{2})
 	require.NoError(err)
 
 	batch := db.NewBatch()
 
-	err = batch.Put([]byte{0}, []byte{1})
+	err = batch.Put(context.Background(), []byte{0}, []byte{1})
 	require.NoError(err)
 
-	err = batch.Delete([]byte{1})
+	err = batch.Delete(context.Background(), []byte{1})
 	require.NoError(err)
 
 	err = sm0.Apply(
@@ -277,11 +278,11 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	)
 	require.NoError(err)
 
-	val, err := db.Get([]byte{0})
+	val, err := db.Get(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{1}, val)
 
-	has, err := db.Has([]byte{1})
+	has, err := db.Has(context.Background(), []byte{1})
 	require.NoError(err)
 	require.False(has)
 }
@@ -292,7 +293,7 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 SharedMemory
 
 	batch := db.NewBatch()
 
-	err := batch.Put([]byte{0}, []byte{1})
+	err := batch.Put(context.Background(), []byte{0}, []byte{1})
 	require.NoError(err)
 
 	batchChainsAndInputs := make(map[ids.ID]*Requests)
@@ -311,7 +312,7 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 SharedMemory
 
 	require.NoError(err)
 
-	val, err := db.Get([]byte{0})
+	val, err := db.Get(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{1}, val)
 }
@@ -341,17 +342,17 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		value := bytes[:elementSize]
 		bytes = bytes[elementSize:]
 
-		err := batch.Put(key, value)
+		err := batch.Put(context.Background(), key, value)
 		require.NoError(err)
 	}
 
-	err = db.Put([]byte{1}, []byte{2})
+	err = db.Put(context.Background(), []byte{1}, []byte{2})
 	require.NoError(err)
 
-	err = batch.Put([]byte{0}, []byte{1})
+	err = batch.Put(context.Background(), []byte{0}, []byte{1})
 	require.NoError(err)
 
-	err = batch.Delete([]byte{1})
+	err = batch.Delete(context.Background(), []byte{1})
 	require.NoError(err)
 
 	err = sm0.Apply(
@@ -360,11 +361,11 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	)
 	require.NoError(err)
 
-	val, err := db.Get([]byte{0})
+	val, err := db.Get(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{1}, val)
 
-	has, err := db.Has([]byte{1})
+	has, err := db.Has(context.Background(), []byte{1})
 	require.NoError(err)
 	require.False(has)
 
@@ -375,7 +376,7 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		key := bytes[:elementSize]
 		bytes = bytes[pairSize:]
 
-		err := batch.Delete(key)
+		err := batch.Delete(context.Background(), key)
 		require.NoError(err)
 	}
 
@@ -393,7 +394,7 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		key := bytes[:elementSize]
 		bytes = bytes[pairSize:]
 
-		err := batch.Delete(key)
+		err := batch.Delete(context.Background(), key)
 		require.NoError(err)
 	}
 
