@@ -48,7 +48,7 @@ func TestRegisterBadVM(t *testing.T) {
 	// Since this factory produces a bad vm, we should get an error.
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
 
-	require.Error(t, resources.registerer.Register(context.Background(), id, vmFactory))
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errNotVM)
 }
 
 // Tests Register if creating endpoints for a VM fails + shutdown fails
@@ -245,7 +245,7 @@ func TestRegisterWithReadLockBadVM(t *testing.T) {
 	// Since this factory produces a bad vm, we should get an error.
 	vmFactory.EXPECT().New(logging.NoLog{}).Times(1).Return(vm, nil)
 
-	require.Error(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory))
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errNotVM)
 }
 
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown fails
