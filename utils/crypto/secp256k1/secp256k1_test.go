@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -100,7 +101,7 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	copy(sig[32:], newSBytes[:])
 
 	_, err = f.RecoverPublicKey(msg, sig)
-	require.Error(err)
+	require.ErrorIs(err, errMutatedSig)
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
@@ -123,30 +124,47 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 	tests := []struct {
 		label string
 		in    []byte
+		err   error
 	}{
 		{
-			"too short",
-			[]byte(`"`),
+			label: "too short",
+			in:    []byte(`"`),
+			err:   errMissingQuotes,
 		},
 		{
-			"missing start quote",
-			[]byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			label: "missing start quote",
+			in:    []byte(`PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			err:   errMissingQuotes,
 		},
 		{
-			"missing end quote",
-			[]byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
+			label: "missing end quote",
+			in:    []byte(`"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`),
+			err:   errMissingQuotes,
 		},
 		{
-			"incorrect prefix",
-			[]byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			label: "incorrect prefix",
+			in:    []byte(`"PrivateKfy-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"`),
+			err:   errMissingKeyPrefix,
 		},
 		{
-			`"PrivateKey-"`,
-			[]byte(`"PrivateKey-"`),
+			label: `"PrivateKey-"`,
+			in:    []byte(`"PrivateKey-"`),
+			err:   cb58.ErrBase58Decoding,
 		},
 		{
-			`"PrivateKey-1"`,
-			[]byte(`"PrivateKey-1"`),
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-1"`),
+			err:   cb58.ErrMissingChecksum,
+		},
+		{
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-1"`),
+			err:   cb58.ErrMissingChecksum,
+		},
+		{
+			label: `"PrivateKey-1"`,
+			in:    []byte(`"PrivateKey-45PJLL"`),
+			err:   errInvalidPrivateKeyLength,
 		},
 	}
 	for _, tt := range tests {
@@ -155,7 +173,7 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 
 			foo := PrivateKey{}
 			err := foo.UnmarshalJSON(tt.in)
-			require.Error(err)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }

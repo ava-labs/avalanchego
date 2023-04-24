@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestUnsignedMessage(t *testing.T) {
@@ -29,6 +29,9 @@ func TestUnsignedMessage(t *testing.T) {
 }
 
 func TestParseUnsignedMessageJunk(t *testing.T) {
-	_, err := ParseUnsignedMessage(utils.RandomBytes(1024))
-	require.Error(t, err)
+	require := require.New(t)
+
+	bytes := []byte{0, 1, 2, 3, 4, 5, 6, 7}
+	_, err := ParseUnsignedMessage(bytes)
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }

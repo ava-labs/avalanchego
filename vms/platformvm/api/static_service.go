@@ -30,9 +30,10 @@ import (
 // state of the network.
 
 var (
-	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
-	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
-	errStakeOverflow        = errors.New("validator stake exceeds limit")
+	errUTXOHasNoValue         = errors.New("genesis UTXO has no value")
+	errValidatorHasNoWeight   = errors.New("validator has not weight")
+	errValidatorAlreadyExited = errors.New("validator would have already unstaked")
+	errStakeOverflow          = errors.New("validator stake exceeds limit")
 
 	_ utils.Sortable[UTXO] = UTXO{}
 )
@@ -278,10 +279,10 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		}
 
 		if weight == 0 {
-			return errValidatorAddsNoValue
+			return errValidatorHasNoWeight
 		}
 		if uint64(vdr.EndTime) <= uint64(args.Time) {
-			return errValidatorAddsNoValue
+			return errValidatorAlreadyExited
 		}
 
 		owner := &secp256k1fx.OutputOwners{
