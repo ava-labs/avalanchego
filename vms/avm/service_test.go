@@ -1664,7 +1664,7 @@ func TestServiceGetNilTx(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{}, &reply)
-	require.Error(t, err, "Nil TxID should have returned an error")
+	require.ErrorIs(t, err, errNilTxID)
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
@@ -1677,8 +1677,8 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	}()
 
 	reply := api.GetTxReply{}
-	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.Empty}, &reply)
-	require.Error(t, err, "Unknown TxID should have returned an error")
+	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
+	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
 func TestServiceGetUTXOs(t *testing.T) {

@@ -31,7 +31,7 @@ func TestMultiGathererDuplicatedPrefix(t *testing.T) {
 	require.NoError(err)
 
 	err = g.Register("", og)
-	require.Equal(errDuplicatedPrefix, err)
+	require.ErrorIs(err, errDuplicatedPrefix)
 
 	err = g.Register("lol", og)
 	require.NoError(err)

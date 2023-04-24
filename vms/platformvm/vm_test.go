@@ -69,7 +69,9 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -682,20 +684,17 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	)
 	require.NoError(err)
 
-	blk := vm.manager.NewBlock(statelessBlk)
-	require.NoError(err)
-
-	blkBytes := blk.Bytes()
+	blkBytes := statelessBlk.Bytes()
 
 	parsedBlock, err := vm.ParseBlock(context.Background(), blkBytes)
 	require.NoError(err)
 
 	err = parsedBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, txexecutor.ErrTimestampNotBeforeStartTime)
 
 	txID := statelessBlk.Txs()[0].ID()
 	reason := vm.Builder.GetDropReason(txID)
-	require.Error(reason)
+	require.ErrorIs(reason, txexecutor.ErrTimestampNotBeforeStartTime)
 }
 
 // Reject attempt to add validator to primary network
@@ -733,7 +732,7 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(blk.Reject(context.Background()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
-	require.Error(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -753,7 +752,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	// Use nodeID that is already in the genesis
 	repeatNodeID := ids.NodeID(keys[0].PublicKey().Address())
 
-	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create valid tx
@@ -771,7 +770,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// trigger block creation
 	err = vm.Builder.AddUnverifiedTx(tx)
-	require.Error(err, "should have erred due to adding a validator with a nodeID that is already in the validator set")
+	require.ErrorIs(err, txexecutor.ErrAlreadyValidator)
 }
 
 // Accept proposal to add validator to subnet
@@ -854,7 +853,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(blk.Reject(context.Background()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
-	require.Error(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in validator set
 	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
@@ -1162,7 +1161,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 	_, err := vm.Builder.BuildBlock(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, blockbuilder.ErrNoPendingBlocks)
 }
 
 // test acceptance of proposal to create a new chain
@@ -1346,7 +1345,7 @@ func TestAtomicImport(t *testing.T) {
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	require.Error(err, "should have errored due to missing utxos")
+	require.ErrorIs(err, txbuilder.ErrNoFunds)
 
 	// Provide the avm UTXO
 
@@ -1457,13 +1456,13 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	blk := vm.manager.NewBlock(statelessBlk)
 
 	err = blk.Verify(context.Background())
-	require.Error(err, "should have erred due to missing UTXOs")
+	require.ErrorIs(err, database.ErrNotFound) // erred due to missing shared memory UTXOs
 
 	err = vm.SetState(context.Background(), snow.Bootstrapping)
 	require.NoError(err)
 
 	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(err) // skips shared memory UTXO verification during bootstrapping
 
 	err = blk.Accept(context.Background())
 	require.NoError(err)

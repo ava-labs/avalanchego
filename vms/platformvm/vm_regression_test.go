@@ -35,9 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -49,7 +48,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	validatorStartTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -85,7 +84,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(firstAdvanceTimeBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
@@ -120,7 +119,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	vm.clock.Set(secondDelegatorStartTime.Add(-10 * txexecutor.SyncBound))
+	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -160,11 +159,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// trigger block creation
 	err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
-	require.Error(err, "should have marked the delegator as being over delegated")
+	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
-	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -185,19 +184,16 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 	delegator4Stake := defaultMaxValidatorStake - validatorStake - defaultMinValidatorStake
 
 	tests := []struct {
-		name       string
-		ap3Time    time.Time
-		shouldFail bool
+		name    string
+		ap3Time time.Time
 	}{
 		{
-			name:       "pre-upgrade is no longer restrictive",
-			ap3Time:    validatorEndTime,
-			shouldFail: false,
+			name:    "pre-upgrade is no longer restrictive",
+			ap3Time: validatorEndTime,
 		},
 		{
-			name:       "post-upgrade calculate max stake correctly",
-			ap3Time:    defaultGenesisTime,
-			shouldFail: false,
+			name:    "post-upgrade calculate max stake correctly",
+			ap3Time: defaultGenesisTime,
 		},
 	}
 
@@ -333,12 +329,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// trigger block creation for the fourth add delegator tx
 			addFourthDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
-
-			if test.shouldFail {
-				require.Error(err, "should have failed to allow new delegator")
-				return
-			}
-
 			require.NoError(err)
 			require.NoError(addFourthDelegatorBlock.Verify(context.Background()))
 			require.NoError(addFourthDelegatorBlock.Accept(context.Background()))
@@ -490,7 +480,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	newValidatorStartTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
 	key, err := testKeyFactory.NewPrivateKey()
@@ -596,7 +586,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
 	err = importBlk.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Because we no longer ever reject a block in verification, the status
 	// should remain as processing.
@@ -714,7 +704,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
-	newValidatorStartTime0 := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID0 := ids.NodeID(ids.GenerateTestShortID())
@@ -852,7 +842,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
 	err = importBlk.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Because we no longer ever reject a block in verification, the status
 	// should remain as processing.
@@ -892,7 +882,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlkStatus = importBlk.Status()
 	require.Equal(choices.Processing, importBlkStatus)
 
-	newValidatorStartTime1 := newValidatorStartTime0.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
 
 	nodeID1 := ids.NodeID(ids.GenerateTestShortID())
@@ -1062,7 +1052,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		require.Equal(weight, validators[nodeID].Weight)
 	}
 
-	newValidatorStartTime0 := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
 	nodeID5 := ids.GenerateTestNodeID()
@@ -1165,7 +1155,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 	validatorStake := defaultMaxValidatorStake / 5
 
@@ -1254,13 +1244,14 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// attempting to issue the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	require.Error(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
+	err = vm.Builder.AddUnverifiedTx(addSecondDelegatorTx)
+	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(CortinaFork)
@@ -1382,7 +1373,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *testing.T) {
 	require := require.New(t)
 
-	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(CortinaFork)
