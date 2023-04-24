@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -33,7 +34,7 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 		return vtx
 	}
 
-	bytes, err := s.db.Get(id[:])
+	bytes, err := s.db.Get(context.TODO(), id[:])
 	if err != nil {
 		s.log.Verbo("failed to get vertex from database",
 			zap.Binary("key", id[:]),
@@ -64,10 +65,10 @@ func (s *state) SetVertex(id ids.ID, vtx vertex.StatelessVertex) error {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {
-		return s.db.Delete(id[:])
+		return s.db.Delete(context.TODO(), id[:])
 	}
 
-	return s.db.Put(id[:], vtx.Bytes())
+	return s.db.Put(context.TODO(), id[:], vtx.Bytes())
 }
 
 func (s *state) Status(id ids.ID) choices.Status {
@@ -92,7 +93,7 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	s.dbCache.Put(id, status)
 
 	if status == choices.Unknown {
-		return s.db.Delete(id[:])
+		return s.db.Delete(context.TODO(), id[:])
 	}
 	return database.PutUInt32(s.db, id[:], uint32(status))
 }
@@ -103,7 +104,7 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 		return frontier
 	}
 
-	if b, err := s.db.Get(id[:]); err == nil {
+	if b, err := s.db.Get(context.TODO(), id[:]); err == nil {
 		p := wrappers.Packer{Bytes: b}
 
 		frontierSize := p.UnpackInt()
@@ -134,7 +135,7 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 	s.dbCache.Put(id, frontier)
 
 	if len(frontier) == 0 {
-		return s.db.Delete(id[:])
+		return s.db.Delete(context.TODO(), id[:])
 	}
 
 	size := wrappers.IntLen + hashing.HashLen*len(frontier)
@@ -144,5 +145,5 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 		p.PackFixedBytes(id[:])
 	}
 
-	return s.db.Put(id[:], p.Bytes)
+	return s.db.Put(context.TODO(), id[:], p.Bytes)
 }

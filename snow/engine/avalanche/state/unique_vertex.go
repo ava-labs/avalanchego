@@ -86,7 +86,7 @@ func newUniqueVertex(ctx context.Context, s *Serializer, b []byte) (*uniqueVerte
 	// The vertex is newly parsed, so set the status
 	// and persist it.
 	vtx.v.status = choices.Processing
-	return vtx, vtx.persist()
+	return vtx, vtx.persist(ctx)
 }
 
 func (vtx *uniqueVertex) refresh() {
@@ -145,17 +145,17 @@ func (vtx *uniqueVertex) setVertex(ctx context.Context, innerVtx vertex.Stateles
 	}
 
 	vtx.v.status = choices.Processing
-	return vtx.persist()
+	return vtx.persist(ctx)
 }
 
-func (vtx *uniqueVertex) persist() error {
+func (vtx *uniqueVertex) persist(ctx context.Context) error {
 	if err := vtx.serializer.state.SetVertex(vtx.v.vtx); err != nil {
 		return err
 	}
 	if err := vtx.serializer.state.SetStatus(vtx.ID(), vtx.v.status); err != nil {
 		return err
 	}
-	return vtx.serializer.versionDB.Commit()
+	return vtx.serializer.versionDB.Commit(ctx)
 }
 
 func (vtx *uniqueVertex) setStatus(status choices.Status) error {
@@ -198,10 +198,10 @@ func (vtx *uniqueVertex) Accept(ctx context.Context) error {
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	return vtx.serializer.versionDB.Commit()
+	return vtx.serializer.versionDB.Commit(ctx)
 }
 
-func (vtx *uniqueVertex) Reject(context.Context) error {
+func (vtx *uniqueVertex) Reject(ctx context.Context) error {
 	if err := vtx.setStatus(choices.Rejected); err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (vtx *uniqueVertex) Reject(context.Context) error {
 	// parents to be garbage collected
 	vtx.v.parents = nil
 
-	return vtx.serializer.versionDB.Commit()
+	return vtx.serializer.versionDB.Commit(ctx)
 }
 
 // TODO: run performance test to see if shallow refreshing
