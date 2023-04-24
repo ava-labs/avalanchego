@@ -37,12 +37,6 @@ func newSyncWorkHeap() *syncWorkHeap {
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
-				if a.workItem == nil {
-					return b.workItem != nil
-				}
-				if b.workItem == nil {
-					return false
-				}
 				return bytes.Compare(a.workItem.start, b.workItem.start) < 0
 			},
 		),
