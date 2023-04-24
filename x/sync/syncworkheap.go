@@ -31,9 +31,9 @@ type syncWorkHeap struct {
 	closed      bool
 }
 
-func newSyncWorkHeap(maxSize int) *syncWorkHeap {
+func newSyncWorkHeap() *syncWorkHeap {
 	return &syncWorkHeap{
-		priorityHeap: make([]*heapItem, 0, maxSize),
+		priorityHeap: make([]*heapItem, 0),
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
