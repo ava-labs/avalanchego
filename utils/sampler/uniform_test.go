@@ -93,7 +93,7 @@ func UniformOutOfRangeTest(t *testing.T, s Uniform) {
 	s.Initialize(0)
 
 	_, err := s.Sample(1)
-	require.Error(t, err, "should have reported an out of range error")
+	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func UniformEmptyTest(t *testing.T, s Uniform) {
@@ -101,7 +101,7 @@ func UniformEmptyTest(t *testing.T, s Uniform) {
 
 	val, err := s.Sample(0)
 	require.NoError(t, err)
-	require.Len(t, val, 0, "shouldn't have selected any element")
+	require.Empty(t, val)
 }
 
 func UniformSingletonTest(t *testing.T, s Uniform) {
@@ -131,7 +131,7 @@ func UniformOverSampleTest(t *testing.T, s Uniform) {
 	s.Initialize(3)
 
 	_, err := s.Sample(4)
-	require.Error(t, err, "should have returned an out of range error")
+	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func UniformLazilySample(t *testing.T, s Uniform) {
@@ -148,7 +148,7 @@ func UniformLazilySample(t *testing.T, s Uniform) {
 		}
 
 		_, err := s.Next()
-		require.Error(t, err, "should have returned an out of range error")
+		require.ErrorIs(t, err, ErrOutOfRange)
 
 		s.Reset()
 	}
