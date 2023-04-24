@@ -38,11 +38,11 @@ type StandardTxExecutor struct {
 }
 
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {

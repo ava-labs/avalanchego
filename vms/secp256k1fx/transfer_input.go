@@ -27,7 +27,7 @@ func (in *TransferInput) Amount() uint64 {
 func (in *TransferInput) Verify() error {
 	switch {
 	case in == nil:
-		return errNilInput
+		return ErrNilInput
 	case in.Amt == 0:
 		return ErrNoValueInput
 	default:
