@@ -8,12 +8,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/codec"
 )
 
 func TestParseGibberish(t *testing.T) {
-	randomBytes := utils.RandomBytes(256 * units.KiB)
+	randomBytes := []byte{0, 1, 2, 3, 4, 5}
 	_, err := Parse(randomBytes)
-	require.Error(t, err)
+	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }

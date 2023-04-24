@@ -34,9 +34,9 @@ const targetBlockSize = 128 * units.KiB
 var (
 	_ Builder = (*builder)(nil)
 
-	errEndOfTime       = errors.New("program time is suspiciously far in the future")
-	errNoPendingBlocks = errors.New("no pending blocks")
-	errChainNotSynced  = errors.New("chain not synced")
+	ErrEndOfTime       = errors.New("program time is suspiciously far in the future")
+	ErrNoPendingBlocks = errors.New("no pending blocks")
+	ErrChainNotSynced  = errors.New("chain not synced")
 )
 
 type Builder interface {
@@ -126,7 +126,7 @@ func (b *builder) Preferred() (snowman.Block, error) {
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	if !b.txExecutorBackend.Bootstrapped.Get() {
-		return errChainNotSynced
+		return ErrChainNotSynced
 	}
 
 	txID := tx.ID()
@@ -369,7 +369,7 @@ func buildBlock(
 	// If there is no reason to build a block, don't.
 	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return nil, errNoPendingBlocks
+		return nil, ErrNoPendingBlocks
 	}
 
 	// Issue a block with as many transactions as possible.
@@ -394,7 +394,7 @@ func getNextStakerToReward(
 	preferredState state.Chain,
 ) (ids.ID, bool, error) {
 	if !chainTimestamp.Before(mockable.MaxTime) {
-		return ids.Empty, false, errEndOfTime
+		return ids.Empty, false, ErrEndOfTime
 	}
 
 	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
