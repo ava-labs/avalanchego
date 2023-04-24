@@ -488,7 +488,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require.NoError(err)
 
 	err = blk.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 // VM.ParseBlock tests section
@@ -525,7 +525,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 
 	// test
 	_, err = proVM.ParseBlock(context.Background(), proBlk.Bytes())
-	require.Error(err)
+	require.ErrorIs(err, errMarshallingFailed)
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
@@ -992,7 +992,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	<-toEngine
 
 	_, err = proVM.BuildBlock(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())

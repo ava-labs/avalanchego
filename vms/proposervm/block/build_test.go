@@ -50,7 +50,7 @@ func TestBuildBlsSigned(t *testing.T) {
 	require.NoError(err)
 
 	err = builtBlock.Verify(false, chainID, pk)
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedProposer)
 }
 
 func TestBuildCertSigned(t *testing.T) {
@@ -88,7 +88,7 @@ func TestBuildCertSigned(t *testing.T) {
 	require.NoError(err)
 
 	err = builtBlock.Verify(false, chainID, nil)
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedProposer)
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -112,7 +112,7 @@ func TestBuildUnsigned(t *testing.T) {
 	require.NoError(err)
 
 	err = builtBlock.Verify(true, ids.Empty, nil)
-	require.Error(err)
+	require.ErrorIs(err, errMissingProposer)
 }
 
 func TestBuildHeader(t *testing.T) {

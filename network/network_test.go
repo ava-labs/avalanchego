@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"crypto/rsa"
 	"net"
 	"sync"
 	"testing"
@@ -425,7 +426,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 		Signature: nil,
 	}})
 	// The signature is wrong so this peer tracking info isn't useful.
-	require.Error(err)
+	require.ErrorIs(err, rsa.ErrVerification)
 
 	network.peersLock.RLock()
 	require.Empty(network.trackedIPs)

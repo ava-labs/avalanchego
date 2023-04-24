@@ -480,7 +480,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 		vm:    proVM,
 	}
 	err = preForkChild.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
@@ -753,7 +753,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	}
 
 	err = invalidChild.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext

@@ -34,18 +34,18 @@ func TestCoreVMNotRemote(t *testing.T) {
 	maxBlocksNum := 1000                            // an high value to get all built blocks
 	maxBlocksSize := 1000000                        // an high value to get all built blocks
 	maxBlocksRetrivalTime := time.Duration(1000000) // an high value to get all built blocks
-	_, errAncestors := proVM.GetAncestors(
+	_, err := proVM.GetAncestors(
 		context.Background(),
 		blkID,
 		maxBlocksNum,
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	require.Error(errAncestors)
+	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
 
 	var blks [][]byte
-	_, errBatchedParse := proVM.BatchedParseBlock(context.Background(), blks)
-	require.Error(errBatchedParse)
+	_, err = proVM.BatchedParseBlock(context.Background(), blks)
+	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
 }
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {

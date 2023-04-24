@@ -87,7 +87,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 
 	// If there wasn't an error parsing - verify must return an error
 	err = parsedBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnknownBlock)
 }
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
@@ -194,13 +194,13 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 
 	err = yBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	err = aBlock.Accept(context.Background())
 	require.NoError(err)
 
 	err = yBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
@@ -292,14 +292,14 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 
 	// If there wasn't an error parsing - verify must return an error
 	err = bBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	err = aBlock.Accept(context.Background())
 	require.NoError(err)
 
 	// If there wasn't an error parsing - verify must return an error
 	err = bBlock.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
@@ -393,10 +393,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require.NoError(err)
 
 	err = opts[0].Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errInnerParentMismatch)
 
 	err = opts[1].Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 //	  ,--G ----.
@@ -695,7 +695,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 
 	err = invalidBlk.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Note that the invalidBlk.ID() is the same as the correct blk ID because
 	// the signature isn't part of the blk ID.
@@ -714,5 +714,5 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	// GetBlock returned, so it must have somehow gotten a valid representation
 	// of [blkID].
 	err = fetchedBlk.Verify(context.Background())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo
 }

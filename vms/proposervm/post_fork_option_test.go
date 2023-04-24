@@ -564,7 +564,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	}
 
 	err = invalidChild.Verify(context.Background())
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestOptionTimestampValidity(t *testing.T) {
