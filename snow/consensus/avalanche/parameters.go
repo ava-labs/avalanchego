@@ -21,9 +21,9 @@ type Parameters struct {
 func (p Parameters) Valid() error {
 	switch {
 	case p.Parents <= 1:
-		return fmt.Errorf("parents = %d: Fails the condition that: 1 < Parents", p.Parents)
+		return fmt.Errorf("%w: parents = %d: Fails the condition that: 1 < Parents", snowball.ErrParametersInvalid, p.Parents)
 	case p.BatchSize <= 0:
-		return fmt.Errorf("batchSize = %d: Fails the condition that: 0 < BatchSize", p.BatchSize)
+		return fmt.Errorf("%w: batchSize = %d: Fails the condition that: 0 < BatchSize", snowball.ErrParametersInvalid, p.BatchSize)
 	default:
 		return p.Parameters.Verify()
 	}

@@ -53,7 +53,7 @@ type activeFork uint8
 
 const (
 	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
+	defaultWeight = 5 * units.MilliAvax
 
 	ApricotFork           activeFork = 0
 	BanffFork             activeFork = 1
@@ -66,7 +66,7 @@ var (
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
 	preFundedKeys             = secp256k1.TestKeys()

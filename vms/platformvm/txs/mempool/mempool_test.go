@@ -198,7 +198,7 @@ func TestContinuousStakingForkInMempool(t *testing.T) {
 
 	// insert post fork
 	postForkTime := forkTime.Add(time.Second)
-	require.Error(mpool.Add(tx, postForkTime), "should be marked as duplicated even across fork")
+	require.ErrorIs(mpool.Add(tx, postForkTime), errTxAlreadyInMempool)
 	mpool.Remove(txs)
 	require.NoError(mpool.Add(tx, postForkTime))
 	require.False(mpool.HasStakerTx(), "post fork there should not be staker txs anymore")

@@ -28,8 +28,6 @@ func TestNewExportTx(t *testing.T) {
 		destinationChainID ids.ID
 		sourceKeys         []*secp256k1.PrivateKey
 		timestamp          time.Time
-		shouldErr          bool
-		shouldVerify       bool
 	}
 
 	sourceKey := preFundedKeys[0]
@@ -40,16 +38,12 @@ func TestNewExportTx(t *testing.T) {
 			destinationChainID: xChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          defaultValidateStartTime,
-			shouldErr:          false,
-			shouldVerify:       true,
 		},
 		{
 			description:        "P->C export",
 			destinationChainID: cChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.ApricotPhase5Time,
-			shouldErr:          false,
-			shouldVerify:       true,
 		},
 	}
 
@@ -67,10 +61,6 @@ func TestNewExportTx(t *testing.T) {
 				tt.sourceKeys,
 				ids.ShortEmpty, // Change address
 			)
-			if tt.shouldErr {
-				require.Error(err)
-				return
-			}
 			require.NoError(err)
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
@@ -88,11 +78,7 @@ func TestNewExportTx(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&verifier)
-			if tt.shouldVerify {
-				require.NoError(err)
-			} else {
-				require.Error(err)
-			}
+			require.NoError(err)
 		})
 	}
 }

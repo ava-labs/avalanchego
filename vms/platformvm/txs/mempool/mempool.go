@@ -36,7 +36,8 @@ const (
 var (
 	_ Mempool = (*mempool)(nil)
 
-	errMempoolFull = errors.New("mempool is full")
+	errMempoolFull        = errors.New("mempool is full")
+	errTxAlreadyInMempool = errors.New("tx already in mempool")
 )
 
 type BlockTimer interface {
@@ -168,7 +169,7 @@ func (m *mempool) Add(tx *txs.Tx, timestamp time.Time) error {
 	// Note: a previously dropped tx can be re-added
 	txID := tx.ID()
 	if m.Has(txID) {
-		return fmt.Errorf("duplicate tx %s", txID)
+		return fmt.Errorf("%w, txID %s", errTxAlreadyInMempool, txID)
 	}
 
 	txBytes := tx.Bytes()
