@@ -28,6 +28,13 @@ import (
 var (
 	_ Handler = (*handler)(nil)
 
+	ErrInsufficientFunds            = errors.New("insufficient funds")
+	ErrInsufficientUnlockedFunds    = errors.New("insufficient unlocked funds")
+	ErrInsufficientLockedFunds      = errors.New("insufficient locked funds")
+	errWrongNumberCredentials       = errors.New("wrong number of credentials")
+	errWrongNumberUTXOs             = errors.New("wrong number of UTXOs")
+	errAssetIDMismatch              = errors.New("input asset ID does not match UTXO asset ID")
+	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
 )
@@ -371,8 +378,9 @@ func (h *handler) Spend(
 
 	if amountBurned < fee || amountStaked < amount {
 		return nil, nil, nil, nil, fmt.Errorf(
-			"provided keys have balance (unlocked, locked) (%d, %d) but need (%d, %d)",
-			amountBurned, amountStaked, fee, amount)
+			"%w (unlocked, locked) (%d, %d) but need (%d, %d)",
+			ErrInsufficientFunds, amountBurned, amountStaked, fee, amount,
+		)
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, signers)  // sort inputs and keys
@@ -459,14 +467,16 @@ func (h *handler) VerifySpendUTXOs(
 ) error {
 	if len(ins) != len(creds) {
 		return fmt.Errorf(
-			"there are %d inputs but %d credentials. Should be same number",
+			"%w: %d inputs != %d credentials",
+			errWrongNumberCredentials,
 			len(ins),
 			len(creds),
 		)
 	}
 	if len(ins) != len(utxos) {
 		return fmt.Errorf(
-			"there are %d inputs but %d utxos. Should be same number",
+			"%w: %d inputs != %d utxos",
+			errWrongNumberUTXOs,
 			len(ins),
 			len(utxos),
 		)
@@ -496,8 +506,8 @@ func (h *handler) VerifySpendUTXOs(
 		claimedAssetID := input.AssetID()
 		if realAssetID != claimedAssetID {
 			return fmt.Errorf(
-				"input %d has asset ID %s but UTXO has asset ID %s",
-				index,
+				"%w: %s != %s",
+				errAssetIDMismatch,
 				claimedAssetID,
 				realAssetID,
 			)
@@ -520,7 +530,12 @@ func (h *handler) VerifySpendUTXOs(
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return fmt.Errorf("expected input %d locktime to be %d but got %d", index, locktime, inner.Locktime)
+				return fmt.Errorf(
+					"%w: %d != %d",
+					errLocktimeMismatch,
+					inner.Locktime,
+					locktime,
+				)
 			}
 			in = inner.TransferableIn
 		}
@@ -630,10 +645,11 @@ func (h *handler) VerifySpendUTXOs(
 					unlockedConsumedAsset := unlockedConsumed[assetID]
 					if increase > unlockedConsumedAsset {
 						return fmt.Errorf(
-							"address %s produces %d unlocked and consumes %d unlocked for locktime %d",
+							"%w: %s needs %d more %s for locktime %d",
+							ErrInsufficientLockedFunds,
 							ownerID,
-							increase,
-							unlockedConsumedAsset,
+							increase-unlockedConsumedAsset,
+							assetID,
 							locktime,
 						)
 					}
@@ -648,10 +664,10 @@ func (h *handler) VerifySpendUTXOs(
 		// More unlocked tokens produced than consumed. Invalid.
 		if unlockedProducedAsset > unlockedConsumedAsset {
 			return fmt.Errorf(
-				"tx produces more unlocked %q (%d) than it consumes (%d)",
+				"%w: needs %d more %s",
+				ErrInsufficientUnlockedFunds,
+				unlockedProducedAsset-unlockedConsumedAsset,
 				assetID,
-				unlockedProducedAsset,
-				unlockedConsumedAsset,
 			)
 		}
 	}

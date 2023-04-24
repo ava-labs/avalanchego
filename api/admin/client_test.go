@@ -240,61 +240,56 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 func TestSetLoggerLevel(t *testing.T) {
 	type test struct {
-		name            string
-		logLevel        string
-		displayLevel    string
-		serviceErr      bool
-		clientShouldErr bool
+		name         string
+		logLevel     string
+		displayLevel string
+		serviceErr   error
+		clientErr    error
 	}
 	tests := []test{
 		{
-			name:            "Happy path",
-			logLevel:        "INFO",
-			displayLevel:    "INFO",
-			serviceErr:      false,
-			clientShouldErr: false,
+			name:         "Happy path",
+			logLevel:     "INFO",
+			displayLevel: "INFO",
+			serviceErr:   nil,
+			clientErr:    nil,
 		},
 		{
-			name:            "Service errors",
-			logLevel:        "INFO",
-			displayLevel:    "INFO",
-			serviceErr:      true,
-			clientShouldErr: true,
+			name:         "Service errors",
+			logLevel:     "INFO",
+			displayLevel: "INFO",
+			serviceErr:   errTest,
+			clientErr:    errTest,
 		},
 		{
-			name:            "Invalid log level",
-			logLevel:        "invalid",
-			displayLevel:    "INFO",
-			serviceErr:      false,
-			clientShouldErr: true,
+			name:         "Invalid log level",
+			logLevel:     "invalid",
+			displayLevel: "INFO",
+			serviceErr:   nil,
+			clientErr:    logging.ErrUnknownLevel,
 		},
 		{
-			name:            "Invalid display level",
-			logLevel:        "INFO",
-			displayLevel:    "invalid",
-			serviceErr:      false,
-			clientShouldErr: true,
+			name:         "Invalid display level",
+			logLevel:     "INFO",
+			displayLevel: "invalid",
+			serviceErr:   nil,
+			clientErr:    logging.ErrUnknownLevel,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errTest
+
+			c := client{
+				requester: NewMockClient(&api.EmptyReply{}, tt.serviceErr),
 			}
-			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, err)}
-			err = mockClient.SetLoggerLevel(
+			err := c.SetLoggerLevel(
 				context.Background(),
 				"",
 				tt.logLevel,
 				tt.displayLevel,
 			)
-			if tt.clientShouldErr {
-				require.Error(err)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, tt.clientErr)
 		})
 	}
 }
@@ -304,8 +299,8 @@ func TestGetLoggerLevel(t *testing.T) {
 		name            string
 		loggerName      string
 		serviceResponse map[string]LogAndDisplayLevels
-		serviceErr      bool
-		clientShouldErr bool
+		serviceErr      error
+		clientErr       error
 	}
 	tests := []test{
 		{
@@ -314,35 +309,37 @@ func TestGetLoggerLevel(t *testing.T) {
 			serviceResponse: map[string]LogAndDisplayLevels{
 				"foo": {LogLevel: logging.Info, DisplayLevel: logging.Info},
 			},
-			serviceErr:      false,
-			clientShouldErr: false,
+			serviceErr: nil,
+			clientErr:  nil,
 		},
 		{
 			name:            "service errors",
 			loggerName:      "foo",
 			serviceResponse: nil,
-			serviceErr:      true,
-			clientShouldErr: true,
+			serviceErr:      errTest,
+			clientErr:       errTest,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errTest
+
+			c := client{
+				requester: NewMockClient(
+					&GetLoggerLevelReply{
+						LoggerLevels: tt.serviceResponse,
+					},
+					tt.serviceErr,
+				),
 			}
-			mockClient := client{requester: NewMockClient(&GetLoggerLevelReply{LoggerLevels: tt.serviceResponse}, err)}
-			res, err := mockClient.GetLoggerLevel(
+			res, err := c.GetLoggerLevel(
 				context.Background(),
 				tt.loggerName,
 			)
-			if tt.clientShouldErr {
-				require.Error(err)
-				return
+			require.ErrorIs(err, tt.clientErr)
+			if tt.clientErr == nil {
+				require.EqualValues(tt.serviceResponse, res)
 			}
-			require.NoError(err)
-			require.EqualValues(tt.serviceResponse, res)
 		})
 	}
 }
@@ -350,40 +347,37 @@ func TestGetLoggerLevel(t *testing.T) {
 func TestGetConfig(t *testing.T) {
 	type test struct {
 		name             string
-		serviceErr       bool
-		clientShouldErr  bool
+		serviceErr       error
+		clientErr        error
 		expectedResponse interface{}
 	}
 	var resp interface{} = "response"
 	tests := []test{
 		{
 			name:             "Happy path",
-			serviceErr:       false,
-			clientShouldErr:  false,
+			serviceErr:       nil,
+			clientErr:        nil,
 			expectedResponse: &resp,
 		},
 		{
 			name:             "service errors",
-			serviceErr:       true,
-			clientShouldErr:  true,
+			serviceErr:       errTest,
+			clientErr:        errTest,
 			expectedResponse: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errTest
+
+			c := client{
+				requester: NewMockClient(tt.expectedResponse, tt.serviceErr),
 			}
-			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
-			res, err := mockClient.GetConfig(context.Background())
-			if tt.clientShouldErr {
-				require.Error(err)
-				return
+			res, err := c.GetConfig(context.Background())
+			require.ErrorIs(err, tt.clientErr)
+			if tt.clientErr == nil {
+				require.Equal(resp, res)
 			}
-			require.NoError(err)
-			require.EqualValues("response", res)
 		})
 	}
 }
