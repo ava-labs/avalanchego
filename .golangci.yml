@@ -20,6 +20,7 @@ linters:
     - depguard
     - errcheck
     - exportloopref
+    - forbidigo
     - goconst
     - gocritic
     - gofmt
@@ -49,11 +50,28 @@ linters:
     # - lll
 
 linters-settings:
+  depguard:
+    list-type: blacklist
+    packages-with-error-message:
+      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
+      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
+    include-go-root: true
   errorlint:
     # Check for plain type assertions and type switches.
     asserts: false
     # Check for plain error comparisons.
     comparison: false
+  # https://golangci-lint.run/usage/linters/#forbidigo
+  forbidigo:
+    # Forbid the following identifiers (list of regexp).
+    forbid:
+      - 'require\.Error$(# ErrorIs should be used instead)?'
+      - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
+    exclude_godoc_examples: false
+  # https://golangci-lint.run/usage/linters#gosec
+  gosec:
+    excludes:
+      - G107 # https://securego.io/docs/rules/g107.html
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -103,13 +121,3 @@ linters-settings:
       - "all"
       - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
       - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
-  # https://golangci-lint.run/usage/linters#gosec
-  gosec:
-    excludes:
-      - G107 # https://securego.io/docs/rules/g107.html
-  depguard:
-    list-type: blacklist
-    packages-with-error-message:
-      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
-      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
-    include-go-root: true

@@ -9,25 +9,24 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
-	defaultLeafRequestLimit = 1024
-	maxTokenWaitTime        = 5 * time.Second
+	defaultRequestKeyLimit      = maxKeyValuesLimit
+	defaultRequestByteSizeLimit = maxByteSizeLimit
 )
 
 var (
-	token                         = struct{}{}
 	ErrAlreadyStarted             = errors.New("cannot start a StateSyncManager that has already been started")
 	ErrAlreadyClosed              = errors.New("StateSyncManager is closed")
-	ErrNotEnoughBytes             = errors.New("less bytes read than the specified length")
 	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
 	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
@@ -80,7 +79,7 @@ type StateSyncManager struct {
 	unprocessedWork *syncWorkHeap
 	// Signalled when:
 	// - An item is added to [unprocessedWork].
-	// - There are no more items in [unprocessedWork] and [processingWorkItems] is 0.
+	// - An item is added to [processedWork].
 	// - Close() is called.
 	// [workLock] is its inner lock.
 	unprocessedWorkCond sync.Cond
@@ -92,9 +91,6 @@ type StateSyncManager struct {
 	// - [cancelCtx] was called.
 	// - [workToBeDone] and [completedWork] are closed.
 	syncDoneChan chan struct{}
-
-	// Rate-limits the number of concurrently processing work items.
-	workTokens chan struct{}
 
 	errLock sync.Mutex
 	// If non-nil, there was a fatal error.
@@ -132,16 +128,11 @@ func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
 	m := &StateSyncManager{
 		config:          config,
 		syncDoneChan:    make(chan struct{}),
-		unprocessedWork: newSyncWorkHeap(2 * config.SimultaneousWorkLimit),
-		processedWork:   newSyncWorkHeap(2 * config.SimultaneousWorkLimit),
-		workTokens:      make(chan struct{}, config.SimultaneousWorkLimit),
+		unprocessedWork: newSyncWorkHeap(),
+		processedWork:   newSyncWorkHeap(),
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
-	// fill the work tokens channel with work tokens
-	for i := 0; i < config.SimultaneousWorkLimit; i++ {
-		m.workTokens <- token
-	}
 	return m, nil
 }
 
@@ -170,8 +161,8 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 func (m *StateSyncManager) sync(ctx context.Context) {
 	defer func() {
 		// Note we release [m.workLock] before calling Close()
-		// because Close() will try to acquire [m.workLock].
-		// Invariant: [m.workLock] is held when we return from this goroutine.
+		// because Close() will acquire [m.workLock].
+		// Invariant: [m.workLock] is held when this goroutine begins.
 		m.workLock.Unlock()
 		m.Close()
 	}()
@@ -182,6 +173,12 @@ func (m *StateSyncManager) sync(ctx context.Context) {
 		// Invariant: [m.workLock] is held here.
 		if ctx.Err() != nil { // [m] is closed.
 			return // [m.workLock] released by defer.
+		}
+		if m.processingWorkItems >= m.config.SimultaneousWorkLimit {
+			// We're already processing the maximum number of work items.
+			// Wait until one of them finishes.
+			m.unprocessedWorkCond.Wait()
+			continue
 		}
 		if m.unprocessedWork.Len() == 0 {
 			if m.processingWorkItems == 0 {
@@ -231,23 +228,12 @@ func (m *StateSyncManager) Close() {
 // Processes [item] by fetching and applying a change or range proof.
 // Assumes [m.workLock] is not held.
 func (m *StateSyncManager) doWork(ctx context.Context, item *syncWorkItem) {
-	// Wait until we get a work token or we close.
-	select {
-	case <-m.workTokens:
-	case <-ctx.Done():
-		// [m] is closed and sync() is returning so don't care about cleanup.
-		return
-	}
-
 	defer func() {
-		m.workTokens <- token
 		m.workLock.Lock()
+		defer m.workLock.Unlock()
+
 		m.processingWorkItems--
-		if m.processingWorkItems == 0 && m.unprocessedWork.Len() == 0 {
-			// There are no processing or unprocessed work items so we're done.
-			m.unprocessedWorkCond.Signal()
-		}
-		m.workLock.Unlock()
+		m.unprocessedWorkCond.Signal()
 	}()
 
 	if item.LocalRootID == ids.Empty {
@@ -270,13 +256,15 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	changeproof, err := m.config.Client.GetChangeProof(ctx,
-		&ChangeProofRequest{
-			StartingRoot: workItem.LocalRootID,
-			EndingRoot:   rootID,
-			Start:        workItem.start,
-			End:          workItem.end,
-			Limit:        defaultLeafRequestLimit,
+	changeproof, err := m.config.Client.GetChangeProof(
+		ctx,
+		&syncpb.ChangeProofRequest{
+			StartRoot:  workItem.LocalRootID[:],
+			EndRoot:    rootID[:],
+			Start:      workItem.start,
+			End:        workItem.end,
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -328,11 +316,12 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *syncWorkItem) {
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
-		&RangeProofRequest{
-			Root:  rootID,
-			Start: workItem.start,
-			End:   workItem.end,
-			Limit: defaultLeafRequestLimit,
+		&syncpb.RangeProofRequest{
+			Root:       rootID[:],
+			Start:      workItem.start,
+			End:        workItem.end,
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 	)
 	if err != nil {
@@ -386,7 +375,7 @@ func (m *StateSyncManager) findNextKey(
 	// for now, just fallback to using the start key, which is always correct.
 	// TODO: determine a more accurate nextKey in this scenario
 	if !startKeyPath.HasPrefix(localProofNodes[localIndex].KeyPath) || !startKeyPath.HasPrefix(receivedProofNodes[receivedIndex].KeyPath) {
-		return start, nil
+		return append(start, 0), nil
 	}
 
 	// walk up the node paths until a difference is found
@@ -428,6 +417,10 @@ func (m *StateSyncManager) findNextKey(
 			// the local proof has an extra node due to a branch that was not present in the received proof
 			branchNode = localNode
 			localIndex--
+		}
+
+		if startKeyPath.NibbleLength <= branchNode.KeyPath.NibbleLength {
+			return append(start, 0), nil
 		}
 
 		// the two nodes have different paths, so find where they branched

@@ -28,7 +28,7 @@ func (n *Network) Initialize(params Parameters, numColors int) {
 
 func (n *Network) AddNode(sb Consensus) {
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(n.colors)))
+	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
 	sb.Initialize(n.params, n.colors[int(indices[0])])
 	for _, index := range indices[1:] {
@@ -70,7 +70,7 @@ func (n *Network) Round() {
 		running := n.running[runningInd]
 
 		s := sampler.NewUniform()
-		_ = s.Initialize(uint64(len(n.nodes)))
+		s.Initialize(uint64(len(n.nodes)))
 		count := len(n.nodes)
 		if count > n.params.K {
 			count = n.params.K

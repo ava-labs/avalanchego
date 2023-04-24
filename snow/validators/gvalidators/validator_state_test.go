@@ -82,7 +82,8 @@ func TestGetMinimumHeight(t *testing.T) {
 	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetMinimumHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetCurrentHeight(t *testing.T) {
@@ -105,7 +106,8 @@ func TestGetCurrentHeight(t *testing.T) {
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetCurrentHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetSubnetID(t *testing.T) {
@@ -129,7 +131,8 @@ func TestGetSubnetID(t *testing.T) {
 	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
 
 	_, err = state.client.GetSubnetID(context.Background(), chainID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetValidatorSet(t *testing.T) {
@@ -180,7 +183,21 @@ func TestGetValidatorSet(t *testing.T) {
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, errCustom)
 
 	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
+}
+
+func TestPublicKeyDeserialize(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+
+	pkBytes := pk.Serialize()
+	pkDe := new(bls.PublicKey).Deserialize(pkBytes)
+	require.NotNil(pkDe)
+	require.EqualValues(pk, pkDe)
 }
 
 // BenchmarkGetValidatorSet measures the time it takes complete a gRPC client

@@ -326,7 +326,7 @@ func TestStateSyncEnabled(t *testing.T) {
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.StateSyncEnabled(context.Background())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 func TestGetOngoingSyncStateSummary(t *testing.T) {
@@ -351,7 +351,7 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetOngoingSyncStateSummary(context.Background())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 func TestGetLastStateSummary(t *testing.T) {
@@ -376,7 +376,7 @@ func TestGetLastStateSummary(t *testing.T) {
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetLastStateSummary(context.Background())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 func TestParseStateSummary(t *testing.T) {
@@ -400,12 +400,12 @@ func TestParseStateSummary(t *testing.T) {
 
 	// test parsing nil summary
 	_, err = vm.ParseStateSummary(context.Background(), nil)
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 func TestGetStateSummary(t *testing.T) {
@@ -430,7 +430,7 @@ func TestGetStateSummary(t *testing.T) {
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetStateSummary(context.Background(), mockedSummary.Height())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 func TestAcceptStateSummary(t *testing.T) {
@@ -458,7 +458,7 @@ func TestAcceptStateSummary(t *testing.T) {
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = summary.Accept(context.Background())
-	require.Error(err)
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
 // Show that LastAccepted call returns the right answer after a StateSummary
