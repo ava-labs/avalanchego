@@ -219,6 +219,14 @@ func generateTestStakeableUTXO(txID ids.ID, assetID ids.ID, amount, locktime uin
 	}
 }
 
+func generateTestInsFromUTXOs(utxos []*avax.UTXO) []*avax.TransferableInput {
+	ins := make([]*avax.TransferableInput, len(utxos))
+	for i := range utxos {
+		ins[i] = generateTestInFromUTXO(utxos[i], []uint32{0})
+	}
+	return ins
+}
+
 func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.TransferableInput {
 	var in avax.TransferableIn
 	switch out := utxo.Out.(type) {
@@ -230,6 +238,14 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 	case *locked.Out:
 		in = &locked.In{
 			IDs: out.IDs,
+			TransferableIn: &secp256k1fx.TransferInput{
+				Amt:   out.Amount(),
+				Input: secp256k1fx.Input{SigIndices: sigIndices},
+			},
+		}
+	case *stakeable.LockOut:
+		in = &stakeable.LockIn{
+			Locktime: out.Locktime,
 			TransferableIn: &secp256k1fx.TransferInput{
 				Amt:   out.Amount(),
 				Input: secp256k1fx.Input{SigIndices: sigIndices},

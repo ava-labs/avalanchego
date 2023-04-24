@@ -623,7 +623,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 
 	depositOffer, err := e.State.GetDepositOffer(tx.DepositOfferID)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't get deposit offer: %w", err)
 	}
 
 	currentChainTime := e.State.GetTimestamp()
@@ -1002,10 +1002,6 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 }
 
 func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
-	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
-		return err
-	}
-
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
@@ -1037,6 +1033,8 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		// Verify that the node is not already registered
 		if _, err := e.State.GetShortIDLink(ids.ShortID(tx.NewNodeID), state.ShortLinkKeyRegisterNode); err == nil {
 			return errNodeAlreadyRegistered
+		} else if err != database.ErrNotFound {
+			return err
 		}
 	}
 
@@ -1347,10 +1345,6 @@ func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
 }
 
 func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error {
-	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
-		return err
-	}
-
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}

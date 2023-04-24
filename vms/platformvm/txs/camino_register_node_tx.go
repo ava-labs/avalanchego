@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
 var (
@@ -52,6 +53,10 @@ func (tx *RegisterNodeTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNoNodeID
 	case tx.ConsortiumMemberAddress == ids.ShortEmpty:
 		return errConsortiumMemberAddrEmpty
+	}
+
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

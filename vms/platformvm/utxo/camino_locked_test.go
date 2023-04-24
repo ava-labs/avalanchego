@@ -480,35 +480,32 @@ func TestLock(t *testing.T) {
 }
 
 func TestVerifyLockUTXOs(t *testing.T) {
+	assetID := ids.ID{'t', 'e', 's', 't'}
+	wrongAssetID := ids.ID{'w', 'r', 'o', 'n', 'g'}
 	fx := &secp256k1fx.Fx{}
-
-	err := fx.InitializeVM(&secp256k1fx.TestVM{})
-	require.NoError(t, err)
-
-	err = fx.Bootstrapped()
-	require.NoError(t, err)
-
-	ctrl := gomock.NewController(t)
-	internalState := state.NewMockState(ctrl)
-	internalState.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
-	testHandler := defaultCaminoHandler(t, internalState)
-
-	assetID := testHandler.ctx.AVAXAssetID
-
+	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
+	require.NoError(t, fx.Bootstrapped())
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.Initialize([]byte{0})
 
 	outputOwners1, cred1 := generateOwnersAndSig(tx)
 	outputOwners2, cred2 := generateOwnersAndSig(tx)
 
-	sigIndices := []uint32{0}
-	existingTxID := ids.GenerateTestID()
+	depositTxID1 := ids.ID{0, 1}
+	depositTxID2 := ids.ID{0, 2}
+
+	noMsigState := func(c *gomock.Controller) *state.MockState {
+		s := state.NewMockState(c)
+		s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+		return s
+	}
 
 	// Note that setting [chainTimestamp] also set's the VM's clock.
 	// Adjust input/output locktimes accordingly.
 	tests := map[string]struct {
+		state            func(*gomock.Controller) *state.MockState
 		utxos            []*avax.UTXO
-		ins              []*avax.TransferableInput
+		ins              func([]*avax.UTXO) []*avax.TransferableInput
 		outs             []*avax.TransferableOutput
 		creds            []verify.Verifiable
 		mintedAmount     uint64
@@ -516,265 +513,370 @@ func TestVerifyLockUTXOs(t *testing.T) {
 		appliedLockState locked.State
 		expectedErr      error
 	}{
-		"OK (no lock): produced + fee == consumed + minted": {
+		"Fail: Invalid appliedLockState": {
+			state:            noMsigState,
+			appliedLockState: locked.StateDepositedBonded,
+			expectedErr:      errInvalidTargetLockState,
+		},
+		"Fail: Inputs length not equal credentials length": {
+			state: noMsigState,
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestIn(assetID, 10, ids.Empty, ids.Empty, []uint32{0}),
+				}
+			},
+			creds:            []verify.Verifiable{},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errInputsCredentialsMismatch,
+		},
+		"Fail: Inputs length not equal UTXOs length": {
+			state: noMsigState,
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestIn(assetID, 10, ids.Empty, ids.Empty, []uint32{0}),
+				}
+			},
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errInputsUTXOsMismatch,
+		},
+		"Fail: Invalid credential": {
+			state: noMsigState,
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
 			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 11, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestOut(assetID, 11, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 10, outputOwners2, existingTxID, ids.Empty),
-			},
-			mintedAmount:     4,
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      nil,
+			ins:              generateTestInsFromUTXOs,
+			creds:            []verify.Verifiable{(*secp256k1fx.Credential)(nil)},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errWrongCredentials,
 		},
-		"OK (no lock): produced + fee == consumed": {
+		"Fail: Invalid utxo assetID": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, wrongAssetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			},
+			ins:              generateTestInsFromUTXOs,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errAssetIDMismatch,
+		},
+		"Fail: Invalid input assetID": {
+			state: noMsigState,
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
 			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestIn(wrongAssetID, 10, ids.Empty, ids.Empty, []uint32{0}),
+				}
 			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 9, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestOut(assetID, 9, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 10, outputOwners2, existingTxID, ids.Empty),
-			},
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      nil,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errAssetIDMismatch,
 		},
-		"Fail (no lock): produced > consumed": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 3, outputOwners2, existingTxID, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 2, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestOut(assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 4, outputOwners2, existingTxID, ids.Empty),
-			},
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      errWrongProducedAmount,
-		},
-		"Fail (no lock): produced + fee > consumed": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 3, outputOwners2, existingTxID, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 2, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestOut(assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 4, outputOwners2, existingTxID, ids.Empty),
-			},
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      errWrongProducedAmount,
-		},
-		"OK (lock): produced + fee == consumed": {
+		"Fail: Invalid output assetID": {
+			state: noMsigState,
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
 			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-			},
+			ins: generateTestInsFromUTXOs,
 			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 5, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
-				generateTestOut(assetID, 10, outputOwners1, existingTxID, locked.ThisTxID),
-				generateTestOut(assetID, 9, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 5, outputOwners2, existingTxID, ids.Empty),
-				generateTestOut(assetID, 5, outputOwners2, existingTxID, locked.ThisTxID),
+				generateTestStakeableOut(wrongAssetID, 10, 0, outputOwners1),
 			},
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      nil,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errAssetIDMismatch,
 		},
-		"OK (lock): produced + fee == consumed + minted": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, existingTxID, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 5, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
-				generateTestOut(assetID, 10, outputOwners1, existingTxID, locked.ThisTxID),
-				generateTestOut(assetID, 13, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 5, outputOwners2, existingTxID, ids.Empty),
-				generateTestOut(assetID, 5, outputOwners2, existingTxID, locked.ThisTxID),
-			},
-			mintedAmount:     4,
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      nil,
-		},
-		"Fail (lock): produced > consumed": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 2, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 3, outputOwners2, existingTxID, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 2, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 2, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 1, outputOwners1, ids.Empty, locked.ThisTxID),
-				generateTestOut(assetID, 2, outputOwners1, existingTxID, locked.ThisTxID),
-				generateTestOut(assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 2, outputOwners2, existingTxID, ids.Empty),
-				generateTestOut(assetID, 2, outputOwners2, existingTxID, locked.ThisTxID),
-			},
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      errWrongProducedAmount,
-		},
-		"Fail (lock): produced + fee > consumed": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{2}, assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestUTXO(ids.ID{3}, assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestUTXO(ids.ID{4}, assetID, 3, outputOwners2, existingTxID, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 2, existingTxID, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, ids.Empty, ids.Empty, sigIndices),
-				generateTestIn(assetID, 3, existingTxID, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 1, outputOwners1, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 2, outputOwners1, existingTxID, ids.Empty),
-				generateTestOut(assetID, 3, outputOwners2, ids.Empty, ids.Empty),
-				generateTestOut(assetID, 4, outputOwners2, existingTxID, ids.Empty),
-			},
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
-			appliedLockState: locked.StateBonded,
-			expectedErr:      errWrongProducedAmount,
-		},
-		"utxos have stakable.LockedOut": {
+		"Fail: Stakable utxo output": {
+			state: noMsigState,
 			utxos: []*avax.UTXO{
 				generateTestStakeableUTXO(ids.ID{1}, assetID, 10, 0, outputOwners1),
 			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-			},
-			burnedAmount:     2,
+			ins:              generateTestInsFromUTXOs,
 			creds:            []verify.Verifiable{cred1},
-			appliedLockState: locked.StateBonded,
+			appliedLockState: locked.StateUnlocked,
 			expectedErr:      errWrongUTXOOutType,
 		},
-		"outs have stakable.LockedOut": {
-			utxos: []*avax.UTXO{
-				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
-			},
-			ins: []*avax.TransferableInput{
-				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
-			},
+		"Fail: Stakable output": {
+			state: noMsigState,
 			outs: []*avax.TransferableOutput{
 				generateTestStakeableOut(assetID, 10, 0, outputOwners1),
 			},
-			burnedAmount:     2,
-			creds:            []verify.Verifiable{cred1},
-			appliedLockState: locked.StateBonded,
+			appliedLockState: locked.StateUnlocked,
 			expectedErr:      errWrongOutType,
 		},
-		"ins have stakable.LockedIn": {
+		"Fail: Stakable input": {
+			state: noMsigState,
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
 			},
-			ins: []*avax.TransferableInput{
-				generateTestStakeableIn(assetID, 10, 0, sigIndices),
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestStakeableIn(assetID, 10, 0, []uint32{0}),
+				}
 			},
-			outs: []*avax.TransferableOutput{
-				generateTestOut(assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errWrongInType,
+		},
+		"Fail: UTXO is deposited, appliedLockState is unlocked": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
 			},
-			burnedAmount:     2,
+			ins:              generateTestInsFromUTXOs,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateUnlocked,
+			expectedErr:      errLockedUTXO,
+		},
+		"Fail: UTXO is deposited, appliedLockState is deposited": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+			},
+			ins:              generateTestInsFromUTXOs,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateDeposited,
+			expectedErr:      errLockingLockedUTXO,
+		},
+		"Fail: input lockIDs don't match utxo lockIDs": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+			},
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestIn(assetID, 10, depositTxID2, ids.Empty, []uint32{0}),
+				}
+			},
 			creds:            []verify.Verifiable{cred1},
 			appliedLockState: locked.StateBonded,
-			expectedErr:      errWrongInType,
+			expectedErr:      errLockIDsMismatch,
+		},
+		"Fail: utxo is locked, but input is not": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+			},
+			ins: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestIn(assetID, 10, ids.Empty, ids.Empty, []uint32{0}),
+				}
+			},
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errLockedFundsNotMarkedAsLocked,
+		},
+		"Fail: bond, but no outs are actually bonded; produced + fee > consumed, owner1 has excess as locked": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 5, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 5, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 4, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 6, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errWrongProducedAmount,
+		},
+		"Fail: bond, but no outs are actually bonded; produced + fee > consumed, owner2 has excess": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 5, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 5, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 4, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 6, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			burnedAmount:     1,
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errNotBurnedEnough,
+		},
+		"Fail: bond, produced + fee > consumed, owner1 has excess as locked": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 5, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 5, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 2, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 3, outputOwners1, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 3, outputOwners1, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 3, outputOwners1, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 5, outputOwners2, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 5, outputOwners2, depositTxID1, locked.ThisTxID),
+			},
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errWrongProducedAmount,
+		},
+		"Fail: bond, produced + fee > consumed, owner2 has excess": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 5, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 5, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 5, outputOwners2, depositTxID1, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 2, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 2, outputOwners1, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 2, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 3, outputOwners1, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 1, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 5, outputOwners2, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 5, outputOwners2, depositTxID1, locked.ThisTxID),
+			},
+			burnedAmount:     1,
+			creds:            []verify.Verifiable{cred1, cred1, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errNotBurnedEnough,
+		},
+		"OK: bond, but no outs are actually bonded; produced + fee == consumed": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{6}, assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 9, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestOut(assetID, 9, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred1, cred2, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+		},
+		"OK: bond, produced + fee == consumed": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{6}, assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 5, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 6, outputOwners1, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 4, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 7, outputOwners1, depositTxID2, locked.ThisTxID),
+				generateTestOut(assetID, 3, outputOwners1, depositTxID2, ids.Empty),
+				generateTestOut(assetID, 9, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred1, cred2, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+		},
+		"OK: bond, but no outs are actually bonded; produced + fee == consumed + minted": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{6}, assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 11, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestOut(assetID, 11, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			mintedAmount:     4,
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred1, cred2, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      nil,
+		},
+		"OK: bond; produced + fee == consumed + minted": {
+			state: noMsigState,
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, assetID, 10, outputOwners1, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{3}, assetID, 10, outputOwners1, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{4}, assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{5}, assetID, 10, outputOwners2, depositTxID1, ids.Empty),
+				generateTestUTXO(ids.ID{6}, assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 8, outputOwners1, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
+				generateTestOut(assetID, 6, outputOwners1, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 4, outputOwners1, depositTxID1, ids.Empty),
+				generateTestOut(assetID, 7, outputOwners1, depositTxID2, locked.ThisTxID),
+				generateTestOut(assetID, 3, outputOwners1, depositTxID2, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID1, locked.ThisTxID),
+				generateTestOut(assetID, 10, outputOwners2, depositTxID2, ids.Empty),
+			},
+			mintedAmount:     4,
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1, cred1, cred1, cred2, cred2, cred2},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      nil,
 		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			testHandler := defaultCaminoHandler(t, tt.state(ctrl))
+
+			var ins []*avax.TransferableInput
+			if tt.ins != nil {
+				ins = tt.ins(tt.utxos)
+			}
+
 			err := testHandler.VerifyLockUTXOs(
 				tx,
-				test.utxos,
-				test.ins,
-				test.outs,
-				test.creds,
-				test.mintedAmount,
-				test.burnedAmount,
+				tt.utxos,
+				ins,
+				tt.outs,
+				tt.creds,
+				tt.mintedAmount,
+				tt.burnedAmount,
 				assetID,
-				test.appliedLockState,
+				tt.appliedLockState,
 			)
-			require.ErrorIs(t, err, test.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -1097,7 +1199,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				ins:   []*avax.TransferableInput{{}},
 				creds: []verify.Verifiable{cred1},
 			},
-			err: fmt.Errorf("there are %d inputs and %d utxos: %w", 1, 2, errInputsUTXOSMismatch),
+			err: fmt.Errorf("there are %d inputs and %d utxos: %w", 1, 2, errInputsUTXOsMismatch),
 		},
 		"Wrong credentials": {
 			args: args{

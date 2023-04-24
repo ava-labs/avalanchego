@@ -506,7 +506,6 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	if err != nil {
 		return nil, err
 	}
-	sigIndices := in.(*secp256k1fx.TransferInput).SigIndices
 	signers = append(signers, consortiumSigners)
 
 	utx := &txs.RegisterNodeTx{
@@ -518,7 +517,7 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 		}},
 		OldNodeID:               oldNodeID,
 		NewNodeID:               newNodeID,
-		ConsortiumMemberAuth:    &secp256k1fx.Input{SigIndices: sigIndices},
+		ConsortiumMemberAuth:    &in.(*secp256k1fx.TransferInput).Input,
 		ConsortiumMemberAddress: consortiumMemberAddress,
 	}
 

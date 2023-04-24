@@ -35,7 +35,7 @@ var (
 	errWrongUTXOOutType          = errors.New("wrong utxo output type")
 	errWrongProducedAmount       = errors.New("produced more tokens, than input had")
 	errInputsCredentialsMismatch = errors.New("number of inputs is different from number of credentials")
-	errInputsUTXOSMismatch       = errors.New("number of inputs is different from number of utxos")
+	errInputsUTXOsMismatch       = errors.New("number of inputs is different from number of utxos")
 	errWrongCredentials          = errors.New("wrong credentials")
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
 	errAssetIDMismatch           = errors.New("utxo/input/output assetID is different from expected asset id")
@@ -811,7 +811,7 @@ func (h *handler) VerifyLockUTXOs(
 			"there are %d inputs and %d utxos: %w",
 			len(ins),
 			len(utxos),
-			errInputsUTXOSMismatch,
+			errInputsUTXOsMismatch,
 		)
 	}
 
@@ -1051,7 +1051,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			"there are %d inputs and %d utxos: %w",
 			len(ins),
 			len(utxos),
-			errInputsUTXOSMismatch,
+			errInputsUTXOsMismatch,
 		)
 	}
 

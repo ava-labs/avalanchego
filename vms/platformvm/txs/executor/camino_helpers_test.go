@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -509,6 +510,33 @@ func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortI
 	}
 }
 
+func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32) ([]*crypto.PrivateKeySECP256K1R, *multisig.AliasWithNonce, *secp256k1fx.OutputOwners, *secp256k1fx.OutputOwners) {
+	keys := make([]*crypto.PrivateKeySECP256K1R, addrsCount)
+
+	aliasOwners := &secp256k1fx.OutputOwners{
+		Threshold: threshold,
+		Addrs:     make([]ids.ShortID, addrsCount),
+	}
+	for i := uint32(0); i < addrsCount; i++ {
+		key, err := testKeyfactory.NewPrivateKey()
+		require.NoError(t, err)
+		secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+		require.True(t, ok)
+		aliasOwners.Addrs[i] = secpKey.Address()
+		keys[i] = secpKey
+	}
+
+	alias := &multisig.AliasWithNonce{Alias: multisig.Alias{
+		ID:     ids.GenerateTestShortID(),
+		Owners: aliasOwners,
+	}}
+
+	return keys, alias, aliasOwners, &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{alias.ID},
+	}
+}
+
 func shutdownCaminoEnvironment(env *caminoEnvironment) error {
 	if env.isBootstrapped.GetValue() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
@@ -539,22 +567,14 @@ func shutdownCaminoEnvironment(env *caminoEnvironment) error {
 	return errs.Err
 }
 
-func noInputs(_ []*avax.UTXO) []*avax.TransferableInput {
-	return []*avax.TransferableInput{}
-}
-
-func noOffers(_ caminoEnvironment) ids.ID {
-	return ids.Empty
-}
-
 func newCaminoEnvironmentWithMocks(
-	postBanff bool,
-	addSubnet bool,
-	caminoVMConfig *config.CaminoConfig,
+	postBanff bool, //nolint:unparam
+	addSubnet bool, //nolint:unparam
+	caminoVMConfig *config.CaminoConfig, //nolint:unparam
 	caminoGenesisConf api.Camino,
 	mockableState state.State,
 	sharedMemory atomic.SharedMemory,
-	utxoHandler utxo.Handler,
+	utxoHandler utxo.Handler, //nolint:unparam
 ) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
@@ -638,10 +658,36 @@ func newCaminoEnvironmentWithMocks(
 	return env
 }
 
-func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) { //nolint:unparam
+func stateExpectingShutdownCaminoEnvironment(c *gomock.Controller) *state.MockState {
+	s := state.NewMockState(c)
+	s.EXPECT().SetHeight(uint64(math.MaxUint64))
+	s.EXPECT().Commit()
+	s.EXPECT().Close()
+	return s
+}
+
+func expectStateGetMultisigAliases(s *state.MockState, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
 	for i := range addrs {
 		var alias *multisig.AliasWithNonce
-		if len(aliases) > i {
+		if i < len(aliases) {
+			alias = aliases[i]
+		}
+		if alias == nil {
+			s.EXPECT().GetMultisigAlias(addrs[i]).Return(nil, database.ErrNotFound)
+		} else {
+			s.EXPECT().GetMultisigAlias(addrs[i]).Return(alias, nil)
+		}
+	}
+}
+
+func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+	expectDiffGetMultisigAliases(s, addrs, aliases)
+}
+
+func expectDiffGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+	for i := range addrs {
+		var alias *multisig.AliasWithNonce
+		if i < len(aliases) {
 			alias = aliases[i]
 		}
 		if alias == nil {
@@ -658,7 +704,11 @@ func expectVerifyLock(s *state.MockDiff, ins []*avax.TransferableInput, utxos []
 
 func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
 	for i := range ins {
-		s.EXPECT().GetUTXO(ins[i].InputID()).Return(utxos[i], nil)
+		if utxos[i] == nil {
+			s.EXPECT().GetUTXO(ins[i].InputID()).Return(nil, database.ErrNotFound)
+		} else {
+			s.EXPECT().GetUTXO(ins[i].InputID()).Return(utxos[i], nil)
+		}
 	}
 }
 
@@ -677,6 +727,25 @@ func expectProduceUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID
 			},
 			Asset: outs[i].Asset,
 			Out:   outs[i].Out,
+		})
+	}
+}
+
+func expectProduceNewlyLockedUTXOs(s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int, lockState locked.State) { //nolint:unparam
+	for i := range outs {
+		out := outs[i].Out
+		if lockedOut, ok := out.(*locked.Out); ok {
+			utxoLockedOut := *lockedOut
+			utxoLockedOut.FixLockID(txID, lockState)
+			out = &utxoLockedOut
+		}
+		s.EXPECT().AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(baseOutIndex + i),
+			},
+			Asset: outs[i].Asset,
+			Out:   out,
 		})
 	}
 }
