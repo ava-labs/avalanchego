@@ -428,6 +428,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 				Start:          block.Timestamp,
 				Duration:       depositTx.DepositDuration,
 				Amount:         depositAmount,
+				RewardOwner:    depositTx.RewardsOwner,
 			}
 
 			currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)

@@ -196,9 +196,10 @@ func TestUnlockDepositTx(t *testing.T) {
 	depositStartTime := time.Now()
 	depositExpiredTime := depositStartTime.Add(100 * time.Second)
 	deposit := &deposits.Deposit{
-		Duration: 60,
-		Amount:   defaultCaminoValidatorWeight,
-		Start:    uint64(depositStartTime.Unix()),
+		Duration:    60,
+		Amount:      defaultCaminoValidatorWeight,
+		Start:       uint64(depositStartTime.Unix()),
+		RewardOwner: &outputOwners,
 	}
 
 	tests := map[string]struct {

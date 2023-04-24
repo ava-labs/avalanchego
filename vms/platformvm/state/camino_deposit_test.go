@@ -15,13 +15,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetDeposit(t *testing.T) {
 	depositTxID := ids.GenerateTestID()
-	deposit1 := &deposit.Deposit{Duration: 101}
+	deposit1 := &deposit.Deposit{
+		RewardOwner: &secp256k1fx.OutputOwners{
+			Addrs: []ids.ShortID{{1}},
+		},
+	}
 	depositBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, deposit1)
 	require.NoError(t, err)
 	testError := errors.New("test error")
@@ -593,9 +598,24 @@ func TestWriteDeposits(t *testing.T) {
 	depositTxID1 := ids.ID{1}
 	depositTxID2 := ids.ID{2}
 	depositTxID3 := ids.ID{3}
-	deposit1 := &deposit.Deposit{Duration: 101, Amount: 1}
-	deposit2 := &deposit.Deposit{Duration: 101, Amount: 2}
-	deposit3 := &deposit.Deposit{Duration: 101, Amount: 3}
+	deposit1 := &deposit.Deposit{
+		Duration: 101,
+		RewardOwner: &secp256k1fx.OutputOwners{
+			Addrs: []ids.ShortID{{1}},
+		},
+	}
+	deposit2 := &deposit.Deposit{
+		Duration: 101,
+		RewardOwner: &secp256k1fx.OutputOwners{
+			Addrs: []ids.ShortID{{2}},
+		},
+	}
+	deposit3 := &deposit.Deposit{
+		Duration: 101,
+		RewardOwner: &secp256k1fx.OutputOwners{
+			Addrs: []ids.ShortID{{3}},
+		},
+	}
 	depositEndtime := deposit2.EndTime()
 	deposit1Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, deposit1)
 	require.NoError(t, err)

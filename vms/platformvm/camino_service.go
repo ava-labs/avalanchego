@@ -38,7 +38,6 @@ var (
 	errEncodeTransferables    = errors.New("can't encode transferables as string")
 	errWrongOwnerType         = errors.New("wrong owner type")
 	errSerializeOwners        = errors.New("can't serialize owners")
-	errWrongTxType            = errors.New("wrong transaction type")
 )
 
 // CaminoService defines the API calls that can be made to the platform chain
@@ -685,7 +684,15 @@ type APIDeposit struct {
 	RewardOwner         platformapi.Owner `json:"rewardOwner"`
 }
 
-func APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) *APIDeposit {
+func (s *CaminoService) APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) (*APIDeposit, error) {
+	rewardOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, errWrongOwnerType
+	}
+	apiOwner, err := s.apiOwnerFromSECP(rewardOwner)
+	if err != nil {
+		return nil, err
+	}
 	return &APIDeposit{
 		DepositTxID:         depositTxID,
 		DepositOfferID:      deposit.DepositOfferID,
@@ -694,7 +701,8 @@ func APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) *APIDep
 		Start:               utilsjson.Uint64(deposit.Start),
 		Duration:            deposit.Duration,
 		Amount:              utilsjson.Uint64(deposit.Amount),
-	}
+		RewardOwner:         *apiOwner,
+	}, nil
 }
 
 type GetDepositsArgs struct {
@@ -723,27 +731,11 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 		if err != nil {
 			return err
 		}
-
-		signedDepositTx, _, err := s.vm.state.GetTx(args.DepositTxIDs[i])
+		reply.Deposits[i], err = s.APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
 		if err != nil {
 			return err
 		}
-		depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-		if !ok {
-			return errWrongTxType
-		}
-		rewardOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
-		if !ok {
-			return errWrongOwnerType
-		}
-		apiRewardOwner, err := s.apiOwnerFromSECP(rewardOwner)
-		if err != nil {
-			return err
-		}
-
 		reply.AvailableRewards[i] = utilsjson.Uint64(deposit.ClaimableReward(offer, timestamp))
-		reply.Deposits[i] = APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
-		reply.Deposits[i].RewardOwner = *apiRewardOwner
 	}
 	return nil
 }

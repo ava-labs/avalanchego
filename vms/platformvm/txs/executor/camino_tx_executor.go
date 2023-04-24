@@ -21,7 +21,6 @@ import (
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -59,7 +58,6 @@ var (
 	errNodeAlreadyRegistered        = errors.New("node is already registered")
 	errClaimableCredentialMissmatch = errors.New("claimable credential isn't matching")
 	errDepositNotFound              = errors.New("deposit not found")
-	errNotSECPOwner                 = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongCredentialsNumber       = errors.New("unexpected number of credentials")
 	errWrongOwnerType               = errors.New("wrong owner type")
 	errImportedUTXOMissmatch        = errors.New("imported input doesn't match expected utxo")
@@ -684,6 +682,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		Duration:       tx.DepositDuration,
 		Amount:         depositAmount,
 		Start:          uint64(currentChainTime.Unix()),
+		RewardOwner:    tx.RewardsOwner,
 	}
 
 	potentialReward := deposit.TotalReward(depositOffer)
@@ -761,23 +760,14 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 			}
 
 			if remainingReward := deposit.TotalReward(offer) - deposit.ClaimedRewardAmount; remainingReward > 0 {
-				signedDepositTx, _, err := e.State.GetTx(depositTxID)
-				if err != nil {
-					return fmt.Errorf("can't get depositTx: %w", err)
-				}
-				depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-				if !ok {
-					return fmt.Errorf("can't get depositTx: %w", errWrongTxType)
-				}
-
-				claimableOwnerID, err := txs.GetOwnerID(depositTx.RewardsOwner)
+				claimableOwnerID, err := txs.GetOwnerID(deposit.RewardOwner)
 				if err != nil {
 					return err
 				}
 
 				claimable, err := e.State.GetClaimable(claimableOwnerID)
 				if err == database.ErrNotFound {
-					scepOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+					scepOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
 					if !ok {
 						return errWrongOwnerType
 					}
@@ -809,6 +799,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				Amount:              deposit.Amount,
 				Start:               deposit.Start,
 				Duration:            deposit.Duration,
+				RewardOwner:         deposit.RewardOwner,
 			})
 		}
 	}
@@ -845,43 +836,24 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 	for i, txClaimable := range tx.Claimables {
 		switch txClaimable.Type {
 		case txs.ClaimTypeActiveDepositReward:
-			// Getting deposit tx
-
-			signedDepositTx, txStatus, err := e.State.GetTx(txClaimable.ID)
-			if err != nil {
-				return fmt.Errorf("%w: %s", errDepositNotFound, err)
-			}
-			if txStatus != status.Committed {
-				return fmt.Errorf("%w: %s", errDepositNotFound, "tx is not committed")
-			}
-			depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-			if !ok {
-				return fmt.Errorf("%w: %s", errDepositNotFound, errWrongTxType)
-			}
-
 			// Checking deposit signatures
 
-			depositRewardsOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if !ok {
-				return errNotSECPOwner
+			deposit, err := e.State.GetDeposit(txClaimable.ID)
+			if err != nil {
+				return fmt.Errorf("%w: %s", errDepositNotFound, err)
 			}
 
 			if err := e.Fx.VerifyMultisigPermission(
 				tx,
 				txClaimable.OwnerAuth,
 				claimableCreds[i],
-				depositRewardsOwner,
+				deposit.RewardOwner,
 				e.State,
 			); err != nil {
 				return fmt.Errorf("%w: %s", errClaimableCredentialMissmatch, err)
 			}
 
 			// Checking claimed amount
-
-			deposit, err := e.State.GetDeposit(txClaimable.ID)
-			if err != nil {
-				return fmt.Errorf("%w: %s", errDepositNotFound, err)
-			}
 
 			depositOffer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
 			if err != nil {
@@ -907,6 +879,7 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 				Start:               deposit.Start,
 				Duration:            deposit.Duration,
 				Amount:              deposit.Amount,
+				RewardOwner:         deposit.RewardOwner,
 			})
 
 		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:

@@ -2160,6 +2160,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Duration:       utx.DepositDuration,
 					Amount:         offer.MinAmount,
 					Start:          offer.Start, // current chaintime
+					RewardOwner:    utx.RewardsOwner,
 				}
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
@@ -2207,6 +2208,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Duration:       utx.DepositDuration,
 					Amount:         offer.MinAmount,
 					Start:          offer.Start, // current chaintime
+					RewardOwner:    utx.RewardsOwner,
 				}
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
@@ -2255,6 +2257,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Duration:       utx.DepositDuration,
 					Amount:         offer.MinAmount,
 					Start:          offer.Start, // current chaintime
+					RewardOwner:    utx.RewardsOwner,
 				}
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
@@ -2302,6 +2305,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Duration:       utx.DepositDuration,
 					Amount:         offer.MinAmount * 2,
 					Start:          offer.Start, // current chaintime
+					RewardOwner:    utx.RewardsOwner,
 				}
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
@@ -2351,6 +2355,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Duration:       utx.DepositDuration,
 					Amount:         offer.MinAmount,
 					Start:          offer.Start, // current chaintime
+					RewardOwner:    utx.RewardsOwner,
 				}
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-deposit1.TotalReward(offer), nil)
@@ -2421,8 +2426,6 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	deposit1WithRewardTxID1 := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
 
-	deposit1WithRewardTx := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &owner1}}
-
 	depositOffer := &deposit.Offer{
 		ID:                   ids.GenerateTestID(),
 		MinAmount:            1,
@@ -2447,6 +2450,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		Duration:       depositOfferWithReward.MinDuration,
 		Amount:         10000,
 		DepositOfferID: depositOfferWithReward.ID,
+		RewardOwner:    &owner1,
 	}
 	deposit2 := &deposit.Deposit{
 		Duration:       depositOffer.MaxDuration,
@@ -3110,7 +3114,6 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				// state update: deposit1
 				s.EXPECT().GetDeposit(deposit1WithRewardTxID1).Return(deposit1WithReward, nil)
 				s.EXPECT().GetDepositOffer(deposit1WithReward.DepositOfferID).Return(depositOfferWithReward, nil)
-				s.EXPECT().GetTx(deposit1WithRewardTxID1).Return(deposit1WithRewardTx, status.Committed, nil)
 				s.EXPECT().GetClaimable(owner1ID).Return(&state.Claimable{Owner: &owner1}, nil)
 				remainingReward := deposit1WithReward.TotalReward(depositOfferWithReward) - deposit1WithReward.ClaimedRewardAmount
 				s.EXPECT().SetClaimable(owner1ID, &state.Claimable{
@@ -3374,7 +3377,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
 				// deposit
-				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, database.ErrNotFound)
+				s.EXPECT().GetDeposit(depositTxID1).Return(nil, database.ErrNotFound)
 				return s
 			},
 			utx: func([]*state.Claimable) *txs.ClaimTx {
@@ -3402,11 +3405,8 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetTimestamp().Return(timestamp)
 				// deposit
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
+				s.EXPECT().GetDeposit(depositTxID1).
+					Return(&deposit.Deposit{RewardOwner: &depositRewardOwner}, nil)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				return s
 			},
@@ -3583,19 +3583,15 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(timestamp)
 
 				// deposit1
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
-				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
+					RewardOwner:    &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
+				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
 					InterestRateNominator: 1_000_000, // 100%
 				}, nil)
@@ -3631,17 +3627,13 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectProduceUTXOs(s, utx.Outs, txID, 0)
 
 				// deposit1
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
+					RewardOwner:    &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
@@ -3655,20 +3647,17 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:               deposit1.Start,
 					Duration:            deposit1.Duration,
 					Amount:              deposit1.Amount,
+					RewardOwner:         deposit1.RewardOwner,
 				})
 
 				// deposit2
-				s.EXPECT().GetTx(depositTxID2).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				deposit2 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
+					RewardOwner:    &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID2).Return(deposit2, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
@@ -3682,6 +3671,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:               deposit2.Start,
 					Duration:            deposit2.Duration,
 					Amount:              deposit2.Amount,
+					RewardOwner:         deposit1.RewardOwner,
 				})
 
 				// claimable
@@ -3918,11 +3908,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectProduceUTXOs(s, utx.Outs, txID, 0)
 
 				// deposit
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID:      depositOfferID,
@@ -3930,6 +3915,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Duration:            365 * 24 * 60 * 60 / 12 * 14,                 // 14 month
 					Amount:              10,
 					ClaimedRewardAmount: 1,
+					RewardOwner:         &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
@@ -3943,6 +3929,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:               deposit1.Start,
 					Duration:            deposit1.Duration,
 					Amount:              deposit1.Amount,
+					RewardOwner:         deposit1.RewardOwner,
 				})
 				return s
 			},
@@ -3980,17 +3967,13 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectProduceUTXOs(s, utx.Outs, txID, 0)
 
 				// deposit1
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &depositRewardOwner}},
-					status.Committed,
-					nil,
-				)
 				expectVerifyMultisigPermission(s, depositRewardOwner.Addrs, nil)
 				deposit1 := &deposit.Deposit{
 					DepositOfferID: depositOfferID,
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
+					RewardOwner:    &depositRewardOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
@@ -4004,6 +3987,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:               deposit1.Start,
 					Duration:            deposit1.Duration,
 					Amount:              deposit1.Amount,
+					RewardOwner:         deposit1.RewardOwner,
 				})
 
 				// claimable
@@ -4128,11 +4112,6 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 				expectProduceUTXOs(s, utx.Outs, txID, 0)
 
 				// deposit1
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: depositRewardMsigOwner}},
-					status.Committed,
-					nil,
-				)
 				expectVerifyMultisigPermission(s, []ids.ShortID{
 					depositRewardMsigAlias.ID,
 					depositRewardMsigAliasOwner.Addrs[0],
@@ -4143,6 +4122,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:          uint64(timestamp.Unix()) - 365*24*60*60/2, // 0.5 year ago
 					Duration:       365 * 24 * 60 * 60,                        // 1 year
 					Amount:         10,
+					RewardOwner:    depositRewardMsigOwner,
 				}
 				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 				s.EXPECT().GetDepositOffer(depositOfferID).Return(&deposit.Offer{
@@ -4155,6 +4135,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					Start:               deposit1.Start,
 					Duration:            deposit1.Duration,
 					Amount:              deposit1.Amount,
+					RewardOwner:         deposit1.RewardOwner,
 				})
 
 				// claimable
