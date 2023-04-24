@@ -59,7 +59,6 @@ func verifyAddValidatorTx(
 	}
 
 	duration := tx.StakingPeriod()
-
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -169,13 +168,13 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	duration := tx.StakingPeriod()
+	stakingPeriod := tx.StakingPeriod()
 	switch {
-	case duration < backend.Config.MinStakeDuration:
+	case stakingPeriod < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case duration > backend.Config.MaxStakeDuration:
+	case stakingPeriod > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
@@ -240,14 +239,14 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
-		if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
+		if stakingPeriod > primaryNetworkValidator.StakingPeriod {
 			return ErrValidatorSubset
 		}
 
 		// TODO ABENEGIA: we assume that the subnet validator may be accepted
 		// if its primary network counterpart will validate for at least another
 		// period. We may change this
-		candidateEndTime := currentChainTime.Add(tx.StakingPeriod())
+		candidateEndTime := currentChainTime.Add(stakingPeriod)
 		if candidateEndTime.After(primaryNetworkValidator.EndTime) {
 			return ErrValidatorSubset
 		}
@@ -529,8 +528,10 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	duration := tx.StakingPeriod()
-	stakedAssetID := tx.StakeOuts[0].AssetID()
+	var (
+		stakingPeriod = tx.StakingPeriod()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -544,11 +545,11 @@ func verifyAddPermissionlessValidatorTx(
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case duration < validatorRules.minStakeDuration:
+	case stakingPeriod < validatorRules.minStakeDuration:
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case duration > validatorRules.maxStakeDuration:
+	case stakingPeriod > validatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 
@@ -592,14 +593,14 @@ func verifyAddPermissionlessValidatorTx(
 		}
 
 		if backend.Config.IsContinuousStakingActivated(currentChainTime) {
-			if tx.StakingPeriod() > primaryNetworkValidator.StakingPeriod {
+			if stakingPeriod > primaryNetworkValidator.StakingPeriod {
 				return ErrValidatorSubset
 			}
 
 			// TODO ABENEGIA: we assume that the subnet validator may be accepted
 			// if its primary network counterpart will validate for at least another
 			// period. We may change this
-			candidateEndTime := currentChainTime.Add(tx.StakingPeriod())
+			candidateEndTime := currentChainTime.Add(stakingPeriod)
 			if candidateEndTime.After(primaryNetworkValidator.EndTime) {
 				return ErrValidatorSubset
 			}
@@ -733,8 +734,10 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	duration := tx.StakingPeriod()
-	stakedAssetID := tx.StakeOuts[0].AssetID()
+	var (
+		duration      = tx.StakingPeriod()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
