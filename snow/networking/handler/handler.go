@@ -904,19 +904,6 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
 	case *message.GossipRequest:
-		// TODO: After Cortina is activated, this can be removed as everyone
-		// will have accepted the StopVertex.
-		if state.Type == p2p.EngineType_ENGINE_TYPE_SNOWMAN {
-			avalancheEngine, ok := h.engineManager.Get(p2p.EngineType_ENGINE_TYPE_AVALANCHE).Get(state.State)
-			if ok {
-				// This chain was linearized, so we should gossip the Avalanche
-				// accepted frontier to make sure everyone eventually linearizes
-				// the chain.
-				if err := avalancheEngine.Gossip(context.TODO()); err != nil {
-					return err
-				}
-			}
-		}
 		return engine.Gossip(context.TODO())
 
 	case *message.Timeout:
