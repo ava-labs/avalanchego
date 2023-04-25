@@ -920,6 +920,7 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
+	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
 	avalancheBootstrapperConfig := avbootstrap.Config{
 		Config:             avalancheCommonCfg,
 		AllGetsServer:      avaGetHandler,
