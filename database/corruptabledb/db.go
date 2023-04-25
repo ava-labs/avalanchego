@@ -67,8 +67,8 @@ func (db *Database) Delete(ctx context.Context, key []byte) error {
 	return db.handleError(db.Database.Delete(ctx, key))
 }
 
-func (db *Database) Compact(ctx context.Context, start []byte, limit []byte) error {
-	return db.handleError(db.Database.Compact(ctx, start, limit))
+func (db *Database) Compact(start []byte, limit []byte) error {
+	return db.handleError(db.Database.Compact(start, limit))
 }
 
 func (db *Database) Close() error {

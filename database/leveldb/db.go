@@ -351,7 +351,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // A nil start is treated as a key before all keys in the DB.
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
-func (db *Database) Compact(_ context.Context, start []byte, limit []byte) error {
+func (db *Database) Compact(start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 

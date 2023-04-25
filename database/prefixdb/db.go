@@ -170,14 +170,14 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	return it
 }
 
-func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
+func (db *Database) Compact(start, limit []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.closed {
 		return database.ErrClosed
 	}
-	return db.db.Compact(ctx, db.prefix(start), db.prefix(limit))
+	return db.db.Compact(db.prefix(start), db.prefix(limit))
 }
 
 func (db *Database) Close() error {

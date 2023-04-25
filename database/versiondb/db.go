@@ -152,14 +152,14 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
+func (db *Database) Compact(start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
 	if db.mem == nil {
 		return database.ErrClosed
 	}
-	return db.db.Compact(ctx, start, limit)
+	return db.db.Compact(start, limit)
 }
 
 // SetDatabase changes the underlying database to the specified database

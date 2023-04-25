@@ -81,7 +81,7 @@ type Compacter interface {
 	// Therefore if both are nil then it will compact entire DB.
 	//
 	// Note: [start] and [limit] are safe to modify and read after calling Compact.
-	Compact(ctx context.Context, start []byte, limit []byte) error
+	Compact(start []byte, limit []byte) error
 }
 
 // Database contains all the methods required to allow handling different

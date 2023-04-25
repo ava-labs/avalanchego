@@ -213,7 +213,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 	if err := currentView.commitToDB(ctx); err != nil {
 		return err
 	}
-	return db.nodeDB.Compact(ctx, nil, nil)
+	return db.nodeDB.Compact(nil, nil)
 }
 
 // New returns a new merkle database.
@@ -258,8 +258,8 @@ func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *R
 	return view.commitToDB(ctx)
 }
 
-func (db *Database) Compact(ctx context.Context, start []byte, limit []byte) error {
-	return db.nodeDB.Compact(ctx, start, limit)
+func (db *Database) Compact(start []byte, limit []byte) error {
+	return db.nodeDB.Compact(start, limit)
 }
 
 func (db *Database) Close() error {

@@ -112,7 +112,7 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 }
 
 // Compact attempts to optimize the space utilization in the provided range
-func (db *DatabaseClient) Compact(ctx context.Context, start, limit []byte) error {
+func (db *DatabaseClient) Compact(start, limit []byte) error {
 	resp, err := db.client.Compact(ctx, &rpcdbpb.CompactRequest{
 		Start: start,
 		Limit: limit,

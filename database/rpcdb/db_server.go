@@ -78,8 +78,8 @@ func (db *DatabaseServer) Delete(ctx context.Context, req *rpcdbpb.DeleteRequest
 
 // Compact delegates the Compact call to the managed database and returns the
 // result
-func (db *DatabaseServer) Compact(ctx context.Context, req *rpcdbpb.CompactRequest) (*rpcdbpb.CompactResponse, error) {
-	err := db.db.Compact(ctx, req.Start, req.Limit)
+func (db *DatabaseServer) Compact(req *rpcdbpb.CompactRequest) (*rpcdbpb.CompactResponse, error) {
+	err := db.db.Compact(req.Start, req.Limit)
 	return &rpcdbpb.CompactResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 

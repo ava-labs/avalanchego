@@ -116,7 +116,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(
 	return it
 }
 
-func (db *Database) Compact(ctx context.Context, start, limit []byte) error {
+func (db *Database) Compact(start, limit []byte) error {
 	startTime := db.clock.Time()
 	err := db.db.Compact(ctx, start, limit)
 	end := db.clock.Time()
