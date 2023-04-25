@@ -57,13 +57,13 @@ jobs:
           toolchain: stable
           override: true
       - name: Run simple example
-        run: cargo run --example simple
+        run: RUST_BACKTRACE=1 cargo run --example simple
       - name: Run dump example
-        run: cargo run --example dump
+        run: RUST_BACKTRACE=1 cargo run --example dump
       - name: Run benchmark example
-        run: cargo run --example benchmark -- --nbatch 100 --batch-size 1000
+        run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
       - name: Run rev example
-        run: cargo run --example rev
+        run: RUST_BACKTRACE=1 cargo run --example rev
 
   docs:
     runs-on: ubuntu-latest
