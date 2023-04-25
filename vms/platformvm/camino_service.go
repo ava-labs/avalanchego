@@ -45,12 +45,6 @@ type CaminoService struct {
 	Service
 }
 
-// APIOwner is a representation of an owner used in API calls
-type APIOwner struct {
-	Addresses []string         `json:"addresses"`
-	Threshold utilsjson.Uint32 `json:"threshold"`
-}
-
 type GetBalanceResponseV2 struct {
 	Balances               map[ids.ID]utilsjson.Uint64 `json:"balances"`
 	UnlockedOutputs        map[ids.ID]utilsjson.Uint64 `json:"unlockedOutputs"`
@@ -300,7 +294,7 @@ func (s *CaminoService) GetAddressStates(_ *http.Request, args *api.JSONAddress,
 
 type GetMultisigAliasReply struct {
 	Memo types.JSONByteSlice `json:"memo"`
-	APIOwner
+	platformapi.Owner
 }
 
 // GetMultisigAlias retrieves the owners and threshold for a given multisig alias
@@ -322,6 +316,7 @@ func (s *CaminoService) GetMultisigAlias(_ *http.Request, args *api.JSONAddress,
 	}
 
 	response.Memo = alias.Memo
+	response.Locktime = utilsjson.Uint64(owners.Locktime)
 	response.Threshold = utilsjson.Uint32(owners.Threshold)
 	response.Addresses = make([]string, len(owners.Addrs))
 
