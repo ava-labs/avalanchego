@@ -59,6 +59,7 @@ import (
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
+	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 
@@ -918,8 +919,15 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
+	// create engine gear
+	avalancheEngine := aveng.New(ctx, avaGetHandler, linearizableVM)
+	if m.TracingEnabled {
+		avalancheEngine = common.TraceEngine(avalancheEngine, m.Tracer)
+	}
+
 	// create bootstrap gear
 	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
+	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
 	avalancheBootstrapperConfig := avbootstrap.Config{
 		Config:             avalancheCommonCfg,
 		AllGetsServer:      avaGetHandler,
@@ -947,7 +955,7 @@ func (m *manager) createAvalancheChain(
 		Avalanche: &handler.Engine{
 			StateSyncer:  nil,
 			Bootstrapper: avalancheBootstrapper,
-			Consensus:    nil,
+			Consensus:    avalancheEngine,
 		},
 		Snowman: &handler.Engine{
 			StateSyncer:  nil,
