@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -358,7 +359,7 @@ func New(
 		return nil, err
 	}
 
-	if err := s.sync(genesisBytes); err != nil {
+	if err := s.sync(context.TODO(), genesisBytes); err != nil {
 		// Drop any errors on close to return the first error
 		_ = s.Close()
 
@@ -614,13 +615,13 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
-func (s *state) shouldInit() (bool, error) {
-	has, err := s.singletonDB.Has(initializedKey)
+func (s *state) shouldInit(ctx context.Context) (bool, error) {
+	has, err := s.singletonDB.Has(ctx, initializedKey)
 	return !has, err
 }
 
-func (s *state) doneInit() error {
-	return s.singletonDB.Put(initializedKey, nil)
+func (s *state) doneInit(ctx context.Context) error {
+	return s.singletonDB.Put(ctx, initializedKey, nil)
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -752,7 +753,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		}
 		return tx.tx, tx.status, nil
 	}
-	txBytes, err := s.txDB.Get(txID[:])
+	txBytes, err := s.txDB.Get(context.TODO(), txID[:])
 	if err == database.ErrNotFound {
 		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
@@ -1408,8 +1409,8 @@ func (s *state) Close() error {
 	return errs.Err
 }
 
-func (s *state) sync(genesis []byte) error {
-	shouldInit, err := s.shouldInit()
+func (s *state) sync(ctx context.Context, genesis []byte) error {
+	shouldInit, err := s.shouldInit(ctx)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
@@ -1420,7 +1421,7 @@ func (s *state) sync(genesis []byte) error {
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := s.init(genesis); err != nil {
+		if err := s.init(ctx, genesis); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
@@ -1437,7 +1438,7 @@ func (s *state) sync(genesis []byte) error {
 	return nil
 }
 
-func (s *state) init(genesisBytes []byte) error {
+func (s *state) init(ctx context.Context, genesisBytes []byte) error {
 	// Create the genesis block and save it as being accepted (We don't do
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
@@ -1455,7 +1456,7 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	if err := s.doneInit(); err != nil {
+	if err := s.doneInit(ctx); err != nil {
 		return err
 	}
 
@@ -1493,7 +1494,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	if err := s.write(true /*=updateValidators*/, s.currentHeight); err != nil {
 		return nil, err
 	}
-	return s.baseDB.CommitBatch()
+	return s.baseDB.CommitBatch(context.TODO())
 }
 
 func (s *state) writeBlocks() error {
@@ -1511,7 +1512,7 @@ func (s *state) writeBlocks() error {
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, &stBlk)
-		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
+		if err := s.blockDB.Put(context.TODO(), blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
@@ -1529,7 +1530,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return blkState.Blk, blkState.Status, nil
 	}
 
-	blkBytes, err := s.blockDB.Get(blockID[:])
+	blkBytes, err := s.blockDB.Get(context.TODO(), blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
 		return nil, choices.Processing, database.ErrNotFound // status does not matter here
@@ -1614,7 +1615,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
 
-				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
+				if err = validatorDB.Put(context.TODO(), staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
@@ -1630,12 +1631,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					pkDiffs[nodeID] = staker.PublicKey
 
 					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
-					if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
+					if err := pkDiffDB.Put(context.TODO(), nodeID[:], pkBytes); err != nil {
 						return err
 					}
 				}
 
-				if err := validatorDB.Delete(staker.TxID[:]); err != nil {
+				if err := validatorDB.Delete(context.TODO(), staker.TxID[:]); err != nil {
 					return fmt.Errorf("failed to delete current staker: %w", err)
 				}
 
@@ -1662,7 +1663,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
 
-			if err := weightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
+			if err := weightDiffDB.Put(context.TODO(), nodeID[:], weightDiffBytes); err != nil {
 				return err
 			}
 
@@ -1740,7 +1741,7 @@ func writeCurrentDelegatorDiff(
 			return fmt.Errorf("failed to decrease node weight diff: %w", err)
 		}
 
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
+		if err := currentDelegatorList.Delete(context.TODO(), staker.TxID[:]); err != nil {
 			return fmt.Errorf("failed to delete current staker: %w", err)
 		}
 	}
@@ -1779,12 +1780,12 @@ func writePendingDiff(
 ) error {
 	switch validatorDiff.validatorStatus {
 	case added:
-		err := pendingValidatorList.Put(validatorDiff.validator.TxID[:], nil)
+		err := pendingValidatorList.Put(context.TODO(), validatorDiff.validator.TxID[:], nil)
 		if err != nil {
 			return fmt.Errorf("failed to add pending validator: %w", err)
 		}
 	case deleted:
-		err := pendingValidatorList.Delete(validatorDiff.validator.TxID[:])
+		err := pendingValidatorList.Delete(context.TODO(), validatorDiff.validator.TxID[:])
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
@@ -1795,13 +1796,13 @@ func writePendingDiff(
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()
 
-		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
+		if err := pendingDelegatorList.Put(context.TODO(), staker.TxID[:], nil); err != nil {
 			return fmt.Errorf("failed to write pending delegator to list: %w", err)
 		}
 	}
 
 	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
+		if err := pendingDelegatorList.Delete(context.TODO(), staker.TxID[:]); err != nil {
 			return fmt.Errorf("failed to delete pending delegator: %w", err)
 		}
 	}
@@ -1826,7 +1827,7 @@ func (s *state) writeTXs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, txStatus)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		if err := s.txDB.Put(context.TODO(), txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
 	}
@@ -1846,7 +1847,7 @@ func (s *state) writeRewardUTXOs() error {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
 			utxoID := utxo.InputID()
-			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+			if err := txDB.Put(context.TODO(), utxoID[:], utxoBytes); err != nil {
 				return fmt.Errorf("failed to add reward UTXO: %w", err)
 			}
 		}
@@ -1875,7 +1876,7 @@ func (s *state) writeSubnets() error {
 	for _, subnet := range s.addedSubnets {
 		subnetID := subnet.ID()
 
-		if err := s.subnetDB.Put(subnetID[:], nil); err != nil {
+		if err := s.subnetDB.Put(context.TODO(), subnetID[:], nil); err != nil {
 			return fmt.Errorf("failed to write subnet: %w", err)
 		}
 	}
@@ -1914,7 +1915,7 @@ func (s *state) writeChains() error {
 			chainDB := s.getChainDB(subnetID)
 
 			chainID := chain.ID()
-			if err := chainDB.Put(chainID[:], nil); err != nil {
+			if err := chainDB.Put(context.TODO(), chainID[:], nil); err != nil {
 				return fmt.Errorf("failed to write chain: %w", err)
 			}
 		}

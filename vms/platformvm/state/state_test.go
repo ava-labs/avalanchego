@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -45,16 +46,16 @@ func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
 	s, db := newUninitializedState(require)
 
-	shouldInit, err := s.(*state).shouldInit()
+	shouldInit, err := s.(*state).shouldInit(context.Background())
 	require.NoError(err)
 	require.True(shouldInit)
 
-	require.NoError(s.(*state).doneInit())
+	require.NoError(s.(*state).doneInit(context.Background()))
 	require.NoError(s.Commit())
 
 	s = newStateFromDB(require, db)
 
-	shouldInit, err = s.(*state).shouldInit()
+	shouldInit, err = s.(*state).shouldInit(context.Background())
 	require.NoError(err)
 	require.False(shouldInit)
 }

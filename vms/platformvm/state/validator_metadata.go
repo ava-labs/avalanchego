@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -246,7 +247,7 @@ func (m *metadata) WriteValidatorMetadata(
 			if subnetID == constants.PrimaryNetworkID {
 				db = dbPrimary
 			}
-			if err := db.Put(metadata.txID[:], metadataBytes); err != nil {
+			if err := db.Put(context.TODO(), metadata.txID[:], metadataBytes); err != nil {
 				return err
 			}
 		}

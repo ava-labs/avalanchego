@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -412,7 +413,7 @@ func (i *indexer) markIncomplete(chainID ids.ID) error {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(key, chainID[:])
 	key[hashing.HashLen] = isIncompletePrefix
-	return i.db.Put(key, nil)
+	return i.db.Put(context.TODO(), key, nil)
 }
 
 // Returns true if this chain is incomplete
@@ -420,14 +421,14 @@ func (i *indexer) isIncomplete(chainID ids.ID) (bool, error) {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(key, chainID[:])
 	key[hashing.HashLen] = isIncompletePrefix
-	return i.db.Has(key)
+	return i.db.Has(context.TODO(), key)
 }
 
 func (i *indexer) markPreviouslyIndexed(chainID ids.ID) error {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(key, chainID[:])
 	key[hashing.HashLen] = previouslyIndexedPrefix
-	return i.db.Put(key, nil)
+	return i.db.Put(context.TODO(), key, nil)
 }
 
 // Returns true if this chain is incomplete
@@ -435,15 +436,15 @@ func (i *indexer) previouslyIndexed(chainID ids.ID) (bool, error) {
 	key := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(key, chainID[:])
 	key[hashing.HashLen] = previouslyIndexedPrefix
-	return i.db.Has(key)
+	return i.db.Has(context.TODO(), key)
 }
 
 // Mark that the node has run at least once
 func (i *indexer) markHasRun() error {
-	return i.db.Put(hasRunKey, nil)
+	return i.db.Put(context.TODO(), hasRunKey, nil)
 }
 
 // Returns true if the node has run before
 func (i *indexer) hasRun() (bool, error) {
-	return i.db.Has(hasRunKey)
+	return i.db.Has(context.TODO(), hasRunKey)
 }
