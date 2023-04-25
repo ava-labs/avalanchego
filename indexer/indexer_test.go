@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -110,7 +111,7 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
 	require.False(idxrIntf.(*indexer).hasRunBefore)
-	require.NoError(db.Commit())
+	require.NoError(db.Commit(context.Background()))
 	require.NoError(idxrIntf.Close())
 	shutdown.Wait()
 	shutdown.Add(1)
@@ -221,7 +222,7 @@ func TestIndexer(t *testing.T) {
 	require.Equal(expectedContainer, containers[0])
 
 	// Close the indexer
-	require.NoError(db.Commit())
+	require.NoError(db.Commit(context.Background()))
 	require.NoError(idxr.Close())
 	require.True(idxr.closed)
 	// Calling Close again should be fine
@@ -382,7 +383,7 @@ func TestIndexer(t *testing.T) {
 	require.EqualValues(blkID, lastAcceptedBlk.ID)
 
 	// Close the indexer again
-	require.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(config.DB.(*versiondb.Database).Commit(context.Background()))
 	require.NoError(idxr.Close())
 
 	// Re-open one more time and re-register chains
@@ -448,7 +449,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.Len(idxr.blockIndices, 0)
 
 	// Close and re-open the indexer, this time with indexing enabled
-	require.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(config.DB.(*versiondb.Database).Commit(context.Background()))
 	require.NoError(idxr.Close())
 	config.IndexingEnabled = true
 	config.DB = versiondb.New(baseDB)
@@ -459,7 +460,7 @@ func TestIncompleteIndex(t *testing.T) {
 	require.True(idxr.indexingEnabled)
 
 	// Register the chain again. Should die due to incomplete index.
-	require.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(config.DB.(*versiondb.Database).Commit(context.Background()))
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	require.True(idxr.closed)
 

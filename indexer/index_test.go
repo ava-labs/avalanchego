@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -82,7 +83,7 @@ func TestIndex(t *testing.T) {
 	}
 
 	// Create a new index with the same database and ensure contents still there
-	require.NoError(db.Commit())
+	require.NoError(db.Commit(context.Background()))
 	require.NoError(idx.Close())
 	db = versiondb.New(baseDB)
 	indexIntf, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})

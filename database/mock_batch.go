@@ -46,7 +46,7 @@ func (m *MockBatch) Delete(arg0 context.Context, arg1 []byte) error {
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockBatchMockRecorder) Delete(arg0,  arg1 interface{}) *gomock.Call {
+func (mr *MockBatchMockRecorder) Delete(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockBatch)(nil).Delete), arg0, arg1)
 }
@@ -80,17 +80,17 @@ func (mr *MockBatchMockRecorder) Put(arg0, arg1, arg2 interface{}) *gomock.Call 
 }
 
 // Replay mocks base method.
-func (m *MockBatch) Replay(arg0 KeyValueWriterDeleter) error {
+func (m *MockBatch) Replay(arg0 context.Context, arg1 KeyValueWriterDeleter) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Replay", arg0)
+	ret := m.ctrl.Call(m, "Replay", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Replay indicates an expected call of Replay.
-func (mr *MockBatchMockRecorder) Replay(arg0 interface{}) *gomock.Call {
+func (mr *MockBatchMockRecorder) Replay(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replay", reflect.TypeOf((*MockBatch)(nil).Replay), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replay", reflect.TypeOf((*MockBatch)(nil).Replay), arg0, arg1)
 }
 
 // Reset mocks base method.

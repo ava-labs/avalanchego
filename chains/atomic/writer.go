@@ -5,6 +5,7 @@ package atomic
 
 import (
 	"context"
+
 	"github.com/ava-labs/avalanchego/database"
 )
 

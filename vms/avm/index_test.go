@@ -553,7 +553,7 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	expectedIdxBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(expectedIdxBytes, expectedIdx)
 
-	idxBytes, err := assetDB.Get([]byte("idx"))
+	idxBytes, err := assetDB.Get(context.Background(), []byte("idx"))
 	require.NoError(t, err)
 
 	require.EqualValues(t, expectedIdxBytes, idxBytes)
@@ -565,7 +565,7 @@ func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortI
 
 	idxBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(idxBytes, index)
-	tx1Bytes, err := assetDB.Get(idxBytes)
+	tx1Bytes, err := assetDB.Get(context.Background(), idxBytes)
 	if err != nil {
 		return err
 	}
@@ -606,17 +606,17 @@ func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID,
 	binary.BigEndian.PutUint64(idxBytes, idx)
 	for _, txID := range testTxs {
 		txID := txID
-		err := assetPrefixDB.Put(idxBytes, txID[:])
+		err := assetPrefixDB.Put(context.Background(), idxBytes, txID[:])
 		require.NoError(t, err)
 		idx++
 		binary.BigEndian.PutUint64(idxBytes, idx)
 	}
-	_, err := db.CommitBatch()
+	_, err := db.CommitBatch(context.Background())
 	require.NoError(t, err)
 
-	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
+	err = assetPrefixDB.Put(context.Background(), []byte("idx"), idxBytes)
 	require.NoError(t, err)
-	err = db.Commit()
+	err = db.Commit(context.Background())
 	require.NoError(t, err)
 	return testTxs
 }
