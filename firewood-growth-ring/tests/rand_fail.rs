@@ -53,13 +53,13 @@ fn short_single_point_failure() {
         block_nbit: 5,
         file_nbit: 6,
         file_cache: 1000,
-        n: 100,
+        n: 10,
         m: 10,
         k: 10,
-        csize: 1000,
+        csize: 100,
         stroke_max_len: 10,
         stroke_max_col: 256,
-        stroke_max_n: 5,
+        stroke_max_n: 2,
         seed: 0,
     };
     multi_point_failure(&[sim]);

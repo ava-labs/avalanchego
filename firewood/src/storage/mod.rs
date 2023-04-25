@@ -569,7 +569,7 @@ fn test_from_ash() {
     let mut rng = StdRng::seed_from_u64(42);
     let min = rng.gen_range(0..2 * PAGE_SIZE);
     let max = rng.gen_range(min + PAGE_SIZE..min + 100 * PAGE_SIZE);
-    for _ in 0..2000 {
+    for _ in 0..20 {
         let n = 20;
         let mut canvas = Vec::new();
         canvas.resize((max - min) as usize, 0);

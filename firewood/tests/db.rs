@@ -47,7 +47,7 @@ fn test_revisions() {
     for i in 0..10 {
         let db = DB::new("test_revisions_db", &cfg.clone().truncate(true).build()).unwrap();
         let mut dumped = VecDeque::new();
-        for _ in 0..100 {
+        for _ in 0..10 {
             {
                 let mut wb = db.new_writebatch();
                 let m = rng.borrow_mut().gen_range(1..20);

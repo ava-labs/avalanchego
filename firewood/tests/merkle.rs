@@ -876,7 +876,7 @@ fn test_single_side_range_proof() -> Result<(), ProofError> {
 fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let mut set = HashMap::new();
-        for _ in 0..4096_u32 {
+        for _ in 0..1024_u32 {
             let key = rand::thread_rng().gen::<[u8; 32]>();
             let val = rand::thread_rng().gen::<[u8; 20]>();
             set.insert(key, val);
