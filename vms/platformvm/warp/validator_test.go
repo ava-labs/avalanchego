@@ -314,9 +314,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	for i := 0; i < numNodes; i++ {
 		nodeID := ids.GenerateTestNodeID()
 		blsPrivateKey, err := bls.NewSecretKey()
-		if err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(b, err)
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
 			NodeID:    nodeID,
