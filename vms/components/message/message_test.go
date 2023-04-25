@@ -21,7 +21,7 @@ func TestParseGibberish(t *testing.T) {
 	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }
 
-func TestBuildParseProto(t *testing.T) {
+func TestParseProto(t *testing.T) {
 	require := require.New(t)
 
 	txBytes := []byte{'y', 'e', 'e', 't'}
