@@ -920,16 +920,6 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
-	// create bootstrap gear
-	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config:        avalancheCommonCfg,
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       vtxManager,
-		VM:            linearizableVM,
-	}
-
 	var avalancheConsensus avcon.Consensus = &avcon.Topological{}
 	if m.TracingEnabled {
 		avalancheConsensus = avcon.Trace(avalancheConsensus, m.Tracer)
@@ -958,10 +948,22 @@ func (m *manager) createAvalancheChain(
 		avalancheEngine = aveng.TraceEngine(avalancheEngine, m.Tracer)
 	}
 
+	// create bootstrap gear
+	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
+	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
+	avalancheBootstrapperConfig := avbootstrap.Config{
+		Config:             avalancheCommonCfg,
+		AllGetsServer:      avaGetHandler,
+		VtxBlocked:         vtxBlocker,
+		TxBlocked:          txBlocker,
+		Manager:            vtxManager,
+		VM:                 linearizableVM,
+		LinearizeOnStartup: !specifiedLinearizationTime,
+	}
+
 	avalancheBootstrapper, err := avbootstrap.New(
 		context.TODO(),
 		avalancheBootstrapperConfig,
-		avalancheEngine.Start,
 		snowmanBootstrapper.Start,
 	)
 	if err != nil {
