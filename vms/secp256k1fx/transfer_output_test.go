@@ -47,7 +47,7 @@ func TestOutputVerify(t *testing.T) {
 func TestOutputVerifyNil(t *testing.T) {
 	require := require.New(t)
 	out := (*TransferOutput)(nil)
-	require.ErrorIs(out.Verify(), errNilOutput)
+	require.ErrorIs(out.Verify(), ErrNilOutput)
 }
 
 func TestOutputVerifyNoValue(t *testing.T) {
@@ -77,7 +77,7 @@ func TestOutputVerifyUnspendable(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errOutputUnspendable)
+	require.ErrorIs(out.Verify(), ErrOutputUnspendable)
 }
 
 func TestOutputVerifyUnoptimized(t *testing.T) {
@@ -92,7 +92,7 @@ func TestOutputVerifyUnoptimized(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errOutputUnoptimized)
+	require.ErrorIs(out.Verify(), ErrOutputUnoptimized)
 }
 
 func TestOutputVerifyUnsorted(t *testing.T) {
@@ -108,7 +108,7 @@ func TestOutputVerifyUnsorted(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
+	require.ErrorIs(out.Verify(), ErrAddrsNotSortedUnique)
 }
 
 func TestOutputVerifyDuplicated(t *testing.T) {
@@ -124,7 +124,7 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
+	require.ErrorIs(out.Verify(), ErrAddrsNotSortedUnique)
 }
 
 func TestOutputSerialize(t *testing.T) {

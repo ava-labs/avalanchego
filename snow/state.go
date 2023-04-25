@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	Initializing = iota
+	Initializing State = iota
 	StateSyncing
 	Bootstrapping
 	NormalOp

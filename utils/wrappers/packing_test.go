@@ -33,12 +33,12 @@ func TestPackerCheckSpace(t *testing.T) {
 	p = Packer{Bytes: []byte{0x01}, Offset: 1}
 	p.checkSpace(1)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 2}
 	p.checkSpace(0)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerExpand(t *testing.T) {
@@ -47,7 +47,7 @@ func TestPackerExpand(t *testing.T) {
 	p := Packer{Bytes: []byte{0x01}, Offset: 2}
 	p.expand(1)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: []byte{0x01, 0x02, 0x03}, Offset: 0}
 	p.expand(1)
@@ -67,7 +67,7 @@ func TestPackerPackByte(t *testing.T) {
 
 	p.PackByte(0x02)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackByte(t *testing.T) {
@@ -81,7 +81,7 @@ func TestPackerUnpackByte(t *testing.T) {
 
 	require.Equal(uint8(ByteSentinel), p.UnpackByte())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerPackShort(t *testing.T) {
@@ -105,7 +105,7 @@ func TestPackerUnpackShort(t *testing.T) {
 
 	require.Equal(uint16(ShortSentinel), p.UnpackShort())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerPackInt(t *testing.T) {
@@ -119,7 +119,7 @@ func TestPackerPackInt(t *testing.T) {
 
 	p.PackInt(0x05060708)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackInt(t *testing.T) {
@@ -133,7 +133,7 @@ func TestPackerUnpackInt(t *testing.T) {
 
 	require.Equal(uint32(IntSentinel), p.UnpackInt())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerPackLong(t *testing.T) {
@@ -147,7 +147,7 @@ func TestPackerPackLong(t *testing.T) {
 
 	p.PackLong(0x090a0b0c0d0e0f00)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackLong(t *testing.T) {
@@ -161,7 +161,7 @@ func TestPackerUnpackLong(t *testing.T) {
 
 	require.Equal(uint64(LongSentinel), p.UnpackLong())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerPackFixedBytes(t *testing.T) {
@@ -175,7 +175,7 @@ func TestPackerPackFixedBytes(t *testing.T) {
 
 	p.PackFixedBytes([]byte("Avax"))
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackFixedBytes(t *testing.T) {
@@ -189,7 +189,7 @@ func TestPackerUnpackFixedBytes(t *testing.T) {
 
 	require.Nil(p.UnpackFixedBytes(4))
 	require.True(p.Errored())
-	require.Error(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerPackBytes(t *testing.T) {
@@ -203,7 +203,7 @@ func TestPackerPackBytes(t *testing.T) {
 
 	p.PackBytes([]byte("Avax"))
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackBytes(t *testing.T) {
@@ -217,7 +217,7 @@ func TestPackerUnpackBytes(t *testing.T) {
 
 	require.Nil(p.UnpackBytes())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackLimitedBytes(t *testing.T) {
@@ -231,7 +231,7 @@ func TestPackerUnpackLimitedBytes(t *testing.T) {
 
 	require.Nil(p.UnpackLimitedBytes(10))
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	// Reset and don't allow enough bytes
 	p = Packer{Bytes: p.Bytes}
@@ -263,7 +263,7 @@ func TestPackerUnpackString(t *testing.T) {
 
 	require.Equal("", p.UnpackStr())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackLimitedString(t *testing.T) {
@@ -277,7 +277,7 @@ func TestPackerUnpackLimitedString(t *testing.T) {
 
 	require.Equal("", p.UnpackLimitedStr(10))
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	// Reset and don't allow enough bytes
 	p = Packer{Bytes: p.Bytes}
@@ -301,7 +301,7 @@ func TestPacker(t *testing.T) {
 
 	p.PackShort(1)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: p.Bytes}
 	require.Equal(uint16(17), p.UnpackShort())
@@ -340,7 +340,7 @@ func TestPackerPackBool(t *testing.T) {
 
 	p.PackBool(false)
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 }
 
 func TestPackerUnpackBool(t *testing.T) {
@@ -355,7 +355,7 @@ func TestPackerUnpackBool(t *testing.T) {
 
 	require.Equal(BoolSentinel, p.UnpackBool())
 	require.True(p.Errored())
-	require.ErrorIs(p.Err, errBadLength)
+	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: []byte{0x42}, Offset: 0}
 	require.Equal(false, p.UnpackBool())
