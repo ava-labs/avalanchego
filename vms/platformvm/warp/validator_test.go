@@ -332,7 +332,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			getValidatorsOutput[validator.NodeID] = validator
 		}
 		validatorState := &validators.TestState{
-			GetValidatorSetF: func(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 				return getValidatorsOutput, nil
 			},
 		}
