@@ -49,7 +49,7 @@ func (m *MockState) Commit(arg0 context.Context) error {
 }
 
 // Commit indicates an expected call of Commit.
-func (mr *MockStateMockRecorder) Commit(arg0 interface{} ) *gomock.Call {
+func (mr *MockStateMockRecorder) Commit(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit), arg0)
 }

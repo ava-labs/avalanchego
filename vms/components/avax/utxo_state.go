@@ -5,6 +5,7 @@ package avax
 
 import (
 	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
