@@ -920,9 +920,9 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 	require.NoError(db.Put(context.Background(), key2, value2))
 	require.NoError(db.Put(context.Background(), key3, value3))
 
-	require.NoError(db.Compact(context.Background(), nil, nil))
+	require.NoError(db.Compact(nil, nil))
 	require.NoError(db.Close())
-	require.Equal(ErrClosed, db.Compact(context.Background(), nil, nil))
+	require.Equal(ErrClosed, db.Compact(nil, nil))
 }
 
 // TestClear tests to make sure the deletion helper works as expected.

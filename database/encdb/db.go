@@ -144,7 +144,7 @@ func (db *Database) Compact(start, limit []byte) error {
 	if db.closed {
 		return database.ErrClosed
 	}
-	return db.db.Compact(ctx, start, limit)
+	return db.db.Compact(start, limit)
 }
 
 func (db *Database) Close() error {
