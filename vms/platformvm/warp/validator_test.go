@@ -325,20 +325,15 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		})
 	}
 
-	getNValidatorsMap := func(n int) map[ids.NodeID]*validators.GetValidatorOutput {
-		validators := make(map[ids.NodeID]*validators.GetValidatorOutput)
-		for i := 0; i < n; i++ {
-			validator := getValidatorOutputs[i]
-			validators[validator.NodeID] = validator
-		}
-		return validators
-	}
-
 	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
-		validatorsOutput := getNValidatorsMap(size)
+		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < size; i++ {
+			validator := getValidatorOutputs[i]
+			getValidatorsOutput[validator.NodeID] = validator
+		}
 		validatorState := &validators.TestState{
-			GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-				return validatorsOutput, nil
+			GetValidatorSetF: func(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return getValidatorsOutput, nil
 			},
 		}
 
