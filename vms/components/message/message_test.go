@@ -8,7 +8,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/codec"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
 func TestParseGibberish(t *testing.T) {
@@ -21,13 +25,17 @@ func TestBuildParseProto(t *testing.T) {
 	require := require.New(t)
 
 	txBytes := []byte{'y', 'e', 'e', 't'}
-	txMsg := Tx{
-		Tx: txBytes,
+	protoMsg := pb.Message{
+		Message: &pb.Message_Tx{
+			Tx: &pb.Tx{
+				Tx: txBytes,
+			},
+		},
 	}
-	txMsgBytes, err := BuildProto(&txMsg)
+	msgBytes, err := proto.Marshal(&protoMsg)
 	require.NoError(err)
 
-	parsedMsgIntf, err := Parse(txMsgBytes)
+	parsedMsgIntf, err := Parse(msgBytes)
 	require.NoError(err)
 
 	parsedMsg, ok := parsedMsgIntf.(*Tx)

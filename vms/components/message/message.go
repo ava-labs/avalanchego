@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 
-	messagepb "github.com/ava-labs/avalanchego/proto/pb/message"
+	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
 var (
@@ -47,13 +47,13 @@ func (m *message) Bytes() []byte {
 func Parse(bytes []byte) (Message, error) {
 	var (
 		msg      Message
-		protoMsg messagepb.Message
+		protoMsg pb.Message
 	)
 
 	if err := proto.Unmarshal(bytes, &protoMsg); err == nil {
 		// This message was encoded with proto.
 		switch m := protoMsg.GetMessage().(type) {
-		case *messagepb.Message_Tx:
+		case *pb.Message_Tx:
 			msg = &Tx{
 				Tx: m.Tx.Tx,
 			}
@@ -79,26 +79,6 @@ func Parse(bytes []byte) (Message, error) {
 
 func Build(msg Message) ([]byte, error) {
 	bytes, err := c.Marshal(codecVersion, &msg)
-	msg.initialize(bytes)
-	return bytes, err
-}
-
-// TODO once all nodes support handling of proto encoded messages
-// (i.e. when all nodes are on v1.11.0 or later), replace Build
-// with this function.
-func BuildProto(msg Message) ([]byte, error) {
-	var protoMsg messagepb.Message
-	switch m := msg.(type) {
-	case *Tx:
-		protoMsg.Message = &messagepb.Message_Tx{
-			Tx: &messagepb.Tx{
-				Tx: m.Tx,
-			},
-		}
-	default:
-		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
-	}
-	bytes, err := proto.Marshal(&protoMsg)
 	msg.initialize(bytes)
 	return bytes, err
 }
