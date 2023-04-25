@@ -347,6 +347,7 @@ func makeValidator(
 			},
 			RewardsOwner: rewardsOwner,
 		},
+		NodeOwnerAuth: &secp256k1fx.Input{},
 	}}
 	if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 		return nil, err

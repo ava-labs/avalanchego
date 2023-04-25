@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -326,8 +325,8 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}})
 				// deposits
-				depositTx := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx, status.Committed, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{RewardOwner: &rewardOwner1}, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -371,10 +370,10 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
-				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
-				depositTx2 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner2}}
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
-				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{RewardOwner: &rewardOwner1}, nil)
+				s.EXPECT().GetDeposit(depositTxID2).Return(&deposits.Deposit{RewardOwner: &rewardOwner2}, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(rewardOwner2Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -438,15 +437,16 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
-				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{
-					RewardsOwner: &secp256k1fx.OutputOwners{
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{
+					RewardOwner: &secp256k1fx.OutputOwners{
 						Threshold: 2,
 						Addrs:     []ids.ShortID{rewardOwner1Addr, rewardOwner2Addr},
 					},
-				}}
-				depositTx2 := &txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}}
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
-				s.EXPECT().GetTx(depositTxID2).Return(depositTx2, status.Committed, nil)
+				}, nil)
+				s.EXPECT().GetDeposit(depositTxID2).Return(&deposits.Deposit{RewardOwner: &rewardOwner1}, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(rewardOwner2Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -512,6 +512,7 @@ func TestNewClaimTx(t *testing.T) {
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, ExpiredDepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -555,16 +556,16 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}, rewardOwner1Addr: {}, rewardOwner2Addr: {}})
 				// deposits
-				depositTx1 := &txs.Tx{Unsigned: &txs.DepositTx{
-					RewardsOwner: &secp256k1fx.OutputOwners{
-						Threshold: 2,
-						Addrs:     []ids.ShortID{rewardOwner1Addr, rewardOwner2Addr},
-					},
-				}}
-				s.EXPECT().GetTx(depositTxID1).Return(depositTx1, status.Committed, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{RewardOwner: &secp256k1fx.OutputOwners{
+					Threshold: 2,
+					Addrs:     []ids.ShortID{rewardOwner1Addr, rewardOwner2Addr},
+				}}, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(rewardOwner2Addr).Return(nil, database.ErrNotFound)
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1, ExpiredDepositReward: 10, ValidatorReward: 100}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -628,7 +629,7 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
-				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, database.ErrNotFound)
+				s.EXPECT().GetDeposit(depositTxID1).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -640,48 +641,6 @@ func TestNewClaimTx(t *testing.T) {
 			},
 			expectedErr: database.ErrNotFound,
 		},
-		"Fail, deposit not committed": {
-			state: func(ctrl *gomock.Controller) state.State {
-				s := state.NewMockState(ctrl)
-				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
-				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
-				// deposits
-				s.EXPECT().GetTx(depositTxID1).Return(nil, status.Unknown, nil)
-				return s
-			},
-			args: args{
-				claimables: []txs.ClaimAmount{{
-					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
-				}},
-				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
-			},
-			expectedErr: errTxIsNotCommitted,
-		},
-		"Fail, deposit isn't deposit": {
-			state: func(ctrl *gomock.Controller) state.State {
-				s := state.NewMockState(ctrl)
-				s.EXPECT().CaminoConfig().Return(caminoConfig, nil)
-				// fee
-				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
-				// deposits
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{}},
-					status.Committed,
-					nil,
-				)
-				return s
-			},
-			args: args{
-				claimables: []txs.ClaimAmount{{
-					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
-				}},
-				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
-			},
-			expectedErr: errWrongTxType,
-		},
 		"Fail, deposit rewards owner isn't secp type (shouldn't happen)": {
 			state: func(ctrl *gomock.Controller) state.State {
 				s := state.NewMockState(ctrl)
@@ -689,11 +648,7 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &avax.TransferableOutput{}}},
-					status.Committed,
-					nil,
-				)
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{RewardOwner: &avax.TransferableOutput{}}, nil)
 				return s
 			},
 			args: args{
@@ -712,11 +667,8 @@ func TestNewClaimTx(t *testing.T) {
 				// fee
 				expectLock(s, map[ids.ShortID][]*avax.UTXO{feeAddr: {feeUTXO}})
 				// deposits
-				s.EXPECT().GetTx(depositTxID1).Return(
-					&txs.Tx{Unsigned: &txs.DepositTx{RewardsOwner: &rewardOwner1}},
-					status.Committed,
-					nil,
-				)
+				s.EXPECT().GetDeposit(depositTxID1).Return(&deposits.Deposit{RewardOwner: &rewardOwner1}, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{
@@ -756,6 +708,7 @@ func TestNewClaimTx(t *testing.T) {
 				// claimables
 				claimable := &state.Claimable{Owner: &rewardOwner1}
 				s.EXPECT().GetClaimable(claimableOwnerID).Return(claimable, nil)
+				s.EXPECT().GetMultisigAlias(rewardOwner1Addr).Return(nil, database.ErrNotFound)
 				return s
 			},
 			args: args{

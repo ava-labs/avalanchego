@@ -419,6 +419,7 @@ func defaultGenesisState(addresses []pvm_genesis.AddressState, deposits []*txs.T
 						Validator:    validator.Validator{},
 						RewardsOwner: &secp256k1fx.OutputOwners{},
 					},
+					NodeOwnerAuth: &secp256k1fx.Input{},
 				}}},
 				Deposits: deposits,
 			}},

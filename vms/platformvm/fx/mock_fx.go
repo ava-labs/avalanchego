@@ -168,20 +168,6 @@ func (mr *MockFxMockRecorder) VerifyMultisigTransfer(arg0, arg1, arg2, arg3, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigTransfer", reflect.TypeOf((*MockFx)(nil).VerifyMultisigTransfer), arg0, arg1, arg2, arg3, arg4)
 }
 
-// VerifyMultisigUnorderedPermission mocks base method.
-func (m *MockFx) VerifyMultisigUnorderedPermission(arg0, arg1, arg2, arg3 interface{}) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyMultisigUnorderedPermission", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// VerifyMultisigUnorderedPermission indicates an expected call of VerifyMultisigUnorderedPermission.
-func (mr *MockFxMockRecorder) VerifyMultisigUnorderedPermission(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigUnorderedPermission", reflect.TypeOf((*MockFx)(nil).VerifyMultisigUnorderedPermission), arg0, arg1, arg2, arg3)
-}
-
 // VerifyPermission mocks base method.
 func (m *MockFx) VerifyPermission(arg0, arg1, arg2, arg3 interface{}) error {
 	m.ctrl.T.Helper()

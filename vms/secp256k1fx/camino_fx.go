@@ -206,35 +206,6 @@ func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msig
 	return fx.verifyMultisigCredentials(tx, in, cred, owners, msig)
 }
 
-func (fx *Fx) VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msigIntf interface{}) error {
-	tx, ok := txIntf.(UnsignedTx)
-	if !ok {
-		return errWrongTxType
-	}
-	cred, ok := credIntf.([]verify.Verifiable)
-	if !ok {
-		return errWrongCredentialType
-	}
-	owners, ok := ownerIntf.(*OutputOwners)
-	if !ok {
-		return errWrongUTXOType
-	}
-	msig, ok := msigIntf.(AliasGetter)
-	if !ok {
-		return errNotAliasGetter
-	}
-
-	if err := owners.Verify(); err != nil {
-		return err
-	}
-
-	if err := verify.All(cred...); err != nil {
-		return err
-	}
-
-	return fx.verifyMultisigUnorderedCredentials(tx, cred, owners, msig)
-}
-
 func (*Fx) CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error) {
 	owners, ok := ownerIntf.(*OutputOwners)
 	if !ok {
@@ -287,26 +258,6 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred Credentia
 	}
 	if sigsVerified < uint32(len(sigIdxs)) {
 		return errTooManySigners
-	}
-
-	return nil
-}
-
-func (fx *Fx) verifyMultisigUnorderedCredentials(tx UnsignedTx, creds []verify.Verifiable, owners *OutputOwners, msig AliasGetter) error {
-	resolved, err := fx.RecoverAddresses(tx, creds)
-	if err != nil {
-		return err
-	}
-
-	tf := func(addr ids.ShortID, _, _ uint32) (bool, error) {
-		if _, exists := resolved[addr]; exists {
-			return true, nil
-		}
-		return false, nil
-	}
-
-	if _, err = TraverseOwners(owners, msig, tf); err != nil {
-		return err
 	}
 
 	return nil

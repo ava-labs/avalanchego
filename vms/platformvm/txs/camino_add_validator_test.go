@@ -26,7 +26,7 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 	outputOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
-		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].PublicKey().Address()},
+		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].Address()},
 	}
 	sigIndices := []uint32{0}
 
@@ -123,6 +123,7 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 				},
+				NodeOwnerAuth: &secp256k1fx.Input{},
 			}
 
 			utx = tt.preExecute(t, utx)

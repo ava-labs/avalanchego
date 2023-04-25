@@ -115,7 +115,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 	// verify avax tx
 
-	_, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
+	caminoAddValidatorTx, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
 
 	if !caminoConfig.LockModeBondDeposit && !isCaminoTx {
 		return e.StandardTxExecutor.AddValidatorTx(tx)
@@ -141,18 +141,17 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return fmt.Errorf("%w: %s", errNodeNotRegistered, err)
 	}
 
-	if err = e.Fx.VerifyMultisigUnorderedPermission(
-		tx,
-		e.Tx.Creds,
+	if err := e.Backend.Fx.VerifyMultisigPermission(
+		e.Tx.Unsigned,
+		caminoAddValidatorTx.NodeOwnerAuth,
+		e.Tx.Creds[len(e.Tx.Creds)-1], // consortium member cred
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs: []ids.ShortID{
-				consortiumMemberAddress,
-			},
+			Addrs:     []ids.ShortID{consortiumMemberAddress},
 		},
 		e.State,
 	); err != nil {
-		return errConsortiumSignatureMissing
+		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
 	}
 
 	// verify validator
@@ -210,7 +209,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 			e.State,
 			tx.Ins,
 			tx.Outs,
-			e.Tx.Creds,
+			e.Tx.Creds[:len(e.Tx.Creds)-1],
 			0,
 			e.Backend.Config.AddPrimaryNetworkValidatorFee,
 			e.Backend.Ctx.AVAXAssetID,

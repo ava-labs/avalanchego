@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -33,9 +32,7 @@ var (
 
 	errKeyMissing       = errors.New("couldn't find key matching address")
 	errWrongNodeKeyType = errors.New("node key type isn't *crypto.PrivateKeySECP256K1R")
-	errTxIsNotCommitted = errors.New("tx is not committed")
 	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
-	errWrongTxType      = errors.New("wrong transaction type")
 	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 	errNoUTXOsForImport = errors.New("no utxos for import")
 	errWrongOutType     = errors.New("wrong output type")
@@ -48,6 +45,18 @@ type CaminoBuilder interface {
 }
 
 type CaminoTxBuilder interface {
+	NewCaminoAddValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		nodeOwnerAddress ids.ShortID,
+		rewardAddress ids.ShortID,
+		shares uint32,
+		keys []*crypto.PrivateKeySECP256K1R,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	NewAddressStateTx(
 		address ids.ShortID,
 		remove bool,
@@ -126,11 +135,12 @@ type caminoBuilder struct {
 	builder
 }
 
-func (b *caminoBuilder) NewAddValidatorTx(
+func (b *caminoBuilder) NewCaminoAddValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
+	nodeOwnerAddress ids.ShortID,
 	rewardAddress ids.ShortID,
 	shares uint32,
 	keys []*crypto.PrivateKeySECP256K1R,
@@ -161,7 +171,6 @@ func (b *caminoBuilder) NewAddValidatorTx(
 		locked.StateBonded,
 		nil,
 		&secp256k1fx.OutputOwners{
-			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
 		},
@@ -170,6 +179,22 @@ func (b *caminoBuilder) NewAddValidatorTx(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
+
+	kc := secp256k1fx.NewKeychain(keys...)
+	nodeOwnerInput, nodeOwnerSigners, err := kc.SpendMultiSig(
+		&secp256k1fx.TransferOutput{
+			OutputOwners: secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{nodeOwnerAddress},
+				Threshold: 1,
+			},
+		},
+		0,
+		b.state,
+	)
+	if err != nil {
+		return nil, err
+	}
+	signers = append(signers, nodeOwnerSigners)
 
 	utx := &txs.CaminoAddValidatorTx{
 		AddValidatorTx: txs.AddValidatorTx{
@@ -186,11 +211,11 @@ func (b *caminoBuilder) NewAddValidatorTx(
 				Wght:   stakeAmount,
 			},
 			RewardsOwner: &secp256k1fx.OutputOwners{
-				Locktime:  0,
 				Threshold: 1,
 				Addrs:     []ids.ShortID{rewardAddress},
 			},
 		},
+		NodeOwnerAuth: &nodeOwnerInput.(*secp256k1fx.TransferInput).Input,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
@@ -416,10 +441,15 @@ func (b *caminoBuilder) NewClaimTx(
 		var owner *secp256k1fx.OutputOwners
 		switch txClaimable.Type {
 		case txs.ClaimTypeActiveDepositReward:
-			owner, err = getDepositRewardsOwner(b.state, txClaimable.ID)
+			deposit, err := b.state.GetDeposit(txClaimable.ID)
 			if err != nil {
 				return nil, err
 			}
+			rewardOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
+			if !ok {
+				return nil, errNotSECPOwner
+			}
+			owner = rewardOwner
 
 		case txs.ClaimTypeExpiredDepositReward, txs.ClaimTypeValidatorReward, txs.ClaimTypeAllTreasury:
 			treasuryClaimable, err := b.state.GetClaimable(txClaimable.ID)
@@ -429,13 +459,17 @@ func (b *caminoBuilder) NewClaimTx(
 			owner = treasuryClaimable.Owner
 		}
 
-		indices, claimableSigners, able := kc.Match(owner, b.clk.Unix())
-		if !able {
-			return nil, errKeyMissing
+		claimableInput, claimableSigners, err := kc.SpendMultiSig(
+			&secp256k1fx.TransferOutput{OutputOwners: *owner},
+			0,
+			b.state,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", errKeyMissing, err)
 		}
 
 		signers = append(signers, claimableSigners)
-		claimables[i].OwnerAuth = &secp256k1fx.Input{SigIndices: indices}
+		claimables[i].OwnerAuth = &claimableInput.(*secp256k1fx.TransferInput).Input
 
 		outIntf, err := b.fx.CreateOutput(txClaimable.Amount, claimTo)
 		if err != nil {
@@ -497,7 +531,6 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 			OutputOwners: secp256k1fx.OutputOwners{
 				Addrs:     []ids.ShortID{consortiumMemberAddress},
 				Threshold: 1,
-				Locktime:  0,
 			},
 		},
 		0,
@@ -676,25 +709,4 @@ func getSigners(
 		signers[i] = key
 	}
 	return signers, nil
-}
-
-func getDepositRewardsOwner(state state.Chain, depositTxID ids.ID) (*secp256k1fx.OutputOwners, error) {
-	signedDepositTx, txStatus, err := state.GetTx(depositTxID)
-	if err != nil {
-		return nil, err
-	}
-	if txStatus != status.Committed {
-		return nil, errTxIsNotCommitted
-	}
-	depositTx, ok := signedDepositTx.Unsigned.(*txs.DepositTx)
-	if !ok {
-		return nil, errWrongTxType
-	}
-
-	depositRewardsOwner, ok := depositTx.RewardsOwner.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, errNotSECPOwner
-	}
-
-	return depositRewardsOwner, nil
 }

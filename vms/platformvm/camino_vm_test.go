@@ -120,11 +120,12 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	// Add the validator
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := defaultValidateEndTime.Add(-1 * time.Hour)
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
+		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], consortiumMemberKey},
@@ -320,14 +321,15 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := defaultValidateEndTime.Add(-1 * time.Hour)
-	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+	addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
 		vm.Config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
+		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey},
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)

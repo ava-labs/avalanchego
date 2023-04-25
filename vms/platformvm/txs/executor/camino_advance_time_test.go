@@ -216,7 +216,7 @@ func TestDeferredStakers(t *testing.T) {
 					staker.endTime,
 					staker.nodeID,
 					staker.nodeOwnerAddr,
-					[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], staker.nodeKey},
+					[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], staker.nodeKey, staker.nodeOwnerKey},
 				)
 				require.NoError(err)
 			}
@@ -330,11 +330,12 @@ func addCaminoPendingValidator(
 		return nil, err
 	}
 
-	tx, err := env.txBuilder.NewAddValidatorTx(
+	tx, err := env.txBuilder.NewCaminoAddValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
 		nodeID,
+		nodeOwnerAddr,
 		ids.ShortID(nodeID),
 		reward.PercentDenominator,
 		keys,

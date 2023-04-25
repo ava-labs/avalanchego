@@ -25,10 +25,6 @@ type CaminoFx interface {
 	// Multisig aliases supported.
 	VerifyMultisigPermission(txIntf, inIntf, credIntf, controlGroup, msigIntf interface{}) error
 
-	// VerifyMultisigUnorderedPermission returns nil if credential [credIntf] proves [ownerIntf].
-	// Multisig aliases supported. Signatures order and number doesn't matter.
-	VerifyMultisigUnorderedPermission(txIntf, credIntf, ownerIntf, msigIntf interface{}) error
-
 	// CollectMultisigAliases returns an array of OutputOwners part of the owner
 	CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error)
 }

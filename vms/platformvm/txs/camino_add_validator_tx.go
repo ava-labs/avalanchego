@@ -25,6 +25,10 @@ var (
 // CaminoAddValidatorTx is an unsigned caminoAddValidatorTx
 type CaminoAddValidatorTx struct {
 	AddValidatorTx `serialize:"true"`
+
+	// Auth that will be used to verify credential for [NodeOwnerAuth].
+	// If node owner address is msig-alias, auth must match real signatures.
+	NodeOwnerAuth verify.Verifiable `serialize:"true" json:"nodeOwnerAuth"`
 }
 
 func (tx *CaminoAddValidatorTx) Stake() []*avax.TransferableOutput {
@@ -53,8 +57,8 @@ func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
+	if err := verify.All(&tx.Validator, tx.RewardsOwner, tx.NodeOwnerAuth); err != nil {
+		return fmt.Errorf("failed to verify validator, rewards owner or node owner auth: %w", err)
 	}
 
 	totalStakeWeight := uint64(0)

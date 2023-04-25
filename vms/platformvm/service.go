@@ -1003,6 +1003,7 @@ type AddValidatorArgs struct {
 	api.JSONSpendHeader
 	platformapi.Staker
 	// The address the staking reward, if applicable, will go to
+	NodeOwnerAddress  string       `json:"nodeOwnerAddress"`
 	RewardAddress     string       `json:"rewardAddress"`
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
@@ -1046,6 +1047,12 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 		return err
 	}
 
+	// Parse the node owner address
+	nodeOwnerAddress, err := avax.ParseServiceAddress(s.addrManager, args.NodeOwnerAddress)
+	if err != nil {
+		return fmt.Errorf("problem while parsing node owner address: %w", err)
+	}
+
 	// Parse the reward address
 	rewardAddress, err := avax.ParseServiceAddress(s.addrManager, args.RewardAddress)
 	if err != nil {
@@ -1061,11 +1068,12 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 	}
 
 	// Create the transaction
-	tx, err := s.vm.txBuilder.NewAddValidatorTx(
+	tx, err := s.vm.txBuilder.NewCaminoAddValidatorTx(
 		args.GetWeight(),                     // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
 		nodeID,                               // Node ID
+		nodeOwnerAddress,                     // node owner address
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
 		keys,                                 // Keys providing the staked tokens

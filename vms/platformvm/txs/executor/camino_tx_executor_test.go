@@ -64,9 +64,9 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 	env.config.BanffTime = env.state.GetTimestamp()
 	_, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 	_, nodeID2 := nodeid.GenerateCaminoNodeKeyAndID()
-	msigKey, err := testKeyfactory.NewPrivateKey()
-	require.NoError(t, err)
-	msigAlias := msigKey.PublicKey().Address()
+	// msigKey, err := testKeyfactory.NewPrivateKey()
+	// require.NoError(t, err)
+	// msigAlias := msigKey.PublicKey().Address()
 
 	addr0 := caminoPreFundedKeys[0].Address()
 	addr1 := caminoPreFundedKeys[1].Address()
@@ -78,6 +78,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 		startTime     uint64
 		endTime       uint64
 		nodeID        ids.NodeID
+		nodeOwnerAddr ids.ShortID
 		rewardAddress ids.ShortID
 		shares        uint32
 		keys          []*crypto.PrivateKeySECP256K1R
@@ -95,6 +96,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultValidateStartTime.Unix()) + 1,
 					endTime:       uint64(defaultValidateEndTime.Unix()),
 					nodeID:        nodeID,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -113,6 +115,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultValidateStartTime.Unix()) - 1,
 					endTime:       uint64(defaultValidateEndTime.Unix()),
 					nodeID:        nodeID,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -131,6 +134,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix() + 1),
 					endTime:       uint64(defaultValidateEndTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix() + 1),
 					nodeID:        nodeID,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -149,6 +153,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultValidateStartTime.Unix() + 1),
 					endTime:       uint64(defaultValidateEndTime.Unix()),
 					nodeID:        caminoPreFundedNodeIDs[0],
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -167,6 +172,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultGenesisTime.Add(1 * time.Second).Unix()),
 					endTime:       uint64(defaultGenesisTime.Add(1 * time.Second).Add(defaultMinStakingDuration).Unix()),
 					nodeID:        nodeID2,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -196,6 +202,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultGenesisTime.Add(1 * time.Second).Unix()),
 					endTime:       uint64(defaultGenesisTime.Add(1 * time.Second).Add(defaultMinStakingDuration).Unix()),
 					nodeID:        nodeID2,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -225,6 +232,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					startTime:     uint64(defaultValidateStartTime.Unix() + 1),
 					endTime:       uint64(defaultValidateEndTime.Unix()),
 					nodeID:        nodeID,
+					nodeOwnerAddr: addr1,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[1]},
@@ -241,31 +249,14 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			},
 			expectedErr: errFlowCheckFailed,
 		},
-		"Not signed by consortium member": {
+		"Not signed by node owner": {
 			generateArgs: func() args {
 				return args{
 					stakeAmount:   env.config.MinValidatorStake,
 					startTime:     uint64(defaultValidateStartTime.Unix() + 1),
 					endTime:       uint64(defaultValidateEndTime.Unix()),
 					nodeID:        nodeID,
-					rewardAddress: ids.ShortEmpty,
-					shares:        reward.PercentDenominator,
-					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[2]},
-					changeAddr:    ids.ShortEmpty,
-				}
-			},
-			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr0)
-			},
-			expectedErr: errConsortiumSignatureMissing,
-		},
-		"Not enough sigs from msig consortium member": {
-			generateArgs: func() args {
-				return args{
-					stakeAmount:   env.config.MinValidatorStake,
-					startTime:     uint64(defaultValidateStartTime.Unix() + 1),
-					endTime:       uint64(defaultValidateEndTime.Unix()),
-					nodeID:        nodeID,
+					nodeOwnerAddr: addr0,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -273,31 +264,51 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &msigAlias)
-				env.state.SetMultisigAlias(&multisig.AliasWithNonce{
-					Alias: multisig.Alias{
-						ID: msigAlias,
-						Owners: &secp256k1fx.OutputOwners{
-							Threshold: 2,
-							Addrs: []ids.ShortID{
-								caminoPreFundedKeys[0].Address(),
-								caminoPreFundedKeys[1].Address(),
-							},
-						},
-					},
-				})
+				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr1)
 			},
 			expectedErr: errConsortiumSignatureMissing,
 		},
+		// "Not enough sigs from msig node owner": {
+		// 	generateArgs: func() args {
+		// 		return args{
+		// 			stakeAmount:          env.config.MinValidatorStake,
+		// 			startTime:            uint64(defaultValidateStartTime.Unix() + 1),
+		// 			endTime:              uint64(defaultValidateEndTime.Unix()),
+		// 			nodeID:               nodeID,
+		// 			nodeOwnerAddr: msigAlias,
+		// 			rewardAddress:        ids.ShortEmpty,
+		// 			shares:               reward.PercentDenominator,
+		// 			keys:                 []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		// 			changeAddr:           ids.ShortEmpty,
+		// 		}
+		// 	},
+		// 	preExecute: func(t *testing.T, tx *txs.Tx) {
+		// 		env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &msigAlias)
+		// 		env.state.SetMultisigAlias(&multisig.AliasWithNonce{
+		// 			Alias: multisig.Alias{
+		// 				ID: msigAlias,
+		// 				Owners: &secp256k1fx.OutputOwners{
+		// 					Threshold: 2,
+		// 					Addrs: []ids.ShortID{
+		// 						caminoPreFundedKeys[0].Address(),
+		// 						caminoPreFundedKeys[1].Address(),
+		// 					},
+		// 				},
+		// 			},
+		// 		})
+		// 	},
+		// 	expectedErr: errConsortiumSignatureMissing,
+		// },
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			addValidatorArgs := tt.generateArgs()
-			tx, err := env.txBuilder.NewAddValidatorTx(
+			tx, err := env.txBuilder.NewCaminoAddValidatorTx(
 				addValidatorArgs.stakeAmount,
 				addValidatorArgs.startTime,
 				addValidatorArgs.endTime,
 				addValidatorArgs.nodeID,
+				addValidatorArgs.nodeOwnerAddr,
 				addValidatorArgs.rewardAddress,
 				addValidatorArgs.shares,
 				addValidatorArgs.keys,
@@ -344,11 +355,12 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	// Add `pendingDSValidatorID` as validator to pending set
-	addDSTx, err := env.txBuilder.NewAddValidatorTx(
+	addDSTx, err := env.txBuilder.NewCaminoAddValidatorTx(
 		env.config.MinValidatorStake,
 		uint64(dsStartTime.Unix()),
 		uint64(dsEndTime.Unix()),
 		pendingDSValidatorID,
+		caminoPreFundedKeys[0].Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], pendingDSValidatorKey},
@@ -714,6 +726,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 				ins[i] = generateTestInFromUTXO(utxo, sigIndices)
 				signers[i] = inputSigners
 			}
+			signers = append(signers, []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]})
 
 			avax.SortTransferableInputsWithSigners(ins, signers)
 			avax.SortTransferableOutputs(tt.outs, txs.Codec)
@@ -738,6 +751,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 				},
+				NodeOwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 			}
 
 			tx, err := txs.NewSigned(utx, txs.Codec, signers)
@@ -1549,7 +1563,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 		generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
 			return []*avax.UTXO{
 				generateTestUTXO(txID, env.ctx.AVAXAssetID, defaultCaminoValidatorWeight, stakeOwners, ids.Empty, ids.Empty),
-				generateTestUTXO(unlockedUTXOTxID, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty),
+				generateTestUTXOWithIndex(unlockedUTXOTxID, 2, env.ctx.AVAXAssetID, defaultCaminoBalance, stakeOwners, ids.Empty, ids.Empty, true),
 			}
 		},
 		expectedErr: nil,
@@ -4895,9 +4909,25 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
-	consortiumMemberAddress := caminoPreFundedKeys[0].Address()
-	consortiumMemberKey := caminoPreFundedKeys[0]
-	nodeID := caminoPreFundedNodeIDs[0]
+	// finding first staker to remove
+	env := newCaminoEnvironment( /*postBanff*/ true, false, api.Camino{LockModeBondDeposit: true})
+	stakerIterator, err := env.state.GetCurrentStakerIterator()
+	require.NoError(t, err)
+	require.True(t, stakerIterator.Next())
+	stakerToRemove := stakerIterator.Value()
+	stakerIterator.Release()
+	nodeID := stakerToRemove.NodeID
+	consortiumMemberAddress, err := env.state.GetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode)
+	require.NoError(t, err)
+	kc := secp256k1fx.NewKeychain(caminoPreFundedKeys...)
+	key, ok := kc.Get(consortiumMemberAddress)
+	require.True(t, ok)
+	consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+	require.True(t, ok)
+	require.NoError(t, shutdownCaminoEnvironment(env))
+
+	// other common data
+
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,

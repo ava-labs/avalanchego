@@ -151,6 +151,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 							},
 							StakeOuts: []*avax.TransferableOutput{},
 						},
+						NodeOwnerAuth: &secp256k1fx.Input{},
 					},
 					Creds: []verify.Verifiable{},
 				}
