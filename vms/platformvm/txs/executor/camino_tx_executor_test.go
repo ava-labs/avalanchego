@@ -1831,7 +1831,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 
 	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
 	utxoOwnerKey, utxoOwnerAddr, utxoOwner := generateKeyAndOwner(t)
-	_, _, newUTXOOwner := generateKeyAndOwner(t)
+	_, newUTXOOwnerAddr, newUTXOOwner := generateKeyAndOwner(t)
 
 	feeUTXO := generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
 	doubleFeeUTXO := generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, defaultTxFee*2, feeOwner, ids.Empty, ids.Empty)
@@ -2101,7 +2101,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"Supply overflow": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil) // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{utxoOwnerAddr}, nil)               // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2145,7 +2146,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"OK": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil) // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{utxoOwnerAddr}, nil)               // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2193,7 +2195,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"OK: fee change to new address": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)     // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{newUTXOOwnerAddr, utxoOwnerAddr}, nil) // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2242,7 +2245,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"OK: deposit bonded": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil) // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{utxoOwnerAddr}, nil)               // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2290,7 +2294,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"OK: deposit bonded and unlocked": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr, utxoOwnerAddr}, nil) // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{utxoOwnerAddr, utxoOwnerAddr}, nil)               // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2340,7 +2345,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		"OK: deposited for new owner": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, utxoOwnerAddr}, nil) // consumed
+				expectStateGetMultisigAliases(s, []ids.ShortID{newUTXOOwnerAddr}, nil)            // produced
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID) *state.MockDiff {
@@ -2418,7 +2424,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 
 	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
 	owner1Key, owner1Addr, owner1 := generateKeyAndOwner(t)
-	_, _, owner2 := generateKeyAndOwner(t)
+	_, owner2Addr, owner2 := generateKeyAndOwner(t)
 	owner1ID, err := txs.GetOwnerID(owner1)
 	require.NoError(t, err)
 	bondTxID := ids.GenerateTestID()
@@ -2655,7 +2661,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock some amount, deposit expired": {
-			baseState: stateExpectingShutdownCaminoEnvironment,
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := stateExpectingShutdownCaminoEnvironment(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{owner1Addr}, nil)
+				return s
+			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks
@@ -2686,7 +2697,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -2756,7 +2767,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -2791,7 +2802,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -2821,7 +2832,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Unlock all amount of not owned utxos, deposit expired": {
-			baseState: stateExpectingShutdownCaminoEnvironment,
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := stateExpectingShutdownCaminoEnvironment(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{owner1Addr}, nil)
+				return s
+			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks
@@ -2911,7 +2927,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -2945,7 +2961,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -2979,7 +2995,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3012,7 +3028,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(owner1Addr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{owner1Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3039,7 +3055,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"No fee burning inputs are deposited": {
-			baseState: stateExpectingShutdownCaminoEnvironment,
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := stateExpectingShutdownCaminoEnvironment(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{owner1Addr}, nil)
+				return s
+			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks
@@ -3070,8 +3091,7 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
-				s.EXPECT().GetMultisigAlias(owner1Addr).Return(nil, database.ErrNotFound)
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3101,7 +3121,12 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 			signers: [][]*crypto.PrivateKeySECP256K1R{{owner1Key}, {feeOwnerKey}},
 		},
 		"OK: unlock all amount, deposit with unclaimed reward is expired": {
-			baseState: stateExpectingShutdownCaminoEnvironment,
+			baseState: func(c *gomock.Controller) *state.MockState {
+				s := stateExpectingShutdownCaminoEnvironment(c)
+				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{owner1Addr}, nil)
+				return s
+			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks
@@ -3142,8 +3167,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		"OK: unlock some amount, deposit is still unlocking": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3190,8 +3215,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		"OK: unlock some amount, deposit is still unlocking, fee change to new address": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner2Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3239,8 +3264,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		"OK: unlock deposit, one expired deposit and one active": {
 			baseState: func(c *gomock.Controller) *state.MockState {
 				s := stateExpectingShutdownCaminoEnvironment(c)
-				s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
 				// utxo handler, used in fx VerifyMultisigTransfer method for verify unlock deposit flowcheck
+				expectStateGetMultisigAliases(s, []ids.ShortID{feeOwnerAddr, owner1Addr, owner1Addr}, nil)
 				return s
 			},
 			state: func(c *gomock.Controller, utx *txs.UnlockDepositTx, txID ids.ID, utxos []*avax.UTXO) *state.MockDiff {
@@ -3324,8 +3349,8 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	depositRewardOwnerKey, _, depositRewardOwner := generateKeyAndOwner(t)
 	claimableOwnerKey1, _, claimableOwner1 := generateKeyAndOwner(t)
 	claimableOwnerKey2, _, claimableOwner2 := generateKeyAndOwner(t)
-	_, _, claimToOwner1 := generateKeyAndOwner(t)
-	_, _, claimToOwner2 := generateKeyAndOwner(t)
+	_, claimToOwnerAddr1, claimToOwner1 := generateKeyAndOwner(t)
+	_, claimToOwnerAddr2, claimToOwner2 := generateKeyAndOwner(t)
 	depositRewardMsigKeys, depositRewardMsigAlias, depositRewardMsigAliasOwner, depositRewardMsigOwner := generateMsigAliasAndKeys(t, 1, 2)
 	claimableMsigKeys, claimableMsigAlias, claimableMsigAliasOwner, claimableMsigOwner := generateMsigAliasAndKeys(t, 2, 3)
 	feeMsigKeys, feeMsigAlias, feeMsigAliasOwner, feeMsigOwner := generateMsigAliasAndKeys(t, 2, 2)
@@ -3345,11 +3370,13 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 		LockModeBondDeposit: true,
 	}
 
-	baseStateWithFeeVerify := func(c *gomock.Controller) *state.MockState {
-		s := stateExpectingShutdownCaminoEnvironment(c)
-		// utxo handler, used in fx VerifyMultisigTransfer method for baseTx ins verification
-		s.EXPECT().GetMultisigAlias(feeOwnerAddr).Return(nil, database.ErrNotFound)
-		return s
+	baseState := func(addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) func(c *gomock.Controller) *state.MockState {
+		return func(c *gomock.Controller) *state.MockState {
+			s := stateExpectingShutdownCaminoEnvironment(c)
+			// utxo handler, used in ins fx VerifyMultisigTransfer and outs VerifyMultisigOwner for baseTx verification
+			expectStateGetMultisigAliases(s, addrs, aliases)
+			return s
+		}
 	}
 
 	baseTxWithFeeInput := func(outs []*avax.TransferableOutput) *txs.BaseTx {
@@ -3616,7 +3643,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			expectedErr: errWrongClaimedAmount,
 		},
 		"OK, 2 deposits and claimable": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr1, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3740,7 +3769,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			}},
 		},
 		"OK, 2 claimable (splitted outs)": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr2, claimToOwnerAddr1, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3829,7 +3860,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, 2 claimable (compacted out)": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3897,7 +3930,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, deposit with non-zero already claimed reward and no rewards period": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -3956,7 +3991,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			},
 		},
 		"OK, partial claim": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -4045,7 +4082,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 			}},
 		},
 		"OK, claim (expired deposit rewards)": {
-			baseState: baseStateWithFeeVerify,
+			baseState: baseState([]ids.ShortID{
+				feeOwnerAddr, claimToOwnerAddr1,
+			}, nil),
 			state: func(c *gomock.Controller, utx *txs.ClaimTx, txID ids.ID, claimables []*state.Claimable) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				// common checks and fee
@@ -4099,6 +4138,7 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 					feeMsigAlias.ID,
 					feeMsigAliasOwner.Addrs[0],
 					feeMsigAliasOwner.Addrs[1],
+					claimToOwnerAddr1,
 				}, []*multisig.AliasWithNonce{feeMsigAlias})
 				return s
 			},
@@ -5036,12 +5076,13 @@ func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 			expectedErr:        nil,
 			expectedMsigAddrs:  []ids.ShortID{},
 		},
-		"P->C export from nested msig wallet": {
-			destinationChainID: cChainID,
-			to:                 nestedAlias,
-			expectedErr:        nil,
-			expectedMsigAddrs:  []ids.ShortID{nestedAlias, fakeMSigAlias},
-		},
+		// unsupported for now
+		// "P->C export from nested msig wallet": {
+		// 	destinationChainID: cChainID,
+		// 	to:                 nestedAlias,
+		// 	expectedErr:        nil,
+		// 	expectedMsigAddrs:  []ids.ShortID{nestedAlias, fakeMSigAlias},
+		// },
 	}
 
 	for name, tt := range tests {

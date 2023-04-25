@@ -937,11 +937,10 @@ func (h *handler) VerifyLockUTXOs(
 		if lockedOut, ok := out.(*locked.Out); ok {
 			lockIDs = &lockedOut.IDs
 			out = lockedOut.TransferableOut
-		} else {
-			// unlocked tokens can be transferred and must be checked
-			if err := h.fx.VerifyMultisigOwner(out, h.utxosReader); err != nil {
-				return err
-			}
+		}
+
+		if err := h.fx.VerifyMultisigOwner(out, h.utxosReader); err != nil {
+			return err
 		}
 
 		otherLockTxID := &lockIDs.DepositTxID

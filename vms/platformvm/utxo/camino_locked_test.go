@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -490,6 +491,15 @@ func TestVerifyLockUTXOs(t *testing.T) {
 
 	outputOwners1, cred1 := generateOwnersAndSig(tx)
 	outputOwners2, cred2 := generateOwnersAndSig(tx)
+	msigAddr := ids.ShortID{'m', 's', 'i', 'g'}
+	msigOwner := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{msigAddr},
+	}
+	invalidCycledMsigAlias := &multisig.AliasWithNonce{Alias: multisig.Alias{
+		ID:     msigAddr,
+		Owners: &msigOwner,
+	}}
 
 	depositTxID1 := ids.ID{0, 1}
 	depositTxID2 := ids.ID{0, 2}
@@ -666,6 +676,42 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			creds:            []verify.Verifiable{cred1},
 			appliedLockState: locked.StateBonded,
 			expectedErr:      errLockedFundsNotMarkedAsLocked,
+		},
+		"Fail: bond, produced output has invalid msig owner": {
+			state: func(c *gomock.Controller) *state.MockState {
+				s := state.NewMockState(c)
+				s.EXPECT().GetMultisigAlias(outputOwners1.Addrs[0]).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(msigAddr).Return(invalidCycledMsigAlias, nil).Times(2)
+				return s
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 2, outputOwners1, ids.Empty, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 1, msigOwner, ids.Empty, locked.ThisTxID),
+			},
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      secp256k1fx.ErrMsigCombination,
+		},
+		"Fail: bond, but no outs are actually bonded;  produced output has invalid msig owner": {
+			state: func(c *gomock.Controller) *state.MockState {
+				s := state.NewMockState(c)
+				s.EXPECT().GetMultisigAlias(outputOwners1.Addrs[0]).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetMultisigAlias(msigAddr).Return(invalidCycledMsigAlias, nil).Times(2)
+				return s
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 1, outputOwners1, ids.Empty, ids.Empty),
+			},
+			ins: generateTestInsFromUTXOs,
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 1, msigOwner, ids.Empty, ids.Empty),
+			},
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      secp256k1fx.ErrMsigCombination,
 		},
 		"Fail: bond, but no outs are actually bonded; produced + fee > consumed, owner1 has excess as locked": {
 			state: noMsigState,
@@ -1523,7 +1569,9 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			if tt.handlerState != nil {
 				handlerState = tt.handlerState(ctrl)
 			} else {
-				handlerState = state.NewMockState(ctrl)
+				s := state.NewMockState(ctrl)
+				s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+				handlerState = s
 			}
 			testHandler := defaultCaminoHandler(t, handlerState)
 

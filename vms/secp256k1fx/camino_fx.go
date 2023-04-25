@@ -20,8 +20,8 @@ import (
 var (
 	errNotSecp256Cred  = errors.New("expected secp256k1 credentials")
 	errWrongOutputType = errors.New("wrong output type")
-	errMsigCombination = errors.New("msig combinations not supported")
 	errNotAliasGetter  = errors.New("state isn't msig alias getter")
+	ErrMsigCombination = errors.New("msig combinations not supported")
 )
 
 type Owned interface {
@@ -115,12 +115,26 @@ func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
 		return errNotAliasGetter
 	}
 
-	// We don't support msig combinations / nesting
-	if len(owners.Addrs) > 1 {
-		for _, addr := range owners.Addrs {
-			if _, err := msig.GetMultisigAlias(addr); err != database.ErrNotFound {
-				return errMsigCombination
-			}
+	// We don't support msig combinations / nesting for now
+	if len(owners.Addrs) == 1 {
+		alias, err := msig.GetMultisigAlias(owners.Addrs[0])
+		if err == database.ErrNotFound {
+			return nil
+		} else if err != nil && err != database.ErrNotFound {
+			return err
+		}
+		aliasOwners, ok := alias.Owners.(*OutputOwners)
+		if !ok {
+			return errWrongOwnerType
+		}
+		owners = aliasOwners
+	}
+
+	for _, addr := range owners.Addrs {
+		if _, err := msig.GetMultisigAlias(addr); err != nil && err != database.ErrNotFound {
+			return err
+		} else if err == nil {
+			return ErrMsigCombination
 		}
 	}
 
