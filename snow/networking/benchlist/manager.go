@@ -45,17 +45,17 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Benchable              Benchable          `json:"-"`
-	Validators             validators.Manager `json:"-"`
-	StakingEnabled         bool               `json:"-"`
-	Threshold              int                `json:"threshold"`
-	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
-	Duration               time.Duration      `json:"duration"`
-	MaxPortion             float64            `json:"maxPortion"`
+	Threshold              int           `json:"threshold"`
+	MinimumFailingDuration time.Duration `json:"minimumFailingDuration"`
+	Duration               time.Duration `json:"duration"`
+	MaxPortion             float64       `json:"maxPortion"`
 }
 
 type manager struct {
-	config *Config
+	config         Config
+	validators     validators.Manager
+	benchable      Benchable
+	stakingEnabled bool
 	// Chain ID --> benchlist for that chain.
 	// Each benchlist is safe for concurrent access.
 	chainBenchlists map[ids.ID]Benchlist
@@ -64,7 +64,12 @@ type manager struct {
 }
 
 // NewManager returns a manager for chain-specific query benchlisting
-func NewManager(config *Config) Manager {
+func NewManager(
+	config Config,
+	validators validators.Manager,
+	benchable Benchable,
+	stakingEnabled bool,
+) Manager {
 	// If the maximum portion of validators allowed to be benchlisted
 	// is 0, return the no-op benchlist
 	if config.MaxPortion <= 0 {
@@ -72,6 +77,9 @@ func NewManager(config *Config) Manager {
 	}
 	return &manager{
 		config:          config,
+		validators:      validators,
+		benchable:       benchable,
+		stakingEnabled:  stakingEnabled,
 		chainBenchlists: make(map[ids.ID]Benchlist),
 	}
 }
@@ -119,11 +127,11 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		vdrs validators.Set
 		ok   bool
 	)
-	if m.config.StakingEnabled {
-		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
+	if m.stakingEnabled {
+		vdrs, ok = m.validators.Get(ctx.SubnetID)
 	} else {
 		// If staking is disabled, everyone validates every chain
-		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
+		vdrs, ok = m.validators.Get(constants.PrimaryNetworkID)
 	}
 	if !ok {
 		return errUnknownValidators
@@ -132,7 +140,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	benchlist, err := NewBenchlist(
 		ctx.ChainID,
 		ctx.Log,
-		m.config.Benchable,
+		m.benchable,
 		vdrs,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
