@@ -315,6 +315,10 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 	}
 
+	if err := vm.state.CleanupTxs(); err != nil {
+		return err
+	}
+
 	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
 	if err != nil {
 		return err

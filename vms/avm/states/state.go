@@ -101,6 +101,9 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	// Remove rejected and processing Txs from txDB
+	CleanupTxs() error
+
 	Close() error
 }
 
@@ -572,6 +575,58 @@ func (s *state) writeStatuses() error {
 		s.statusCache.Put(id, &status)
 		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
 			return fmt.Errorf("failed to add status: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) CleanupTxs() error {
+	iter := s.statusDB.NewIterator()
+	defer iter.Release()
+
+	for iter.Next() {
+		key := iter.Key()
+		val := iter.Value()
+
+		txID, err := ids.ToID(key)
+		if err != nil {
+			return err
+		}
+		tx, err := s.GetTx(txID)
+		if err != nil {
+			return err
+		}
+
+		valStatus, err := database.ParseUInt32(val)
+		if err != nil {
+			return err
+		}
+		txStatus := choices.Status(valStatus)
+
+		switch txStatus {
+		case choices.Accepted:
+			// find UTXOs consumed by accepted tx
+			utxos := tx.Unsigned.InputUTXOs()
+			// remove all the UTXOs consumed by the tx
+			for _, UTXO := range utxos {
+				delete(s.modifiedUTXOs, UTXO.InputID())
+				if err := s.utxoState.DeleteUTXO(UTXO.InputID()); err != nil {
+					return err
+				}
+			}
+		default:
+			// remove all these transactions from map
+			delete(s.addedTxs, txID)
+			// remove all these transactions from cache
+			s.txCache.Evict(txID)
+			// remove all these transactions from db
+			if err := s.txDB.Delete(key); err != nil {
+				return err
+			}
+		}
+		s.statusCache.Evict(txID)
+		if err := s.statusDB.Delete(key); err != nil {
+			return err
 		}
 	}
 	return nil
