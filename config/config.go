@@ -106,8 +106,6 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
 		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
 		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 	}
 }
 

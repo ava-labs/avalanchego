@@ -397,7 +397,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		default:
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(ctx, blk); err != nil {
+				if err := t.deliver(ctx, blk, false); err != nil {
 					return err
 				}
 			}
@@ -546,7 +546,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(ctx, blk); err != nil {
+		if err := t.issue(ctx, blk, false); err != nil {
 			return false, err
 		}
 
@@ -586,7 +586,7 @@ func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) 
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		err := t.issue(ctx, blk)
+		err := t.issue(ctx, blk, true)
 		if err != nil {
 			return false, err
 		}
@@ -626,7 +626,7 @@ func (t *Transitive) wasIssued(blk snowman.Block) bool {
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
-func (t *Transitive) issue(ctx context.Context, blk snowman.Block) error {
+func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
@@ -637,8 +637,9 @@ func (t *Transitive) issue(ctx context.Context, blk snowman.Block) error {
 
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
-		t:   t,
-		blk: blk,
+		t:    t,
+		blk:  blk,
+		push: push,
 	}
 
 	// block on the parent if needed
@@ -709,7 +710,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
-func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
+func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -729,16 +730,11 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
-		// Send a push query to some of the validators, and a pull query to the rest.
-		numPushTo := t.Params.MixedQueryNumPushVdr
-		if !t.Validators.Contains(t.Ctx.NodeID) {
-			numPushTo = t.Params.MixedQueryNumPushNonVdr
-		}
-		common.SendMixedQuery(
+		sendQuery(
 			ctx,
 			t.Sender,
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
-			numPushTo,
+			push,
 			t.RequestID,
 			blkID,
 			blk.Bytes(),
@@ -747,7 +743,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 }
 
 // issue [blk] to consensus
-func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
+func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -817,13 +813,13 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendMixedQuery(ctx, blk)
+		t.sendQuery(ctx, blk, push)
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.sendMixedQuery(ctx, blk)
+			t.sendQuery(ctx, blk, push)
 		}
 
 		blkID := blk.ID()
@@ -901,4 +897,30 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 		metrics: &t.metrics,
 		tree:    t.nonVerifieds,
 	})
+}
+
+// Send a query composed partially of push queries and partially of pull queries.
+// The validators in [vdrs] will be queried.
+// This function sends at most [numPushTo] push queries. The rest are pull queries.
+// If [push], a push query is used. Otherwise, a pull query is used.
+// [containerID] and [container] are the ID and body of the container being queried.
+// [sender] is used to actually send the queries.
+func sendQuery(
+	ctx context.Context,
+	sender common.Sender,
+	vdrs []ids.NodeID,
+	push bool,
+	reqID uint32,
+	containerID ids.ID,
+	container []byte,
+) {
+	sendTo := set.NewSet[ids.NodeID](len(vdrs))
+	sendTo.Add(vdrs[:]...)
+
+	if push {
+		sender.SendPushQuery(ctx, sendTo, reqID, container)
+		return
+	}
+
+	sender.SendPullQuery(ctx, sendTo, reqID, containerID)
 }
