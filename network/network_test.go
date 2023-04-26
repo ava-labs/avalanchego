@@ -579,8 +579,10 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			dialer,
 			&testHandler{
 				InboundHandler: nil,
-				ConnectedF:     func(ids.NodeID, *version.Application, ids.ID) {},
-				DisconnectedF:  nil,
+				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
+					require.FailNow("unexpectedly connected to a peer")
+				},
+				DisconnectedF: nil,
 			},
 		)
 		require.NoError(err)
