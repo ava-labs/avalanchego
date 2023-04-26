@@ -51,7 +51,7 @@ const LIBAIO_EAGAIN: libc::c_int = -libc::EAGAIN;
 const LIBAIO_ENOMEM: libc::c_int = -libc::ENOMEM;
 const LIBAIO_ENOSYS: libc::c_int = -libc::ENOSYS;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AIOError {
     MaxEventsTooLarge,
     LowKernelRes,

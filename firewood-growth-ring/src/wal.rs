@@ -701,7 +701,7 @@ impl<F: WALStore> WALWriter<F> {
                 rings.push(ring);
             }
             for ring in rings.into_iter().rev() {
-                let ring = ring.map_err(|_| WALError::Other)?;
+                let ring = ring.map_err(|_| WALError::Other("error mapping ring".to_string()))?;
                 let (header, payload) = ring;
                 let payload = payload.unwrap();
                 match header.rtype.try_into() {
@@ -745,7 +745,11 @@ impl<F: WALStore> WALWriter<F> {
                     }
                     Ok(WALRingType::Null) => break,
                     Err(_) => match recover_policy {
-                        RecoverPolicy::Strict => return Err(WALError::Other),
+                        RecoverPolicy::Strict => {
+                            return Err(WALError::Other(
+                                "invalid ring type - strict recovery requested".to_string(),
+                            ))
+                        }
                         RecoverPolicy::BestEffort => break 'outer,
                     },
                 }
@@ -818,7 +822,7 @@ impl WALLoader {
             Ok(true)
         } else {
             match p {
-                RecoverPolicy::Strict => Err(WALError::Other),
+                RecoverPolicy::Strict => Err(WALError::Other("invalid checksum".to_string())),
                 RecoverPolicy::BestEffort => Ok(false),
             }
         }
@@ -1153,7 +1157,9 @@ impl WALLoader {
                     let (bytes, ring_id, _) = match res {
                         Err(e) => {
                             if e {
-                                return Err(WALError::Other);
+                                return Err(WALError::Other(
+                                    "error loading from storage".to_string(),
+                                ));
                             } else {
                                 break 'outer;
                             }
@@ -1171,7 +1177,8 @@ impl WALLoader {
                 .collect()
                 .await;
             for e in records.into_iter().rev() {
-                let (rec, _) = e.map_err(|_| WALError::Other)?;
+                let (rec, _) =
+                    e.map_err(|_| WALError::Other("error decoding WALRingBlob".to_string()))?;
                 if rec.rtype == WALRingType::Full as u8 || rec.rtype == WALRingType::Last as u8 {
                     counter = rec.counter + 1;
                     break 'outer;
@@ -1194,7 +1201,8 @@ impl WALLoader {
             let stream = Self::read_rings(&f, false, self.block_nbit, &self.recover_policy);
             futures::pin_mut!(stream);
             while let Some(r) = stream.next().await {
-                last = Some(r.map_err(|_| WALError::Other)?);
+                last =
+                    Some(r.map_err(|_| WALError::Other("error decoding WALRingBlob".to_string()))?);
             }
             if let Some((last_rec, _)) = last {
                 if !counter_lt(last_rec.counter + keep_nrecords, counter) {

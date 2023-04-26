@@ -40,7 +40,7 @@ pub struct WALFileEmul<G: FailGen> {
 impl<G: FailGen> WALFile for WALFileEmul<G> {
     async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("allocate fgen next fail".to_string()));
         }
         let offset = offset as usize;
         if offset + length > self.file.borrow().len() {
@@ -54,7 +54,7 @@ impl<G: FailGen> WALFile for WALFileEmul<G> {
 
     async fn truncate(&self, length: usize) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("truncate fgen next fail".to_string()));
         }
         self.file.borrow_mut().resize(length, 0);
         Ok(())
@@ -62,7 +62,7 @@ impl<G: FailGen> WALFile for WALFileEmul<G> {
 
     async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("write fgen next fail".to_string()));
         }
         let offset = offset as usize;
         self.file.borrow_mut()[offset..offset + data.len()].copy_from_slice(&data);
@@ -71,7 +71,7 @@ impl<G: FailGen> WALFile for WALFileEmul<G> {
 
     async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("read fgen next fail".to_string()));
         }
 
         let offset = offset as usize;
@@ -128,7 +128,7 @@ where
 
     async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("open_file fgen next fail".to_string()));
         }
         match self.state.borrow_mut().files.entry(filename.to_string()) {
             hash_map::Entry::Occupied(e) => Ok(Box::new(WALFileEmul {
@@ -142,7 +142,7 @@ where
                         fgen: self.fgen.clone(),
                     }))
                 } else {
-                    Err(WALError::Other)
+                    Err(WALError::Other("open_file not found".to_string()))
                 }
             }
         }
@@ -151,19 +151,21 @@ where
     async fn remove_file(&self, filename: String) -> Result<(), WALError> {
         //println!("remove_file(filename={})", filename);
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other("remove_file fgen next fail".to_string()));
         }
         self.state
             .borrow_mut()
             .files
             .remove(&filename)
-            .ok_or(WALError::Other)
+            .ok_or(WALError::Other("remove_file not found".to_string()))
             .map(|_| ())
     }
 
     fn enumerate_files(&self) -> Result<Self::FileNameIter, WALError> {
         if self.fgen.next_fail() {
-            return Err(WALError::Other);
+            return Err(WALError::Other(
+                "enumerate_files fgen next fail".to_string(),
+            ));
         }
         let mut logfiles = Vec::new();
         for (fname, _) in self.state.borrow().files.iter() {
@@ -501,7 +503,7 @@ impl PaintingSim {
             WALStoreEmul::new(state, fgen.clone()),
             |_, _| {
                 if fgen.next_fail() {
-                    Err(WALError::Other)
+                    Err(WALError::Other("run fgen fail".to_string()))
                 } else {
                     Ok(())
                 }
@@ -529,7 +531,8 @@ impl PaintingSim {
                 .zip(pss_.into_iter())
                 .map(|(r, ps)| -> Result<_, _> {
                     ops.push(ps);
-                    let (rec, rid) = futures::executor::block_on(r).map_err(|_| WALError::Other)?;
+                    let (rec, rid) = futures::executor::block_on(r)
+                        .map_err(|_| WALError::Other("paintstrokes executor error".to_string()))?;
                     ringid_map.insert(rid, ops.len() - 1);
                     Ok((rec, rid))
                 })
@@ -548,7 +551,7 @@ impl PaintingSim {
             for _ in 0..rng.gen_range(1..self.k) {
                 // storage I/O could fail
                 if fgen.next_fail() {
-                    return Err(WALError::Other);
+                    return Err(WALError::Other("run fgen fail: storage i/o".to_string()));
                 }
                 if let Some((fin_rid, _)) = canvas.rand_paint(&mut rng) {
                     if let Some(rid) = fin_rid {

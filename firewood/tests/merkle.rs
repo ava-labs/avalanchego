@@ -316,7 +316,7 @@ fn test_bad_proof() -> Result<(), DataStoreError> {
 fn test_missing_key_proof() -> Result<(), DataStoreError> {
     let items = vec![("k", "v")];
     let merkle = merkle_build_test(items, 0x10000, 0x10000)?;
-    for key in vec!["a", "j", "l", "z"] {
+    for key in &["a", "j", "l", "z"] {
         let proof = merkle.prove(key)?;
         assert!(!proof.0.is_empty());
         assert!(proof.0.len() == 1);
@@ -401,8 +401,8 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
         let mut keys: Vec<[u8; 32]> = Vec::new();
         let mut vals: Vec<[u8; 20]> = Vec::new();
         for i in start..end {
-            keys.push(items[i].0.clone());
-            vals.push(items[i].1.clone());
+            keys.push(*items[i].0);
+            vals.push(*items[i].1);
         }
 
         let test_case: u32 = rand::thread_rng().gen_range(0..6);
@@ -445,13 +445,7 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
             _ => unreachable!(),
         }
         assert!(merkle
-            .verify_range_proof(
-                &proof,
-                items[start].0.clone(),
-                items[end - 1].0.clone(),
-                keys,
-                vals
-            )
+            .verify_range_proof(&proof, *items[start].0, *items[end - 1].0, keys, vals)
             .is_err());
     }
 
@@ -909,7 +903,7 @@ fn test_reverse_single_side_range_proof() -> Result<(), ProofError> {
 fn test_both_sides_range_proof() -> Result<(), ProofError> {
     for _ in 0..10 {
         let mut set = HashMap::new();
-        for _ in 0..4096 as u32 {
+        for _ in 0..4096_u32 {
             let key = rand::thread_rng().gen::<[u8; 32]>();
             let val = rand::thread_rng().gen::<[u8; 20]>();
             set.insert(key, val);
@@ -1050,7 +1044,7 @@ fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
 fn test_bloadted_range_proof() -> Result<(), ProofError> {
     // Use a small trie
     let mut items = Vec::new();
-    for i in 0..100 as u32 {
+    for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
         let mut data: [u8; 20] = [0; 20];
         for (index, d) in i.to_be_bytes().iter().enumerate() {
@@ -1067,7 +1061,7 @@ fn test_bloadted_range_proof() -> Result<(), ProofError> {
     let mut keys = Vec::new();
     let mut vals = Vec::new();
     for (i, item) in items.iter().enumerate() {
-        let cur_proof = merkle.prove(&item.0)?;
+        let cur_proof = merkle.prove(item.0)?;
         assert!(!cur_proof.0.is_empty());
         proof.concat_proofs(cur_proof);
         if i == 50 {

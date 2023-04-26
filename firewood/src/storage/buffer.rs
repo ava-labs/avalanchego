@@ -1,10 +1,9 @@
 //! Disk buffer for staging in memory pages and flushing them to disk.
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
-
-use crate::storage::Fd;
 
 use super::{
     Ash, AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WALConfig,
@@ -25,7 +24,7 @@ use typed_builder::TypedBuilder;
 #[derive(Debug)]
 pub enum BufferCmd {
     /// Initialize the WAL.
-    InitWAL(Fd, String),
+    InitWAL(PathBuf, String),
     /// Process a write batch against the underlying store.
     WriteBatch(Vec<BufferWrite>, AshRecord),
     /// Get a page from the disk buffer.
@@ -184,12 +183,12 @@ impl DiskBuffer {
     }
 
     /// Initialize the WAL subsystem if it does not exists and attempts to replay the WAL if exists.
-    async fn init_wal(&mut self, rootfd: Fd, waldir: String) -> Result<(), WALError> {
+    async fn init_wal(&mut self, rootpath: PathBuf, waldir: String) -> Result<(), WALError> {
+        let final_path = rootpath.clone().join(waldir.clone());
         let mut aiobuilder = AIOBuilder::default();
         aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
-        let aiomgr = aiobuilder.build().map_err(|_| WALError::Other)?;
-        let store = WALStoreAIO::new(&waldir, false, Some(rootfd), Some(aiomgr))
-            .map_err(|_| WALError::Other)?;
+        let aiomgr = aiobuilder.build()?;
+        let store = WALStoreAIO::new(final_path.clone(), false, Some(aiomgr))?;
         let mut loader = WALLoader::new();
         loader
             .file_nbit(self.wal_cfg.file_nbit)
@@ -214,12 +213,22 @@ impl DiskBuffer {
                             nix::sys::uio::pwrite(
                                 file_pool
                                     .get_file(fid)
-                                    .map_err(|_| WALError::Other)?
+                                    .map_err(|e| {
+                                        WALError::Other(format!(
+                                            "file pool error: {:?} - final path {:?}",
+                                            e, final_path
+                                        ))
+                                    })?
                                     .get_fd(),
                                 &data,
                                 (offset & file_mask) as nix::libc::off_t,
                             )
-                            .map_err(|_| WALError::Other)?;
+                            .map_err(|e| {
+                                WALError::Other(format!(
+                                    "wal loader error: {:?} - final path {:?}",
+                                    e, final_path
+                                ))
+                            })?;
                         }
                     }
                     Ok(())
@@ -312,10 +321,15 @@ impl DiskBuffer {
     ) -> bool {
         match req {
             BufferCmd::Shutdown => return false,
-            BufferCmd::InitWAL(rootfd, waldir) => {
-                if (self.init_wal(rootfd, waldir).await).is_err() {
-                    panic!("cannot initialize from WAL")
-                }
+            BufferCmd::InitWAL(root_path, waldir) => {
+                self.init_wal(root_path.clone(), waldir.clone())
+                    .await
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "Initialize WAL in dir {:?} failed creating {:?}: {e:?}",
+                            root_path, waldir
+                        )
+                    });
             }
             BufferCmd::GetPage(page_key, tx) => tx
                 .send(self.pending.get(&page_key).map(|e| e.staging_data.clone()))
@@ -452,9 +466,9 @@ impl DiskBufferRequester {
     }
 
     /// Initialize the WAL.
-    pub fn init_wal(&self, waldir: &str, rootfd: Fd) {
+    pub fn init_wal(&self, waldir: &str, rootpath: PathBuf) {
         self.sender
-            .blocking_send(BufferCmd::InitWAL(rootfd, waldir.to_string()))
+            .blocking_send(BufferCmd::InitWAL(rootpath, waldir.to_string()))
             .map_err(StoreError::Send)
             .ok();
     }
@@ -482,11 +496,7 @@ impl DiskBufferRequester {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        path::{Path, PathBuf},
-        thread,
-        time::Duration,
-    };
+    use std::path::PathBuf;
 
     use super::*;
     use crate::{
@@ -508,14 +518,15 @@ mod tests {
         let wal_cfg = WALConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
-        let (root_db_fd, reset) =
-            crate::file::open_dir(&tmpdb.into_iter().collect::<PathBuf>(), true).unwrap();
+        // TODO: Run the test in a separate standalone directory for concurrency reasons
+        let path = std::path::PathBuf::from(r"/tmp/firewood");
+        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
 
         // file descriptor of the state directory
-        let state_fd = file::touch_dir("state", root_db_fd).unwrap();
+        let state_path = file::touch_dir("state", &root_db_path).unwrap();
         assert!(reset);
         // create a new wal directory on top of root_db_fd
-        disk_requester.init_wal("wal", root_db_fd);
+        disk_requester.init_wal("wal", root_db_path);
 
         // create a new state cache which tracks on disk state.
         let state_cache = Rc::new(
@@ -525,7 +536,7 @@ mod tests {
                     .ncached_files(1)
                     .space_id(STATE_SPACE)
                     .file_nbit(1)
-                    .rootfd(state_fd)
+                    .rootdir(state_path)
                     .build(),
             )
             .unwrap(),
@@ -536,7 +547,7 @@ mod tests {
         disk_requester.reg_cached_space(state_cache.as_ref());
 
         // memory mapped store
-        let mut mut_store = StoreRevMut::new(state_cache.clone() as Rc<dyn MemStoreR>);
+        let mut mut_store = StoreRevMut::new(state_cache as Rc<dyn MemStoreR>);
 
         let change = b"this is a test";
 

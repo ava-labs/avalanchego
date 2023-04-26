@@ -37,8 +37,8 @@ impl<'a> Profiler for FlamegraphProfiler<'a> {
     fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
         std::fs::create_dir_all(benchmark_dir).unwrap();
         let flamegraph_path = benchmark_dir.join("flamegraph.svg");
-        let flamegraph_file = File::create(&flamegraph_path)
-            .expect("File system error while creating flamegraph.svg");
+        let flamegraph_file =
+            File::create(flamegraph_path).expect("File system error while creating flamegraph.svg");
         if let Some(profiler) = self.active_profiler.take() {
             profiler
                 .report()
@@ -59,7 +59,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 
         let offset = rng.gen_range(0..BENCH_MEM_SIZE - len as u64);
 
-        cached.write(offset, &rdata);
+        cached.write(offset, rdata);
         let view = cached
             .get_view(offset, rdata.len().try_into().unwrap())
             .unwrap();

@@ -38,6 +38,7 @@ const SPACE_RESERVED: u64 = 0x1000;
 const MAGIC_STR: &[u8; 13] = b"firewood v0.1";
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum DBError {
     InvalidParams,
     Merkle(MerkleError),
@@ -46,6 +47,7 @@ pub enum DBError {
     System(nix::Error),
     KeyNotFound,
     CreateError,
+    IO(std::io::Error),
 }
 
 impl fmt::Display for DBError {
@@ -58,7 +60,14 @@ impl fmt::Display for DBError {
             DBError::System(e) => write!(f, "system error: {e:?}"),
             DBError::KeyNotFound => write!(f, "not found"),
             DBError::CreateError => write!(f, "database create error"),
+            DBError::IO(e) => write!(f, "I/O error: {e:?}"),
         }
+    }
+}
+
+impl From<std::io::Error> for DBError {
+    fn from(e: std::io::Error) -> Self {
+        DBError::IO(e)
     }
 }
 
@@ -450,18 +459,17 @@ impl DB {
         if cfg.truncate {
             let _ = std::fs::remove_dir_all(db_path.as_ref());
         }
-        let (db_fd, reset) = file::open_dir(db_path, cfg.truncate).map_err(DBError::System)?;
+        let (db_path, reset) = file::open_dir(db_path, cfg.truncate)?;
 
-        let merkle_fd = file::touch_dir("merkle", db_fd).map_err(DBError::System)?;
-        let merkle_meta_fd = file::touch_dir("meta", merkle_fd).map_err(DBError::System)?;
-        let merkle_payload_fd = file::touch_dir("compact", merkle_fd).map_err(DBError::System)?;
+        let merkle_path = file::touch_dir("merkle", &db_path)?;
+        let merkle_meta_path = file::touch_dir("meta", &merkle_path)?;
+        let merkle_payload_path = file::touch_dir("compact", &merkle_path)?;
 
-        let blob_fd = file::touch_dir("blob", db_fd).map_err(DBError::System)?;
-        let blob_meta_fd = file::touch_dir("meta", blob_fd).map_err(DBError::System)?;
-        let blob_payload_fd = file::touch_dir("compact", blob_fd).map_err(DBError::System)?;
+        let blob_path = file::touch_dir("blob", &db_path)?;
+        let blob_meta_path = file::touch_dir("meta", &blob_path)?;
+        let blob_payload_path = file::touch_dir("compact", &blob_path)?;
 
-        let file0 =
-            crate::file::File::new(0, SPACE_RESERVED, merkle_meta_fd).map_err(DBError::System)?;
+        let file0 = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
         let fd0 = file0.get_fd();
 
         if reset {
@@ -504,7 +512,7 @@ impl DB {
                             .ncached_files(cfg.meta_ncached_files)
                             .space_id(MERKLE_META_SPACE)
                             .file_nbit(header.meta_file_nbit)
-                            .rootfd(merkle_meta_fd)
+                            .rootdir(merkle_meta_path)
                             .build(),
                     )
                     .unwrap(),
@@ -516,7 +524,7 @@ impl DB {
                             .ncached_files(cfg.payload_ncached_files)
                             .space_id(MERKLE_PAYLOAD_SPACE)
                             .file_nbit(header.payload_file_nbit)
-                            .rootfd(merkle_payload_fd)
+                            .rootdir(merkle_payload_path)
                             .build(),
                     )
                     .unwrap(),
@@ -530,7 +538,7 @@ impl DB {
                             .ncached_files(cfg.meta_ncached_files)
                             .space_id(BLOB_META_SPACE)
                             .file_nbit(header.meta_file_nbit)
-                            .rootfd(blob_meta_fd)
+                            .rootdir(blob_meta_path)
                             .build(),
                     )
                     .unwrap(),
@@ -542,7 +550,7 @@ impl DB {
                             .ncached_files(cfg.payload_ncached_files)
                             .space_id(BLOB_PAYLOAD_SPACE)
                             .file_nbit(header.payload_file_nbit)
-                            .rootfd(blob_payload_fd)
+                            .rootdir(blob_payload_path)
                             .build(),
                     )
                     .unwrap(),
@@ -588,7 +596,7 @@ impl DB {
         };
 
         // recover from WAL
-        disk_requester.init_wal("wal", db_fd);
+        disk_requester.init_wal("wal", db_path);
 
         // set up the storage layout
 

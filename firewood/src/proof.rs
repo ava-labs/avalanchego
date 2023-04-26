@@ -67,6 +67,10 @@ impl From<DBError> for ProofError {
             DBError::System(e) => ProofError::SystemError(e),
             DBError::KeyNotFound => ProofError::InvalidEdgeKeys,
             DBError::CreateError => ProofError::NoSuchNode,
+            // TODO: fix better by adding a new error to ProofError
+            DBError::IO(e) => {
+                ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
+            }
         }
     }
 }
