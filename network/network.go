@@ -1073,6 +1073,17 @@ func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.C
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
 func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
+	// If the network is configured to disallow private IPs and the provided IP
+	// is private, we skip all attempts to initiate a connection.
+	if !n.config.AllowPrivateIPs && ip.ip.IP.IsPrivate() {
+		n.peerConfig.Log.Verbo("skipping connection dial",
+			zap.String("reason", "outbound connections to private IPs are prohibited"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("peerIP", ip.ip.IP),
+		)
+		return
+	}
+
 	go func() {
 		n.metrics.numTracked.Inc()
 		defer n.metrics.numTracked.Dec()
