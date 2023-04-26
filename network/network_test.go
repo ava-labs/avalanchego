@@ -618,6 +618,10 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		}(net)
 	}
 
+	// Give the dialer time to run one iteration. This is racy, but should ony
+	// be possible to flake as a false negative (test passes when it shouldn't).
+	time.Sleep(50 * time.Millisecond)
+
 	network := networks[1].(*network)
 	require.NoError(primaryVdrs.RemoveWeight(nodeIDs[0], 1))
 	require.Eventually(

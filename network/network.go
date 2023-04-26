@@ -1136,7 +1136,9 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			//
 			// Invariant: We perform this check inside of the looping goroutine
 			// because this goroutine must clean up the trackedIPs entry if
-			// nodeID leaves the validator set.
+			// nodeID leaves the validator set. This is why we continue the loop
+			// rather than returning even though we will never initiate an
+			// outbound connection with this IP.
 			if !n.config.AllowPrivateIPs && ip.ip.IP.IsPrivate() {
 				n.peerConfig.Log.Verbo("skipping connection dial",
 					zap.String("reason", "outbound connections to private IPs are prohibited"),
