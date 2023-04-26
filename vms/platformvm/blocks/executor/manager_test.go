@@ -36,7 +36,7 @@ func TestGetBlock(t *testing.T) {
 		// Case: block isn't in memory or database
 		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 		_, err := manager.GetBlock(statelessBlk.ID())
-		require.Error(err)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 	{
 		// Case: block isn't in memory but is in database.
