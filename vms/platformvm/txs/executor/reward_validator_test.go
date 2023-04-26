@@ -31,19 +31,40 @@ func TestRewardValidatorTxExecuteOnCommitPostContinuousStakingFork(t *testing.T)
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	// Add a continuous validator
+	onParentState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
-	require.True(currentStakerIterator.Next())
 
-	stakerToReward := currentStakerIterator.Value()
-	currentStakerIterator.Release()
-
-	stakerToRewardTxIntf, _, err := env.state.GetTx(stakerToReward.TxID)
+	valRewardAddress := ids.GenerateTestShortID()
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(0),
+		uint64(24*60*60), // 24h in seconds
+		ids.GenerateTestNodeID(),
+		valRewardAddress,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty,
+	)
 	require.NoError(err)
-	stakerToRewardTx := stakerToRewardTxIntf.Unsigned.(*txs.AddValidatorTx)
+	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
+
+	addValExecutor := StandardTxExecutor{
+		State:   onParentState,
+		Backend: &env.backend,
+		Tx:      addValTx,
+	}
+	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
+	onParentState.AddTx(addValTx, status.Committed)
+	require.NoError(onParentState.Apply(env.state))
+	env.state.SetHeight(dummyHeight)
+	require.NoError(env.state.Commit())
+
+	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+	require.NoError(err)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToReward.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -60,8 +81,8 @@ func TestRewardValidatorTxExecuteOnCommitPostContinuousStakingFork(t *testing.T)
 	}
 	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
 
-	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(stakerToReward.EndTime)
+	// Advance chain timestamp to time that next validator should be rewarded
+	env.state.SetTimestamp(continuousStaker.NextTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
@@ -82,7 +103,7 @@ func TestRewardValidatorTxExecuteOnCommitPostContinuousStakingFork(t *testing.T)
 	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToReward.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -103,35 +124,42 @@ func TestRewardValidatorTxExecuteOnCommitPostContinuousStakingFork(t *testing.T)
 	require.NoError(err)
 
 	// check that post ContinuousStakingFork, staker is shifted ahead by its staking period
-	var shiftedStaker state.Staker
+	var shiftedStaker *state.Staker
 	for onCommitStakerIterator.Next() {
 		nextStaker := onCommitStakerIterator.Value()
-		if nextStaker.TxID == stakerToReward.TxID {
-			shiftedStaker = *nextStaker
+		if nextStaker.TxID == continuousStaker.TxID {
+			shiftedStaker = nextStaker
 			break
 		}
 	}
 	onCommitStakerIterator.Release()
 	require.NotNil(shiftedStaker)
-	require.Equal(shiftedStaker.StakingPeriod, stakerToReward.StakingPeriod)
-	require.Equal(shiftedStaker.StartTime, stakerToReward.StartTime.Add(stakerToReward.StakingPeriod))
-	require.Equal(shiftedStaker.NextTime, stakerToReward.NextTime.Add(stakerToReward.StakingPeriod))
-	require.Equal(shiftedStaker.EndTime, stakerToReward.EndTime.Add(stakerToReward.StakingPeriod))
+	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
+	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
+	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
+	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
 
-	// check that stake/reward is given back
-	stakeOwners := stakerToRewardTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	// check that reward is given, while stake is not (because of restaking)
+	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	rewardAddresses := set.NewSet[ids.ShortID](0)
+	rewardAddresses.Add(valRewardAddress)
 
-	// Get old balances
-	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
+	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
+	require.NoError(err)
+	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
 	require.NoError(err)
 
 	require.NoError(txExecutor.OnCommitState.Apply(env.state))
-	env.state.SetHeight(dummyHeight)
+	env.state.SetHeight(dummyHeight + 1)
 	require.NoError(env.state.Commit())
 
-	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
+	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToReward.Weight+27697, onCommitBalance)
+	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
+	require.NoError(err)
+
+	require.Equal(stakeOnCommitBalance, stakeOldBalance)
+	require.Equal(rewardsOnCommitBalance, rewardsOldBalance+1370)
 }
 
 func TestRewardValidatorTxExecuteOnAbortPostContinuousStakingFork(t *testing.T) {
@@ -142,19 +170,40 @@ func TestRewardValidatorTxExecuteOnAbortPostContinuousStakingFork(t *testing.T) 
 	}()
 	dummyHeight := uint64(1)
 
-	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	// Add a continuous validator
+	onParentState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
-	require.True(currentStakerIterator.Next())
 
-	stakerToReward := currentStakerIterator.Value()
-	currentStakerIterator.Release()
-
-	stakerToRewardTxIntf, _, err := env.state.GetTx(stakerToReward.TxID)
+	valRewardAddress := ids.GenerateTestShortID()
+	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(0),
+		uint64(24*60*60), // 24h in seconds
+		ids.GenerateTestNodeID(),
+		valRewardAddress,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty,
+	)
 	require.NoError(err)
-	stakerToRewardTx := stakerToRewardTxIntf.Unsigned.(*txs.AddValidatorTx)
+	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
+
+	addValExecutor := StandardTxExecutor{
+		State:   onParentState,
+		Backend: &env.backend,
+		Tx:      addValTx,
+	}
+	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
+	onParentState.AddTx(addValTx, status.Committed)
+	require.NoError(onParentState.Apply(env.state))
+	env.state.SetHeight(dummyHeight)
+	require.NoError(env.state.Commit())
+
+	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+	require.NoError(err)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToReward.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -172,7 +221,7 @@ func TestRewardValidatorTxExecuteOnAbortPostContinuousStakingFork(t *testing.T) 
 	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(stakerToReward.EndTime)
+	env.state.SetTimestamp(continuousStaker.NextTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
@@ -187,7 +236,7 @@ func TestRewardValidatorTxExecuteOnAbortPostContinuousStakingFork(t *testing.T) 
 	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToReward.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -208,35 +257,43 @@ func TestRewardValidatorTxExecuteOnAbortPostContinuousStakingFork(t *testing.T) 
 	require.NoError(err)
 
 	// check that post ContinuousStakingFork, staker is shifted ahead by its staking period
-	var shiftedStaker state.Staker
+	var shiftedStaker *state.Staker
 	for onAbortStakerIterator.Next() {
 		nextStaker := onAbortStakerIterator.Value()
-		if nextStaker.TxID == stakerToReward.TxID {
-			shiftedStaker = *nextStaker
+		if nextStaker.TxID == continuousStaker.TxID {
+			shiftedStaker = nextStaker
 			break
 		}
 	}
 	onAbortStakerIterator.Release()
 	require.NotNil(shiftedStaker)
-	require.Equal(shiftedStaker.StakingPeriod, stakerToReward.StakingPeriod)
-	require.Equal(shiftedStaker.StartTime, stakerToReward.StartTime.Add(stakerToReward.StakingPeriod))
-	require.Equal(shiftedStaker.NextTime, stakerToReward.NextTime.Add(stakerToReward.StakingPeriod))
-	require.Equal(shiftedStaker.EndTime, stakerToReward.EndTime.Add(stakerToReward.StakingPeriod))
+	require.NotNil(shiftedStaker)
+	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
+	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
+	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
+	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
 
-	// check that stake/reward isn't given back
-	stakeOwners := stakerToRewardTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	// check that reward is given, while stake is not (because of restaking)
+	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	rewardAddresses := set.NewSet[ids.ShortID](0)
+	rewardAddresses.Add(valRewardAddress)
 
-	// Get old balances
-	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
+	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
+	require.NoError(err)
+	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
 	require.NoError(err)
 
 	require.NoError(txExecutor.OnAbortState.Apply(env.state))
-	env.state.SetHeight(dummyHeight)
+	env.state.SetHeight(dummyHeight + 1)
 	require.NoError(env.state.Commit())
 
-	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
+	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToReward.Weight, onAbortBalance)
+	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
+	require.NoError(err)
+
+	require.Equal(stakeOnCommitBalance, stakeOldBalance)
+	require.Equal(rewardsOnCommitBalance, rewardsOldBalance)
 }
 
 func TestRewardValidatorTxExecuteOnCommitPreContinuousStakingFork(t *testing.T) {

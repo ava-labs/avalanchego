@@ -112,6 +112,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().GetRewardUTXOs(gomock.Any()).Return([]*avax.UTXO{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 	onParentAccept.EXPECT().GetRewardConfig(gomock.Any()).Return(env.config.RewardConfig, nil).AnyTimes()
 
@@ -236,6 +237,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	currentStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
 
+	onParentAccept.EXPECT().GetRewardUTXOs(gomock.Any()).Return([]*avax.UTXO{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	pendingStakersIt := state.NewMockStakerIterator(ctrl)

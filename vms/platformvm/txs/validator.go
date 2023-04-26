@@ -63,7 +63,7 @@ func (v *Validator) Verify() error {
 	switch {
 	case v.Wght == 0: // Ensure the validator has some weight
 		return ErrWeightTooSmall
-	case v.Start == 0 && v.End > uint64(StakerMaxDuration):
+	case v.Start == 0 && v.StakingPeriod() > StakerMaxDuration:
 		// Ensure proper encoding when v.End is used to encode a duration
 		return ErrBadValidatorDuration
 	default:
