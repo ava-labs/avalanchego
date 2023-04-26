@@ -56,20 +56,19 @@ func (vm *VM) GetAncestors(
 
 		res = append(res, blkBytes)
 		blkID = blk.ParentID()
-		maxBlocksNum--
-
-		if maxBlocksNum <= 0 {
+		if len(res) == maxBlocksNum {
 			return res, nil
 		}
 	}
 
 	// snowman++ fork may have been hit.
+	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
 	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
 	innerBytes, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
-		maxBlocksNum,
+		preMaxBlocksNum,
 		preMaxBlocksSize,
 		preMaxBlocksRetrivalTime,
 	)
