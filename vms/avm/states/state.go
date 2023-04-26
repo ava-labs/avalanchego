@@ -422,22 +422,10 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 		return *status, nil
 	}
 
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
+	if tx, err := s.GetTx(id); tx != nil && err == nil {
+		return choices.Accepted, nil
 	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-
-	s.statusCache.Put(id, &status)
-	return status, nil
+	return choices.Unknown, nil
 }
 
 // TODO: remove status support
