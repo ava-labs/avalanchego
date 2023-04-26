@@ -1047,9 +1047,8 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 // peerIPStatus assumes the caller holds [peersLock]
 func (n *network) peerIPStatus(nodeID ids.NodeID, ip *ips.ClaimedIPPort) (*ips.ClaimedIPPort, bool, bool, bool) {
 	prevIP, previouslyTracked := n.peerIPs[nodeID]
-	_, connected := n.connectedPeers.GetByID(nodeID)
 	shouldUpdateOurIP := previouslyTracked && prevIP.Timestamp < ip.Timestamp
-	shouldDial := !previouslyTracked && !connected && n.wantsConnection(nodeID)
+	shouldDial := !previouslyTracked && n.wantsConnection(nodeID)
 	return prevIP, previouslyTracked, shouldUpdateOurIP, shouldDial
 }
 
