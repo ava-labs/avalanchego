@@ -899,20 +899,3 @@ func (t *Transitive) addUnverifiedBlockToConsensus(ctx context.Context, blk snow
 		tree:    t.nonVerifieds,
 	})
 }
-
-// Send a query composed partially of push queries and partially of pull queries.
-// The validators in [vdrs] will be queried.
-// This function sends at most [numPushTo] push queries. The rest are pull queries.
-// If [push], a push query is used. Otherwise, a pull query is used.
-// [containerID] and [container] are the ID and body of the container being queried.
-// [sender] is used to actually send the queries.
-func sendQuery(
-	ctx context.Context,
-	sender common.Sender,
-	vdrs []ids.NodeID,
-	push bool,
-	reqID uint32,
-	containerID ids.ID,
-	container []byte,
-) {
-}
