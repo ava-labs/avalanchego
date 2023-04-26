@@ -4,19 +4,20 @@
 package config
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -50,12 +51,21 @@ var (
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
 )
 
-func addProcessFlags(fs *flag.FlagSet) {
+func deprecateFlags(fs *pflag.FlagSet) error {
+	for key, message := range deprecatedKeys {
+		if err := fs.MarkDeprecated(key, message); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
 }
 
-func addNodeFlags(fs *flag.FlagSet) {
+func addNodeFlags(fs *pflag.FlagSet) {
 	// Home directory
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
@@ -143,6 +153,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
 
 	fs.Bool(NetworkCompressionEnabledKey, constants.DefaultNetworkCompressionEnabled, "If true, compress certain outbound messages. This node will be able to parse compressed inbound messages regardless of this flag's value")
+	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s, %s]", compression.TypeGzip, compression.TypeZstd, compression.TypeNone))
+
 	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
 	fs.Bool(NetworkAllowPrivateIPsKey, constants.DefaultNetworkAllowPrivateIPs, "Allows the node to initiate outbound connection attempts to peers with private IPs")
 	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
@@ -166,6 +178,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Router
 	fs.Duration(ConsensusGossipFrequencyKey, constants.DefaultConsensusGossipFrequency, "Frequency of gossiping accepted frontiers")
+	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
 	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
@@ -367,10 +380,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
-func BuildFlagSet() *flag.FlagSet {
-	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
-	// and then putting those into a *plag.FlagSet
-	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
+func BuildFlagSet() *pflag.FlagSet {
+	fs := pflag.NewFlagSet(constants.AppName, pflag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)
 	return fs

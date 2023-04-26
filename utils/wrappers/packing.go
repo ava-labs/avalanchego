@@ -33,11 +33,11 @@ func StringLen(str string) int {
 }
 
 var (
-	errBadLength      = errors.New("packer has insufficient length for input")
-	errNegativeOffset = errors.New("negative offset")
-	errInvalidInput   = errors.New("input does not match expected format")
-	errBadBool        = errors.New("unexpected value when unpacking bool")
-	errOversized      = errors.New("size is larger than limit")
+	ErrInsufficientLength = errors.New("packer has insufficient length for input")
+	errNegativeOffset     = errors.New("negative offset")
+	errInvalidInput       = errors.New("input does not match expected format")
+	errBadBool            = errors.New("unexpected value when unpacking bool")
+	errOversized          = errors.New("size is larger than limit")
 )
 
 // Packer packs and unpacks a byte array from/to standard values
@@ -252,7 +252,7 @@ func (p *Packer) checkSpace(bytes int) {
 	case bytes < 0:
 		p.Add(errInvalidInput)
 	case len(p.Bytes)-p.Offset < bytes:
-		p.Add(errBadLength)
+		p.Add(ErrInsufficientLength)
 	}
 }
 
@@ -266,7 +266,7 @@ func (p *Packer) expand(bytes int) {
 	case neededSize <= len(p.Bytes): // Byte slice has sufficient length already
 		return
 	case neededSize > p.MaxSize: // Lengthening the byte slice would cause it to grow too large
-		p.Err = errBadLength
+		p.Err = ErrInsufficientLength
 		return
 	case neededSize <= cap(p.Bytes): // Byte slice has sufficient capacity to lengthen it without mem alloc
 		p.Bytes = p.Bytes[:neededSize]

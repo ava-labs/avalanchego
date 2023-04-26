@@ -1,14 +1,14 @@
 name: build-public-ami
 
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to create AMI from'
         required: true
+  push:
+    tags:
+      - "*"
 
 jobs:
   build-public-ami-and-upload:

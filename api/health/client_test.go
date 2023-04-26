@@ -48,26 +48,26 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		readiness, err := c.Readiness(context.Background())
+		readiness, err := c.Readiness(context.Background(), nil)
 		require.NoError(err)
 		require.True(readiness.Healthy)
 	}
 
 	{
-		health, err := c.Health(context.Background())
+		health, err := c.Health(context.Background(), nil)
 		require.NoError(err)
 		require.True(health.Healthy)
 	}
 
 	{
-		liveness, err := c.Liveness(context.Background())
+		liveness, err := c.Liveness(context.Background(), nil)
 		require.NoError(err)
 		require.True(liveness.Healthy)
 	}
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		healthy, err := AwaitHealthy(ctx, c, time.Second)
+		healthy, err := AwaitHealthy(ctx, c, time.Second, nil)
 		cancel()
 		require.NoError(err)
 		require.True(healthy)
@@ -75,7 +75,7 @@ func TestClient(t *testing.T) {
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		healthy, err := AwaitReady(ctx, c, time.Second)
+		healthy, err := AwaitReady(ctx, c, time.Second, nil)
 		cancel()
 		require.NoError(err)
 		require.True(healthy)
@@ -85,17 +85,17 @@ func TestClient(t *testing.T) {
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
-		healthy, err := AwaitHealthy(ctx, c, time.Microsecond)
+		healthy, err := AwaitHealthy(ctx, c, time.Microsecond, nil)
 		cancel()
-		require.Error(err)
+		require.ErrorIs(err, context.DeadlineExceeded)
 		require.False(healthy)
 	}
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
-		healthy, err := AwaitReady(ctx, c, time.Microsecond)
+		healthy, err := AwaitReady(ctx, c, time.Microsecond, nil)
 		cancel()
-		require.Error(err)
+		require.ErrorIs(err, context.DeadlineExceeded)
 		require.False(healthy)
 	}
 
@@ -104,14 +104,14 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		healthy, err := AwaitHealthy(context.Background(), c, time.Microsecond)
+		healthy, err := AwaitHealthy(context.Background(), c, time.Microsecond, nil)
 		require.NoError(err)
 		require.True(healthy)
 	}
 
 	mc.reply.Healthy = false
 	{
-		healthy, err := AwaitReady(context.Background(), c, time.Microsecond)
+		healthy, err := AwaitReady(context.Background(), c, time.Microsecond, nil)
 		require.NoError(err)
 		require.True(healthy)
 	}

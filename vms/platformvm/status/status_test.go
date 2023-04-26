@@ -34,7 +34,7 @@ func TestStatusJSON(t *testing.T) {
 	{
 		status := Status(math.MaxInt32)
 		_, err := json.Marshal(status)
-		require.Error(err)
+		require.ErrorIs(err, errUnknownStatus)
 	}
 
 	{
@@ -47,7 +47,7 @@ func TestStatusJSON(t *testing.T) {
 	{
 		var status Status
 		err := json.Unmarshal([]byte(`"not a status"`), &status)
-		require.Error(err)
+		require.ErrorIs(err, errUnknownStatus)
 	}
 }
 
@@ -68,7 +68,7 @@ func TestStatusVerify(t *testing.T) {
 
 	badStatus := Status(math.MaxInt32)
 	err := badStatus.Verify()
-	require.Error(err, "%s passed verification", badStatus)
+	require.ErrorIs(err, errUnknownStatus)
 }
 
 func TestStatusString(t *testing.T) {

@@ -267,8 +267,8 @@ func (p *peer) Info() Info {
 		PublicIP:              publicIPStr,
 		ID:                    p.id,
 		Version:               p.version.String(),
-		LastSent:              time.Unix(atomic.LoadInt64(&p.lastSent), 0),
-		LastReceived:          time.Unix(atomic.LoadInt64(&p.lastReceived), 0),
+		LastSent:              p.LastSent(),
+		LastReceived:          p.LastReceived(),
 		ObservedUptime:        json.Uint32(primaryUptime),
 		ObservedSubnetUptimes: uptimes,
 		TrackedSubnets:        trackedSubnets,
@@ -468,9 +468,8 @@ func (p *peer) readMessages() {
 			continue
 		}
 
-		now := p.Clock.Time().Unix()
-		atomic.StoreInt64(&p.Config.LastReceived, now)
-		atomic.StoreInt64(&p.lastReceived, now)
+		now := p.Clock.Time()
+		p.storeLastReceived(now)
 		p.Metrics.Received(msg, msgLen)
 
 		// Handle the message. Note that when we are done handling this message,
@@ -578,9 +577,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
-	now := p.Clock.Time().Unix()
-	atomic.StoreInt64(&p.Config.LastSent, now)
-	atomic.StoreInt64(&p.lastSent, now)
+	now := p.Clock.Time()
+	p.storeLastSent(now)
 	p.Metrics.Sent(msg)
 }
 
@@ -994,20 +992,16 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 			return
 		}
 
-		// TODO: After the next network upgrade, require txIDs to be populated.
-		var txID ids.ID
-		if len(claimedIPPort.TxId) > 0 {
-			txID, err = ids.ToID(claimedIPPort.TxId)
-			if err != nil {
-				p.Log.Debug("message with invalid field",
-					zap.Stringer("nodeID", p.id),
-					zap.Stringer("messageOp", message.PeerListOp),
-					zap.String("field", "txID"),
-					zap.Error(err),
-				)
-				p.StartClose()
-				return
-			}
+		txID, err := ids.ToID(claimedIPPort.TxId)
+		if err != nil {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.PeerListOp),
+				zap.String("field", "txID"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
 		}
 
 		discoveredIPs[i] = &ips.ClaimedIPPort{
@@ -1072,4 +1066,16 @@ func (p *peer) handlePeerListAck(msg *p2p.PeerListAck) {
 
 func (p *peer) nextTimeout() time.Time {
 	return p.Clock.Time().Add(p.PongTimeout)
+}
+
+func (p *peer) storeLastSent(time time.Time) {
+	unixTime := time.Unix()
+	atomic.StoreInt64(&p.Config.LastSent, unixTime)
+	atomic.StoreInt64(&p.lastSent, unixTime)
+}
+
+func (p *peer) storeLastReceived(time time.Time) {
+	unixTime := time.Unix()
+	atomic.StoreInt64(&p.Config.LastReceived, unixTime)
+	atomic.StoreInt64(&p.lastReceived, unixTime)
 }

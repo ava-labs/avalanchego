@@ -6,7 +6,6 @@ on:
       tag:
         description: 'Tag to include in artifact name'
         required: true
-
   push:
     tags:
       - "*"
