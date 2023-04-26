@@ -56,7 +56,7 @@ func (vm *VM) GetAncestors(
 
 		res = append(res, blkBytes)
 		blkID = blk.ParentID()
-		if len(res) == maxBlocksNum {
+		if len(res) >= maxBlocksNum {
 			return res, nil
 		}
 	}
