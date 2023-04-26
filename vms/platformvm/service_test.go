@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -235,7 +236,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	// put the chain in existing chain list
 	err = service.vm.Builder.AddUnverifiedTx(tx)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
 
 	mutableSharedMemory.SharedMemory = sm
 
@@ -331,7 +332,7 @@ func TestGetTx(t *testing.T) {
 				}
 				var response api.GetTxReply
 				err = service.GetTx(nil, arg, &response)
-				require.Error(err)
+				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
 				err = service.vm.Builder.AddUnverifiedTx(tx)
 				require.NoError(err)
@@ -433,10 +434,10 @@ func TestGetStake(t *testing.T) {
 		addrsStrs = append(addrsStrs, addr)
 
 		args := GetStakeArgs{
-			api.JSONAddresses{
+			JSONAddresses: api.JSONAddresses{
 				Addresses: []string{addr},
 			},
-			formatting.Hex,
+			Encoding: formatting.Hex,
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
@@ -461,10 +462,10 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for multiple addresses
 	args := GetStakeArgs{
-		api.JSONAddresses{
+		JSONAddresses: api.JSONAddresses{
 			Addresses: addrsStrs,
 		},
-		formatting.Hex,
+		Encoding: formatting.Hex,
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
@@ -623,7 +624,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
-	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
@@ -635,14 +636,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 
 	staker, err := state.NewCurrentStaker(
-		tx.ID(),
-		tx.Unsigned.(*txs.AddDelegatorTx),
+		delTx.ID(),
+		delTx.Unsigned.(*txs.AddDelegatorTx),
 		0,
 	)
 	require.NoError(err)
 
 	service.vm.state.PutCurrentDelegator(staker)
-	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.AddTx(delTx, status.Committed)
 	err = service.vm.state.Commit()
 	require.NoError(err)
 
@@ -684,6 +685,27 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
+
+	// Reward the delegator
+	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	require.NoError(err)
+	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.DeleteCurrentDelegator(staker)
+	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
+	require.NoError(service.vm.state.Commit())
+
+	// Call getValidators
+	response = GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	require.Equal(len(genesis.Validators), len(response.Validators))
+
+	for i := 0; i < len(response.Validators); i++ {
+		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
+		if vdr.NodeID != validatorNodeID {
+			continue
+		}
+		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
+	}
 }
 
 func TestGetTimestamp(t *testing.T) {

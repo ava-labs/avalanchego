@@ -415,7 +415,7 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 
 	// now disable indexing with allow-incomplete set to false
 	_, err = index.NewNoIndexer(db, false)
-	require.Error(t, err)
+	require.ErrorIs(t, err, index.ErrCausesIncompleteIndex)
 
 	// now disable indexing with allow-incomplete set to true
 	_, err = index.NewNoIndexer(db, true)
@@ -432,7 +432,7 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 
 	// It's not OK to have an incomplete index when allowIncompleteIndices is false
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
-	require.Error(t, err)
+	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
@@ -457,12 +457,12 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	_, err := index.NewNoIndexer(db, false)
 	require.NoError(t, err)
 
-	// we initialise with indexing enabled now and allow incomplete indexing as false
+	// we initialize with indexing enabled now and allow incomplete indexing as false
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
-	require.Error(t, err)
+	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
 }
 
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {

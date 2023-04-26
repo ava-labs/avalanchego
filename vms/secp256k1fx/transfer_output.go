@@ -43,7 +43,7 @@ func (out *TransferOutput) Amount() uint64 {
 func (out *TransferOutput) Verify() error {
 	switch {
 	case out == nil:
-		return errNilOutput
+		return ErrNilOutput
 	case out.Amt == 0:
 		return ErrNoValueOutput
 	default:
