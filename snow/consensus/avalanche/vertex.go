@@ -11,6 +11,9 @@ import (
 )
 
 // Vertex is a collection of multiple transactions tied to other vertices
+//
+// Note: Verify is not part of this interface because bootstrapping uses IDs to
+// verify the vertex is valid.
 type Vertex interface {
 	choices.Decidable
 
