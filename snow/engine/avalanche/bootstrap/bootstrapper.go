@@ -338,9 +338,6 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		if err != nil {
 			return fmt.Errorf("failed to create stop vertex: %w", err)
 		}
-		if err := stopVertex.Verify(ctx); err != nil {
-			return fmt.Errorf("failed to verify stop vertex: %w", err)
-		}
 		if err := stopVertex.Accept(ctx); err != nil {
 			return fmt.Errorf("failed to accept stop vertex: %w", err)
 		}

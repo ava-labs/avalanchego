@@ -303,8 +303,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// linearization with "Beta value to use for virtuous transactions"
 	fs.Int(SnowVirtuousCommitThresholdKey, 15, "This flag is temporarily ignored due to the X-chain linearization")
 	fs.Int(SnowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
-	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
-	fs.Int(SnowAvalancheBatchSizeKey, 30, "Number of operations to batch in each new vertex")
 	fs.Int(SnowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
 	fs.Int(SnowOptimalProcessingKey, 10, "Optimal number of processing containers in consensus")
 	fs.Int(SnowMaxProcessingKey, 256, "Maximum number of processing items to be considered healthy")
