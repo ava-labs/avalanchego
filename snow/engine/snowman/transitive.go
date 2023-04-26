@@ -915,7 +915,7 @@ func sendQuery(
 	container []byte,
 ) {
 	sendTo := set.NewSet[ids.NodeID](len(vdrs))
-	sendTo.Add(vdrs[:]...)
+	sendTo.Add(vdrs...)
 
 	if push {
 		sender.SendPushQuery(ctx, sendTo, reqID, container)
