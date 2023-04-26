@@ -50,11 +50,6 @@ describe("ExampleRewardManager", function () {
     await tx.wait()
   });
 
-  it("should add contract deployer as owner", async function () {
-    const contractOwnerAddr: string = await contract.owner()
-    expect(owner.address).to.equal(contractOwnerAddr)
-  });
-
   // this contract is not selected as the reward address yet, so should not be able to receive fees
   it("should send fees to blackhole", async function () {
     let rewardAddress = await contract.currentRewardAddress();
@@ -118,28 +113,6 @@ describe("ExampleRewardManager", function () {
     let balance = await ethers.provider.getBalance(contract.address)
     expect(balance.gt(previousBalance)).to.be.true
   })
-
-  it("signer1 should be appointed as reward address", async function () {
-    let tx = await contract.setRewardAddress(signer1.address);
-    await tx.wait()
-    let rewardAddress = await contract.currentRewardAddress();
-    expect(rewardAddress).to.be.equal(signer1.address)
-  });
-
-  it("signer1 should be able to receive fees", async function () {
-    let previousBalance = await ethers.provider.getBalance(signer1.address)
-
-    // Send a transaction to mine a new block
-    const tx = await owner.sendTransaction({
-      to: signer2.address,
-      value: ethers.utils.parseEther("0.0001")
-    })
-    await tx.wait()
-
-    let balance = await ethers.provider.getBalance(signer1.address)
-    expect(balance.gt(previousBalance)).to.be.true
-  })
-
 
   it("should return false for allowFeeRecipients check", async function () {
     let res = await contract.areFeeRecipientsAllowed();

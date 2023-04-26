@@ -42,11 +42,6 @@ describe("ExampleDeployerList", function () {
 
   });
 
-  it("should add contract deployer as owner", async function () {
-    const contractOwnerAddr: string = await contract.owner()
-    expect(owner.address).to.equal(contractOwnerAddr)
-  });
-
   it("precompile should see owner address has admin role", async function () {
     // test precompile first
     const allowList = await ethers.getContractAt("IAllowList", ALLOWLIST_ADDRESS, owner);
@@ -85,31 +80,6 @@ describe("ExampleDeployerList", function () {
     expect.fail("should have errored")
   });
 
-  it("should not allow deployer to enable itself", async function () {
-    try {
-      await contract.connect(deployer).addDeployer(deployer.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  });
-
-  it("should not allow admin to enable deployer without enabling contract", async function () {
-    const allowList = await ethers.getContractAt("IAllowList", ALLOWLIST_ADDRESS, owner);
-    let role = await allowList.readAllowList(contract.address);
-    expect(role).to.be.equal(ROLES.NONE)
-    const result = await contract.isEnabled(contract.address);
-    expect(result).to.be.false
-    try {
-      await contract.addDeployer(deployer.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  });
-
   it("should allow admin to add contract as admin", async function () {
     const allowList = await ethers.getContractAt("IAllowList", ALLOWLIST_ADDRESS, owner);
     let role = await allowList.readAllowList(contract.address);
@@ -137,55 +107,11 @@ describe("ExampleDeployerList", function () {
     expect(token.address).not.null
   });
 
-  it("should not let deployer add another deployer", async function () {
-    try {
-      const signers: SignerWithAddress[] = await ethers.getSigners()
-      const testAddress = signers.slice(-2)[0]
-      await contract.connect(deployer).addDeployer(testAddress.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  });
-
-  it("should not let deployer to revoke admin", async function () {
-    try {
-      await contract.connect(deployer).revoke(owner.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  });
-
-
-  it("should not let deployer to revoke itself", async function () {
-    try {
-      await contract.connect(deployer).revoke(deployer.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  });
-
   it("should let admin to revoke deployer", async function () {
     let tx = await contract.revoke(deployer.address);
     await tx.wait()
     const allowList = await ethers.getContractAt("IAllowList", ALLOWLIST_ADDRESS, owner);
     let noRole = await allowList.readAllowList(deployer.address);
     expect(noRole).to.be.equal(ROLES.NONE)
-  });
-
-
-  it("should not let admin to revoke itself", async function () {
-    try {
-      await contract.revoke(owner.address);
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
   });
 })

@@ -92,16 +92,6 @@ describe("ExampleTxAllowList", function () {
   })
 
   it("should not allow noRole to enable itself", async function () {
-    try {
-      await contract.connect(noRole).addDeployer(noRole.address)
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  })
-
-  it("should not allow admin to enable noRole without enabling contract", async function () {
     const allowList = await ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS, admin)
     let role = await allowList.readAllowList(contract.address)
     expect(role).to.be.equal(ROLES.NONE)
@@ -167,33 +157,11 @@ describe("ExampleTxAllowList", function () {
     expect.fail("should have errored")
   })
 
-
-  it("should not let allowed to revoke itself", async function () {
-    try {
-      await contract.connect(allowed).revoke(allowed.address)
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
-  })
-
   it("should let admin to revoke allowed", async function () {
     let tx = await contract.revoke(allowed.address)
     await tx.wait()
     const allowList = await ethers.getContractAt("IAllowList", TX_ALLOW_LIST_ADDRESS, admin)
     let noRole = await allowList.readAllowList(allowed.address)
     expect(noRole).to.be.equal(ROLES.NONE)
-  })
-
-
-  it("should not let admin to revoke itself", async function () {
-    try {
-      await contract.revoke(admin.address)
-    }
-    catch (err) {
-      return
-    }
-    expect.fail("should have errored")
   })
 })

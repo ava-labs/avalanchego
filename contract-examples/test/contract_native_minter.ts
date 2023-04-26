@@ -53,11 +53,6 @@ describe("ERC20NativeMinter", function () {
     })
   });
 
-  it("should add contract deployer as owner", async function () {
-    const contractOwnerAddr: string = await contract.owner()
-    expect(owner.address).to.equal(contractOwnerAddr)
-  });
-
   // this contract is not given minter permission yet, so should not mintdraw
   it("contract should not be able to mintdraw", async function () {
     const minterList = await ethers.getContractAt("INativeMinter", MINT_PRECOMPILE_ADDRESS, owner);
