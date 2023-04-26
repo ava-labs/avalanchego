@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrWeightTooSmall = errors.New("weight of this validator is too low")
-	errBadSubnetID    = errors.New("subnet ID can't be primary network ID")
+	ErrWeightTooSmall       = errors.New("weight of this validator is too low")
+	ErrBadValidatorDuration = errors.New("validator duration too large")
+	errBadSubnetID          = errors.New("subnet ID can't be primary network ID")
 )
 
 // Validator is a validator.
@@ -62,6 +63,9 @@ func (v *Validator) Verify() error {
 	switch {
 	case v.Wght == 0: // Ensure the validator has some weight
 		return ErrWeightTooSmall
+	case v.Start == 0 && v.End > uint64(StakerMaxDuration):
+		// Ensure proper encoding when v.End is used to encode a duration
+		return ErrBadValidatorDuration
 	default:
 		return nil
 	}
