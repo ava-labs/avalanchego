@@ -730,15 +730,16 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
-		sendQuery(
-			ctx,
-			t.Sender,
-			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
-			push,
-			t.RequestID,
-			blkID,
-			blk.Bytes(),
-		)
+		vdrs := vdrBag.List()
+		sendTo := set.NewSet[ids.NodeID](len(vdrs))
+		sendTo.Add(vdrs...)
+
+		if push {
+			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())
+			return
+		}
+
+		t.Sender.SendPullQuery(ctx, sendTo, t.RequestID, blk.ID())
 	}
 }
 
@@ -914,13 +915,4 @@ func sendQuery(
 	containerID ids.ID,
 	container []byte,
 ) {
-	sendTo := set.NewSet[ids.NodeID](len(vdrs))
-	sendTo.Add(vdrs...)
-
-	if push {
-		sender.SendPushQuery(ctx, sendTo, reqID, container)
-		return
-	}
-
-	sender.SendPullQuery(ctx, sendTo, reqID, containerID)
 }
