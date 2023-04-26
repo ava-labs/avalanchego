@@ -673,7 +673,10 @@ func New(
 	}
 	cChainID := createEVMTx.ID()
 
-	benchlistManager := benchlist.NewManager(config.BenchlistConfig, consensusRouter, validatorManager, config.EnableStaking)
+	config.BenchlistConfig.Validators = validatorManager
+	config.BenchlistConfig.Benchable = config.ConsensusRouter
+	config.BenchlistConfig.StakingEnabled = config.EnableStaking
+	benchlistManager := benchlist.NewManager(&config.BenchlistConfig)
 
 	// If any of these chains die, the node shuts down
 	criticalChains := set.Set[ids.ID]{}
