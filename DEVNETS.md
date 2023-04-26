@@ -49,6 +49,7 @@ aws sts get-caller-identity
 Now we can spin up a new network of 6 nodes with some defaults:
 - `avalanche-ops` supports [Graviton-based processors](https://aws.amazon.com/ec2/graviton/) (ARM64). Use `--arch-type arm64` to run nodes in ARM64 CPUs.
 - `avalanche-ops` supports [EC2 Spot instances](https://aws.amazon.com/ec2/spot/) for cost savings. Use `--instance-mode=spot` to run instances in spot mode.
+- `avalanche-ops` supports multi-region deployments. Use `--auto-regions 3` to distribute node across 3 regions.
 
 ```bash
 /tmp/avalancheup-aws default-spec \
@@ -56,7 +57,7 @@ Now we can spin up a new network of 6 nodes with some defaults:
 --rust-os-type ubuntu20.04 \
 --anchor-nodes 3 \
 --non-anchor-nodes 3 \
---region us-west-2 \
+--regions us-west-2 \
 --instance-mode=on-demand \
 --instance-types=c5.4xlarge \
 --ip-mode=elastic \
