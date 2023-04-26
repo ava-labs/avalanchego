@@ -34,18 +34,18 @@ func TestCoreVMNotRemote(t *testing.T) {
 	maxBlocksNum := 1000                            // an high value to get all built blocks
 	maxBlocksSize := 1000000                        // an high value to get all built blocks
 	maxBlocksRetrivalTime := time.Duration(1000000) // an high value to get all built blocks
-	_, errAncestors := proVM.GetAncestors(
+	_, err := proVM.GetAncestors(
 		context.Background(),
 		blkID,
 		maxBlocksNum,
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	require.Error(errAncestors)
+	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
 
 	var blks [][]byte
-	_, errBatchedParse := proVM.BatchedParseBlock(context.Background(), blks)
-	require.Error(errBatchedParse)
+	_, err = proVM.BatchedParseBlock(context.Background(), blks)
+	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
 }
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
@@ -456,32 +456,30 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, _, _ int, _ time.Duration) ([][]byte, error) {
-		res := make([][]byte, 0, 3)
+	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, maxBlocksNum, _ int, _ time.Duration) ([][]byte, error) {
+		sortedBlocks := [][]byte{coreBlk4.Bytes(), coreBlk3.Bytes(), coreBlk2.Bytes(), coreBlk1.Bytes()}
+		var startIdx int
 		switch blkID {
 		case coreBlk4.ID():
-			res = append(res, coreBlk4.Bytes())
-			res = append(res, coreBlk3.Bytes())
-			res = append(res, coreBlk2.Bytes())
-			res = append(res, coreBlk1.Bytes())
-			return res, nil
+			startIdx = 0
 		case coreBlk3.ID():
-			res = append(res, coreBlk3.Bytes())
-			res = append(res, coreBlk2.Bytes())
-			res = append(res, coreBlk1.Bytes())
-			return res, nil
+			startIdx = 1
 		case coreBlk2.ID():
-			res = append(res, coreBlk2.Bytes())
-			res = append(res, coreBlk1.Bytes())
-			return res, nil
+			startIdx = 2
 		case coreBlk1.ID():
-			res = append(res, coreBlk1.Bytes())
-			return res, nil
+			startIdx = 3
 		default:
-			return res, nil
+			return [][]byte{}, nil // unknown blockID
 		}
+
+		endIdx := startIdx + maxBlocksNum
+		if endIdx > len(sortedBlocks) {
+			endIdx = len(sortedBlocks)
+		}
+		return sortedBlocks[startIdx:endIdx], nil
 	}
 
+	// load all know blocks
 	reqBlkID := builtBlk4.ID()
 	maxBlocksNum := 1000                      // an high value to get all built blocks
 	maxBlocksSize := 1000000                  // an high value to get all built blocks
@@ -501,6 +499,24 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	require.EqualValues(res[1], builtBlk3.Bytes())
 	require.EqualValues(res[2], builtBlk2.Bytes())
 	require.EqualValues(res[3], builtBlk1.Bytes())
+
+	// Regression case: load some prefork and some postfork blocks.
+	reqBlkID = builtBlk4.ID()
+	maxBlocksNum = 3
+	res, err = proRemoteVM.GetAncestors(
+		context.Background(),
+		reqBlkID,
+		maxBlocksNum,
+		maxBlocksSize,
+		maxBlocksRetrivalTime,
+	)
+
+	// ... and check returned values are as expected
+	require.NoError(err, "Error calling GetAncestors: %v", err)
+	require.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	require.EqualValues(res[0], builtBlk4.Bytes())
+	require.EqualValues(res[1], builtBlk3.Bytes())
+	require.EqualValues(res[2], builtBlk2.Bytes())
 
 	// another good call
 	reqBlkID = builtBlk1.ID()

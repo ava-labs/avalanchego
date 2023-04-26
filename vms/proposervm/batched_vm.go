@@ -64,13 +64,12 @@ func (vm *VM) GetAncestors(
 	}
 
 	// snowman++ fork may have been hit.
-	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
 	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
 	innerBytes, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
-		preMaxBlocksNum,
+		maxBlocksNum,
 		preMaxBlocksSize,
 		preMaxBlocksRetrivalTime,
 	)
