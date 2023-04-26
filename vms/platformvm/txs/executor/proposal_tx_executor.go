@@ -361,8 +361,21 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
-		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
-		e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
+		if e.Config.IsContinuousStakingActivated(stakerToRemove.StartTime) {
+			// every staker accepted after Continuous Staking fork activation
+			// is not removed from validator set. Instead it is shifted ahead.
+			shiftedStaker := *stakerToRemove
+			state.ShiftStakerAheadInPlace(&shiftedStaker)
+			if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
+				return fmt.Errorf("failed updating current validator: %w", err)
+			}
+			if err := e.OnAbortState.UpdateCurrentValidator(&shiftedStaker); err != nil {
+				return fmt.Errorf("failed updating current validator: %w", err)
+			}
+		} else {
+			e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
+			e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
+		}
 
 		stake := uStakerTx.Stake()
 		outputs := uStakerTx.Outputs()

@@ -368,37 +368,37 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		stakingPeriod: 10*defaultMinStakingDuration + time.Minute,
 	}
 	staker2 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		stakingPeriod: defaultMinStakingDuration + time.Minute,
 	}
 	staker3 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker2.startTime.Add(1 * time.Minute),
-		endTime:       staker2.endTime.Add(1 * time.Minute),
+		stakingPeriod: staker2.stakingPeriod,
 	}
 	staker3Sub := staker{
 		nodeID:        staker3.nodeID,
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker3.startTime.Add(1 * time.Minute),
-		endTime:       staker3.endTime.Add(-1 * time.Minute),
+		stakingPeriod: staker3.stakingPeriod - time.Minute,
 	}
 	staker4 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
 		startTime:     staker3.startTime,
-		endTime:       staker3.endTime,
+		stakingPeriod: staker3.stakingPeriod,
 	}
 	staker5 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
-		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
+		startTime:     staker2.startTime.Add(staker2.stakingPeriod),
+		stakingPeriod: defaultMinStakingDuration,
 	}
 
 	tests := []test{
@@ -491,7 +491,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, ContinuousStakingFork)
+			env := newEnvironment(t, nil, CortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -501,10 +501,12 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
+				start := staker.startTime
+				end := staker.startTime.Add(staker.stakingPeriod)
 				_, err := addPendingValidator(
 					env,
-					staker.startTime,
-					staker.endTime,
+					start,
+					end,
 					staker.nodeID,
 					staker.rewardAddress,
 					[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -513,10 +515,12 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
+				start := staker.startTime
+				end := staker.startTime.Add(staker.stakingPeriod)
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
-					uint64(staker.startTime.Unix()),
-					uint64(staker.endTime.Unix()),
+					uint64(start.Unix()),
+					uint64(end.Unix()),
 					staker.nodeID, // validator ID
 					subnetID,      // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},

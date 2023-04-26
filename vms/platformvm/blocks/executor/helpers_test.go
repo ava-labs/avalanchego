@@ -99,9 +99,10 @@ var (
 type stakerStatus uint
 
 type staker struct {
-	nodeID             ids.NodeID
-	rewardAddress      ids.ShortID
-	startTime, endTime time.Time
+	nodeID        ids.NodeID
+	rewardAddress ids.ShortID
+	startTime     time.Time
+	stakingPeriod time.Duration
 }
 
 type test struct {

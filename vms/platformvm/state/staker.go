@@ -50,8 +50,8 @@ type Staker struct {
 
 	// StartTime is the time this staker enters the current validators set.
 	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
-	// Post ContinuousStakingFork StartTime is set to chain time when Add*Tx is accepted.
-	// StartTime does not change during a staker lifetime.
+	// Post ContinuousStakingFork StartTime is initially set to chain time when Add*Tx is accepted;
+	// Upon restaking, StartTime is moved ahead by StakingDuration.
 	StartTime time.Time
 
 	// StakingPeriod is the time the staker will stake.

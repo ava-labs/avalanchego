@@ -152,7 +152,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, ContinuousStakingFork)
+	env := newEnvironment(t, ctrl, BanffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -403,7 +403,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker0RewardAddress),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
-		endTime:       time.Time{}, // actual endTime depends on specific test
+		stakingPeriod: state.StakerMaxDuration,
 	}
 
 	staker1RewardAddress := ids.GenerateTestShortID()
@@ -411,7 +411,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker1RewardAddress),
 		rewardAddress: staker1RewardAddress,
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		stakingPeriod: 10*defaultMinStakingDuration + time.Minute,
 	}
 
 	staker2RewardAddress := ids.ShortID{1}
@@ -419,7 +419,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker2RewardAddress),
 		rewardAddress: staker2RewardAddress,
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		stakingPeriod: defaultMinStakingDuration + time.Minute,
 	}
 
 	staker3RewardAddress := ids.GenerateTestShortID()
@@ -427,14 +427,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker3RewardAddress),
 		rewardAddress: staker3RewardAddress,
 		startTime:     staker2.startTime.Add(1 * time.Minute),
-		endTime:       staker2.endTime.Add(1 * time.Minute),
+		stakingPeriod: staker2.stakingPeriod,
 	}
 
 	staker3Sub := staker{
 		nodeID:        staker3.nodeID,
 		rewardAddress: staker3.rewardAddress,
 		startTime:     staker3.startTime.Add(1 * time.Minute),
-		endTime:       staker3.endTime.Add(-1 * time.Minute),
+		stakingPeriod: staker3.stakingPeriod - time.Minute,
 	}
 
 	staker4RewardAddress := ids.GenerateTestShortID()
@@ -442,15 +442,15 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker4RewardAddress),
 		rewardAddress: staker4RewardAddress,
 		startTime:     staker3.startTime,
-		endTime:       staker3.endTime,
+		stakingPeriod: staker3.stakingPeriod,
 	}
 
 	staker5RewardAddress := ids.GenerateTestShortID()
 	staker5 := staker{
 		nodeID:        ids.NodeID(staker5RewardAddress),
 		rewardAddress: staker5RewardAddress,
-		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
+		startTime:     staker2.startTime.Add(staker2.stakingPeriod),
+		stakingPeriod: defaultMinStakingDuration,
 	}
 
 	tests := []test{
@@ -566,7 +566,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, ContinuousStakingFork)
+			env := newEnvironment(t, nil, CortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -576,10 +576,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
+				start := staker.startTime.Unix()
+				end := staker.startTime.Add(staker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddValidatorTx(
 					env.config.MinValidatorStake,
-					uint64(staker.startTime.Unix()),
-					uint64(staker.endTime.Unix()),
+					uint64(start),
+					uint64(end),
 					staker.nodeID,
 					staker.rewardAddress,
 					reward.PercentDenominator,
@@ -600,10 +602,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
+				start := subStaker.startTime.Unix()
+				end := subStaker.startTime.Add(subStaker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					10, // Weight
-					uint64(subStaker.startTime.Unix()),
-					uint64(subStaker.endTime.Unix()),
+					uint64(start),
+					uint64(end),
 					subStaker.nodeID, // validator ID
 					subnetID,         // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -627,11 +631,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
-				staker0.endTime = newTime
+				staker0.stakingPeriod = newTime.Sub(staker0.startTime)
 				addStaker0, err := env.txBuilder.NewAddValidatorTx(
 					10,
 					uint64(staker0.startTime.Unix()),
-					uint64(staker0.endTime.Unix()),
+					uint64(staker0.startTime.Add(staker0.stakingPeriod).Unix()),
 					staker0.nodeID,
 					staker0.rewardAddress,
 					reward.PercentDenominator,
@@ -714,7 +718,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, ContinuousStakingFork)
+	env := newEnvironment(t, nil, CortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -855,7 +859,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, ContinuousStakingFork)
+			env := newEnvironment(t, nil, CortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -960,7 +964,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, ContinuousStakingFork)
+	env := newEnvironment(t, nil, CortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1144,7 +1148,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, ContinuousStakingFork)
+	env := newEnvironment(t, nil, CortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
