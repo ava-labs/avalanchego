@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -159,6 +160,24 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 	}, nil
 }
 
-func RotateStakerInPlace(s *Staker) {
+// ShiftStakerAheadInPlace moves staker times ahead.
+// Calling StartTime S, NextTime N and EndTime E, it works as follows:
+//
+// 1. Current continuous Staker
+// S-----N------------~ E
+// ......S-----N------~ E
+//
+// 2. Current non-continuous Staker
+// S-----NE
+// ......S-----NE
+//
+// 3. Pending Staker
+// SN-----E
+// ......SN-----E
+func ShiftStakerAheadInPlace(s *Staker) {
+	s.StartTime = s.StartTime.Add(s.StakingPeriod)
 	s.NextTime = s.NextTime.Add(s.StakingPeriod)
+	if !s.EndTime.Equal(mockable.MaxTime) {
+		s.EndTime = s.EndTime.Add(s.StakingPeriod)
+	}
 }

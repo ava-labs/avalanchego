@@ -399,7 +399,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
+					TxID: tx.TxID,
+
+					// TODO ABENEGIA: for consecutive restaking we need to figure out
+					// the right index here
 					OutputIndex: uint32(len(outputs) + len(stake)),
 				},
 				Asset: stakeAsset,
@@ -407,6 +410,9 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			}
 
 			e.OnCommitState.AddUTXO(utxo)
+
+			// TODO ABENEGIA: for consecutive restaking we need to figure out
+			// a different way to index reward UTXOs
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 
 			offset++
