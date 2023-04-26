@@ -473,7 +473,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				primaryNetworkVdr := &state.Staker{
 					StartTime:     time.Unix(0, 0),
-					StakingPeriod: state.StakerMaxDuration,
+					StakingPeriod: txs.StakerMaxDuration,
 					EndTime:       mockable.MaxTime,
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)

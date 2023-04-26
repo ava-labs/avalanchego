@@ -5,7 +5,6 @@ package state
 
 import (
 	"bytes"
-	"math"
 	"time"
 
 	"github.com/google/btree"
@@ -16,12 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ btree.LessFunc[*Staker] = (*Staker).Less
-
-	StakerZeroTime                  = time.Unix(0, 0)
-	StakerMaxDuration time.Duration = math.MaxInt64 // time.Duration underlying type is currently int64
-)
+var _ btree.LessFunc[*Staker] = (*Staker).Less
 
 // StakerIterator defines an interface for iterating over a set of stakers.
 type StakerIterator interface {

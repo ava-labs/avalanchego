@@ -403,7 +403,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker0RewardAddress),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
-		stakingPeriod: state.StakerMaxDuration,
+		stakingPeriod: txs.StakerMaxDuration,
 	}
 
 	staker1RewardAddress := ids.GenerateTestShortID()

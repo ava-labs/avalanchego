@@ -122,7 +122,7 @@ func verifyAddValidatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
+		if startTime != txs.StakerZeroTime {
 			return nil, fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
@@ -186,7 +186,7 @@ func verifyAddSubnetValidatorTx(
 	currentChainTime := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
-		if startTime != state.StakerZeroTime {
+		if startTime != txs.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
@@ -399,7 +399,7 @@ func verifyAddDelegatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
+		if startTime != txs.StakerZeroTime {
 			return nil, fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
@@ -504,7 +504,7 @@ func verifyAddPermissionlessValidatorTx(
 	currentChainTime := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
-		if startTime != state.StakerZeroTime {
+		if startTime != txs.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
@@ -711,7 +711,7 @@ func verifyAddPermissionlessDelegatorTx(
 	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
+		if startTime != txs.StakerZeroTime {
 			return fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
