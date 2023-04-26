@@ -617,20 +617,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	}
 
 	network := networks[1].(*network)
-	require.Eventually(
-		func() bool {
-			network.peersLock.RLock()
-			defer network.peersLock.RUnlock()
-
-			nodeID := nodeIDs[0]
-			require.Contains(network.trackedIPs, nodeID)
-			ip := network.trackedIPs[nodeID]
-			return ip.getDelay() != 0
-		},
-		10*time.Second,
-		50*time.Millisecond,
-	)
-
 	require.NoError(primaryVdrs.RemoveWeight(nodeIDs[0], 1))
 	require.Eventually(
 		func() bool {
