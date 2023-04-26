@@ -1087,6 +1087,10 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 			}
 
 			n.peersLock.Lock()
+			// If we no longer desire a connect to nodeID, we should cleanup
+			// trackedIPs and this goroutine. This prevents a memory leak when
+			// the tracked nodeID leaves the validator set and is never able to
+			// be connected to.
 			if !n.wantsConnection(nodeID) {
 				// Typically [n.trackedIPs[nodeID]] will already equal [ip], but
 				// the reference to [ip] is refreshed to avoid any potential
@@ -1124,6 +1128,25 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				n.config.InitialReconnectDelay,
 				n.config.MaxReconnectDelay,
 			)
+
+			// If the network is configured to disallow private IPs and the
+			// provided IP is private, we skip all attempts to initiate a
+			// connection.
+			//
+			// Invariant: We perform this check inside of the looping goroutine
+			// because this goroutine must clean up the trackedIPs entry if
+			// nodeID leaves the validator set. This is why we continue the loop
+			// rather than returning even though we will never initiate an
+			// outbound connection with this IP.
+			if !n.config.AllowPrivateIPs && ip.ip.IP.IsPrivate() {
+				n.peerConfig.Log.Verbo("skipping connection dial",
+					zap.String("reason", "outbound connections to private IPs are prohibited"),
+					zap.Stringer("nodeID", nodeID),
+					zap.Stringer("peerIP", ip.ip.IP),
+					zap.Duration("delay", ip.delay),
+				)
+				continue
+			}
 
 			conn, err := n.dialer.Dial(ctx, ip.ip)
 			if err != nil {
