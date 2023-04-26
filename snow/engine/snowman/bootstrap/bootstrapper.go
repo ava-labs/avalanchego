@@ -240,6 +240,14 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, blkID)
 }
 
+func (*bootstrapper) Staked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
+func (*bootstrapper) Unstaked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
 func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err

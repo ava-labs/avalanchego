@@ -44,7 +44,7 @@ func (a *accepted) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.I
 	a.frontier[nodeID] = nil
 }
 
-func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
+func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ ids.ID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

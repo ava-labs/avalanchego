@@ -58,7 +58,7 @@ func (p *peers) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, 
 	}
 }
 
-func (p *peers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
+func (p *peers) OnValidatorRemoved(nodeID ids.NodeID, _ ids.ID, weight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

@@ -540,6 +540,7 @@ type AppHandler interface {
 type InternalHandler interface {
 	// Notify this engine of peer changes.
 	validators.Connector
+	validators.Staker
 
 	// Notify this engine that a registered timeout has fired.
 	Timeout(context.Context) error

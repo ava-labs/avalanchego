@@ -728,6 +728,11 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	case *message.Disconnected:
 		return engine.Disconnected(ctx, nodeID)
 
+	case *message.Staked:
+		return engine.Staked(ctx, nodeID, msg.TxID)
+	case *message.Unstaked:
+		return engine.Unstaked(ctx, nodeID, msg.TxID)
+
 	default:
 		return fmt.Errorf(
 			"attempt to submit unhandled sync msg %s from %s",

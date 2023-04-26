@@ -65,6 +65,8 @@ const (
 	NotifyOp
 	GossipRequestOp
 	TimeoutOp
+	StakedOp
+	UnstakedOp
 )
 
 var (

@@ -442,6 +442,40 @@ func InternalCrossChainAppResponse(
 	}
 }
 
+type Staked struct {
+	ChainID ids.ID
+	TxID    ids.ID
+}
+
+func InternalStaked(nodeID ids.NodeID, chainID, txID ids.ID) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     StakedOp,
+		message: &Staked{
+			ChainID: chainID,
+			TxID:    txID,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
+type Unstaked struct {
+	ChainID ids.ID
+	TxID    ids.ID
+}
+
+func InternalUnstaked(nodeID ids.NodeID, chainID, txID ids.ID) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     UnstakedOp,
+		message: &Unstaked{
+			ChainID: chainID,
+			TxID:    txID,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 type Connected struct {
 	NodeVersion *version.Application `json:"node_version,omitempty"`
 }

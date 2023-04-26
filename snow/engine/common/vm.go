@@ -23,6 +23,8 @@ type VM interface {
 	// Connector represents a handler that is called on connection connect/disconnect
 	validators.Connector
 
+	validators.Staker
+
 	// Initialize this VM.
 	// [chainCtx]: Metadata about this VM.
 	//     [chainCtx.networkID]: The ID of the network this VM's chain is

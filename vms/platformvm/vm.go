@@ -475,6 +475,18 @@ func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return vm.state.Commit()
 }
 
+func (*VM) Staked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
+func (vm *VM) Unstaked(
+	_ context.Context,
+	nodeID ids.NodeID,
+	txID ids.ID,
+) error {
+	return vm.ctx.Slasher.Reset(nodeID, txID, constants.PrimaryNetworkID)
+}
+
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
 func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {

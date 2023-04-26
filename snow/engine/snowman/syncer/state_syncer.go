@@ -6,7 +6,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -535,6 +534,14 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 
 	ss.Ctx.StateSyncing.Set(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
+}
+
+func (*stateSyncer) Staked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
+}
+
+func (*stateSyncer) Unstaked(context.Context, ids.NodeID, ids.ID) error {
+	return nil
 }
 
 func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {

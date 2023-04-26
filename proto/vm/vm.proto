@@ -28,6 +28,8 @@ service VM {
   // process is created other processes will be created to populate blockchains,
   // but they will not have the static handlers be called again.
   rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
+  rpc Staked(StakedRequest) returns (google.protobuf.Empty);
+  rpc Unstaked(UnstakedRequest) returns (google.protobuf.Empty);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
@@ -311,6 +313,16 @@ message CrossChainAppResponseMsg {
   uint32 request_id = 2;
   // The response body
   bytes response = 3;
+}
+
+message StakedRequest {
+  bytes node_id = 1;
+  bytes tx_id = 2;
+}
+
+message UnstakedRequest {
+  bytes node_id = 1;
+  bytes tx_id = 2;
 }
 
 message ConnectedRequest {

@@ -48,6 +48,7 @@ type Transitive struct {
 	common.AncestorsHandler
 	common.AppHandler
 	validators.Connector
+	validators.Staker
 
 	RequestID uint32
 
@@ -110,6 +111,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
+		Staker:                      config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                NewAncestorTree(),
 		nonVerifiedCache:            nonVerifiedCache,

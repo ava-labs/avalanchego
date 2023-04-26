@@ -52,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/reward"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
@@ -200,6 +201,9 @@ type Node struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
+
+	// slashes staking rewards for uncooperative nodes
+	slasher reward.Slasher
 }
 
 /*
@@ -751,6 +755,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		TracingEnabled:                          n.Config.TraceConfig.Enabled,
 		Tracer:                                  n.tracer,
 		ChainDataDir:                            n.Config.ChainDataDir,
+		Slasher:                                 n.slasher,
 	})
 
 	// Notify the API server when new chains are created
@@ -1365,6 +1370,12 @@ func (n *Node) Initialize(
 
 	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
+
+	slasher, err := reward.NewSlashDB(n.DB, n.Log, n.MetricsRegisterer)
+	if err != nil {
+		return fmt.Errorf("couldn't initialize slasher: %w", err)
+	}
+	n.slasher = slasher
 
 	// Start the Platform chain
 	if err := n.initChains(n.Config.GenesisBytes); err != nil {

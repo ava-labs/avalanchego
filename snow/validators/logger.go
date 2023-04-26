@@ -64,12 +64,14 @@ func (l *logger) OnValidatorAdded(
 
 func (l *logger) OnValidatorRemoved(
 	nodeID ids.NodeID,
+	txID ids.ID,
 	weight uint64,
 ) {
 	if l.enabled.Get() && l.nodeIDs.Contains(nodeID) {
 		l.log.Info("node removed from validator set",
 			zap.Stringer("subnetID", l.subnetID),
 			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("txID", txID),
 			zap.Uint64("weight", weight),
 		)
 	}

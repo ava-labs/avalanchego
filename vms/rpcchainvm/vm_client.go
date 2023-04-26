@@ -410,6 +410,24 @@ func (vm *VMClient) CreateStaticHandlers(ctx context.Context) (map[string]*commo
 	return handlers, nil
 }
 
+func (vm *VMClient) Staked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	_, err := vm.client.Staked(ctx, &vmpb.StakedRequest{
+		NodeId: nodeID[:],
+		TxId:   txID[:],
+	})
+
+	return err
+}
+
+func (vm *VMClient) Unstaked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	_, err := vm.client.Unstaked(ctx, &vmpb.UnstakedRequest{
+		NodeId: nodeID[:],
+		TxId:   txID[:],
+	})
+
+	return err
+}
+
 func (vm *VMClient) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	_, err := vm.client.Connected(ctx, &vmpb.ConnectedRequest{
 		NodeId:  nodeID[:],

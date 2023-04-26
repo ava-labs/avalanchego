@@ -92,6 +92,9 @@ type EngineTest struct {
 	CantConnected,
 	CantDisconnected,
 
+	CantStaked,
+	CantUnstaked,
+
 	CantHealth,
 
 	CantCrossChainAppRequest,
@@ -125,6 +128,8 @@ type EngineTest struct {
 	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
+	StakedF                     func(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
+	UnstakedF                   func(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error
 	HealthF                     func(context.Context) (interface{}, error)
 	GetVMF                      func() VM
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
@@ -168,6 +173,8 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantChits = cant
 	e.CantConnected = cant
 	e.CantDisconnected = cant
+	e.CantStaked = cant
+	e.CantUnstaked = cant
 	e.CantHealth = cant
 	e.CantAppRequest = cant
 	e.CantAppRequestFailed = cant
@@ -642,6 +649,32 @@ func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		e.T.Fatal(errChits)
 	}
 	return errChits
+}
+
+func (e *EngineTest) Staked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	if e.StakedF != nil {
+		return e.StakedF(ctx, nodeID, txID)
+	}
+	if !e.CantStaked {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errStaked)
+	}
+	return errStaked
+}
+
+func (e *EngineTest) Unstaked(ctx context.Context, nodeID ids.NodeID, txID ids.ID) error {
+	if e.UnstakedF != nil {
+		return e.UnstakedF(ctx, nodeID, txID)
+	}
+	if !e.CantUnstaked {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errUnstaked)
+	}
+	return errUnstaked
 }
 
 func (e *EngineTest) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
