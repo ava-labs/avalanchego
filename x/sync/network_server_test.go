@@ -275,7 +275,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			}
 			require.NotNil(proofResult)
 			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proofResult.KeyValues)+len(proofResult.DeletedKeys), test.expectedResponseLen)
+				require.LessOrEqual(len(proofResult.KeyChanges), test.expectedResponseLen)
 			}
 
 			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proofResult)
