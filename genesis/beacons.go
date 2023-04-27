@@ -4,9 +4,26 @@
 package genesis
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
+
+var beacons map[uint32][]Beacon
+
+func init() {
+	f, err := os.OpenFile("beacons.json", os.O_RDWR, 0600)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read beacons.json %v", err))
+	}
+	err = json.NewDecoder(f).Decode(&beacons)
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode beacons.json %v", err))
+	}
+}
 
 // getIPs returns the beacon IPs for each network
 func getIPs(networkID uint32) []string {
@@ -128,8 +145,8 @@ func getNodeIDs(networkID uint32) []string {
 
 // Represents the relationship between the nodeID and the nodeIP.
 type Beacon struct {
-	ID string
-	IP string
+	ID string `json:"id"`
+	IP string `json:"ip"`
 }
 
 func getBeacons(networkID uint32) []Beacon {

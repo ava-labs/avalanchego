@@ -4,6 +4,7 @@
 package genesis
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,6 +25,20 @@ func TestSampleBeacons(t *testing.T) {
 
 			_, err = ips.ToIPPort(beaconIPs[i])
 			require.NoError(err)
+		}
+	}
+}
+
+// Check the compatibility during migration to JSON-based beacon lists
+func TestInitializedBeacons(t *testing.T) {
+	require := require.New(t)
+
+	for _, networkID := range []uint32{constants.FujiID, constants.MainnetID} {
+		nodes := beacons[networkID]
+		loadedBeacons := getBeacons(networkID)
+		for i, node := range nodes {
+			require.Equal(node.ID, loadedBeacons[i].ID, fmt.Sprintf("%d-th node mismatch ID", i))
+			require.Equal(node.IP, loadedBeacons[i].IP, fmt.Sprintf("%d-th node mismatch IP", i))
 		}
 	}
 }
