@@ -54,7 +54,7 @@ func Parse(bytes []byte) (Message, error) {
 		// This message was encoded with proto.
 		switch m := protoMsg.GetMessage().(type) {
 		case *pb.Message_Tx:
-			msg = &Tx{
+			msg = &TxGossip{
 				Tx: m.Tx.Tx,
 			}
 		default:
