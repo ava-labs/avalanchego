@@ -71,9 +71,8 @@ import (
 )
 
 const (
-	defaultChannelSize          = 1
-	initialQueueSize            = 3
-	fallbackMinPercentConnected = 0.8
+	defaultChannelSize = 1
+	initialQueueSize   = 3
 )
 
 var (
@@ -474,7 +473,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		minPercentConnected, ok = m.MinPercentConnectedStakeHealthy[constants.PrimaryNetworkID]
 		if !ok {
 			// fallback to default
-			minPercentConnected = fallbackMinPercentConnected
+			minPercentConnected = constants.DefaultMinConnectedStake
 		}
 	}
 
