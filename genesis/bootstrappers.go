@@ -10,6 +10,8 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -30,8 +32,8 @@ func init() {
 // Represents the relationship between the nodeID and the nodeIP.
 // Sometimes called "anchor" or "beacon" node.
 type Bootstrapper struct {
-	ID string `json:"id"`
-	IP string `json:"ip"`
+	ID ids.NodeID `json:"id"`
+	IP ips.IPDesc `json:"ip"`
 }
 
 // SampleBootstrappers returns the some beacons this node should connect to

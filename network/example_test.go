@@ -110,27 +110,7 @@ func ExampleNewTestNetwork() {
 	// gossip will enable connecting to all the remaining nodes in the network.
 	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
 	for _, bootstrapper := range bootstrappers {
-		beaconID, err := ids.NodeIDFromString(bootstrapper.ID)
-		if err != nil {
-			log.Fatal(
-				"failed to parse beaconID",
-				zap.String("beaconID", bootstrapper.ID),
-				zap.Error(err),
-			)
-			return
-		}
-
-		ipPort, err := ips.ToIPPort(bootstrapper.IP)
-		if err != nil {
-			log.Fatal(
-				"failed to parse beaconIP",
-				zap.String("beaconIP", bootstrapper.IP),
-				zap.Error(err),
-			)
-			return
-		}
-
-		network.ManuallyTrack(beaconID, ipPort)
+		network.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}
 
 	// Typically network.StartClose() should be called based on receiving a
