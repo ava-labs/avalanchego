@@ -4,21 +4,24 @@
 package genesis
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var bootstrappersPerNetworkID map[uint32][]Bootstrapper
+var (
+	//go:embed bootstrappers.json
+	bootstrappersPerNetworkRawJSON []byte
+)
+
+var bootstrappersPerNetwork map[uint32][]Bootstrapper
 
 func init() {
-	f, err := os.OpenFile("bootstrappers.json", os.O_RDWR, 0600)
-	if err != nil {
-		panic(fmt.Sprintf("failed to read bootstrappers.json %v", err))
-	}
-	err = json.NewDecoder(f).Decode(&bootstrappersPerNetworkID)
+	err := json.NewDecoder(bytes.NewReader(bootstrappersPerNetworkRawJSON)).Decode(&bootstrappersPerNetwork)
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode bootstrappers.json %v", err))
 	}
@@ -33,7 +36,7 @@ type Bootstrapper struct {
 
 // SampleBootstrappers returns the some beacons this node should connect to
 func SampleBootstrappers(networkID uint32, count int) []Bootstrapper {
-	bootstrappers := bootstrappersPerNetworkID[networkID]
+	bootstrappers := bootstrappersPerNetwork[networkID]
 	if numIPs := len(bootstrappers); numIPs < count {
 		count = numIPs
 	}
