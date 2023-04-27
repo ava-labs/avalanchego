@@ -4,7 +4,6 @@
 package genesis
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,27 +17,13 @@ func TestSampleBootstrappers(t *testing.T) {
 	require := require.New(t)
 
 	for _, networkID := range []uint32{constants.FujiID, constants.MainnetID} {
-		beaconIPs, beaconIDs := SampleBootstrappers(networkID, 5)
-		for i, beaconID := range beaconIDs {
-			_, err := ids.NodeIDFromString(beaconID)
+		bootstrappers := SampleBootstrappers(networkID, 5)
+		for _, bootstrapper := range bootstrappers {
+			_, err := ids.NodeIDFromString(bootstrapper.ID)
 			require.NoError(err)
 
-			_, err = ips.ToIPPort(beaconIPs[i])
+			_, err = ips.ToIPPort(bootstrapper.IP)
 			require.NoError(err)
-		}
-	}
-}
-
-// Check the compatibility during migration to JSON-based beacon lists
-func TestInitializedBootstrappers(t *testing.T) {
-	require := require.New(t)
-
-	for _, networkID := range []uint32{constants.FujiID, constants.MainnetID} {
-		bootstrappersFromJSON := bootstrappersPerNetworkID[networkID]
-		loaded := getBootstrappers(networkID)
-		for i, node := range bootstrappersFromJSON {
-			require.Equal(node.ID, loaded[i].ID, fmt.Sprintf("%d-th node mismatch ID", i))
-			require.Equal(node.IP, loaded[i].IP, fmt.Sprintf("%d-th node mismatch IP", i))
 		}
 	}
 }

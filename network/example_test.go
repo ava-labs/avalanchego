@@ -108,24 +108,23 @@ func ExampleNewTestNetwork() {
 
 	// We need to initially connect to some nodes in the network before peer
 	// gossip will enable connecting to all the remaining nodes in the network.
-	beaconIPs, beaconIDs := genesis.SampleBootstrappers(constants.FujiID, 5)
-	for i, beaconIDStr := range beaconIDs {
-		beaconID, err := ids.NodeIDFromString(beaconIDStr)
+	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
+	for _, bootstrapper := range bootstrappers {
+		beaconID, err := ids.NodeIDFromString(bootstrapper.ID)
 		if err != nil {
 			log.Fatal(
 				"failed to parse beaconID",
-				zap.String("beaconID", beaconIDStr),
+				zap.String("beaconID", bootstrapper.ID),
 				zap.Error(err),
 			)
 			return
 		}
 
-		beaconIPStr := beaconIPs[i]
-		ipPort, err := ips.ToIPPort(beaconIPStr)
+		ipPort, err := ips.ToIPPort(bootstrapper.IP)
 		if err != nil {
 			log.Fatal(
 				"failed to parse beaconIP",
-				zap.String("beaconIP", beaconIPStr),
+				zap.String("beaconIP", bootstrapper.IP),
 				zap.Error(err),
 			)
 			return

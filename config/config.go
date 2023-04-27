@@ -537,31 +537,41 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
 
-	bootstrapIPs, bootstrapIDs := genesis.SampleBootstrappers(networkID, 5)
+	bootstrappers := genesis.SampleBootstrappers(networkID, 5)
 	if ipsSet {
-		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
+		bootstrappersIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
+		bootstrappers = make([]genesis.Bootstrapper, len(bootstrappersIPs))
+		for i, ip := range bootstrappersIPs {
+			bootstrappers[i] = genesis.Bootstrapper{ID: "", IP: ip}
+		}
 	}
-	for _, ip := range bootstrapIPs {
-		if ip == "" {
+	for _, bootstrapper := range bootstrappers {
+		if bootstrapper.IP == "" {
 			continue
 		}
-		addr, err := ips.ToIPPort(ip)
+		addr, err := ips.ToIPPort(bootstrapper.IP)
 		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", bootstrapper.IP, err)
 		}
 		config.BootstrapIPs = append(config.BootstrapIPs, addr)
 	}
 
 	if idsSet {
-		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
+		bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
+		if len(bootstrappers) != len(bootstrapIDs) {
+			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", len(bootstrappers), len(bootstrapIDs))
+		}
+		for i, id := range bootstrapIDs {
+			bootstrappers[i].ID = id
+		}
 	}
-	for _, id := range bootstrapIDs {
-		if id == "" {
+	for _, bootstrapper := range bootstrappers {
+		if bootstrapper.ID == "" {
 			continue
 		}
-		nodeID, err := ids.NodeIDFromString(id)
+		nodeID, err := ids.NodeIDFromString(bootstrapper.ID)
 		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", bootstrapper.ID, err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
 	}
