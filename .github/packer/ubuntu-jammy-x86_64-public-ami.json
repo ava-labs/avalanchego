@@ -1,13 +1,15 @@
 {
   "variables": {
-    "version": "focal-20.04",
-    "tag": "{{env `TAG`}}"
+    "version": "jammy-22.04",
+    "tag": "{{env `TAG`}}",
+    "skip_create_ami": "{{env `SKIP_CREATE_AMI`}}"
   },
   "builders": [
     {
       "type": "amazon-ebs",
       "region": "us-east-1",
-      "ami_name": "public-avalanche-ubuntu-{{user `version` }}-{{timestamp}}",
+      "skip_create_ami": "{{ user `skip_create_ami` }}",
+      "ami_name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{timestamp}}",
       "source_ami_filter": {
         "filters": {
           "virtualization-type": "hvm",
@@ -24,7 +26,7 @@
       "instance_type": "t2.micro",
       "ami_groups": "all",
       "tags": {
-        "Name": "public-avalanche-ubuntu-{{user `version`}}-{{ isotime | clean_resource_name }}",
+        "Name": "public-avalanche-ubuntu-{{ user `version` }}-{{ user `tag` }}-{{ isotime | clean_resource_name }}",
         "Release": "{{ user `version` }}",
         "Base_AMI_Name": "{{ .SourceAMIName }}"
       }
@@ -46,7 +48,7 @@
       "playbook_file": ".github/packer/create_public_ami.yml",
       "roles_path": ".github/packer/roles/",
       "use_proxy": false,
-      "extra_arguments": ["-e", "component=public-ami build=packer os_release=focal tag={{user `tag`}}"]
+      "extra_arguments": ["-e", "component=public-ami build=packer os_release=jammy tag={{ user `tag` }}"]
     },
     {
       "type": "shell",

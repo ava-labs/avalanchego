@@ -820,7 +820,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				root,
 			)
 			require.NoError(err)
-			require.LessOrEqual(len(changeProof.KeyValues)+len(changeProof.DeletedKeys), 100)
+			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
