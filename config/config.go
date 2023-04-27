@@ -539,9 +539,15 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 
 	bootstrappers := genesis.SampleBootstrappers(networkID, 5)
 	if ipsSet {
-		bootstrappersIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
-		bootstrappers = make([]genesis.Bootstrapper, len(bootstrappersIPs))
-		for i, ip := range bootstrappersIPs {
+		bootstrapIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
+
+		bootstrappers = make([]genesis.Bootstrapper, len(bootstrapIPs))
+		for i, bootstrapIP := range bootstrapIPs {
+			ip := strings.TrimSpace(bootstrapIP)
+			if ip == "" {
+				continue
+			}
+
 			addr, err := ips.ToIPPort(ip)
 			if err != nil {
 				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
@@ -558,7 +564,13 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		if len(bootstrappers) != len(bootstrapIDs) {
 			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", len(bootstrappers), len(bootstrapIDs))
 		}
-		for i, id := range bootstrapIDs {
+
+		for i, bootstrapID := range bootstrapIDs {
+			id := strings.TrimSpace(bootstrapID)
+			if id == "" {
+				continue
+			}
+
 			nodeID, err := ids.NodeIDFromString(id)
 			if err != nil {
 				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", nodeID, err)
