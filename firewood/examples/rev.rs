@@ -19,6 +19,15 @@ fn main() {
         db.kv_dump(&mut std::io::stdout()).unwrap();
         println!(
             "{}",
+            hex::encode(*db.get_revision(0, None).unwrap().kv_root_hash().unwrap())
+        );
+        // The latest committed revision matches with the current state without dirty writes.
+        assert_eq!(
+            db.kv_root_hash().unwrap(),
+            db.get_revision(0, None).unwrap().kv_root_hash().unwrap()
+        );
+        println!(
+            "{}",
             hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
         );
         let root_hash = *db.get_revision(1, None).unwrap().kv_root_hash().unwrap();
@@ -53,6 +62,12 @@ fn main() {
     {
         let db = DB::new("rev_db", &cfg.truncate(false).build()).unwrap();
         {
+            // The latest committed revision matches with the current state after replaying from WALs.
+            assert_eq!(
+                db.kv_root_hash().unwrap(),
+                db.get_revision(0, None).unwrap().kv_root_hash().unwrap()
+            );
+
             let rev = db.get_revision(1, None).unwrap();
             println!("{}", hex::encode(*rev.kv_root_hash().unwrap()));
             rev.kv_dump(&mut std::io::stdout()).unwrap();

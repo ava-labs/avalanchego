@@ -25,8 +25,8 @@ use crate::proof::{Proof, ProofError};
 use crate::storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester};
 pub use crate::storage::{buffer::DiskBufferConfig, WALConfig};
 use crate::storage::{
-    AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreRevMut, StoreRevShared,
-    PAGE_SIZE_NBIT,
+    AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
+    StoreRevShared, PAGE_SIZE_NBIT,
 };
 
 const MERKLE_META_SPACE: SpaceID = 0x0;
@@ -450,6 +450,7 @@ pub struct DB {
 pub struct DBRevInner {
     inner: VecDeque<Universe<StoreRevShared>>,
     max_revisions: usize,
+    base: Universe<StoreRevShared>,
 }
 
 impl DB {
@@ -695,6 +696,17 @@ impl DB {
         };
         latest.flush_dirty().unwrap();
 
+        let base = Universe {
+            merkle: SubUniverse::new(
+                StoreRevShared::from_delta(cached.merkle.meta.clone(), StoreDelta::new_empty()),
+                StoreRevShared::from_delta(cached.merkle.payload.clone(), StoreDelta::new_empty()),
+            ),
+            blob: SubUniverse::new(
+                StoreRevShared::from_delta(cached.blob.meta.clone(), StoreDelta::new_empty()),
+                StoreRevShared::from_delta(cached.blob.payload.clone(), StoreDelta::new_empty()),
+            ),
+        };
+
         Ok(Self {
             inner: Arc::new(RwLock::new(DBInner {
                 latest,
@@ -706,6 +718,7 @@ impl DB {
             revisions: Arc::new(Mutex::new(DBRevInner {
                 inner: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
+                base,
             })),
             payload_regn_nbit: header.payload_regn_nbit,
             rev_cfg: cfg.rev.clone(),
@@ -739,20 +752,17 @@ impl DB {
             .kv_get(key)
             .ok_or(DBError::KeyNotFound)
     }
-    /// Get a handle that grants the access to some historical state of the entire DB.
+    /// Get a handle that grants the access to any committed state of the entire DB.
     ///
-    /// Note: There must be at least two committed batches in order for this function to return an older 'Revision',
-    /// other than the latest state.
-    ///
-    /// The latest revision (nback) starts from 1, which is one behind the current state.
-    /// If nback equals 0, or is above the configured maximum number of revisions, this function returns None.
+    /// The latest revision (nback) starts from 0, which is the current state.
+    /// If nback equals is above the configured maximum number of revisions, this function returns None.
     /// It also returns None in the case where the nback is larger than the number of revisions available.
     pub fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<Revision> {
         let mut revisions = self.revisions.lock();
         let inner = self.inner.read();
 
         let rlen = revisions.inner.len();
-        if nback == 0 || nback > revisions.max_revisions {
+        if nback > revisions.max_revisions {
             return None;
         }
         if rlen < nback {
@@ -778,7 +788,6 @@ impl DB {
         if revisions.inner.len() < nback {
             return None;
         }
-        drop(inner);
         // set up the storage layout
 
         let mut offset = std::mem::size_of::<DBParams>() as u64;
@@ -792,7 +801,12 @@ impl DB {
         // Blob CompactSpaceHeader starts right in blob meta space
         let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
-        let space = &revisions.inner[nback - 1];
+        let space = if nback == 0 {
+            &revisions.base
+        } else {
+            &revisions.inner[nback - 1]
+        };
+        drop(inner);
 
         let (db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
             let merkle_meta_ref = &space.merkle.meta;
@@ -1021,6 +1035,30 @@ impl WriteBatch {
         while revisions.inner.len() > revisions.max_revisions {
             revisions.inner.pop_back();
         }
+
+        let base = Universe {
+            merkle: SubUniverse::new(
+                StoreRevShared::from_delta(
+                    rev_inner.cached.merkle.meta.clone(),
+                    StoreDelta::new_empty(),
+                ),
+                StoreRevShared::from_delta(
+                    rev_inner.cached.merkle.payload.clone(),
+                    StoreDelta::new_empty(),
+                ),
+            ),
+            blob: SubUniverse::new(
+                StoreRevShared::from_delta(
+                    rev_inner.cached.blob.meta.clone(),
+                    StoreDelta::new_empty(),
+                ),
+                StoreRevShared::from_delta(
+                    rev_inner.cached.blob.payload.clone(),
+                    StoreDelta::new_empty(),
+                ),
+            ),
+        };
+        revisions.base = base;
 
         self.committed = true;
 

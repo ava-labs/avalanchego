@@ -170,6 +170,11 @@ impl Deref for StoreDelta {
 }
 
 impl StoreDelta {
+    pub fn new_empty() -> Self {
+        let deltas = Vec::new();
+        Self(deltas)
+    }
+
     pub fn new(src: &dyn MemStoreR, writes: &[SpaceWrite]) -> Self {
         let mut deltas = Vec::new();
         let mut widx: Vec<_> = (0..writes.len())
