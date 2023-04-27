@@ -109,7 +109,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "avm"),
 		zap.String("method", "getBlockByHeight"),
-		zap.Uint64("height", args.Height),
+		zap.Uint64("height", uint64(args.Height)),
 	)
 
 	if s.vm.chainManager == nil {
@@ -117,7 +117,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	}
 	reply.Encoding = args.Encoding
 
-	blockID, err := s.vm.state.GetBlockID(args.Height)
+	blockID, err := s.vm.state.GetBlockID(uint64(args.Height))
 	if err != nil {
 		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
 	}
