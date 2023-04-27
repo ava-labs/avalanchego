@@ -558,6 +558,7 @@ func (n *Node) initIndexer() error {
 // Initializes the Platform chain.
 // Its genesis data specifies the other chains that should be created.
 func (n *Node) initChains(genesisBytes []byte) error {
+	n.Log.Info("additional log for testing")
 	n.Log.Info("initializing chains")
 
 	platformChain := chains.ChainParameters{
