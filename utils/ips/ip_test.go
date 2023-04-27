@@ -11,22 +11,26 @@ import (
 
 func TestIPPortEqual(t *testing.T) {
 	tests := []struct {
+		ipPort  string
 		ipPort1 IPPort
 		ipPort2 IPPort
 		result  bool
 	}{
 		// Expected equal
 		{
+			"\"127.0.0.1:0\"",
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			true,
 		},
 		{
+			"\"[::1]:0\"",
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("::1"), 0},
 			true,
 		},
 		{
+			"\"127.0.0.1:0\"",
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("::ffff:127.0.0.1"), 0},
 			true,
@@ -34,16 +38,19 @@ func TestIPPortEqual(t *testing.T) {
 
 		// Expected unequal
 		{
+			"\"127.0.0.1:0\"",
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("1.2.3.4"), 0},
 			false,
 		},
 		{
+			"\"[::1]:0\"",
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("2001::1"), 0},
 			false,
 		},
 		{
+			"\"127.0.0.1:0\"",
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 1},
 			false,
@@ -51,6 +58,15 @@ func TestIPPortEqual(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			ipPort := &IPDesc{}
+			if err := ipPort.UnmarshalJSON([]byte(tt.ipPort)); err != nil {
+				t.Fatalf("failed to IPDesc.UnmarshalJSON %v", err)
+			}
+
+			if isEqual := IPPort(*ipPort).Equal(tt.ipPort1); !isEqual {
+				t.Error("Expected decoded IPDesc to be equal to IPPort")
+			}
+
 			if tt.ipPort1.IP == nil {
 				t.Error("ipPort1 nil")
 			} else if tt.ipPort2.IP == nil {
