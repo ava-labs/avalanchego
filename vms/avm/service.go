@@ -201,11 +201,6 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 	return nil
 }
 
-// TODO: After the chain is linearized, remove this.
-func (s *Service) IssueStopVertex(_ *http.Request, _, _ *struct{}) error {
-	return s.vm.issueStopVertex()
-}
-
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`

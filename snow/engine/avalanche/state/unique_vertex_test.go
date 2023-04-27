@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,9 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/utils/compare"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 var errUnknownTx = errors.New("unknown tx")
@@ -219,10 +216,6 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		t.Fatalf("expected status to be processing, but found: %s", status)
 	}
 
-	if err := vtx.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
 	validateVertex := func(vtx *uniqueVertex, expectedStatus choices.Status) {
 		if status := vtx.Status(); status != expectedStatus {
 			t.Fatalf("expected status to be %s, but found: %s", expectedStatus, status)
@@ -384,239 +377,6 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	}
 }
 
-func TestStopVertexWhitelistEmpty(t *testing.T) {
-	// vtx itself is accepted, no parent ==> empty transitives
-	_, parseTx := generateTestTxs('a')
-
-	// create serializer object
-	ts := newTestSerializer(t, parseTx)
-
-	uvtx := newTestUniqueVertex(t, ts, nil, [][]byte{{'a'}}, true)
-	if err := uvtx.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	tsv, err := uvtx.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-	if tsv.Len() > 0 {
-		t.Fatal("expected empty whitelist")
-	}
-}
-
-func TestStopVertexWhitelistWithParents(t *testing.T) {
-	t.Parallel()
-
-	txs, parseTx := generateTestTxs('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
-	ts := newTestSerializer(t, parseTx)
-
-	//      (accepted)           (accepted)
-	//        vtx_1                vtx_2
-	//    [tx_a, tx_b]          [tx_c, tx_d]
-	//          ⬆      ⬉     ⬈       ⬆
-	//        vtx_3                vtx_4
-	//    [tx_e, tx_f]          [tx_g, tx_h]
-	//                    ⬉           ⬆
-	//                         stop_vertex_5
-	uvtx1 := newTestUniqueVertex(t, ts, nil, [][]byte{{'a'}, {'b'}}, false)
-	if err := uvtx1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	uvtx2 := newTestUniqueVertex(t, ts, nil, [][]byte{{'c'}, {'d'}}, false)
-	if err := uvtx2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	uvtx3 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'e'}, {'f'}}, false)
-	uvtx4 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'g'}, {'h'}}, false)
-	svtx5 := newTestUniqueVertex(t, ts, []ids.ID{uvtx3.id, uvtx4.id}, nil, true)
-
-	whitelist, err := svtx5.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-
-	expectedWhitelist := []ids.ID{
-		txs[4].ID(), // 'e'
-		txs[5].ID(), // 'f'
-		txs[6].ID(), // 'g'
-		txs[7].ID(), // 'h'
-		uvtx3.ID(),
-		uvtx4.ID(),
-		svtx5.ID(),
-	}
-	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
-		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
-	}
-}
-
-func TestStopVertexWhitelistWithLinearChain(t *testing.T) {
-	t.Parallel()
-
-	// 0 -> 1 -> 2 -> 3 -> 4 -> 5
-	// all vertices on the transitive paths are processing
-	txs, parseTx := generateTestTxs('a', 'b', 'c', 'd', 'e')
-
-	// create serializer object
-	ts := newTestSerializer(t, parseTx)
-
-	uvtx5 := newTestUniqueVertex(t, ts, nil, [][]byte{{'e'}}, false)
-	if err := uvtx5.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	uvtx4 := newTestUniqueVertex(t, ts, []ids.ID{uvtx5.id}, [][]byte{{'d'}}, false)
-	uvtx3 := newTestUniqueVertex(t, ts, []ids.ID{uvtx4.id}, [][]byte{{'c'}}, false)
-	uvtx2 := newTestUniqueVertex(t, ts, []ids.ID{uvtx3.id}, [][]byte{{'b'}}, false)
-	uvtx1 := newTestUniqueVertex(t, ts, []ids.ID{uvtx2.id}, [][]byte{{'a'}}, false)
-	uvtx0 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id}, nil, true)
-
-	whitelist, err := uvtx0.Whitelist(context.Background())
-	if err != nil {
-		t.Fatalf("failed to get whitelist %v", err)
-	}
-
-	expectedWhitelist := []ids.ID{
-		txs[0].ID(),
-		txs[1].ID(),
-		txs[2].ID(),
-		txs[3].ID(),
-		uvtx0.ID(),
-		uvtx1.ID(),
-		uvtx2.ID(),
-		uvtx3.ID(),
-		uvtx4.ID(),
-	}
-	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
-		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
-	}
-}
-
-func TestStopVertexVerifyUnexpectedDependencies(t *testing.T) {
-	t.Parallel()
-
-	txs, parseTx := generateTestTxs('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'x')
-	ts := newTestSerializer(t, parseTx)
-
-	//      (accepted)           (accepted)
-	//        vtx_1                vtx_2
-	//    [tx_a, tx_b]          [tx_c, tx_d]
-	//          ⬆      ⬉     ⬈       ⬆
-	//        vtx_3                vtx_4
-	//    [tx_e, tx_f]          [tx_g, tx_h]
-	//                               ⬆
-	//                         stop_vertex_5
-	//
-	// [tx_a, tx_b] transitively referenced by "stop_vertex_5"
-	// has the dependent transactions [tx_e, tx_f]
-	// that are not transitively referenced by "stop_vertex_5"
-	// in case "tx_g" depends on "tx_e" that is not in vtx4.
-	// Thus "stop_vertex_5" is invalid!
-
-	// "tx_g" depends on "tx_e"
-	txEInf := txs[4]
-	txGInf := txs[6]
-	txG, ok := txGInf.(*snowstorm.TestTx)
-	if !ok {
-		t.Fatalf("unexpected type %T", txGInf)
-	}
-	txG.DependenciesV = []snowstorm.Tx{txEInf}
-
-	uvtx1 := newTestUniqueVertex(t, ts, nil, [][]byte{{'a'}, {'b'}}, false)
-	if err := uvtx1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	uvtx2 := newTestUniqueVertex(t, ts, nil, [][]byte{{'c'}, {'d'}}, false)
-	if err := uvtx2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	uvtx3 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'e'}, {'f'}}, false)
-	uvtx4 := newTestUniqueVertex(t, ts, []ids.ID{uvtx1.id, uvtx2.id}, [][]byte{{'g'}, {'h'}}, false)
-
-	svtx5 := newTestUniqueVertex(t, ts, []ids.ID{uvtx4.id}, nil, true)
-	if verr := svtx5.Verify(context.Background()); !errors.Is(verr, errUnexpectedDependencyStopVtx) {
-		t.Fatalf("stop vertex 'Verify' expected %v, got %v", errUnexpectedDependencyStopVtx, verr)
-	}
-
-	// if "tx_e" that "tx_g" depends on were accepted,
-	// transitive closure is reaching all accepted frontier
-	txE, ok := txEInf.(*snowstorm.TestTx)
-	if !ok {
-		t.Fatalf("unexpected type %T", txEInf)
-	}
-	txE.StatusV = choices.Accepted
-	svtx5 = newTestUniqueVertex(t, ts, []ids.ID{uvtx4.id}, nil, true)
-	if verr := svtx5.Verify(context.Background()); verr != nil {
-		t.Fatalf("stop vertex 'Verify' expected nil, got %v", verr)
-	}
-
-	// valid stop vertex
-	//
-	//      (accepted)           (accepted)
-	//        vtx_1                vtx_2
-	//    [tx_a, tx_b]          [tx_c, tx_d]
-	//          ⬆      ⬉     ⬈       ⬆
-	//        vtx_3                vtx_4
-	//    [tx_e, tx_f]          [tx_g, tx_h]
-	//                    ⬉           ⬆
-	//                         stop_vertex_5
-	svtx5 = newTestUniqueVertex(t, ts, []ids.ID{uvtx3.id, uvtx4.id}, nil, true)
-	if verr := svtx5.Verify(context.Background()); verr != nil {
-		t.Fatalf("stop vertex 'Verify' expected nil, got %v", verr)
-	}
-	if err := uvtx3.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := uvtx4.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := svtx5.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	// stop vertex cannot be issued twice
-	if verr := svtx5.Verify(context.Background()); !errors.Is(verr, errStopVertexAlreadyAccepted) {
-		t.Fatalf("stop vertex 'Verify' expected %v, got %v", errStopVertexAlreadyAccepted, verr)
-	}
-
-	// no vertex should never be able to refer to a stop vertex in its transitive closure
-	// regular vertex with stop vertex as a parent should fail!
-	//
-	//      (accepted)           (accepted)
-	//        vtx_1                vtx_2
-	//    [tx_a, tx_b]          [tx_c, tx_d]
-	//          ⬆      ⬉     ⬈       ⬆
-	//        vtx_3                vtx_4
-	//    [tx_e, tx_f]          [tx_g, tx_h]
-	//                    ⬉           ⬆
-	//                         stop_vertex_5
-	//                                ⬆
-	//                              vtx_6
-	//                              [tx_x]
-	//                           (should fail)
-	uvtx6 := newTestUniqueVertex(t, ts, []ids.ID{svtx5.id}, [][]byte{{'x'}}, false)
-	if verr := uvtx6.Verify(context.Background()); !errors.Is(verr, errStopVertexAlreadyAccepted) {
-		t.Fatalf("stop vertex 'Verify' expected %v, got %v", errStopVertexAlreadyAccepted, verr)
-	}
-}
-
-func TestStopVertexVerifyNotAllowedTimestamp(t *testing.T) {
-	t.Parallel()
-
-	_, parseTx := generateTestTxs('a')
-	ts := newTestSerializer(t, parseTx)
-	ts.CortinaTime = version.CortinaDefaultTime
-
-	svtx := newTestUniqueVertex(t, ts, nil, nil, true)
-	svtx.time = func() time.Time {
-		return version.CortinaDefaultTime.Add(-time.Second)
-	}
-
-	if verr := svtx.Verify(context.Background()); !errors.Is(verr, errStopVertexNotAllowedTimestamp) {
-		t.Fatalf("stop vertex 'Verify' expected %v, got %v", errStopVertexNotAllowedTimestamp, verr)
-	}
-}
-
 func newTestUniqueVertex(
 	t *testing.T,
 	s *Serializer,
@@ -650,26 +410,4 @@ func newTestUniqueVertex(
 		t.Fatal(err)
 	}
 	return uvtx
-}
-
-func generateTestTxs(idSlice ...byte) ([]snowstorm.Tx, func(context.Context, []byte) (snowstorm.Tx, error)) {
-	txs := make([]snowstorm.Tx, len(idSlice))
-	bytesToTx := make(map[string]snowstorm.Tx, len(idSlice))
-	for i, b := range idSlice {
-		txs[i] = &snowstorm.TestTx{
-			TestDecidable: choices.TestDecidable{
-				IDV: ids.ID{b},
-			},
-			BytesV: []byte{b},
-		}
-		bytesToTx[string([]byte{b})] = txs[i]
-	}
-	parseTx := func(_ context.Context, b []byte) (snowstorm.Tx, error) {
-		tx, ok := bytesToTx[string(b)]
-		if !ok {
-			return nil, errUnknownTx
-		}
-		return tx, nil
-	}
-	return txs, parseTx
 }

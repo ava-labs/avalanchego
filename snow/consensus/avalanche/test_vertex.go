@@ -6,10 +6,8 @@ package avalanche
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Vertex = (*TestVertex)(nil)
@@ -18,33 +16,17 @@ var _ Vertex = (*TestVertex)(nil)
 type TestVertex struct {
 	choices.TestDecidable
 
-	VerifyErrV    error
-	ParentsV      []Vertex
-	ParentsErrV   error
-	HasWhitelistV bool
-	WhitelistV    set.Set[ids.ID]
-	WhitelistErrV error
-	HeightV       uint64
-	HeightErrV    error
-	TxsV          []snowstorm.Tx
-	TxsErrV       error
-	BytesV        []byte
-}
-
-func (v *TestVertex) Verify(context.Context) error {
-	return v.VerifyErrV
+	ParentsV    []Vertex
+	ParentsErrV error
+	HeightV     uint64
+	HeightErrV  error
+	TxsV        []snowstorm.Tx
+	TxsErrV     error
+	BytesV      []byte
 }
 
 func (v *TestVertex) Parents() ([]Vertex, error) {
 	return v.ParentsV, v.ParentsErrV
-}
-
-func (v *TestVertex) HasWhitelist() bool {
-	return v.HasWhitelistV
-}
-
-func (v *TestVertex) Whitelist(context.Context) (set.Set[ids.ID], error) {
-	return v.WhitelistV, v.WhitelistErrV
 }
 
 func (v *TestVertex) Height() (uint64, error) {
