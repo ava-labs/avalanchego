@@ -12,16 +12,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var beacons map[uint32][]Beacon
+var bootstrappersPerNetworkID map[uint32][]Bootstrapper
 
 func init() {
-	f, err := os.OpenFile("beacons.json", os.O_RDWR, 0600)
+	f, err := os.OpenFile("bootstrappers.json", os.O_RDWR, 0600)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read beacons.json %v", err))
+		panic(fmt.Sprintf("failed to read bootstrappers.json %v", err))
 	}
-	err = json.NewDecoder(f).Decode(&beacons)
+	err = json.NewDecoder(f).Decode(&bootstrappersPerNetworkID)
 	if err != nil {
-		panic(fmt.Sprintf("failed to decode beacons.json %v", err))
+		panic(fmt.Sprintf("failed to decode bootstrappers.json %v", err))
 	}
 }
 
@@ -144,30 +144,31 @@ func getNodeIDs(networkID uint32) []string {
 }
 
 // Represents the relationship between the nodeID and the nodeIP.
-type Beacon struct {
+// Sometimes called "anchor" or "beacon" node.
+type Bootstrapper struct {
 	ID string `json:"id"`
 	IP string `json:"ip"`
 }
 
-func getBeacons(networkID uint32) []Beacon {
+func getBootstrappers(networkID uint32) []Bootstrapper {
 	ids := getNodeIDs(networkID)
 	ips := getIPs(networkID)
 	if ids == nil {
 		return nil
 	}
 
-	beacons := make([]Beacon, len(ids))
-	for i := range beacons {
-		beacons[i] = Beacon{ID: ids[i], IP: ips[i]}
+	bootstrappers := make([]Bootstrapper, len(ids))
+	for i := range bootstrappers {
+		bootstrappers[i] = Bootstrapper{ID: ids[i], IP: ips[i]}
 	}
 
-	return beacons
+	return bootstrappers
 }
 
-// SampleBeacons returns the some beacons this node should connect to
-func SampleBeacons(networkID uint32, count int) ([]string, []string) {
-	beacons := getBeacons(networkID)
-	if numIPs := len(beacons); numIPs < count {
+// SampleBootstrappers returns the some beacons this node should connect to
+func SampleBootstrappers(networkID uint32, count int) ([]string, []string) {
+	bootstrappers := getBootstrappers(networkID)
+	if numIPs := len(bootstrappers); numIPs < count {
 		count = numIPs
 	}
 
@@ -175,11 +176,11 @@ func SampleBeacons(networkID uint32, count int) ([]string, []string) {
 	sampledIDs := make([]string, 0, count)
 
 	s := sampler.NewUniform()
-	s.Initialize(uint64(len(beacons)))
+	s.Initialize(uint64(len(bootstrappers)))
 	indices, _ := s.Sample(count)
 	for _, index := range indices {
-		sampledIPs = append(sampledIPs, beacons[int(index)].IP)
-		sampledIDs = append(sampledIDs, beacons[int(index)].ID)
+		sampledIPs = append(sampledIPs, bootstrappers[int(index)].IP)
+		sampledIDs = append(sampledIDs, bootstrappers[int(index)].ID)
 	}
 
 	return sampledIPs, sampledIDs

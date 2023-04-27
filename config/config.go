@@ -537,7 +537,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
 
-	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(networkID, 5)
+	bootstrapIPs, bootstrapIDs := genesis.SampleBootstrappers(networkID, 5)
 	if ipsSet {
 		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
 	}
