@@ -18,9 +18,9 @@ import (
 var (
 	//go:embed bootstrappers.json
 	bootstrappersPerNetworkRawJSON []byte
-)
 
-var bootstrappersPerNetwork map[uint32][]Bootstrapper
+	bootstrappersPerNetwork map[uint32][]Bootstrapper
+)
 
 func init() {
 	err := json.NewDecoder(bytes.NewReader(bootstrappersPerNetworkRawJSON)).Decode(&bootstrappersPerNetwork)
