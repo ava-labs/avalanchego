@@ -126,12 +126,31 @@ func getNodeIDs(networkID uint32) []string {
 	}
 }
 
+// Represents the relationship between the nodeID and the nodeIP.
+type Beacon struct {
+	ID string
+	IP string
+}
+
+func getBeacons(networkID uint32) []Beacon {
+	ids := getNodeIDs(networkID)
+	ips := getIPs(networkID)
+	if ids == nil {
+		return nil
+	}
+
+	beacons := make([]Beacon, len(ids))
+	for i := range beacons {
+		beacons[i] = Beacon{ID: ids[i], IP: ips[i]}
+	}
+
+	return beacons
+}
+
 // SampleBeacons returns the some beacons this node should connect to
 func SampleBeacons(networkID uint32, count int) ([]string, []string) {
-	ips := getIPs(networkID)
-	ids := getNodeIDs(networkID)
-
-	if numIPs := len(ips); numIPs < count {
+	beacons := getBeacons(networkID)
+	if numIPs := len(beacons); numIPs < count {
 		count = numIPs
 	}
 
@@ -139,11 +158,11 @@ func SampleBeacons(networkID uint32, count int) ([]string, []string) {
 	sampledIDs := make([]string, 0, count)
 
 	s := sampler.NewUniform()
-	s.Initialize(uint64(len(ips)))
+	s.Initialize(uint64(len(beacons)))
 	indices, _ := s.Sample(count)
 	for _, index := range indices {
-		sampledIPs = append(sampledIPs, ips[int(index)])
-		sampledIDs = append(sampledIDs, ids[int(index)])
+		sampledIPs = append(sampledIPs, beacons[int(index)].IP)
+		sampledIDs = append(sampledIDs, beacons[int(index)].ID)
 	}
 
 	return sampledIPs, sampledIDs
