@@ -249,10 +249,13 @@ impl<'a, T> Drop for ObjRef<'a, T> {
         let mut inner = self.inner.take().unwrap();
         let ptr = inner.as_ptr();
         let cache = self.cache.get_inner_mut();
-        if cache.pinned.remove(&ptr).unwrap() {
-            inner.dirty = None;
-        } else {
-            cache.cached.put(ptr, inner);
+        match cache.pinned.remove(&ptr) {
+            Some(true) => {
+                inner.dirty = None;
+            }
+            _ => {
+                cache.cached.put(ptr, inner);
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ lru = "0.10.0"
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }
 pprof = { version = "0.11.1", features = ["flamegraph"] }
+sha3 = "0.10.7"
 rand = "0.8.5"
 
 [[bench]]

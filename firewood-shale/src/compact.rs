@@ -584,3 +584,113 @@ impl<T: Storable + 'static, M: CachedStore> ShaleStore<T> for CompactSpace<T, M>
         inner.obj_cache.flush_dirty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sha3::Digest;
+
+    use crate::{cached::DynamicMem, ObjCache};
+
+    use super::*;
+
+    const HASH_SIZE: usize = 32;
+    const ZERO_HASH: Hash = Hash([0u8; HASH_SIZE]);
+
+    #[derive(PartialEq, Eq, Debug, Clone)]
+    pub struct Hash(pub [u8; HASH_SIZE]);
+
+    impl Hash {
+        const MSIZE: u64 = 32;
+    }
+
+    impl std::ops::Deref for Hash {
+        type Target = [u8; HASH_SIZE];
+        fn deref(&self) -> &[u8; HASH_SIZE] {
+            &self.0
+        }
+    }
+
+    impl Storable for Hash {
+        fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+            let raw = mem
+                .get_view(addr, Self::MSIZE)
+                .ok_or(ShaleError::LinearCachedStoreError)?;
+            Ok(Self(
+                raw.as_deref()[..Self::MSIZE as usize].try_into().unwrap(),
+            ))
+        }
+
+        fn dehydrated_len(&self) -> u64 {
+            Self::MSIZE
+        }
+
+        fn dehydrate(&self, to: &mut [u8]) {
+            let mut cur = to;
+            cur.write_all(&self.0).unwrap()
+        }
+    }
+
+    #[test]
+    fn test_space_item() {
+        const META_SIZE: u64 = 0x10000;
+        const COMPACT_SIZE: u64 = 0x10000;
+        const RESERVED: u64 = 0x1000;
+
+        let mut dm = DynamicMem::new(META_SIZE, 0x0);
+
+        // initialize compact space
+        let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x1);
+        dm.write(
+            compact_header.addr(),
+            &crate::to_dehydrated(&CompactSpaceHeader::new(RESERVED, RESERVED)),
+        );
+        let compact_header =
+            StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
+        let mem_meta = Rc::new(dm);
+        let mem_payload = Rc::new(DynamicMem::new(COMPACT_SIZE, 0x1));
+
+        let cache: ObjCache<Hash> = ObjCache::new(1);
+        let space =
+            CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16).unwrap();
+
+        // initial write
+        let data = b"hello world";
+        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(&data).into();
+        let obj_ref = space.put_item(Hash(hash), 0).unwrap();
+        assert_eq!(obj_ref.as_ptr().addr(), 4113);
+        // create hash ptr from address and attempt to read dirty write.
+        let hash_ref = space.get_item(ObjPtr::new_from_addr(4113)).unwrap();
+        // read before flush results in zeroed hash
+        assert_eq!(hash_ref.as_ref(), ZERO_HASH.as_ref());
+        // not cached
+        assert!(obj_ref
+            .cache
+            .get_inner_mut()
+            .cached
+            .get(&ObjPtr::new_from_addr(4113))
+            .is_none());
+        // pinned
+        assert!(obj_ref
+            .cache
+            .get_inner_mut()
+            .pinned
+            .get(&ObjPtr::new_from_addr(4113))
+            .is_some());
+        // dirty
+        assert!(obj_ref
+            .cache
+            .get_inner_mut()
+            .dirty
+            .get(&ObjPtr::new_from_addr(4113))
+            .is_some());
+        drop(obj_ref);
+        // write is visible
+        assert_eq!(
+            space
+                .get_item(ObjPtr::new_from_addr(4113))
+                .unwrap()
+                .as_ref(),
+            hash
+        );
+    }
+}
