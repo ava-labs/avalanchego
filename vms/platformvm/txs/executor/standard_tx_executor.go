@@ -542,3 +542,43 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 	}
 	return state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
 }
+
+func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
+	staker, relatedStakers, err := verifyStopStakerTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	state.MarkStakerForRemovalInPlace(staker)
+	if staker.Priority.IsValidator() {
+		err = e.State.UpdateCurrentValidator(staker)
+	} else {
+		err = e.State.UpdateCurrentDelegator(staker)
+	}
+	if err != nil {
+		return err
+	}
+
+	for _, toStop := range relatedStakers {
+		state.MarkStakerForRemovalInPlaceBeforeTime(toStop, staker.EndTime)
+		if toStop.Priority.IsValidator() {
+			err = e.State.UpdateCurrentValidator(toStop)
+		} else {
+			err = e.State.UpdateCurrentDelegator(toStop)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}

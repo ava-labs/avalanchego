@@ -105,3 +105,8 @@ func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx)
 	}
 	return nil
 }
+
+func (i *issuer) StopStakerTx(*txs.StopStakerTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}

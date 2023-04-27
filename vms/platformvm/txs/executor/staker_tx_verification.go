@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -39,6 +41,7 @@ var (
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
+	ErrUnauthorizedStakerStopping      = errors.New("unauthorized staker stopping")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -891,4 +894,142 @@ func getDelegatorRules(
 		maxStakeDuration:         time.Duration(transformSubnet.MaxStakeDuration) * time.Second,
 		maxValidatorWeightFactor: transformSubnet.MaxValidatorWeightFactor,
 	}, nil
+}
+
+func verifyStopStakerTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.StopStakerTx,
+) (*state.Staker, []*state.Staker, error) {
+	if backend.Config.IsContinuousStakingActivated(chainState.GetTimestamp()) {
+		return nil, nil, errors.New("StopStakerTx cannot be accepted before continuous staking fork activation")
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, nil, err
+	}
+
+	// retrieve staker to be stopped
+	var (
+		txID         = tx.TxID
+		stakerToStop *state.Staker
+	)
+
+	stakersIt, err := chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	for stakersIt.Next() {
+		if stakersIt.Value().TxID == txID {
+			stakerToStop = stakersIt.Value()
+			break
+		}
+	}
+	if stakerToStop == nil {
+		return nil, nil, errors.New("could not find staker to stop among current ones")
+	}
+
+	if backend.Bootstrapped.Get() {
+		// Full verification only one bootstrapping is done. Otherwise only execution
+
+		baseTxCreds, err := verifyStopStakerAuthorization(backend, chainState, sTx, txID, tx.StakerAuth)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Verify the flowcheck
+		if err := backend.FlowChecker.VerifySpend(
+			tx,
+			chainState,
+			tx.Ins,
+			tx.Outs,
+			baseTxCreds,
+			map[ids.ID]uint64{
+				backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+			},
+		); err != nil {
+			return nil, nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		}
+	}
+
+	if !stakerToStop.Priority.IsValidator() || stakerToStop.SubnetID != constants.PrimaryNetworkID {
+		return stakerToStop, []*state.Staker{}, nil
+	}
+
+	// primary network validators are special since, when stopping them, we need to handle
+	// their delegators and subnet validators as well, to make sure they don't outlive the
+	// primary network validators
+	res := make([]*state.Staker, 0)
+	stakersIt, err = chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	for stakersIt.Next() {
+		staker := stakersIt.Value()
+		if staker.NodeID == stakerToStop.NodeID && staker.TxID != stakerToStop.TxID {
+			res = append(res, staker)
+		}
+	}
+	return stakerToStop, res, nil
+}
+
+func verifyStopStakerAuthorization(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	stakerTxID ids.ID,
+	stakerAuth verify.Verifiable,
+) ([]verify.Verifiable, error) {
+	if len(sTx.Creds) == 0 {
+		// Ensure there is at least one credential for the subnet authorization
+		return nil, errWrongNumberOfCredentials
+	}
+
+	baseTxCredsLen := len(sTx.Creds) - 1
+	stakerCred := sTx.Creds[baseTxCredsLen]
+
+	stakerTx, _, err := chainState.GetTx(stakerTxID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"staker tx not found %q: %v",
+			stakerTxID,
+			err,
+		)
+	}
+
+	var stakerOwner fx.Owner
+	switch uStakerTx := stakerTx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		stakerOwner = uStakerTx.ValidationRewardsOwner()
+	case txs.DelegatorTx:
+		stakerOwner = uStakerTx.RewardsOwner()
+	case *txs.AddSubnetValidatorTx:
+		signedSubnetTx, _, err := chainState.GetTx(uStakerTx.Subnet)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"tx creating subnet not found %q: %v",
+				uStakerTx.Subnet,
+				err,
+			)
+		}
+		subnetTx, ok := signedSubnetTx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			return nil, ErrWrongTxType
+		}
+		stakerOwner = subnetTx.Owner
+	default:
+		return nil, fmt.Errorf(
+			"unhandled staker type: %t",
+			uStakerTx,
+		)
+	}
+
+	err = backend.Fx.VerifyPermission(sTx.Unsigned, stakerAuth, stakerCred, stakerOwner)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnauthorizedStakerStopping, err)
+	}
+
+	return sTx.Creds[:baseTxCredsLen], nil
 }

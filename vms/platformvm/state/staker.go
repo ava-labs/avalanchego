@@ -175,3 +175,15 @@ func ShiftStakerAheadInPlace(s *Staker) {
 		s.EndTime = s.EndTime.Add(s.StakingPeriod)
 	}
 }
+
+func MarkStakerForRemovalInPlace(s *Staker) {
+	// stop at T+1
+	s.EndTime = s.NextTime.Add(s.StakingPeriod)
+}
+
+func MarkStakerForRemovalInPlaceBeforeTime(s *Staker, stopTime time.Time) {
+	s.EndTime = s.NextTime
+	for candidate := s.EndTime.Add(s.StakingPeriod); candidate.Before(stopTime); candidate = s.EndTime.Add(s.StakingPeriod) {
+		s.EndTime = candidate
+	}
+}

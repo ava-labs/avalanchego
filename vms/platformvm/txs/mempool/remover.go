@@ -3,7 +3,9 @@
 
 package mempool
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+import (
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
 
 var _ txs.Visitor = (*remover)(nil)
 
@@ -81,5 +83,10 @@ func (*remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 
 func (*remover) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	// this tx is never in mempool
+	return nil
+}
+
+func (r *remover) StopStakerTx(*txs.StopStakerTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }

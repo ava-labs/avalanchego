@@ -164,6 +164,10 @@ func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 	return sign(s.tx, true, txSigners)
 }
 
+func (*signerVisitor) StopStakerTx(*txs.StopStakerTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
