@@ -2975,7 +2975,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			service, expected := tt.serviceAndExpectedBlockFunc(ctrl)
 
 			args := &api.GetBlockByHeightArgs{
-				Height:   blockHeight,
+				Height:   json.Uint64(blockHeight),
 				Encoding: tt.encoding,
 			}
 			reply := &api.GetBlockResponse{}
