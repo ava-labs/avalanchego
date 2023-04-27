@@ -506,17 +506,20 @@ func (proof *ChangeProof) Empty() bool {
 // If [end] is nil, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
-	hasLowerBound := len(start) > 0
-	hasUpperBound := len(end) > 0
-	for i := 0; i < len(kvs); i++ {
-		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
+
+	// ensure that the keys are in increasing order
+	for i := 0; i < len(kvs)-1; i++ {
+		if bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start) < 0) ||
-			(hasUpperBound && bytes.Compare(kvs[i].Key, end) > 0) {
-			return ErrStateFromOutsideOfRange
-		}
 	}
+	
+	// ensure that the keys are within the range [start, end]
+	if (len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
+		(len(end) > 0 && bytes.Compare(kvs[len(kvs)-1].Key, end) > 0) {
+		return ErrStateFromOutsideOfRange
+	}
+
 	return nil
 }
 
