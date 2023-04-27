@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/btree"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -1342,8 +1343,7 @@ func (s *state) initValidatorSets() error {
 	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
 	primaryValidators.RegisterCallbackListener(vl)
 
-	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
-	s.metrics.SetTotalStake(primaryValidators.Weight())
+	s.setStakeMetrics()
 
 	for subnetID := range s.cfg.TrackedSubnets {
 		subnetValidators := validators.NewSet()
@@ -1707,13 +1707,52 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 	if !updateValidators {
 		return nil
 	}
+
+	s.setStakeMetrics()
+	return nil
+}
+
+func (s *state) setStakeMetrics() {
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
-		return nil
+		return
 	}
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
 	s.metrics.SetTotalStake(primaryValidators.Weight())
-	return nil
+
+	localPrimaryValidator, err := s.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		s.ctx.NodeID,
+	)
+	switch err {
+	case nil:
+		s.metrics.SetTimeUntilUnstake(time.Until(localPrimaryValidator.EndTime))
+	case database.ErrNotFound:
+		s.metrics.SetTimeUntilUnstake(0)
+	default:
+		s.ctx.Log.Error("couldn't update primary stake metrics",
+			zap.Error(err),
+		)
+		return
+	}
+
+	for subnetID := range s.cfg.TrackedSubnets {
+		localSubnetValidator, err := s.GetCurrentValidator(
+			subnetID,
+			s.ctx.NodeID,
+		)
+		switch err {
+		case nil:
+			s.metrics.SetTimeUntilSubnetUnstake(subnetID, time.Until(localSubnetValidator.EndTime))
+		case database.ErrNotFound:
+			s.metrics.SetTimeUntilSubnetUnstake(subnetID, 0)
+		default:
+			s.ctx.Log.Error("couldn't update subnet stake metrics",
+				zap.Error(err),
+				zap.Stringer("subnetID", subnetID))
+			return
+		}
+	}
 }
 
 func writeCurrentDelegatorDiff(

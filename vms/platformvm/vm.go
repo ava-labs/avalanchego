@@ -680,32 +680,3 @@ func (vm *VM) Clock() *mockable.Clock {
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
 }
-
-// Returns the percentage of the total stake of the subnet connected to this
-// node.
-func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
-	vdrSet, exists := vm.Validators.Get(subnetID)
-	if !exists {
-		return 0, errMissingValidatorSet
-	}
-
-	vdrSetWeight := vdrSet.Weight()
-	if vdrSetWeight == 0 {
-		return 1, nil
-	}
-
-	var (
-		connectedStake uint64
-		err            error
-	)
-	for _, vdr := range vdrSet.List() {
-		if !vm.uptimeManager.IsConnected(vdr.NodeID, subnetID) {
-			continue // not connected to us --> don't include
-		}
-		connectedStake, err = math.Add64(connectedStake, vdr.Weight)
-		if err != nil {
-			return 0, err
-		}
-	}
-	return float64(connectedStake) / float64(vdrSetWeight), nil
-}
