@@ -11,6 +11,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
@@ -19,7 +20,7 @@ var (
 	//go:embed bootstrappers.json
 	bootstrappersPerNetworkRawJSON []byte
 
-	bootstrappersPerNetwork map[uint32][]Bootstrapper
+	bootstrappersPerNetwork map[string][]Bootstrapper
 )
 
 func init() {
@@ -38,7 +39,12 @@ type Bootstrapper struct {
 
 // SampleBootstrappers returns the some beacons this node should connect to
 func SampleBootstrappers(networkID uint32, count int) []Bootstrapper {
-	bootstrappers := bootstrappersPerNetwork[networkID]
+	networkName, ok := constants.NetworkIDToNetworkName[networkID]
+	if !ok {
+		return nil
+	}
+
+	bootstrappers := bootstrappersPerNetwork[networkName]
 	if numIPs := len(bootstrappers); numIPs < count {
 		count = numIPs
 	}

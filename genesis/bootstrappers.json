@@ -1,5 +1,5 @@
 {
-    "1": [
+    "mainnet": [
         {
             "id": "NodeID-A6onFGyJjA37EZ7kYHANMR1PFRT8NmXrF",
             "ip": "54.94.43.49:9651"
@@ -97,7 +97,7 @@
             "ip": "15.188.9.42:9651"
         }
     ],
-    "5": [
+    "fuji": [
         {
             "id": "NodeID-2m38qc95mhHXtrhjyGbe7r2NhniqHHJRB",
             "ip": "18.192.93.241:9651"
