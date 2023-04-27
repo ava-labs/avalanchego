@@ -23,11 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	// Maximum number of containers IDs that can be fetched at a time
-	// in a call to GetContainerRange
-	MaxFetchedByRange = 1024
-)
+// Maximum number of containers IDs that can be fetched at a time in a call to
+// GetContainerRange
+const MaxFetchedByRange = 1024
 
 var (
 	// Maps to the byte representation of the next accepted index
@@ -35,7 +33,8 @@ var (
 	indexToContainerPrefix = []byte{0x01}
 	containerToIDPrefix    = []byte{0x02}
 	errNoneAccepted        = errors.New("no containers have been accepted")
-	errNumToFetchZero      = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
+	errNumToFetchInvalid   = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
+	errNoContainerAtIndex  = errors.New("no container at index")
 
 	_ Index = (*index)(nil)
 )
@@ -195,7 +194,7 @@ func (i *index) GetContainerByIndex(index uint64) (Container, error) {
 func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	lastAcceptedIndex, ok := i.lastAcceptedIndex()
 	if !ok || index > lastAcceptedIndex {
-		return Container{}, fmt.Errorf("no container at index %d", index)
+		return Container{}, fmt.Errorf("%w %d", errNoContainerAtIndex, index)
 	}
 	indexBytes := database.PackUInt64(index)
 	return i.getContainerByIndexBytes(indexBytes)
@@ -224,10 +223,8 @@ func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 // [numToFetch] should be in [0, MaxFetchedByRange]
 func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, error) {
 	// Check arguments for validity
-	if numToFetch == 0 {
-		return nil, errNumToFetchZero
-	} else if numToFetch > MaxFetchedByRange {
-		return nil, fmt.Errorf("requested %d but maximum page size is %d", numToFetch, MaxFetchedByRange)
+	if numToFetch == 0 || numToFetch > MaxFetchedByRange {
+		return nil, fmt.Errorf("%w but is %d", errNumToFetchInvalid, numToFetch)
 	}
 
 	i.lock.RLock()

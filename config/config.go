@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -86,30 +85,29 @@ var (
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
+	errCannotReadDirectory           = errors.New("cannot read directory")
+	errUnmarshalling                 = errors.New("unmarshalling failed")
+	errFileDoesNotExist              = errors.New("file does not exist")
 )
 
-func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
-	return avalanche.Parameters{
-		Parameters: snowball.Parameters{
-			K:     v.GetInt(SnowSampleSizeKey),
-			Alpha: v.GetInt(SnowQuorumSizeKey),
-			// During the X-chain linearization we require BetaVirtuous and
-			// BetaRogue to be equal. Therefore we use the more conservative
-			// BetaRogue value for both BetaVirtuous and BetaRogue.
-			//
-			// TODO: After the X-chain linearization use the
-			// SnowVirtuousCommitThresholdKey as before.
-			BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
-			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
-			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
-			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
-			MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
-			MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-			MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-			MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
-		},
-		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
-		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
+func getConsensusConfig(v *viper.Viper) snowball.Parameters {
+	return snowball.Parameters{
+		K:     v.GetInt(SnowSampleSizeKey),
+		Alpha: v.GetInt(SnowQuorumSizeKey),
+		// During the X-chain linearization we require BetaVirtuous and
+		// BetaRogue to be equal. Therefore we use the more conservative
+		// BetaRogue value for both BetaVirtuous and BetaRogue.
+		//
+		// TODO: After the X-chain linearization use the
+		// SnowVirtuousCommitThresholdKey as before.
+		BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
+		BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
+		ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
+		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
+		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 	}
 }
 
@@ -464,7 +462,7 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters avalanche.Parameters) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
 	alpha := consensusParameters.Alpha
 	k := consensusParameters.K
 	config := benchlist.Config{
@@ -952,7 +950,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 		if !exists {
 			if v.IsSet(fileKey) {
-				return nil, fmt.Errorf("%s file does not exist in %v", name, aliasFilePath)
+				return nil, fmt.Errorf("%w: %s", errFileDoesNotExist, aliasFilePath)
 			}
 			return nil, nil
 		}
@@ -965,7 +963,7 @@ func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) 
 
 	aliasMap := make(map[ids.ID][]string)
 	if err := json.Unmarshal(fileBytes, &aliasMap); err != nil {
-		return nil, fmt.Errorf("problem unmarshaling %s: %w", name, err)
+		return nil, fmt.Errorf("%w on %s: %s", errUnmarshalling, name, err)
 	}
 	return aliasMap, nil
 }
@@ -1008,7 +1006,7 @@ func getPathFromDirKey(v *viper.Viper, configKey string) (string, error) {
 	}
 	if v.IsSet(configKey) {
 		// user specified a config dir explicitly, but dir does not exist.
-		return "", fmt.Errorf("cannot read directory: %v", cleanPath)
+		return "", fmt.Errorf("%w: %s", errCannotReadDirectory, cleanPath)
 	}
 	return "", nil
 }
@@ -1161,7 +1159,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 		config := getDefaultSubnetConfig(v)
 		if err := json.Unmarshal(file, &config); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", errUnmarshalling, err)
 		}
 
 		if err := config.Valid(); err != nil {
@@ -1440,16 +1438,16 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	// Node health
 	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters),
+		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters),
 	}
 
 	// Invariant: nodeConfig.MinPercentConnectedStakeHealthy is populated for all tracked subnets
 	// including the primary network
 	for _, subnetID := range nodeConfig.TrackedSubnets.List() {
 		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
-			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(subnetConfig.ConsensusParameters.Parameters)
+			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(subnetConfig.ConsensusParameters)
 		} else {
-			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters)
+			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters)
 		}
 	}
 

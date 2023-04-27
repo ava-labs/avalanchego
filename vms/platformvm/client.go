@@ -220,7 +220,12 @@ type Client interface {
 	//
 	// Deprecated: Stake should be calculated using GetTx, GetCurrentValidators,
 	// and GetPendingValidators.
-	GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (map[ids.ID]uint64, [][]byte, error)
+	GetStake(
+		ctx context.Context,
+		addrs []ids.ShortID,
+		validatorsOnly bool,
+		options ...rpc.Option,
+	) (map[ids.ID]uint64, [][]byte, error)
 	// GetMinStake returns the minimum staking amount in nAVAX for validators
 	// and delegators respectively
 	GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
@@ -752,13 +757,19 @@ func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, freq time.Dura
 	}
 }
 
-func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (map[ids.ID]uint64, [][]byte, error) {
+func (c *client) GetStake(
+	ctx context.Context,
+	addrs []ids.ShortID,
+	validatorsOnly bool,
+	options ...rpc.Option,
+) (map[ids.ID]uint64, [][]byte, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest(ctx, "platform.getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
 			Addresses: ids.ShortIDsToStrings(addrs),
 		},
-		Encoding: formatting.Hex,
+		ValidatorsOnly: validatorsOnly,
+		Encoding:       formatting.Hex,
 	}, res, options...)
 	if err != nil {
 		return nil, nil, err

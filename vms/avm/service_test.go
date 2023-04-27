@@ -131,9 +131,7 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 	sampledAddrsStr := []string{}
 
 	sampler := sampler.NewUniform()
-	if err := sampler.Initialize(uint64(len(addrs))); err != nil {
-		t.Fatal(err)
-	}
+	sampler.Initialize(uint64(len(addrs)))
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
 	indices, err := sampler.Sample(numAddrs)
@@ -844,7 +842,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 
 	// contains the address in the right format
 	require.Contains(jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]}")
-	require.Contains(jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[]}")
+	require.Contains(jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[],\"id\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\"}")
 }
 
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
@@ -1666,7 +1664,7 @@ func TestServiceGetNilTx(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{}, &reply)
-	require.Error(t, err, "Nil TxID should have returned an error")
+	require.ErrorIs(t, err, errNilTxID)
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
@@ -1679,8 +1677,8 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	}()
 
 	reply := api.GetTxReply{}
-	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.Empty}, &reply)
-	require.Error(t, err, "Unknown TxID should have returned an error")
+	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
+	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
 func TestServiceGetUTXOs(t *testing.T) {

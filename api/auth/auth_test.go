@@ -39,13 +39,15 @@ func init() {
 var dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func TestNewTokenWrongPassword(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	_, err := auth.NewToken("", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
-	require.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, password.ErrEmptyPassword)
 
 	_, err = auth.NewToken("notThePassword", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
-	require.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 }
 
 func TestNewTokenHappyPath(t *testing.T) {
@@ -76,12 +78,14 @@ func TestNewTokenHappyPath(t *testing.T) {
 }
 
 func TestTokenHasWrongSig(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Try to parse the token using the wrong password
 	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -89,7 +93,7 @@ func TestTokenHasWrongSig(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return []byte(""), nil
 	})
-	require.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, jwt.ErrSignatureInvalid)
 
 	// Try to parse the token using the wrong password
 	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -97,35 +101,37 @@ func TestTokenHasWrongSig(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return []byte("notThePassword"), nil
 	})
-	require.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, jwt.ErrSignatureInvalid)
 }
 
 func TestChangePassword(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	password2 := "fejhkefjhefjhefhje" // #nosec G101
 	var err error
 
 	err = auth.ChangePassword("", password2)
-	require.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
 	err = auth.ChangePassword("notThePassword", password2)
-	require.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
 	err = auth.ChangePassword(testPassword, "")
-	require.Error(t, err, "should have failed because new password is empty")
+	require.ErrorIs(err, password.ErrEmptyPassword)
 
 	err = auth.ChangePassword(testPassword, password2)
-	require.NoError(t, err, "should have succeeded")
-	require.True(t, auth.password.Check(password2), "password should have been changed")
+	require.NoError(err)
+	require.True(auth.password.Check(password2), "password should have been changed")
 
 	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
 
 	err = auth.ChangePassword(testPassword, password3)
-	require.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
 	err = auth.ChangePassword(password2, password3)
-	require.NoError(t, err, "should have succeeded")
+	require.NoError(err)
 }
 
 func TestRevokeToken(t *testing.T) {
