@@ -126,7 +126,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 						"percentConnected": connectedPerc,
 					}
 					require.Contains(fmt.Sprint(details), fmt.Sprint(expectedDetails))
-					require.ErrorContains(err, getPercentErr(connectedPerc, test.minStake).Error())
+					require.Contains(err.Error(), getPercentErr(connectedPerc, test.minStake).Error())
 				}
 			}
 		})
