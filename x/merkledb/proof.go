@@ -514,8 +514,8 @@ func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
 	}
 
 	// ensure that the keys are within the range [start, end]
-	if (len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
-		(len(end) > 0 && bytes.Compare(kvs[len(kvs)-1].Key, end) > 0) {
+	if len(kvs) > 0 && ((len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
+		(len(end) > 0 && bytes.Compare(kvs[len(kvs)-1].Key, end) > 0)) {
 		return ErrStateFromOutsideOfRange
 	}
 
