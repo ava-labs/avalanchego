@@ -2688,6 +2688,10 @@ dotignore@~0.1.2:
   dependencies:
     minimatch "^3.0.4"
 
+"ds-test@https://github.com/dapphub/ds-test.git":
+  version "1.0.0"
+  resolved "https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0"
+
 duplexer3@^0.1.4:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/duplexer3/-/duplexer3-0.1.4.tgz#ee01dd1cac0ed3cbc7fdbea37dc0a8f1ce002ce2"
