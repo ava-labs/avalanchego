@@ -21,6 +21,10 @@ var (
 
 type IPDesc (IPPort)
 
+func (ipDesc IPDesc) String() string {
+	return IPPort(ipDesc).String()
+}
+
 func (ipDesc IPDesc) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + fmt.Sprintf("%s:%d", ipDesc.IP, ipDesc.Port) + "\""), nil
 }

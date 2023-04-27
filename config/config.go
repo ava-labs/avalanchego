@@ -542,18 +542,15 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		bootstrappersIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
 		bootstrappers = make([]genesis.Bootstrapper, len(bootstrappersIPs))
 		for i, ip := range bootstrappersIPs {
-			bootstrappers[i] = genesis.Bootstrapper{ID: "", IP: ip}
+			addr, err := ips.ToIPPort(ip)
+			if err != nil {
+				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
+			}
+			bootstrappers[i] = genesis.Bootstrapper{ID: ids.EmptyNodeID, IP: ips.IPDesc(addr)}
 		}
 	}
 	for _, bootstrapper := range bootstrappers {
-		if bootstrapper.IP == "" {
-			continue
-		}
-		addr, err := ips.ToIPPort(bootstrapper.IP)
-		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", bootstrapper.IP, err)
-		}
-		config.BootstrapIPs = append(config.BootstrapIPs, addr)
+		config.BootstrapIPs = append(config.BootstrapIPs, ips.IPPort(bootstrapper.IP))
 	}
 
 	if idsSet {
@@ -562,18 +559,18 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", len(bootstrappers), len(bootstrapIDs))
 		}
 		for i, id := range bootstrapIDs {
-			bootstrappers[i].ID = id
+			nodeID, err := ids.NodeIDFromString(id)
+			if err != nil {
+				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", nodeID, err)
+			}
+			bootstrappers[i].ID = nodeID
 		}
 	}
 	for _, bootstrapper := range bootstrappers {
-		if bootstrapper.ID == "" {
+		if bootstrapper.ID == ids.EmptyNodeID {
 			continue
 		}
-		nodeID, err := ids.NodeIDFromString(bootstrapper.ID)
-		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", bootstrapper.ID, err)
-		}
-		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
+		config.BootstrapIDs = append(config.BootstrapIDs, bootstrapper.ID)
 	}
 
 	lenIPs := len(config.BootstrapIPs)
