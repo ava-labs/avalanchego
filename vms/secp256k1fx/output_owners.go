@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	errNilOutput            = errors.New("nil output")
-	errOutputUnspendable    = errors.New("output is unspendable")
-	errOutputUnoptimized    = errors.New("output representation should be optimized")
-	errAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
-	errMarshal              = errors.New("cannot marshal without ctx")
+	ErrNilOutput            = errors.New("nil output")
+	ErrOutputUnspendable    = errors.New("output is unspendable")
+	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
+	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
+	ErrMarshal              = errors.New("cannot marshal without ctx")
 
 	_ verify.State = (*OutputOwners)(nil)
 )
@@ -57,13 +57,13 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 }
 
 // Fields returns JSON keys in a map that can be used with marshal JSON
-// to serialise OutputOwners struct
+// to serialize OutputOwners struct
 func (out *OutputOwners) Fields() (map[string]interface{}, error) {
 	addrsLen := len(out.Addrs)
 
 	// we need out.ctx to do this, if its absent, throw error
 	if addrsLen > 0 && out.ctx == nil {
-		return nil, errMarshal
+		return nil, ErrMarshal
 	}
 
 	addresses := make([]string, addrsLen)
@@ -123,13 +123,13 @@ func (out *OutputOwners) Equals(other *OutputOwners) bool {
 func (out *OutputOwners) Verify() error {
 	switch {
 	case out == nil:
-		return errNilOutput
+		return ErrNilOutput
 	case out.Threshold > uint32(len(out.Addrs)):
-		return errOutputUnspendable
+		return ErrOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
-		return errOutputUnoptimized
+		return ErrOutputUnoptimized
 	case !utils.IsSortedAndUniqueSortable(out.Addrs):
-		return errAddrsNotSortedUnique
+		return ErrAddrsNotSortedUnique
 	default:
 		return nil
 	}

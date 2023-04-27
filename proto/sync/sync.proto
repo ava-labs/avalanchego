@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package sync;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
+
+message Request {
+  oneof message {
+    RangeProofRequest range_proof_request = 1;
+    ChangeProofRequest change_proof_request = 2;
+  }
+}
+
+message RangeProofRequest {
+  bytes root = 1;
+  bytes start = 2;
+  bytes end = 3;
+  uint32 key_limit = 4;
+  uint32 bytes_limit = 5;
+}
+
+message ChangeProofRequest {
+  bytes start_root = 1;
+  bytes end_root = 2;
+  bytes start = 3;
+  bytes end = 4;
+  uint32 key_limit = 5;
+  uint32 bytes_limit = 6;
+}

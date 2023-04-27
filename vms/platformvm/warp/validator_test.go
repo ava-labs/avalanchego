@@ -5,6 +5,7 @@ package warp
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 
@@ -166,7 +167,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk0),
+		PublicKeyBytes: pk0.Serialize(),
 		Weight:         1,
 	}
 
@@ -175,7 +176,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk1),
+		PublicKeyBytes: pk1.Serialize(),
 		Weight:         2,
 	}
 
@@ -300,6 +301,44 @@ func TestSumWeight(t *testing.T) {
 			require.ErrorIs(err, tt.expectedErr)
 			if err == nil {
 				require.Equal(tt.expectedSum, sum)
+			}
+		})
+	}
+}
+
+func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
+	pChainHeight := uint64(1)
+	subnetID := ids.GenerateTestID()
+	numNodes := 10_000
+	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeID := ids.GenerateTestNodeID()
+		blsPrivateKey, err := bls.NewSecretKey()
+		require.NoError(b, err)
+		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
+		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: blsPublicKey,
+			Weight:    20,
+		})
+	}
+
+	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
+		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < size; i++ {
+			validator := getValidatorOutputs[i]
+			getValidatorsOutput[validator.NodeID] = validator
+		}
+		validatorState := &validators.TestState{
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return getValidatorsOutput, nil
+			},
+		}
+
+		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
+				require.NoError(b, err)
 			}
 		})
 	}
