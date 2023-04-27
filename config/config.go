@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -91,28 +90,24 @@ var (
 	errFileDoesNotExist              = errors.New("file does not exist")
 )
 
-func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
-	return avalanche.Parameters{
-		Parameters: snowball.Parameters{
-			K:     v.GetInt(SnowSampleSizeKey),
-			Alpha: v.GetInt(SnowQuorumSizeKey),
-			// During the X-chain linearization we require BetaVirtuous and
-			// BetaRogue to be equal. Therefore we use the more conservative
-			// BetaRogue value for both BetaVirtuous and BetaRogue.
-			//
-			// TODO: After the X-chain linearization use the
-			// SnowVirtuousCommitThresholdKey as before.
-			BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
-			BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
-			ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
-			OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
-			MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
-			MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-			MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-			MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
-		},
-		BatchSize: v.GetInt(SnowAvalancheBatchSizeKey),
-		Parents:   v.GetInt(SnowAvalancheNumParentsKey),
+func getConsensusConfig(v *viper.Viper) snowball.Parameters {
+	return snowball.Parameters{
+		K:     v.GetInt(SnowSampleSizeKey),
+		Alpha: v.GetInt(SnowQuorumSizeKey),
+		// During the X-chain linearization we require BetaVirtuous and
+		// BetaRogue to be equal. Therefore we use the more conservative
+		// BetaRogue value for both BetaVirtuous and BetaRogue.
+		//
+		// TODO: After the X-chain linearization use the
+		// SnowVirtuousCommitThresholdKey as before.
+		BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
+		BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
+		ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
+		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
+		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
 	}
 }
 
@@ -467,7 +462,7 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters avalanche.Parameters) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
 	alpha := consensusParameters.Alpha
 	k := consensusParameters.K
 	config := benchlist.Config{
@@ -1443,11 +1438,11 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	// Node health
 	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters),
+		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters),
 	}
 
 	for subnetID, config := range subnetConfigs {
-		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters.Parameters)
+		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters)
 	}
 
 	// Chain Configs
