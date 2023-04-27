@@ -30,7 +30,8 @@ func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ ids.ID) 
 	require.NoError(err)
 
 	_, err = s.Sign(msg)
-	require.Error(err)
+	// TODO: require error to be errWrongSourceChainID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 // Test that a signature generated with the signer verifies correctly

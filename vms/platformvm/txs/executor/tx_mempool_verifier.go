@@ -23,11 +23,11 @@ type MempoolTxVerifier struct {
 }
 
 func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (*MempoolTxVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errWrongTxType
+	return ErrWrongTxType
 }
 
 func (v *MempoolTxVerifier) AddValidatorTx(tx *txs.AddValidatorTx) error {
@@ -88,7 +88,7 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because the time will be advanced
 	// when this transaction is issued.
-	if errors.Is(err, errFutureStakeTime) {
+	if errors.Is(err, ErrFutureStakeTime) {
 		return nil
 	}
 	return err
