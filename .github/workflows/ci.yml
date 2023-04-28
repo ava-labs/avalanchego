@@ -24,7 +24,7 @@ jobs:
         with:
           version: v1.51
           working-directory: .
-          args: --timeout 3m
+          args: --timeout 10m
 
   unit_test:
     name: Golang Unit Tests
