@@ -61,6 +61,8 @@ func New(
 	return b, nil
 }
 
+// Note: To align with the Snowman invariant, it should be guaranteed the VM is
+// not used until after the bootstrapper has been Started.
 type bootstrapper struct {
 	Config
 

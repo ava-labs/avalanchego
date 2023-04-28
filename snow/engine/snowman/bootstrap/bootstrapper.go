@@ -34,6 +34,8 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
+// Invariant: The VM is not guaranteed to be initialized until Start has been
+// called, so it must be guaranteed the VM is not used until after Start.
 type bootstrapper struct {
 	Config
 
