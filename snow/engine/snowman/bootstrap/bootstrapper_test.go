@@ -1507,7 +1507,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
-
 	peers := validators.NewSet()
 
 	sender := &common.SenderTest{}
@@ -1533,17 +1532,12 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
 	peers.RegisterCallbackListener(startupTracker)
-
-	if err := startupTracker.Connected(context.Background(), peer, version.CurrentApp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -1560,12 +1554,11 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	}
 
 	snowGetHandler, err := getter.New(vm, commonConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	queueDB := memdb.New()
-	blocker, _ := queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	blocker, err := queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	require.NoError(err)
 
 	blk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1605,7 +1598,8 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 
 	vm.GetBlockF = nil
 
-	blocker, _ = queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	blocker, err = queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	require.NoError(err)
 
 	config := Config{
 		Config:        commonConfig,
