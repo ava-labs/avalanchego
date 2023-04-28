@@ -462,7 +462,7 @@ func TestGetChangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyValues = append(response.KeyValues, make([]merkledb.KeyValue, defaultRequestKeyLimit)...)
+				response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
 			},
 			expectedErr: errTooManyKeys,
 		},
@@ -483,7 +483,7 @@ func TestGetChangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyValues = response.KeyValues[1:]
+				response.KeyChanges = response.KeyChanges[1:]
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
@@ -495,7 +495,7 @@ func TestGetChangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
+				response.KeyChanges = response.KeyChanges[:len(response.KeyChanges)-2]
 			},
 			expectedErr: merkledb.ErrProofNodeNotForKey,
 		},
@@ -507,7 +507,7 @@ func TestGetChangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
+				response.KeyChanges = append(response.KeyChanges[:100], response.KeyChanges[101:]...)
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
@@ -537,7 +537,7 @@ func TestGetChangeProof(t *testing.T) {
 			}
 			require.NoError(err)
 			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proof.KeyValues)+len(proof.DeletedKeys), test.expectedResponseLen)
+				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}
 			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proof)
 			require.NoError(err)
