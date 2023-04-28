@@ -135,7 +135,7 @@ func (a *app) Start() error {
 	}
 
 	// Track if sybil control is enforced
-	if !a.config.EnableStaking {
+	if !a.config.SybilProtectionEnabled {
 		log.Warn("sybil control is not enforced",
 			zap.String("reason", "staking is disabled"),
 		)
