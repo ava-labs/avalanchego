@@ -173,7 +173,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		})
 		return nil
 	}
-	bs, err := New(context.Background(), cfg, dummyCallback)
+	bs, err := New(cfg, dummyCallback)
 	require.NoError(err)
 
 	vm.CantSetState = false
@@ -245,7 +245,6 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -352,7 +351,6 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -516,7 +514,6 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -683,7 +680,6 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -872,7 +868,6 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1018,7 +1013,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 		return blk0, nil
 	}
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1231,7 +1225,6 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1374,7 +1367,6 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1464,7 +1456,6 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{

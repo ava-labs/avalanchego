@@ -33,7 +33,6 @@ const (
 var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 func New(
-	ctx context.Context,
 	config Config,
 	onFinished func(ctx context.Context, lastReqID uint32) error,
 ) (common.BootstrapableEngine, error) {
@@ -54,24 +53,6 @@ func New(
 	}
 
 	if err := b.metrics.Initialize("bs", config.Ctx.AvalancheRegisterer); err != nil {
-		return nil, err
-	}
-
-	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAcceptedVts,
-		numDropped:  b.numDroppedVts,
-		manager:     b.Manager,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := b.TxBlocked.SetParser(&txParser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAcceptedTxs,
-		numDropped:  b.numDroppedTxs,
-		vm:          b.VM,
-	}); err != nil {
 		return nil, err
 	}
 
@@ -313,6 +294,24 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
+	}
+
+	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
+		log:         b.Ctx.Log,
+		numAccepted: b.numAcceptedVts,
+		numDropped:  b.numDroppedVts,
+		manager:     b.Manager,
+	}); err != nil {
+		return err
+	}
+
+	if err := b.TxBlocked.SetParser(&txParser{
+		log:         b.Ctx.Log,
+		numAccepted: b.numAcceptedTxs,
+		numDropped:  b.numDroppedTxs,
+		vm:          b.VM,
+	}); err != nil {
+		return err
 	}
 
 	b.Config.SharedCfg.RequestID = startReqID
