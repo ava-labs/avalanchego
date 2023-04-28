@@ -558,7 +558,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			ins:              generateTestInsFromUTXOs,
 			creds:            []verify.Verifiable{(*secp256k1fx.Credential)(nil)},
 			appliedLockState: locked.StateUnlocked,
-			expectedErr:      errWrongCredentials,
+			expectedErr:      errBadCredentials,
 		},
 		"Fail: Invalid utxo assetID": {
 			state: noMsigState,
@@ -1185,14 +1185,15 @@ func TestUnlockDeposit(t *testing.T) {
 }
 
 func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
-	assetID := snow.DefaultContextTest().AVAXAssetID
+	assetID := ids.ID{'C', 'A', 'M'}
+	wrongAssetID := ids.ID{'C', 'A', 'T'}
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.Initialize([]byte{0})
-	var nilCreds *secp256k1fx.Credential
-	outputOwners, cred1 := generateOwnersAndSig(tx)
-	depositID := ids.GenerateTestID()
-	otherID := ids.GenerateTestID()
-	sigIndices := []uint32{0}
+	owner1, cred1 := generateOwnersAndSig(tx)
+	depositTxID1 := ids.ID{0, 0, 1}
+	depositTxID2 := ids.ID{0, 0, 2}
+	bondTxID1 := ids.ID{0, 0, 3}
+	bondTxID2 := ids.ID{0, 0, 4}
 
 	deposit1 := &deposit.Deposit{
 		DepositOfferID: ids.GenerateTestID(),
@@ -1208,8 +1209,14 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 	depositExpiredTime := deposit1.StartTime().Add(time.Duration(deposit1.Duration) * time.Second)
 	unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(depositNotExpiredTime.Unix()))
 
+	noMsigState := func(ctrl *gomock.Controller) *state.MockState {
+		s := state.NewMockState(ctrl)
+		s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+		return s
+	}
+
 	type args struct {
-		chainState   func(ctrl *gomock.Controller) state.Chain
+		state        func(ctrl *gomock.Controller) *state.MockChain
 		tx           txs.UnsignedTx
 		utxos        []*avax.UTXO
 		ins          []*avax.TransferableInput
@@ -1219,371 +1226,405 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 		assetID      ids.ID
 	}
 	tests := map[string]struct {
-		handlerState func(ctrl *gomock.Controller) state.State
-		args         args
-		want         map[ids.ID]uint64
-		err          error
+		handlerState           func(ctrl *gomock.Controller) *state.MockState
+		args                   args
+		expectedUnlockedAmount map[ids.ID]uint64
+		expectedErr            error
 	}{
-		"Inputs Credentials Mismatch": {
+		"Number of inputs-credentials mismatch": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
-					s := state.NewMockChain(ctrl)
-					return s
-				},
+				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}},
 				ins:   []*avax.TransferableInput{{}},
 				creds: []verify.Verifiable{cred1, cred1},
 			},
-			err: errInputsCredentialsMismatch,
+			expectedErr: errInputsCredentialsMismatch,
 		},
 		"Number of inputs-utxos mismatch": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
-					return state.NewMockChain(ctrl)
-				},
+				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}, {}},
 				ins:   []*avax.TransferableInput{{}},
 				creds: []verify.Verifiable{cred1},
 			},
-			err: fmt.Errorf("there are %d inputs and %d utxos: %w", 1, 2, errInputsUTXOsMismatch),
+			expectedErr: errInputsUTXOsMismatch,
 		},
-		"Wrong credentials": {
+		"Bad credentials": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
-					return state.NewMockChain(ctrl)
-				},
+				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}},
 				ins:   []*avax.TransferableInput{{}},
-				creds: []verify.Verifiable{nilCreds},
+				creds: []verify.Verifiable{(*secp256k1fx.Credential)(nil)},
 			},
-			err: errWrongCredentials,
-		},
-		"Lock IDs mismatch or no lockedOut output": {
-			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
-					s := state.NewMockChain(ctrl)
-					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
-					return s
-				},
-				utxos: []*avax.UTXO{
-					generateTestUTXO(depositID, assetID, 1, outputOwners, ids.Empty, ids.Empty),
-				},
-				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, depositID, ids.Empty, sigIndices),
-				},
-				creds: []verify.Verifiable{cred1},
-			},
-			err: errLockIDsMismatch,
+			expectedErr: errBadCredentials,
 		},
 		"UTXO AssetID mismatch": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, depositID),
+					generateTestUTXO(ids.ID{9, 9}, wrongAssetID, 1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, []uint32{0}),
 				},
 				creds:   []verify.Verifiable{cred1},
-				assetID: depositID,
+				assetID: assetID,
 			},
-			err: fmt.Errorf("utxo %d has asset ID %s but expect %s: %w", 0, assetID, depositID, errAssetIDMismatch),
+			expectedErr: errAssetIDMismatch,
 		},
 		"Input AssetID mismatch": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, depositID, 1, outputOwners, ids.Empty, depositID),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
-				},
-				creds:   []verify.Verifiable{cred1},
-				assetID: depositID,
-			},
-			err: errAssetIDMismatch,
-		},
-		"UTXO already unlocked": {
-			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
-					s := state.NewMockChain(ctrl)
-					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
-					return s
-				},
-				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, depositID),
-				},
-				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(wrongAssetID, 1, ids.Empty, ids.Empty, []uint32{0}),
 				},
 				creds:   []verify.Verifiable{cred1},
 				assetID: assetID,
 			},
-			err: errUnlockingUnlockedUTXO,
+			expectedErr: errAssetIDMismatch,
 		},
-		"Locked funds not marked as locked": {
+		"UTXO locked, but not deposited": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					return s
 				},
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, ids.Empty, bondTxID1),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, []uint32{0}),
 				},
 				creds:   []verify.Verifiable{cred1},
 				assetID: assetID,
 			},
-			err: errLockedFundsNotMarkedAsLocked,
+			expectedErr: errUnlockingUnlockedUTXO,
 		},
-		"Consumed input amount mismatch": {
+		"Input and utxo lock IDs mismatch: utxo isn't locked, but input is locked": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
+					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
+					return s
+				},
+				utxos: []*avax.UTXO{
+					generateTestUTXO(depositTxID1, assetID, 1, owner1, ids.Empty, ids.Empty),
+				},
+				ins: []*avax.TransferableInput{
+					generateTestIn(assetID, 1, depositTxID1, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: assetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Input and utxo lock IDs mismatch: different depositTxIDs": {
+			handlerState: noMsigState,
+			args: args{
+				state: func(ctrl *gomock.Controller) *state.MockChain {
+					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
+					return s
+				},
+				utxos: []*avax.UTXO{
+					generateTestUTXO(depositTxID1, assetID, 1, owner1, depositTxID1, ids.Empty),
+				},
+				ins: []*avax.TransferableInput{
+					generateTestIn(assetID, 1, depositTxID2, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: assetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Input and utxo lock IDs mismatch: different bondTxIDs": {
+			handlerState: noMsigState,
+			args: args{
+				state: func(ctrl *gomock.Controller) *state.MockChain {
+					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
+					return s
+				},
+				utxos: []*avax.UTXO{
+					generateTestUTXO(depositTxID1, assetID, 1, owner1, depositTxID1, bondTxID1),
+				},
+				ins: []*avax.TransferableInput{
+					generateTestIn(assetID, 1, depositTxID1, bondTxID2, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: assetID,
+			},
+			expectedErr: errLockIDsMismatch,
+		},
+		"Input and utxo lock IDs mismatch: utxo is locked, but input isn't locked": {
+			handlerState: noMsigState,
+			args: args{
+				state: func(ctrl *gomock.Controller) *state.MockChain {
+					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
+					return s
+				},
+				utxos: []*avax.UTXO{
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, depositTxID1, ids.Empty),
+				},
+				ins: []*avax.TransferableInput{
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, []uint32{0}),
+				},
+				creds:   []verify.Verifiable{cred1},
+				assetID: assetID,
+			},
+			expectedErr: errLockedFundsNotMarkedAsLocked,
+		},
+		"Input and utxo amount mismatch, utxo is deposited": {
+			handlerState: noMsigState,
+			args: args{
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1+1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1+1, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			err: fmt.Errorf("failed to verify transfer: utxo inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Am"),
+			expectedErr: errUTXOOutTypeOrAmtMissmatch,
 		},
 		"Insufficient amount to cover burn fees (deposit not expired)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				creds:        []verify.Verifiable{cred1},
-				burnedAmount: 1 + 1,
+				burnedAmount: 1,
 				assetID:      assetID,
 			},
-			err: errNotBurnedEnough,
+			expectedErr: errNotBurnedEnough,
 		},
 		"Unlocked more deposited tokens than available (deposit not expired)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount+1, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount+1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, unlockableAmount+1, depositID, ids.Empty, sigIndices),
-				},
-				outs: []*avax.TransferableOutput{
-					generateTestOut(assetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestIn(assetID, unlockableAmount+1, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			err: fmt.Errorf("unlockedDepositAmount %d > %d unlockableAmount: %w", unlockableAmount+1, unlockableAmount, errUnlockedMoreThanAvailable),
+			expectedErr: errUnlockedMoreThanAvailable,
 		},
 		"Produces outputs exceed inputs (deposit expired)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(assetID, deposit1.Amount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(assetID, deposit1.Amount+1, owner1, ids.Empty, ids.Empty),
 				},
 				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			err: errWrongProducedAmount,
+			expectedErr: errWrongProducedAmount,
 		},
 		"Consumed-produced amount mismatch": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(assetID, unlockableAmount, outputOwners, ids.Empty, otherID),
+					generateTestOut(assetID, unlockableAmount, owner1, ids.Empty, bondTxID1),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			err: errWrongProducedAmount,
+			expectedErr: errWrongProducedAmount,
 		},
 		"Partially consumed deposited amount (deposit expired)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount/2, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount-1, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, deposit1.Amount/2, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount-1, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				outs: []*avax.TransferableOutput{
-					generateTestOut(assetID, deposit1.Amount/2, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(assetID, deposit1.Amount-1, owner1, ids.Empty, ids.Empty),
 				},
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			err: errNotConsumedDeposit,
+			expectedErr: errNotConsumedDeposit,
 		},
 		"Success (expired deposit)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, deposit1.Amount, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, deposit1.Amount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, deposit1.Amount, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			want: map[ids.ID]uint64{depositID: deposit1.Amount},
+			expectedUnlockedAmount: map[ids.ID]uint64{depositTxID1: deposit1.Amount},
 		},
 		"Success (not expired deposit)": {
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, unlockableAmount, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, unlockableAmount, depositTxID1, ids.Empty, []uint32{0}),
 				},
-				creds:        []verify.Verifiable{&secp256k1fx.Credential{}},
+				creds:        []verify.Verifiable{cred1},
 				burnedAmount: 0,
 				assetID:      assetID,
 			},
-			want: map[ids.ID]uint64{depositID: unlockableAmount},
+			expectedUnlockedAmount: map[ids.ID]uint64{depositTxID1: unlockableAmount},
 		},
 		"Success (not expired deposit), burn fee": {
-			handlerState: func(ctrl *gomock.Controller) state.State {
-				s := state.NewMockState(ctrl)
-				s.EXPECT().GetMultisigAlias(outputOwners.Addrs[0]).Return(nil, database.ErrNotFound)
-				return s
-			},
+			handlerState: noMsigState,
 			args: args{
-				chainState: func(ctrl *gomock.Controller) state.Chain {
+				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
-					s.EXPECT().GetDeposit(depositID).Return(deposit1, nil)
+					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
 					return s
 				},
 				tx: tx,
 				utxos: []*avax.UTXO{
-					generateTestUTXO(ids.ID{9, 9}, assetID, 1, outputOwners, ids.Empty, ids.Empty),
-					generateTestUTXO(ids.ID{9, 11}, assetID, unlockableAmount, outputOwners, depositID, ids.Empty),
+					generateTestUTXO(ids.ID{9, 9}, assetID, 1, owner1, ids.Empty, ids.Empty),
+					generateTestUTXO(ids.ID{9, 11}, assetID, unlockableAmount, owner1, depositTxID1, ids.Empty),
 				},
 				ins: []*avax.TransferableInput{
-					generateTestIn(assetID, 1, ids.Empty, ids.Empty, sigIndices),
-					generateTestIn(assetID, unlockableAmount, depositID, ids.Empty, sigIndices),
+					generateTestIn(assetID, 1, ids.Empty, ids.Empty, []uint32{0}),
+					generateTestIn(assetID, unlockableAmount, depositTxID1, ids.Empty, []uint32{0}),
 				},
 				creds:        []verify.Verifiable{cred1, cred1},
 				burnedAmount: 1,
 				assetID:      assetID,
 			},
-			want: map[ids.ID]uint64{depositID: unlockableAmount},
+			expectedUnlockedAmount: map[ids.ID]uint64{depositTxID1: unlockableAmount},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-
-			var handlerState state.State
-			if tt.handlerState != nil {
-				handlerState = tt.handlerState(ctrl)
-			} else {
-				s := state.NewMockState(ctrl)
-				s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
-				handlerState = s
-			}
-			testHandler := defaultCaminoHandler(t, handlerState)
-
-			got, err := testHandler.VerifyUnlockDepositedUTXOs(tt.args.chainState(ctrl), tt.args.tx, tt.args.utxos, tt.args.ins, tt.args.outs, tt.args.creds, tt.args.burnedAmount, tt.args.assetID)
-
-			if tt.err != nil {
-				require.ErrorContains(err, tt.err.Error())
-				return
-			}
-
-			require.NoError(err)
-			require.Equal(tt.want, got)
+			unlockedAmount, err := defaultCaminoHandler(t, tt.handlerState(ctrl)).VerifyUnlockDepositedUTXOs(
+				tt.args.state(ctrl),
+				tt.args.tx,
+				tt.args.utxos,
+				tt.args.ins,
+				tt.args.outs,
+				tt.args.creds,
+				tt.args.burnedAmount,
+				tt.args.assetID,
+			)
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedUnlockedAmount, unlockedAmount)
 		})
 	}
 }

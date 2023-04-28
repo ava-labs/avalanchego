@@ -64,6 +64,7 @@ var (
 	errInputAmountMissmatch         = errors.New("utxo amount doesn't match input amount")
 	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
 	errWrongClaimedAmount           = errors.New("claiming more than was available to claim")
+	errNoUnlock                     = errors.New("no tokens unlocked")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -613,16 +614,12 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return err
 	}
 
-	depositAmount, err := tx.DepositAmount()
-	if err != nil {
-		return err
-	}
-
 	depositOffer, err := e.State.GetDepositOffer(tx.DepositOfferID)
 	if err != nil {
 		return fmt.Errorf("can't get deposit offer: %w", err)
 	}
 
+	depositAmount := tx.DepositAmount()
 	currentChainTime := e.State.GetTimestamp()
 
 	switch {
@@ -741,13 +738,17 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 
 	txID := e.Tx.ID()
 
-	for depositTxID, newUnlockedAmount := range newUnlockedAmounts {
+	for depositTxID, newlyUnlockedAmount := range newUnlockedAmounts {
+		if newlyUnlockedAmount == 0 {
+			return errNoUnlock
+		}
+
 		deposit, err := e.State.GetDeposit(depositTxID)
 		if err != nil {
 			return err
 		}
 
-		newUnlockedAmount, err := math.Add64(newUnlockedAmount, deposit.UnlockedAmount)
+		newUnlockedAmount, err := math.Add64(newlyUnlockedAmount, deposit.UnlockedAmount)
 		if err != nil {
 			return err
 		}
@@ -980,7 +981,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	// verify consortium member state
 
-	consortiumMemberAddressState, err := e.State.GetAddressStates(tx.ConsortiumMemberAddress)
+	consortiumMemberAddressState, err := e.State.GetAddressStates(tx.NodeOwnerAddress)
 	if err != nil {
 		return err
 	}
@@ -992,7 +993,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	newNodeIDEmpty := tx.NewNodeID == ids.EmptyNodeID
 	oldNodeIDEmpty := tx.OldNodeID == ids.EmptyNodeID
 
-	linkedNodeID, err := e.State.GetShortIDLink(tx.ConsortiumMemberAddress, state.ShortLinkKeyRegisterNode)
+	linkedNodeID, err := e.State.GetShortIDLink(tx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode)
 	haslinkedNode := err != database.ErrNotFound
 	if haslinkedNode && err != nil {
 		return err
@@ -1013,11 +1014,11 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	// verify consortium member cred
 	if err := e.Backend.Fx.VerifyMultisigPermission(
 		e.Tx.Unsigned,
-		tx.ConsortiumMemberAuth,
+		tx.NodeOwnerAuth,
 		e.Tx.Creds[len(e.Tx.Creds)-1], // consortium member cred
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{tx.ConsortiumMemberAddress},
+			Addrs:     []ids.ShortID{tx.NodeOwnerAddress},
 		},
 		e.State,
 	); err != nil {
@@ -1081,16 +1082,16 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	if !oldNodeIDEmpty {
 		e.State.SetShortIDLink(ids.ShortID(tx.OldNodeID), state.ShortLinkKeyRegisterNode, nil)
-		e.State.SetShortIDLink(tx.ConsortiumMemberAddress, state.ShortLinkKeyRegisterNode, nil)
+		e.State.SetShortIDLink(tx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode, nil)
 	}
 
 	if !newNodeIDEmpty {
 		e.State.SetShortIDLink(ids.ShortID(tx.NewNodeID),
 			state.ShortLinkKeyRegisterNode,
-			&tx.ConsortiumMemberAddress,
+			&tx.NodeOwnerAddress,
 		)
 		link := ids.ShortID(tx.NewNodeID)
-		e.State.SetShortIDLink(tx.ConsortiumMemberAddress,
+		e.State.SetShortIDLink(tx.NodeOwnerAddress,
 			state.ShortLinkKeyRegisterNode,
 			&link,
 		)

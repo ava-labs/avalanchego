@@ -33,10 +33,10 @@ var (
 	errWrongInType               = errors.New("wrong input type")
 	errWrongOutType              = errors.New("wrong output type")
 	errWrongUTXOOutType          = errors.New("wrong utxo output type")
-	errWrongProducedAmount       = errors.New("produced more tokens, than input had")
+	errWrongProducedAmount       = errors.New("produced more tokens, than consumed had")
 	errInputsCredentialsMismatch = errors.New("number of inputs is different from number of credentials")
 	errInputsUTXOsMismatch       = errors.New("number of inputs is different from number of utxos")
-	errWrongCredentials          = errors.New("wrong credentials")
+	errBadCredentials            = errors.New("bad credentials")
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
 	errAssetIDMismatch           = errors.New("utxo/input/output assetID is different from expected asset id")
 	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
@@ -45,6 +45,7 @@ var (
 	errNotConsumedDeposit        = errors.New("didn't consume whole deposit amount, but deposit is expired and can't be partially unlocked")
 	errLockedUTXO                = errors.New("can't spend locked utxo")
 	errNotLockedUTXO             = errors.New("can't spend unlocked utxo")
+	errUTXOOutTypeOrAmtMissmatch = errors.New("inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Amt")
 )
 
 // Creates UTXOs from [outs] and adds them to the UTXO set.
@@ -817,7 +818,7 @@ func (h *handler) VerifyLockUTXOs(
 
 	for _, cred := range creds {
 		if err := cred.Verify(); err != nil {
-			return errWrongCredentials
+			return errBadCredentials
 		}
 	}
 
@@ -1056,7 +1057,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 
 	for _, cred := range creds {
 		if err := cred.Verify(); err != nil {
-			return nil, errWrongCredentials
+			return nil, errBadCredentials
 		}
 	}
 
@@ -1126,7 +1127,18 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 		if isDeposited {
 			// verifying that input amount equal to utxo amount
 			if innerOut, ok := out.(*secp256k1fx.TransferOutput); !ok || innerOut.Amt != consumedAmount {
-				return nil, fmt.Errorf("failed to verify transfer: utxo inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Am")
+				return nil, fmt.Errorf("failed to verify transfer: %w", errUTXOOutTypeOrAmtMissmatch)
+			}
+
+			deposit, err := chainState.GetDeposit(lockIDs.DepositTxID)
+			if err != nil {
+				return nil, err
+			}
+
+			if !deposit.IsExpired(currentTimestamp) {
+				if err := h.fx.VerifyMultisigTransfer(tx, in, creds[index], out, h.utxosReader); err != nil {
+					return nil, fmt.Errorf("failed to verify transfer: %w", err)
+				}
 			}
 
 			// calculating consumed amounts
@@ -1235,7 +1247,13 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 		}
 		consumedOwnerAmounts[lockIDs.BondTxID] -= amountToRemoveFromConsumed
 
-		if depUnlock, ok := depositUnlocks[lockIDs.DepositTxID]; ok {
+		if lockIDs.DepositTxID != ids.Empty {
+			depUnlock, ok := depositUnlocks[lockIDs.DepositTxID]
+			if !ok {
+				depUnlock = &depositUnlock{}
+				depositUnlocks[lockIDs.DepositTxID] = depUnlock
+			}
+
 			newAmount, err := math.Add64(depUnlock.produced, producedAmount)
 			if err != nil {
 				return nil, err

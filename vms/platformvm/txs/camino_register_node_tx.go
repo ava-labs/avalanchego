@@ -17,6 +17,7 @@ var (
 	_ UnsignedTx = (*RegisterNodeTx)(nil)
 
 	errNoNodeID                  = errors.New("no nodeID specified")
+	errBadConsortiumMemberAuth   = errors.New("bad consortium member auth")
 	errConsortiumMemberAddrEmpty = errors.New("consortium member address is empty")
 )
 
@@ -28,11 +29,11 @@ type RegisterNodeTx struct {
 	OldNodeID ids.NodeID `serialize:"true" json:"oldNodeID"`
 	// Node id that will be registered for consortium member
 	NewNodeID ids.NodeID `serialize:"true" json:"newNodeID"`
-	// Auth that will be used to verify credential for [ConsortiumMemberAddress].
-	// If [ConsortiumMemberAddress] is msig-alias, auth must match real signatures.
-	ConsortiumMemberAuth verify.Verifiable `serialize:"true" json:"consortiumMemberAuth"`
-	// Address of consortium member to which node id will be registered
-	ConsortiumMemberAddress ids.ShortID `serialize:"true" json:"consortiumMemberAddress"`
+	// Auth that will be used to verify credential for [NodeOwnerAddress].
+	// If [NodeOwnerAddress] is msig-alias, auth must match real signatures.
+	NodeOwnerAuth verify.Verifiable `serialize:"true" json:"nodeOwnerAuth"`
+	// Address of node owner to which node id will be registered. Must be consortium member
+	NodeOwnerAddress ids.ShortID `serialize:"true" json:"nodeOwnerAddress"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -51,7 +52,7 @@ func (tx *RegisterNodeTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.NewNodeID == ids.EmptyNodeID && tx.OldNodeID == ids.EmptyNodeID:
 		return errNoNodeID
-	case tx.ConsortiumMemberAddress == ids.ShortEmpty:
+	case tx.NodeOwnerAddress == ids.ShortEmpty:
 		return errConsortiumMemberAddrEmpty
 	}
 
@@ -63,8 +64,8 @@ func (tx *RegisterNodeTx) SyntacticVerify(ctx *snow.Context) error {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 
-	if err := tx.ConsortiumMemberAuth.Verify(); err != nil {
-		return fmt.Errorf("failed to verify consortium member auth: %w", err)
+	if err := tx.NodeOwnerAuth.Verify(); err != nil {
+		return fmt.Errorf("%w: %s", errBadConsortiumMemberAuth, err)
 	}
 
 	// cache that this is valid

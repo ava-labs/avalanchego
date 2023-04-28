@@ -75,7 +75,7 @@ type CaminoTxBuilder interface {
 	) (*txs.Tx, error)
 
 	NewUnlockDepositTx(
-		lockTxIDs []ids.ID,
+		depositTxIDs []ids.ID,
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -88,9 +88,9 @@ type CaminoTxBuilder interface {
 	) (*txs.Tx, error)
 
 	NewRegisterNodeTx(
-		OldNodeID ids.NodeID,
-		NewNodeID ids.NodeID,
-		ConsortiumMemberAddress ids.ShortID,
+		oldNodeID ids.NodeID,
+		newNodeID ids.NodeID,
+		nodeOwnerAddress ids.ShortID,
 		keys []*crypto.PrivateKeySECP256K1R,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -367,7 +367,7 @@ func (b *caminoBuilder) NewDepositTx(
 }
 
 func (b *caminoBuilder) NewUnlockDepositTx(
-	lockTxIDs []ids.ID,
+	depositTxIDs []ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
@@ -380,7 +380,7 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	}
 
 	// unlocking
-	ins, outs, signers, err := b.UnlockDeposit(b.state, keys, lockTxIDs)
+	ins, outs, signers, err := b.UnlockDeposit(b.state, keys, depositTxIDs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -507,7 +507,7 @@ func (b *caminoBuilder) NewClaimTx(
 func (b *caminoBuilder) NewRegisterNodeTx(
 	oldNodeID ids.NodeID,
 	newNodeID ids.NodeID,
-	consortiumMemberAddress ids.ShortID,
+	nodeOwnerAddress ids.ShortID,
 	keys []*crypto.PrivateKeySECP256K1R,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
@@ -529,7 +529,7 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	in, consortiumSigners, err := kc.SpendMultiSig(
 		&secp256k1fx.TransferOutput{
 			OutputOwners: secp256k1fx.OutputOwners{
-				Addrs:     []ids.ShortID{consortiumMemberAddress},
+				Addrs:     []ids.ShortID{nodeOwnerAddress},
 				Threshold: 1,
 			},
 		},
@@ -548,10 +548,10 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		OldNodeID:               oldNodeID,
-		NewNodeID:               newNodeID,
-		ConsortiumMemberAuth:    &in.(*secp256k1fx.TransferInput).Input,
-		ConsortiumMemberAddress: consortiumMemberAddress,
+		OldNodeID:        oldNodeID,
+		NewNodeID:        newNodeID,
+		NodeOwnerAuth:    &in.(*secp256k1fx.TransferInput).Input,
+		NodeOwnerAddress: nodeOwnerAddress,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)

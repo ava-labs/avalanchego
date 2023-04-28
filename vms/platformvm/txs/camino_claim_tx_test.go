@@ -17,15 +17,11 @@ import (
 func TestClaimTxSyntacticVerify(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
-	owner1 := secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-
-	depositTxID := ids.GenerateTestID()
-	claimableOwnerID1 := ids.GenerateTestID()
-	claimableOwnerID2 := ids.GenerateTestID()
-	claimableOwnerID3 := ids.GenerateTestID()
+	owner1 := secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{{0, 0, 1}}}
+	depositTxID := ids.ID{0, 1}
+	claimableOwnerID1 := ids.ID{0, 2}
+	claimableOwnerID2 := ids.ID{0, 3}
+	claimableOwnerID3 := ids.ID{0, 4}
 
 	baseTx := BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    ctx.NetworkID,
@@ -106,7 +102,7 @@ func TestClaimTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Ins: []*avax.TransferableInput{
-						generateTestIn(ctx.AVAXAssetID, 1, ids.GenerateTestID(), ids.Empty, []uint32{0}),
+						generateTestIn(ctx.AVAXAssetID, 1, depositTxID, ids.Empty, []uint32{0}),
 					},
 				}},
 				Claimables: []ClaimAmount{{
@@ -123,7 +119,41 @@ func TestClaimTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.GenerateTestID(), ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, depositTxID, ids.Empty),
+					},
+				}},
+				Claimables: []ClaimAmount{{
+					Type:      ClaimTypeAllTreasury,
+					Amount:    1,
+					OwnerAuth: &secp256k1fx.Input{},
+				}},
+			},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"Stakable base tx input": {
+			tx: &ClaimTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestStakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
+					},
+				}},
+				Claimables: []ClaimAmount{{
+					Type:      ClaimTypeAllTreasury,
+					Amount:    1,
+					OwnerAuth: &secp256k1fx.Input{},
+				}},
+			},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Stakable base tx output": {
+			tx: &ClaimTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Outs: []*avax.TransferableOutput{
+						generateTestStakeableOut(ctx.AVAXAssetID, 1, 1, owner1),
 					},
 				}},
 				Claimables: []ClaimAmount{{

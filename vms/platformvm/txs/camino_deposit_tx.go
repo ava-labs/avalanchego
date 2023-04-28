@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,7 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
-var _ UnsignedTx = (*DepositTx)(nil)
+var (
+	_ UnsignedTx = (*DepositTx)(nil)
+
+	errToBigDeposit       = errors.New("to big deposit")
+	errInvalidRewardOwner = errors.New("invalid reward owner")
+)
 
 // DepositTx is an unsigned depositTx
 type DepositTx struct {
@@ -26,6 +32,8 @@ type DepositTx struct {
 	DepositDuration uint32 `serialize:"true" json:"duration"`
 	// Where to send staking rewards when done validating
 	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
+
+	depositAmount *uint64
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -36,22 +44,17 @@ func (tx *DepositTx) InitCtx(ctx *snow.Context) {
 	tx.RewardsOwner.InitCtx(ctx)
 }
 
-func (tx *DepositTx) Duration() uint32 {
-	return tx.DepositDuration
-}
-
-func (tx *DepositTx) DepositAmount() (uint64, error) {
-	depositAmount := uint64(0)
-	for _, out := range tx.Outs {
-		if lockedOut, ok := out.Out.(*locked.Out); ok && lockedOut.IsNewlyLockedWith(locked.StateDeposited) {
-			newDepositAmount, err := math.Add64(depositAmount, lockedOut.Amount())
-			if err != nil {
-				return 0, err
+func (tx *DepositTx) DepositAmount() uint64 {
+	if tx.depositAmount == nil {
+		depositAmount := uint64(0)
+		for _, out := range tx.Outs {
+			if lockedOut, ok := out.Out.(*locked.Out); ok && lockedOut.IsNewlyLockedWith(locked.StateDeposited) {
+				depositAmount += lockedOut.Amount()
 			}
-			depositAmount = newDepositAmount
 		}
+		tx.depositAmount = &depositAmount
 	}
-	return depositAmount, nil
+	return *tx.depositAmount
 }
 
 // SyntacticVerify returns nil if [tx] is valid
@@ -67,8 +70,20 @@ func (tx *DepositTx) SyntacticVerify(ctx *snow.Context) error {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(tx.RewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
+		return fmt.Errorf("%w: %s", errInvalidRewardOwner, err)
 	}
+
+	depositAmount := uint64(0)
+	for _, out := range tx.Outs {
+		if lockedOut, ok := out.Out.(*locked.Out); ok && lockedOut.IsNewlyLockedWith(locked.StateDeposited) {
+			newDepositAmount, err := math.Add64(depositAmount, lockedOut.Amount())
+			if err != nil {
+				return fmt.Errorf("%w: %s", errToBigDeposit, err)
+			}
+			depositAmount = newDepositAmount
+		}
+	}
+	tx.depositAmount = &depositAmount
 
 	// cache that this is valid
 	tx.SyntacticallyVerified = true

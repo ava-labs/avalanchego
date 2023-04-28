@@ -424,10 +424,10 @@ type RegisterNodeArgs struct {
 	api.UserPass
 	api.JSONFromAddrs
 
-	Change                  platformapi.Owner `json:"change"`
-	OldNodeID               ids.NodeID        `json:"oldNodeID"`
-	NewNodeID               ids.NodeID        `json:"newNodeID"`
-	ConsortiumMemberAddress string            `json:"consortiumMemberAddress"`
+	Change           platformapi.Owner `json:"change"`
+	OldNodeID        ids.NodeID        `json:"oldNodeID"`
+	NewNodeID        ids.NodeID        `json:"newNodeID"`
+	NodeOwnerAddress string            `json:"nodeOwnerAddress"`
 }
 
 // RegisterNode issues an RegisterNodeTx
@@ -444,17 +444,17 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 		return fmt.Errorf(errInvalidChangeAddr, err)
 	}
 
-	// Parse the consortium member address.
-	consortiumMemberAddress, err := avax.ParseServiceAddress(s.addrManager, args.ConsortiumMemberAddress)
+	// Parse the node owner address.
+	nodeOwnerAddress, err := avax.ParseServiceAddress(s.addrManager, args.NodeOwnerAddress)
 	if err != nil {
-		return fmt.Errorf("couldn't parse consortiumMemberAddress: %w", err)
+		return fmt.Errorf("couldn't parse nodeOwnerAddress: %w", err)
 	}
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewRegisterNodeTx(
 		args.OldNodeID,
 		args.NewNodeID,
-		consortiumMemberAddress,
+		nodeOwnerAddress,
 		privKeys,
 		change,
 	)
