@@ -881,14 +881,16 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 
 func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
-	if v.IsSet(getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey)) {
-		genesisData := v.GetString(getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey))
+	configContentKey := getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey)
+	if v.IsSet(configContentKey) {
+		genesisData := v.GetString(configContentKey)
 		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
+	configFileKey := getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey)
 	// if content is not specified go for the file
-	if v.IsSet(getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey)) {
-		genesisFileName := GetExpandedArg(v, getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey))
+	if v.IsSet(configFileKey) {
+		genesisFileName := GetExpandedArg(v, configFileKey)
 		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
