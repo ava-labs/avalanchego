@@ -4,7 +4,34 @@
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged. The supported plugin version is `26`.
 
-## What's Changed
+### APIs
+
+- Enabled `avm.getBlockByHeight` to take in `height` as a string
+- Added IDs to json formats
+  - `platform.getTx` now includes `id` in the `tx` response
+  - `platform.getBlock` now includes `id` in the `block` response and in the internal `tx` fields
+  - `avm.getTx` now includes `id` in the `tx` response
+  - `avm.getBlock` now includes `id` in the `block` response and in the internal `tx` fields
+  - `avm.getBlockByHeight` now includes `id` in the `block` response and in the internal `tx` fields
+- Removed `avm.issueStopVertex`
+- Fixed `wallet` methods to correctly allow issuance of dependent transactions after the X-chain linearization
+- Added `validatorOnly` flag in `platform.getStake`
+- Removed all avalanche consensus metrics
+- Fixed `msgHandlingTime` metrics
+
+### Configs
+
+- Removed `--snow-avalanche-num-parents`
+- Removed `--snow-avalanche-batch-size`
+
+### Fixes
+
+- Fixed panic when restarting partially completed X-chain snowman bootstrapping
+- Fixed `--network-allow-private-ips` handling to correctly prevent outbound connections to private IP ranges
+- Fixed UniformSampler to support sampling numbers between MaxInt64 and MaxUint64
+- Fixed data race in txID access during transaction gossip in the AVM
+
+### What's Changed
 
 - Add benchmark for gRPC GetValidatorSet by @hexfusion in https://github.com/ava-labs/avalanchego/pull/1326
 - Add checks for database being closed in merkledb; other nits by @danlaine in https://github.com/ava-labs/avalanchego/pull/1333
@@ -60,8 +87,9 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 - Update AMI generation workflow by @charlie-ava in https://github.com/ava-labs/avalanchego/pull/1289
 - Support `height` as a string in `avm.getBlockByHeight` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1437
 - Defer Snowman Bootstrapper parser initialization to Start by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1442
+- Cleanup proposervm ancestors packing @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1446
 
-## New Contributors
+### New Contributors
 
 - @hexfusion made their first contribution in https://github.com/ava-labs/avalanchego/pull/1326
 
