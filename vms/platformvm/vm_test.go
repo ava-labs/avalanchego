@@ -1855,7 +1855,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapper, err := bootstrap.New(
-		context.Background(),
 		bootstrapConfig,
 		engine.Start,
 	)
