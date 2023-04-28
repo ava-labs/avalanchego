@@ -59,6 +59,7 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 - Change ChangeProofs to only have one list of key/value change instead of key/values and deleted by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1385
 - Update AMI generation workflow by @charlie-ava in https://github.com/ava-labs/avalanchego/pull/1289
 - Support `height` as a string in `avm.getBlockByHeight` by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1437
+- Defer Snowman Bootstrapper parser initialization to Start by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1442
 
 ## New Contributors
 
