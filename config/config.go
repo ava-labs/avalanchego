@@ -563,7 +563,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
 
 		bootstrapNodeIDs := make([]ids.NodeID, 0, len(bootstrapIDs))
-		for i, bootstrapID := range bootstrapIDs {
+		for _, bootstrapID := range bootstrapIDs {
 			id := strings.TrimSpace(bootstrapID)
 			if id == "" {
 				continue
