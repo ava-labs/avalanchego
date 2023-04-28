@@ -839,7 +839,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 
 	require.Equal(txID, retrivedTx.ID())
 
-	// show that transaction is not re-gossiped is recently added to mempool
+	// show that transaction is not re-gossiped if recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
 	err = env.Builder.Add(tx)
