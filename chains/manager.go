@@ -59,7 +59,6 @@ import (
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
-	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
@@ -866,7 +865,7 @@ func (m *manager) createAvalancheChain(
 		VM:            vmWrappingProposerVM,
 		Sender:        snowmanCommonCfg.Sender,
 		Validators:    vdrs,
-		Params:        consensusParams.Parameters,
+		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
@@ -920,48 +919,28 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
 	}
 
-	// create bootstrap gear
-	avalancheBootstrapperConfig := avbootstrap.Config{
-		Config:        avalancheCommonCfg,
-		AllGetsServer: avaGetHandler,
-		VtxBlocked:    vtxBlocker,
-		TxBlocked:     txBlocker,
-		Manager:       vtxManager,
-		VM:            linearizableVM,
-	}
-
-	var avalancheConsensus avcon.Consensus = &avcon.Topological{}
-	if m.TracingEnabled {
-		avalancheConsensus = avcon.Trace(avalancheConsensus, m.Tracer)
-	}
-
 	// create engine gear
-	avalancheEngineConfig := aveng.Config{
-		Ctx:           ctx,
-		AllGetsServer: avaGetHandler,
-		VM:            linearizableVM,
-		Manager:       vtxManager,
-		Sender:        avalancheMessageSender,
-		Validators:    vdrs,
-		Params:        consensusParams,
-		Consensus:     avalancheConsensus,
-	}
-	avalancheEngine, err := aveng.New(
-		avalancheEngineConfig,
-		snowmanEngine.Start,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
+	avalancheEngine := aveng.New(ctx, avaGetHandler, linearizableVM)
+	if m.TracingEnabled {
+		avalancheEngine = common.TraceEngine(avalancheEngine, m.Tracer)
 	}
 
-	if m.TracingEnabled {
-		avalancheEngine = aveng.TraceEngine(avalancheEngine, m.Tracer)
+	// create bootstrap gear
+	_, specifiedLinearizationTime := version.CortinaTimes[ctx.NetworkID]
+	specifiedLinearizationTime = specifiedLinearizationTime && ctx.ChainID == m.XChainID
+	avalancheBootstrapperConfig := avbootstrap.Config{
+		Config:             avalancheCommonCfg,
+		AllGetsServer:      avaGetHandler,
+		VtxBlocked:         vtxBlocker,
+		TxBlocked:          txBlocker,
+		Manager:            vtxManager,
+		VM:                 linearizableVM,
+		LinearizeOnStartup: !specifiedLinearizationTime,
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
 		context.TODO(),
 		avalancheBootstrapperConfig,
-		avalancheEngine.Start,
 		snowmanBootstrapper.Start,
 	)
 	if err != nil {
@@ -1223,7 +1202,7 @@ func (m *manager) createSnowmanChain(
 		VM:            vm,
 		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
-		Params:        consensusParams.Parameters,
+		Params:        consensusParams,
 		Consensus:     consensus,
 	}
 	engine, err := smeng.New(engineConfig)

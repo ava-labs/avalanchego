@@ -44,6 +44,7 @@ const (
 )
 
 var (
+	ErrInvalidSig              = errors.New("invalid signature")
 	errCompressed              = errors.New("wasn't expecting a compressed key")
 	errMissingQuotes           = errors.New("first and last characters should be quotes")
 	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
@@ -108,7 +109,7 @@ func (f *Factory) RecoverHashPublicKey(hash, sig []byte) (*PublicKey, error) {
 
 	rawPubkey, compressed, err := ecdsa.RecoverCompact(sig, hash)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidSig
 	}
 
 	if compressed {
