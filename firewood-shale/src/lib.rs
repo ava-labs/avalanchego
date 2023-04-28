@@ -1,23 +1,37 @@
+use std::any::type_name;
 use std::cell::UnsafeCell;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Display, Formatter};
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use thiserror::Error;
+
 pub mod cached;
 pub mod compact;
 pub mod util;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ShaleError {
-    LinearCachedStoreError,
-    DecodeError,
-    ObjRefAlreadyInUse,
-    ObjPtrInvalid,
-    SliceError,
+    #[error("obj invalid: {addr:?} obj: {obj_type:?} error: {error:?}")]
+    InvalidObj {
+        addr: u64,
+        obj_type: &'static str,
+        error: &'static str,
+    },
+    #[error("invalid address length expected: {expected:?} found: {found:?})")]
+    InvalidAddressLength { expected: u64, found: u64 },
+    #[error("invalid node type")]
+    InvalidNodeType,
+    #[error("failed to create view: offset: {offset:?} size: {size:?}")]
+    InvalidCacheView { offset: u64, size: u64 },
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type SpaceID = u8;
@@ -60,7 +74,7 @@ pub trait CachedStore: Debug {
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>>;
     /// Returns a handle that allows shared access to the store.
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>>;
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>>;
     /// Write the `change` to the portion of the linear space starting at `offset`. The change
     /// should be immediately visible to all `CachedView` associated to this linear space.
     fn write(&mut self, offset: u64, change: &[u8]);
@@ -89,14 +103,14 @@ impl<T> Clone for ObjPtr<T> {
     }
 }
 
-impl<T> std::hash::Hash for ObjPtr<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl<T> Hash for ObjPtr<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.addr.hash(state)
     }
 }
 
-impl<T: ?Sized> fmt::Display for ObjPtr<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl<T: ?Sized> Display for ObjPtr<T> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "[ObjPtr addr={:08x}]", self.addr)
     }
 }
@@ -141,7 +155,7 @@ pub trait TypedView<T: ?Sized>: Deref<Target = T> {
     fn estimate_mem_image(&self) -> Option<u64>;
     /// Serialize the type content to the memory image. It defines how the current in-memory object
     /// of `T` should be represented in the linear storage space.
-    fn write_mem_image(&self, mem_image: &mut [u8]);
+    fn write_mem_image(&self, mem_image: &mut [u8]) -> Result<(), ShaleError>;
     /// Gain mutable access to the typed content. By changing it, its serialized bytes (and length)
     /// could change.
     fn write(&mut self) -> &mut T;
@@ -190,7 +204,8 @@ impl<T: ?Sized> Obj<T> {
         if !self.value.is_mem_mapped() {
             if let Some(new_value_len) = self.dirty.take() {
                 let mut new_value = vec![0; new_value_len as usize];
-                self.value.write_mem_image(&mut new_value);
+                // TODO: log error
+                self.value.write_mem_image(&mut new_value).unwrap();
                 let offset = self.value.get_offset();
                 let bx: &mut dyn CachedStore = self.value.get_mut_mem_store();
                 bx.write(offset, &new_value);
@@ -278,7 +293,7 @@ pub trait ShaleStore<T> {
 /// compression/decompression is needed to reduce disk I/O and facilitate faster in-memory access.
 pub trait Storable {
     fn dehydrated_len(&self) -> u64;
-    fn dehydrate(&self, to: &mut [u8]);
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError>;
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError>
     where
         Self: Sized;
@@ -287,10 +302,10 @@ pub trait Storable {
     }
 }
 
-pub fn to_dehydrated(item: &dyn Storable) -> Vec<u8> {
+pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
     let mut buff = vec![0; item.dehydrated_len() as usize];
-    item.dehydrate(&mut buff);
-    buff
+    item.dehydrate(&mut buff)?;
+    Ok(buff)
 }
 
 /// Reference implementation of [TypedView]. It takes any type that implements [Storable]
@@ -330,7 +345,7 @@ impl<T: Storable> TypedView<T> for StoredView<T> {
         }
     }
 
-    fn write_mem_image(&self, mem_image: &mut [u8]) {
+    fn write_mem_image(&self, mem_image: &mut [u8]) -> Result<(), ShaleError> {
         self.decoded.dehydrate(mem_image)
     }
 
@@ -349,9 +364,7 @@ impl<T: Storable + 'static> StoredView<T> {
         Ok(Self {
             offset,
             decoded,
-            mem: space
-                .get_shared()
-                .ok_or(ShaleError::LinearCachedStoreError)?,
+            mem: space.get_shared(),
             len_limit,
         })
     }
@@ -366,9 +379,7 @@ impl<T: Storable + 'static> StoredView<T> {
         Ok(Self {
             offset,
             decoded,
-            mem: space
-                .get_shared()
-                .ok_or(ShaleError::LinearCachedStoreError)?,
+            mem: space.get_shared(),
             len_limit,
         })
     }
@@ -409,9 +420,7 @@ impl<T: Storable> StoredView<T> {
         Ok(Self {
             offset,
             decoded,
-            mem: space
-                .get_shared()
-                .ok_or(ShaleError::LinearCachedStoreError)?,
+            mem: space.get_shared(),
             len_limit,
         })
     }
@@ -424,7 +433,11 @@ impl<T: Storable> StoredView<T> {
     ) -> Result<Obj<U>, ShaleError> {
         let addr_ = s.value.get_offset() + offset;
         if s.dirty.is_some() {
-            return Err(ShaleError::SliceError);
+            return Err(ShaleError::InvalidObj {
+                addr: offset,
+                obj_type: type_name::<T>(),
+                error: "dirty write",
+            });
         }
         let r = Box::new(StoredView::new_from_slice(
             addr_,
@@ -448,17 +461,19 @@ impl<T> Storable for ObjPtr<T> {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         use std::io::{Cursor, Write};
-        Cursor::new(to)
-            .write_all(&self.addr().to_le_bytes())
-            .unwrap();
+        Cursor::new(to).write_all(&self.addr().to_le_bytes())?;
+        Ok(())
     }
 
     fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
         let addrdyn = raw.deref();
         let addrvec = addrdyn.as_deref();
         Ok(Self::new_from_addr(u64::from_le_bytes(
@@ -497,7 +512,11 @@ impl<T> ObjCache<T> {
         let inner = &mut self.get_inner_mut();
         if let Some(r) = inner.cached.pop(&ptr) {
             if inner.pinned.insert(ptr, false).is_some() {
-                return Err(ShaleError::ObjRefAlreadyInUse);
+                return Err(ShaleError::InvalidObj {
+                    addr: ptr.addr(),
+                    obj_type: type_name::<T>(),
+                    error: "address already in use",
+                });
             }
             return Ok(Some(ObjRef {
                 inner: Some(r),

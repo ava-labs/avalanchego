@@ -1,6 +1,8 @@
 extern crate firewood_shale as shale;
 
-use criterion::{criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion};
+use criterion::{
+    black_box, criterion_group, criterion_main, profiler::Profiler, Bencher, Criterion,
+};
 use pprof::ProfilerGuard;
 use rand::Rng;
 use shale::{
@@ -55,7 +57,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 
     b.iter(|| {
         let len = rng.gen_range(0..26);
-        let rdata = &"abcdefghijklmnopqrstuvwxyz".as_bytes()[..len];
+        let rdata = black_box(&"abcdefghijklmnopqrstuvwxyz".as_bytes()[..len]);
 
         let offset = rng.gen_range(0..BENCH_MEM_SIZE - len as u64);
 

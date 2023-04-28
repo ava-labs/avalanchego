@@ -14,6 +14,7 @@ use bytemuck::{cast_slice, AnyBitPattern};
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "eth")]
 use primitive_types::U256;
+use shale::ShaleError;
 use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceID, Storable, StoredView};
 use typed_builder::TypedBuilder;
 
@@ -47,6 +48,7 @@ pub enum DBError {
     System(nix::Error),
     KeyNotFound,
     CreateError,
+    Shale(ShaleError),
     IO(std::io::Error),
 }
 
@@ -61,6 +63,7 @@ impl fmt::Display for DBError {
             DBError::KeyNotFound => write!(f, "not found"),
             DBError::CreateError => write!(f, "database create error"),
             DBError::IO(e) => write!(f, "I/O error: {e:?}"),
+            DBError::Shale(e) => write!(f, "shale error: {e:?}"),
         }
     }
 }
@@ -68,6 +71,12 @@ impl fmt::Display for DBError {
 impl From<std::io::Error> for DBError {
     fn from(e: std::io::Error) -> Self {
         DBError::IO(e)
+    }
+}
+
+impl From<ShaleError> for DBError {
+    fn from(e: ShaleError) -> Self {
+        DBError::Shale(e)
     }
 }
 
@@ -211,9 +220,12 @@ impl Storable for DBHeader {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(shale::ShaleError::LinearCachedStoreError)?;
-        let acc_root = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
-        let kv_root = u64::from_le_bytes(raw.as_deref()[8..].try_into().unwrap());
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
+        let acc_root = u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
+        let kv_root = u64::from_le_bytes(raw.as_deref()[8..].try_into().expect("invalid slice"));
         Ok(Self {
             acc_root: ObjPtr::new_from_addr(acc_root),
             kv_root: ObjPtr::new_from_addr(kv_root),
@@ -224,10 +236,11 @@ impl Storable for DBHeader {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.acc_root.addr().to_le_bytes()).unwrap();
-        cur.write_all(&self.kv_root.addr().to_le_bytes()).unwrap();
+        cur.write_all(&self.acc_root.addr().to_le_bytes())?;
+        cur.write_all(&self.kv_root.addr().to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -616,11 +629,11 @@ impl DB {
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
                     SPACE_RESERVED,
                     SPACE_RESERVED,
-                )),
+                ))?,
             );
             initializer.write(
                 db_header.addr(),
-                &shale::to_dehydrated(&DBHeader::new_empty()),
+                &shale::to_dehydrated(&DBHeader::new_empty())?,
             );
             let initializer = Rc::<StoreRevMut>::make_mut(&mut staging.blob.meta);
             initializer.write(
@@ -628,7 +641,7 @@ impl DB {
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
                     SPACE_RESERVED,
                     SPACE_RESERVED,
-                )),
+                ))?,
             );
         }
 

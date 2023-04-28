@@ -24,10 +24,15 @@ impl Storable for CompactHeader {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
-        let payload_size = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
+        let payload_size =
+            u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
         let is_freed = raw.as_deref()[8] != 0;
-        let desc_addr = u64::from_le_bytes(raw.as_deref()[9..17].try_into().unwrap());
+        let desc_addr =
+            u64::from_le_bytes(raw.as_deref()[9..17].try_into().expect("invalid slice"));
         Ok(Self {
             payload_size,
             is_freed,
@@ -39,11 +44,12 @@ impl Storable for CompactHeader {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.payload_size.to_le_bytes()).unwrap();
-        cur.write_all(&[if self.is_freed { 1 } else { 0 }]).unwrap();
-        cur.write_all(&self.desc_addr.addr().to_le_bytes()).unwrap();
+        cur.write_all(&self.payload_size.to_le_bytes())?;
+        cur.write_all(&[if self.is_freed { 1 } else { 0 }])?;
+        cur.write_all(&self.desc_addr.addr().to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -59,7 +65,10 @@ impl Storable for CompactFooter {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
         let payload_size = u64::from_le_bytes(raw.as_deref().try_into().unwrap());
         Ok(Self { payload_size })
     }
@@ -68,10 +77,9 @@ impl Storable for CompactFooter {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
-        Cursor::new(to)
-            .write_all(&self.payload_size.to_le_bytes())
-            .unwrap();
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+        Cursor::new(to).write_all(&self.payload_size.to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -89,9 +97,13 @@ impl Storable for CompactDescriptor {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
-        let payload_size = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
-        let haddr = u64::from_le_bytes(raw.as_deref()[8..].try_into().unwrap());
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
+        let payload_size =
+            u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
+        let haddr = u64::from_le_bytes(raw.as_deref()[8..].try_into().expect("invalid slice"));
         Ok(Self {
             payload_size,
             haddr,
@@ -102,10 +114,11 @@ impl Storable for CompactDescriptor {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.payload_size.to_le_bytes()).unwrap();
-        cur.write_all(&self.haddr.to_le_bytes()).unwrap();
+        cur.write_all(&self.payload_size.to_le_bytes())?;
+        cur.write_all(&self.haddr.to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -158,11 +171,18 @@ impl Storable for CompactSpaceHeader {
     fn hydrate<T: CachedStore + std::fmt::Debug>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
-        let meta_space_tail = u64::from_le_bytes(raw.as_deref()[..8].try_into().unwrap());
-        let compact_space_tail = u64::from_le_bytes(raw.as_deref()[8..16].try_into().unwrap());
-        let base_addr = u64::from_le_bytes(raw.as_deref()[16..24].try_into().unwrap());
-        let alloc_addr = u64::from_le_bytes(raw.as_deref()[24..].try_into().unwrap());
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
+        let meta_space_tail =
+            u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
+        let compact_space_tail =
+            u64::from_le_bytes(raw.as_deref()[8..16].try_into().expect("invalid slice"));
+        let base_addr =
+            u64::from_le_bytes(raw.as_deref()[16..24].try_into().expect("invalid slice"));
+        let alloc_addr =
+            u64::from_le_bytes(raw.as_deref()[24..].try_into().expect("invalid slice"));
         Ok(Self {
             meta_space_tail,
             compact_space_tail,
@@ -175,14 +195,13 @@ impl Storable for CompactSpaceHeader {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.meta_space_tail.to_le_bytes()).unwrap();
-        cur.write_all(&self.compact_space_tail.to_le_bytes())
-            .unwrap();
-        cur.write_all(&self.base_addr.addr().to_le_bytes()).unwrap();
-        cur.write_all(&self.alloc_addr.addr().to_le_bytes())
-            .unwrap();
+        cur.write_all(&self.meta_space_tail.to_le_bytes())?;
+        cur.write_all(&self.compact_space_tail.to_le_bytes())?;
+        cur.write_all(&self.base_addr.addr().to_le_bytes())?;
+        cur.write_all(&self.alloc_addr.addr().to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -196,16 +215,19 @@ impl<T> Storable for ObjPtrField<T> {
     fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
-        Ok(Self(ObjPtr::new_from_addr(u64::from_le_bytes(
-            raw.as_deref().try_into().unwrap(),
-        ))))
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
+        let obj_ptr = ObjPtr::new_from_addr(u64::from_le_bytes(
+            <[u8; 8]>::try_from(&raw.as_deref()[0..8]).expect("invalid slice"),
+        ));
+        Ok(Self(obj_ptr))
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
-        Cursor::new(to)
-            .write_all(&self.0.addr().to_le_bytes())
-            .unwrap()
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+        Cursor::new(to).write_all(&self.0.addr().to_le_bytes())?;
+        Ok(())
     }
 
     fn dehydrated_len(&self) -> u64 {
@@ -236,7 +258,10 @@ impl Storable for U64Field {
     fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
-            .ok_or(ShaleError::LinearCachedStoreError)?;
+            .ok_or(ShaleError::InvalidCacheView {
+                offset: addr,
+                size: Self::MSIZE,
+            })?;
         Ok(Self(u64::from_le_bytes(raw.as_deref().try_into().unwrap())))
     }
 
@@ -244,8 +269,9 @@ impl Storable for U64Field {
         Self::MSIZE
     }
 
-    fn dehydrate(&self, to: &mut [u8]) {
-        Cursor::new(to).write_all(&self.0.to_le_bytes()).unwrap()
+    fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
+        Cursor::new(to).write_all(&self.0.to_le_bytes())?;
+        Ok(())
     }
 }
 
@@ -570,7 +596,10 @@ impl<T: Storable + 'static, M: CachedStore> ShaleStore<T> for CompactSpace<T, M>
             return Ok(r);
         }
         if ptr.addr() < CompactSpaceHeader::MSIZE {
-            return Err(ShaleError::ObjPtrInvalid);
+            return Err(ShaleError::InvalidAddressLength {
+                expected: CompactSpaceHeader::MSIZE,
+                found: ptr.addr(),
+            });
         }
         let h = inner.get_header(ObjPtr::new(ptr.addr() - CompactHeader::MSIZE))?;
         Ok(inner
@@ -614,9 +643,14 @@ mod tests {
         fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
             let raw = mem
                 .get_view(addr, Self::MSIZE)
-                .ok_or(ShaleError::LinearCachedStoreError)?;
+                .ok_or(ShaleError::InvalidCacheView {
+                    offset: addr,
+                    size: Self::MSIZE,
+                })?;
             Ok(Self(
-                raw.as_deref()[..Self::MSIZE as usize].try_into().unwrap(),
+                raw.as_deref()[..Self::MSIZE as usize]
+                    .try_into()
+                    .expect("invalid slice"),
             ))
         }
 
@@ -624,9 +658,10 @@ mod tests {
             Self::MSIZE
         }
 
-        fn dehydrate(&self, to: &mut [u8]) {
+        fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
             let mut cur = to;
-            cur.write_all(&self.0).unwrap()
+            cur.write_all(&self.0)?;
+            Ok(())
         }
     }
 
@@ -642,7 +677,7 @@ mod tests {
         let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x1);
         dm.write(
             compact_header.addr(),
-            &crate::to_dehydrated(&CompactSpaceHeader::new(RESERVED, RESERVED)),
+            &crate::to_dehydrated(&CompactSpaceHeader::new(RESERVED, RESERVED)).unwrap(),
         );
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();

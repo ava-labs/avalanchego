@@ -46,11 +46,11 @@ impl CachedStore for PlainMem {
         }
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
-        Some(Box::new(PlainMemShared(Self {
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+        Box::new(PlainMemShared(Self {
             space: self.space.clone(),
             id: self.id,
-        })))
+        }))
     }
 
     fn write(&mut self, offset: u64, change: &[u8]) {
@@ -140,11 +140,11 @@ impl CachedStore for DynamicMem {
         }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
-        Some(Box::new(DynamicMemShared(Self {
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+        Box::new(DynamicMemShared(Self {
             space: self.space.clone(),
             id: self.id,
-        })))
+        }))
     }
 
     fn write(&mut self, offset: u64, change: &[u8]) {
@@ -240,7 +240,7 @@ mod tests {
         mem.write(0, &[1, 2]);
         mem.write(0, &[3, 4]);
         assert_eq!(mem.get_view(0, 2).unwrap().as_deref(), [3, 4]);
-        mem.get_shared().unwrap().write(0, &[5, 6]);
+        mem.get_shared().write(0, &[5, 6]);
 
         // capacity is increased
         mem.write(5, &[0; 10]);

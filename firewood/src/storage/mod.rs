@@ -359,8 +359,8 @@ impl CachedStore for StoreRevShared {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
-        Some(Box::new(StoreShared(self.clone())))
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+        Box::new(StoreShared(self.clone()))
     }
 
     fn write(&mut self, _offset: u64, _change: &[u8]) {
@@ -507,8 +507,8 @@ impl CachedStore for StoreRevMut {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Option<Box<dyn DerefMut<Target = dyn CachedStore>>> {
-        Some(Box::new(StoreShared(self.clone())))
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+        Box::new(StoreShared(self.clone()))
     }
 
     fn write(&mut self, offset: u64, mut change: &[u8]) {

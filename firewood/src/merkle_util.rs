@@ -121,7 +121,8 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
     let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x0);
     dm.write(
         compact_header.addr(),
-        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED)),
+        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED))
+            .unwrap(),
     );
     let compact_header =
         StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();

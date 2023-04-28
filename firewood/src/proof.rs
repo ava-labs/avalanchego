@@ -12,6 +12,7 @@ use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
 use shale::ObjPtr;
+use shale::ShaleError;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -44,6 +45,7 @@ pub enum ProofError {
     #[cfg(feature = "eth")]
     BlobStoreError(BlobError),
     SystemError(Errno),
+    Shale(ShaleError),
     InvalidRootHash,
 }
 
@@ -71,6 +73,7 @@ impl From<DBError> for ProofError {
             DBError::IO(e) => {
                 ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
             }
+            DBError::Shale(e) => ProofError::Shale(e),
         }
     }
 }
@@ -98,6 +101,7 @@ impl fmt::Display for ProofError {
             ProofError::BlobStoreError(e) => write!(f, "blob store error: {e:?}"),
             ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
             ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
+            ProofError::Shale(e) => write!(f, "shale error: {e:?}"),
         }
     }
 }
