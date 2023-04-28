@@ -458,7 +458,6 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		}
 
 		pushed, err := b.Blocked.Push(ctx, &blockJob{
-			parser:      b.parser,
 			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
