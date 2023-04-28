@@ -1,0 +1,16 @@
+name: Mark stale issues and pull requests
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run every day at midnight UTC
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v8
+        with:
+          stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove the stale label or leave a comment or this will be closed in 7 days.'
+          stale-pr-message: 'This pull request is stale because it has been open 60 days with no activity.'
+          close-issue-message: 'This issue was closed because it has been marked as stale for 7 days with no activity.'
+          days-before-stale: 60
+          days-before-close: 7
+          days-before-pr-close: -1 # don't close stale PRs
