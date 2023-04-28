@@ -91,9 +91,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			},
 			expectedVdrs: []*Validator{
 				{
-					PublicKey:      testVdrs[0].vdr.PublicKey,
-					PublicKeyBytes: testVdrs[0].vdr.PublicKeyBytes,
-					Weight:         testVdrs[0].vdr.Weight * 2,
+					PublicKey: testVdrs[0].vdr.PublicKey,
+					Weight:    testVdrs[0].vdr.Weight * 2,
 					NodeIDs: []ids.NodeID{
 						testVdrs[0].nodeID,
 						testVdrs[2].nodeID,
@@ -112,7 +111,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: nil,
+							PublicKey: validators.PublicKey{},
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
@@ -150,10 +149,10 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Equal(len(tt.expectedVdrs), len(vdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
-				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey)
-				gotPKBytes := bls.PublicKeyToBytes(gotVdr.PublicKey)
+				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey.PublicKey)
+				gotPKBytes := bls.PublicKeyToBytes(gotVdr.PublicKey.PublicKey)
 				require.Equal(expectedPKBytes, gotPKBytes)
-				require.Equal(expectedVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
+				require.Equal(expectedVdr.PublicKey.Serialize(), gotVdr.PublicKey.Serialize())
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
 				require.ElementsMatch(expectedVdr.NodeIDs, gotVdr.NodeIDs)
 			}
@@ -166,18 +165,22 @@ func TestFilterValidators(t *testing.T) {
 	require.NoError(t, err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
-		PublicKey:      pk0,
-		PublicKeyBytes: pk0.Serialize(),
-		Weight:         1,
+		PublicKey: validators.PublicKey{
+			PublicKey: pk0,
+			Bytes:     pk0.Serialize(),
+		},
+		Weight: 1,
 	}
 
 	sk1, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
-		PublicKey:      pk1,
-		PublicKeyBytes: pk1.Serialize(),
-		Weight:         2,
+		PublicKey: validators.PublicKey{
+			PublicKey: pk1,
+			Bytes:     pk1.Serialize(),
+		},
+		Weight: 2,
 	}
 
 	type test struct {
@@ -317,9 +320,55 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		require.NoError(b, err)
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: blsPublicKey,
-			Weight:    20,
+			NodeID: nodeID,
+			PublicKey: validators.PublicKey{
+				PublicKey: blsPublicKey,
+				Bytes:     nil,
+			},
+			Weight: 20,
+		})
+	}
+
+	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
+		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < size; i++ {
+			validator := getValidatorOutputs[i]
+			getValidatorsOutput[validator.NodeID] = validator
+		}
+		validatorState := &validators.TestState{
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return getValidatorsOutput, nil
+			},
+		}
+
+		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
+				require.NoError(b, err)
+			}
+		})
+	}
+}
+
+func BenchmarkGetCanonicalValidatorSetCachedKey(b *testing.B) {
+	pChainHeight := uint64(1)
+	subnetID := ids.GenerateTestID()
+	numNodes := 10_000
+	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeID := ids.GenerateTestNodeID()
+		blsPrivateKey, err := bls.NewSecretKey()
+		require.NoError(b, err)
+		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
+		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
+			NodeID: nodeID,
+			PublicKey: validators.PublicKey{
+				PublicKey: blsPublicKey,
+				// assuming that the pchain state caches the serialized form of
+				// the key
+				Bytes: blsPublicKey.Serialize(),
+			},
+			Weight: 20,
 		})
 	}
 

@@ -26,6 +26,19 @@ type Validator struct {
 // a validator of the Avalanche Network for the output of GetValidator.
 type GetValidatorOutput struct {
 	NodeID    ids.NodeID
-	PublicKey *bls.PublicKey
+	PublicKey PublicKey
 	Weight    uint64
+}
+
+type PublicKey struct {
+	*bls.PublicKey
+	Bytes []byte
+}
+
+func (pk PublicKey) Serialize() []byte {
+	if pk.Bytes == nil {
+		pk.Bytes = pk.PublicKey.Serialize()
+	}
+
+	return pk.Bytes
 }

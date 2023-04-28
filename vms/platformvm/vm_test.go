@@ -2481,9 +2481,11 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -2526,19 +2528,25 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight + 1,
 				},
 				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+					NodeID: vdrs[1].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[1].PublicKey,
+					},
+					Weight: vdrs[1].Weight - 1,
 				},
 				vdrs[2].NodeID: {
-					NodeID:    vdrs[2].NodeID,
-					PublicKey: vdrs[2].PublicKey,
-					Weight:    vdrs[2].Weight,
+					NodeID: vdrs[2].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[2].PublicKey,
+					},
+					Weight: vdrs[2].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -2598,14 +2606,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 2,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight + 2,
 				},
 				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 2,
+					NodeID: vdrs[1].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[1].PublicKey,
+					},
+					Weight: vdrs[1].Weight - 2,
 				},
 			},
 			expectedErr: nil,
@@ -2646,14 +2658,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight + 1,
 				},
 				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+					NodeID: vdrs[1].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[1].PublicKey,
+					},
+					Weight: vdrs[1].Weight - 1,
 				},
 				vdrs[2].NodeID: {
 					NodeID: vdrs[2].NodeID,
@@ -2700,14 +2716,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight + 1,
 				},
 				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+					NodeID: vdrs[1].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[1].PublicKey,
+					},
+					Weight: vdrs[1].Weight - 1,
 				},
 				vdrs[2].NodeID: {
 					NodeID: vdrs[2].NodeID,
@@ -2737,9 +2757,11 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight,
+					NodeID: vdrs[0].NodeID,
+					PublicKey: validators.PublicKey{
+						PublicKey: vdrs[0].PublicKey,
+					},
+					Weight: vdrs[0].Weight,
 				},
 			},
 			expectedErr: nil,

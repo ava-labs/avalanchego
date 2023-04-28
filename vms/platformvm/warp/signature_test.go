@@ -54,10 +54,12 @@ func newTestValidator() *testValidator {
 		nodeID: nodeID,
 		sk:     sk,
 		vdr: &Validator{
-			PublicKey:      pk,
-			PublicKeyBytes: pk.Serialize(),
-			Weight:         3,
-			NodeIDs:        []ids.NodeID{nodeID},
+			PublicKey: validators.PublicKey{
+				PublicKey: pk,
+				Bytes:     nil,
+			},
+			Weight:  3,
+			NodeIDs: []ids.NodeID{nodeID},
 		},
 	}
 }
@@ -648,7 +650,7 @@ func TestSignatureVerification(t *testing.T) {
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
 					testVdrs[0].nodeID: {
 						NodeID:    testVdrs[0].nodeID,
-						PublicKey: nil,
+						PublicKey: validators.PublicKey{},
 						Weight:    testVdrs[0].vdr.Weight,
 					},
 					testVdrs[1].nodeID: {
@@ -709,7 +711,7 @@ func TestSignatureVerification(t *testing.T) {
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
 					testVdrs[0].nodeID: {
 						NodeID:    testVdrs[0].nodeID,
-						PublicKey: nil,
+						PublicKey: validators.PublicKey{},
 						Weight:    testVdrs[0].vdr.Weight,
 					},
 					testVdrs[1].nodeID: {

@@ -86,9 +86,14 @@ func (c *Client) GetValidatorSet(
 			}
 		}
 		vdrs[nodeID] = &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: publicKey,
-			Weight:    validator.Weight,
+			NodeID: nodeID,
+			// As an optimization, we pre-populate the cached deserialized key
+			// since it was given to us off gRPC.
+			PublicKey: validators.PublicKey{
+				PublicKey: publicKey,
+				Bytes:     validator.PublicKey,
+			},
+			Weight: validator.Weight,
 		}
 	}
 	return vdrs, nil
