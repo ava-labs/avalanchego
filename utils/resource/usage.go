@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/shirou/gopsutil/process"
 
 	"github.com/ava-labs/avalanchego/utils/storage"
@@ -82,19 +83,21 @@ type manager struct {
 	processMetrics *metrics
 }
 
-func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) Manager {
+func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration, metricsRegisterer prometheus.Registerer) (Manager, error) {
 	m := &manager{
 		processes:          make(map[int]*proc),
 		onClose:            make(chan struct{}),
 		availableDiskBytes: math.MaxUint64,
 	}
 
-	metricsRegisterer := prometheus.NewRegistry()
-	processMetrics, _ := newMetrics("System resources", metricsRegisterer, m.processes)
+	processMetrics, err := newMetrics("system_resources", metricsRegisterer)
+	if err != nil {
+		return nil, err
+	}
 	m.processMetrics = processMetrics
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
-	return m
+	return m, nil
 }
 
 func (m *manager) CPUUsage() float64 {
@@ -109,34 +112,6 @@ func (m *manager) DiskUsage() (float64, float64) {
 	defer m.usageLock.RUnlock()
 
 	return m.readUsage, m.writeUsage
-}
-
-func (m *manager) DiskNumberRead(pid int) uint64 {
-	m.usageLock.RLock()
-	defer m.usageLock.RUnlock()
-
-	return m.processes[pid].read
-}
-
-func (m *manager) DiskReadBytes(pid int) uint64 {
-	m.usageLock.RLock()
-	defer m.usageLock.RUnlock()
-
-	return m.processes[pid].lastReadBytes
-}
-
-func (m *manager) DiskNumberWrite(pid int) uint64 {
-	m.usageLock.RLock()
-	defer m.usageLock.RUnlock()
-
-	return m.processes[pid].write
-}
-
-func (m *manager) DiskWriteBytes(pid int) uint64 {
-	m.usageLock.RLock()
-	defer m.usageLock.RUnlock()
-
-	return m.processes[pid].lastWriteBytes
 }
 
 func (m *manager) AvailableDiskBytes() uint64 {
@@ -226,7 +201,7 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 		totalWrite += write
 
 		processIDStr := strconv.Itoa(int(p.p.Pid))
-		m.processMetrics.numCPUCycles.WithLabelValues(processIDStr).Set(p.cpuCycles)
+		m.processMetrics.numCPUCycles.WithLabelValues(processIDStr).Set(p.lastTotalCPU)
 		m.processMetrics.numDiskReads.WithLabelValues(processIDStr).Set(float64(p.read))
 		m.processMetrics.numDiskReadBytes.WithLabelValues(processIDStr).Set(float64(p.lastReadBytes))
 		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.write))
@@ -249,9 +224,6 @@ type proc struct {
 	// [lastWriteBytes] is the most recent measurement of total disk bytes
 	// written.
 	lastWriteBytes uint64
-
-	// number of CPUCycles
-	cpuCycles float64
 
 	// number of reads and writes
 	read, write uint64
@@ -280,17 +252,16 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 		if totalCPU > p.lastTotalCPU {
 			newCPU := totalCPU - p.lastTotalCPU
 			cpu = newCPU / secondsSinceLastUpdate
-			p.cpuCycles = newCPU
 		}
 		if io.ReadBytes > p.lastReadBytes {
 			newRead := io.ReadBytes - p.lastReadBytes
 			read = float64(newRead) / secondsSinceLastUpdate
-			p.read = newRead
+			p.read = io.ReadCount
 		}
 		if io.WriteBytes > p.lastWriteBytes {
 			newWrite := io.WriteBytes - p.lastWriteBytes
 			write = float64(newWrite) / secondsSinceLastUpdate
-			p.write = newWrite
+			p.write = io.WriteCount
 		}
 	}
 
