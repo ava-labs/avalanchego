@@ -245,6 +245,21 @@ func (mr *MockStateMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockState)(nil).DeleteUTXO), arg0)
 }
 
+// GetBlockID mocks base method.
+func (m *MockState) GetBlockID(arg0 uint64) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockID", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockID indicates an expected call of GetBlockID.
+func (mr *MockStateMockRecorder) GetBlockID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockID", reflect.TypeOf((*MockState)(nil).GetBlockID), arg0)
+}
+
 // GetChains mocks base method.
 func (m *MockState) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
