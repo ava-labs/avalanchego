@@ -255,6 +255,8 @@ type Client interface {
 	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetBlockByHeight returns the block at the given [height].
+	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -857,13 +859,26 @@ func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height ui
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
-	response := &api.FormattedBlock{}
+	res := &api.FormattedBlock{}
 	if err := c.requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
 		BlockID:  blockID,
 		Encoding: formatting.Hex,
-	}, response, options...); err != nil {
+	}, res, options...); err != nil {
 		return nil, err
 	}
 
-	return formatting.Decode(response.Encoding, response.Block)
+	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "platform.getBlockByHeight", &api.GetBlockByHeightArgs{
+		Height:   json.Uint64(height),
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return formatting.Decode(res.Encoding, res.Block)
 }
