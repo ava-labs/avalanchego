@@ -240,7 +240,7 @@ type state struct {
 	blockIDDB     database.Database
 
 	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database.
+	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB                 database.Database
