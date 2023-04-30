@@ -18,7 +18,7 @@ import (
 
 var (
 	//go:embed bootstrappers.json
-	bootstrappersPerNetworkRawJSON []byte
+	bootstrappersPerNetworkJSON []byte
 
 	bootstrappersPerNetwork map[string][]Bootstrapper
 )
