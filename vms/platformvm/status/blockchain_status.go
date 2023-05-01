@@ -53,7 +53,7 @@ func (s *BlockchainStatus) UnmarshalJSON(b []byte) error {
 		*s = Syncing
 	case "null":
 	default:
-		return errUnknownStatus
+		return errUnknownBlockchainStatus
 	}
 	return nil
 }

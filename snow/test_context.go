@@ -35,9 +35,9 @@ func DefaultContextTest() *Context {
 
 func DefaultConsensusContextTest(t *testing.T) *ConsensusContext {
 	var (
-		startedState State = Initializing
-		stoppedState State = Initializing
-		engineType         = p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
+		startedState = Initializing
+		stoppedState = Initializing
+		engineType   = p2p.EngineType_ENGINE_TYPE_UNSPECIFIED
 	)
 
 	return &ConsensusContext{

@@ -5,8 +5,9 @@ package txs
 
 import (
 	"errors"
-	"math"
 	"testing"
+
+	stdmath "math"
 
 	"github.com/golang/mock/gomock"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -81,6 +83,28 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				}
 			},
 			err: errNoStake,
+		},
+		{
+			name: "invalid BaseTx",
+			txFunc: func(*gomock.Controller) *AddPermissionlessDelegatorTx {
+				return &AddPermissionlessDelegatorTx{
+					BaseTx: invalidBaseTx,
+					Validator: Validator{
+						NodeID: ids.GenerateTestNodeID(),
+					},
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: ids.GenerateTestID(),
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+					},
+				}
+			},
+			err: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "invalid rewards owner",
@@ -205,6 +229,42 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			err: errOutputsNotSorted,
 		},
 		{
+			name: "stake overflow",
+			txFunc: func(ctrl *gomock.Controller) *AddPermissionlessDelegatorTx {
+				rewardsOwner := fx.NewMockOwner(ctrl)
+				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+				assetID := ids.GenerateTestID()
+				return &AddPermissionlessDelegatorTx{
+					BaseTx: validBaseTx,
+					Validator: Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
+					},
+					Subnet: ids.GenerateTestID(),
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: stdmath.MaxUint64,
+							},
+						},
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 2,
+							},
+						},
+					},
+					DelegationRewardsOwner: rewardsOwner,
+				}
+			},
+			err: math.ErrOverflow,
+		},
+		{
 			name: "weight mismatch",
 			txFunc: func(ctrl *gomock.Controller) *AddPermissionlessDelegatorTx {
 				rewardsOwner := fx.NewMockOwner(ctrl)
@@ -321,65 +381,6 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
-
-	t.Run("invalid BaseTx", func(t *testing.T) {
-		tx := &AddPermissionlessDelegatorTx{
-			BaseTx: invalidBaseTx,
-			Validator: Validator{
-				NodeID: ids.GenerateTestNodeID(),
-			},
-			StakeOuts: []*avax.TransferableOutput{
-				{
-					Asset: avax.Asset{
-						ID: ids.GenerateTestID(),
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				},
-			},
-		}
-		err := tx.SyntacticVerify(ctx)
-		require.Error(t, err)
-	})
-
-	t.Run("stake overflow", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		rewardsOwner := fx.NewMockOwner(ctrl)
-		rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-		assetID := ids.GenerateTestID()
-		tx := &AddPermissionlessDelegatorTx{
-			BaseTx: validBaseTx,
-			Validator: Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				Wght:   1,
-			},
-			Subnet: ids.GenerateTestID(),
-			StakeOuts: []*avax.TransferableOutput{
-				{
-					Asset: avax.Asset{
-						ID: assetID,
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: math.MaxUint64,
-					},
-				},
-				{
-					Asset: avax.Asset{
-						ID: assetID,
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 2,
-					},
-				},
-			},
-			DelegationRewardsOwner: rewardsOwner,
-		}
-		err := tx.SyntacticVerify(ctx)
-		require.Error(t, err)
-	})
 }
 
 func TestAddPermissionlessDelegatorTxNotValidatorTx(t *testing.T) {

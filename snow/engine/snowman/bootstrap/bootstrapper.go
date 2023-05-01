@@ -31,6 +31,8 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
+// Invariant: The VM is not guaranteed to be initialized until Start has been
+// called, so it must be guaranteed the VM is not used until after Start.
 type bootstrapper struct {
 	Config
 
@@ -76,7 +78,7 @@ type bootstrapper struct {
 	bootstrappedOnce sync.Once
 }
 
-func New(ctx context.Context, config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	metrics, err := newMetrics("bs", config.Ctx.Registerer)
 	if err != nil {
 		return nil, err
@@ -98,16 +100,6 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 		executedStateTransitions: math.MaxInt32,
 	}
 
-	b.parser = &parser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAccepted,
-		numDropped:  b.numDropped,
-		vm:          b.VM,
-	}
-	if err := b.Blocked.SetParser(ctx, b.parser); err != nil {
-		return nil, err
-	}
-
 	config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 
@@ -119,6 +111,16 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
+	}
+
+	b.parser = &parser{
+		log:         b.Ctx.Log,
+		numAccepted: b.numAccepted,
+		numDropped:  b.numDropped,
+		vm:          b.VM,
+	}
+	if err := b.Blocked.SetParser(ctx, b.parser); err != nil {
+		return err
 	}
 
 	// Set the starting height
@@ -437,7 +439,6 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		}
 
 		pushed, err := b.Blocked.Push(ctx, &blockJob{
-			parser:      b.parser,
 			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
