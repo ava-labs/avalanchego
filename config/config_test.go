@@ -407,14 +407,13 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"parents": 111, "alpha":16} }`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alpha":16} }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.Equal(true, config.ValidatorOnly)
-				require.Equal(111, config.ConsensusParameters.Parents)
 				require.Equal(16, config.ConsensusParameters.Alpha)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
@@ -513,8 +512,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 30,
-						"alpha": 20,
-						"parents": 111
+						"alpha": 20
 					},
 					"validatorOnly": true
 				}
@@ -524,7 +522,6 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				require.Equal(true, config.ValidatorOnly)
-				require.Equal(111, config.ConsensusParameters.Parents)
 				require.Equal(20, config.ConsensusParameters.Alpha)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
@@ -558,7 +555,7 @@ func TestCalcMinConnectedStake(t *testing.T) {
 	v := setupViperFlags()
 	defaultParams := getConsensusConfig(v)
 	defaultExpectedMinStake := 0.8
-	minStake := calcMinConnectedStake(defaultParams.Parameters)
+	minStake := calcMinConnectedStake(defaultParams)
 	require.Equal(t, defaultExpectedMinStake, minStake)
 }
 

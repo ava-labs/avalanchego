@@ -450,12 +450,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
+			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
@@ -869,11 +869,11 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
+			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),

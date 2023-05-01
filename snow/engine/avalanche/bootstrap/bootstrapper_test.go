@@ -143,7 +143,6 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -253,7 +252,6 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -421,7 +419,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -548,7 +545,6 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -660,7 +656,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -788,7 +783,6 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -953,7 +947,6 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
