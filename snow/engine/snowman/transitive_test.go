@@ -2880,7 +2880,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// After a single vote for [blk2], it should be marked as accepted.
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
-	require.Equalf(blk2.Status(), choices.Accepted, "Expected blk2 to be Accepted, but found status: %s", blk2.Status())
+	require.Equal(choices.Accepted, blk2.Status())
 }
 
 // Test that in the following scenario, if block B fails verification, votes
