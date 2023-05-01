@@ -859,15 +859,15 @@ func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height ui
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
-	res := &api.FormattedBlock{}
+	response := &api.FormattedBlock{}
 	if err := c.requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
 		BlockID:  blockID,
 		Encoding: formatting.Hex,
-	}, res, options...); err != nil {
+	}, response, options...); err != nil {
 		return nil, err
 	}
 
-	return formatting.Decode(res.Encoding, res.Block)
+	return formatting.Decode(response.Encoding, response.Block)
 }
 
 func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
@@ -879,6 +879,5 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Block)
 }
