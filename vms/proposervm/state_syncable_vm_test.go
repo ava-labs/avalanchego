@@ -314,7 +314,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	// Pre fork summary case, fork height not reached hence not set yet
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(h, reqHeight)
+		require.Equal(reqHeight, h)
 		return innerSummary, nil
 	}
 	_, err = vm.GetForkHeight()
@@ -327,7 +327,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(h, reqHeight)
+		require.Equal(reqHeight, h)
 		return innerSummary, nil
 	}
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
@@ -629,5 +629,5 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	summary, err := proVM.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.Height(), summaryHeight)
+	require.Equal(summaryHeight, summary.Height())
 }
