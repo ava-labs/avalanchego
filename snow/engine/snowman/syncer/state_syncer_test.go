@@ -482,7 +482,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// unresponsiveBeacon not pending anymore
 	require.NotContains(syncer.pendingSeeders, unresponsiveBeaconID)
-	require.Contains(syncer.failedSeeders, (unresponsiveBeaconID))
+	require.Contains(syncer.failedSeeders, unresponsiveBeaconID)
 
 	// even in case of timeouts, other listed vdrs
 	// are reached for data
