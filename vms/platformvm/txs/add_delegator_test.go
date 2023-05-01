@@ -202,7 +202,9 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 }
 
 func TestAddDelegatorTxNotValidatorTx(t *testing.T) {
+	require := require.New(t)
+
 	txIntf := any((*AddDelegatorTx)(nil))
 	_, ok := txIntf.(ValidatorTx)
-	require.False(t, ok)
+	require.False(ok)
 }

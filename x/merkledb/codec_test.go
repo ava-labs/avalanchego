@@ -443,6 +443,8 @@ func FuzzCodecRangeProofDeterministic(f *testing.F) {
 			numEndProofNodes uint,
 			numKeyValues uint,
 		) {
+			require := require.New(t)
+
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 			var rootID ids.ID
@@ -477,19 +479,19 @@ func FuzzCodecRangeProofDeterministic(f *testing.F) {
 			}
 
 			proofBytes, err := Codec.EncodeRangeProof(Version, &proof)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			var gotProof RangeProof
 			_, err = Codec.DecodeRangeProof(proofBytes, &gotProof)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			nilEmptySlices(&proof)
 			nilEmptySlices(&gotProof)
-			require.Equal(t, proof, gotProof)
+			require.Equal(proof, gotProof)
 
 			proofBytes2, err := Codec.EncodeRangeProof(Version, &gotProof)
-			require.NoError(t, err)
-			require.Equal(t, proofBytes, proofBytes2)
+			require.NoError(err)
+			require.Equal(proofBytes, proofBytes2)
 		},
 	)
 }

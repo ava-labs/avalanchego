@@ -20,6 +20,8 @@ import (
 )
 
 func TestStatus(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		name           string
 		blockF         func(*gomock.Controller) *Block
@@ -120,7 +122,7 @@ func TestStatus(t *testing.T) {
 			defer ctrl.Finish()
 
 			blk := tt.blockF(ctrl)
-			require.Equal(t, tt.expectedStatus, blk.Status())
+			require.Equal(tt.expectedStatus, blk.Status())
 		})
 	}
 }

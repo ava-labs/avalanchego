@@ -68,12 +68,14 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	require := require.New(t)
+
 	vm, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
 	err := ks.CreateUser(testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{
@@ -87,34 +89,40 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
+	require := require.New(t)
+
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	err = user.PutKeys(pk, keys[0])
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestAddValidator(t *testing.T) {
+	require := require.New(t)
+
 	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
-	require.NoError(t, err)
-	require.Equal(t, expectedJSONString, string(bytes))
+	require.NoError(err)
+	require.Equal(expectedJSONString, string(bytes))
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
+	require := require.New(t)
+
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
 	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	_, err = stdjson.Marshal(args.GenesisData)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestExportKey(t *testing.T) {

@@ -10,11 +10,13 @@ import (
 )
 
 func TestSemanticString(t *testing.T) {
+	require := require.New(t)
+
 	v := Semantic{
 		Major: 1,
 		Minor: 2,
 		Patch: 3,
 	}
 
-	require.Equal(t, "v1.2.3", v.String())
+	require.Equal("v1.2.3", v.String())
 }

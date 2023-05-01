@@ -16,6 +16,8 @@ import (
 )
 
 func Test_Metrics_Basic_Usage(t *testing.T) {
+	require := require.New(t)
+
 	db, err := New(
 		context.Background(),
 		memdb.New(),
@@ -25,31 +27,33 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 			NodeCacheSize: minCacheSize,
 		},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(3), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(1), db.metrics.(*mockMetrics).keyReadCount)
+	require.Equal(int64(1), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(int64(3), db.metrics.(*mockMetrics).hashCount)
 
 	err = db.Delete([]byte("key"))
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(4), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(1), db.metrics.(*mockMetrics).keyReadCount)
+	require.Equal(int64(2), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(int64(4), db.metrics.(*mockMetrics).hashCount)
 
 	_, err = db.Get([]byte("key2"))
-	require.ErrorIs(t, err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyReadCount)
-	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(4), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(2), db.metrics.(*mockMetrics).keyReadCount)
+	require.Equal(int64(2), db.metrics.(*mockMetrics).keyWriteCount)
+	require.Equal(int64(4), db.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Metrics_Initialize(t *testing.T) {
+	require := require.New(t)
+
 	db, err := New(
 		context.Background(),
 		memdb.New(),
@@ -60,15 +64,15 @@ func Test_Metrics_Initialize(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
 	val, err := db.Get([]byte("key"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), val)
+	require.NoError(err)
+	require.Equal([]byte("value"), val)
 
 	err = db.Delete([]byte("key"))
-	require.NoError(t, err)
+	require.NoError(err)
 }

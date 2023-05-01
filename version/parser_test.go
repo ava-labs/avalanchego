@@ -11,14 +11,16 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	require := require.New(t)
+
 	v, err := Parse("v1.2.3")
 
-	require.NoError(t, err)
-	require.NotNil(t, v)
-	require.Equal(t, "v1.2.3", v.String())
-	require.Equal(t, 1, v.Major)
-	require.Equal(t, 2, v.Minor)
-	require.Equal(t, 3, v.Patch)
+	require.NoError(err)
+	require.NotNil(v)
+	require.Equal("v1.2.3", v.String())
+	require.Equal(1, v.Major)
+	require.Equal(2, v.Minor)
+	require.Equal(3, v.Patch)
 
 	tests := []struct {
 		version     string
@@ -60,22 +62,24 @@ func TestParse(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.version, func(t *testing.T) {
 			_, err := Parse(test.version)
-			require.ErrorIs(t, err, test.expectedErr)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
 
 func TestParseApplication(t *testing.T) {
+	require := require.New(t)
+
 	v, err := ParseApplication("avalanche/1.2.3")
 
-	require.NoError(t, err)
-	require.NotNil(t, v)
-	require.Equal(t, "avalanche/1.2.3", v.String())
-	require.Equal(t, 1, v.Major)
-	require.Equal(t, 2, v.Minor)
-	require.Equal(t, 3, v.Patch)
-	require.NoError(t, v.Compatible(v))
-	require.False(t, v.Before(v))
+	require.NoError(err)
+	require.NotNil(v)
+	require.Equal("avalanche/1.2.3", v.String())
+	require.Equal(1, v.Major)
+	require.Equal(2, v.Minor)
+	require.Equal(3, v.Patch)
+	require.NoError(v.Compatible(v))
+	require.False(v.Before(v))
 
 	tests := []struct {
 		version     string
@@ -109,7 +113,7 @@ func TestParseApplication(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.version, func(t *testing.T) {
 			_, err := ParseApplication(test.version)
-			require.ErrorIs(t, err, test.expectedErr)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

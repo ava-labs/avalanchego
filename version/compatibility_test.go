@@ -12,6 +12,8 @@ import (
 )
 
 func TestCompatibility(t *testing.T) {
+	require := require.New(t)
+
 	v := &Application{
 		Major: 1,
 		Minor: 4,
@@ -35,7 +37,7 @@ func TestCompatibility(t *testing.T) {
 		minCompatableTime,
 		prevMinCompatable,
 	).(*compatibility)
-	require.Equal(t, v, compatibility.Version())
+	require.Equal(v, compatibility.Version())
 
 	tests := []struct {
 		peer       *Application

@@ -33,9 +33,11 @@ func TestClockSync(t *testing.T) {
 }
 
 func TestClockUnixTime(t *testing.T) {
+	require := require.New(t)
+
 	clock := Clock{true, time.Unix(123, 123)}
-	require.Zero(t, clock.UnixTime().Nanosecond())
-	require.Equal(t, 123, clock.Time().Nanosecond())
+	require.Zero(clock.UnixTime().Nanosecond())
+	require.Equal(123, clock.Time().Nanosecond())
 }
 
 func TestClockUnix(t *testing.T) {

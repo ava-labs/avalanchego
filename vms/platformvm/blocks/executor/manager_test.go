@@ -65,6 +65,8 @@ func TestGetBlock(t *testing.T) {
 }
 
 func TestManagerLastAccepted(t *testing.T) {
+	require := require.New(t)
+
 	lastAcceptedID := ids.GenerateTestID()
 	manager := &manager{
 		backend: &backend{
@@ -72,5 +74,5 @@ func TestManagerLastAccepted(t *testing.T) {
 		},
 	}
 
-	require.Equal(t, lastAcceptedID, manager.LastAccepted())
+	require.Equal(lastAcceptedID, manager.LastAccepted())
 }

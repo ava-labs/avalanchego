@@ -763,6 +763,8 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 }
 
 func TestIsProcessing(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -783,22 +785,22 @@ func TestIsProcessing(t *testing.T) {
 
 	// Parse blk1
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Check that it is not processing in consensus
-	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.False(chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Verify blk1
 	err = parsedBlk1.Verify(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Check that it is processing in consensus
-	require.True(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.True(chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Accept blk1
 	err = parsedBlk1.Accept(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Check that it is no longer processing in consensus
-	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.False(chainState.IsProcessing(parsedBlk1.ID()))
 }

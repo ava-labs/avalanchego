@@ -890,6 +890,8 @@ func TestIssueProperty(t *testing.T) {
 }
 
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	require := require.New(t)
+
 	addr0Str, _ := address.FormatBech32(testHRP, addrs[0].Bytes())
 	addr1Str, _ := address.FormatBech32(testHRP, addrs[1].Bytes())
 	addr2Str, _ := address.FormatBech32(testHRP, addrs[2].Bytes())
@@ -941,34 +943,36 @@ func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.M
 	}
 	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, nil, customArgs)
 	expectedID, err := vm.Aliaser.Lookup(assetAlias)
-	require.NoError(t, err)
-	require.Equal(t, expectedID, vm.feeAssetID)
+	require.NoError(err)
+	require.Equal(expectedID, vm.feeAssetID)
 	return genesisBytes, issuer, vm, m
 }
 
 func TestIssueTxWithFeeAsset(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
 	ctx := vm.ctx
 	defer func() {
 		err := vm.Shutdown(context.Background())
-		require.NoError(t, err)
+		require.NoError(err)
 		ctx.Lock.Unlock()
 	}()
 	// send first asset
 	newTx := NewTxWithAsset(t, genesisBytes, vm, feeAssetName)
 
 	txID, err := vm.IssueTx(newTx.Bytes())
-	require.NoError(t, err)
-	require.Equal(t, txID, newTx.ID())
+	require.NoError(err)
+	require.Equal(txID, newTx.ID())
 
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	require.Equal(t, msg, common.PendingTxs)
+	require.Equal(msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
 	txs := vm.PendingTxs(context.Background())
-	require.Len(t, txs, 1)
+	require.Len(txs, 1)
 	t.Log(txs)
 }
 
@@ -1031,12 +1035,12 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 
 	txID, err := vm.IssueTx(newTx.Bytes())
 	require.NoError(err)
-	require.Equal(t, txID, newTx.ID())
+	require.Equal(txID, newTx.ID())
 
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	require.Equal(t, msg, common.PendingTxs)
+	require.Equal(msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
 	txs := vm.PendingTxs(context.Background())
@@ -1355,7 +1359,7 @@ func TestImportTxSerialization(t *testing.T) {
 	}}
 
 	require.NoError(vm.parser.InitializeTx(tx))
-	require.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
+	require.Equal(tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
@@ -1411,7 +1415,7 @@ func TestImportTxSerialization(t *testing.T) {
 		0x46, 0x4e, 0xa1, 0xaf, 0x00,
 	}
 	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0], keys[0]}, {keys[0], keys[0]}}))
-	require.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
+	require.Equal(tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
 	result = tx.Bytes()
 
 	// there are two credentials

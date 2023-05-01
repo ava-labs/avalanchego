@@ -189,45 +189,47 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 }
 
 func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
+	require := require.New(t)
+
 	// merge with range before
 	syncHeap := newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
-	require.Equal(t, 1, syncHeap.Len())
+	require.Equal(1, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: []byte{192}})
-	require.Equal(t, 2, syncHeap.Len())
+	require.Equal(2, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{193}, end: nil})
-	require.Equal(t, 3, syncHeap.Len())
+	require.Equal(3, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{63}, end: []byte{126}, priority: lowPriority})
-	require.Equal(t, 3, syncHeap.Len())
+	require.Equal(3, syncHeap.Len())
 
 	// merge with range after
 	syncHeap = newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
-	require.Equal(t, 1, syncHeap.Len())
+	require.Equal(1, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: []byte{192}})
-	require.Equal(t, 2, syncHeap.Len())
+	require.Equal(2, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{193}, end: nil})
-	require.Equal(t, 3, syncHeap.Len())
+	require.Equal(3, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{64}, end: []byte{127}, priority: lowPriority})
-	require.Equal(t, 3, syncHeap.Len())
+	require.Equal(3, syncHeap.Len())
 
 	// merge both sides at the same time
 	syncHeap = newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
-	require.Equal(t, 1, syncHeap.Len())
+	require.Equal(1, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: nil})
-	require.Equal(t, 2, syncHeap.Len())
+	require.Equal(2, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: []byte{63}, end: []byte{127}, priority: lowPriority})
-	require.Equal(t, 1, syncHeap.Len())
+	require.Equal(1, syncHeap.Len())
 }

@@ -2045,10 +2045,12 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
+	require := require.New(t)
+
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -2083,7 +2085,6 @@ func TestMaxStakeAmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			require := require.New(t)
 			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
@@ -2385,6 +2386,8 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 }
 
 func TestVM_GetValidatorSet(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -2411,17 +2414,17 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
 	err := vm.Initialize(context.Background(), ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender)
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	vm.clock.Set(defaultGenesisTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
-	require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	var (
 		oldVdrs       = vm.Validators
@@ -2433,7 +2436,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	// Populate the validator set to use below
 	for i := 0; i < numVdrs; i++ {
 		sk, err := bls.NewSecretKey()
-		require.NoError(t, err)
+		require.NoError(err)
 
 		vdrs = append(vdrs, &validators.Validator{
 			NodeID:    ids.GenerateTestNodeID(),
@@ -2748,8 +2751,6 @@ func TestVM_GetValidatorSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			// Mock the VM's validators
 			vdrs := validators.NewMockManager(ctrl)
 			vm.Validators = vdrs

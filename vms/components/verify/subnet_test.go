@@ -20,6 +20,8 @@ import (
 var errMissing = errors.New("missing")
 
 func TestSameSubnet(t *testing.T) {
+	require := require.New(t)
+
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 	chainID0 := ids.GenerateTestID()
@@ -95,7 +97,7 @@ func TestSameSubnet(t *testing.T) {
 			ctx := test.ctxF(ctrl)
 
 			result := SameSubnet(context.Background(), ctx, test.chainID)
-			require.ErrorIs(t, result, test.result)
+			require.ErrorIs(result, test.result)
 		})
 	}
 }

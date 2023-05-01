@@ -19,6 +19,7 @@ import (
 )
 
 func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	require := require.New(t)
 	tx, err := txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -28,7 +29,7 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	return tx
 }
 

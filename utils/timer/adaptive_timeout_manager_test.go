@@ -17,6 +17,8 @@ import (
 
 // Test that Initialize works
 func TestAdaptiveTimeoutManagerInit(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		config        AdaptiveTimeoutConfig
 		shouldErrWith string
@@ -86,9 +88,9 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 	for _, test := range tests {
 		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry())
 		if err != nil && test.shouldErrWith == "" {
-			require.FailNow(t, "error from valid config", err)
+			require.FailNow("error from valid config", err)
 		} else if err == nil && test.shouldErrWith != "" {
-			require.FailNowf(t, "should have errored", test.shouldErrWith)
+			require.FailNowf("should have errored", test.shouldErrWith)
 		}
 	}
 }

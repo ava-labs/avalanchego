@@ -111,19 +111,21 @@ func sendRangeRequest(
 }
 
 func TestGetRangeProof(t *testing.T) {
+	require := require.New(t)
+
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
 	smallTrieKeyCount := defaultRequestKeyLimit
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
-	require.NoError(t, err)
+	require.NoError(err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	largeTrieKeyCount := 10_000
 	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
-	require.NoError(t, err)
+	require.NoError(err)
 	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	tests := map[string]struct {
 		db                  *merkledb.Database
@@ -263,7 +265,6 @@ func TestGetRangeProof(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			proof, err := sendRangeRequest(t, test.db, test.request, 1, test.modifyResponse)
 			if test.expectedErr != nil {
 				require.ErrorIs(err, test.expectedErr)
@@ -367,6 +368,8 @@ func sendChangeRequest(
 }
 
 func TestGetChangeProof(t *testing.T) {
+	require := require.New(t)
+
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
 	trieDB, err := merkledb.New(
@@ -378,7 +381,7 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: defaultRequestKeyLimit,
 		},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	verificationDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
@@ -388,47 +391,47 @@ func TestGetChangeProof(t *testing.T) {
 			NodeCacheSize: defaultRequestKeyLimit,
 		},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// create changes
 	for x := 0; x < defaultRequestKeyLimit/2; x++ {
 		view, err := trieDB.NewView()
-		require.NoError(t, err)
+		require.NoError(err)
 
 		// add some key/values
 		for i := 0; i < 10; i++ {
 			key := make([]byte, r.Intn(100))
 			_, err = r.Read(key)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			val := make([]byte, r.Intn(100))
 			_, err = r.Read(val)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			err = view.Insert(context.Background(), key, val)
-			require.NoError(t, err)
+			require.NoError(err)
 		}
 
 		// delete a key
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
 			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
+			require.NoError(err)
 		}
-		require.NoError(t, it.Error())
+		require.NoError(it.Error())
 		it.Release()
 
-		require.NoError(t, view.CommitToDB(context.Background()))
+		require.NoError(view.CommitToDB(context.Background()))
 	}
 
 	endRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	tests := map[string]struct {
 		db                  *merkledb.Database
@@ -528,8 +531,6 @@ func TestGetChangeProof(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-
 			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
 			if test.expectedErr != nil {
 				require.ErrorIs(err, test.expectedErr)

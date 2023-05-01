@@ -87,68 +87,79 @@ func WeightedWithoutReplacementInitializeOverflowTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{1, stdmath.MaxUint64})
-	require.ErrorIs(t, err, math.ErrOverflow)
+	require.ErrorIs(err, math.ErrOverflow)
 }
 
 func WeightedWithoutReplacementOutOfRangeTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	_, err = s.Sample(2)
-	require.ErrorIs(t, err, ErrOutOfRange)
+	require.ErrorIs(err, ErrOutOfRange)
 }
 
 func WeightedWithoutReplacementEmptyWithoutWeightTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize(nil)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	indices, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.NoError(err)
+	require.Len(indices, 0, "shouldn't have selected any elements")
 }
 
 func WeightedWithoutReplacementEmptyTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	indices, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.NoError(err)
+	require.Len(indices, 0, "shouldn't have selected any elements")
 }
 
 func WeightedWithoutReplacementSingletonTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	indices, err := s.Sample(1)
-	require.NoError(t, err)
-	require.Equal(t, []int{0}, indices, "should have selected the first element")
+	require.NoError(err)
+	require.Equal([]int{0}, indices, "should have selected the first element")
 }
 
 func WeightedWithoutReplacementWithZeroTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{0, 1})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	indices, err := s.Sample(1)
-	require.NoError(t, err)
+	require.NoError(err)
 	require.Equal(
-		t,
 		[]int{1},
 		indices,
 		"should have selected the second element",
@@ -159,15 +170,16 @@ func WeightedWithoutReplacementDistributionTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
+	require := require.New(t)
+
 	err := s.Initialize([]uint64{1, 1, 2})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	indices, err := s.Sample(4)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	slices.Sort(indices)
 	require.Equal(
-		t,
 		[]int{0, 1, 2, 2},
 		indices,
 		"should have selected all the elements",

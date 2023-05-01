@@ -11,59 +11,63 @@ import (
 )
 
 func Test_Node_Marshal(t *testing.T) {
+	require := require.New(t)
+
 	root := newNode(nil, EmptyPath)
-	require.NotNil(t, root)
+	require.NotNil(root)
 
 	fullpath := newPath([]byte("key"))
 	childNode := newNode(root, fullpath)
 	childNode.setValue(Some([]byte("value")))
-	require.NotNil(t, childNode)
+	require.NotNil(childNode)
 
 	err := childNode.calculateID(&mockMetrics{})
-	require.NoError(t, err)
+	require.NoError(err)
 	root.addChild(childNode)
 
 	data, err := root.marshal()
-	require.NoError(t, err)
+	require.NoError(err)
 	rootParsed, err := parseNode(newPath([]byte("")), data)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(rootParsed.children))
+	require.NoError(err)
+	require.Equal(1, len(rootParsed.children))
 
 	rootIndex := root.getSingleChildPath()[len(root.key)]
 	parsedIndex := rootParsed.getSingleChildPath()[len(rootParsed.key)]
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
-	require.Equal(t, rootChildEntry.id, parseChildEntry.id)
+	require.Equal(rootChildEntry.id, parseChildEntry.id)
 }
 
 func Test_Node_Marshal_Errors(t *testing.T) {
+	require := require.New(t)
+
 	root := newNode(nil, EmptyPath)
-	require.NotNil(t, root)
+	require.NotNil(root)
 
 	fullpath := newPath([]byte{255})
 	childNode1 := newNode(root, fullpath)
 	childNode1.setValue(Some([]byte("value1")))
-	require.NotNil(t, childNode1)
+	require.NotNil(childNode1)
 
 	err := childNode1.calculateID(&mockMetrics{})
-	require.NoError(t, err)
+	require.NoError(err)
 	root.addChild(childNode1)
 
 	fullpath = newPath([]byte{237})
 	childNode2 := newNode(root, fullpath)
 	childNode2.setValue(Some([]byte("value2")))
-	require.NotNil(t, childNode2)
+	require.NotNil(childNode2)
 
 	err = childNode2.calculateID(&mockMetrics{})
-	require.NoError(t, err)
+	require.NoError(err)
 	root.addChild(childNode2)
 
 	data, err := root.marshal()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
 		_, err = parseNode(newPath([]byte("")), broken)
-		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		require.ErrorIs(err, io.ErrUnexpectedEOF)
 	}
 }

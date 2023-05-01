@@ -382,12 +382,14 @@ func TestIndexer_Read(t *testing.T) {
 		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
 		require.NoError(err)
 		require.Len(txIDs, 5)
-		require.Equal(t, txIDs, testTxs[cursor:cursor+pageSize])
+		require.Equal(txIDs, testTxs[cursor:cursor+pageSize])
 		cursor += pageSize
 	}
 }
 
 func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
+	require := require.New(t)
+
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
 
@@ -395,43 +397,47 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 
 	// start with indexing enabled
 	_, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// now disable indexing with allow-incomplete set to false
 	_, err = index.NewNoIndexer(db, false)
-	require.ErrorIs(t, err, index.ErrCausesIncompleteIndex)
+	require.ErrorIs(err, index.ErrCausesIncompleteIndex)
 
 	// now disable indexing with allow-incomplete set to true
 	_, err = index.NewNoIndexer(db, true)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
+	require := require.New(t)
+
 	ctx := NewContext(t)
 	db := memdb.New()
 
 	// disable indexing with allow-incomplete set to false
 	_, err := index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// It's not OK to have an incomplete index when allowIncompleteIndices is false
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
-	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
+	require.ErrorIs(err, index.ErrIndexingRequiredFromGenesis)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// It's OK to have an incomplete index when indexing currently disabled
 	_, err = index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
 	_, err = index.NewNoIndexer(db, true)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestIndexingAllowIncomplete(t *testing.T) {
+	require := require.New(t)
+
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
 
@@ -439,14 +445,14 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	db := versiondb.New(prefixDB)
 	// disabled indexer will persist idxEnabled as false
 	_, err := index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// we initialize with indexing enabled now and allow incomplete indexing as false
 	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
-	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
+	require.ErrorIs(err, index.ErrIndexingRequiredFromGenesis)
 }
 
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {
@@ -527,6 +533,8 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 }
 
 func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
+	require := require.New(t)
+
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
@@ -534,9 +542,9 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	binary.BigEndian.PutUint64(expectedIdxBytes, expectedIdx)
 
 	idxBytes, err := assetDB.Get([]byte("idx"))
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.EqualValues(t, expectedIdxBytes, idxBytes)
+	require.EqualValues(expectedIdxBytes, idxBytes)
 }
 
 func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) error {
@@ -573,6 +581,8 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 //	    - 0: txID1
 //	    - 1: txID1
 func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
+	require := require.New(t)
+
 	var testTxs []ids.ID
 	for i := 0; i < txCount; i++ {
 		testTxs = append(testTxs, ids.GenerateTestID())
@@ -586,16 +596,16 @@ func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID,
 	for _, txID := range testTxs {
 		txID := txID
 		err := assetPrefixDB.Put(idxBytes, txID[:])
-		require.NoError(t, err)
+		require.NoError(err)
 		idx++
 		binary.BigEndian.PutUint64(idxBytes, idx)
 	}
 	_, err := db.CommitBatch()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
-	require.NoError(t, err)
+	require.NoError(err)
 	err = db.Commit()
-	require.NoError(t, err)
+	require.NoError(err)
 	return testTxs
 }

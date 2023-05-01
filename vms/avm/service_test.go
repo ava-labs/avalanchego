@@ -658,7 +658,7 @@ func TestServiceGetTx(t *testing.T) {
 	require.NoError(err)
 	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx.(string))
 	require.NoError(err)
-	require.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
+	require.Equal(genesisTx.Bytes(), txBytes)
 }
 
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {

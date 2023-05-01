@@ -106,12 +106,14 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
+	require := require.New(t)
+
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic

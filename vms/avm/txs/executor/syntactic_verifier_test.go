@@ -50,13 +50,15 @@ func newContext(t testing.TB) *snow.Context {
 }
 
 func TestSyntacticVerifierBaseTx(t *testing.T) {
+	require := require.New(t)
+
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -408,8 +410,6 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
@@ -422,13 +422,15 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
+	require := require.New(t)
+
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1017,8 +1019,6 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
@@ -1031,13 +1031,15 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierOperationTx(t *testing.T) {
+	require := require.New(t)
+
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1506,8 +1508,6 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
@@ -1520,13 +1520,15 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierImportTx(t *testing.T) {
+	require := require.New(t)
+
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1906,8 +1908,6 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
@@ -1920,13 +1920,15 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 }
 
 func TestSyntacticVerifierExportTx(t *testing.T) {
+	require := require.New(t)
+
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -2318,8 +2320,6 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,

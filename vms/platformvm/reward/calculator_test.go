@@ -29,6 +29,8 @@ var defaultConfig = Config{
 }
 
 func TestLongerDurationBonus(t *testing.T) {
+	require := require.New(t)
+
 	c := NewCalculator(defaultConfig)
 	shortDuration := 24 * time.Hour
 	totalDuration := 365 * 24 * time.Hour
@@ -42,10 +44,12 @@ func TestLongerDurationBonus(t *testing.T) {
 
 	longBalance := units.KiloAvax
 	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
-	require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
+	require.Less(shortBalance, longBalance, "should promote stakers to stake longer")
 }
 
 func TestRewards(t *testing.T) {
+	require := require.New(t)
+
 	c := NewCalculator(defaultConfig)
 	tests := []struct {
 		duration       time.Duration
@@ -128,12 +132,14 @@ func TestRewards(t *testing.T) {
 				test.stakeAmount,
 				test.existingAmount,
 			)
-			require.Equal(t, test.expectedReward, reward)
+			require.Equal(test.expectedReward, reward)
 		})
 	}
 }
 
 func TestRewardsOverflow(t *testing.T) {
+	require := require.New(t)
+
 	var (
 		maxSupply     uint64 = math.MaxUint64
 		initialSupply uint64 = 1
@@ -149,10 +155,12 @@ func TestRewardsOverflow(t *testing.T) {
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
 	)
-	require.Equal(t, maxSupply-initialSupply, reward)
+	require.Equal(maxSupply-initialSupply, reward)
 }
 
 func TestRewardsMint(t *testing.T) {
+	require := require.New(t)
+
 	var (
 		maxSupply     uint64 = 1000
 		initialSupply uint64 = 1
@@ -168,5 +176,5 @@ func TestRewardsMint(t *testing.T) {
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
 	)
-	require.Equal(t, maxSupply-initialSupply, rewards)
+	require.Equal(maxSupply-initialSupply, rewards)
 }

@@ -16,9 +16,11 @@ import (
 )
 
 func TestParseGibberish(t *testing.T) {
+	require := require.New(t)
+
 	randomBytes := []byte{0, 1, 2, 3, 4, 5}
 	_, err := Parse(randomBytes)
-	require.ErrorIs(t, err, codec.ErrUnknownVersion)
+	require.ErrorIs(err, codec.ErrUnknownVersion)
 }
 
 func TestParseProto(t *testing.T) {
