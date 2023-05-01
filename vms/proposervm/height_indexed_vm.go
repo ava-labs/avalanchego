@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -27,7 +28,7 @@ func (vm *VM) shouldHeightIndexBeRepaired(ctx context.Context) (bool, error) {
 	// no checkpoint. Either index is complete or repair was never attempted.
 	// index is complete iff lastAcceptedBlock is indexed
 	latestProBlkID, err := vm.State.GetLastAccepted()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {

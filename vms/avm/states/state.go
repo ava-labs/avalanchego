@@ -4,6 +4,7 @@
 package states
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -266,7 +267,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 	}
 
 	txBytes, err := s.txDB.Get(txID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.txCache.Put(txID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -303,7 +304,7 @@ func (s *state) GetBlockID(height uint64) (ids.ID, error) {
 	heightKey := database.PackUInt64(height)
 
 	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blockIDCache.Put(height, ids.Empty)
 		return ids.Empty, database.ErrNotFound
 	}
@@ -328,7 +329,7 @@ func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
 	}
 
 	blkBytes, err := s.blockDB.Get(blkID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blockCache.Put(blkID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -353,7 +354,7 @@ func (s *state) AddBlock(block blocks.Block) {
 
 func (s *state) InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error {
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return s.initializeChainState(stopVertexID, genesisTimestamp)
 	} else if err != nil {
 		return err
@@ -420,7 +421,7 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 	}
 
 	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.statusCache.Put(id, nil)
 		return choices.Unknown, database.ErrNotFound
 	}

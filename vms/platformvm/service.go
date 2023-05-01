@@ -607,7 +607,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 		}
 
 		subnetTx, _, err := s.vm.state.GetTx(subnetID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -1954,7 +1954,7 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 	}
 
 	tx, _, err := state.GetTx(chainID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -2453,7 +2453,7 @@ func (s *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmountArgs
 	}
 
 	staker, err := executor.GetValidator(s.vm.state, args.SubnetID, args.NodeID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
 	if err != nil {

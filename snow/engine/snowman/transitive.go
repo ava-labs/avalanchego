@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -386,7 +387,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
 		options, err := oracleBlk.Options(ctx)
 		switch {
-		case err == snowman.ErrNotOracle:
+		case errors.Is(err, snowman.ErrNotOracle):
 			// if there aren't blocks we need to deliver on startup, we need to set
 			// the preference to the last accepted block
 			if err := t.VM.SetPreference(ctx, lastAcceptedID); err != nil {

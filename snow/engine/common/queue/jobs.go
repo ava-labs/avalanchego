@@ -5,6 +5,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -142,7 +143,7 @@ func (j *Jobs) ExecuteAll(
 		}
 
 		job, err := j.state.RemoveRunnableJob(ctx)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			break
 		}
 		if err != nil {

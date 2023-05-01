@@ -672,7 +672,7 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	}
 
 	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.transformedSubnetCache.Put(subnetID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -753,7 +753,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		return tx.tx, tx.status, nil
 	}
 	txBytes, err := s.txDB.Get(txID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
@@ -884,7 +884,7 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	}
 
 	supply, err := database.GetUInt64(s.supplyDB, subnetID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.supplyCache.Put(subnetID, nil)
 		return 0, database.ErrNotFound
 	}
@@ -1530,7 +1530,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blockCache.Put(blockID, nil)
 		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	} else if err != nil {
