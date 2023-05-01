@@ -57,6 +57,8 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int]) {
 }
 
 func TestEviction(t *testing.T, cache Cacher[ids.ID, int]) {
+	require := require.New(t)
+
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}
 	id3 := ids.ID{3}
@@ -64,69 +66,56 @@ func TestEviction(t *testing.T, cache Cacher[ids.ID, int]) {
 	cache.Put(id1, 1)
 	cache.Put(id2, 2)
 
-	if val, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 1 {
-		t.Fatalf("Retrieved wrong value")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	} else if _, found := cache.Get(id3); found {
-		t.Fatalf("Retrieve value when none exists")
-	}
+	val, found := cache.Get(id1)
+	require.True(found)
+	require.Equal(1, val)
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
+	_, found = cache.Get(id3)
+	require.False(found)
 
 	cache.Put(id3, 3)
 
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieve value when none exists")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	} else if val, found := cache.Get(id3); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 3 {
-		t.Fatalf("Retrieved wrong value")
-	}
+	_, found = cache.Get(id1)
+	require.False(found)
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
+	val, found = cache.Get(id3)
+	require.True(found)
+	require.Equal(3, val)
 
 	cache.Get(id2)
 	cache.Put(id1, 1)
 
-	if val, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 1 {
-		t.Fatalf("Retrieved wrong value")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	} else if _, found := cache.Get(id3); found {
-		t.Fatalf("Retrieved value when none exists")
-	}
+	val, found = cache.Get(id1)
+	require.True(found)
+	require.Equal(1, val)
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
+	_, found = cache.Get(id3)
+	require.False(found)
 
 	cache.Evict(id2)
 	cache.Put(id3, 3)
 
-	if val, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 1 {
-		t.Fatalf("Retrieved wrong value")
-	} else if _, found := cache.Get(id2); found {
-		t.Fatalf("Retrieved value when none exists")
-	} else if val, found := cache.Get(id3); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 3 {
-		t.Fatalf("Retrieved wrong value")
-	}
+	val, found = cache.Get(id1)
+	require.True(found)
+	require.Equal(1, val)
+	_, found = cache.Get(id2)
+	require.False(found)
+	val, found = cache.Get(id3)
+	require.True(found)
+	require.Equal(3, val)
 
 	cache.Flush()
 
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieved value when none exists")
-	} else if _, found := cache.Get(id2); found {
-		t.Fatalf("Retrieved value when none exists")
-	} else if _, found := cache.Get(id3); found {
-		t.Fatalf("Retrieved value when none exists")
-	}
+	_, found = cache.Get(id1)
+	require.False(found)
+	_, found = cache.Get(id2)
+	require.False(found)
+	_, found = cache.Get(id3)
+	require.False(found)
 }

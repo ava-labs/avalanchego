@@ -43,9 +43,7 @@ func TestIterate(t *testing.T) {
 	require.NoError(db.Commit())
 
 	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
+	require.NotNil(iterator)
 	defer iterator.Release()
 
 	require.True(iterator.Next())

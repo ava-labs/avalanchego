@@ -6,7 +6,6 @@ package ids
 import (
 	"bytes"
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,16 +14,14 @@ import (
 )
 
 func TestID(t *testing.T) {
+	require := require.New(t)
+
 	id := ID{24}
 	idCopy := ID{24}
 	prefixed := id.Prefix(0)
 
-	if id != idCopy {
-		t.Fatalf("ID.Prefix mutated the ID")
-	}
-	if nextPrefix := id.Prefix(0); prefixed != nextPrefix {
-		t.Fatalf("ID.Prefix not consistent")
-	}
+	require.Equal(idCopy, id)
+	require.Equal(prefixed, id.Prefix(0))
 }
 
 func TestIDBit(t *testing.T) {
@@ -135,12 +132,11 @@ func TestIDUnmarshalJSON(t *testing.T) {
 }
 
 func TestIDHex(t *testing.T) {
+	require := require.New(t)
+
 	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	expected := "617661206c616273000000000000000000000000000000000000000000000000"
-	actual := id.Hex()
-	if actual != expected {
-		t.Fatalf("got %s, expected %s", actual, expected)
-	}
+	require.Equal(expected, id.Hex())
 }
 
 func TestIDString(t *testing.T) {
@@ -163,6 +159,7 @@ func TestIDString(t *testing.T) {
 }
 
 func TestSortIDs(t *testing.T) {
+	require := require.New(t)
 	ids := []ID{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
@@ -174,9 +171,7 @@ func TestSortIDs(t *testing.T) {
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	if !reflect.DeepEqual(ids, expected) {
-		t.Fatal("[]ID was not sorted lexographically")
-	}
+	require.Equal(expected, ids)
 }
 
 func TestIDMapMarshalling(t *testing.T) {
@@ -193,14 +188,7 @@ func TestIDMapMarshalling(t *testing.T) {
 	err = json.Unmarshal(mapJSON, &unmarshalledMap)
 	require.NoError(err)
 
-	if len(originalMap) != len(unmarshalledMap) {
-		t.Fatalf("wrong map lengths")
-	}
-	for originalID, num := range originalMap {
-		if unmarshalledMap[originalID] != num {
-			t.Fatalf("map was incorrectly Unmarshalled")
-		}
-	}
+	require.Equal(originalMap, unmarshalledMap)
 }
 
 func TestIDLess(t *testing.T) {

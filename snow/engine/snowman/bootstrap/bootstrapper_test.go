@@ -409,19 +409,11 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes0})) // respond with wrong block
 	require.NotEqual(oldReqID, *requestID)
 
-	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1})
-	switch {
-	case err != nil: // respond with right block
-		t.Fatal(err)
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case blk0.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	case blk1.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	case blk2.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1}))
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, blk0.Status())
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Accepted, blk2.Status())
 }
 
 // There are multiple needed blocks and Ancestors returns one at a time
@@ -547,9 +539,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	requestID := new(uint32)
 	requested := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
-		}
+		require.Equal(peerID, vdr)
 		switch vtxID {
 		case blkID1, blkID2:
 		default:
@@ -559,32 +549,18 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
-	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request blk2
-		t.Fatal(err)
-	}
+	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request blk2
 
-	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
-		t.Fatal(err)
-	} else if requested != blkID1 {
-		t.Fatal("should have requested blk1")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2})) // respond with blk2
+	require.Equal(blkID1, requested)
 
-	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
-		t.Fatal(err)
-	} else if requested != blkID1 {
-		t.Fatal("should not have requested another block")
-	}
+	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1})) // respond with blk1
+	require.Equal(blkID1, requested)
 
-	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
-		t.Fatalf("Bootstrapping should have finished")
-	case blk0.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	case blk1.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	case blk2.Status() != choices.Accepted:
-		t.Fatalf("Block should be accepted")
-	}
+	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.Equal(choices.Accepted, blk0.Status())
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Accepted, blk2.Status())
 }
 
 // There are multiple needed blocks and some validators do not have all the blocks
@@ -873,9 +849,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	requestID := new(uint32)
 	requested := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
-		if vdr != peerID {
-			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
-		}
+		require.Equal(peerID, vdr)
 		switch vtxID {
 		case blkID1, blkID2:
 		default:
@@ -1186,9 +1160,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}))
 
-	if config.Ctx.State.Get().State == snow.NormalOp {
-		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
-	}
+	require.NotEqual(snow.NormalOp, config.Ctx.State.Get().State == snow.NormalOp)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}))
 

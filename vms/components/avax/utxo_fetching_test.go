@@ -167,9 +167,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
 	}
 
-	if len(totalUTXOs) != 2000 {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 2000, len(totalUTXOs))
-	}
+	require.Len(totalUTXOs, 2000)
 
 	// Fetch all UTXOs
 	notPaginatedUTXOs, err := GetAllUTXOs(s, addrs)

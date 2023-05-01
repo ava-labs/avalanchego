@@ -480,25 +480,16 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	votes.Add(firstBlock.ID())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	if pref := sm.Preference(); pref != firstBlock.ID() {
-		t.Fatalf("Preference returned the wrong block")
-	} else if sm.Finalized() {
-		t.Fatalf("Snowman instance finalized too soon")
-	} else if status := firstBlock.Status(); status != choices.Processing {
-		t.Fatalf("Block's status changed unexpectedly")
-	} else if status := secondBlock.Status(); status != choices.Processing {
-		t.Fatalf("Block's status changed unexpectedly")
-	}
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.False(sm.Finalized())
+	require.Equal(choices.Processing, firstBlock.Status())
+	require.Equal(choices.Processing, secondBlock.Status())
+
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	if pref := sm.Preference(); pref != firstBlock.ID() {
-		t.Fatalf("Preference returned the wrong block")
-	} else if !sm.Finalized() {
-		t.Fatalf("Snowman instance didn't finalize")
-	} else if status := firstBlock.Status(); status != choices.Accepted {
-		t.Fatalf("Block's status should have been set to accepted")
-	} else if status := secondBlock.Status(); status != choices.Rejected {
-		t.Fatalf("Block's status should have been set to rejected")
-	}
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.True(sm.Finalized())
+	require.Equal(choices.Accepted, firstBlock.Status())
+	require.Equal(choices.Rejected, secondBlock.Status())
 }
 
 func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
@@ -652,17 +643,11 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// 0
 	// Tail = 0
 
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if pref := sm.Preference(); block0.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	} else if status := block0.Status(); status != choices.Accepted {
-		t.Fatalf("Wrong status returned")
-	} else if status := block1.Status(); status != choices.Rejected {
-		t.Fatalf("Wrong status returned")
-	} else if status := block2.Status(); status != choices.Rejected {
-		t.Fatalf("Wrong status returned")
-	}
+	require.True(sm.Finalized())
+	require.Equal(block0.ID(), sm.Preference())
+	require.Equal(choices.Accepted, block0.Status())
+	require.Equal(choices.Rejected, block1.Status())
+	require.Equal(choices.Rejected, block2.Status())
 }
 
 func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
@@ -731,48 +716,31 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor2 := bag.Bag[ids.ID]{}
 	votesFor2.Add(block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if pref := sm.Preference(); block2.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
 
 	emptyVotes := bag.Bag[ids.ID]{}
 	require.NoError(sm.RecordPoll(context.Background(), emptyVotes))
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if pref := sm.Preference(); block2.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
+
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if pref := sm.Preference(); block2.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
 
 	votesFor3 := bag.Bag[ids.ID]{}
 	votesFor3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if pref := sm.Preference(); block2.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
+
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
-	if !sm.Finalized() {
-		t.Fatalf("Finalized too late")
-	} else if pref := sm.Preference(); block3.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	} else if status := block0.Status(); status != choices.Rejected {
-		t.Fatalf("Wrong status returned")
-	} else if status := block1.Status(); status != choices.Accepted {
-		t.Fatalf("Wrong status returned")
-	} else if status := block2.Status(); status != choices.Rejected {
-		t.Fatalf("Wrong status returned")
-	} else if status := block3.Status(); status != choices.Accepted {
-		t.Fatalf("Wrong status returned")
-	}
+	require.True(sm.Finalized())
+	require.Equal(block3.ID(), sm.Preference())
+	require.Equal(choices.Rejected, block0.Status())
+	require.Equal(choices.Accepted, block1.Status())
+	require.Equal(choices.Rejected, block2.Status())
+	require.Equal(choices.Accepted, block3.Status())
 }
 
 func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
@@ -813,11 +781,8 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	invalidVotes.Add(unknownBlockID)
 	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
-	if sm.Finalized() {
-		t.Fatalf("Finalized too early")
-	} else if pref := sm.Preference(); block.ID() != pref {
-		t.Fatalf("Wrong preference listed")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block.ID(), sm.Preference())
 }
 
 func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
@@ -911,23 +876,13 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	pref := sm.Preference()
-	switch {
-	case block2.ID() != pref:
-		t.Fatalf("Wrong preference listed")
-	case sm.Finalized():
-		t.Fatalf("Finalized too early")
-	case block0.Status() != choices.Accepted:
-		t.Fatalf("Should have accepted")
-	case block1.Status() != choices.Processing:
-		t.Fatalf("Should have accepted")
-	case block2.Status() != choices.Processing:
-		t.Fatalf("Should have accepted")
-	case block3.Status() != choices.Processing:
-		t.Fatalf("Should have rejected")
-	case block4.Status() != choices.Processing:
-		t.Fatalf("Should have rejected")
-	}
+	require.False(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(choices.Accepted, block0.Status())
+	require.Equal(choices.Processing, block1.Status())
+	require.Equal(choices.Processing, block2.Status())
+	require.Equal(choices.Processing, block3.Status())
+	require.Equal(choices.Processing, block4.Status())
 
 	dep2_2_2 := bag.Bag[ids.ID]{}
 	dep2_2_2.AddCount(block2.ID(), 3)
@@ -937,23 +892,13 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	//   2
 	// Tail = 2
 
-	pref = sm.Preference()
-	switch {
-	case block2.ID() != pref:
-		t.Fatalf("Wrong preference listed")
-	case !sm.Finalized():
-		t.Fatalf("Finalized too late")
-	case block0.Status() != choices.Accepted:
-		t.Fatalf("Should have accepted")
-	case block1.Status() != choices.Accepted:
-		t.Fatalf("Should have accepted")
-	case block2.Status() != choices.Accepted:
-		t.Fatalf("Should have accepted")
-	case block3.Status() != choices.Rejected:
-		t.Fatalf("Should have rejected")
-	case block4.Status() != choices.Rejected:
-		t.Fatalf("Should have rejected")
-	}
+	require.True(sm.Finalized())
+	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(choices.Accepted, block0.Status())
+	require.Equal(choices.Accepted, block1.Status())
+	require.Equal(choices.Accepted, block2.Status())
+	require.Equal(choices.Rejected, block3.Status())
+	require.Equal(choices.Rejected, block4.Status())
 }
 
 func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
@@ -1227,44 +1172,23 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(context.Background(), b1Block))
 	require.NoError(sm.Add(context.Background(), b2Block))
 
-	if sm.Preference() != a2Block.ID() {
-		t.Fatal("Wrong preference reported")
-	}
+	require.Equal(a2Block.ID(), sm.Preference())
 
-	if !sm.IsPreferred(a1Block) {
-		t.Fatalf("Should have reported a1 as being preferred")
-	}
-	if !sm.IsPreferred(a2Block) {
-		t.Fatalf("Should have reported a2 as being preferred")
-	}
-	if sm.IsPreferred(b1Block) {
-		t.Fatalf("Shouldn't have reported b1 as being preferred")
-	}
-	if sm.IsPreferred(b2Block) {
-		t.Fatalf("Shouldn't have reported b2 as being preferred")
-	}
+	require.True(sm.IsPreferred(a1Block))
+	require.True(sm.IsPreferred(a2Block))
+	require.False(sm.IsPreferred(b1Block))
+	require.False(sm.IsPreferred(b2Block))
 
 	b2Votes := bag.Bag[ids.ID]{}
 	b2Votes.Add(b2Block.ID())
 
 	require.NoError(sm.RecordPoll(context.Background(), b2Votes))
 
-	if sm.Preference() != b2Block.ID() {
-		t.Fatal("Wrong preference reported")
-	}
-
-	if sm.IsPreferred(a1Block) {
-		t.Fatalf("Shouldn't have reported a1 as being preferred")
-	}
-	if sm.IsPreferred(a2Block) {
-		t.Fatalf("Shouldn't have reported a2 as being preferred")
-	}
-	if !sm.IsPreferred(b1Block) {
-		t.Fatalf("Should have reported b1 as being preferred")
-	}
-	if !sm.IsPreferred(b2Block) {
-		t.Fatalf("Should have reported b2 as being preferred")
-	}
+	require.Equal(b2Block.ID(), sm.Preference())
+	require.False(sm.IsPreferred(a1Block))
+	require.False(sm.IsPreferred(a2Block))
+	require.True(sm.IsPreferred(b1Block))
+	require.True(sm.IsPreferred(b2Block))
 
 	a1Votes := bag.Bag[ids.ID]{}
 	a1Votes.Add(a1Block.ID())
@@ -1272,22 +1196,11 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
 	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
 
-	if sm.Preference() != a2Block.ID() {
-		t.Fatal("Wrong preference reported")
-	}
-
-	if !sm.IsPreferred(a1Block) {
-		t.Fatalf("Should have reported a1 as being preferred")
-	}
-	if !sm.IsPreferred(a2Block) {
-		t.Fatalf("Should have reported a2 as being preferred")
-	}
-	if sm.IsPreferred(b1Block) {
-		t.Fatalf("Shouldn't have reported b1 as being preferred")
-	}
-	if sm.IsPreferred(b2Block) {
-		t.Fatalf("Shouldn't have reported b2 as being preferred")
-	}
+	require.Equal(a2Block.ID(), sm.Preference())
+	require.True(sm.IsPreferred(a1Block))
+	require.True(sm.IsPreferred(a2Block))
+	require.False(sm.IsPreferred(b1Block))
+	require.False(sm.IsPreferred(b2Block))
 }
 
 func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
@@ -1314,9 +1227,8 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 
 	require.NoError(ctx.Registerer.Register(numProcessing))
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
-		t.Fatalf("should have errored during initialization due to a duplicate metric")
-	}
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
 func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
@@ -1343,9 +1255,8 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 
 	require.NoError(ctx.Registerer.Register(numAccepted))
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
-		t.Fatalf("should have errored during initialization due to a duplicate metric")
-	}
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
 func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
@@ -1372,9 +1283,8 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 
 	require.NoError(ctx.Registerer.Register(numRejected))
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
-		t.Fatalf("should have errored during initialization due to a duplicate metric")
-	}
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
 func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
@@ -1411,9 +1321,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		HeightV: rejectedBlock.HeightV + 1,
 	}
 
-	if err := sm.Add(context.Background(), block); err == nil {
-		t.Fatalf("Should have errored on rejecting the rejectable block")
-	}
+	require.ErrorIs(sm.Add(context.Background(), block), errTest)
 }
 
 func ErrorOnAcceptTest(t *testing.T, factory Factory) {
@@ -1449,9 +1357,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
-	if err := sm.RecordPoll(context.Background(), votes); err == nil {
-		t.Fatalf("Should have errored on accepted the block")
-	}
+	require.ErrorIs(sm.RecordPoll(context.Background(), votes), errTest)
 }
 
 func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
@@ -1496,9 +1402,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
-	if err := sm.RecordPoll(context.Background(), votes); err == nil {
-		t.Fatalf("Should have errored on rejecting the block's sibling")
-	}
+	require.ErrorIs(sm.RecordPoll(context.Background(), votes), errTest)
 }
 
 func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
@@ -1552,9 +1456,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
-	if err := sm.RecordPoll(context.Background(), votes); err == nil {
-		t.Fatalf("Should have errored on transitively rejecting the block")
-	}
+	require.ErrorIs(sm.RecordPoll(context.Background(), votes), errTest)
 }
 
 func RandomizedConsistencyTest(t *testing.T, factory Factory) {
@@ -1587,9 +1489,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 		require.NoError(n.Round())
 	}
 
-	if !n.Agreement() {
-		t.Fatalf("Network agreed on inconsistent values")
-	}
+	require.True(n.Agreement())
 }
 
 func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {

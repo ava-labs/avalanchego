@@ -5,7 +5,6 @@ package snowball
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,6 +62,8 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 }
 
 func TestParametersInvalidK(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     0,
 		Alpha:                 1,
@@ -74,12 +75,12 @@ func TestParametersInvalidK(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid k")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidAlpha(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 0,
@@ -91,12 +92,12 @@ func TestParametersInvalidAlpha(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid alpha")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaVirtuous(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -108,12 +109,12 @@ func TestParametersInvalidBetaVirtuous(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta virtuous")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaRogue(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -125,12 +126,12 @@ func TestParametersInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta rogue")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -142,14 +143,12 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta rogue")
-	} else if !strings.Contains(err.Error(), "\n") {
-		t.Fatalf("Should have described the extensive error")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidConcurrentRepolls(t *testing.T) {
+	require := require.New(t)
+
 	tests := []Parameters{
 		{
 			K:                     1,
@@ -175,14 +174,14 @@ func TestParametersInvalidConcurrentRepolls(t *testing.T) {
 	for _, p := range tests {
 		label := fmt.Sprintf("ConcurrentRepolls=%d", p.ConcurrentRepolls)
 		t.Run(label, func(t *testing.T) {
-			if err := p.Verify(); err == nil {
-				t.Error("Should have failed due to invalid concurrent repolls")
-			}
+			require.ErrorIs(p.Verify(), ErrParametersInvalid)
 		})
 	}
 }
 
 func TestParametersInvalidOptimalProcessing(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -194,12 +193,12 @@ func TestParametersInvalidOptimalProcessing(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid optimal processing")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -211,12 +210,12 @@ func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid max outstanding items")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -228,7 +227,5 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 		MaxItemProcessingTime: 0,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid max item processing time")
-	}
+	require.ErrorIs(p.Verify(), ErrParametersInvalid)
 }

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -39,7 +41,8 @@ func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return vm.GetMinimumHeightF(ctx)
 	}
 	if vm.CantGetMinimumHeight && vm.T != nil {
-		vm.T.Fatal(errMinimumHeight)
+		require := require.New(vm.T)
+		require.FailNow(errMinimumHeight.Error())
 	}
 	return 0, errMinimumHeight
 }
@@ -49,7 +52,8 @@ func (vm *TestState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return vm.GetCurrentHeightF(ctx)
 	}
 	if vm.CantGetCurrentHeight && vm.T != nil {
-		vm.T.Fatal(errCurrentHeight)
+		require := require.New(vm.T)
+		require.FailNow(errCurrentHeight.Error())
 	}
 	return 0, errCurrentHeight
 }
@@ -59,7 +63,8 @@ func (vm *TestState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, e
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
 	if vm.CantGetSubnetID && vm.T != nil {
-		vm.T.Fatal(errSubnetID)
+		require := require.New(vm.T)
+		require.FailNow(errSubnetID.Error())
 	}
 	return ids.Empty, errSubnetID
 }
@@ -73,7 +78,8 @@ func (vm *TestState) GetValidatorSet(
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.CantGetValidatorSet && vm.T != nil {
-		vm.T.Fatal(errGetValidatorSet)
+		require := require.New(vm.T)
+		require.FailNow(errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
 }

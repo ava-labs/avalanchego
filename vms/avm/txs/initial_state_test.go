@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
@@ -74,12 +73,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 
 	isBytes, err := m.Marshal(CodecVersion, is)
 	require.NoError(err)
-	if !bytes.Equal(isBytes, expected) {
-		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
-			expected,
-			isBytes,
-		)
-	}
+	require.Equal(expected, isBytes)
 }
 
 func TestInitialStateVerifyNil(t *testing.T) {
@@ -91,9 +85,7 @@ func TestInitialStateVerifyNil(t *testing.T) {
 	numFxs := 1
 
 	is := (*InitialState)(nil)
-	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have erred due to nil initial state")
-	}
+	require.ErrorIs(is.Verify(m, numFxs), ErrNilInitialState)
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
@@ -107,9 +99,7 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	is := InitialState{
 		FxIndex: 1,
 	}
-	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have erred due to unknown FxIndex")
-	}
+	require.ErrorIs(is.Verify(m, numFxs), ErrUnknownFx)
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
@@ -124,9 +114,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 		FxIndex: 0,
 		Outs:    []verify.State{nil},
 	}
-	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have erred due to a nil output")
-	}
+	require.ErrorIs(is.Verify(m, numFxs), ErrNilFxOutput)
 }
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
@@ -142,9 +130,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 		FxIndex: 0,
 		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
 	}
-	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have erred due to an invalid output")
-	}
+	require.ErrorIs(is.Verify(m, numFxs), errTest)
 }
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
@@ -163,12 +149,8 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 			&avax.TestTransferable{Val: 0},
 		},
 	}
-	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have erred due to unsorted outputs")
-	}
-
+	require.Error(is.Verify(m, numFxs), ErrOutputsNotSorted)
 	is.Sort(m)
-
 	require.NoError(is.Verify(m, numFxs))
 }
 

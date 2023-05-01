@@ -323,13 +323,13 @@ func TestSend(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)
@@ -362,13 +362,13 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)

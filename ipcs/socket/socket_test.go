@@ -39,19 +39,16 @@ func TestSocketSendAndReceive(t *testing.T) {
 	// Receive message and compare it to what was sent
 	receivedMsg, err := client.Recv()
 	require.NoError(err)
-	if string(receivedMsg) != string(msg) {
-		t.Fatal("Received incorrect message:", string(msg))
-	}
+	require.Equal(msg, receivedMsg)
 
 	// Test max message size
 	client.SetMaxMessageSize(msgLen)
-	if _, err := client.Recv(); err != nil {
-		t.Fatal("Failed to receive from socket:", err.Error())
-	}
+	_, err = client.Recv()
+	require.NoError(err)
+
 	client.SetMaxMessageSize(msgLen - 1)
-	if _, err := client.Recv(); err != ErrMessageTooLarge {
-		t.Fatal("Should have received message too large error, got:", err)
-	}
+	_, err = client.Recv()
+	require.ErrorIs(err, ErrMessageTooLarge)
 }
 
 // newTestAcceptFn creates a new acceptFn and a channel that receives all new

@@ -111,9 +111,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	bsIntf, err := New(vm, config)
 	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.True(ok)
 
 	var accepted []ids.ID
 	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
@@ -122,12 +120,8 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
 
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
-		t.Fatalf("Blk should be accepted")
-	}
+	require.Len(accepted, 1)
+	require.Equal(blkID, accepted[0])
 }
 
 func TestFilterAccepted(t *testing.T) {
@@ -163,9 +157,7 @@ func TestFilterAccepted(t *testing.T) {
 	bsIntf, err := New(vm, config)
 	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.True(ok)
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -191,16 +183,8 @@ func TestFilterAccepted(t *testing.T) {
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
-	if acceptedSet.Len() != 2 {
-		t.Fatalf("Two blocks should be accepted")
-	}
-	if !acceptedSet.Contains(blkID0) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if !acceptedSet.Contains(blkID1) {
-		t.Fatalf("Blk should be accepted")
-	}
-	if acceptedSet.Contains(blkID2) {
-		t.Fatalf("Blk shouldn't be accepted")
-	}
+	require.Len(acceptedSet, 2)
+	require.Contains(acceptedSet, blkID0)
+	require.Contains(acceptedSet, blkID1)
+	require.NotContains(acceptedSet, blkID2)
 }
