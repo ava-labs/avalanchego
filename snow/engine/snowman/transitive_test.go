@@ -2765,8 +2765,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.False(*asked, "Asked multiple times")
-		require.Equal(blkID, blk1.ID(), "Expected engine to request blk1")
-		require.Equal(inVdr, vdr, "Expected engine to request blk1 from vdr")
+		require.Equal(blk1.ID(), blkID, "Expected engine to request blk1")
+		require.Equal(vdr, inVdr, "Expected engine to request blk1 from vdr")
 		*asked = true
 	}
 	// this engine receives Gossip message for [blk2] which is "unknown" in this engine
