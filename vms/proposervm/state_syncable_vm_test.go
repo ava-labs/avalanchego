@@ -181,7 +181,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -263,7 +263,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -348,7 +348,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -418,7 +418,7 @@ func TestParseStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -478,7 +478,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -552,7 +552,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(b, innerBlk.Bytes())
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
