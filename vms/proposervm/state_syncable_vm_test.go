@@ -392,7 +392,7 @@ func TestParseStateSummary(t *testing.T) {
 		return innerSummary, nil
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(h, reqHeight)
+		require.Equal(reqHeight, h)
 		return innerSummary, nil
 	}
 
@@ -474,7 +474,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(h, reqHeight)
+		require.Equal(reqHeight, h)
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -548,7 +548,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(h, reqHeight)
+		require.Equal(reqHeight, h)
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
