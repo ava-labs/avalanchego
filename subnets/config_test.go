@@ -9,24 +9,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var validParameters = avalanche.Parameters{
-	Parents:   2,
-	BatchSize: 1,
-	Parameters: snowball.Parameters{
-		K:                     1,
-		Alpha:                 1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	},
+var validParameters = snowball.Parameters{
+	K:                     1,
+	Alpha:                 1,
+	BetaVirtuous:          1,
+	BetaRogue:             1,
+	ConcurrentRepolls:     1,
+	OptimalProcessing:     1,
+	MaxOutstandingItems:   1,
+	MaxItemProcessingTime: 1,
 }
 
 func TestValid(t *testing.T) {
@@ -38,11 +33,9 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid consensus parameters",
 			s: Config{
-				ConsensusParameters: avalanche.Parameters{
-					Parameters: snowball.Parameters{
-						K:     2,
-						Alpha: 1,
-					},
+				ConsensusParameters: snowball.Parameters{
+					K:     2,
+					Alpha: 1,
 				},
 			},
 			expectedErr: snowball.ErrParametersInvalid,
