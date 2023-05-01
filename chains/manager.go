@@ -885,7 +885,6 @@ func (m *manager) createAvalancheChain(
 		VM:            vmWrappingProposerVM,
 	}
 	snowmanBootstrapper, err := smbootstrap.New(
-		context.TODO(),
 		bootstrapCfg,
 		snowmanEngine.Start,
 	)
@@ -939,7 +938,6 @@ func (m *manager) createAvalancheChain(
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
-		context.TODO(),
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
 	)
@@ -1223,7 +1221,6 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:  bootstrapFunc,
 	}
 	bootstrapper, err := smbootstrap.New(
-		context.TODO(),
 		bootstrapCfg,
 		engine.Start,
 	)
