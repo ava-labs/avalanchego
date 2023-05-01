@@ -4,6 +4,12 @@
 package pebble
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
+)
+
+import (
 	"bytes"
 	"context"
 	"errors"
@@ -51,8 +57,9 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func New(file string, cfg Config) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
+
 	opts := &pebble.Options{
 		Cache:        pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync: cfg.BytesPerSync,
@@ -80,6 +87,11 @@ func New(file string, cfg Config) (database.Database, error) {
 		}
 	}
 	opts.Experimental.ReadSamplingMultiplier = -1 // explicitly disable seek compaction
+
+	log.Info("creating pebbledb")
+	//zap.Reflect("config", parsedConfig),
+	//)
+
 	db, err := pebble.Open(file, opts)
 	if err != nil {
 		return nil, err
@@ -88,6 +100,9 @@ func New(file string, cfg Config) (database.Database, error) {
 }
 
 func (db *Database) Close() error {
+	if _, herr := db.HealthCheck(nil); herr != nil {
+		return database.ErrClosed
+	}
 	db.closed.Set(true)
 	return updateError(db.db.Close())
 }
@@ -101,6 +116,10 @@ func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
+	if _, herr := db.HealthCheck(nil); herr != nil {
+		return false, database.ErrClosed
+	}
+
 	_, closer, err := db.db.Get(key)
 	if err == pebble.ErrNotFound {
 		return false, nil
@@ -112,6 +131,10 @@ func (db *Database) Has(key []byte) (bool, error) {
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
+	if _, herr := db.HealthCheck(nil); herr != nil {
+		return nil, database.ErrClosed
+	}
+
 	data, closer, err := db.db.Get(key)
 	if err != nil {
 		return nil, updateError(err)
@@ -126,11 +149,18 @@ func (db *Database) Put(key []byte, value []byte) error {
 	// Use of [pebble.NoSync] here means we don't wait for the [Set] to be
 	// persisted to the WAL before returning. Basic benchmarking indicates that
 	// waiting for the WAL to sync reduces performance by 20%.
+
+	if _, herr := db.HealthCheck(nil); herr != nil {
+		return database.ErrClosed
+	}
 	return updateError(db.db.Set(key, value, pebble.NoSync))
 }
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
+	if _, herr := db.HealthCheck(nil); herr != nil {
+		return database.ErrClosed
+	}
 	return updateError(db.db.Delete(key, pebble.NoSync))
 }
 
@@ -140,13 +170,14 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 
 // batch is a wrapper around a pebbleDB batch to contain sizes.
 type batch struct {
+	db    *Database
 	batch *pebble.Batch
 	size  int
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
 // the database when write is called
-func (db *Database) NewBatch() database.Batch { return &batch{batch: db.db.NewBatch()} }
+func (db *Database) NewBatch() database.Batch { return &batch{db: db, batch: db.db.NewBatch()} }
 
 // Put the value into the batch for later writing
 func (b *batch) Put(key, value []byte) error {
@@ -165,6 +196,9 @@ func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
+	if _, herr := b.db.HealthCheck(nil); herr != nil {
+		return database.ErrClosed
+	}
 	return updateError(b.batch.Commit(pebble.NoSync))
 }
 
