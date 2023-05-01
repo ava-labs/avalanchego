@@ -2710,6 +2710,9 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 //	B
 func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	expectedVdrSet := set.Set[ids.NodeID]{}
+	expectedVdrSet.Add(vdr)
+
 	require := require.New(t)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
@@ -2764,36 +2767,36 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		require.False(*asked, "Asked multiple times")
-		require.Equal(blk1.ID(), blkID, "Expected engine to request blk1")
-		require.Equal(vdr, inVdr, "Expected engine to request blk1 from vdr")
+		require.False(*asked)
+		require.Equal(blkID, blk1.ID())
+		require.Equal(vdr, inVdr)
 		*asked = true
 	}
 	// this engine receives Gossip message for [blk2] which is "unknown" in this engine
 	// thus sending a Get request for its ancestor [blk1]
 	// (see above for expected "Get" request)
 	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
-	require.True(*asked, "Didn't ask for missing blk1")
+	require.True(*asked)
 
 	// Prepare to PushQuery [blk1] after our Get request is fulfilled. We should not PushQuery
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		require.False(*queried, "Asked multiple times")
+		require.False(*queried)
 		*queried = true
 
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		require.Equal(inVdrs, vdrSet, "Asking wrong validator for preference")
-		require.Equal(blk1.Bytes(), blkBytes, "Asking for wrong block")
+		require.Equal(inVdrs, vdrSet)
+		require.Equal(blk1.Bytes(), blkBytes)
 	}
 	// this engine now answers the "Get" request, and this should allow [blk1] to be issued
 	// and cause [blk2] to fail verification.
 	// (see above for expected "PushQuery" request)
 	require.NoError(te.Put(context.Background(), vdr, *reqID, blk1.Bytes()))
-	require.True(*asked, "Didn't ask for preferences regarding blk1")
+	require.True(*asked)
 	require.True(*queried, "Didn't query the newly issued blk1")
 
 	// now [blk1] is verified, vm can return it
@@ -2846,8 +2849,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require.NoError(te.Put(context.Background(), *reqVdr, *sendReqID, blk2.Bytes()))
 
 	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
-	require.Equalf(blk1.Status(), choices.Accepted, "Expected blk1 to be Accepted, but found status: %s", blk1.Status())
-	require.Equal(blk2.Status(), choices.Processing)
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Processing, blk2.Status())
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
@@ -2866,17 +2869,15 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	*queried = false
 	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		require.False(*queried, "Asked multiple times")
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
-		require.Equal(inVdrs, vdrSet, "Asking wrong validator for preference")
-		require.Equal(blk2.Bytes(), blkBytes, "Asking for wrong block")
+		require.Equal(expectedVdrSet, inVdrs)
+		require.Equal(blk2.Bytes(), blkBytes)
 	}
 	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
 	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
-	require.True(*queried, "Didn't ask for preferences regarding blk2")
+	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
@@ -2898,6 +2899,9 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 //	C
 func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	expectedVdrSet := set.Set[ids.NodeID]{}
+	expectedVdrSet.Add(vdr)
+
 	require := require.New(t)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
@@ -2965,15 +2969,15 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		require.False(*asked, "Asked multiple times")
-		require.Equal(blkID, blk2.ID(), "Expected engine to request blk2")
-		require.Equal(inVdr, vdr, "Expected engine to request blk2 from vdr")
+		require.False(*asked)
+		require.Equal(blk2.ID(), blkID)
+		require.Equal(vdr, inVdr)
 		*asked = true
 	}
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
 	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk3.Bytes()))
-	require.True(*asked, "Didn't ask for preferences regarding blk2")
+	require.True(*asked)
 
 	// Prepare to PushQuery [blk1] after our request for [blk2] is fulfilled.
 	// We should not PushQuery [blk2] since it currently fails verification.
@@ -2981,18 +2985,16 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		require.False(*queried, "Asked multiple times")
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
-		require.Equal(inVdrs, vdrSet, "Asking wrong validator for preference")
-		require.Equal(blk1.Bytes(), blkBytes, "Asking for wrong block")
+		require.Equal(expectedVdrSet, inVdrs)
+		require.Equal(blk1.Bytes(), blkBytes)
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
 	require.NoError(te.Put(context.Background(), vdr, *reqID, blk2.Bytes()))
-	require.True(*queried, "Didn't ask for preferences regarding blk1")
+	require.True(*queried)
 
 	sendReqID := new(uint32)
 	reqVdr := new(ids.NodeID)
@@ -3017,21 +3019,6 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
-	// this VM expects to receive "Chits" in response to the "PullQuery"
-	// not to send out a "PullQuery"
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			require.FailNow("Unexpectedly sent a PullQuery request for blk1")
-		case blk2.ID():
-			require.FailNow("Unexpectedly sent a PullQuery request for blk2")
-		case blk3.ID():
-			require.FailNow("Unexpectedly sent a PullQuery request for blk3")
-		default:
-			require.FailNow("Unexpectedly sent a PullQuery request for unknown block")
-		}
-	}
-
 	// Now we are expecting a Chits message, and we receive it for [blk3] instead of [blk1].
 	// This will cause the node to again request [blk3].
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk3.ID()}, nil))
@@ -3043,7 +3030,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
-	require.Equalf(blk1.Status(), choices.Accepted, "Expected blk1 to be Accepted, but found status: %s", blk1.Status())
+	require.Equal(choices.Accepted, blk1.Status())
 }
 
 func TestMixedQueryNumPushSet(t *testing.T) {
