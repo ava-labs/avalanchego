@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -173,7 +174,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		})
 		return nil
 	}
-	bs, err := New(context.Background(), cfg, dummyCallback)
+	bs, err := New(cfg, dummyCallback)
 	require.NoError(err)
 
 	vm.CantSetState = false
@@ -245,7 +246,6 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -352,7 +352,6 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -516,7 +515,6 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -683,7 +681,6 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -872,7 +869,6 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1018,7 +1014,6 @@ func TestBootstrapperFinalized(t *testing.T) {
 		return blk0, nil
 	}
 	bs, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1231,7 +1226,6 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1374,7 +1368,6 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1464,7 +1457,6 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	}
 
 	bsIntf, err := New(
-		context.Background(),
 		config,
 		func(context.Context, uint32) error {
 			config.Ctx.State.Set(snow.EngineState{
@@ -1509,4 +1501,122 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	if bs.Blocked.NumMissingIDs() != 1 {
 		t.Fatal("Should have left blk1 as missing")
 	}
+}
+
+func TestBootstrapNoParseOnNew(t *testing.T) {
+	require := require.New(t)
+
+	ctx := snow.DefaultConsensusContextTest()
+	peers := validators.NewSet()
+
+	sender := &common.SenderTest{}
+	vm := &block.TestVM{}
+
+	sender.T = t
+	vm.T = t
+
+	sender.Default(true)
+	vm.Default(true)
+
+	isBootstrapped := false
+	bootstrapTracker := &common.BootstrapTrackerTest{
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
+	}
+
+	sender.CantSendGetAcceptedFrontier = false
+
+	peer := ids.GenerateTestNodeID()
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+
+	peerTracker := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
+	peers.RegisterCallbackListener(startupTracker)
+	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
+
+	commonConfig := common.Config{
+		Ctx:                            ctx,
+		Beacons:                        peers,
+		SampleK:                        peers.Len(),
+		Alpha:                          peers.Weight()/2 + 1,
+		StartupTracker:                 startupTracker,
+		Sender:                         sender,
+		BootstrapTracker:               bootstrapTracker,
+		Timer:                          &common.TimerTest{},
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+
+	snowGetHandler, err := getter.New(vm, commonConfig)
+	require.NoError(err)
+
+	queueDB := memdb.New()
+	blocker, err := queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	require.NoError(err)
+
+	blk0 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV: 0,
+		BytesV:  utils.RandomBytes(32),
+	}
+
+	blk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: blk0.ID(),
+		HeightV: 1,
+		BytesV:  utils.RandomBytes(32),
+	}
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		require.Equal(blk0.ID(), blkID)
+		return blk0, nil
+	}
+
+	pushed, err := blocker.Push(context.Background(), &blockJob{
+		log:         logging.NoLog{},
+		numAccepted: prometheus.NewCounter(prometheus.CounterOpts{}),
+		numDropped:  prometheus.NewCounter(prometheus.CounterOpts{}),
+		blk:         blk1,
+		vm:          vm,
+	})
+	require.NoError(err)
+	require.True(pushed)
+
+	require.NoError(blocker.Commit())
+
+	vm.GetBlockF = nil
+
+	blocker, err = queue.NewWithMissing(queueDB, "", prometheus.NewRegistry())
+	require.NoError(err)
+
+	config := Config{
+		Config:        commonConfig,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocker,
+		VM:            vm,
+	}
+
+	_, err = New(
+		config,
+		func(context.Context, uint32) error {
+			config.Ctx.State.Set(snow.EngineState{
+				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+				State: snow.NormalOp,
+			})
+			return nil
+		},
+	)
+	require.NoError(err)
 }

@@ -26,11 +26,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli python3-pip packer
-
-      - name: Install python packer
-        run: |
-          pip install python-packer boto3
+          sudo apt-get -y install packer python3-boto3
 
       - name: Get the tag
         id: get_tag
@@ -42,6 +38,13 @@ jobs:
             echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
           fi
         shell: bash
+
+      - name: Set whether to skip ami creation in packer
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Setting SKIP_CREATE_AMI to False"
+            echo "SKIP_CREATE_AMI=False" >> $GITHUB_ENV
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
