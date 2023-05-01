@@ -1,5 +1,14 @@
 # Release Notes
 
+## [v0.12.1](https://github.com/ava-labs/coreth/releases/tag/v0.12.1)
+
+- Bump AvalancheGo dependency to v1.10.1
+- Improve block building logic
+- Use shorter ctx while reading snapshot to serve state sync requests
+- Remove proposer activation time from gossiper
+- Fail outstanding requests on shutdown
+- Make state sync request sizes configurable
+
 ## [v0.12.0](https://github.com/ava-labs/coreth/releases/tag/v0.12.0)
 
 - Increase C-Chain block gas limit to 15M in Cortina
