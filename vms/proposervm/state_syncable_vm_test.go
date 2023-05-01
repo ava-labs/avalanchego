@@ -155,9 +155,9 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
@@ -166,9 +166,9 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -207,7 +207,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(innerSummary.Height(), summary.Height())
 }
 
 func TestStateSyncGetLastStateSummary(t *testing.T) {
@@ -237,9 +237,9 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetLastStateSummaryF = func(context.Context) (block.StateSummary, error) {
@@ -248,9 +248,9 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -289,7 +289,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(innerSummary.Height(), summary.Height())
 }
 
 func TestStateSyncGetStateSummary(t *testing.T) {
@@ -321,9 +321,9 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
@@ -333,9 +333,9 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.Equal(summary.ID(), innerSummary.ID())
-	require.Equal(summary.Height(), innerSummary.Height())
-	require.Equal(summary.Bytes(), innerSummary.Bytes())
+	require.Equal(innerSummary.ID(), summary.ID())
+	require.Equal(innerSummary.Height(), summary.Height())
+	require.Equal(innerSummary.Bytes(), summary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -374,7 +374,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(innerSummary.Height(), summary.Height())
 }
 
 func TestParseStateSummary(t *testing.T) {
