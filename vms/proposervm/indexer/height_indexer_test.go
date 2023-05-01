@@ -94,7 +94,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
 	require.NoError(err)
-	require.Equal(1, loadedForkHeight)
+	require.Equal(uint64(1), loadedForkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
 		require.NoError(err)
