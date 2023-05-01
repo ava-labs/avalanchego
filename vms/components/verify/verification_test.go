@@ -29,11 +29,11 @@ func TestAllNil(t *testing.T) {
 }
 
 func TestAllError(t *testing.T) {
+	require := require.New(t)
+
 	err := All(
 		testVerifiable{},
 		testVerifiable{err: errTest},
 	)
-	if err == nil {
-		t.Fatalf("Should have returned an error")
-	}
+	require.ErrorIs(err, errTest)
 }

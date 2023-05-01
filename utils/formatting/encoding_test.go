@@ -16,9 +16,7 @@ func TestEncodingMarshalJSON(t *testing.T) {
 	enc := Hex
 	jsonBytes, err := enc.MarshalJSON()
 	require.NoError(err)
-	if string(jsonBytes) != `"hex"` {
-		t.Fatal("should be 'hex'")
-	}
+	require.Equal(`"hex"`, string(jsonBytes))
 }
 
 func TestEncodingUnmarshalJSON(t *testing.T) {
@@ -27,19 +25,14 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 	jsonBytes := []byte(`"hex"`)
 	var enc Encoding
 	require.NoError(json.Unmarshal(jsonBytes, &enc))
-	if enc != Hex {
-		t.Fatal("should be hex")
-	}
+	require.Equal(Hex, enc)
 
+	var serr *json.SyntaxError
 	jsonBytes = []byte("")
-	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have erred due to invalid encoding")
-	}
+	require.ErrorAs(json.Unmarshal(jsonBytes, &enc), &serr)
 
 	jsonBytes = []byte(`""`)
-	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have erred due to invalid encoding")
-	}
+	require.ErrorIs(json.Unmarshal(jsonBytes, &enc), errInvalidEncoding)
 }
 
 func TestEncodingString(t *testing.T) {
@@ -107,19 +100,20 @@ func TestEncodeNil(t *testing.T) {
 }
 
 func TestDecodeHexInvalid(t *testing.T) {
+	require := require.New(t)
+
 	invalidHex := []string{"0", "x", "0xg", "0x0017afa0Zd", "0xafafafafaf"}
 	for _, str := range invalidHex {
 		_, err := Decode(Hex, str)
-		if err == nil {
-			t.Fatalf("should have failed to decode invalid hex '%s'", str)
-		}
+		require.ErrorIs(err, errMissingHexPrefix)
 	}
 }
 
 func TestDecodeNil(t *testing.T) {
-	if result, err := Decode(Hex, ""); err != nil || len(result) != 0 {
-		t.Fatal("decoding the empty string should return an empty byte slice")
-	}
+	require := require.New(t)
+	result, err := Decode(Hex, "")
+	require.NoError(err)
+	require.Empty(result)
 }
 
 func FuzzEncodeDecode(f *testing.F) {

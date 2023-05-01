@@ -68,28 +68,20 @@ func TestCPUTracker(t *testing.T) {
 
 	node1Utilization := cpuTracker.Usage(node1, endTime2)
 	node2Utilization := cpuTracker.Usage(node2, endTime2)
-	if node1Utilization >= node2Utilization {
-		t.Fatalf("Utilization should have been higher for the more recent spender")
-	}
+	require.Less(node1Utilization, node2Utilization)
 
 	cumulative := cpuTracker.TotalUsage()
 	sum := node1Utilization + node2Utilization
-	if cumulative != sum {
-		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
-	}
+	require.Equal(sum, cumulative)
 
 	mockUser.EXPECT().CPUUsage().Return(.5).Times(3)
 
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)
 	newNode1Utilization := cpuTracker.Usage(node1, endTime3)
-	if newNode1Utilization >= node1Utilization {
-		t.Fatalf("node CPU utilization should decrease over time")
-	}
+	require.Less(newNode1Utilization, node1Utilization)
 	newCumulative := cpuTracker.TotalUsage()
-	if newCumulative >= cumulative {
-		t.Fatal("at-large CPU utilization should decrease over time ")
-	}
+	require.Less(newCumulative, cumulative)
 
 	startTime4 := endTime3
 	endTime4 := startTime4.Add(halflife)

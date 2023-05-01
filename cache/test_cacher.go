@@ -47,14 +47,13 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int]) {
 
 	expectedValue2 := 2
 	cache.Put(id2, expectedValue2)
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieved value when none exists")
-	}
-	if value, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if value != expectedValue2 {
-		t.Fatalf("Failed to retrieve correct value when one exists")
-	}
+
+	_, found = cache.Get(id1)
+	require.False(found)
+
+	value, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(expectedValue2, value)
 }
 
 func TestEviction(t *testing.T, cache Cacher[ids.ID, int]) {

@@ -29,22 +29,24 @@ func (o *testOperable) Outs() []verify.State {
 }
 
 func TestOperationVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	op := (*Operation)(nil)
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to nil operation")
-	}
+	require.ErrorIs(op.Verify(), ErrNilOperation)
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
+	require := require.New(t)
+
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 	}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to empty operation")
-	}
+	require.ErrorIs(op.Verify(), ErrNilFxOperation)
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
+	require := require.New(t)
+
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -59,9 +61,7 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to unsorted utxoIDs")
-	}
+	require.ErrorIs(op.Verify(), ErrNotSortedAndUniqueUTXOIDs)
 }
 
 func TestOperationVerify(t *testing.T) {
@@ -112,13 +112,9 @@ func TestOperationSorting(t *testing.T) {
 			Op: &testOperable{},
 		},
 	}
-	if IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Shouldn't be sorted")
-	}
+	require.False(IsSortedAndUniqueOperations(ops, m))
 	SortOperations(ops, m)
-	if !IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Should be sorted")
-	}
+	require.True(IsSortedAndUniqueOperations(ops, m))
 	ops = append(ops, &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -129,14 +125,13 @@ func TestOperationSorting(t *testing.T) {
 		},
 		Op: &testOperable{},
 	})
-	if IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Shouldn't be unique")
-	}
+	require.False(IsSortedAndUniqueOperations(ops, m))
 }
 
 func TestOperationTxNotState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&OperationTx{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

@@ -89,15 +89,9 @@ func TestSetsAndGets(t *testing.T) {
 	resultStatus, err := state.GetStatus(txID)
 	require.NoError(err)
 
-	if resultUTXO.OutputIndex != 1 {
-		t.Fatalf("Wrong UTXO returned")
-	}
-	if resultTx.ID() != tx.ID() {
-		t.Fatalf("Wrong Tx returned")
-	}
-	if resultStatus != choices.Accepted {
-		t.Fatalf("Wrong Status returned")
-	}
+	require.Equal(1, resultUTXO.OutputIndex)
+	require.Equal(tx.ID(), resultTx.ID())
+	require.Equal(choices.Accepted, resultStatus)
 }
 
 func TestFundingNoAddresses(t *testing.T) {

@@ -139,9 +139,7 @@ func TestServiceCreateDuplicate(t *testing.T) {
 			Username: "bob",
 			Password: strongPassword,
 		}, &api.EmptyReply{})
-		if err == nil {
-			t.Fatalf("Should have errored due to the username already existing")
-		}
+		require.ErrorIs(err, errUserAlreadyExists)
 	}
 }
 
@@ -153,11 +151,10 @@ func TestServiceCreateUserNoName(t *testing.T) {
 	s := service{ks: ks.(*keystore)}
 
 	reply := api.EmptyReply{}
-	if err := s.CreateUser(nil, &api.UserPass{
+	err = s.CreateUser(nil, &api.UserPass{
 		Password: strongPassword,
-	}, &reply); err == nil {
-		t.Fatalf("Shouldn't have allowed empty username")
-	}
+	}, &reply)
+	require.ErrorIs(err, errEmptyUsername)
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {

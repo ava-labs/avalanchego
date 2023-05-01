@@ -6,12 +6,15 @@ package nftfx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOutputState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&MintOutput{})
-	if _, ok := intf.(verify.State); !ok {
-		t.Fatalf("should be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.True(ok)
 }

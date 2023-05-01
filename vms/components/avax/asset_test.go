@@ -14,17 +14,17 @@ import (
 )
 
 func TestAssetVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	id := (*Asset)(nil)
-	if err := id.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil AssetID")
-	}
+	require.ErrorIs(id.Verify(), errNilAssetID)
 }
 
 func TestAssetVerifyEmpty(t *testing.T) {
+	require := require.New(t)
+
 	id := Asset{}
-	if err := id.Verify(); err == nil {
-		t.Fatalf("Should have errored due to empty AssetID")
-	}
+	require.ErrorIs(id.Verify(), errEmptyAssetID)
 }
 
 func TestAssetID(t *testing.T) {
@@ -49,13 +49,10 @@ func TestAssetID(t *testing.T) {
 	require.NoError(err)
 
 	newID := Asset{}
-	if _, err := manager.Unmarshal(bytes, &newID); err != nil {
-		t.Fatal(err)
-	}
+	_, err = manager.Unmarshal(bytes, &newID)
+	require.NoError(err)
 
 	require.NoError(newID.Verify())
 
-	if id.AssetID() != newID.AssetID() {
-		t.Fatalf("Parsing returned the wrong Asset ID")
-	}
+	require.Equal(id.AssetID(), newID.AssetID())
 }

@@ -13,32 +13,25 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func TestNewSetErrorOnMetrics(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
 	registerer := prometheus.NewRegistry()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "polls",
-		})),
-		registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "poll_duration",
-		})),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "polls",
+	})))
+	require.NoError(registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "poll_duration",
+	})))
 
 	s := NewSet(factory, log, namespace, registerer)
-	if s == nil {
-		t.Fatalf("shouldn't have failed due to a metrics initialization err")
-	}
+	require.NotNil(s)
 }
 
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
@@ -223,6 +216,8 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -240,36 +235,25 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 		vdr2,
 	)
 
-	if s.Len() != 0 {
-		t.Fatalf("Shouldn't have any active polls yet")
-	} else if !s.Add(0, vdrs) {
-		t.Fatalf("Should have been able to add a new poll")
-	} else if s.Len() != 1 {
-		t.Fatalf("Should only have one active poll")
-	} else if s.Add(0, vdrs) {
-		t.Fatalf("Shouldn't have been able to add a duplicated poll")
-	} else if s.Len() != 1 {
-		t.Fatalf("Should only have one active poll")
-	} else if results := s.Vote(1, vdr1, vtxID); len(results) > 0 {
-		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
-		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
-		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results := s.Vote(0, vdr2, vtxID); len(results) == 0 {
-		t.Fatalf("Should have finished the")
-	} else if len(results) != 1 {
-		t.Fatalf("Wrong number of results returned")
-	} else if list := results[0].List(); len(list) != 1 {
-		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; retVtxID != vtxID {
-		t.Fatalf("Wrong vertex returned")
-	} else if results[0].Count(vtxID) != 2 {
-		t.Fatalf("Wrong number of votes returned")
-	}
+	require.Zero(s.Len())
+	require.True(s.Add(0, vdrs))
+	require.Equal(1, s.Len())
+	require.False(s.Add(0, vdrs))
+	require.Equal(1, s.Len())
+	require.Len(s.Vote(1, vdr1, vtxID), 0)
+	require.Len(s.Vote(0, vdr1, vtxID), 0)
+	require.Len(s.Vote(0, vdr1, vtxID), 0)
+	results := s.Vote(0, vdr2, vtxID)
+	require.Len(results, 1)
+	list := results[0].List()
+	require.Len(list, 1)
+	require.Equal(vtxID, list[0])
+	require.Equal(2, results[0].Count(vtxID))
 }
 
 func TestCreateAndFinishFailedPoll(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -285,30 +269,22 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 		vdr2,
 	)
 
-	if s.Len() != 0 {
-		t.Fatalf("Shouldn't have any active polls yet")
-	} else if !s.Add(0, vdrs) {
-		t.Fatalf("Should have been able to add a new poll")
-	} else if s.Len() != 1 {
-		t.Fatalf("Should only have one active poll")
-	} else if s.Add(0, vdrs) {
-		t.Fatalf("Shouldn't have been able to add a duplicated poll")
-	} else if s.Len() != 1 {
-		t.Fatalf("Should only have one active poll")
-	} else if results := s.Drop(1, vdr1); len(results) > 0 {
-		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results := s.Drop(0, vdr1); len(results) > 0 {
-		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results := s.Drop(0, vdr1); len(results) > 0 {
-		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results := s.Drop(0, vdr2); len(results) == 0 {
-		t.Fatalf("Should have finished the")
-	} else if list := results[0].List(); len(list) != 0 {
-		t.Fatalf("Wrong number of vertices returned")
-	}
+	require.Zero(s.Len())
+	require.True(s.Add(0, vdrs))
+	require.Equal(1, s.Len())
+	require.False(s.Add(0, vdrs))
+	require.Equal(1, s.Len())
+	require.Len(s.Drop(1, vdr1), 0)
+	require.Len(s.Drop(0, vdr1), 0)
+	require.Len(s.Drop(0, vdr1), 0)
+	results := s.Drop(0, vdr2)
+	require.Len(results, 1)
+	require.Len(results[0].List(), 0)
 }
 
 func TestSetString(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -325,11 +301,6 @@ func TestSetString(t *testing.T) {
         waiting on Bag: (Size = 1)
             NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
         received Bag: (Size = 0)`
-	if !s.Add(0, vdrs) {
-		t.Fatalf("Should have been able to add a new poll")
-	} else if str := s.String(); expected != str {
-		t.Fatalf("Set return wrong string, Expected:\n%s\nReturned:\n%s",
-			expected,
-			str)
-	}
+	require.True(s.Add(0, vdrs))
+	require.Equal(expected, s.String())
 }

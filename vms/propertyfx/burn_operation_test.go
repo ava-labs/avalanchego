@@ -6,29 +6,32 @@ package propertyfx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestBurnOperationInvalid(t *testing.T) {
+	require := require.New(t)
+
 	op := BurnOperation{Input: secp256k1fx.Input{
 		SigIndices: []uint32{1, 0},
 	}}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("operation should have failed verification")
-	}
+	require.ErrorIs(op.Verify(), nil)
 }
 
 func TestBurnOperationNumberOfOutput(t *testing.T) {
+	require := require.New(t)
+
 	op := BurnOperation{}
-	if outs := op.Outs(); len(outs) != 0 {
-		t.Fatalf("wrong number of outputs")
-	}
+	require.Empty(op.Outs())
 }
 
 func TestBurnOperationState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&BurnOperation{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

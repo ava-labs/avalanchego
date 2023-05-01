@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -231,33 +230,23 @@ func TestEngineQuery(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk.Bytes(), blkBytes)
 	}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, blk.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(blk.Bytes(), b)
 		return blk, nil
 	}
 	require.NoError(te.Put(context.Background(), vdr, *getRequestID, blk.Bytes()))
 	vm.ParseBlockF = nil
 
-	if !*queried {
-		t.Fatalf("Didn't ask for preferences")
-	}
+	require.True(*queried)
 
 	blk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -276,47 +265,33 @@ func TestEngineQuery(t *testing.T) {
 		case blk1.ID():
 			return nil, errUnknownBlock
 		}
-		t.Fatalf("Wrong block requested")
-		panic("Should have failed")
+		require.FailNow("Wrong block requested")
+		return nil, errUnknownBlock
 	}
 
 	*asked = false
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*asked)
 		*asked = true
 		*getRequestID = requestID
-		if vdr != inVdr {
-			t.Fatalf("Asking wrong validator for block")
-		}
-		if blk1.ID() != blkID {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdr, inVdr)
+		require.Equal(blk1.ID(), blkID)
 	}
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk1.ID()}, nil))
 
 	*queried = false
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk1.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk1.Bytes(), blkBytes)
 	}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, blk1.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(blk1.Bytes(), b)
 
 		vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			switch blkID {
@@ -325,8 +300,8 @@ func TestEngineQuery(t *testing.T) {
 			case blk1.ID():
 				return blk1, nil
 			}
-			t.Fatalf("Wrong block requested")
-			panic("Should have failed")
+			require.FailNow("Wrong block requested")
+			return nil, nil
 		}
 
 		return blk1, nil
@@ -334,19 +309,13 @@ func TestEngineQuery(t *testing.T) {
 	require.NoError(te.Put(context.Background(), vdr, *getRequestID, blk1.Bytes()))
 	vm.ParseBlockF = nil
 
-	if blk1.Status() != choices.Accepted {
-		t.Fatalf("Should have executed block")
-	}
-	if len(te.blocked) != 0 {
-		t.Fatalf("Should have finished blocking")
-	}
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Empty(te.blocked)
 
 	_ = te.polls.String() // Shouldn't panic
 
 	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
-	if len(te.blocked) != 0 {
-		t.Fatalf("Should have finished blocking")
-	}
+	require.Empty(te.blocked)
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
@@ -372,15 +341,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		vals.Add(vdr0, nil, ids.Empty, 1),
-		vals.Add(vdr1, nil, ids.Empty, 1),
-		vals.Add(vdr2, nil, ids.Empty, 1),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -403,9 +366,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID != gBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
+		require.Equal(gBlk.ID(), blkID)
 		return gBlk, nil
 	}
 
@@ -430,19 +391,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk0.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk0.Bytes(), blkBytes)
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -475,24 +430,18 @@ func TestEngineMultipleQuery(t *testing.T) {
 		case blk1.ID():
 			return nil, errUnknownBlock
 		}
-		t.Fatalf("Unknown block")
-		panic("Should have errored")
+		require.FailNow("Unknown block")
+		return nil, nil
 	}
 
 	asked := new(bool)
 	getRequestID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*asked)
 		*asked = true
 		*getRequestID = requestID
-		if vdr0 != inVdr {
-			t.Fatalf("Asking wrong validator for block")
-		}
-		if blk1.ID() != blkID {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdr0, inVdr)
+		require.Equal(blk1.ID(), blkID)
 	}
 	blkSet := []ids.ID{blk1.ID()}
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil))
@@ -506,8 +455,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 			case blkID == blk1.ID():
 				return blk1, nil
 			}
-			t.Fatalf("Wrong block requested")
-			panic("Should have failed")
+			require.FailNow("Wrong block requested")
+			return nil, nil
 		}
 
 		return blk1, nil
@@ -516,19 +465,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 	*queried = false
 	secondQueryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*secondQueryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk1.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk1.Bytes(), blkBytes)
 	}
 	require.NoError(te.Put(context.Background(), vdr0, *getRequestID, blk1.Bytes()))
 
@@ -609,16 +552,14 @@ func TestEngineAbandonResponse(t *testing.T) {
 		case blkID == blk.ID():
 			return nil, errUnknownBlock
 		}
-		t.Fatalf("Wrong block requested")
+		require.FailNow("Wrong block requested")
 		return nil, errUnknownBlock
 	}
 
 	require.NoError(te.issue(context.Background(), blk))
 	require.NoError(te.QueryFailed(context.Background(), vdr, 1))
 
-	if len(te.blocked) != 0 {
-		t.Fatalf("Should have removed blocking event")
-	}
+	require.Empty(te.blocked)
 }
 
 func TestEngineFetchBlock(t *testing.T) {
@@ -629,32 +570,21 @@ func TestEngineFetchBlock(t *testing.T) {
 	sender.Default(false)
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		if id == gBlk.ID() {
-			return gBlk, nil
-		}
-		t.Fatalf("Unknown block")
-		panic("Should have failed")
+		require.Equal(gBlk.ID(), id)
+		return gBlk, nil
 	}
 
 	added := new(bool)
 	sender.SendPutF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blk []byte) {
-		if vdr != inVdr {
-			t.Fatalf("Wrong validator")
-		}
-		if requestID != 123 {
-			t.Fatalf("Wrong request id")
-		}
-		if !bytes.Equal(gBlk.Bytes(), blk) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdr, inVdr)
+		require.Equal(uint32(123), requestID)
+		require.Equal(gBlk.Bytes(), blk)
 		*added = true
 	}
 
 	require.NoError(te.Get(context.Background(), vdr, 123, gBlk.ID()))
 
-	if !*added {
-		t.Fatalf("Should have sent block to peer")
-	}
+	require.True(*added)
 }
 
 func TestEnginePushQuery(t *testing.T) {
@@ -694,54 +624,30 @@ func TestEnginePushQuery(t *testing.T) {
 
 	chitted := new(bool)
 	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
-		if *chitted {
-			t.Fatalf("Sent chit multiple times")
-		}
+		require.False(*chitted)
 		*chitted = true
-		if inVdr != vdr {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if requestID != 20 {
-			t.Fatalf("Wrong request id")
-		}
-		if len(votes) != 1 {
-			t.Fatal("votes should only have one element")
-		}
-		if gBlk.ID() != votes[0] {
-			t.Fatalf("Asking for wrong block")
-		}
-		if len(accepted) != 1 {
-			t.Fatal("accepted should only have one element")
-		}
-		if gBlk.ID() != accepted[0] {
-			t.Fatalf("Wrong accepted frontier")
-		}
+		require.Equal(vdr, inVdr)
+		require.Equal(uint32(20), requestID)
+		require.Len(votes, 1)
+		require.Equal(gBlk.ID(), votes[0])
+		require.Len(accepted, 1)
+		require.Equal(gBlk.ID(), accepted[0])
 	}
 
 	queried := new(bool)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.PushQuery(context.Background(), vdr, 20, blk.Bytes()))
 
-	if !*chitted {
-		t.Fatalf("Should have sent a chit to the peer")
-	}
-	if !*queried {
-		t.Fatalf("Should have sent a query to the peer")
-	}
+	require.True(*chitted)
+	require.True(*queried)
 }
 
 func TestEngineBuildBlock(t *testing.T) {
@@ -772,15 +678,11 @@ func TestEngineBuildBlock(t *testing.T) {
 
 	queried := new(bool)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
+		require.Equal(vdrSet, inVdrs)
 	}
 
 	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -788,34 +690,27 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 	require.NoError(te.Notify(context.Background(), common.PendingTxs))
 
-	if !*queried {
-		t.Fatalf("Should have sent a query to the peer")
-	}
+	require.True(*queried)
 }
 
 func TestEngineRepoll(t *testing.T) {
+	require := require.New(t)
 	vdr, _, sender, _, te, _ := setupDefaultConfig(t)
 
 	sender.Default(true)
 
 	queried := new(bool)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
+		require.Equal(vdrSet, inVdrs)
 	}
 
 	te.repoll(context.Background())
 
-	if !*queried {
-		t.Fatalf("Should have sent a query to the peer")
-	}
+	require.True(*queried)
 }
 
 func TestVoteCanceling(t *testing.T) {
@@ -841,15 +736,9 @@ func TestVoteCanceling(t *testing.T) {
 	vdr1 := ids.GenerateTestNodeID()
 	vdr2 := ids.GenerateTestNodeID()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		vals.Add(vdr0, nil, ids.Empty, 1),
-		vals.Add(vdr1, nil, ids.Empty, 1),
-		vals.Add(vdr2, nil, ids.Empty, 1),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(vals.Add(vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.Add(vdr1, nil, ids.Empty, 1))
+	require.NoError(vals.Add(vdr2, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -872,13 +761,8 @@ func TestVoteCanceling(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		switch id {
-		case gBlk.ID():
-			return gBlk, nil
-		default:
-			t.Fatalf("Loaded unknown block")
-			panic("Should have failed")
-		}
+		require.Equal(gBlk.ID(), id)
+		return gBlk, nil
 	}
 
 	te, err := newTransitive(engCfg)
@@ -901,32 +785,22 @@ func TestVoteCanceling(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.issue(context.Background(), blk))
 
-	if te.polls.Len() != 1 {
-		t.Fatalf("Shouldn't have finished blocking issue")
-	}
+	require.Equal(1, te.polls.Len())
 
 	require.NoError(te.QueryFailed(context.Background(), vdr0, *queryRequestID))
 
-	if te.polls.Len() != 1 {
-		t.Fatalf("Shouldn't have finished blocking issue")
-	}
+	require.Equal(1, te.polls.Len())
 
 	repolled := new(bool)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
@@ -934,9 +808,7 @@ func TestVoteCanceling(t *testing.T) {
 	}
 	require.NoError(te.QueryFailed(context.Background(), vdr1, *queryRequestID))
 
-	if !*repolled {
-		t.Fatalf("Should have finished blocking issue and repolled the network")
-	}
+	require.True(*repolled)
 }
 
 func TestEngineNoQuery(t *testing.T) {
@@ -1033,13 +905,8 @@ func TestEngineAbandonQuery(t *testing.T) {
 	blkID := ids.GenerateTestID()
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		switch id {
-		case blkID:
-			return nil, errUnknownBlock
-		default:
-			t.Fatalf("Loaded unknown block")
-			panic("Should have failed")
-		}
+		require.Equal(blkID, id)
+		return nil, errUnknownBlock
 	}
 
 	reqID := new(uint32)
@@ -1051,15 +918,11 @@ func TestEngineAbandonQuery(t *testing.T) {
 
 	require.NoError(te.PullQuery(context.Background(), vdr, 0, blkID))
 
-	if te.blkReqs.Len() != 1 {
-		t.Fatalf("Should have issued request")
-	}
+	require.Equal(1, te.blkReqs.Len())
 
 	require.NoError(te.GetFailed(context.Background(), vdr, *reqID))
 
-	if te.blkReqs.Len() != 0 {
-		t.Fatalf("Should have removed request")
-	}
+	require.Zero(te.blkReqs.Len())
 }
 
 func TestEngineAbandonChit(t *testing.T) {
@@ -1086,7 +949,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		t.Fatalf("Wrong block requested")
+		require.FailNow("Wrong block requested")
 		return nil, errUnknownBlock
 	}
 
@@ -1144,7 +1007,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		t.Fatalf("Wrong block requested")
+		require.FailNow("Wrong block requested")
 		return nil, errUnknownBlock
 	}
 
@@ -1235,13 +1098,8 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, blockingBlk.Bytes()):
-			return blockingBlk, nil
-		default:
-			t.Fatalf("Loaded unknown block")
-			panic("Should have failed")
-		}
+		require.Equal(blockingBlk.Bytes(), b)
+		return blockingBlk, nil
 	}
 
 	require.NoError(te.issue(context.Background(), parentBlk))
@@ -1250,18 +1108,14 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	require.NoError(te.PushQuery(context.Background(), vdr, 0, blockingBlk.Bytes()))
 
-	if len(te.blocked) != 2 {
-		t.Fatalf("Both inserts should be blocking")
-	}
+	require.Len(te.blocked, 2)
 
 	sender.CantSendPushQuery = false
 
 	missingBlk.StatusV = choices.Processing
 	require.NoError(te.issue(context.Background(), missingBlk))
 
-	if len(te.blocked) != 0 {
-		t.Fatalf("Both inserts should not longer be blocking")
-	}
+	require.Empty(te.blocked)
 }
 
 func TestEngineBlockingChitResponse(t *testing.T) {
@@ -1317,12 +1171,8 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(issuedBlk.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(issuedBlk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.issue(context.Background(), issuedBlk))
@@ -1383,9 +1233,7 @@ func TestEngineRetryFetch(t *testing.T) {
 	vm.CantGetBlock = true
 	sender.SendGetF = nil
 
-	if !*called {
-		t.Fatalf("Should have requested the block again")
-	}
+	require.True(*called)
 }
 
 func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
@@ -1441,10 +1289,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, *reqID, []ids.ID{invalidBlkID}, nil))
 
-	if status := validBlk.Status(); status != choices.Accepted {
-		t.Log(status)
-		t.Fatalf("Should have bubbled invalid votes to the valid parent")
-	}
+	require.Equal(choices.Accepted, validBlk.Status())
 }
 
 func TestEngineGossip(t *testing.T) {
@@ -1456,26 +1301,19 @@ func TestEngineGossip(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID == gBlk.ID() {
-			return gBlk, nil
-		}
-		t.Fatal(errUnknownBlock)
-		return nil, errUnknownBlock
+		require.Equal(gBlk.ID(), blkID)
+		return gBlk, nil
 	}
 
 	called := new(bool)
 	sender.SendGossipF = func(_ context.Context, blkBytes []byte) {
 		*called = true
-		if !bytes.Equal(blkBytes, gBlk.Bytes()) {
-			t.Fatal(errUnknownBytes)
-		}
+		require.Equal(gBlk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.Gossip(context.Background()))
 
-	if !*called {
-		t.Fatalf("Should have gossiped the block")
-	}
+	require.True(*called)
 }
 
 func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
@@ -1533,12 +1371,8 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if reqVdr != vdr {
-			t.Fatalf("Wrong validator requested")
-		}
-		if blkID != missingBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
+		require.Equal(vdr, reqVdr)
+		require.Equal(missingBlk.ID(), blkID)
 	}
 	sender.CantSendChits = false
 
@@ -1573,10 +1407,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, *reqID, missingBlk.Bytes()))
 
-	pref := te.Consensus.Preference()
-	if pref != pendingBlk.ID() {
-		t.Fatalf("Shouldn't have abandoned the pending block")
-	}
+	require.Equal(pendingBlk.ID(), te.Consensus.Preference())
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
@@ -1631,12 +1462,8 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if reqVdr != vdr {
-			t.Fatalf("Wrong validator requested")
-		}
-		if blkID != missingBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
+		require.Equal(vdr, reqVdr)
+		require.Equal(missingBlk.ID(), blkID)
 	}
 	sender.CantSendChits = false
 
@@ -1672,10 +1499,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, *reqID, missingBlk.Bytes()))
 
-	pref := te.Consensus.Preference()
-	if pref != pendingBlk.ID() {
-		t.Fatalf("Shouldn't have abandoned the pending block")
-	}
+	require.Equal(pendingBlk.ID(), te.Consensus.Preference())
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
@@ -1711,9 +1535,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID != gBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
+		require.Equal(gBlk.ID(), blkID)
 		return gBlk, nil
 	}
 
@@ -1770,13 +1592,8 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
 
-	if *numPushed != 1 {
-		t.Fatalf("Should have initially sent a push query")
-	}
-
-	if *numPulled != 1 {
-		t.Fatalf("Should have sent an additional pull query")
-	}
+	require.Equal(1, *numPushed)
+	require.Equal(1, *numPulled)
 }
 
 func TestEngineDoubleChit(t *testing.T) {
@@ -1826,11 +1643,8 @@ func TestEngineDoubleChit(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		if id == gBlk.ID() {
-			return gBlk, nil
-		}
-		t.Fatalf("Unknown block")
-		panic("Should have errored")
+		require.Equal(gBlk.ID(), id)
+		return gBlk, nil
 	}
 
 	te, err := newTransitive(engCfg)
@@ -1853,19 +1667,13 @@ func TestEngineDoubleChit(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk.Bytes(), blkBytes)
 	}
 
 	require.NoError(te.issue(context.Background(), blk))
@@ -1877,33 +1685,25 @@ func TestEngineDoubleChit(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		t.Fatalf("Unknown block")
-		panic("Should have errored")
+		require.FailNow("Unknown block")
+		return nil, nil
 	}
 
 	blkSet := []ids.ID{blk.ID()}
 
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
-	}
+	require.Equal(choices.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil))
 
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
-	}
+	require.Equal(choices.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil))
 
-	if status := blk.Status(); status != choices.Processing {
-		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
-	}
+	require.Equal(choices.Processing, blk.Status())
 
 	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blkSet, nil))
 
-	if status := blk.Status(); status != choices.Accepted {
-		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Accepted)
-	}
+	require.Equal(choices.Accepted, blk.Status())
 }
 
 func TestEngineBuildBlockLimit(t *testing.T) {
@@ -1941,9 +1741,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		return gBlk.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		if blkID != gBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
+		require.Equal(gBlk.ID(), blkID)
 		return gBlk, nil
 	}
 
@@ -1981,15 +1779,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], rID uint32, _ []byte) {
 		reqID = rID
-		if queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(queried)
 		queried = true
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
+		require.Equal(vdrSet, inVdrs)
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -2003,25 +1797,19 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	blkToReturn := 0
 	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		if blkToReturn >= len(blks) {
-			t.Fatalf("Built too many blocks")
-		}
+		require.Less(blkToReturn, len(blks))
 		blk := blks[blkToReturn]
 		blkToReturn++
 		return blk, nil
 	}
 	require.NoError(te.Notify(context.Background(), common.PendingTxs))
 
-	if !queried {
-		t.Fatalf("Should have sent a query to the peer")
-	}
+	require.True(queried)
 
 	queried = false
 	require.NoError(te.Notify(context.Background(), common.PendingTxs))
 
-	if queried {
-		t.Fatalf("Shouldn't have sent a query to the peer")
-	}
+	require.False(queried)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -2036,9 +1824,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{blk0.ID()}, nil))
 
-	if !queried {
-		t.Fatalf("Should have sent a query to the peer")
-	}
+	require.True(queried)
 }
 
 func TestEngineReceiveNewRejectedBlock(t *testing.T) {
@@ -2083,7 +1869,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2110,9 +1896,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
 
-	if !asked {
-		t.Fatalf("Didn't query for the new block")
-	}
+	require.True(asked)
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil))
 
@@ -2126,17 +1910,13 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
 
-	if !asked {
-		t.Fatalf("Didn't request the missing block")
-	}
+	require.True(asked)
 
 	rejectedBlk.StatusV = choices.Rejected
 
 	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
 
-	if te.blkReqs.Len() != 0 {
-		t.Fatalf("Should have finished all requests")
-	}
+	require.Zero(te.blkReqs.Len())
 }
 
 func TestEngineRejectionAmplification(t *testing.T) {
@@ -2181,7 +1961,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2208,9 +1988,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
 
-	if !queried {
-		t.Fatalf("Didn't query for the new block")
-	}
+	require.True(queried)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -2225,9 +2003,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil))
 
-	if !te.Consensus.Finalized() {
-		t.Fatalf("Should have finalized the consensus instance")
-	}
+	require.True(te.Consensus.Finalized())
 
 	queried = false
 	var asked bool
@@ -2238,26 +2014,18 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		asked = true
 		reqID = rID
 
-		if blkID != rejectedBlk.ID() {
-			t.Fatalf("requested %s but should have requested %s", blkID, rejectedBlk.ID())
-		}
+		require.Equal(rejectedBlk.ID(), blkID)
 	}
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
 
-	if queried {
-		t.Fatalf("Queried for the pending block")
-	}
-	if !asked {
-		t.Fatalf("Should have asked for the missing block")
-	}
+	require.False(queried)
+	require.True(asked)
 
 	rejectedBlk.StatusV = choices.Processing
 	require.NoError(te.Put(context.Background(), vdr, reqID, rejectedBlk.Bytes()))
 
-	if queried {
-		t.Fatalf("Queried for the rejected block")
-	}
+	require.False(queried)
 }
 
 // Test that the node will not issue a block into consensus that it knows will
@@ -2305,7 +2073,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2334,25 +2102,17 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	require.NoError(te.Put(context.Background(), vdr, 0, acceptedBlk.Bytes()))
 
-	if !queried {
-		t.Fatalf("Didn't query for the new block")
-	}
+	require.True(queried)
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil))
 
-	if !te.Consensus.Finalized() {
-		t.Fatalf("Should have finalized the consensus instance")
-	}
+	require.True(te.Consensus.Finalized())
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
 
-	if !te.Consensus.Finalized() {
-		t.Fatalf("Should have finalized the consensus instance")
-	}
+	require.True(te.Consensus.Finalized())
 
-	if len(te.pending) != 0 {
-		t.Fatalf("Shouldn't have any pending blocks")
-	}
+	require.Empty(te.pending)
 }
 
 // Test that the node will not issue a block into consensus that it knows will
@@ -2401,7 +2161,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2495,14 +2255,10 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 	}
 
 	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
-		if bytes.Equal(nonPreferredBlk.Bytes(), blkBytes) {
-			t.Fatalf("gossiped non-preferred block")
-		}
+		require.NotEqual(nonPreferredBlk.Bytes(), blkBytes)
 	}
 	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
-		if blkID == nonPreferredBlk.ID() {
-			t.Fatalf("gossiped non-preferred block")
-		}
+		require.NotEqual(nonPreferredBlk.ID(), blkID)
 	}
 
 	require.NoError(te.Put(context.Background(), vdr, 0, preferredBlk.Bytes()))
@@ -2754,7 +2510,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2775,24 +2531,16 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
-		if blkID != blk2.ID() {
-			t.Fatalf("Expected engine to request blk2")
-		}
-		if inVdr != vdr {
-			t.Fatalf("Expected engine to request blk2 from vdr")
-		}
+		require.False(*asked)
+		require.Equal(blk2.ID(), blkID)
+		require.Equal(vdr, inVdr)
 		*asked = true
 	}
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
 	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk3.Bytes()))
 
-	if !*asked {
-		t.Fatalf("Didn't ask for missing blk2")
-	}
+	require.True(*asked)
 
 	// Prepare to PushQuery [blk1] after our request for [blk2] is fulfilled.
 	// We should not PushQuery [blk2] since it currently fails verification.
@@ -2800,27 +2548,19 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if !bytes.Equal(blk1.Bytes(), blkBytes) {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk1.Bytes(), blkBytes)
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
 	require.NoError(te.Put(context.Background(), vdr, *reqID, blk2.Bytes()))
 
-	if !*queried {
-		t.Fatalf("Didn't ask for preferences regarding blk1")
-	}
+	require.True(*queried)
 
 	sendReqID := new(uint32)
 	reqVdr := new(ids.NodeID)
@@ -2829,7 +2569,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
-			t.Fatal("Unexpectedly sent a Get request for blk1")
+			require.FailNow("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
 			t.Logf("sending get for blk2 with %d", requestID)
 			*sendReqID = requestID
@@ -2841,20 +2581,20 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 			*reqVdr = inVdr
 			return
 		default:
-			t.Fatal("Unexpectedly sent a Get request for unknown block")
+			require.FailNow("Unexpectedly sent a Get request for unknown block")
 		}
 	}
 
 	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk1")
+			require.FailNow("Unexpectedly sent a PullQuery request for blk1")
 		case blk2.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk2")
+			require.FailNow("Unexpectedly sent a PullQuery request for blk2")
 		case blk3.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk3")
+			require.FailNow("Unexpectedly sent a PullQuery request for blk3")
 		default:
-			t.Fatal("Unexpectedly sent a PullQuery request for unknown block")
+			require.FailNow("Unexpectedly sent a PullQuery request for unknown block")
 		}
 	}
 
@@ -2869,9 +2609,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
-	if blk1.Status() != choices.Accepted {
-		t.Fatalf("Expected blk1 to be Accepted, but found status: %s", blk1.Status())
-	}
+	require.Equal(choices.Accepted, blk1.Status())
 }
 
 func TestMixedQueryNumPushSet(t *testing.T) {
@@ -2944,7 +2682,7 @@ func TestSendMixedQuery(t *testing.T) {
 					case bytes.Equal(b, blk1.Bytes()):
 						return blk1, nil
 					default:
-						t.Fatalf("Unknown block bytes")
+						require.FailNow("Unknown block bytes")
 						return nil, nil
 					}
 				}
@@ -2963,12 +2701,8 @@ func TestSendMixedQuery(t *testing.T) {
 				pullQueryReqID := new(uint32)
 				pullQueriedVdrs := set.Set[ids.NodeID]{}
 				sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
-					switch {
-					case *pullQuerySent:
-						t.Fatalf("Asked multiple times")
-					case blkID != blk1.ID():
-						t.Fatalf("Expected engine to request blk1")
-					}
+					require.False(*pullQuerySent)
+					require.Equal(blk1.ID(), blkID)
 					pullQueriedVdrs.Union(inVdrs)
 					*pullQuerySent = true
 					*pullQueryReqID = requestID
@@ -2978,12 +2712,8 @@ func TestSendMixedQuery(t *testing.T) {
 				pushQueryReqID := new(uint32)
 				pushQueriedVdrs := set.Set[ids.NodeID]{}
 				sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-					switch {
-					case *pushQuerySent:
-						t.Fatal("Asked multiple times")
-					case !bytes.Equal(blkBytes, blk1.Bytes()):
-						t.Fatal("got unexpected block bytes instead of blk1")
-					}
+					require.False(*pushQuerySent)
+					require.Equal(blk1.Bytes(), blkBytes)
 					*pushQuerySent = true
 					*pushQueryReqID = requestID
 					pushQueriedVdrs.Union(inVdrs)
@@ -2993,26 +2723,19 @@ func TestSendMixedQuery(t *testing.T) {
 				// consisting of 12 push queries and 8 pull queries.
 				require.NoError(te.Put(context.Background(), te.Validators.List()[0].NodeID, constants.GossipMsgRequestID, blk1.Bytes()))
 
-				switch {
-				case !*pullQuerySent:
-					t.Fatal("expected us to send pull queries")
-				case !*pushQuerySent:
-					t.Fatal("expected us to send push queries")
-				case *pushQueryReqID != *pullQueryReqID:
-					t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
-				case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
-					t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
-				case !tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushNonVdr:
-					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushNonVdr)
-				case tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushVdr:
-					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushVdr)
+				require.True(*pullQuerySent)
+				require.True(*pushQuerySent)
+				require.Equal(*pushQueryReqID, *pullQueryReqID)
+				require.Equal(te.Config.Params.K, pushQueriedVdrs.Len()+pullQueriedVdrs.Len())
+				expectedPushQueriedVdrs := te.Params.MixedQueryNumPushNonVdr
+				if tt.isVdr {
+					expectedPushQueriedVdrs = te.Params.MixedQueryNumPushVdr
 				}
+				require.Len(pushQueriedVdrs, expectedPushQueriedVdrs)
 
 				pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
 				for vdr := range pullQueriedVdrs {
-					if !vdrs.Contains(vdr) {
-						t.Fatalf("got unexpected vdr %v", vdr)
-					}
+					require.Contains(vdrs, vdr)
 				}
 			})
 	}
@@ -3245,8 +2968,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		t.Fatalf("unknown block")
-		panic("Should have errored")
+		require.FailNow("unknown block")
+		return nil, nil
 	}
 
 	require.Equal(choices.Processing, blk.Status())

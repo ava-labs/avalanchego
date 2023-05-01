@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"testing"
 	"time"
 
@@ -85,9 +84,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := parsedBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
+	require.ErrorIs(parsedBlock.Verify(context.Background()), errUnknownBlock)
 }
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
@@ -174,9 +171,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.True(ok)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
@@ -190,15 +185,11 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		// It's okay for this block not to be parsed
 		return
 	}
-	if err := yBlock.Verify(context.Background()); err == nil {
-		t.Fatal("unexpectedly passed block verification")
-	}
+	require.ErrorIs(yBlock.Verify(context.Background()), errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
-	if err := yBlock.Verify(context.Background()); err == nil {
-		t.Fatal("unexpectedly passed block verification")
-	}
+	require.ErrorIs(yBlock.Verify(context.Background()), errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
@@ -289,16 +280,12 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	require.NoError(aBlock.Verify(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
+	require.ErrorIs(bBlock.Verify(context.Background()), errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
+	require.ErrorIs(bBlock.Verify(context.Background()), errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
@@ -384,19 +371,13 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.True(ok)
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
 	require.NoError(aBlock.Verify(context.Background()))
-	if err := opts[0].Verify(context.Background()); err == nil {
-		t.Fatal("option 0 has invalid parent, should not verify")
-	}
-	if err := opts[1].Verify(context.Background()); err == nil {
-		t.Fatal("option 1 has invalid parent, should not verify")
-	}
+	require.ErrorIs(opts[0].Verify(context.Background()), errInnerParentMismatch)
+	require.ErrorIs(opts[1].Verify(context.Background()), errInnerParentMismatch)
 }
 
 //	  ,--G ----.
@@ -502,9 +483,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(context.Background()); !errors.Is(err, errUnexpectedBlockType) {
-		t.Fatal(err)
-	}
+	require.ErrorIs(outerOption.Verify(context.Background()), errUnexpectedBlockType)
 
 	// generate A from X and O2
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -591,9 +570,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(context.Background()); err != errInnerParentMismatch {
-		t.Fatal(err)
-	}
+	require.ErrorIs(outerOption.Verify(context.Background()), errInnerParentMismatch)
 }
 
 func TestGetBlock_MutatedSignature(t *testing.T) {
@@ -690,18 +667,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		t.Skip(err)
 	}
 
-	if err := invalidBlk.Verify(context.Background()); err == nil {
-		t.Fatalf("verified block without valid signature")
-	}
+	require.ErrorIs(invalidBlk.Verify(context.Background()), database.ErrNotFound)
 
 	// Note that the invalidBlk.ID() is the same as the correct blk ID because
 	// the signature isn't part of the blk ID.
 	blkID, err := ids.FromString("2R3Uz98YmxHUJARWv6suApPdAbbZ7X7ipat1gZuZNNhC5wPwJW")
 	require.NoError(err)
-
-	if blkID != invalidBlk.ID() {
-		t.Fatalf("unexpected block ID; expected = %s , got = %s", blkID, invalidBlk.ID())
-	}
+	require.Equal(blkID, invalidBlk.ID())
 
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]

@@ -5,7 +5,6 @@ package meter
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -61,6 +60,8 @@ func NewTest(t *testing.T, factory Factory) {
 }
 
 func TimeTravelTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
 	m := factory.New(halflife)
 
 	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
@@ -68,26 +69,22 @@ func TimeTravelTest(t *testing.T, factory Factory) {
 
 	now = now.Add(halflife - 1)
 	epsilon := 0.0001
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(.5, m.Read(now), epsilon)
 
 	m.Dec(now, 1)
 
 	now = now.Add(-halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(.5, m.Read(now), epsilon)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife / 2)
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(.5, m.Read(now), epsilon)
 }
 
 func StandardUsageTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
 	m := factory.New(halflife)
 
 	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
@@ -95,74 +92,50 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 
 	now = now.Add(halflife - 1)
 	epsilon := 0.0001
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(.5, m.Read(now), epsilon)
 
 	m.Inc(now, 1)
+	require.InDelta(.5, m.Read(now), epsilon)
 
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	m.Dec(now, 1)
+	require.InDelta(.5, m.Read(now), epsilon)
 
 	m.Dec(now, 1)
 
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
-
-	m.Dec(now, 1)
-
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(.5, m.Read(now), epsilon)
 
 	now = now.Add(halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.25) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .25, uptime)
-	}
+	require.InDelta(.25, m.Read(now), epsilon)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.625) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
-	}
+	require.InDelta(.625, m.Read(now), epsilon)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
-	}
+	require.InDelta(1, m.Read(now), epsilon)
 
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-0) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 0, uptime)
-	}
+	require.InDelta(0, m.Read(now), epsilon)
 
 	m.Inc(now, 1)
 
 	now = now.Add(2 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.75) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .75, uptime)
-	}
+	require.InDelta(.75, m.Read(now), epsilon)
 
 	// Second start
 	m.Inc(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-2) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 2, uptime)
-	}
+	require.InDelta(2, m.Read(now), epsilon)
 
 	// Stop the second CPU
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
-	}
+	require.InDelta(1, m.Read(now), epsilon)
 }
 
 func TestTimeUntil(t *testing.T) {

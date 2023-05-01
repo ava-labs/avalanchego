@@ -335,7 +335,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	require.Equal(proBlk2.ID(), proBlk1.ID())
+	require.NotEqual(proBlk2.ID(), proBlk1.ID())
 	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
@@ -426,9 +426,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("proBlk1 and proBlk2 should be different for this test")
-	}
+	require.NotEqual(proBlk1.ID(), proBlk2.ID())
 
 	require.NoError(proBlk2.Verify(context.Background()))
 
@@ -443,7 +441,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			wronglyPreferredcoreBlk = coreBlk1
 			return nil
 		default:
-			t.Fatal("Unknown core Blocks set as preferred")
+			require.FailNow("Unknown core Blocks set as preferred")
 			return nil
 		}
 	}
@@ -454,7 +452,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			t.Fatalf("Wrong bytes")
+			require.FailNow("Wrong bytes")
 			return nil, nil
 		}
 	}
@@ -480,9 +478,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	if err := blk.Verify(context.Background()); err == nil {
-		t.Fatal("coreVM does not build on preferred coreBlock. It should err")
-	}
+	require.ErrorIs(blk.Verify(context.Background()), errInnerParentMismatch)
 }
 
 // VM.ParseBlock tests section
@@ -518,10 +514,8 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	}
 
 	// test
-
-	if _, err := proVM.ParseBlock(context.Background(), proBlk.Bytes()); err == nil {
-		t.Fatal("failed parsing proposervm.Block. Error:", err)
-	}
+	_, err = proVM.ParseBlock(context.Background(), proBlk.Bytes())
+	require.ErrorIs(err, errMarshallingFailed)
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
@@ -537,9 +531,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		TimestampV: proVM.Time(),
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, innerBlk.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -581,9 +573,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		},
 	}
 
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("Test requires proBlk1 and proBlk2 to be different")
-	}
+	require.NotEqual(proBlk1.ID(), proBlk2.ID())
 
 	// Show that both can be parsed and retrieved
 	parsedBlk1, err := proVM.ParseBlock(context.Background(), proBlk1.Bytes())
@@ -591,12 +581,8 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	parsedBlk2, err := proVM.ParseBlock(context.Background(), proBlk2.Bytes())
 	require.NoError(err)
 
-	if parsedBlk1.ID() != proBlk1.ID() {
-		t.Fatal("error in parsing block")
-	}
-	if parsedBlk2.ID() != proBlk2.ID() {
-		t.Fatal("error in parsing block")
-	}
+	require.Equal(proBlk1.ID(), parsedBlk1.ID())
+	require.Equal(proBlk2.ID(), parsedBlk2.ID())
 }
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
@@ -636,7 +622,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		case bytes.Equal(b, netcoreBlk.Bytes()):
 			return netcoreBlk, nil
 		default:
-			t.Fatalf("Unknown bytes")
+			require.FailNow("Unknown bytes")
 			return nil, nil
 		}
 	}
@@ -677,12 +663,9 @@ func TestPreFork_Initialize(t *testing.T) {
 	rtvdBlk, err := proVM.GetBlock(context.Background(), blkID)
 	require.NoError(err)
 
-	if _, ok := rtvdBlk.(*preForkBlock); !ok {
-		t.Fatal("Block retrieved from proposerVM should be proposerBlocks")
-	}
-	if !bytes.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes()) {
-		t.Fatal("Stored block is not genesis")
-	}
+	_, ok := rtvdBlk.(*preForkBlock)
+	require.True(ok)
+	require.Equal(coreGenBlk.Bytes(), rtvdBlk.Bytes())
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
@@ -708,15 +691,10 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	if _, ok := builtBlk.(*preForkBlock); !ok {
-		t.Fatal("Block built by proposerVM should be proposerBlocks")
-	}
-	if builtBlk.ID() != coreBlk.ID() {
-		t.Fatal("unexpected built block")
-	}
-	if !bytes.Equal(builtBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("unexpected built block")
-	}
+	_, ok := builtBlk.(*preForkBlock)
+	require.True(ok)
+	require.Equal(coreBlk.ID(), builtBlk.ID())
+	require.Equal(coreBlk.Bytes(), builtBlk.Bytes())
 
 	// test
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
@@ -724,9 +702,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), builtBlk.ID())
 	require.NoError(err)
-	if storedBlk.ID() != builtBlk.ID() {
-		t.Fatal("proposerVM retrieved wrong block")
-	}
+	require.Equal(builtBlk.ID(), storedBlk.ID())
 }
 
 func TestPreFork_ParseBlock(t *testing.T) {
@@ -743,35 +719,24 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	}
 
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, coreBlk.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(coreBlk.Bytes(), b)
 		return coreBlk, nil
 	}
 
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
 	require.NoError(err)
-	if _, ok := parsedBlk.(*preForkBlock); !ok {
-		t.Fatal("Block parsed by proposerVM should be proposerBlocks")
-	}
-	if parsedBlk.ID() != coreBlk.ID() {
-		t.Fatal("Parsed block does not match expected block")
-	}
-	if !bytes.Equal(parsedBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("Parsed block does not match expected block")
-	}
+	_, ok := parsedBlk.(*preForkBlock)
+	require.True(ok)
+	require.Equal(coreBlk.ID(), parsedBlk.ID())
+	require.Equal(coreBlk.Bytes(), parsedBlk.Bytes())
 
 	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		if id != coreBlk.ID() {
-			t.Fatalf("Unknown core block")
-		}
+		require.Equal(coreBlk.ID(), id)
 		return coreBlk, nil
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), parsedBlk.ID())
 	require.NoError(err)
-	if storedBlk.ID() != parsedBlk.ID() {
-		t.Fatal("proposerVM retrieved wrong block")
-	}
+	require.Equal(parsedBlk.ID(), storedBlk.ID())
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
@@ -832,9 +797,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 	}
 	nextBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	if nextBlk.Parent() != builtBlk.ID() {
-		t.Fatal("Preferred block should be parent of next built block")
-	}
+	require.Equal(builtBlk.ID(), nextBlk.Parent())
 }
 
 func TestExpiredBuildBlock(t *testing.T) {
@@ -1000,16 +963,15 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		t.Fatal("unexpectedly called build block")
-		panic("unexpectedly called build block")
+		require.FailNow("unexpectedly called build block")
+		return nil, nil
 	}
 
 	// The first notification will be read from the consensus engine
 	<-toEngine
 
-	if _, err := proVM.BuildBlock(context.Background()); err == nil {
-		t.Fatal("build block when the proposer window hasn't started")
-	}
+	_, err = proVM.BuildBlock(context.Background())
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())
@@ -1275,9 +1237,7 @@ func TestInnerVMRollback(t *testing.T) {
 	parsedBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
 
-	if status := parsedBlock.Status(); status != choices.Processing {
-		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
-	}
+	require.Equal(choices.Processing, parsedBlock.Status())
 
 	require.NoError(parsedBlock.Verify(context.Background()))
 
@@ -1288,9 +1248,7 @@ func TestInnerVMRollback(t *testing.T) {
 	fetchedBlock, err := proVM.GetBlock(context.Background(), parsedBlock.ID())
 	require.NoError(err)
 
-	if status := fetchedBlock.Status(); status != choices.Accepted {
-		t.Fatalf("unexpected status %s. Expected %s", status, choices.Accepted)
-	}
+	require.Equal(choices.Accepted, fetchedBlock.Status())
 
 	// Restart the node and have the inner VM rollback state.
 
@@ -1321,16 +1279,12 @@ func TestInnerVMRollback(t *testing.T) {
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 
-	if lastAcceptedID != coreGenBlk.IDV {
-		t.Fatalf("failed to roll back the VM to the last accepted block")
-	}
+	require.Equal(coreGenBlk.IDV, lastAcceptedID)
 
 	parsedBlock, err = proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
 
-	if status := parsedBlock.Status(); status != choices.Processing {
-		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
-	}
+	require.Equal(choices.Processing, parsedBlock.Status())
 }
 
 func TestBuildBlockDuringWindow(t *testing.T) {
@@ -1512,29 +1466,18 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	require.NoError(cBlock.Verify(context.Background()))
 
-	if aBlock.Parent() != bBlock.Parent() ||
-		zBlock.Parent() != yBlock.ID() ||
-		cBlock.Parent() != bBlock.ID() {
-		t.Fatal("inconsistent parent")
-	}
+	require.Equal(bBlock.Parent(), aBlock.Parent())
+	require.Equal(yBlock.ID(), zBlock.Parent())
+	require.Equal(bBlock.ID(), cBlock.Parent())
 
-	if yBlock.Status() == choices.Rejected {
-		t.Fatal("yBlock should not be rejected")
-	}
+	require.NotEqual(choices.Rejected, yBlock.Status())
 
 	// accept A
 	require.NoError(aBlock.Accept(context.Background()))
 
-	if xBlock.Status() != choices.Accepted {
-		t.Fatal("xBlock should be accepted because aBlock is accepted")
-	}
-
-	if yBlock.Status() != choices.Rejected {
-		t.Fatal("yBlock should be rejected")
-	}
-	if zBlock.Status() != choices.Rejected {
-		t.Fatal("zBlock should be rejected")
-	}
+	require.Equal(choices.Accepted, xBlock.Status())
+	require.Equal(choices.Rejected, yBlock.Status())
+	require.Equal(choices.Rejected, zBlock.Status())
 }
 
 func TestTooFarAdvanced(t *testing.T) {
@@ -1589,9 +1532,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != errProposerWindowNotStarted {
-		t.Fatal("should have errored errProposerWindowNotStarted")
-	}
+	require.ErrorIs(bBlock.Verify(context.Background()), errProposerWindowNotStarted)
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1611,9 +1552,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != errTimeTooAdvanced {
-		t.Fatal("should have errored errTimeTooAdvanced")
-	}
+	require.ErrorIs(bBlock.Verify(context.Background()), errTimeTooAdvanced)
 }
 
 // Ensure that Accepting a PostForkOption (B) causes both the other option and
@@ -1673,9 +1612,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.True(ok)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
@@ -1691,16 +1628,12 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require.NoError(bBlock.Accept(context.Background()))
 
 	// the other pre-fork option should be rejected
-	if xBlock.opts[1].Status() != choices.Rejected {
-		t.Fatal("the pre-fork option block should have be rejected")
-	}
+	require.Equal(choices.Rejected, xBlock.opts[1].Status())
 
 	// the other post-fork option should also be rejected
 	require.NoError(cBlock.Reject(context.Background()))
 
-	if cBlock.Status() != choices.Rejected {
-		t.Fatal("cBlock status should not be accepted")
-	}
+	require.Equal(choices.Rejected, cBlock.Status())
 }
 
 // Ensure that given the chance, built blocks will reference a lagged P-chain

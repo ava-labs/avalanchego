@@ -12,15 +12,13 @@ import (
 )
 
 func TestNodeIDEquality(t *testing.T) {
+	require := require.New(t)
+
 	id := NodeID{24}
 	idCopy := NodeID{24}
-	if id != idCopy {
-		t.Fatalf("ID.Prefix mutated the ID")
-	}
+	require.Equal(id, idCopy)
 	id2 := NodeID{}
-	if id == id2 {
-		t.Fatal("expected Node IDs to be unequal")
-	}
+	require.NotEqual(id, id2)
 }
 
 func TestNodeIDFromString(t *testing.T) {
@@ -30,13 +28,9 @@ func TestNodeIDFromString(t *testing.T) {
 	idStr := id.String()
 	id2, err := NodeIDFromString(idStr)
 	require.NoError(err)
-	if id != id2 {
-		t.Fatal("Expected FromString to be inverse of String but it wasn't")
-	}
+	require.Equal(id, id2)
 	expected := "NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"
-	if idStr != expected {
-		t.Fatalf("expected %s but got %s", expected, idStr)
-	}
+	require.Equal(expected, idStr)
 }
 
 func TestNodeIDFromStringError(t *testing.T) {
@@ -178,14 +172,7 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 	err = json.Unmarshal(mapJSON, &unmarshalledMap)
 	require.NoError(err)
 
-	if len(originalMap) != len(unmarshalledMap) {
-		t.Fatalf("wrong map lengths")
-	}
-	for originalID, num := range originalMap {
-		if unmarshalledMap[originalID] != num {
-			t.Fatalf("map was incorrectly Unmarshalled")
-		}
-	}
+	require.Equal(originalMap, unmarshalledMap)
 }
 
 func TestNodeIDLess(t *testing.T) {

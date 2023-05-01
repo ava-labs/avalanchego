@@ -28,8 +28,9 @@ const (
 )
 
 var (
-	errEmptyUsername = errors.New("empty username")
-	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errEmptyUsername     = errors.New("empty username")
+	errUserMaxLength     = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errUserAlreadyExists = errors.New("user already exists")
 
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
@@ -182,7 +183,7 @@ func (ks *keystore) CreateUser(username, pw string) error {
 		return err
 	}
 	if passwordHash != nil {
-		return fmt.Errorf("user already exists: %s", username)
+		return fmt.Errorf("%w: %s", errUserAlreadyExists, username)
 	}
 
 	if err := password.IsValid(pw, password.OK); err != nil {
@@ -290,7 +291,7 @@ func (ks *keystore) ImportUser(username, pw string, userBytes []byte) error {
 		return err
 	}
 	if passwordHash != nil {
-		return fmt.Errorf("user already exists: %s", username)
+		return fmt.Errorf("%w: %s", errUserAlreadyExists, username)
 	}
 
 	userData := user{}

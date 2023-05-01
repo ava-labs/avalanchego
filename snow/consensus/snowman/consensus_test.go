@@ -105,11 +105,8 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	if pref := sm.Preference(); pref != GenesisID {
-		t.Fatalf("Wrong preference returned")
-	} else if !sm.Finalized() {
-		t.Fatalf("Wrong should have marked the instance as being finalized")
-	}
+	require.Equal(GenesisID, sm.Preference())
+	require.True(sm.Finalized())
 }
 
 // Make sure that the number of processing blocks is tracked correctly
@@ -140,24 +137,18 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
-		t.Fatalf("expected %d blocks to be processing but returned %d", 0, numProcessing)
-	}
+	require.Zero(sm.NumProcessing())
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), block))
 
-	if numProcessing := sm.NumProcessing(); numProcessing != 1 {
-		t.Fatalf("expected %d blocks to be processing but returned %d", 1, numProcessing)
-	}
+	require.Equal(1, sm.NumProcessing())
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 
-	if numProcessing := sm.NumProcessing(); numProcessing != 0 {
-		t.Fatalf("expected %d blocks to be processing but returned %d", 0, numProcessing)
-	}
+	require.Zero(sm.NumProcessing())
 }
 
 // Make sure that adding a block to the tail updates the preference
@@ -190,11 +181,8 @@ func AddToTailTest(t *testing.T, factory Factory) {
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), block))
-	if pref := sm.Preference(); pref != block.ID() {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
-	} else if !sm.IsPreferred(block) {
-		t.Fatalf("Should have marked %s as being Preferred", pref)
-	}
+	require.Equal(block.ID(), sm.Preference())
+	require.True(sm.IsPreferred(block))
 }
 
 // Make sure that adding a block not to the tail doesn't change the preference
@@ -235,16 +223,12 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(context.Background(), firstBlock))
-	if pref := sm.Preference(); pref != firstBlock.IDV {
-		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
-	}
+	require.Equal(firstBlock.IDV, sm.Preference())
 
 	// Adding to something other than the previous preference won't update the
 	// preference
 	require.NoError(sm.Add(context.Background(), secondBlock))
-	if pref := sm.Preference(); pref != firstBlock.IDV {
-		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
-	}
+	require.Equal(firstBlock.IDV, sm.Preference())
 }
 
 // Make sure that adding a block that is detached from the rest of the tree
@@ -284,11 +268,8 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 	// Adding a block with an unknown parent means the parent must have already
 	// been rejected. Therefore the block should be immediately rejected
 	require.NoError(sm.Add(context.Background(), block))
-	if pref := sm.Preference(); pref != GenesisID {
-		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
-	} else if status := block.Status(); status != choices.Rejected {
-		t.Fatalf("Should have rejected the block")
-	}
+	require.Equal(GenesisID, sm.Preference())
+	require.Equal(choices.Rejected, block.Status())
 }
 
 func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
@@ -309,18 +290,10 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	}
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
-	if Genesis.Status() != choices.Accepted {
-		t.Fatalf("Should have marked an accepted block as having been accepted")
-	}
-	if sm.Processing(Genesis.ID()) {
-		t.Fatalf("Shouldn't have marked an accepted block as having been processing")
-	}
-	if !sm.Decided(Genesis) {
-		t.Fatalf("Should have marked an accepted block as having been decided")
-	}
-	if !sm.IsPreferred(Genesis) {
-		t.Fatalf("Should have marked an accepted block as being preferred")
-	}
+	require.Equal(choices.Accepted, Genesis.Status())
+	require.False(sm.Processing(Genesis.ID()))
+	require.True(sm.Decided(Genesis))
+	require.True(sm.IsPreferred(Genesis))
 }
 
 func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
@@ -350,18 +323,10 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if block.Status() == choices.Accepted {
-		t.Fatalf("Shouldn't have marked a rejected block as having been accepted")
-	}
-	if sm.Processing(block.ID()) {
-		t.Fatalf("Shouldn't have marked a rejected block as having been processing")
-	}
-	if !sm.Decided(block) {
-		t.Fatalf("Should have marked a rejected block as having been decided")
-	}
-	if sm.IsPreferred(block) {
-		t.Fatalf("Shouldn't have marked a rejected block as being preferred")
-	}
+	require.NotEqual(choices.Accepted, block.Status())
+	require.False(sm.Processing(block.ID()))
+	require.True(sm.Decided(block))
+	require.False(sm.IsPreferred(block))
 }
 
 func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
@@ -425,18 +390,10 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	}
 
 	require.NoError(sm.Add(context.Background(), block))
-	if block.Status() == choices.Accepted {
-		t.Fatalf("Shouldn't have marked the block as accepted")
-	}
-	if !sm.Processing(block.ID()) {
-		t.Fatalf("Should have marked the block as processing")
-	}
-	if sm.Decided(block) {
-		t.Fatalf("Shouldn't have marked the block as decided")
-	}
-	if !sm.IsPreferred(block) {
-		t.Fatalf("Should have marked the tail as being preferred")
-	}
+	require.NotEqual(choices.Accepted, block.Status())
+	require.True(sm.Processing(block.ID()))
+	require.False(sm.Decided(block))
+	require.True(sm.IsPreferred(block))
 }
 
 func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
@@ -471,21 +428,14 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	if pref := sm.Preference(); pref != block.ID() {
-		t.Fatalf("Preference returned the wrong block")
-	} else if sm.Finalized() {
-		t.Fatalf("Snowman instance finalized too soon")
-	} else if status := block.Status(); status != choices.Processing {
-		t.Fatalf("Block's status changed unexpectedly")
-	}
+	require.Equal(block.ID(), sm.Preference())
+	require.False(sm.Finalized())
+	require.Equal(choices.Processing, block.Status())
+
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	if pref := sm.Preference(); pref != block.ID() {
-		t.Fatalf("Preference returned the wrong block")
-	} else if !sm.Finalized() {
-		t.Fatalf("Snowman instance didn't finalize")
-	} else if status := block.Status(); status != choices.Accepted {
-		t.Fatalf("Block's status should have been set to accepted")
-	}
+	require.Equal(block.ID(), sm.Preference())
+	require.True(sm.Finalized())
+	require.Equal(choices.Accepted, block.Status())
 }
 
 func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
