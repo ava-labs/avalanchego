@@ -4,17 +4,20 @@ If you can, put all of your test logic into DS-test tests. Prefix test functions
 
 The `test` function is a wrapper around Mocha's `it` function. It provides a normalized framework for running the
 majority of your test assertions inside of a smart-contract, using `DS-Test`.
-The API can be used as follows:
+The API can be used as follows (all of the examples are equivalent):
 
-```js
+```ts
 test("<test_name>", "<contract_function_name>");
+
 test("<test_name>", ["<contract_function_name>"]);
+
 test("<test_name>", {
   method: "<contract_function_name>",
   overrides: {},
   shouldFail: false,
   debug: false,
 });
+
 test("<test_name>", [
   {
     method: "<contract_function_name>",
@@ -23,6 +26,7 @@ test("<test_name>", [
     debug: false,
   },
 ]);
+
 test(
   "<test_name>",
   [{ method: "<contract_function_name>", shouldFail: false, debug: false }],
@@ -30,11 +34,10 @@ test(
 );
 ```
 
-All of the above examples are equivalent.
 Many contract functions can be called as a part of the same test:
 
-```js
-test("<test_name>", [<test_fn1>, <test_fn2>, <test_fn3>])
+```ts
+test("<test_name>", ["<test_fn1>", "<test_fn2>", "<test_fn3>"])
 ```
 
 Individual test functions can describe their own overrides with the `overrides` property.
@@ -42,10 +45,11 @@ If an object is passed in as the third argument to `test`, it will be used as th
 functions.
 The following are equivalent:
 
-```js
+```ts
 test("<test_name>", [
   { method: "<contract_function_name>", overrides: { from: "0x123" } },
 ]);
+
 test("<test_name>", [{ method: "<contract_function_name>" }], {
   from: "0x123",
 });

@@ -1,28 +1,28 @@
 import { ethers } from "hardhat"
+import { CallOverrides } from "ethers"
 const assert = require("assert")
 
 /*
  *
  * The `test` function is a wrapper around Mocha's `it` function. It provides a normalized framework for running the
  * majority of your test assertions inside of a smart-contract, using `DS-Test`.
- * The API can be used as follows:
- * ```js
+ * The API can be used as follows (all of the examples are equivalent):
+ * ```ts
  * test("<test_name>", "<contract_function_name>")
  * test("<test_name>", ["<contract_function_name>"])
  * test("<test_name>", { method: "<contract_function_name>", overrides: {}, shouldFail: false, debug: false })
  * test("<test_name>", [{ method: "<contract_function_name>", overrides: {}, shouldFail: false, debug: false }])
  * test("<test_name>", [{ method: "<contract_function_name>", shouldFail: false, debug: false }], {})
  * ```
- * All of the above examples are equivalent.
  * Many contract functions can be called as a part of the same test:
- * ```js
- * test("<test_name>", [<test_fn1>, <test_fn2>, <test_fn3>])
+ * ```ts
+ * test("<test_name>", ["<test_fn1>", "<test_fn2>", "<test_fn3>"])
  * ```
  * Individual test functions can describe their own overrides with the `overrides` property.
  * If an object is passed in as the third argument to `test`, it will be used as the default overrides for all test
  * functions.
  * The following are equivalent:
- * ```js
+ * ```ts
  * test("<test_name>", [{ method: "<contract_function_name>", overrides: { from: "0x123" } }])
  * test("<test_name>", [{ method: "<contract_function_name>" }], { from: "0x123" })
  * ```
@@ -38,22 +38,26 @@ const assert = require("assert")
 
 // Below are the types that help define all the different ways to call `test`
 type FnNameOrObject = string | string[] | MethodObject | MethodObject[]
-type MethodObject = { method: string, debug?: boolean, overrides?: any, shouldFail?: boolean }
+
+// Limit `from` property to be a `string` instead of `string | Promise<string>`
+type Overrides = CallOverrides & { from?: string }
+
+type MethodObject = { method: string, debug?: boolean, overrides?: Overrides, shouldFail?: boolean }
 
 // This type is after all default values have been applied
-type MethodWithDebugAndOverrides = MethodObject & { debug: boolean, overrides: any, shouldFail: boolean }
+type MethodWithDebugAndOverrides = MethodObject & { debug: boolean, overrides: Overrides, shouldFail: boolean }
 
 // `test` is used very similarly to `it` from Mocha
-export const test = (name, fnNameOrObject, overrides = {}) => it(name, testFn(fnNameOrObject, overrides))
+export const test = (name, fnNameOrObject, overrides = {}) => it(name, buildTestFn(fnNameOrObject, overrides))
 // `test.only` is used very similarly to `it.only` from Mocha, it will isolate all tests marked with `test.only`
-test.only = (name, fnNameOrObject, overrides = {}) => it.only(name, testFn(fnNameOrObject, overrides))
+test.only = (name, fnNameOrObject, overrides = {}) => it.only(name, buildTestFn(fnNameOrObject, overrides))
 // `test.debug` is used to apply `debug: true` to all DSTest contract method calls in the test
-test.debug = (name, fnNameOrObject, overrides = {}) => it.only(name, testFn(fnNameOrObject, overrides, true))
+test.debug = (name, fnNameOrObject, overrides = {}) => it.only(name, buildTestFn(fnNameOrObject, overrides, true))
 // `test.skip` is used very similarly to `it.skip` from Mocha, it will skip all tests marked with `test.skip`
-test.skip = (name, fnNameOrObject, overrides = {}) => it.skip(name, testFn(fnNameOrObject, overrides))
+test.skip = (name, fnNameOrObject, overrides = {}) => it.skip(name, buildTestFn(fnNameOrObject, overrides))
 
-// `testFn` is a higher-order function. It returns a function that can be used as the test function for `it`
-const testFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = false) => {
+// `buildTestFn` is a higher-order function. It returns a function that can be used as the test function for `it`
+const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = false) => {
   // normalize the input to an array of objects
   const fnObjects: MethodWithDebugAndOverrides[] = (Array.isArray(fnNameOrObject) ? fnNameOrObject : [fnNameOrObject]).map(fnNameOrObject => {
     fnNameOrObject = typeof fnNameOrObject === 'string' ? { method: fnNameOrObject } : fnNameOrObject
