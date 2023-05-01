@@ -155,8 +155,8 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 	return nil
 }
 
-// Repeatedly awaits signal on [m.unprocessedWorkCond] that there
-// is work to do or we're done, and dispatches a goroutine to do
+// sync awaits signal on [m.unprocessedWorkCond] which indicates that there
+// is work to do, or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
 func (m *StateSyncManager) sync(ctx context.Context) {
 	defer func() {
@@ -203,7 +203,7 @@ func (m *StateSyncManager) sync(ctx context.Context) {
 	}
 }
 
-// Called when there is a fatal error or sync is complete.
+// Close is called when there is a fatal error or sync is complete.
 func (m *StateSyncManager) Close() {
 	m.closeOnce.Do(func() {
 		m.workLock.Lock()
@@ -256,7 +256,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		return
 	}
 
-	changeproof, err := m.config.Client.GetChangeProof(
+	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&syncpb.ChangeProofRequest{
 			StartRoot:  workItem.LocalRootID[:],
@@ -283,7 +283,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 	// The start or end root IDs are not present in other nodes' history.
 	// Add this range as a fresh uncompleted work item to the work heap.
 	// TODO danlaine send range proof instead of failure notification
-	if !changeproof.HadRootsInHistory {
+	if !changeProof.HadRootsInHistory {
 		workItem.LocalRootID = ids.Empty
 		m.enqueueWork(workItem)
 		return
@@ -291,15 +291,15 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	largestHandledKey := workItem.end
 	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeproof.KeyChanges) > 0 {
-		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
+	if len(changeProof.KeyChanges) > 0 {
+		if err := m.config.SyncDB.CommitChangeProof(ctx, changeProof); err != nil {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = changeproof.KeyChanges[len(changeproof.KeyChanges)-1].Key
+		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
 	}
 
-	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeproof.EndProof)
+	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [workItem].
@@ -490,7 +490,7 @@ func (m *StateSyncManager) Error() error {
 	return m.fatalError
 }
 
-// Blocks until either:
+// Wait blocks until one of the following occurs:
 // - sync is complete.
 // - sync fatally errored.
 // - [ctx] is canceled.
@@ -695,15 +695,11 @@ func midPoint(start, end []byte) []byte {
 		if total >= 256 {
 			total -= 256
 			index := i - 1
-			for index >= 0 {
-				if midpoint[index] != 255 {
-					midpoint[index]++
-					break
-				}
-
+			for index > 0 && midpoint[index] == 255 {
 				midpoint[index] = 0
 				index--
 			}
+			midpoint[index]++
 		}
 		midpoint[i] = byte(total)
 	}
