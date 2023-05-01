@@ -6,7 +6,6 @@ package proposervm
 import (
 	"context"
 	"crypto"
-	"errors"
 	"testing"
 	"time"
 
@@ -25,9 +24,9 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var errUnknownSummary = errors.New("unknown summary")
-
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
+	require := require.New(t)
+
 	innerVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
@@ -50,7 +49,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	// load innerVM expectations
 	innerGenesisBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'G', 'e', 'n', 's', 'y', 's', 'I', 'D'},
+			IDV: ids.ID{'i', 'n', 'n', 'e', 'r', 'G', 'e', 'n', 'e', 's', 'i', 's', 'I', 'D'},
 		},
 		HeightV: 0,
 		BytesV:  []byte("genesis state"),
@@ -98,9 +97,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	return innerVM, vm
 }
@@ -607,9 +604,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 		return coreStateSummary, nil
 	}
 	coreVM.GetStateSummaryF = func(_ context.Context, height uint64) (block.StateSummary, error) {
-		if height != summaryHeight {
-			return nil, errUnknownSummary
-		}
+		require.Equal(summaryHeight, height)
 		return coreStateSummary, nil
 	}
 
