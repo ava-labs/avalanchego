@@ -65,6 +65,8 @@ var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	deprecatedKeys = map[string]string{
 		NetworkCompressionEnabledKey: fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
+		BootstrapIDsKey:              fmt.Sprintf("use --%s instead", BootstrappersKey),
+		BootstrapIPsKey:              fmt.Sprintf("use --%s instead", BootstrappersKey),
 	}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
@@ -528,6 +530,12 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
+	if v.IsSet(BootstrappersKey) {
+		s := v.GetString(BootstrappersKey)
+		return config, json.Unmarshal([]byte(s), &config.Bootstrappers)
+	}
+
+	// "--bootstrappers" is not set, so fallback to old flags
 	ipsSet := v.IsSet(BootstrapIPsKey)
 	idsSet := v.IsSet(BootstrapIDsKey)
 	if ipsSet && !idsSet {
@@ -555,9 +563,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			bootstrappers = append(bootstrappers, genesis.Bootstrapper{ID: ids.EmptyNodeID, IP: ips.IPDesc(addr)})
 		}
 	}
-	for _, bootstrapper := range bootstrappers {
-		config.BootstrapIPs = append(config.BootstrapIPs, ips.IPPort(bootstrapper.IP))
-	}
+	config.Bootstrappers = bootstrappers
 
 	if idsSet {
 		bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
@@ -575,21 +581,12 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			bootstrapNodeIDs = append(bootstrapNodeIDs, nodeID)
 		}
 
-		if len(bootstrappers) != len(bootstrapNodeIDs) {
-			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapNodeIDs (%d)", len(bootstrappers), len(bootstrapNodeIDs))
+		if len(config.Bootstrappers) != len(bootstrapNodeIDs) {
+			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapNodeIDs (%d)", len(config.Bootstrappers), len(bootstrapNodeIDs))
 		}
 		for i, nodeID := range bootstrapNodeIDs {
-			bootstrappers[i].ID = nodeID
+			config.Bootstrappers[i].ID = nodeID
 		}
-	}
-	for _, bootstrapper := range bootstrappers {
-		config.BootstrapIDs = append(config.BootstrapIDs, bootstrapper.ID)
-	}
-
-	lenIPs := len(config.BootstrapIPs)
-	lenIDs := len(config.BootstrapIDs)
-	if lenIPs != lenIDs {
-		return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", lenIPs, lenIDs)
 	}
 
 	return config, nil
