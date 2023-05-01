@@ -94,6 +94,8 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 }
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
+	require := require.New(t)
+
 	tm, err := NewAdaptiveTimeoutManager(
 		&AdaptiveTimeoutConfig{
 			InitialTimeout:     time.Millisecond,
@@ -105,9 +107,7 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	go tm.Dispatch()
 
 	var lock sync.Mutex

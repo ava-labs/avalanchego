@@ -38,6 +38,8 @@ var indexEnabledAvmConfig = Config{
 }
 
 func TestIndexTransaction_Ordered(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -46,9 +48,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -69,9 +69,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(signTX(vm.parser.Codec(), tx, key))
 
 		// Provide the platform UTXO
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
@@ -115,11 +113,11 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 		// index the transaction
 		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	// ensure length is 5
-	require.Len(t, uniqueTxs, 5)
+	require.Len(uniqueTxs, 5)
 	// for each *UniqueTx check its indexed at right index
 	for i, tx := range uniqueTxs {
 		assertIndexedTX(t, vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
@@ -129,6 +127,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 }
 
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -138,9 +138,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -159,9 +157,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(signTX(vm.parser.Codec(), tx, key))
 
 		// Provide the platform UTXO
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
@@ -205,11 +201,11 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 		// index the transaction
 		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	// ensure length is same as keys length
-	require.Len(t, addressTxMap, len(keys))
+	require.Len(addressTxMap, len(keys))
 
 	// for each *UniqueTx check its indexed at right index for the right address
 	for key, tx := range addressTxMap {
@@ -219,6 +215,8 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 }
 
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -228,9 +226,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -253,9 +249,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	tx := buildTX(utxoID, txAssetID, addrs...)
 
 	// sign the transaction
-	if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(signTX(vm.parser.Codec(), tx, key))
 
 	// Provide the platform UTXO
 	utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
@@ -266,23 +260,23 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	var inputUTXOs []*avax.UTXO //nolint:prealloc
 	for _, utxoID := range tx.Unsigned.InputUTXOs() {
 		utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
 	// index the transaction
 	err := vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs())
-	require.NoError(t, err)
-	require.NoError(t, err)
+	require.NoError(err)
+	require.NoError(err)
 
 	assertIndexedTX(t, vm.db, uint64(0), addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 1)
 }
 
 func TestIndexTransaction_UnorderedWrites(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -291,9 +285,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -312,9 +304,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(signTX(vm.parser.Codec(), tx, key))
 
 		// Provide the platform UTXO
 		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
@@ -358,11 +348,11 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 		// index the transaction, NOT calling Accept(ids.ID) method
 		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	// ensure length is same as keys length
-	require.Len(t, addressTxMap, len(keys))
+	require.Len(addressTxMap, len(keys))
 
 	// for each *UniqueTx check its indexed at right index for the right address
 	for key, tx := range addressTxMap {
@@ -372,13 +362,13 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 }
 
 func TestIndexer_Read(t *testing.T) {
+	require := require.New(t)
+
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -389,15 +379,15 @@ func TestIndexer_Read(t *testing.T) {
 	// setup some fake txs under the above generated address and asset IDs
 	testTxCount := 25
 	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
-	require.Len(t, testTxs, 25)
+	require.Len(testTxs, 25)
 
 	// read the pages, 5 items at a time
 	var cursor uint64
 	var pageSize uint64 = 5
 	for cursor < 25 {
 		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
-		require.NoError(t, err)
-		require.Len(t, txIDs, 5)
+		require.NoError(err)
+		require.Len(txIDs, 5)
 		require.Equal(t, txIDs, testTxs[cursor:cursor+pageSize])
 		cursor += pageSize
 	}
@@ -511,9 +501,11 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *
 }
 
 func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message, config Config) *VM {
+	require := require.New(t)
+
 	vm := &VM{}
 	avmConfigBytes, err := json.Marshal(config)
-	require.NoError(t, err)
+	require.NoError(err)
 	appSender := &common.SenderTest{T: t}
 
 	err = vm.Initialize(
@@ -530,19 +522,13 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 		}},
 		appSender,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	vm.batchTimeout = 0
 
-	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	return vm
 }
 
@@ -580,9 +566,8 @@ func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortI
 }
 
 func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
-	if err := checkIndexedTX(db, index, sourceAddress, assetID, transactionID); err != nil {
-		t.Fatal(err)
-	}
+	require := require.New(t)
+	require.NoError(checkIndexedTX(db, index, sourceAddress, assetID, transactionID))
 }
 
 // Sets up test tx IDs in DB in the following structure for the indexer to pick

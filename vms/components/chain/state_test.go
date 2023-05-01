@@ -220,6 +220,8 @@ func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) 
 }
 
 func TestState(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -256,9 +258,7 @@ func TestState(t *testing.T) {
 	})
 
 	lastAccepted, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if lastAccepted != genesisBlock.ID() {
 		t.Fatal("Expected last accepted block to be the genesis block")
 	}
@@ -322,15 +322,9 @@ func TestState(t *testing.T) {
 	}
 
 	// Decide the blocks and ensure they are removed from the processing blocks map
-	if err := parsedBlk1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := parsedBlk2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := parsedBlk3.Reject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlk1.Accept(context.Background()))
+	require.NoError(parsedBlk2.Accept(context.Background()))
+	require.NoError(parsedBlk3.Reject(context.Background()))
 
 	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 0 {
 		t.Fatalf("Expected chain state to have 0 processing blocks, but found: %d", numProcessing)
@@ -338,9 +332,7 @@ func TestState(t *testing.T) {
 
 	// Check that the last accepted block was updated correctly
 	lastAcceptedID, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if lastAcceptedID != blk2.ID() {
 		t.Fatal("Expected last accepted block to be blk2")
 	}
@@ -357,6 +349,8 @@ func TestState(t *testing.T) {
 }
 
 func TestBuildBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -382,15 +376,13 @@ func TestBuildBlock(t *testing.T) {
 	})
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.NoError(err)
+	require.Len(chainState.verifiedBlocks, 0)
 
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.Len(chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
@@ -402,6 +394,8 @@ func TestBuildBlock(t *testing.T) {
 }
 
 func TestStateDecideBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(4)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -426,24 +420,18 @@ func TestStateDecideBlock(t *testing.T) {
 
 	// Parse badVerifyBlk (which should fail verification)
 	badBlk, err := chainState.ParseBlock(context.Background(), badVerifyBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if err := badBlk.Verify(context.Background()); err == nil {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Len(chainState.verifiedBlocks, 0)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := badBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.NoError(err)
+	require.NoError(badBlk.Verify(context.Background()))
+	require.Len(chainState.verifiedBlocks, 1)
 
 	if err := badBlk.Accept(context.Background()); err == nil {
 		t.Fatal("Block should have errored on Accept")
@@ -451,12 +439,8 @@ func TestStateDecideBlock(t *testing.T) {
 
 	// Ensure that an error during block reject is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badRejectBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := badBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(badBlk.Verify(context.Background()))
 	// Note: an error during block Accept/Reject is fatal, so it is undefined whether
 	// the block that failed on Accept should be removed from processing or not. We allow
 	// either case here to make this test more flexible.
@@ -470,6 +454,8 @@ func TestStateDecideBlock(t *testing.T) {
 }
 
 func TestStateParent(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -490,9 +476,7 @@ func TestStateParent(t *testing.T) {
 	})
 
 	parsedBlk2, err := chainState.ParseBlock(context.Background(), blk2.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	missingBlk1ID := parsedBlk2.Parent()
 
@@ -501,26 +485,22 @@ func TestStateParent(t *testing.T) {
 	}
 
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	genesisBlkParentID := parsedBlk1.Parent()
 	genesisBlkParent, err := chainState.GetBlock(context.Background(), genesisBlkParentID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	checkAcceptedBlock(t, chainState, genesisBlkParent, true)
 
 	parentBlk1ID := parsedBlk2.Parent()
 	parentBlk1, err := chainState.GetBlock(context.Background(), parentBlk1ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	checkProcessingBlock(t, chainState, parentBlk1)
 }
 
 func TestGetBlockInternal(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -547,9 +527,7 @@ func TestGetBlockInternal(t *testing.T) {
 	}
 
 	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	if _, ok := blk.(*TestBlock); !ok {
 		t.Fatalf("Expected retrieved block to return a block of type *snowman.TestBlock, but found %T", blk)
@@ -560,6 +538,8 @@ func TestGetBlockInternal(t *testing.T) {
 }
 
 func TestGetBlockError(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -594,9 +574,7 @@ func TestGetBlockError(t *testing.T) {
 	// function.
 	blk1.SetStatus(choices.Processing)
 	blk, err := chainState.GetBlock(context.Background(), blk1.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if blk.ID() != blk1.ID() {
 		t.Fatalf("Expected GetBlock to retrieve %s, but found %s", blk1.ID(), blk.ID())
 	}
@@ -652,6 +630,8 @@ func TestBuildBlockError(t *testing.T) {
 }
 
 func TestMeteredCache(t *testing.T) {
+	require := require.New(t)
+
 	registry := prometheus.NewRegistry()
 
 	testBlks := NewTestBlocks(1)
@@ -671,9 +651,7 @@ func TestMeteredCache(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	}
 	_, err := NewMeteredState(registry, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	_, err = NewMeteredState(registry, config)
 	if err == nil {
 		t.Fatal("Expected creating a second NewMeteredState to error due to a registry conflict")
@@ -736,6 +714,8 @@ func TestStateBytesToIDCache(t *testing.T) {
 // TestSetLastAcceptedBlock ensures chainState's last accepted block
 // can be updated by calling [SetLastAcceptedBlock].
 func TestSetLastAcceptedBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -777,21 +757,15 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 		GetBlockIDAtHeight: getCanonicalBlockID,
 	})
 	lastAcceptedID, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if lastAcceptedID != genesisBlock.ID() {
 		t.Fatal("Expected last accepted block to be the genesis block")
 	}
 
 	// call SetLastAcceptedBlock for postSetBlk1
-	if err := chainState.SetLastAcceptedBlock(postSetBlk1); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(chainState.SetLastAcceptedBlock(postSetBlk1))
 	lastAcceptedID, err = chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if lastAcceptedID != postSetBlk1.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk1")
 	}
@@ -807,13 +781,9 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if err := parsedpostSetBlk2.Verify(context.Background()); err != nil {
 		t.Fatal("Parsed postSetBlk2 failed verification unexpectedly due to %w", err)
 	}
-	if err := parsedpostSetBlk2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedpostSetBlk2.Accept(context.Background()))
 	lastAcceptedID, err = chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if lastAcceptedID != postSetBlk2.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk2")
 	}

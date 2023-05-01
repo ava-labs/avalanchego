@@ -21,14 +21,12 @@ import (
 var errTest = errors.New("non-nil error")
 
 func TestInitialStateVerifySerialization(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 
 	expected := []byte{
 		// Codec version:
@@ -75,9 +73,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 	}
 
 	isBytes, err := m.Marshal(CodecVersion, is)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if !bytes.Equal(isBytes, expected) {
 		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
 			expected,
@@ -87,11 +83,11 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 }
 
 func TestInitialStateVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := (*InitialState)(nil)
@@ -101,11 +97,11 @@ func TestInitialStateVerifyNil(t *testing.T) {
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := InitialState{
@@ -117,11 +113,11 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := InitialState{
@@ -134,14 +130,12 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 }
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&avax.TestVerifiable{}))
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := InitialState{
@@ -154,14 +148,12 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 }
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&avax.TestTransferable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&avax.TestTransferable{}))
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := InitialState{
@@ -177,9 +169,7 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 
 	is.Sort(m)
 
-	if err := is.Verify(m, numFxs); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(is.Verify(m, numFxs))
 }
 
 func TestInitialStateLess(t *testing.T) {

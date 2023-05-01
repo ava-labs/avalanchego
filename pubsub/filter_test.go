@@ -39,15 +39,15 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 }
 
 func TestFilterParamUpdateMulti(t *testing.T) {
+	require := require.New(t)
+
 	fp := NewFilterParam()
 
 	addr1 := []byte("abc")
 	addr2 := []byte("def")
 	addr3 := []byte("xyz")
 
-	if err := fp.Add(addr1, addr2, addr3); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fp.Add(addr1, addr2, addr3))
 	if len(fp.set) != 3 {
 		t.Fatalf("update multi failed")
 	}
@@ -63,15 +63,15 @@ func TestFilterParamUpdateMulti(t *testing.T) {
 }
 
 func TestFilterParam(t *testing.T) {
+	require := require.New(t)
+
 	mapFilter := bloom.NewMap()
 
 	fp := NewFilterParam()
 	fp.SetFilter(mapFilter)
 
 	addr := ids.GenerateTestShortID()
-	if err := fp.Add(addr[:]); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fp.Add(addr[:]))
 	if !fp.Check(addr[:]) {
 		t.Fatalf("check address failed")
 	}

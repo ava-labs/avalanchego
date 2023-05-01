@@ -15,12 +15,12 @@ import (
 )
 
 func TestInterface(t *testing.T) {
+	require := require.New(t)
+
 	for _, test := range database.Tests {
 		baseDB := memdb.New()
 		db, err := New("", prometheus.NewRegistry(), baseDB)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		test(t, db)
 	}

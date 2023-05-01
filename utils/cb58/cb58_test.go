@@ -12,6 +12,8 @@ import (
 
 // Test encoding bytes to a string and decoding back to bytes
 func TestEncodeDecode(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		bytes []byte
 		str   string
@@ -44,16 +46,12 @@ func TestEncodeDecode(t *testing.T) {
 	for _, test := range tests {
 		// Encode the bytes
 		strResult, err := Encode(test.bytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		// Make sure the string repr. is what we expected
 		require.Equal(t, test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(strResult)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		// Make sure we got the same bytes back
 		if !bytes.Equal(test.bytes, bytesResult) {
 			t.Fatal("bytes not symmetric")

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -90,6 +92,8 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
@@ -136,12 +140,8 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		t.Fatalf("Could not build proposer block: %s", err)
 	}
 
-	if err := prntProBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), prntProBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
@@ -198,6 +198,8 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
@@ -243,12 +245,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	if err := prntProBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), prntProBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	prntTimestamp := prntProBlk.Timestamp()
 
@@ -396,6 +394,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
@@ -441,12 +441,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	if err := prntProBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), prntProBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
 
@@ -554,6 +550,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
@@ -631,12 +629,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	if err := oracleBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), oracleBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(oracleBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), oracleBlk.ID()))
 
 	// retrieve one option and verify block built on it
 	postForkOracleBlk, ok := oracleBlk.(*postForkBlock)
@@ -649,12 +643,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 	parentBlk := opts[0]
 
-	if err := parentBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
 
@@ -760,6 +750,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 }
 
 func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
+	require := require.New(t)
+
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
@@ -806,15 +798,11 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		t.Fatal("could not build block")
 	}
 
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// set error on coreBlock.Verify and recall Verify()
 	coreBlk.VerifyV = errDuplicateVerify
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// rebuild a block with the same core block
 	pChainHeight++
@@ -981,6 +969,8 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -1056,12 +1046,8 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	if err := parentBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
 	postForkOracleBlk, ok := parentBlk.(*postForkBlock)

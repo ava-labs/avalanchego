@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParametersVerify(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -21,12 +25,12 @@ func TestParametersVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(p.Verify())
 }
 
 func TestParametersAnotherVerify(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -38,12 +42,12 @@ func TestParametersAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(p.Verify())
 }
 
 func TestParametersYetAnotherVerify(t *testing.T) {
+	require := require.New(t)
+
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -55,9 +59,7 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(p.Verify())
 }
 
 func TestParametersInvalidK(t *testing.T) {

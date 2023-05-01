@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,6 +37,8 @@ func (tob TestOptionsBlock) Options(context.Context) ([2]snowman.Block, error) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -108,12 +112,8 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	if err := parentBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
 	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
@@ -169,6 +169,8 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 // ProposerBlock.Accept tests section
 func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
+	require := require.New(t)
+
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -245,12 +247,8 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	if err := parentBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
 	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
@@ -618,6 +616,8 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 }
 
 func TestOptionTimestampValidity(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreOracleBlkID := ids.GenerateTestID()
@@ -659,9 +659,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		0,
 		coreOracleBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -693,13 +691,9 @@ func TestOptionTimestampValidity(t *testing.T) {
 	}
 
 	statefulBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := statefulBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock.Verify(context.Background()))
 
 	statefulOracleBlock, ok := statefulBlock.(snowman.OracleBlock)
 	if !ok {
@@ -707,18 +701,12 @@ func TestOptionTimestampValidity(t *testing.T) {
 	}
 
 	options, err := statefulOracleBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	option := options[0]
-	if err := option.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(option.Verify(context.Background()))
 
-	if err := statefulBlock.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock.Accept(context.Background()))
 
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
 		t.Fatal("called GetBlock when unable to handle the error")
@@ -734,9 +722,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		t.Fatalf("wrong time returned expected %s got %s", expectedTime, optionTime)
 	}
 
-	if err := option.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(option.Accept(context.Background()))
 
 	// Restart the node.
 
@@ -812,9 +798,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	}
 
 	statefulOptionBlock, err := proVM.ParseBlock(context.Background(), option.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	if status := statefulOptionBlock.Status(); status != choices.Accepted {
 		t.Fatalf("wrong status returned expected %s got %s", choices.Accepted, status)

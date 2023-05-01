@@ -8,17 +8,19 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestInterface(t *testing.T) {
+	require := require.New(t)
+
 	for _, test := range cache.CacherTests {
 		cache := &cache.LRU[ids.ID, int]{Size: test.Size}
 		c, err := New[ids.ID, int]("", prometheus.NewRegistry(), cache)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		test.Func(t, c)
 	}

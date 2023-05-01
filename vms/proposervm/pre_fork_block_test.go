@@ -617,6 +617,8 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
+	require := require.New(t)
+
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
@@ -688,13 +690,9 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	}
 
 	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := firstBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(firstBlock.Verify(context.Background()))
 
 	oracleBlock, ok := firstBlock.(snowman.OracleBlock)
 	if !ok {
@@ -702,20 +700,16 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	}
 
 	options, err := oracleBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := options[0].Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(options[0].Verify(context.Background()))
 
-	if err := options[1].Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(options[1].Verify(context.Background()))
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
+	require := require.New(t)
+
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
@@ -787,13 +781,9 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	}
 
 	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := firstBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(firstBlock.Verify(context.Background()))
 
 	slb, err := block.Build(
 		firstBlock.ID(), // refer unknown parent

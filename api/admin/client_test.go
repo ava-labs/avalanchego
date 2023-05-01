@@ -76,6 +76,8 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 }
 
 func TestStartCPUProfiler(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -85,13 +87,13 @@ func TestStartCPUProfiler(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
 func TestStopCPUProfiler(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -101,13 +103,13 @@ func TestStopCPUProfiler(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
 func TestMemoryProfile(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -117,13 +119,13 @@ func TestMemoryProfile(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
 func TestLockProfile(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -133,13 +135,13 @@ func TestLockProfile(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
 func TestAlias(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -149,13 +151,13 @@ func TestAlias(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
 func TestAliasChain(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -165,9 +167,7 @@ func TestAliasChain(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 
@@ -193,6 +193,8 @@ func TestGetChainAliases(t *testing.T) {
 }
 
 func TestStacktrace(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
@@ -202,9 +204,7 @@ func TestStacktrace(t *testing.T) {
 		if err != nil && test.Err != nil {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.NoError(err)
 	}
 }
 

@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,6 +36,8 @@ func TestUTXOVerifyEmpty(t *testing.T) {
 }
 
 func TestUTXOSerialize(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
@@ -116,9 +120,7 @@ func TestUTXOSerialize(t *testing.T) {
 	}
 
 	utxoBytes, err := manager.Marshal(codecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if !bytes.Equal(utxoBytes, expected) {
 		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
 			expected,

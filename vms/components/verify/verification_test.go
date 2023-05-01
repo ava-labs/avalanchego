@@ -6,6 +6,8 @@ package verify
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var errTest = errors.New("non-nil error")
@@ -17,13 +19,13 @@ func (v testVerifiable) Verify() error {
 }
 
 func TestAllNil(t *testing.T) {
+	require := require.New(t)
+
 	err := All(
 		testVerifiable{},
 		testVerifiable{},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 }
 
 func TestAllError(t *testing.T) {

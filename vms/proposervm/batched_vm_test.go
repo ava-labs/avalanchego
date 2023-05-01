@@ -947,6 +947,8 @@ func initTestRemoteProposerVM(
 	*VM,
 	*snowman.TestBlock,
 ) {
+	require := require.New(t)
+
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -1062,13 +1064,9 @@ func initTestRemoteProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	if err := proVM.SetPreference(context.Background(), coreGenBlk.IDV); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	return coreVM, proVM, coreGenBlk
 }

@@ -61,15 +61,13 @@ func TestIDBit(t *testing.T) {
 }
 
 func TestFromString(t *testing.T) {
+	require := require.New(t)
+
 	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
 	id2, err := FromString(idStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != id2 {
-		t.Fatal("Expected FromString to be inverse of String but it wasn't")
-	}
+	require.NoError(err)
+	require.Equal(id, id2)
 }
 
 func TestIDFromStringError(t *testing.T) {
@@ -191,20 +189,18 @@ func TestSortIDs(t *testing.T) {
 }
 
 func TestIDMapMarshalling(t *testing.T) {
+	require := require.New(t)
+
 	originalMap := map[ID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	var unmarshalledMap map[ID]int
 	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	if len(originalMap) != len(unmarshalledMap) {
 		t.Fatalf("wrong map lengths")

@@ -6,6 +6,8 @@ package avax
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,11 +28,11 @@ func TestAssetVerifyEmpty(t *testing.T) {
 }
 
 func TestAssetID(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	id := Asset{
 		ID: ids.ID{
@@ -41,23 +43,17 @@ func TestAssetID(t *testing.T) {
 		},
 	}
 
-	if err := id.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(id.Verify())
 
 	bytes, err := manager.Marshal(codecVersion, &id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	newID := Asset{}
 	if _, err := manager.Unmarshal(bytes, &newID); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := newID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(newID.Verify())
 
 	if id.AssetID() != newID.AssetID() {
 		t.Fatalf("Parsing returned the wrong Asset ID")

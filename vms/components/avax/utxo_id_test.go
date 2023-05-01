@@ -23,11 +23,11 @@ func TestUTXOIDVerifyNil(t *testing.T) {
 }
 
 func TestUTXOID(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	utxoID := UTXOID{
 		TxID: ids.ID{
@@ -39,23 +39,17 @@ func TestUTXOID(t *testing.T) {
 		OutputIndex: 0x20212223,
 	}
 
-	if err := utxoID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(utxoID.Verify())
 
 	bytes, err := manager.Marshal(codecVersion, &utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	newUTXOID := UTXOID{}
 	if _, err := manager.Unmarshal(bytes, &newUTXOID); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := newUTXOID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(newUTXOID.Verify())
 
 	if utxoID.InputID() != newUTXOID.InputID() {
 		t.Fatalf("Parsing returned the wrong UTXO ID")

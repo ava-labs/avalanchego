@@ -34,6 +34,8 @@ func testSetup(
 	t *testing.T,
 	ctrl *gomock.Controller,
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
+	require := require.New(t)
+
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -61,9 +63,7 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -82,6 +82,8 @@ func testSetup(
 }
 
 func TestAcceptedFrontier(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -107,9 +109,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	}
 
 	bsIntf, err := New(vm, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
 	if !ok {
 		t.Fatal("Unexpected get handler")
@@ -120,9 +120,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
 
 	if len(accepted) != 1 {
 		t.Fatalf("Only one block should be accepted")
@@ -133,6 +131,8 @@ func TestAcceptedFrontier(t *testing.T) {
 }
 
 func TestFilterAccepted(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -161,9 +161,7 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	bsIntf, err := New(vm, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
 	if !ok {
 		t.Fatal("Unexpected get handler")
@@ -188,9 +186,7 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
 
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)

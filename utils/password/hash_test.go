@@ -5,13 +5,15 @@ package password
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestHash(t *testing.T) {
+	require := require.New(t)
+
 	h := Hash{}
-	if err := h.Set("heytherepal"); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(h.Set("heytherepal"))
 	if !h.Check("heytherepal") {
 		t.Fatalf("Should have verified the password")
 	}

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -36,15 +38,14 @@ var (
 )
 
 func TestFxInitialize(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	err := fx.Initialize(&vm)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 }
 
 func TestFxInitializeInvalid(t *testing.T) {
@@ -56,6 +57,8 @@ func TestFxInitializeInvalid(t *testing.T) {
 }
 
 func TestFxVerifyMintOperation(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -64,9 +67,7 @@ func TestFxVerifyMintOperation(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -88,12 +89,12 @@ func TestFxVerifyMintOperation(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	if err := fx.VerifyOperation(tx, op, cred, utxos); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.VerifyOperation(tx, op, cred, utxos))
 }
 
 func TestFxVerifyMintOperationWrongTx(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -102,9 +103,7 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	cred := &Credential{Credential: secp256k1fx.Credential{
 		Sigs: [][secp256k1.SignatureLen]byte{
 			sigBytes,
@@ -129,6 +128,8 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 }
 
 func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -137,9 +138,7 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -161,6 +160,8 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 }
 
 func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -169,9 +170,7 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -194,6 +193,8 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 }
 
 func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -202,9 +203,7 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -226,6 +225,8 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 }
 
 func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -234,9 +235,7 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -265,6 +264,8 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 }
 
 func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -273,9 +274,7 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -304,6 +303,8 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperation(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -312,9 +313,7 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -350,12 +349,12 @@ func TestFxVerifyTransferOperation(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	if err := fx.VerifyOperation(tx, op, cred, utxos); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.VerifyOperation(tx, op, cred, utxos))
 }
 
 func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -364,9 +363,7 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -398,6 +395,8 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -406,9 +405,7 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -447,6 +444,8 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -455,9 +454,7 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -499,6 +496,8 @@ func TestFxVerifyTransferOperationWrongGroupID(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -507,9 +506,7 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -551,6 +548,8 @@ func TestFxVerifyTransferOperationWrongBytes(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -559,9 +558,7 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -604,6 +601,8 @@ func TestFxVerifyTransferOperationTooSoon(t *testing.T) {
 }
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -612,9 +611,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	tx := &secp256k1fx.TestTx{
 		UnsignedBytes: txBytes,
 	}
@@ -641,6 +638,8 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 }
 
 func TestFxVerifyTransfer(t *testing.T) {
+	require := require.New(t)
+
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
@@ -649,9 +648,7 @@ func TestFxVerifyTransfer(t *testing.T) {
 	vm.Clk.Set(date)
 
 	fx := Fx{}
-	if err := fx.Initialize(&vm); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(fx.Initialize(&vm))
 	if err := fx.VerifyTransfer(nil, nil, nil, nil); err == nil {
 		t.Fatalf("this Fx doesn't support transfers")
 	}

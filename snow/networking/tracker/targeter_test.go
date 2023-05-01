@@ -42,6 +42,8 @@ func TestNewTargeter(t *testing.T) {
 }
 
 func TestTarget(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -50,12 +52,8 @@ func TestTarget(t *testing.T) {
 	totalVdrWeight := uint64(10)
 	nonVdr := ids.NodeID{2}
 	vdrs := validators.NewSet()
-	if err := vdrs.Add(vdr, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vdrs.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{

@@ -162,9 +162,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	var totalUTXOs []*UTXO
 	for i := 0; i <= 10; i++ {
 		fetchedUTXOs, lastAddr, lastIdx, err = GetPaginatedUTXOs(s, addrs, lastAddr, lastIdx, 512)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
 	}
@@ -175,11 +173,6 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 
 	// Fetch all UTXOs
 	notPaginatedUTXOs, err := GetAllUTXOs(s, addrs)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(notPaginatedUTXOs) != len(totalUTXOs) {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", len(totalUTXOs), len(notPaginatedUTXOs))
-	}
+	require.NoError(err)
+	require.Len(notPaginatedUTXOs, len(totalUTXOs))
 }

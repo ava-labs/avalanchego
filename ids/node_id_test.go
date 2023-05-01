@@ -24,12 +24,12 @@ func TestNodeIDEquality(t *testing.T) {
 }
 
 func TestNodeIDFromString(t *testing.T) {
+	require := require.New(t)
+
 	id := NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
 	id2, err := NodeIDFromString(idStr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if id != id2 {
 		t.Fatal("Expected FromString to be inverse of String but it wasn't")
 	}
@@ -165,20 +165,18 @@ func TestNodeIDString(t *testing.T) {
 }
 
 func TestNodeIDMapMarshalling(t *testing.T) {
+	require := require.New(t)
+
 	originalMap := map[NodeID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	var unmarshalledMap map[NodeID]int
 	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	if len(originalMap) != len(unmarshalledMap) {
 		t.Fatalf("wrong map lengths")

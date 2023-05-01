@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,28 +31,26 @@ func TestTransferableOutputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableOutputVerify(t *testing.T) {
+	require := require.New(t)
+
 	assetID := ids.GenerateTestID()
 	to := &TransferableOutput{
 		Asset: Asset{ID: assetID},
 		Out:   &TestTransferable{Val: 1},
 	}
-	if err := to.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(to.Verify())
 	if to.Output() != to.Out {
 		t.Fatalf("Should have returned the fx output")
 	}
 }
 
 func TestTransferableOutputSorting(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&TestTransferable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&TestTransferable{}))
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	assetID1 := ids.ID{1}
 	outs := []*TransferableOutput{
@@ -101,14 +101,12 @@ func TestTransferableOutputSorting(t *testing.T) {
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	expected := []byte{
 		// Codec version
@@ -161,9 +159,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 	}
 
 	outBytes, err := manager.Marshal(codecVersion, out)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if !bytes.Equal(outBytes, expected) {
 		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
 			expected,
@@ -190,25 +186,25 @@ func TestTransferableInputVerifyNilFx(t *testing.T) {
 }
 
 func TestTransferableInputVerify(t *testing.T) {
+	require := require.New(t)
+
 	assetID := ids.GenerateTestID()
 	ti := &TransferableInput{
 		UTXOID: UTXOID{TxID: assetID},
 		Asset:  Asset{ID: assetID},
 		In:     &TestTransferable{},
 	}
-	if err := ti.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(ti.Verify())
 	if ti.Input() != ti.In {
 		t.Fatalf("Should have returned the fx input")
 	}
 }
 
 func TestTransferableInputSorting(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&TestTransferable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&TestTransferable{}))
 
 	ins := []*TransferableInput{
 		{
@@ -268,14 +264,12 @@ func TestTransferableInputSorting(t *testing.T) {
 }
 
 func TestTransferableInputSerialization(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&secp256k1fx.TransferInput{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&secp256k1fx.TransferInput{}))
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	expected := []byte{
 		// Codec version
@@ -325,9 +319,7 @@ func TestTransferableInputSerialization(t *testing.T) {
 	}
 
 	inBytes, err := manager.Marshal(codecVersion, in)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	if !bytes.Equal(inBytes, expected) {
 		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
 			expected,

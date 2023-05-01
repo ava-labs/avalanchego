@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,32 +48,30 @@ func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atom
 // 3) The wallet service that wraps the VM
 // 4) atomic memory to use in tests
 func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
+	require := require.New(t)
+
 	genesisBytes, vm, ws, m, tx := setupWS(t, isAVAXAsset)
 
 	// Import the initially funded private keys
 	user, err := keystore.NewUserFromKeystore(ws.vm.ctx.Keystore, username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	if err := user.PutKeys(keys...); err != nil {
 		t.Fatalf("Failed to set key for user: %s", err)
 	}
 
-	if err := user.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(user.Close())
 	return genesisBytes, vm, ws, m, tx
 }
 
 func TestWalletService_SendMultiple(t *testing.T) {
+	require := require.New(t)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, vm, ws, _, genesisTx := setupWSWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 

@@ -21,6 +21,8 @@ var minimumFailingDuration = 5 * time.Minute
 
 // Test that validators are properly added to the bench
 func TestBenchlistAdd(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := validators.NewSet()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -57,9 +59,7 @@ func TestBenchlistAdd(t *testing.T) {
 		maxPortion,
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	b := benchIntf.(*benchlist)
 	defer b.timer.Stop()
 	now := time.Now()
@@ -67,14 +67,14 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Nobody should be benched at the start
 	b.lock.Lock()
-	require.False(t, b.isBenched(vdrID0))
-	require.False(t, b.isBenched(vdrID1))
-	require.False(t, b.isBenched(vdrID2))
-	require.False(t, b.isBenched(vdrID3))
-	require.False(t, b.isBenched(vdrID4))
-	require.Len(t, b.failureStreaks, 0)
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
+	require.False(b.isBenched(vdrID0))
+	require.False(b.isBenched(vdrID1))
+	require.False(b.isBenched(vdrID2))
+	require.False(b.isBenched(vdrID3))
+	require.False(b.isBenched(vdrID4))
+	require.Len(b.failureStreaks, 0)
+	require.Equal(b.benchedQueue.Len(), 0)
+	require.Equal(b.benchlistSet.Len(), 0)
 	b.lock.Unlock()
 
 	// Register [threshold - 1] failures in a row for vdr0
@@ -83,13 +83,13 @@ func TestBenchlistAdd(t *testing.T) {
 	}
 
 	// Still shouldn't be benched due to not enough consecutive failure
-	require.False(t, b.isBenched(vdrID0))
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
-	require.Len(t, b.failureStreaks, 1)
+	require.False(b.isBenched(vdrID0))
+	require.Equal(b.benchedQueue.Len(), 0)
+	require.Equal(b.benchlistSet.Len(), 0)
+	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID0]
-	require.Equal(t, threshold-1, fs.consecutive)
-	require.True(t, fs.firstFailure.Equal(now))
+	require.Equal(threshold-1, fs.consecutive)
+	require.True(fs.firstFailure.Equal(now))
 
 	// Register another failure
 	b.RegisterFailure(vdrID0)
@@ -97,9 +97,9 @@ func TestBenchlistAdd(t *testing.T) {
 	// Still shouldn't be benched because not enough time (any in this case)
 	// has passed since the first failure
 	b.lock.Lock()
-	require.False(t, b.isBenched(vdrID0))
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
+	require.False(b.isBenched(vdrID0))
+	require.Equal(b.benchedQueue.Len(), 0)
+	require.Equal(b.benchlistSet.Len(), 0)
 	b.lock.Unlock()
 
 	// Move the time up
@@ -118,16 +118,16 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Now this validator should be benched
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.Equal(t, b.benchedQueue.Len(), 1)
-	require.Equal(t, b.benchlistSet.Len(), 1)
+	require.True(b.isBenched(vdrID0))
+	require.Equal(b.benchedQueue.Len(), 1)
+	require.Equal(b.benchlistSet.Len(), 1)
 
 	next := b.benchedQueue[0]
-	require.Equal(t, vdrID0, next.nodeID)
-	require.True(t, !next.benchedUntil.After(now.Add(duration)))
-	require.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
-	require.Len(t, b.failureStreaks, 0)
-	require.True(t, benched)
+	require.Equal(vdrID0, next.nodeID)
+	require.True(!next.benchedUntil.After(now.Add(duration)))
+	require.True(!next.benchedUntil.Before(now.Add(duration / 2)))
+	require.Len(b.failureStreaks, 0)
+	require.True(benched)
 	benchable.BenchedF = nil
 	b.lock.Unlock()
 
@@ -142,11 +142,11 @@ func TestBenchlistAdd(t *testing.T) {
 	// vdr1 shouldn't be benched
 	// The response should have cleared its consecutive failures
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.False(t, b.isBenched(vdrID1))
-	require.Equal(t, b.benchedQueue.Len(), 1)
-	require.Equal(t, b.benchlistSet.Len(), 1)
-	require.Len(t, b.failureStreaks, 0)
+	require.True(b.isBenched(vdrID0))
+	require.False(b.isBenched(vdrID1))
+	require.Equal(b.benchedQueue.Len(), 1)
+	require.Equal(b.benchlistSet.Len(), 1)
+	require.Len(b.failureStreaks, 0)
 	b.lock.Unlock()
 
 	// Register another failure for vdr0, who is benched
@@ -154,12 +154,14 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// A failure for an already benched validator should not count against it
 	b.lock.Lock()
-	require.Len(t, b.failureStreaks, 0)
+	require.Len(b.failureStreaks, 0)
 	b.lock.Unlock()
 }
 
 // Test that the benchlist won't bench more than the maximum portion of stake
 func TestBenchlistMaxStake(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := validators.NewSet()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -195,9 +197,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 		maxPortion,
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	b := benchIntf.(*benchlist)
 	defer b.timer.Stop()
 	now := time.Now()
@@ -225,12 +225,12 @@ func TestBenchlistMaxStake(t *testing.T) {
 	// Benching vdr2 (weight 1000) would cause the amount benched
 	// to exceed the maximum
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.True(t, b.isBenched(vdrID1))
-	require.False(t, b.isBenched(vdrID2))
-	require.Equal(t, b.benchedQueue.Len(), 2)
-	require.Equal(t, b.benchlistSet.Len(), 2)
-	require.Len(t, b.failureStreaks, 1)
+	require.True(b.isBenched(vdrID0))
+	require.True(b.isBenched(vdrID1))
+	require.False(b.isBenched(vdrID2))
+	require.Equal(b.benchedQueue.Len(), 2)
+	require.Equal(b.benchlistSet.Len(), 2)
+	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID2]
 	fs.consecutive = threshold
 	fs.firstFailure = now
@@ -252,15 +252,15 @@ func TestBenchlistMaxStake(t *testing.T) {
 
 	// vdr4 should be benched now
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.True(t, b.isBenched(vdrID1))
-	require.True(t, b.isBenched(vdrID4))
-	require.Equal(t, 3, b.benchedQueue.Len())
-	require.Equal(t, 3, b.benchlistSet.Len())
-	require.Contains(t, b.benchlistSet, vdrID0)
-	require.Contains(t, b.benchlistSet, vdrID1)
-	require.Contains(t, b.benchlistSet, vdrID4)
-	require.Len(t, b.failureStreaks, 1) // for vdr2
+	require.True(b.isBenched(vdrID0))
+	require.True(b.isBenched(vdrID1))
+	require.True(b.isBenched(vdrID4))
+	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchlistSet.Len())
+	require.Contains(b.benchlistSet, vdrID0)
+	require.Contains(b.benchlistSet, vdrID1)
+	require.Contains(b.benchlistSet, vdrID4)
+	require.Len(b.failureStreaks, 1) // for vdr2
 	b.lock.Unlock()
 
 	// More failures for vdr2 shouldn't add it to the bench
@@ -270,21 +270,21 @@ func TestBenchlistMaxStake(t *testing.T) {
 	}
 
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.True(t, b.isBenched(vdrID1))
-	require.True(t, b.isBenched(vdrID4))
-	require.False(t, b.isBenched(vdrID2))
-	require.Equal(t, 3, b.benchedQueue.Len())
-	require.Equal(t, 3, b.benchlistSet.Len())
-	require.Len(t, b.failureStreaks, 1)
-	require.Contains(t, b.failureStreaks, vdrID2)
+	require.True(b.isBenched(vdrID0))
+	require.True(b.isBenched(vdrID1))
+	require.True(b.isBenched(vdrID4))
+	require.False(b.isBenched(vdrID2))
+	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchlistSet.Len())
+	require.Len(b.failureStreaks, 1)
+	require.Contains(b.failureStreaks, vdrID2)
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
 	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID4}
 	for _, benchedVdr := range b.benchedQueue {
-		require.Contains(t, benchedIDs, benchedVdr.nodeID)
-		require.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
+		require.Contains(benchedIDs, benchedVdr.nodeID)
+		require.True(!benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
 	b.lock.Unlock()
@@ -292,6 +292,8 @@ func TestBenchlistMaxStake(t *testing.T) {
 
 // Test validators are removed from the bench correctly
 func TestBenchlistRemove(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := validators.NewSet()
 	vdrID0 := ids.GenerateTestNodeID()
 	vdrID1 := ids.GenerateTestNodeID()
@@ -335,9 +337,7 @@ func TestBenchlistRemove(t *testing.T) {
 		maxPortion,
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	b := benchIntf.(*benchlist)
 	defer b.timer.Stop()
 	now := time.Now()
@@ -364,19 +364,19 @@ func TestBenchlistRemove(t *testing.T) {
 
 	// All 3 should be benched
 	b.lock.Lock()
-	require.True(t, b.isBenched(vdrID0))
-	require.True(t, b.isBenched(vdrID1))
-	require.True(t, b.isBenched(vdrID2))
-	require.Equal(t, 3, b.benchedQueue.Len())
-	require.Equal(t, 3, b.benchlistSet.Len())
-	require.Len(t, b.failureStreaks, 0)
+	require.True(b.isBenched(vdrID0))
+	require.True(b.isBenched(vdrID1))
+	require.True(b.isBenched(vdrID2))
+	require.Equal(3, b.benchedQueue.Len())
+	require.Equal(3, b.benchlistSet.Len())
+	require.Len(b.failureStreaks, 0)
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
 	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID2}
 	for _, benchedVdr := range b.benchedQueue {
-		require.Contains(t, benchedIDs, benchedVdr.nodeID)
-		require.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
+		require.Contains(benchedIDs, benchedVdr.nodeID)
+		require.True(!benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
 	// Set the benchlist's clock past when all validators should be unbenched
@@ -386,7 +386,6 @@ func TestBenchlistRemove(t *testing.T) {
 
 	// Make sure each validator is eventually removed
 	require.Eventually(
-		t,
 		func() bool {
 			return !b.IsBenched(vdrID0)
 		},
@@ -395,7 +394,6 @@ func TestBenchlistRemove(t *testing.T) {
 	)
 
 	require.Eventually(
-		t,
 		func() bool {
 			return !b.IsBenched(vdrID1)
 		},
@@ -404,7 +402,6 @@ func TestBenchlistRemove(t *testing.T) {
 	)
 
 	require.Eventually(
-		t,
 		func() bool {
 			return !b.IsBenched(vdrID2)
 		},

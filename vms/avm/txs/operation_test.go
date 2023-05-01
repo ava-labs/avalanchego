@@ -6,6 +6,8 @@ package txs
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -63,6 +65,8 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 }
 
 func TestOperationVerify(t *testing.T) {
+	require := require.New(t)
+
 	assetID := ids.GenerateTestID()
 	op := &Operation{
 		Asset: avax.Asset{ID: assetID},
@@ -74,21 +78,17 @@ func TestOperationVerify(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(op.Verify())
 }
 
 func TestOperationSorting(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&testOperable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&testOperable{}))
 
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 
 	ops := []*Operation{
 		{

@@ -314,14 +314,15 @@ func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
 }
 
 func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	idBytes := [tokenIDByteLen]byte{}
-	if _, err := rand.Read(idBytes[:]); err != nil {
-		t.Fatal(err)
-	}
+	_, err := rand.Read(idBytes[:])
+	require.NoError(err)
 	id := base64.RawURLEncoding.EncodeToString(idBytes[:])
 
 	claims := endpointClaims{
@@ -333,9 +334,7 @@ func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, &claims)
 	tokenStr, err := token.SignedString(auth.password.Password[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
