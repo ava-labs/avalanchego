@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"bytes"
 	"context"
 	"crypto"
 	"errors"
@@ -145,20 +144,20 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		return nil, database.ErrNotFound
 	}
 	summary, err := vm.GetOngoingSyncStateSummary(context.Background())
-	require.True(err == database.ErrNotFound)
-	require.True(summary == nil)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(summary)
 
 	// Pre fork summary case, fork height not reached hence not set yet
 	innerVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return innerSummary, nil
 	}
 	_, err = vm.GetForkHeight()
-	require.Equal(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
@@ -167,9 +166,9 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -182,7 +181,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -208,7 +207,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.Height() == innerSummary.Height())
+	require.Equal(summary.Height(), innerSummary.Height())
 }
 
 func TestStateSyncGetLastStateSummary(t *testing.T) {
@@ -227,20 +226,20 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		return nil, database.ErrNotFound
 	}
 	summary, err := vm.GetLastStateSummary(context.Background())
-	require.True(err == database.ErrNotFound)
-	require.True(summary == nil)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(summary)
 
 	// Pre fork summary case, fork height not reached hence not set yet
 	innerVM.GetLastStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return innerSummary, nil
 	}
 	_, err = vm.GetForkHeight()
-	require.Equal(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetLastStateSummaryF = func(context.Context) (block.StateSummary, error) {
@@ -249,9 +248,9 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -264,7 +263,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -290,7 +289,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.Height() == innerSummary.Height())
+	require.Equal(summary.Height(), innerSummary.Height())
 }
 
 func TestStateSyncGetStateSummary(t *testing.T) {
@@ -310,33 +309,33 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		return nil, database.ErrNotFound
 	}
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
-	require.True(err == database.ErrNotFound)
-	require.True(summary == nil)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(summary)
 
 	// Pre fork summary case, fork height not reached hence not set yet
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.True(h == reqHeight)
+		require.Equal(h, reqHeight)
 		return innerSummary, nil
 	}
 	_, err = vm.GetForkHeight()
-	require.Equal(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Pre fork summary case, fork height already reached
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.True(h == reqHeight)
+		require.Equal(h, reqHeight)
 		return innerSummary, nil
 	}
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.True(summary.ID() == innerSummary.ID())
-	require.True(summary.Height() == innerSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), innerSummary.Bytes()))
+	require.Equal(summary.ID(), innerSummary.ID())
+	require.Equal(summary.Height(), innerSummary.Height())
+	require.Equal(summary.Bytes(), innerSummary.Bytes())
 
 	// Post fork summary case
 	vm.hIndexer.MarkRepaired(true)
@@ -349,7 +348,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -375,7 +374,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
-	require.True(summary.Height() == innerSummary.Height())
+	require.Equal(summary.Height(), innerSummary.Height())
 }
 
 func TestParseStateSummary(t *testing.T) {
@@ -393,7 +392,7 @@ func TestParseStateSummary(t *testing.T) {
 		return innerSummary, nil
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.True(h == reqHeight)
+		require.Equal(h, reqHeight)
 		return innerSummary, nil
 	}
 
@@ -404,9 +403,9 @@ func TestParseStateSummary(t *testing.T) {
 
 	parsedSummary, err := vm.ParseStateSummary(context.Background(), summary.Bytes())
 	require.NoError(err)
-	require.True(summary.ID() == parsedSummary.ID())
-	require.True(summary.Height() == parsedSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), parsedSummary.Bytes()))
+	require.Equal(summary.ID(), parsedSummary.ID())
+	require.Equal(summary.Height(), parsedSummary.Height())
+	require.Equal(summary.Bytes(), parsedSummary.Bytes())
 
 	// Get a post fork block than parse it
 	vm.hIndexer.MarkRepaired(true)
@@ -419,7 +418,7 @@ func TestParseStateSummary(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -448,9 +447,9 @@ func TestParseStateSummary(t *testing.T) {
 
 	parsedSummary, err = vm.ParseStateSummary(context.Background(), summary.Bytes())
 	require.NoError(err)
-	require.True(summary.ID() == parsedSummary.ID())
-	require.True(summary.Height() == parsedSummary.Height())
-	require.True(bytes.Equal(summary.Bytes(), parsedSummary.Bytes()))
+	require.Equal(summary.ID(), parsedSummary.ID())
+	require.Equal(summary.Height(), parsedSummary.Height())
+	require.Equal(summary.Bytes(), parsedSummary.Bytes())
 }
 
 func TestStateSummaryAccept(t *testing.T) {
@@ -475,11 +474,11 @@ func TestStateSummaryAccept(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.True(h == reqHeight)
+		require.Equal(h, reqHeight)
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -549,11 +548,11 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		HeightV:    innerSummary.Height(),
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.True(h == reqHeight)
+		require.Equal(h, reqHeight)
 		return innerSummary, nil
 	}
 	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.True(bytes.Equal(b, innerBlk.Bytes()))
+		require.Equal(b, innerBlk.Bytes())
 		return innerBlk, nil
 	}
 
@@ -630,5 +629,5 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	summary, err := proVM.GetLastStateSummary(context.Background())
 	require.NoError(err)
-	require.True(summary.Height() == summaryHeight)
+	require.Equal(summary.Height(), summaryHeight)
 }
