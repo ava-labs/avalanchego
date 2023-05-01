@@ -4,7 +4,6 @@
 package genesis
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -24,14 +23,13 @@ var (
 )
 
 func init() {
-	err := json.NewDecoder(bytes.NewReader(bootstrappersPerNetworkRawJSON)).Decode(&bootstrappersPerNetwork)
-	if err != nil {
+	if err := json.Unmarshal(bootstrappersPerNetworkJSON, &bootstrappersPerNetwork); err != nil {
 		panic(fmt.Sprintf("failed to decode bootstrappers.json %v", err))
 	}
 }
 
 // Represents the relationship between the nodeID and the nodeIP.
-// Sometimes called "anchor" or "beacon" node.
+// The bootstrapper is sometimes called "anchor" or "beacon" node.
 type Bootstrapper struct {
 	ID ids.NodeID `json:"id"`
 	IP ips.IPDesc `json:"ip"`
