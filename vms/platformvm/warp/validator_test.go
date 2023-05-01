@@ -167,7 +167,7 @@ func TestFilterValidators(t *testing.T) {
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk0),
+		PublicKeyBytes: pk0.Serialize(),
 		Weight:         1,
 	}
 
@@ -176,7 +176,7 @@ func TestFilterValidators(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
-		PublicKeyBytes: bls.PublicKeyToBytes(pk1),
+		PublicKeyBytes: pk1.Serialize(),
 		Weight:         2,
 	}
 
