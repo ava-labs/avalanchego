@@ -311,6 +311,7 @@ func BindHelper(types []string, abis []string, bytecodes []string, fsigs []map[s
 		"capitalise":    capitalise,
 		"decapitalise":  decapitalise,
 		"convertToNil":  convertToNil,
+		"mkList":        mkList,
 	}
 
 	// render the template
@@ -699,4 +700,8 @@ func hasStruct(t abi.Type) bool {
 	default:
 		return false
 	}
+}
+
+func mkList(args ...interface{}) []interface{} {
+	return args
 }

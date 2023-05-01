@@ -64,7 +64,7 @@ func TestVerifyWithChainConfig(t *testing.T) {
 }
 
 func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
-	admins := []common.Address{{1}}
+	admins := []common.Address{{0}}
 	baseConfig := *SubnetEVMDefaultChainConfig
 	config := &baseConfig
 	config.PrecompileUpgrades = []PrecompileUpgrade{

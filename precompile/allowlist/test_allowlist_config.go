@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 )
 
 // mkConfigWithAllowList creates a new config with the correct type for [module]
@@ -96,19 +95,7 @@ func VerifyPrecompileWithAllowListTests(t *testing.T, module modules.Module, ver
 		tests[name] = test
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Helper()
-			require := require.New(t)
-
-			err := test.Config.Verify()
-			if test.ExpectedError == "" {
-				require.NoError(err)
-			} else {
-				require.ErrorContains(err, test.ExpectedError)
-			}
-		})
-	}
+	testutils.RunVerifyTests(t, tests)
 }
 
 func EqualPrecompileWithAllowListTests(t *testing.T, module modules.Module, equalTests map[string]testutils.ConfigEqualTest) {
@@ -122,12 +109,5 @@ func EqualPrecompileWithAllowListTests(t *testing.T, module modules.Module, equa
 		tests[name] = test
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Helper()
-			require := require.New(t)
-
-			require.Equal(test.Expected, test.Config.Equal(test.Other))
-		})
-	}
+	testutils.RunEqualTests(t, tests)
 }

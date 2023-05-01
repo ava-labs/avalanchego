@@ -13,11 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func TestVerifyTxAllowlistConfig(t *testing.T) {
+func TestVerify(t *testing.T) {
 	allowlist.VerifyPrecompileWithAllowListTests(t, Module, nil)
 }
 
-func TestEqualTxAllowListConfig(t *testing.T) {
+func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{

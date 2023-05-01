@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func TestVerifyRewardManagerConfig(t *testing.T) {
-	admins := []common.Address{{1}}
-	enableds := []common.Address{{2}}
+func TestVerify(t *testing.T) {
+	admins := []common.Address{allowlist.TestAdminAddr}
+	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigVerifyTest{
 		"both reward mechanisms should not be activated at the same time in reward manager": {
 			Config: NewConfig(big.NewInt(3), admins, enableds, &InitialRewardConfig{
@@ -28,9 +28,9 @@ func TestVerifyRewardManagerConfig(t *testing.T) {
 	allowlist.VerifyPrecompileWithAllowListTests(t, Module, tests)
 }
 
-func TestEqualRewardManagerConfig(t *testing.T) {
-	admins := []common.Address{{1}}
-	enableds := []common.Address{{2}}
+func TestEqual(t *testing.T) {
+	admins := []common.Address{allowlist.TestAdminAddr}
+	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{
 		"non-nil config and nil other": {
 			Config:   NewConfig(big.NewInt(3), admins, enableds, nil),

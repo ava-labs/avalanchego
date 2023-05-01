@@ -27,7 +27,7 @@ var validFeeConfig = commontype.FeeConfig{
 	BlockGasCostStep: big.NewInt(200_000),
 }
 
-func TestVerifyFeeManagerConfig(t *testing.T) {
+func TestVerify(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	invalidFeeConfig := validFeeConfig
 	invalidFeeConfig.GasLimit = big.NewInt(0)
@@ -44,7 +44,7 @@ func TestVerifyFeeManagerConfig(t *testing.T) {
 	allowlist.VerifyPrecompileWithAllowListTests(t, Module, tests)
 }
 
-func TestEqualFeeManagerConfig(t *testing.T) {
+func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{

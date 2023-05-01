@@ -99,7 +99,7 @@ func golangBindingsFailure(t *testing.T) {
 	for i, tt := range bindFailedTests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Generate the binding
-			_, _, _, err := PrecompileBind([]string{tt.name}, tt.abi, tt.bytecode, tt.fsigs, "bindtest", bind.LangGo, tt.libs, tt.aliases, "")
+			_, err := PrecompileBind([]string{tt.name}, tt.abi, tt.bytecode, tt.fsigs, "bindtest", bind.LangGo, tt.libs, tt.aliases, "", true)
 			if err == nil {
 				t.Fatalf("test %d: no error occurred but was expected", i)
 			}

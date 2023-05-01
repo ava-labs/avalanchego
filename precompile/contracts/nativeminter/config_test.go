@@ -14,9 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-func TestVerifyContractNativeMinterConfig(t *testing.T) {
-	admins := []common.Address{{1}}
-	enableds := []common.Address{{2}}
+func TestVerify(t *testing.T) {
+	admins := []common.Address{allowlist.TestAdminAddr}
+	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigVerifyTest{
 		"invalid allow list config in native minter allowlist": {
 			Config:        NewConfig(big.NewInt(3), admins, admins, nil),
@@ -50,7 +50,7 @@ func TestVerifyContractNativeMinterConfig(t *testing.T) {
 	allowlist.VerifyPrecompileWithAllowListTests(t, Module, tests)
 }
 
-func TestEqualContractNativeMinterConfig(t *testing.T) {
+func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlist.TestAdminAddr}
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{
