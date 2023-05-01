@@ -15,11 +15,11 @@ import (
 )
 
 func TestUTXOIDVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	utxoID := (*UTXOID)(nil)
 
-	if err := utxoID.Verify(); err == nil {
-		t.Fatalf("Should have errored due to a nil utxo ID")
-	}
+	require.ErrorIs(utxoID.Verify(), errNilUTXOID)
 }
 
 func TestUTXOID(t *testing.T) {
@@ -45,15 +45,11 @@ func TestUTXOID(t *testing.T) {
 	require.NoError(err)
 
 	newUTXOID := UTXOID{}
-	if _, err := manager.Unmarshal(bytes, &newUTXOID); err != nil {
-		t.Fatal(err)
-	}
+	_, err = manager.Unmarshal(bytes, &newUTXOID)
+	require.NoError(err)
 
 	require.NoError(newUTXOID.Verify())
-
-	if utxoID.InputID() != newUTXOID.InputID() {
-		t.Fatalf("Parsing returned the wrong UTXO ID")
-	}
+	require.Equal(utxoID.InputID(), newUTXOID.InputID())
 }
 
 func TestUTXOIDLess(t *testing.T) {

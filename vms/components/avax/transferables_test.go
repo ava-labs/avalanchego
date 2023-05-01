@@ -4,7 +4,6 @@
 package avax
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,17 +16,17 @@ import (
 )
 
 func TestTransferableOutputVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	to := (*TransferableOutput)(nil)
-	if err := to.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil transferable output")
-	}
+	require.ErrorIs(to.Verify(), ErrNilTransferableOutput)
 }
 
 func TestTransferableOutputVerifyNilFx(t *testing.T) {
+	require := require.New(t)
+
 	to := &TransferableOutput{Asset: Asset{ID: ids.Empty}}
-	if err := to.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil transferable fx output")
-	}
+	require.ErrorIs(to.Verify(), ErrNilTransferableFxOutput)
 }
 
 func TestTransferableOutputVerify(t *testing.T) {
@@ -39,9 +38,7 @@ func TestTransferableOutputVerify(t *testing.T) {
 		Out:   &TestTransferable{Val: 1},
 	}
 	require.NoError(to.Verify())
-	if to.Output() != to.Out {
-		t.Fatalf("Should have returned the fx output")
-	}
+	require.Equal(to.Out, to.Output())
 }
 
 func TestTransferableOutputSorting(t *testing.T) {
@@ -76,28 +73,14 @@ func TestTransferableOutputSorting(t *testing.T) {
 		},
 	}
 
-	if IsSortedTransferableOutputs(outs, manager) {
-		t.Fatalf("Shouldn't be sorted")
-	}
+	require.False(IsSortedTransferableOutputs(outs, manager))
 	SortTransferableOutputs(outs, manager)
-	if !IsSortedTransferableOutputs(outs, manager) {
-		t.Fatalf("Should be sorted")
-	}
-	if result := outs[0].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[1].Out.(*TestTransferable).Val; result != 0 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[2].Out.(*TestTransferable).Val; result != 1 {
-		t.Fatalf("Val expected: %d ; result: %d", 0, result)
-	}
-	if result := outs[3].AssetID(); result != assetID1 {
-		t.Fatalf("Val expected: %s ; result: %s", assetID1, result)
-	}
-	if result := outs[4].AssetID(); result != assetID1 {
-		t.Fatalf("Val expected: %s ; result: %s", assetID1, result)
-	}
+	require.True(IsSortedTransferableOutputs(outs, manager))
+	require.Equal(uint64(0), outs[0].Out.(*TestTransferable).Val)
+	require.Equal(uint64(0), outs[1].Out.(*TestTransferable).Val)
+	require.Equal(uint64(1), outs[2].Out.(*TestTransferable).Val)
+	require.Equal(assetID1, outs[3].AssetID())
+	require.Equal(assetID1, outs[4].AssetID())
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {
@@ -160,29 +143,24 @@ func TestTransferableOutputSerialization(t *testing.T) {
 
 	outBytes, err := manager.Marshal(codecVersion, out)
 	require.NoError(err)
-	if !bytes.Equal(outBytes, expected) {
-		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
-			expected,
-			outBytes,
-		)
-	}
+	require.Equal(expected, outBytes)
 }
 
 func TestTransferableInputVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	ti := (*TransferableInput)(nil)
-	if err := ti.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil transferable input")
-	}
+	require.ErrorIs(ti.Verify(), ErrNilTransferableInput)
 }
 
 func TestTransferableInputVerifyNilFx(t *testing.T) {
+	require := require.New(t)
+
 	ti := &TransferableInput{
 		UTXOID: UTXOID{TxID: ids.Empty},
 		Asset:  Asset{ID: ids.Empty},
 	}
-	if err := ti.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil transferable fx input")
-	}
+	require.ErrorIs(ti.Verify(), ErrNilTransferableFxInput)
 }
 
 func TestTransferableInputVerify(t *testing.T) {
@@ -195,9 +173,7 @@ func TestTransferableInputVerify(t *testing.T) {
 		In:     &TestTransferable{},
 	}
 	require.NoError(ti.Verify())
-	if ti.Input() != ti.In {
-		t.Fatalf("Should have returned the fx input")
-	}
+	require.Equal(ti.In, ti.Input())
 }
 
 func TestTransferableInputSorting(t *testing.T) {
@@ -241,13 +217,9 @@ func TestTransferableInputSorting(t *testing.T) {
 		},
 	}
 
-	if utils.IsSortedAndUniqueSortable(ins) {
-		t.Fatalf("Shouldn't be sorted")
-	}
+	require.False(utils.IsSortedAndUniqueSortable(ins))
 	utils.Sort(ins)
-	if !utils.IsSortedAndUniqueSortable(ins) {
-		t.Fatalf("Should be sorted")
-	}
+	require.True(utils.IsSortedAndUniqueSortable(ins))
 
 	ins = append(ins, &TransferableInput{
 		UTXOID: UTXOID{
@@ -258,9 +230,7 @@ func TestTransferableInputSorting(t *testing.T) {
 		In:    &TestTransferable{},
 	})
 
-	if utils.IsSortedAndUniqueSortable(ins) {
-		t.Fatalf("Shouldn't be unique")
-	}
+	require.False(utils.IsSortedAndUniqueSortable(ins))
 }
 
 func TestTransferableInputSerialization(t *testing.T) {
@@ -320,10 +290,5 @@ func TestTransferableInputSerialization(t *testing.T) {
 
 	inBytes, err := manager.Marshal(codecVersion, in)
 	require.NoError(err)
-	if !bytes.Equal(inBytes, expected) {
-		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
-			expected,
-			inBytes,
-		)
-	}
+	require.Equal(expected, inBytes)
 }

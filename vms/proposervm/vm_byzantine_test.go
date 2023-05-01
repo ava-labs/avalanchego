@@ -32,6 +32,8 @@ import (
 //	    |
 //	    Y
 func TestInvalidByzantineProposerParent(t *testing.T) {
+	require := require.New(t)
+
 	forkTime := time.Unix(0, 0) // enable ProBlks
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
@@ -50,19 +52,12 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	}
 
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
-
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(aBlock.Accept(context.Background()))
 
 	yBlockBytes := []byte{2}
 	yBlock := &snowman.TestBlock{
@@ -176,9 +171,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
 	if !ok {
@@ -186,9 +179,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
 	require.NoError(aBlock.Verify(context.Background()))
 	require.NoError(opts[0].Verify(context.Background()))
@@ -240,9 +231,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	}
 
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
 
@@ -297,18 +286,14 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		return
 	}
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
 	if err := bBlock.Verify(context.Background()); err == nil {
 		t.Fatal("should have marked the parsed block as invalid")
 	}
 
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
+	require.NoError(aBlock.Accept(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
 	if err := bBlock.Verify(context.Background()); err == nil {
@@ -396,18 +381,14 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}
 
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
 	if !ok {
 		t.Fatal("expected post fork block")
 	}
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
 	require.NoError(aBlock.Verify(context.Background()))
 	if err := opts[0].Verify(context.Background()); err == nil {
@@ -491,9 +472,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		uint64(2000),
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	// create post-fork block B from Y
 	bBlock := postForkBlock{
@@ -688,13 +667,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 
 	builtBlk0, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("could not build post fork block %s", err)
-	}
+	require.NoError(err)
 
-	if err := builtBlk0.Verify(context.Background()); err != nil {
-		t.Fatalf("failed to verify newly created block %s", err)
-	}
+	require.NoError(builtBlk0.Verify(context.Background()))
 
 	require.NoError(proVM.SetPreference(context.Background(), builtBlk0.ID()))
 
@@ -738,7 +713,5 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	// GetBlock returned, so it must have somehow gotten a valid representation
 	// of [blkID].
-	if err := fetchedBlk.Verify(context.Background()); err != nil {
-		t.Fatalf("GetBlock returned an invalid block when the ID represented a potentially valid block: %s", err)
-	}
+	require.NoError(fetchedBlk.Verify(context.Background()))
 }

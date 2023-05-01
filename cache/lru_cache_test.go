@@ -6,6 +6,8 @@ package cache
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -22,6 +24,8 @@ func TestLRUEviction(t *testing.T) {
 }
 
 func TestLRUResize(t *testing.T) {
+	require := require.New(t)
+
 	cache := LRU[ids.ID, int]{Size: 2}
 
 	id1 := ids.ID{1}
@@ -30,35 +34,29 @@ func TestLRUResize(t *testing.T) {
 	cache.Put(id1, 1)
 	cache.Put(id2, 2)
 
-	if val, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 1 {
-		t.Fatalf("Retrieved wrong value")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	}
+	val, found := cache.Get(id1)
+	require.True(found)
+	require.Equal(1, val)
+
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
 
 	cache.Size = 1
 	// id1 evicted
 
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieve value when none exists")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	}
+	_, found = cache.Get(id1)
+	require.False(found)
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
 
 	cache.Size = 0
 	// We reset the size to 1 in resize
 
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieve value when none exists")
-	} else if val, found := cache.Get(id2); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if val != 2 {
-		t.Fatalf("Retrieved wrong value")
-	}
+	_, found = cache.Get(id1)
+	require.False(found)
+	val, found = cache.Get(id2)
+	require.True(found)
+	require.Equal(2, val)
 }

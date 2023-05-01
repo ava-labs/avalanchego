@@ -28,6 +28,8 @@ func TestID(t *testing.T) {
 }
 
 func TestIDBit(t *testing.T) {
+	require := require.New(t)
+
 	id0 := ID{1 << 0}
 	id1 := ID{1 << 1}
 	id2 := ID{1 << 2}
@@ -38,26 +40,15 @@ func TestIDBit(t *testing.T) {
 	id7 := ID{1 << 7}
 	id8 := ID{0, 1 << 0}
 
-	switch {
-	case id0.Bit(0) != 1:
-		t.Fatalf("Wrong bit")
-	case id1.Bit(1) != 1:
-		t.Fatalf("Wrong bit")
-	case id2.Bit(2) != 1:
-		t.Fatalf("Wrong bit")
-	case id3.Bit(3) != 1:
-		t.Fatalf("Wrong bit")
-	case id4.Bit(4) != 1:
-		t.Fatalf("Wrong bit")
-	case id5.Bit(5) != 1:
-		t.Fatalf("Wrong bit")
-	case id6.Bit(6) != 1:
-		t.Fatalf("Wrong bit")
-	case id7.Bit(7) != 1:
-		t.Fatalf("Wrong bit")
-	case id8.Bit(8) != 1:
-		t.Fatalf("Wrong bit")
-	}
+	require.Equal(1, id0.Bit(0))
+	require.Equal(1, id1.Bit(1))
+	require.Equal(1, id2.Bit(2))
+	require.Equal(1, id3.Bit(3))
+	require.Equal(1, id4.Bit(4))
+	require.Equal(1, id5.Bit(5))
+	require.Equal(1, id6.Bit(6))
+	require.Equal(1, id7.Bit(7))
+	require.Equal(1, id8.Bit(8))
 }
 
 func TestFromString(t *testing.T) {

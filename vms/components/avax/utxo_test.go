@@ -4,7 +4,6 @@
 package avax
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,27 +11,26 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestUTXOVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	utxo := (*UTXO)(nil)
 
-	if err := utxo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to a nil utxo")
-	}
+	require.ErrorIs(utxo.Verify(), errNilUTXO)
 }
 
 func TestUTXOVerifyEmpty(t *testing.T) {
+	require := require.New(t)
+
 	utxo := &UTXO{
 		UTXOID: UTXOID{TxID: ids.Empty},
 		Asset:  Asset{ID: ids.Empty},
 	}
 
-	if err := utxo.Verify(); err == nil {
-		t.Fatalf("Should have errored due to an empty utxo")
-	}
+	require.ErrorIs(utxo.Verify(), errEmptyUTXO)
 }
 
 func TestUTXOSerialize(t *testing.T) {
@@ -41,18 +39,12 @@ func TestUTXOSerialize(t *testing.T) {
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(c.RegisterType(&secp256k1fx.MintOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Input{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferInput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Credential{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	expected := []byte{
 		// Codec version
@@ -121,10 +113,5 @@ func TestUTXOSerialize(t *testing.T) {
 
 	utxoBytes, err := manager.Marshal(codecVersion, utxo)
 	require.NoError(err)
-	if !bytes.Equal(utxoBytes, expected) {
-		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
-			expected,
-			utxoBytes,
-		)
-	}
+	require.Equal(expected, utxoBytes)
 }

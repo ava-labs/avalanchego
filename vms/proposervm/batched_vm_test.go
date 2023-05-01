@@ -1057,9 +1057,7 @@ func initTestRemoteProposerVM(
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil

@@ -6,10 +6,14 @@ package vertex
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestVertexVerify(t *testing.T) {
+	require := require.New(t)
+
 	tooManyParents := make([]ids.ID, maxNumParents+1)
 	for i := range tooManyParents {
 		tooManyParents[i][0] = byte(i)
@@ -24,14 +28,14 @@ func TestVertexVerify(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		vertex    StatelessVertex
-		shouldErr bool
+		name        string
+		vertex      StatelessVertex
+		expectedErr error
 	}{
 		{
-			name:      "zero vertex",
-			vertex:    statelessVertex{innerStatelessVertex: innerStatelessVertex{}},
-			shouldErr: true,
+			name:        "zero vertex",
+			vertex:      statelessVertex{innerStatelessVertex: innerStatelessVertex{}},
+			expectedErr: errNoOperations,
 		},
 		{
 			name: "valid vertex",
@@ -43,7 +47,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       [][]byte{{}},
 			}},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 		{
 			name: "invalid vertex epoch",
@@ -55,7 +59,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       [][]byte{{}},
 			}},
-			shouldErr: true,
+			expectedErr: errBadEpoch,
 		},
 		{
 			name: "too many vertex parents",
@@ -67,7 +71,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: tooManyParents,
 				Txs:       [][]byte{{}},
 			}},
-			shouldErr: true,
+			expectedErr: errTooManyParentIDs,
 		},
 		{
 			name: "no vertex txs",
@@ -79,7 +83,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       [][]byte{},
 			}},
-			shouldErr: true,
+			expectedErr: errNoOperations,
 		},
 		{
 			name: "too many vertex txs",
@@ -91,7 +95,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       tooManyTxs,
 			}},
-			shouldErr: true,
+			expectedErr: errTooManyTxs,
 		},
 		{
 			name: "unsorted vertex parents",
@@ -103,7 +107,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{{1}, {0}},
 				Txs:       [][]byte{{}},
 			}},
-			shouldErr: true,
+			expectedErr: errInvalidParents,
 		},
 		{
 			name: "unsorted vertex txs",
@@ -115,7 +119,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       [][]byte{{0}, {1}}, // note that txs are sorted by their hashes
 			}},
-			shouldErr: true,
+			expectedErr: errInvalidTxs,
 		},
 		{
 			name: "duplicate vertex parents",
@@ -127,7 +131,7 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{{0}, {0}},
 				Txs:       [][]byte{{}},
 			}},
-			shouldErr: true,
+			expectedErr: errInvalidParents,
 		},
 		{
 			name: "duplicate vertex txs",
@@ -139,17 +143,12 @@ func TestVertexVerify(t *testing.T) {
 				ParentIDs: []ids.ID{},
 				Txs:       [][]byte{{0}, {0}}, // note that txs are sorted by their hashes
 			}},
-			shouldErr: true,
+			expectedErr: errInvalidTxs,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.vertex.Verify()
-			if test.shouldErr && err == nil {
-				t.Fatal("expected verify to return an error but it didn't")
-			} else if !test.shouldErr && err != nil {
-				t.Fatalf("expected verify to pass but it returned: %s", err)
-			}
+			require.ErrorIs(test.vertex.Verify(), test.expectedErr)
 		})
 	}
 }

@@ -104,9 +104,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
 			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			inputUTXOs = append(inputUTXOs, utxo)
 		}
@@ -192,9 +190,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
 			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			inputUTXOs = append(inputUTXOs, utxo)
 		}
@@ -339,9 +335,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		var inputUTXOs []*avax.UTXO
 		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
 			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			inputUTXOs = append(inputUTXOs, utxo)
 		}

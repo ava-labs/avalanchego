@@ -7,11 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDelayFromNew(t *testing.T) {
+	require := require.New(t)
+
 	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
@@ -22,12 +26,12 @@ func TestDelayFromNew(t *testing.T) {
 	fromVM <- common.PendingTxs
 
 	<-toEngine
-	if time.Until(startTime) > 0 {
-		t.Fatalf("passed message too soon")
-	}
+	require.Negative(time.Until(startTime))
 }
 
 func TestDelayFromSetTime(t *testing.T) {
+	require := require.New(t)
+
 	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
@@ -41,9 +45,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	fromVM <- common.PendingTxs
 
 	<-toEngine
-	if time.Until(startTime) > 0 {
-		t.Fatalf("passed message too soon")
-	}
+	require.Negative(time.Until(startTime))
 }
 
 func TestReceipt(*testing.T) {

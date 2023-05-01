@@ -75,9 +75,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	bsIntf, err := New(manager, config)
 	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.True(ok)
 
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
@@ -98,15 +96,9 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	manager.EdgeF = nil
 
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
+	require.Contains(acceptedSet, vtxID0)
+	require.Contains(acceptedSet, vtxID1)
+	require.NotContains(acceptedSet, vtxID2)
 }
 
 func TestFilterAccepted(t *testing.T) {
@@ -130,9 +122,7 @@ func TestFilterAccepted(t *testing.T) {
 	bsIntf, err := New(manager, config)
 	require.NoError(err)
 	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.True(ok)
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
@@ -145,7 +135,7 @@ func TestFilterAccepted(t *testing.T) {
 		case vtxID2:
 			return nil, errUnknownVertex
 		}
-		t.Fatal(errUnknownVertex)
+		require.FailNow(errUnknownVertex.Error())
 		return nil, errUnknownVertex
 	}
 
@@ -161,13 +151,7 @@ func TestFilterAccepted(t *testing.T) {
 
 	manager.GetVtxF = nil
 
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
+	require.Contains(acceptedSet, vtxID0)
+	require.Contains(acceptedSet, vtxID1)
+	require.NotContains(acceptedSet, vtxID2)
 }

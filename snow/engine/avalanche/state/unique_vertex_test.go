@@ -102,9 +102,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		id:         id,
 		serializer: s,
 	}
-	if err := uVtx.setVertex(context.Background(), vtx); err != nil {
-		t.Fatalf("Failed to set vertex due to: %s", err)
-	}
+	require.NoError(uVtx.setVertex(context.Background(), vtx))
 
 	newUVtx := &uniqueVertex{
 		id:         id,
@@ -112,38 +110,22 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	}
 
 	parents, err := newUVtx.Parents()
-	if err != nil {
-		t.Fatalf("Error while retrieving parents of known vertex")
-	}
-	if len(parents) != 1 {
-		t.Fatalf("Parents should have length 1")
-	}
-	if parents[0].ID() != parentID {
-		t.Fatalf("ParentID is incorrect")
-	}
+	require.NoError(err)
+	require.Len(parents, 1)
+	require.Equal(parentID, parents[0].ID())
 
 	newHeight, err := newUVtx.Height()
-	if err != nil {
-		t.Fatalf("Error while retrieving height of known vertex")
-	}
+	require.NoError(err)
 	if height != newHeight {
 		t.Fatalf("Vertex height should have been %d, but was: %d", height, newHeight)
 	}
 
 	txs, err := newUVtx.Txs(context.Background())
-	if err != nil {
-		t.Fatalf("Error while retrieving txs of known vertex: %s", err)
-	}
-	if len(txs) != 1 {
-		t.Fatalf("Incorrect number of transactions")
-	}
-	if txs[0] != testTx {
-		t.Fatalf("Txs retrieved the wrong Tx")
-	}
+	require.NoError(err)
+	require.Len(txs, 1)
+	require.Equal(testTx, txs[0])
 
-	if newUVtx.v != uVtx.v {
-		t.Fatalf("Unique vertex failed to get corresponding vertex state from cache")
-	}
+	require.Equal(uVtx.v, newUVtx.v)
 }
 
 func TestUniqueVertexCacheMiss(t *testing.T) {
@@ -227,17 +209,11 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		}
 
 		vtxParents, err := vtx.Parents()
-		if err != nil {
-			t.Fatalf("Fetching vertex parents errored with: %s", err)
-		}
+		require.NoError(err)
 		vtxHeight, err := vtx.Height()
-		if err != nil {
-			t.Fatalf("Fetching vertex height errored with: %s", err)
-		}
+		require.NoError(err)
 		vtxTxs, err := vtx.Txs(context.Background())
-		if err != nil {
-			t.Fatalf("Fetching vertx txs errored with: %s", err)
-		}
+		require.NoError(err)
 		switch {
 		case vtxHeight != height:
 			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)

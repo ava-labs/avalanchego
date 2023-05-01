@@ -113,9 +113,7 @@ func setupWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atom
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, username, password)
 	require.NoError(err)
 
-	if err := user.PutKeys(keys...); err != nil {
-		t.Fatalf("Failed to set key for user: %s", err)
-	}
+	require.NoError(user.PutKeys(keys...))
 
 	require.NoError(user.Close())
 	return genesisBytes, vm, s, m, tx
@@ -1978,14 +1976,10 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 			reply := AssetIDChangeAddr{}
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 			err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
@@ -2005,11 +1999,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 					Address: addrStr,
 				}},
 			}, &reply)
-			if err != nil {
-				t.Fatal(err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.NoError(err)
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 		})
 	}
 }
@@ -2027,14 +2018,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 			reply := AssetIDChangeAddr{}
 			minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 			changeAddrStr := fromAddrsStr[0]
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2056,11 +2043,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 					},
 				},
 			}, &reply)
-			if err != nil {
-				t.Fatal(err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.NoError(err)
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			createAssetTx := UniqueTx{
 				vm:   vm,
@@ -2069,9 +2053,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			if status := createAssetTx.Status(); status != choices.Processing {
 				t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
 			}
-			if err := createAssetTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
-			}
+			require.NoError(createAssetTx.Accept(context.Background()))
 
 			createdAssetID := reply.AssetID.String()
 			// Test minting of the created variable cap asset
@@ -2088,11 +2070,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				To:      minterAddrStr, // Send newly minted tokens to this address
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
-			if err := s.Mint(nil, mintArgs, mintReply); err != nil {
-				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-			} else if mintReply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
-			}
+			require.NoError(s.Mint(nil, mintArgs, mintReply))
+			require.Equal(changeAddrStr, mintReply.ChangeAddr)
 
 			mintTx := UniqueTx{
 				vm:   vm,
@@ -2102,9 +2081,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			if status := mintTx.Status(); status != choices.Processing {
 				t.Fatalf("MintTx status should have been Processing, but was %s", status)
 			}
-			if err := mintTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept MintTx due to: %s", err)
-			}
+			require.NoError(mintTx.Accept(context.Background()))
 
 			sendArgs := &SendArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2122,9 +2099,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			if err := s.Send(nil, sendArgs, sendReply); err != nil {
-				t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
-			} else if sendReply.ChangeAddr != changeAddrStr {
+			require.NoError(s.Send(nil, sendArgs, sendReply))
+			if sendReply.ChangeAddr != changeAddrStr {
 				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
 			}
 		})
@@ -2146,9 +2122,7 @@ func TestNFTWorkflow(t *testing.T) {
 
 			// Test minting of the created variable cap asset
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			createArgs := &CreateNFTAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2171,9 +2145,8 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			}
 			createReply := &AssetIDChangeAddr{}
-			if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
-				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-			} else if createReply.ChangeAddr != fromAddrsStr[0] {
+			require.NoError(s.CreateNFTAsset(nil, createArgs, createReply))
+			if createReply.ChangeAddr != fromAddrsStr[0] {
 				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
 			}
 
@@ -2186,15 +2159,11 @@ func TestNFTWorkflow(t *testing.T) {
 			if createNFTTx.Status() != choices.Processing {
 				t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
 			}
-			if err := createNFTTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
-			}
+			require.NoError(createNFTTx.Accept(context.Background()))
 			require.NoError(verifyTxFeeDeducted(t, s, fromAddrs, 1))
 
 			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			mintArgs := &MintNFTArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
@@ -2211,9 +2180,8 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
 
-			if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
-				t.Fatalf("MintNFT returned an error: %s", err)
-			} else if createReply.ChangeAddr != fromAddrsStr[0] {
+			require.NoError(s.MintNFT(nil, mintArgs, mintReply))
+			if createReply.ChangeAddr != fromAddrsStr[0] {
 				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
 			}
 
@@ -2226,9 +2194,7 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 
 			// Accept the transaction so that we can send the newly minted NFT
-			if err := mintNFTTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept MintNFTTx: %s", err)
-			}
+			require.NoError(mintNFTTx.Accept(context.Background()))
 
 			sendArgs := &SendNFTArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2244,9 +2210,8 @@ func TestNFTWorkflow(t *testing.T) {
 				To:      addrStr,
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
-				t.Fatalf("Failed to send NFT due to: %s", err)
-			} else if sendReply.ChangeAddr != fromAddrsStr[0] {
+			require.NoError(s.SendNFT(nil, sendArgs, sendReply))
+			if sendReply.ChangeAddr != fromAddrsStr[0] {
 				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
 			}
 		})
@@ -2264,9 +2229,7 @@ func TestImportExportKey(t *testing.T) {
 
 	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatalf("problem generating private key: %s", err)
-	}
+	require.NoError(err)
 
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
@@ -2307,9 +2270,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 
 	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatalf("problem generating private key: %s", err)
-	}
+	require.NoError(err)
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -2385,9 +2346,8 @@ func TestSend(t *testing.T) {
 	}
 	reply := &api.JSONTxIDChangeAddr{}
 	vm.timer.Cancel()
-	if err := s.Send(nil, args, reply); err != nil {
-		t.Fatalf("Failed to send transaction: %s", err)
-	} else if reply.ChangeAddr != changeAddrStr {
+	require.NoError(s.Send(nil, args, reply))
+	if reply.ChangeAddr != changeAddrStr {
 		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
 	}
 
@@ -2416,13 +2376,9 @@ func TestSendMultiple(t *testing.T) {
 			addr := keys[0].PublicKey().Address()
 
 			addrStr, err := vm.FormatLocalAddress(addr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 			args := &SendMultipleArgs{
@@ -2449,9 +2405,8 @@ func TestSendMultiple(t *testing.T) {
 			}
 			reply := &api.JSONTxIDChangeAddr{}
 			vm.timer.Cancel()
-			if err := s.SendMultiple(nil, args, reply); err != nil {
-				t.Fatalf("Failed to send transaction: %s", err)
-			} else if reply.ChangeAddr != changeAddrStr {
+			require.NoError(s.SendMultiple(nil, args, reply))
+			if reply.ChangeAddr != changeAddrStr {
 				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
 			}
 
@@ -2486,9 +2441,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	createReply := &api.JSONAddress{}
 
-	if err := s.CreateAddress(nil, createArgs, createReply); err != nil {
-		t.Fatalf("Failed to create address: %s", err)
-	}
+	require.NoError(s.CreateAddress(nil, createArgs, createReply))
 
 	newAddr := createReply.Address
 
@@ -2498,9 +2451,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	listReply := &api.JSONAddresses{}
 
-	if err := s.ListAddresses(nil, listArgs, listReply); err != nil {
-		t.Fatalf("Failed to list addresses: %s", err)
-	}
+	require.NoError(s.ListAddresses(nil, listArgs, listReply))
 
 	for _, addr := range listReply.Addresses {
 		if addr == newAddr {
@@ -2535,9 +2486,7 @@ func TestImport(t *testing.T) {
 				},
 			}
 			utxoBytes, err := vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 			utxoID := utxo.InputID()
@@ -2552,9 +2501,7 @@ func TestImport(t *testing.T) {
 			}
 
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			args := &ImportArgs{
 				UserPass: api.UserPass{
 					Username: username,
@@ -2564,9 +2511,7 @@ func TestImport(t *testing.T) {
 				To:          addrStr,
 			}
 			reply := &api.JSONTxID{}
-			if err := s.Import(nil, args, reply); err != nil {
-				t.Fatalf("Failed to import AVAX due to %s", err)
-			}
+			require.NoError(s.Import(nil, args, reply))
 		})
 	}
 }

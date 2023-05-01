@@ -1198,9 +1198,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
-	if err := parsedFirstTx.Verify(context.Background()); err == nil {
-		t.Fatalf("Should have erred due to a missing UTXO")
-	}
+	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
 }
 
 func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
@@ -1571,10 +1569,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(context.Background()); err != nil {
-		t.Fatal("Failed verify", err)
-	}
-
+	require.NoError(parsedTx.Verify(context.Background()))
 	require.NoError(parsedTx.Accept(context.Background()))
 
 	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())

@@ -15,12 +15,12 @@ import (
 )
 
 func TestInterface(t *testing.T) {
+	require := require.New(t)
+
 	for _, test := range database.Tests {
 		folder := t.TempDir()
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
-		}
+		require.NoError(err)
 
 		defer db.Close()
 

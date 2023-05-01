@@ -6,6 +6,8 @@ package cache
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -19,32 +21,27 @@ var CacherTests = []struct {
 }
 
 func TestBasic(t *testing.T, cache Cacher[ids.ID, int]) {
+	require := require.New(t)
+
 	id1 := ids.ID{1}
-	if _, found := cache.Get(id1); found {
-		t.Fatalf("Retrieved value when none exists")
-	}
+	_, found := cache.Get(id1)
+	require.False(found)
 
 	expectedValue1 := 1
 	cache.Put(id1, expectedValue1)
-	if value, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if value != expectedValue1 {
-		t.Fatalf("Failed to retrieve correct value when one exists")
-	}
+	value, found := cache.Get(id1)
+	require.True(found)
+	require.Equal(expectedValue1, value)
 
 	cache.Put(id1, expectedValue1)
-	if value, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if value != expectedValue1 {
-		t.Fatalf("Failed to retrieve correct value when one exists")
-	}
+	value, found = cache.Get(id1)
+	require.True(found)
+	require.Equal(expectedValue1, value)
 
 	cache.Put(id1, expectedValue1)
-	if value, found := cache.Get(id1); !found {
-		t.Fatalf("Failed to retrieve value when one exists")
-	} else if value != expectedValue1 {
-		t.Fatalf("Failed to retrieve correct value when one exists")
-	}
+	value, found = cache.Get(id1)
+	require.True(found)
+	require.Equal(expectedValue1, value)
 
 	id2 := ids.ID{2}
 

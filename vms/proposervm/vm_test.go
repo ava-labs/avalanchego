@@ -194,9 +194,7 @@ func initTestProposerVM(
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -210,6 +208,8 @@ func initTestProposerVM(
 // VM.BuildBlock tests section
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
+	require := require.New(t)
+
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
@@ -231,16 +231,14 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
-	if builtBlk.Timestamp().Truncate(time.Second) != builtBlk.Timestamp() {
-		t.Fatal("Timestamp should be rounded to second")
-	}
+	require.Equal(builtBlk.Timestamp().Truncate(time.Second), builtBlk.Timestamp())
 }
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
+	require := require.New(t)
+
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
@@ -260,21 +258,17 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 	// test
 	builtBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
 	builtBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
-	if !bytes.Equal(builtBlk1.Bytes(), builtBlk2.Bytes()) {
-		t.Fatal("proposer blocks wrapping the same core block are different")
-	}
+	require.Equal(builtBlk1.Bytes(), builtBlk2.Bytes())
 }
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
+	require := require.New(t)
+
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
@@ -294,19 +288,13 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// test
 	snowBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
+	require.NoError(err)
 
 	// checks
 	proBlock, ok := snowBlock.(*postForkBlock)
-	if !ok {
-		t.Fatal("proposerVM.BuildBlock() does not return a proposervm.Block")
-	}
+	require.True(ok)
 
-	if proBlock.innerBlk != coreBlk {
-		t.Fatal("different block was expected to be built")
-	}
+	require.Equal(coreBlk, proBlock.innerBlk)
 }
 
 // both core blocks and pro blocks must be built on preferred
@@ -330,9 +318,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk1, nil
 	}
 	proBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("Could not build proBlk1 due to %s", err)
-	}
+	require.NoError(err)
 
 	coreBlk2 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -348,13 +334,8 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk2, nil
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk2")
-	}
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("proBlk1 and proBlk2 should be different for this test")
-	}
-
+	require.NoError(err)
+	require.Equal(proBlk2.ID(), proBlk1.ID())
 	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
@@ -368,7 +349,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			prefcoreBlk = coreBlk2
 			return nil
 		default:
-			t.Fatal("Unknown core Blocks set as preferred")
+			require.FailNow("prefID does not match coreBlk1 or coreBlk2")
 			return nil
 		}
 	}
@@ -379,14 +360,12 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			t.Fatalf("Wrong bytes")
+			require.FailNow("bytes do not match coreBlk1 or coreBlk2")
 			return nil, nil
 		}
 	}
 
-	if err := proVM.SetPreference(context.Background(), proBlk2.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
 	coreBlk3 := &snowman.TestBlock{
@@ -405,14 +384,10 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("unexpectedly could not build block due to %s", err)
-	}
+	require.NoError(err)
 
 	// ...show that parent is the preferred one
-	if builtBlk.Parent() != proBlk2.ID() {
-		t.Fatal("proposer block not built on preferred parent")
-	}
+	require.Equal(proBlk2.ID(), builtBlk.Parent())
 }
 
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
@@ -434,9 +409,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk1, nil
 	}
 	proBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk1")
-	}
+	require.NoError(err)
 
 	coreBlk2 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -452,9 +425,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk2, nil
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk2")
-	}
+	require.NoError(err)
 	if proBlk1.ID() == proBlk2.ID() {
 		t.Fatal("proBlk1 and proBlk2 should be different for this test")
 	}
@@ -488,9 +459,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		}
 	}
 
-	if err := proVM.SetPreference(context.Background(), proBlk2.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
 	coreBlk3 := &snowman.TestBlock{
@@ -518,6 +487,8 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 // VM.ParseBlock tests section
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	innerBlk := &snowman.TestBlock{
@@ -536,9 +507,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk := postForkBlock{
 		SignedBlock: slb,
 		postForkCommonComponents: postForkCommonComponents{
@@ -556,6 +525,8 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// create two Proposer blocks at the same height
@@ -581,9 +552,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk1 := postForkBlock{
 		SignedBlock: slb1,
 		postForkCommonComponents: postForkCommonComponents{
@@ -602,9 +571,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk2 := postForkBlock{
 		SignedBlock: slb2,
 		postForkCommonComponents: postForkCommonComponents{
@@ -620,13 +587,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 	// Show that both can be parsed and retrieved
 	parsedBlk1, err := proVM.ParseBlock(context.Background(), proBlk1.Bytes())
-	if err != nil {
-		t.Fatal("proposerVM could not parse parsedBlk1")
-	}
+	require.NoError(err)
 	parsedBlk2, err := proVM.ParseBlock(context.Background(), proBlk2.Bytes())
-	if err != nil {
-		t.Fatal("proposerVM could not parse parsedBlk2")
-	}
+	require.NoError(err)
 
 	if parsedBlk1.ID() != proBlk1.ID() {
 		t.Fatal("error in parsing block")
@@ -638,6 +601,8 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// one block is built from this proVM
@@ -652,12 +617,8 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatal("Built block does not verify")
-	}
+	require.NoError(err)
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// another block with same parent comes from network and is parsed
 	netcoreBlk := &snowman.TestBlock{
@@ -681,9 +642,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve pChain height")
-	}
+	require.NoError(err)
 
 	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
@@ -691,9 +650,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		pChainHeight,
 		netcoreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	netProBlk := postForkBlock{
 		SignedBlock: netSlb,
 		postForkCommonComponents: postForkCommonComponents{
@@ -704,25 +661,21 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	// prove that also block from network verifies
-	if err := netProBlk.Verify(context.Background()); err != nil {
-		t.Fatal("block from network does not verify")
-	}
+	require.NoError(netProBlk.Verify(context.Background()))
 }
 
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {
+	require := require.New(t)
+
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal("failed to retrieve last accepted block")
-	}
+	require.NoError(err)
 
 	rtvdBlk, err := proVM.GetBlock(context.Background(), blkID)
-	if err != nil {
-		t.Fatal("Block should be returned without calling core vm")
-	}
+	require.NoError(err)
 
 	if _, ok := rtvdBlk.(*preForkBlock); !ok {
 		t.Fatal("Block retrieved from proposerVM should be proposerBlocks")
@@ -733,6 +686,8 @@ func TestPreFork_Initialize(t *testing.T) {
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
+	require := require.New(t)
+
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
@@ -752,9 +707,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 	if _, ok := builtBlk.(*preForkBlock); !ok {
 		t.Fatal("Block built by proposerVM should be proposerBlocks")
 	}
@@ -770,15 +723,15 @@ func TestPreFork_BuildBlock(t *testing.T) {
 		return coreBlk, nil
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), builtBlk.ID())
-	if err != nil {
-		t.Fatal("proposerVM has not cached built block")
-	}
+	require.NoError(err)
 	if storedBlk.ID() != builtBlk.ID() {
 		t.Fatal("proposerVM retrieved wrong block")
 	}
 }
 
 func TestPreFork_ParseBlock(t *testing.T) {
+	require := require.New(t)
+
 	// setup
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
@@ -797,9 +750,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	}
 
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
-	if err != nil {
-		t.Fatal("Could not parse naked core block")
-	}
+	require.NoError(err)
 	if _, ok := parsedBlk.(*preForkBlock); !ok {
 		t.Fatal("Block parsed by proposerVM should be proposerBlocks")
 	}
@@ -817,15 +768,15 @@ func TestPreFork_ParseBlock(t *testing.T) {
 		return coreBlk, nil
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), parsedBlk.ID())
-	if err != nil {
-		t.Fatal("proposerVM has not cached parsed block")
-	}
+	require.NoError(err)
 	if storedBlk.ID() != parsedBlk.ID() {
 		t.Fatal("proposerVM retrieved wrong block")
 	}
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk0 := &snowman.TestBlock{
@@ -842,9 +793,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		return coreBlk0, nil
 	}
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proposer block")
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -866,9 +815,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	if err := proVM.SetPreference(context.Background(), builtBlk.ID()); err != nil {
-		t.Fatal("Could not set preference on proposer Block")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), builtBlk.ID()))
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -884,9 +831,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		return coreBlk1, nil
 	}
 	nextBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("Could not build proposer block %s", err)
-	}
+	require.NoError(err)
 	if nextBlk.Parent() != builtBlk.ID() {
 		t.Fatal("Preferred block should be parent of next built block")
 	}
@@ -990,9 +935,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1282,9 +1225,7 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
@@ -1375,9 +1316,7 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1516,13 +1455,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct pre-fork block Y and post-fork block B
 	yBlock := &snowman.TestBlock{
@@ -1542,9 +1477,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -1555,9 +1488,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// append Z/C to Y/B
 	zBlock := &snowman.TestBlock{
@@ -1576,14 +1507,10 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	}
 	require.NoError(proVM.SetPreference(context.Background(), bBlock.ID()))
 	cBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
 
-	if err := cBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(cBlock.Verify(context.Background()))
 
 	if aBlock.Parent() != bBlock.Parent() ||
 		zBlock.Parent() != yBlock.ID() ||
@@ -1596,9 +1523,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	}
 
 	// accept A
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
+	require.NoError(aBlock.Accept(context.Background()))
 
 	if xBlock.Status() != choices.Accepted {
 		t.Fatal("xBlock should be accepted because aBlock is accepted")
@@ -1613,6 +1538,8 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 }
 
 func TestTooFarAdvanced(t *testing.T) {
+	require := require.New(t)
+
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
 
@@ -1642,12 +1569,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	ySlb, err := statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1655,9 +1578,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -1679,9 +1600,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		yBlock.Bytes(),
 	)
 
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock = postForkBlock{
 		SignedBlock: ySlb,
@@ -1751,9 +1670,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
 	if !ok {
@@ -1761,9 +1678,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	}
 
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
 	require.NoError(aBlock.Verify(context.Background()))
 	bBlock := opts[0]
@@ -1781,9 +1696,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	}
 
 	// the other post-fork option should also be rejected
-	if err := cBlock.Reject(context.Background()); err != nil {
-		t.Fatal("the post-fork option block should have be rejected")
-	}
+	require.NoError(cBlock.Reject(context.Background()))
 
 	if cBlock.Status() != choices.Rejected {
 		t.Fatal("cBlock status should not be accepted")

@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var minimumFailingDuration = 5 * time.Minute
@@ -30,17 +29,11 @@ func TestBenchlistAdd(t *testing.T) {
 	vdrID3 := ids.GenerateTestNodeID()
 	vdrID4 := ids.GenerateTestNodeID()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		vdrs.Add(vdrID0, nil, ids.Empty, 50),
-		vdrs.Add(vdrID1, nil, ids.Empty, 50),
-		vdrs.Add(vdrID2, nil, ids.Empty, 50),
-		vdrs.Add(vdrID3, nil, ids.Empty, 50),
-		vdrs.Add(vdrID4, nil, ids.Empty, 50),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 50))
+	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 50))
 
 	benchable := &TestBenchable{T: t}
 	benchable.Default(true)
@@ -170,17 +163,11 @@ func TestBenchlistMaxStake(t *testing.T) {
 	vdrID4 := ids.GenerateTestNodeID()
 
 	// Total weight is 5100
-	errs := wrappers.Errs{}
-	errs.Add(
-		vdrs.Add(vdrID0, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID1, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID2, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID3, nil, ids.Empty, 2000),
-		vdrs.Add(vdrID4, nil, ids.Empty, 100),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 2000))
+	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 100))
 
 	threshold := 3
 	duration := 1 * time.Hour
@@ -302,17 +289,11 @@ func TestBenchlistRemove(t *testing.T) {
 	vdrID4 := ids.GenerateTestNodeID()
 
 	// Total weight is 5000
-	errs := wrappers.Errs{}
-	errs.Add(
-		vdrs.Add(vdrID0, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID1, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID2, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID3, nil, ids.Empty, 1000),
-		vdrs.Add(vdrID4, nil, ids.Empty, 1000),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(vdrs.Add(vdrID0, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID1, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID2, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID3, nil, ids.Empty, 1000))
+	require.NoError(vdrs.Add(vdrID4, nil, ids.Empty, 1000))
 
 	count := 0
 	benchable := &TestBenchable{

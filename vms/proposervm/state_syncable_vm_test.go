@@ -29,6 +29,8 @@ import (
 var errUnknownSummary = errors.New("unknown summary")
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
+	require := require.New(t)
+
 	innerVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
@@ -99,9 +101,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	return innerVM, vm
 }

@@ -4,7 +4,6 @@
 package keystore
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -185,11 +184,9 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 	{
 		db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
 		require.NoError(err)
-		if val, err := db.Get([]byte("hello")); err != nil {
-			t.Fatal(err)
-		} else if !bytes.Equal(val, []byte("world")) {
-			t.Fatalf("Should have read '%s' from the db", "world")
-		}
+		val, err := db.Get([]byte("hello"))
+		require.NoError(err)
+		require.Equal([]byte("world"), val)
 	}
 }
 
@@ -279,6 +276,8 @@ func TestServiceExportImport(t *testing.T) {
 }
 
 func TestServiceDeleteUser(t *testing.T) {
+	require := require.New(t)
+
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	tests := []struct {
@@ -332,16 +331,12 @@ func TestServiceDeleteUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ksIntf, err := CreateTestKeystore()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			ks := ksIntf.(*keystore)
 			s := service{ks: ks}
 
 			if tt.setup != nil {
-				if err := tt.setup(ks); err != nil {
-					t.Fatalf("failed to create user setup in keystore: %v", err)
-				}
+				require.NoError(tt.setup(ks))
 			}
 			got := &api.EmptyReply{}
 			err = s.DeleteUser(nil, tt.request, got)
@@ -359,10 +354,7 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 
 				// deleted user details should be available to create user again.
-				err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
-				if err != nil {
-					t.Fatalf("failed to create user: %v", err)
-				}
+				require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))
 			}
 		})
 	}
