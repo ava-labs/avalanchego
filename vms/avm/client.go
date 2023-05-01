@@ -243,7 +243,6 @@ func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Opti
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
@@ -256,7 +255,6 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
@@ -316,7 +314,6 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Tx)
 }
 
