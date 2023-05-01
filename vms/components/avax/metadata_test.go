@@ -5,18 +5,20 @@ package avax
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMetaDataVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	md := (*Metadata)(nil)
-	if err := md.Verify(); err == nil {
-		t.Fatalf("Should have errored due to nil metadata")
-	}
+	require.ErrorIs(md.Verify(), errNilMetadata)
 }
 
 func TestMetaDataVerifyUninitialized(t *testing.T) {
+	require := require.New(t)
+
 	md := &Metadata{}
-	if err := md.Verify(); err == nil {
-		t.Fatalf("Should have errored due to uninitialized metadata")
-	}
+	require.ErrorIs(md.Verify(), errMetadataNotInitialize)
 }

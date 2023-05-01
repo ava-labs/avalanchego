@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"math"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -482,9 +482,7 @@ func TestInvalidGenesis(t *testing.T) {
 		nil,                                     // fxs
 		nil,                                     // AppSender
 	)
-	if err == nil {
-		t.Fatalf("Should have erred due to an invalid genesis")
-	}
+	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 }
 
 func TestInvalidFx(t *testing.T) {
@@ -512,9 +510,7 @@ func TestInvalidFx(t *testing.T) {
 		},
 		nil,
 	)
-	if err == nil {
-		t.Fatalf("Should have erred due to an invalid interface")
-	}
+	require.ErrorIs(err, errIncompatibleFx)
 }
 
 func TestFxInitializationFailure(t *testing.T) {
@@ -547,9 +543,7 @@ func TestFxInitializationFailure(t *testing.T) {
 		}},
 		nil,
 	)
-	if err == nil {
-		t.Fatalf("Should have erred due to an invalid fx initialization")
-	}
+	require.ErrorIs(err, errUnknownFx)
 }
 
 func TestIssueTx(t *testing.T) {
@@ -566,21 +560,13 @@ func TestIssueTx(t *testing.T) {
 
 	txID, err := vm.IssueTx(newTx.Bytes())
 	require.NoError(err)
-	if txID != newTx.ID() {
-		t.Fatalf("Issue Tx returned wrong TxID")
-	}
+	require.Equal(newTx.ID(), txID)
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 	ctx.Lock.Lock()
 
-	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(vm.PendingTxs(context.Background()), 1)
 }
 
 // Test issuing a transaction that consumes a currently pending UTXO. The
@@ -597,25 +583,17 @@ func TestIssueDependentTx(t *testing.T) {
 	firstTx := txs[1]
 	secondTx := txs[2]
 
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err := vm.IssueTx(firstTx.Bytes())
+	require.NoError(err)
 
-	if _, err := vm.IssueTx(secondTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(secondTx.Bytes())
+	require.NoError(err)
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 	ctx.Lock.Lock()
 
-	pendingTxs := vm.PendingTxs(context.Background())
-	if len(pendingTxs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 2)
-	}
+	require.Len(vm.PendingTxs(context.Background()), 2)
 }
 
 // Test issuing a transaction that creates an NFT family
@@ -691,9 +669,8 @@ func TestIssueNFT(t *testing.T) {
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
 
-	if _, err := vm.IssueTx(createAssetTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	require.NoError(err)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -718,9 +695,8 @@ func TestIssueNFT(t *testing.T) {
 	}}
 	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 
-	if _, err := vm.IssueTx(mintNFTTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(mintNFTTx.Bytes())
+	require.NoError(err)
 
 	transferNFTTx := &txs.Tx{
 		Unsigned: &txs.OperationTx{
@@ -750,9 +726,8 @@ func TestIssueNFT(t *testing.T) {
 	}
 	require.NoError(vm.parser.InitializeTx(transferNFTTx))
 
-	if _, err := vm.IssueTx(transferNFTTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(transferNFTTx.Bytes())
+	require.NoError(err)
 }
 
 // Test issuing a transaction that creates an Property family
@@ -824,9 +799,8 @@ func TestIssueProperty(t *testing.T) {
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
 
-	if _, err := vm.IssueTx(createAssetTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	require.NoError(err)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -860,9 +834,8 @@ func TestIssueProperty(t *testing.T) {
 	})
 	require.NoError(err)
 
-	if _, err := vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(mintPropertyTx.Bytes())
+	require.NoError(err)
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -884,9 +857,8 @@ func TestIssueProperty(t *testing.T) {
 	})
 	require.NoError(err)
 
-	if _, err := vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(burnPropertyTx.Bytes())
+	require.NoError(err)
 }
 
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -1159,27 +1131,19 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Verify(context.Background()))
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(firstTx.Bytes())
+	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 	ctx.Lock.Lock()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
-	parsedFirstTx := txs[0]
+	require.Len(txs, 1)
 
-	if err := parsedFirstTx.Verify(context.Background()); err == nil {
-		t.Fatalf("Should have erred due to a missing UTXO")
-	}
+	parsedFirstTx := txs[0]
+	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
 }
 
 func TestTxVerifyAfterGet(t *testing.T) {
@@ -1196,9 +1160,8 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Verify(context.Background()))
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(firstTx.Bytes())
+	require.NoError(err)
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
@@ -1251,18 +1214,14 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Verify(context.Background()))
-	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(firstTx.Bytes())
+	require.NoError(err)
+	_, err = vm.IssueTx(firstTxDescendant.Bytes())
+	require.NoError(err)
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
-	if err := parsedFirstTx.Verify(context.Background()); err == nil {
-		t.Fatalf("Should have erred due to a missing UTXO")
-	}
+	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
 }
 
 func TestImportTxSerialization(t *testing.T) {
@@ -1360,10 +1319,7 @@ func TestImportTxSerialization(t *testing.T) {
 
 	require.NoError(vm.parser.InitializeTx(tx))
 	require.Equal(tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
-	result := tx.Bytes()
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.Equal(expected, tx.Bytes())
 
 	credBytes := []byte{
 		// type id
@@ -1416,14 +1372,11 @@ func TestImportTxSerialization(t *testing.T) {
 	}
 	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0], keys[0]}, {keys[0], keys[0]}}))
 	require.Equal(tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
-	result = tx.Bytes()
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
 	expected = append(expected, credBytes...)
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.Equal(expected, tx.Bytes())
 }
 
 // Test issuing an import transaction.
@@ -1518,9 +1471,8 @@ func TestIssueImportTx(t *testing.T) {
 	}}
 	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	if _, err := vm.IssueTx(tx.Bytes()); err == nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(tx.Bytes())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Provide the platform UTXO:
 
@@ -1541,25 +1493,20 @@ func TestIssueImportTx(t *testing.T) {
 
 	inputID := utxo.InputID()
 
-	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			key.PublicKey().Address().Bytes(),
 		},
-	}}}}); err != nil {
-		t.Fatal(err)
-	}
+	}}}})
+	require.NoError(err)
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-		t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-	}
+	_, err = vm.IssueTx(tx.Bytes())
+	require.NoError(err)
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 
 	ctx.Lock.Lock()
 	defer func() {
@@ -1568,9 +1515,7 @@ func TestIssueImportTx(t *testing.T) {
 	}()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
 
 	parsedTx := txs[0]
 	require.NoError(parsedTx.Verify(context.Background()))
@@ -1580,9 +1525,8 @@ func TestIssueImportTx(t *testing.T) {
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
-		t.Fatalf("shouldn't have been able to read the utxo")
-	}
+	_, err = vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]})
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // Test force accepting an import transaction.
@@ -1663,23 +1607,21 @@ func TestForceAcceptImportTx(t *testing.T) {
 	parsedTx, err := vm.ParseTx(context.Background(), tx.Bytes())
 	require.NoError(err)
 
-	if err := parsedTx.Verify(context.Background()); err == nil {
-		t.Fatalf("Should have failed verification")
-	}
+	require.ErrorIs(parsedTx.Verify(context.Background()), database.ErrNotFound)
 
 	require.NoError(parsedTx.Accept(context.Background()))
 
 	id := utxoID.InputID()
-	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
-		t.Fatalf("shouldn't have been able to read the utxo")
-	}
+	_, err = vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]})
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestImportTxNotState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&txs.ImportTx{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }
 
 // Test issuing an import transaction.
@@ -1702,7 +1644,7 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
-	if err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -1714,9 +1656,7 @@ func TestIssueExportTx(t *testing.T) {
 			Fx: &secp256k1fx.Fx{},
 		}},
 		nil,
-	); err != nil {
-		t.Fatal(err)
-	}
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1754,16 +1694,12 @@ func TestIssueExportTx(t *testing.T) {
 	}}
 	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err := vm.IssueTx(tx.Bytes())
+	require.NoError(err)
 
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 
 	ctx.Lock.Lock()
 	defer func() {
@@ -1772,9 +1708,7 @@ func TestIssueExportTx(t *testing.T) {
 	}()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
 
 	parsedTx := txs[0]
 	require.NoError(parsedTx.Verify(context.Background()))
@@ -1791,9 +1725,7 @@ func TestIssueExportTx(t *testing.T) {
 		math.MaxInt32,
 	)
 	require.NoError(err)
-	if len(utxoBytes) != 1 {
-		t.Fatalf("wrong number of utxos %d", len(utxoBytes))
-	}
+	require.Len(utxoBytes, 1)
 }
 
 func TestClearForceAcceptedExportTx(t *testing.T) {
@@ -1877,16 +1809,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}}
 	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(tx.Bytes())
+	require.NoError(err)
 
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 
 	ctx.Lock.Lock()
 	defer func() {
@@ -1895,9 +1823,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
 
 	parsedTx := txs[0]
 	require.NoError(parsedTx.Verify(context.Background()))
@@ -1916,7 +1842,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 
-	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]}); err == nil {
-		t.Fatalf("should have failed to read the utxo")
-	}
+	_, err = peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]})
+	require.ErrorIs(err, database.ErrNotFound)
 }
