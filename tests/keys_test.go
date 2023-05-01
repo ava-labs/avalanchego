@@ -12,8 +12,10 @@ import (
 )
 
 func TestLoadTestKeys(t *testing.T) {
+	require := require.New(t)
+
 	keys, err := LoadHexTestKeys("test.insecure.secp256k1.keys")
-	require.NoError(t, err)
+	require.NoError(err)
 	for i, k := range keys {
 		curAddr := encodeShortAddr(k)
 		t.Logf("[%d] loaded %v", i, curAddr)

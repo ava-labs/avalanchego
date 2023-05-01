@@ -43,8 +43,10 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 }
 
 func TestEncodingString(t *testing.T) {
+	require := require.New(t)
+
 	enc := Hex
-	require.Equal(t, enc.String(), "hex")
+	require.Equal(enc.String(), "hex")
 }
 
 // Test encoding bytes to a string and decoding back to bytes
@@ -86,12 +88,12 @@ func TestEncodeDecode(t *testing.T) {
 		strResult, err := Encode(test.encoding, test.bytes)
 		require.NoError(err)
 		// Make sure the string repr. is what we expected
-		require.Equal(t, test.str, strResult)
+		require.Equal(test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(test.encoding, strResult)
 		require.NoError(err)
 		// Make sure we got the same bytes back
-		require.Equal(t, test.bytes, bytesResult)
+		require.Equal(test.bytes, bytesResult)
 	}
 }
 
@@ -101,7 +103,7 @@ func TestEncodeNil(t *testing.T) {
 
 	str, err := Encode(Hex, nil)
 	require.NoError(err)
-	require.Equal(t, "0x7852b855", str)
+	require.Equal("0x7852b855", str)
 }
 
 func TestDecodeHexInvalid(t *testing.T) {

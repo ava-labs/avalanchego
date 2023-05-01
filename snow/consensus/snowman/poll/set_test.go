@@ -42,6 +42,8 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 }
 
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -59,13 +61,13 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	require.True(t, added)
+	require.True(added)
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	require.True(t, added)
-	require.Equal(t, s.Len(), 2)
+	require.True(added)
+	require.Equal(s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -76,25 +78,27 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr3, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	require.Len(t, results, 0)      // expect 2 to not have finished because 1 is still pending
+	require.Len(results, 0)         // expect 2 to not have finished because 1 is still pending
 
 	results = s.Vote(1, vdr2, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
-	require.Len(t, results, 2)
-	require.Equal(t, vtx1, results[0].List()[0])
-	require.Equal(t, vtx2, results[1].List()[0])
+	require.Len(results, 2)
+	require.Equal(vtx1, results[0].List()[0])
+	require.Equal(vtx2, results[1].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -112,13 +116,13 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	require.True(t, added)
+	require.True(added)
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	require.True(t, added)
-	require.Equal(t, s.Len(), 2)
+	require.True(added)
+	require.Equal(s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -129,25 +133,27 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	// vote out of order
 	results = s.Vote(1, vdr1, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr3, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	results = s.Vote(1, vdr2, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
-	require.Len(t, results, 1)      // because 1 is the oldest
-	require.Equal(t, vtx1, results[0].List()[0])
+	require.Len(results, 1)         // because 1 is the oldest
+	require.Equal(vtx1, results[0].List()[0])
 
 	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	require.Len(t, results, 1)      // because 2 is the oldest now
-	require.Equal(t, vtx2, results[0].List()[0])
+	require.Len(results, 1)         // because 2 is the oldest now
+	require.Equal(vtx2, results[0].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
+	require := require.New(t)
+
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -165,18 +171,18 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	require.True(t, added)
+	require.True(added)
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	require.True(t, added)
+	require.True(added)
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
-	require.True(t, added)
-	require.Equal(t, s.Len(), 3)
+	require.True(added)
+	require.Equal(s.Len(), 3)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -190,30 +196,30 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
 	results = s.Vote(2, vdr3, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr2, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(2, vdr1, vtx2)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
 	results = s.Vote(3, vdr2, vtx3)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(3, vdr3, vtx3)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(3, vdr1, vtx3)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
 	results = s.Vote(1, vdr1, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(1, vdr2, vtx1)
-	require.Len(t, results, 0)
+	require.Len(results, 0)
 	results = s.Vote(1, vdr3, vtx1)
-	require.Len(t, results, 3)
-	require.Equal(t, vtx1, results[0].List()[0])
-	require.Equal(t, vtx2, results[1].List()[0])
-	require.Equal(t, vtx3, results[2].List()[0])
+	require.Len(results, 3)
+	require.Equal(vtx1, results[0].List()[0])
+	require.Equal(vtx2, results[1].List()[0])
+	require.Equal(vtx3, results[2].List()[0])
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {

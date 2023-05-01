@@ -97,6 +97,8 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 }
 
 func TestStandardTxExecutorAddDelegator(t *testing.T) {
+	require := require.New(t)
+
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
@@ -118,20 +120,20 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -147,20 +149,20 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
@@ -285,14 +287,14 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
-				require.NoError(t, err)
+				require.NoError(err)
 
 				for _, utxoID := range utxoIDs {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
 				err = target.state.Commit()
-				require.NoError(t, err)
+				require.NoError(err)
 			},
 			AP3Time:              defaultGenesisTime,
 			expectedExecutionErr: ErrFlowCheckFailed,
@@ -328,7 +330,6 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			require := require.New(t)
 			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
@@ -984,6 +985,8 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
 func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
+	require := require.New(t)
+
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1038,7 +1041,7 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec))
 	return unsignedTx, tx
 }
 
@@ -1339,6 +1342,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 // Returns a TransformSubnetTx that passes syntactic verification.
 func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
+	require := require.New(t)
+
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1405,7 +1410,7 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec))
 	return unsignedTx, tx
 }
 
@@ -1446,6 +1451,8 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 }
 
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		name        string
 		newExecutor func(*gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor)
@@ -1614,7 +1621,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.TransformSubnetTx(unsignedTx)
-			require.ErrorIs(t, err, tt.err)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }

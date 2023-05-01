@@ -24,6 +24,8 @@ import (
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
+	require := require.New(t)
+
 	tests := map[string]struct {
 		configs  map[string]string
 		upgrades map[string]string
@@ -40,11 +42,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -65,7 +67,6 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			root := t.TempDir()
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
 			configFile := setupConfigJSON(t, root, configJSON)
@@ -170,6 +171,8 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 }
 
 func TestGetChainConfigsFromFlags(t *testing.T) {
+	require := require.New(t)
+
 	tests := map[string]struct {
 		fullConfigs map[string]chains.ChainConfig
 		expected    map[string]chains.ChainConfig
@@ -182,11 +185,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			fullConfigs: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -194,11 +197,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(t, err)
+				require.NoError(err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -221,7 +224,6 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
 			jsonMaps, err := json.Marshal(test.fullConfigs)
 			require.NoError(err)
 			encodedFileContent := base64.StdEncoding.EncodeToString(jsonMaps)
@@ -552,25 +554,31 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 }
 
 func TestCalcMinConnectedStake(t *testing.T) {
+	require := require.New(t)
+
 	v := setupViperFlags()
 	defaultParams := getConsensusConfig(v)
 	defaultExpectedMinStake := 0.8
 	minStake := calcMinConnectedStake(defaultParams)
-	require.Equal(t, defaultExpectedMinStake, minStake)
+	require.Equal(defaultExpectedMinStake, minStake)
 }
 
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
+	require := require.New(t)
+
 	configFilePath := filepath.Join(rootPath, "config.json")
-	require.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
+	require.NoError(os.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	require.NoError(t, os.MkdirAll(path, 0o700))
+	require := require.New(t)
+
+	require.NoError(os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	require.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
+	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViperFlags() *viper.Viper {

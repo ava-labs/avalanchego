@@ -19,6 +19,8 @@ import (
 )
 
 func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		name   string
 		txFunc func(*gomock.Controller) *TransformSubnetTx
@@ -431,7 +433,7 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(t, err, tt.err)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }

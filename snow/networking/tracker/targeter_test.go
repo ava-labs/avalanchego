@@ -123,7 +123,7 @@ func TestTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
 			target := targeter.TargetUsage(tt.nodeID)
-			require.Equal(t, tt.expectedTarget, target)
+			require.Equal(tt.expectedTarget, target)
 		})
 	}
 }

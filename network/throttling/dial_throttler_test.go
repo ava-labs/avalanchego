@@ -13,6 +13,8 @@ import (
 
 // Test that the DialThrottler returned by NewDialThrottler works
 func TestDialThrottler(t *testing.T) {
+	require := require.New(t)
+
 	startTime := time.Now()
 	// Allows 5 per second
 	throttler := NewDialThrottler(5)
@@ -22,7 +24,7 @@ func TestDialThrottler(t *testing.T) {
 		// Should return immediately because < 5 taken this second
 		go func() {
 			err := throttler.Acquire(context.Background())
-			require.NoError(t, err)
+			require.NoError(err)
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -37,7 +39,7 @@ func TestDialThrottler(t *testing.T) {
 	go func() {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(context.Background())
-		require.NoError(t, err)
+		require.NoError(err)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -61,6 +63,8 @@ func TestDialThrottler(t *testing.T) {
 
 // Test that Acquire honors its specification about its context being canceled
 func TestDialThrottlerCancel(t *testing.T) {
+	require := require.New(t)
+
 	// Allows 5 per second
 	throttler := NewDialThrottler(5)
 	// Use all 5
@@ -69,7 +73,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should return immediately because < 5 taken this second
 		go func() {
 			err := throttler.Acquire(context.Background())
-			require.NoError(t, err)
+			require.NoError(err)
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -86,7 +90,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(ctx)
 		// Should error because we call cancel() below
-		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(err, context.Canceled)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -102,11 +106,13 @@ func TestDialThrottlerCancel(t *testing.T) {
 
 // Test that the Throttler return by NewNoThrottler never blocks on Acquire()
 func TestNoDialThrottler(t *testing.T) {
+	require := require.New(t)
+
 	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
 		err := throttler.Acquire(context.Background()) // Should always immediately return
-		require.NoError(t, err)
-		require.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
+		require.NoError(err)
+		require.WithinDuration(time.Now(), startTime, 25*time.Millisecond)
 	}
 }

@@ -21,6 +21,8 @@ import (
 var errInvalidSubnetAuth = errors.New("invalid subnet auth")
 
 func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		name        string
 		txFunc      func(*gomock.Controller) *RemoveSubnetValidatorTx
@@ -42,7 +44,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		SyntacticallyVerified: true,
 	}
 	// Sanity check.
-	require.NoError(t, verifiedBaseTx.SyntacticVerify(ctx))
+	require.NoError(verifiedBaseTx.SyntacticVerify(ctx))
 
 	// A BaseTx that passes syntactic verification.
 	validBaseTx := BaseTx{
@@ -52,9 +54,9 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}
 	// Sanity check.
-	require.NoError(t, validBaseTx.SyntacticVerify(ctx))
+	require.NoError(validBaseTx.SyntacticVerify(ctx))
 	// Make sure we're not caching the verification result.
-	require.False(t, validBaseTx.SyntacticallyVerified)
+	require.False(validBaseTx.SyntacticallyVerified)
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
@@ -137,7 +139,6 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

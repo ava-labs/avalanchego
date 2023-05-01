@@ -25,6 +25,8 @@ import (
 )
 
 func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		name   string
 		txFunc func(*gomock.Controller) *AddPermissionlessValidatorTx
@@ -55,7 +57,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	blsSK, err := bls.NewSecretKey()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	blsPOP := signer.NewProofOfPossession(blsSK)
 
@@ -483,13 +485,15 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(t, err, tt.err)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }
 
 func TestAddPermissionlessValidatorTxNotDelegatorTx(t *testing.T) {
+	require := require.New(t)
+
 	txIntf := any((*AddPermissionlessValidatorTx)(nil))
 	_, ok := txIntf.(DelegatorTx)
-	require.False(t, ok)
+	require.False(ok)
 }

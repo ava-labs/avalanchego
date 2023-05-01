@@ -72,6 +72,8 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 }
 
 func TestInboundConnThrottlerAddr(t *testing.T) {
+	require := require.New(t)
+
 	addrCalled := false
 	l := &MockListener{
 		t: t,
@@ -82,10 +84,12 @@ func TestInboundConnThrottlerAddr(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_ = wrappedL.Addr()
-	require.True(t, addrCalled)
+	require.True(addrCalled)
 }
 
 func TestInboundConnThrottlerAccept(t *testing.T) {
+	require := require.New(t)
+
 	acceptCalled := false
 	l := &MockListener{
 		t: t,
@@ -96,6 +100,6 @@ func TestInboundConnThrottlerAccept(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_, err := wrappedL.Accept()
-	require.NoError(t, err)
-	require.True(t, acceptCalled)
+	require.NoError(err)
+	require.True(acceptCalled)
 }

@@ -104,7 +104,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		return blkID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, bID ids.ID) (snowman.Block, error) {
-		require.Equal(t, blkID, bID)
+		require.Equal(blkID, bID)
 		return dummyBlk, nil
 	}
 
@@ -156,7 +156,7 @@ func TestFilterAccepted(t *testing.T) {
 		return blk1.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(t, blk1.ID(), blkID)
+		require.Equal(blk1.ID(), blkID)
 		return blk1, nil
 	}
 

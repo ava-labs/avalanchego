@@ -62,6 +62,8 @@ var (
 
 // Get should fail if we hit an io issue when reading files on the disk
 func TestGet_ReadDirFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initVMGetterTest(t)
 	defer resources.ctrl.Finish()
 
@@ -69,11 +71,13 @@ func TestGet_ReadDirFails(t *testing.T) {
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(nil, errTest)
 
 	_, _, err := resources.getter.Get()
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }
 
 // Get should fail if we see an invalid VM id
 func TestGet_InvalidVMName(t *testing.T) {
+	require := require.New(t)
+
 	resources := initVMGetterTest(t)
 	defer resources.ctrl.Finish()
 
@@ -82,11 +86,13 @@ func TestGet_InvalidVMName(t *testing.T) {
 	resources.mockManager.EXPECT().Lookup("invalid-vm").Times(1).Return(ids.Empty, errTest)
 
 	_, _, err := resources.getter.Get()
-	require.ErrorIs(t, err, errInvalidVMID)
+	require.ErrorIs(err, errInvalidVMID)
 }
 
 // Get should fail if we can't get the VM factory
 func TestGet_GetFactoryFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initVMGetterTest(t)
 	defer resources.ctrl.Finish()
 
@@ -98,7 +104,7 @@ func TestGet_GetFactoryFails(t *testing.T) {
 	resources.mockManager.EXPECT().GetFactory(vm).Times(1).Return(nil, errTest)
 
 	_, _, err := resources.getter.Get()
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }
 
 // Get should return the correct registered and unregistered VMs.

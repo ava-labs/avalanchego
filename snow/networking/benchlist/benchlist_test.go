@@ -390,5 +390,5 @@ func TestBenchlistRemove(t *testing.T) {
 		100*time.Millisecond,
 	)
 
-	require.Equal(t, 3, count)
+	require.Equal(3, count)
 }

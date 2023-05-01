@@ -11,15 +11,17 @@ import (
 )
 
 func TestNewDefaultApplication(t *testing.T) {
+	require := require.New(t)
+
 	v := &Application{
 		Major: 1,
 		Minor: 2,
 		Patch: 3,
 	}
 
-	require.Equal(t, "avalanche/1.2.3", v.String())
-	require.NoError(t, v.Compatible(v))
-	require.False(t, v.Before(v))
+	require.Equal("avalanche/1.2.3", v.String())
+	require.NoError(v.Compatible(v))
+	require.False(v.Before(v))
 }
 
 func TestComparingVersions(t *testing.T) {

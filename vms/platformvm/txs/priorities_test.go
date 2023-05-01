@@ -11,6 +11,8 @@ import (
 )
 
 func TestPriorityIsCurrent(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -62,12 +64,14 @@ func TestPriorityIsCurrent(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsCurrent())
+			require.Equal(test.expected, test.priority.IsCurrent())
 		})
 	}
 }
 
 func TestPriorityIsPending(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -119,12 +123,14 @@ func TestPriorityIsPending(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsPending())
+			require.Equal(test.expected, test.priority.IsPending())
 		})
 	}
 }
 
 func TestPriorityIsValidator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -176,12 +182,14 @@ func TestPriorityIsValidator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsValidator())
+			require.Equal(test.expected, test.priority.IsValidator())
 		})
 	}
 }
 
 func TestPriorityIsPermissionedValidator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -233,12 +241,14 @@ func TestPriorityIsPermissionedValidator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsPermissionedValidator())
+			require.Equal(test.expected, test.priority.IsPermissionedValidator())
 		})
 	}
 }
 
 func TestPriorityIsDelegator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -290,12 +300,14 @@ func TestPriorityIsDelegator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsDelegator())
+			require.Equal(test.expected, test.priority.IsDelegator())
 		})
 	}
 }
 
 func TestPriorityIsCurrentValidator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -347,12 +359,14 @@ func TestPriorityIsCurrentValidator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsCurrentValidator())
+			require.Equal(test.expected, test.priority.IsCurrentValidator())
 		})
 	}
 }
 
 func TestPriorityIsCurrentDelegator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -404,12 +418,14 @@ func TestPriorityIsCurrentDelegator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsCurrentDelegator())
+			require.Equal(test.expected, test.priority.IsCurrentDelegator())
 		})
 	}
 }
 
 func TestPriorityIsPendingValidator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -461,12 +477,14 @@ func TestPriorityIsPendingValidator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsPendingValidator())
+			require.Equal(test.expected, test.priority.IsPendingValidator())
 		})
 	}
 }
 
 func TestPriorityIsPendingDelegator(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		priority Priority
 		expected bool
@@ -518,7 +536,7 @@ func TestPriorityIsPendingDelegator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.priority), func(t *testing.T) {
-			require.Equal(t, test.expected, test.priority.IsPendingDelegator())
+			require.Equal(test.expected, test.priority.IsPendingDelegator())
 		})
 	}
 }

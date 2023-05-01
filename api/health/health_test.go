@@ -28,21 +28,24 @@ const (
 var errUnhealthy = errors.New("unhealthy")
 
 func awaitReadiness(t *testing.T, r Reporter, ready bool) {
-	require.Eventually(t, func() bool {
+	require := require.New(t)
+	require.Eventually(func() bool {
 		_, ok := r.Readiness()
 		return ok == ready
 	}, awaitTimeout, awaitFreq)
 }
 
 func awaitHealthy(t *testing.T, r Reporter, healthy bool) {
-	require.Eventually(t, func() bool {
+	require := require.New(t)
+	require.Eventually(func() bool {
 		_, ok := r.Health()
 		return ok == healthy
 	}, awaitTimeout, awaitFreq)
 }
 
 func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
-	require.Eventually(t, func() bool {
+	require := require.New(t)
+	require.Eventually(func() bool {
 		_, ok := r.Liveness()
 		return ok == liveness
 	}, awaitTimeout, awaitFreq)

@@ -22,9 +22,11 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
+	require := require.New(t)
+
 	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	type test struct {
@@ -38,7 +40,7 @@ func TestNewImportTx(t *testing.T) {
 
 	factory := secp256k1.Factory{}
 	sourceKey, err := factory.NewPrivateKey()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	cnt := new(byte)
 
@@ -69,7 +71,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			}
 			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			inputID := utxo.InputID()
 			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
@@ -86,7 +88,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 			)
-			require.NoError(t, err)
+			require.NoError(err)
 		}
 
 		return sm
@@ -151,8 +153,6 @@ func TestNewImportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			require := require.New(t)
-
 			env.msm.SharedMemory = tt.sharedMemory
 			tx, err := env.txBuilder.NewImportTx(
 				tt.sourceChainID,

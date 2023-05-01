@@ -46,6 +46,8 @@ type rawTestPeer struct {
 }
 
 func newMessageCreator(t *testing.T) message.Creator {
+	require := require.New(t)
+
 	t.Helper()
 
 	mc, err := message.NewCreator(
@@ -55,7 +57,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	return mc
 }

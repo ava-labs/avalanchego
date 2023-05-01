@@ -23,6 +23,8 @@ import (
 )
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
+	require := require.New(t)
+
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
@@ -44,20 +46,20 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -73,20 +75,20 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
 		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(err)
 	}
 
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
@@ -203,14 +205,14 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
-				require.NoError(t, err)
+				require.NoError(err)
 
 				for _, utxoID := range utxoIDs {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
 				err = target.state.Commit()
-				require.NoError(t, err)
+				require.NoError(err)
 			},
 			AP3Time:     defaultGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
@@ -243,7 +245,6 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			require := require.New(t)
 			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {

@@ -48,7 +48,7 @@ func TestEncodeDecode(t *testing.T) {
 		strResult, err := Encode(test.bytes)
 		require.NoError(err)
 		// Make sure the string repr. is what we expected
-		require.Equal(t, test.str, strResult)
+		require.Equal(test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(strResult)
 		require.NoError(err)

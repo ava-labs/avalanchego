@@ -45,6 +45,8 @@ func initGetVMsTest(t *testing.T) *getVMsTest {
 
 // Tests GetVMs in the happy-case
 func TestGetVMsSuccess(t *testing.T) {
+	require := require.New(t)
+
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -69,12 +71,14 @@ func TestGetVMsSuccess(t *testing.T) {
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	require.Equal(t, expectedVMRegistry, reply.VMs)
-	require.NoError(t, err)
+	require.Equal(expectedVMRegistry, reply.VMs)
+	require.NoError(err)
 }
 
 // Tests GetVMs if we fail to list our vms.
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -83,11 +87,13 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
 func TestGetVMsGetAliasesFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -103,5 +109,5 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-	require.ErrorIs(t, err, errTest)
+	require.ErrorIs(err, errTest)
 }

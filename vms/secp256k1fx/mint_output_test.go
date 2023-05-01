@@ -12,6 +12,8 @@ import (
 )
 
 func TestMintOutputVerify(t *testing.T) {
+	require := require.New(t)
+
 	tests := []struct {
 		name        string
 		out         *MintOutput
@@ -46,8 +48,8 @@ func TestMintOutputVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, tt.out.Verify(), tt.expectedErr)
-			require.ErrorIs(t, tt.out.VerifyState(), tt.expectedErr)
+			require.ErrorIs(tt.out.Verify(), tt.expectedErr)
+			require.ErrorIs(tt.out.VerifyState(), tt.expectedErr)
 		})
 	}
 }

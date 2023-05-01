@@ -1062,12 +1062,14 @@ func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
 }
 
 func TestConcurrentBatches(t *testing.T, db Database) {
+	require := require.New(t)
+
 	numBatches := 10
 	keysPerBatch := 50
 	keySize := 32
 	valueSize := units.KiB
 
-	require.NoError(t, runConcurrentBatches(
+	require.NoError(runConcurrentBatches(
 		db,
 		numBatches,
 		keysPerBatch,
@@ -1077,12 +1079,14 @@ func TestConcurrentBatches(t *testing.T, db Database) {
 }
 
 func TestManySmallConcurrentKVPairBatches(t *testing.T, db Database) {
+	require := require.New(t)
+
 	numBatches := 100
 	keysPerBatch := 10
 	keySize := 10
 	valueSize := 10
 
-	require.NoError(t, runConcurrentBatches(
+	require.NoError(runConcurrentBatches(
 		db,
 		numBatches,
 		keysPerBatch,

@@ -172,6 +172,8 @@ func TestAliasChain(t *testing.T) {
 }
 
 func TestGetChainAliases(t *testing.T) {
+	require := require.New(t)
+
 	t.Run("successful", func(t *testing.T) {
 		expectedReply := []string{"alias1", "alias2"}
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{
@@ -179,8 +181,8 @@ func TestGetChainAliases(t *testing.T) {
 		}, nil)}
 
 		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
-		require.NoError(t, err)
-		require.ElementsMatch(t, expectedReply, reply)
+		require.NoError(err)
+		require.ElementsMatch(expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
@@ -188,7 +190,7 @@ func TestGetChainAliases(t *testing.T) {
 
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
 
-		require.ErrorIs(t, err, errTest)
+		require.ErrorIs(err, errTest)
 	})
 }
 
@@ -209,6 +211,8 @@ func TestStacktrace(t *testing.T) {
 }
 
 func TestReloadInstalledVMs(t *testing.T) {
+	require := require.New(t)
+
 	t.Run("successful", func(t *testing.T) {
 		expectedNewVMs := map[ids.ID][]string{
 			ids.GenerateTestID(): {"foo"},
@@ -224,9 +228,9 @@ func TestReloadInstalledVMs(t *testing.T) {
 		}, nil)}
 
 		loadedVMs, failedVMs, err := mockClient.LoadVMs(context.Background())
-		require.NoError(t, err)
-		require.Equal(t, expectedNewVMs, loadedVMs)
-		require.Equal(t, expectedFailedVMs, failedVMs)
+		require.NoError(err)
+		require.Equal(expectedNewVMs, loadedVMs)
+		require.Equal(expectedFailedVMs, failedVMs)
 	})
 
 	t.Run("failure", func(t *testing.T) {
@@ -234,7 +238,7 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 		_, _, err := mockClient.LoadVMs(context.Background())
 
-		require.ErrorIs(t, err, errTest)
+		require.ErrorIs(err, errTest)
 	})
 }
 

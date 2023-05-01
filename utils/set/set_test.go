@@ -77,40 +77,44 @@ func TestSetCappedList(t *testing.T) {
 }
 
 func TestSetClear(t *testing.T) {
+	require := require.New(t)
+
 	set := Set[int]{}
 	for i := 0; i < 25; i++ {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Len(t, set, 0)
+	require.Len(set, 0)
 	set.Add(1337)
-	require.Len(t, set, 1)
+	require.Len(set, 1)
 }
 
 func TestSetPop(t *testing.T) {
+	require := require.New(t)
+
 	var s Set[int]
 	_, ok := s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	s = make(Set[int])
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	id1, id2 := 0, 1
 	s.Add(id1, id2)
 
 	got, ok := s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 1, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.EqualValues(1, s.Len())
 
 	got, ok = s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 0, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.EqualValues(0, s.Len())
 
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 }
 
 func TestSetMarshalJSON(t *testing.T) {

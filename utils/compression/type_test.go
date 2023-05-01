@@ -24,6 +24,8 @@ func TestTypeString(t *testing.T) {
 }
 
 func TestTypeMarshalJSON(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		Type     Type
 		expected string
@@ -51,8 +53,8 @@ func TestTypeMarshalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Type.String(), func(t *testing.T) {
 			b, err := tt.Type.MarshalJSON()
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, string(b))
+			require.NoError(err)
+			require.Equal(tt.expected, string(b))
 		})
 	}
 }

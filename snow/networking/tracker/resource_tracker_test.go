@@ -37,6 +37,8 @@ func TestNewCPUTracker(t *testing.T) {
 }
 
 func TestCPUTracker(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 
 	ctrl := gomock.NewController(t)
@@ -44,7 +46,7 @@ func TestCPUTracker(t *testing.T) {
 	mockUser.EXPECT().CPUUsage().Return(1.0).Times(3)
 
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	node1 := ids.NodeID{1}
 	node2 := ids.NodeID{2}
@@ -97,15 +99,15 @@ func TestCPUTracker(t *testing.T) {
 
 	cumulative = cpuTracker.TotalUsage()
 	sum = node1Utilization + node2Utilization
-	if cumulative >= sum {
-		t.Fatal("Sum of CPU usage should exceed cumulative at-large utilization")
-	}
+	require.Less(cumulative, sum)
 }
 
 func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, halflife)
-	require.NoError(t, err)
+	require.NoError(err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
@@ -125,11 +127,11 @@ func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := cpuTracker.Usage(nodeID, now)
 	// Make sure the actual/expected are close
-	require.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(desiredVal, actualVal, .00001)
 	// Make sure TimeUntilUsage returns the zero duration if
 	// the value provided >= the current value
-	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
-	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
+	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
+	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
 	// Make sure it returns the zero duration if the node isn't known
-	require.Zero(t, cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
+	require.Zero(cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
 }

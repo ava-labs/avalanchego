@@ -34,10 +34,12 @@ func (*dummyUnsignedTx) Visit(txs.Visitor) error {
 }
 
 func TestVerifySpendUTXOs(t *testing.T) {
+	require := require.New(t)
+
 	fx := &secp256k1fx.Fx{}
 
-	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
-	require.NoError(t, fx.Bootstrapped())
+	require.NoError(fx.InitializeVM(&secp256k1fx.TestVM{}))
+	require.NoError(fx.Bootstrapped())
 
 	h := &handler{
 		ctx: snow.DefaultContextTest(),
@@ -1089,7 +1091,6 @@ func TestVerifySpendUTXOs(t *testing.T) {
 		h.clk.Set(now)
 
 		t.Run(test.description, func(t *testing.T) {
-			require := require.New(t)
 			err := h.VerifySpendUTXOs(
 				&unsignedTx,
 				test.utxos,

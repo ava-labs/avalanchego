@@ -12,6 +12,8 @@ import (
 )
 
 func TestSingleStagedTimer(t *testing.T) {
+	require := require.New(t)
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	ticks := 1
@@ -25,10 +27,12 @@ func TestSingleStagedTimer(t *testing.T) {
 
 	timer.SetTimeoutIn(time.Millisecond)
 	wg.Wait()
-	require.Equal(t, i, ticks)
+	require.Equal(i, ticks)
 }
 
 func TestMultiStageTimer(t *testing.T) {
+	require := require.New(t)
+
 	wg := sync.WaitGroup{}
 	ticks := 3
 	wg.Add(ticks)
@@ -43,5 +47,5 @@ func TestMultiStageTimer(t *testing.T) {
 
 	timer.SetTimeoutIn(time.Millisecond)
 	wg.Wait()
-	require.Equal(t, i, ticks)
+	require.Equal(i, ticks)
 }

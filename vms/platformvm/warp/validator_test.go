@@ -162,8 +162,10 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 }
 
 func TestFilterValidators(t *testing.T) {
+	require := require.New(t)
+
 	sk0, err := bls.NewSecretKey()
-	require.NoError(t, err)
+	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
@@ -172,7 +174,7 @@ func TestFilterValidators(t *testing.T) {
 	}
 
 	sk1, err := bls.NewSecretKey()
-	require.NoError(t, err)
+	require.NoError(err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
@@ -241,8 +243,6 @@ func TestFilterValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
 			if err == nil {

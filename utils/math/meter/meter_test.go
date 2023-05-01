@@ -54,8 +54,10 @@ func TestMeters(t *testing.T) {
 }
 
 func NewTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
 	m := factory.New(halflife)
-	require.NotNil(t, m, "should have returned a valid interface")
+	require.NotNil(m, "should have returned a valid interface")
 }
 
 func TimeTravelTest(t *testing.T, factory Factory) {
@@ -164,6 +166,8 @@ func StandardUsageTest(t *testing.T, factory Factory) {
 }
 
 func TestTimeUntil(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 	f := ContinuousFactory{}
 	m := f.New(halflife)
@@ -184,9 +188,9 @@ func TestTimeUntil(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := m.Read(now)
 	// Make sure the actual/expected are close
-	require.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(desiredVal, actualVal, .00001)
 	// Make sure TimeUntil returns the zero duration if
 	// the value provided >= the current value
-	require.Zero(t, m.TimeUntil(now, actualVal))
-	require.Zero(t, m.TimeUntil(now, actualVal+.1))
+	require.Zero(m.TimeUntil(now, actualVal))
+	require.Zero(m.TimeUntil(now, actualVal+.1))
 }
