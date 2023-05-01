@@ -317,11 +317,7 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 		return nil, err
 	}
 
-	txBytes, err := formatting.Decode(res.Encoding, res.Tx)
-	if err != nil {
-		return nil, err
-	}
-	return txBytes, nil
+	return formatting.Decode(res.Encoding, res.Tx)
 }
 
 func (c *client) GetUTXOs(
