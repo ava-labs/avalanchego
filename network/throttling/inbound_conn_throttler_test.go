@@ -4,6 +4,7 @@
 package throttling
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -44,6 +45,8 @@ func (ml *MockListener) Addr() net.Addr {
 }
 
 func TestInboundConnThrottlerClose(t *testing.T) {
+	require := require.New(t)
+
 	closed := false
 	l := &MockListener{
 		t: t,
@@ -54,8 +57,9 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	err := wrappedL.Close()
-	require.NoError(t, err)
-	require.True(t, closed)
+	require.NoError(err)
+	require.True(closed)
+
 	select {
 	case <-wrappedL.(*throttledListener).ctx.Done():
 	default:
@@ -64,7 +68,7 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 
 	// Accept() should return an error because the context is cancelled
 	_, err = wrappedL.Accept()
-	require.Error(t, err)
+	require.ErrorIs(err, context.Canceled)
 }
 
 func TestInboundConnThrottlerAddr(t *testing.T) {
