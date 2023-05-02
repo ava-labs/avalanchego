@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -121,10 +122,8 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key
 	key1 := []byte{0}
-	err = trie.Insert(context.Background(), key1, []byte("value"))
-	require.NoError(err)
-	err = trie.calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), key1, []byte("value")))
+	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key1))
 	require.NoError(err)
@@ -136,10 +135,8 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
-	err = trie.Insert(context.Background(), key2, []byte("value"))
-	require.NoError(err)
-	err = trie.calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), key2, []byte("value")))
+	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key2))
 	require.NoError(err)
@@ -150,10 +147,8 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
-	err = trie.Insert(context.Background(), key3, []byte("value"))
-	require.NoError(err)
-	err = trie.calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), key3, []byte("value")))
+	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key3))
 	require.NoError(err)
@@ -195,16 +190,14 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 
 	committedTrie, err := dbTrie.NewView()
 	require.NoError(err)
-	err = committedTrie.Insert(context.Background(), []byte{0}, []byte{0})
-	require.NoError(err)
+	require.NoError(committedTrie.Insert(context.Background(), []byte{0}, []byte{0}))
 
 	require.NoError(committedTrie.CommitToDB(context.Background()))
 
 	newView, err := committedTrie.NewView()
 	require.NoError(err)
 
-	err = newView.Insert(context.Background(), []byte{1}, []byte{1})
-	require.NoError(err)
+	require.NoError(newView.Insert(context.Background(), []byte{1}, []byte{1}))
 	require.NoError(newView.CommitToDB(context.Background()))
 
 	val0, err := dbTrie.GetValue(context.Background(), []byte{0})
@@ -224,26 +217,21 @@ func Test_Trie_Partial_Commit_Leaves_Valid_Tries(t *testing.T) {
 
 	trie2, err := dbTrie.NewView()
 	require.NoError(err)
-	err = trie2.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(err)
+	require.NoError(trie2.Insert(context.Background(), []byte("key"), []byte("value")))
 
 	trie3, err := trie2.NewView()
 	require.NoError(err)
-	err = trie3.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(err)
+	require.NoError(trie3.Insert(context.Background(), []byte("key1"), []byte("value1")))
 
 	trie4, err := trie3.NewView()
 	require.NoError(err)
-	err = trie4.Insert(context.Background(), []byte("key2"), []byte("value2"))
-	require.NoError(err)
+	require.NoError(trie4.Insert(context.Background(), []byte("key2"), []byte("value2")))
 
 	trie5, err := trie4.NewView()
 	require.NoError(err)
-	err = trie5.Insert(context.Background(), []byte("key3"), []byte("value3"))
-	require.NoError(err)
+	require.NoError(trie5.Insert(context.Background(), []byte("key3"), []byte("value3")))
 
-	err = trie3.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(trie3.CommitToDB(context.Background()))
 
 	root, err := trie3.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -269,15 +257,13 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value")))
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
 
-	err = trie.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(trie.CommitToDB(context.Background()))
 
 	p := newPath([]byte("key"))
 	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
@@ -302,8 +288,7 @@ func Test_Trie_InsertAndRetrieve(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value")))
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -318,15 +303,13 @@ func Test_Trie_Overwrite(t *testing.T) {
 	require.NotNil(dbTrie)
 	trie := Trie(dbTrie)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value0"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value0")))
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value1"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value1")))
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -341,15 +324,13 @@ func Test_Trie_Delete(t *testing.T) {
 	require.NotNil(dbTrie)
 	trie := Trie(dbTrie)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value0"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value0")))
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	err = trie.Remove(context.Background(), []byte("key"))
-	require.NoError(err)
+	require.NoError(trie.Remove(context.Background(), []byte("key")))
 
 	value, err = getNodeValue(trie, "key")
 	require.ErrorIs(err, database.ErrNotFound)
@@ -363,8 +344,7 @@ func Test_Trie_DeleteMissingKey(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
-	err = trie.Remove(context.Background(), []byte("key"))
-	require.NoError(err)
+	require.NoError(trie.Remove(context.Background(), []byte("key")))
 }
 
 func Test_Trie_ExpandOnKeyPath(t *testing.T) {
@@ -375,15 +355,13 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NotNil(dbTrie)
 	trie := Trie(dbTrie)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value0"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value0")))
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -393,8 +371,7 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -417,15 +394,13 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NotNil(dbTrie)
 	trie := Trie(dbTrie)
 
-	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
 
 	value, err := getNodeValue(trie, "key12")
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
 
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -435,8 +410,7 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value")))
 
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -460,10 +434,8 @@ func Test_Trie_SplitBranch(t *testing.T) {
 	trie := Trie(dbTrie)
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
-	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key134"), []byte("value134"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
+	require.NoError(trie.Insert(context.Background(), []byte("key134"), []byte("value134")))
 
 	value, err := getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -483,11 +455,9 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	trie := Trie(dbTrie)
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
-	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
 	oldCount := dbTrie.metrics.(*mockMetrics).hashCount
-	err = trie.Insert(context.Background(), []byte("key134"), []byte("value134"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key134"), []byte("value134")))
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
 	require.Equal(oldCount+3, dbTrie.metrics.(*mockMetrics).hashCount)
@@ -500,30 +470,21 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
-	err = trie.Insert(context.Background(), []byte("k"), []byte("value0"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("ke"), []byte("value1"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value2"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value3"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key2"), []byte("value4"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("k"), []byte("value0")))
+	require.NoError(trie.Insert(context.Background(), []byte("ke"), []byte("value1")))
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value2")))
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value3")))
+	require.NoError(trie.Insert(context.Background(), []byte("key2"), []byte("value4")))
 
 	oldCount := trie.metrics.(*mockMetrics).hashCount
 
 	// delete the middle values
 	view, err := trie.NewView()
 	require.NoError(err)
-	err = view.Remove(context.Background(), []byte("k"))
-	require.NoError(err)
-	err = view.Remove(context.Background(), []byte("ke"))
-	require.NoError(err)
-	err = view.Remove(context.Background(), []byte("key"))
-	require.NoError(err)
-	err = view.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view.Remove(context.Background(), []byte("k")))
+	require.NoError(view.Remove(context.Background(), []byte("ke")))
+	require.NoError(view.Remove(context.Background(), []byte("key")))
+	require.NoError(view.CommitToDB(context.Background()))
 
 	// the root is the only updated node so only one new hash
 	require.Equal(oldCount+1, trie.metrics.(*mockMetrics).hashCount)
@@ -537,14 +498,10 @@ func Test_Trie_NoExistingResidual(t *testing.T) {
 	require.NotNil(dbTrie)
 	trie := Trie(dbTrie)
 
-	err = trie.Insert(context.Background(), []byte("k"), []byte("1"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("ke"), []byte("2"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("3"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key123"), []byte("4"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("k"), []byte("1")))
+	require.NoError(trie.Insert(context.Background(), []byte("ke"), []byte("2")))
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("3")))
+	require.NoError(trie.Insert(context.Background(), []byte("key123"), []byte("4")))
 
 	value, err := getNodeValue(trie, "k")
 	require.NoError(err)
@@ -574,8 +531,7 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	view1, ok := view1Intf.(*trieView)
 	require.True(ok)
 
-	err = view1.Insert(context.Background(), []byte{1}, []byte{1})
-	require.NoError(err)
+	require.NoError(view1.Insert(context.Background(), []byte{1}, []byte{1}))
 
 	// view1
 	//   |
@@ -583,22 +539,19 @@ func Test_Trie_CommitChanges(t *testing.T) {
 
 	// Case: Committing to an invalid view
 	view1.invalidated = true
-	err = view1.commitChanges(context.Background(), &trieView{})
-	require.ErrorIs(err, ErrInvalid)
+	require.ErrorIs(view1.commitChanges(context.Background(), &trieView{}), ErrInvalid)
 	view1.invalidated = false // Reset
 
 	// Case: Committing a nil view is a no-op
 	oldRoot, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
-	err = view1.commitChanges(context.Background(), nil)
-	require.NoError(err)
+	require.NoError(view1.commitChanges(context.Background(), nil))
 	newRoot, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(oldRoot, newRoot)
 
 	// Case: Committing a view with the wrong parent.
-	err = view1.commitChanges(context.Background(), &trieView{})
-	require.ErrorIs(err, ErrViewIsNotAChild)
+	require.ErrorIs(view1.commitChanges(context.Background(), &trieView{}), ErrViewIsNotAChild)
 
 	// Case: Committing a view which is invalid
 	err = view1.commitChanges(context.Background(), &trieView{
@@ -613,10 +566,8 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	view2, ok := view2Intf.(*trieView)
 	require.True(ok)
 
-	err = view2.Insert(context.Background(), []byte{2}, []byte{2})
-	require.NoError(err)
-	err = view2.Remove(context.Background(), []byte{1})
-	require.NoError(err)
+	require.NoError(view2.Insert(context.Background(), []byte{2}, []byte{2}))
+	require.NoError(view2.Remove(context.Background(), []byte{1}))
 
 	view2Root, err := view2.getMerkleRoot(context.Background())
 	require.NoError(err)
@@ -643,8 +594,7 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	//  db
 
 	// Commit view2 to view1
-	err = view1.commitChanges(context.Background(), view2)
-	require.NoError(err)
+	require.NoError(view1.commitChanges(context.Background(), view2))
 
 	// All siblings of view2 should be invalidated
 	require.True(view3.invalidated)
@@ -700,34 +650,24 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	newTrie, err := trie.NewView()
 	require.NoError(err)
 
-	err = newTrie.Insert(context.Background(), []byte("k"), []byte("value0"))
-	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("ke"), []byte("value1"))
-	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("key"), []byte("value2"))
-	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value3"))
-	require.NoError(err)
-	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(newTrie.Insert(context.Background(), []byte("k"), []byte("value0")))
+	require.NoError(newTrie.Insert(context.Background(), []byte("ke"), []byte("value1")))
+	require.NoError(newTrie.Insert(context.Background(), []byte("key"), []byte("value2")))
+	require.NoError(newTrie.Insert(context.Background(), []byte("key1"), []byte("value3")))
+	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
 	root, err := newTrie.getEditableNode(EmptyPath)
 	require.NoError(err)
-	require.Equal(1, len(root.children))
+	require.Len(root.children, 1)
 
-	err = newTrie.Remove(context.Background(), []byte("k"))
-	require.NoError(err)
-	err = newTrie.Remove(context.Background(), []byte("ke"))
-	require.NoError(err)
-	err = newTrie.Remove(context.Background(), []byte("key"))
-	require.NoError(err)
-	err = newTrie.Remove(context.Background(), []byte("key1"))
-	require.NoError(err)
-	err = newTrie.(*trieView).calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(newTrie.Remove(context.Background(), []byte("k")))
+	require.NoError(newTrie.Remove(context.Background(), []byte("ke")))
+	require.NoError(newTrie.Remove(context.Background(), []byte("key")))
+	require.NoError(newTrie.Remove(context.Background(), []byte("key1")))
+	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
 	root, err = newTrie.getEditableNode(EmptyPath)
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
-	require.Zero(len(root.children))
+	require.Empty(root.children)
 }
 
 func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {
@@ -751,8 +691,7 @@ func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {
 	require.False(childTrie2.(*trieView).isInvalid())
 	require.False(childTrie3.(*trieView).isInvalid())
 
-	err = trie.Insert(context.Background(), []byte{0}, []byte{0})
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte{0}, []byte{0}))
 
 	require.True(childTrie1.(*trieView).isInvalid())
 	require.True(childTrie2.(*trieView).isInvalid())
@@ -797,49 +736,39 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	trie, err := dbTrie.NewView()
 	require.NoError(err)
 
-	err = trie.Insert(context.Background(), []byte("k"), []byte("value0"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("ke"), []byte("value1"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key"), []byte("value2"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value3"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key2"), []byte("value4"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("k"), []byte("value0")))
+	require.NoError(trie.Insert(context.Background(), []byte("ke"), []byte("value1")))
+	require.NoError(trie.Insert(context.Background(), []byte("key"), []byte("value2")))
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value3")))
+	require.NoError(trie.Insert(context.Background(), []byte("key2"), []byte("value4")))
 
-	err = trie.(*trieView).calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 	root, err := trie.getEditableNode(EmptyPath)
 	require.NoError(err)
-	require.Equal(1, len(root.children))
+	require.Len(root.children, 1)
 
 	root, err = trie.getEditableNode(EmptyPath)
 	require.NoError(err)
-	require.Equal(1, len(root.children))
+	require.Len(root.children, 1)
 
 	firstNode, err := trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(err)
-	require.Equal(1, len(firstNode.children))
+	require.Len(firstNode.children, 1)
 
 	// delete the middle values
-	err = trie.Remove(context.Background(), []byte("k"))
-	require.NoError(err)
-	err = trie.Remove(context.Background(), []byte("ke"))
-	require.NoError(err)
-	err = trie.Remove(context.Background(), []byte("key"))
-	require.NoError(err)
+	require.NoError(trie.Remove(context.Background(), []byte("k")))
+	require.NoError(trie.Remove(context.Background(), []byte("ke")))
+	require.NoError(trie.Remove(context.Background(), []byte("key")))
 
-	err = trie.(*trieView).calculateNodeIDs(context.Background())
-	require.NoError(err)
+	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
 	root, err = trie.getEditableNode(EmptyPath)
 	require.NoError(err)
-	require.Equal(1, len(root.children))
+	require.Len(root.children, 1)
 
 	firstNode, err = trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(err)
-	require.Equal(2, len(firstNode.children))
+	require.Len(firstNode.children, 2)
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {
@@ -957,12 +886,10 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Contains(db.childViews, view1)
 	require.Equal(db, view1.parentTrie)
 
-	err = view1.Insert(context.Background(), []byte{1}, []byte{1})
-	require.NoError(err)
+	require.NoError(view1.Insert(context.Background(), []byte{1}, []byte{1}))
 
 	// Commit the view
-	err = view1.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view1.CommitToDB(context.Background()))
 
 	// view1 (committed)
 	//   |
@@ -1016,8 +943,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Len(db.childViews, 2)
 
 	// Commit view2
-	err = view2.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view2.CommitToDB(context.Background()))
 
 	// view3
 	//   |
@@ -1035,8 +961,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Equal(db, view3.parentTrie)
 
 	// Commit view3
-	err = view3.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view3.CommitToDB(context.Background()))
 
 	// view3 being committed invalidates view2
 	require.True(view2.invalidated)
@@ -1075,8 +1000,7 @@ func Test_TrieView_NewView(t *testing.T) {
 	require.Len(view1.childViews, 1)
 
 	// Commit view1
-	err = view1.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view1.CommitToDB(context.Background()))
 
 	// Make another view atop view1
 	view3Intf, err := view1.NewView()
@@ -1230,18 +1154,15 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 
 		parentView, err := baseView.NewView()
 		require.NoError(err)
-		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
-		require.NoError(err)
+		require.NoError(parentView.Insert(context.Background(), []byte{0}, []byte{0}))
 
 		childView1, err := parentView.NewView()
 		require.NoError(err)
-		err = childView1.Insert(context.Background(), []byte{1}, []byte{1})
-		require.NoError(err)
+		require.NoError(childView1.Insert(context.Background(), []byte{1}, []byte{1}))
 
 		childView2, err := childView1.NewView()
 		require.NoError(err)
-		err = childView2.Insert(context.Background(), []byte{2}, []byte{2})
-		require.NoError(err)
+		require.NoError(childView2.Insert(context.Background(), []byte{2}, []byte{2}))
 
 		var wg sync.WaitGroup
 		wg.Add(3)
@@ -1284,18 +1205,15 @@ func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
 
 		parentView, err := dbTrie.NewView()
 		require.NoError(err)
-		err = parentView.Insert(context.Background(), []byte{0}, []byte{0})
-		require.NoError(err)
+		require.NoError(parentView.Insert(context.Background(), []byte{0}, []byte{0}))
 
 		childView1, err := parentView.NewView()
 		require.NoError(err)
-		err = childView1.Insert(context.Background(), []byte{1}, []byte{1})
-		require.NoError(err)
+		require.NoError(childView1.Insert(context.Background(), []byte{1}, []byte{1}))
 
 		childView2, err := childView1.NewView()
 		require.NoError(err)
-		err = childView2.Insert(context.Background(), []byte{2}, []byte{2})
-		require.NoError(err)
+		require.NoError(childView2.Insert(context.Background(), []byte{2}, []byte{2}))
 
 		var wg sync.WaitGroup
 		wg.Add(3)
@@ -1343,15 +1261,14 @@ func Test_Trie_ConcurrentReadWrite(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Insert(context.Background(), []byte("key"), []byte("value"))
-		require.NoError(err)
+		require.NoError(newTrie.Insert(context.Background(), []byte("key"), []byte("value")))
 	}()
 
 	require.Eventually(
 		func() bool {
 			value, err := newTrie.GetValue(context.Background(), []byte("key"))
 
-			if err == database.ErrNotFound {
+			if errors.Is(err, database.ErrNotFound) {
 				return false
 			}
 
@@ -1373,8 +1290,7 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 
 	newTrie, err := trie.NewView()
 	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("key"), []byte("value0"))
-	require.NoError(err)
+	require.NoError(newTrie.Insert(context.Background(), []byte("key"), []byte("value0")))
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -1382,8 +1298,7 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.CommitToDB(context.Background())
-		require.NoError(err)
+		require.NoError(newTrie.CommitToDB(context.Background()))
 	}()
 
 	newView, err := newTrie.NewView()
@@ -1400,8 +1315,7 @@ func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
 
 	newTrie, err := trie.NewView()
 	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("key"), []byte("value0"))
-	require.NoError(err)
+	require.NoError(newTrie.Insert(context.Background(), []byte("key"), []byte("value0")))
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -1409,8 +1323,7 @@ func Test_Trie_ConcurrentDeleteAndMerkleRoot(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Remove(context.Background(), []byte("key"))
-		require.NoError(err)
+		require.NoError(newTrie.Remove(context.Background(), []byte("key")))
 	}()
 
 	rootID, err := newTrie.GetMerkleRoot(context.Background())
@@ -1434,8 +1347,7 @@ func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
-		require.NoError(err)
+		require.NoError(newTrie.Insert(context.Background(), []byte("key2"), []byte("value2")))
 	}()
 
 	require.Eventually(
@@ -1451,8 +1363,7 @@ func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
 			}
 			require.Equal([]byte("value2"), proof.Value.value)
 
-			err = newTrie.CommitToDB(context.Background())
-			require.NoError(err)
+			require.NoError(newTrie.CommitToDB(context.Background()))
 			return true
 		},
 		time.Second,
@@ -1469,8 +1380,7 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 
 	newTrie, err := trie.NewView()
 	require.NoError(err)
-	err = newTrie.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(err)
+	require.NoError(newTrie.Insert(context.Background(), []byte("key1"), []byte("value1")))
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -1478,10 +1388,8 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := newTrie.Insert(context.Background(), []byte("key2"), []byte("value2"))
-		require.NoError(err)
-		err = newTrie.Insert(context.Background(), []byte("key3"), []byte("value3"))
-		require.NoError(err)
+		require.NoError(newTrie.Insert(context.Background(), []byte("key2"), []byte("value2")))
+		require.NoError(newTrie.Insert(context.Background(), []byte("key3"), []byte("value3")))
 	}()
 
 	require.Eventually(

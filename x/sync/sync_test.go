@@ -119,9 +119,8 @@ func Test_Completion(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
-		err = syncer.Wait(context.Background())
+		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(err)
 		syncer.workLock.Lock()
 		require.Zero(syncer.unprocessedWork.Len())
@@ -225,10 +224,8 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(syncer)
 
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
 		require.NoError(err)
@@ -241,8 +238,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 		// add an extra value to sync db past the last key returned
 		newKey := midPoint(lastKey, nil)
-		err = db.Put(newKey, []byte{1})
-		require.NoError(err)
+		require.NoError(db.Put(newKey, []byte{1}))
 
 		// create a range endpoint that is before the newly added key, but after the last key
 		endPointBeforeNewKey := make([]byte, 0, 2)
@@ -427,10 +423,8 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(syncer)
 
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
 		require.NoError(err)
@@ -439,8 +433,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 		midpoint := midPoint(lastKey, nil)
 
-		err = db.Put(midpoint, []byte{1})
-		require.NoError(err)
+		require.NoError(db.Put(midpoint, []byte{1}))
 
 		// next key at prefix of newly added point
 		nextKey, err := syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
@@ -449,11 +442,9 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		require.True(isPrefix(midpoint, nextKey))
 
-		err = db.Delete(midpoint)
-		require.NoError(err)
+		require.NoError(db.Delete(midpoint))
 
-		err = dbToSync.Put(midpoint, []byte{1})
-		require.NoError(err)
+		require.NoError(dbToSync.Put(midpoint, []byte{1}))
 
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, lastKey, 500)
 		require.NoError(err)
@@ -510,10 +501,8 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 100)
 		require.NoError(err)
@@ -521,11 +510,9 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		// local db has a different child than remote db
 		lastKey = append(lastKey, 16)
-		err = db.Put(lastKey, []byte{1})
-		require.NoError(err)
+		require.NoError(db.Put(lastKey, []byte{1}))
 
-		err = dbToSync.Put(lastKey, []byte{2})
-		require.NoError(err)
+		require.NoError(dbToSync.Put(lastKey, []byte{2}))
 
 		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
 		require.NoError(err)
@@ -581,8 +568,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			key := make([]byte, rand.Intn(maxKeyLen))
 			_, _ = rand.Read(key)
 			val := make([]byte, rand.Intn(maxValLen))
-			err := db.Put(key, val)
-			require.NoError(err)
+			require.NoError(db.Put(key, val))
 		}
 	}
 
@@ -616,12 +602,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Commit the proof to the local database as we do
 		// in the actual syncer.
-		err = localDB.CommitRangeProof(
+		require.NoError(localDB.CommitRangeProof(
 			context.Background(),
 			rangeStart,
 			remoteProof,
-		)
-		require.NoError(err)
+		))
 
 		localProof, err := localDB.GetProof(
 			context.Background(),
@@ -781,11 +766,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
 
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(syncer.Error())
 
 		// new db has fully sync'ed and should be at the same root as the original db
@@ -802,20 +785,16 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			err = db.Put(addkey, val)
-			require.NoError(err)
+			require.NoError(db.Put(addkey, val))
 
-			err = dbToSync.Put(addkey, val)
-			require.NoError(err)
+			require.NoError(dbToSync.Put(addkey, val))
 
 			addNilkey := make([]byte, r.Intn(50))
 			_, err = r.Read(addNilkey)
 			require.NoError(err)
-			err = db.Put(addNilkey, nil)
-			require.NoError(err)
+			require.NoError(db.Put(addNilkey, nil))
 
-			err = dbToSync.Put(addNilkey, nil)
-			require.NoError(err)
+			require.NoError(dbToSync.Put(addNilkey, nil))
 
 			deleteKeyStart := make([]byte, r.Intn(50))
 			_, err = r.Read(deleteKeyStart)
@@ -823,10 +802,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				err = dbToSync.Delete(it.Key())
-				require.NoError(err)
-				err = db.Delete(it.Key())
-				require.NoError(err)
+				require.NoError(dbToSync.Delete(it.Key()))
+				require.NoError(db.Delete(it.Key()))
 			}
 			require.NoError(it.Error())
 			it.Release()
@@ -871,8 +848,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
 
 		// Wait until we've processed some work
 		// before updating the sync target.
@@ -897,10 +873,9 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(newSyncer)
-		err = newSyncer.StartSyncing(context.Background())
-		require.NoError(err)
+		require.NoError(newSyncer.StartSyncing(context.Background()))
 		require.NoError(newSyncer.Error())
-		err = newSyncer.Wait(context.Background())
+		require.NoError(newSyncer.Wait(context.Background()))
 		require.NoError(err)
 		newRoot, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
@@ -957,11 +932,9 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	err = syncer.StartSyncing(context.Background())
-	require.NoError(err)
+	require.NoError(syncer.StartSyncing(context.Background()))
 
-	err = syncer.Wait(context.Background())
-	require.ErrorIs(err, errInvalidRangeProof)
+	require.ErrorIs(syncer.Wait(context.Background()), errInvalidRangeProof)
 }
 
 func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
@@ -1030,8 +1003,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			err = dbToSync.Put(key, val)
-			require.NoError(err)
+			require.NoError(dbToSync.Put(key, val))
 
 			deleteKeyStart := make([]byte, r.Intn(50))
 			_, err = r.Read(deleteKeyStart)
@@ -1039,8 +1011,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				err = dbToSync.Delete(it.Key())
-				require.NoError(err)
+				require.NoError(dbToSync.Delete(it.Key()))
 			}
 			require.NoError(it.Error())
 			it.Release()
@@ -1049,8 +1020,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
 
 		// Wait until we've processed some work
 		// before updating the sync target.
@@ -1064,12 +1034,10 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			3*time.Second,
 			10*time.Millisecond,
 		)
-		err = syncer.UpdateSyncTarget(syncRoot)
-		require.NoError(err)
+		require.NoError(syncer.UpdateSyncTarget(syncRoot))
 		close(updatedRootChan)
 
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(syncer.Error())
 
 		newRoot, err := db.GetMerkleRoot(context.Background())
@@ -1116,8 +1084,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 
 	<-startedWaiting
 	newSyncRoot := ids.GenerateTestID()
-	err = m.UpdateSyncTarget(newSyncRoot)
-	require.NoError(err)
+	require.NoError(m.UpdateSyncTarget(newSyncRoot))
 	<-gotSignalChan
 
 	require.Equal(newSyncRoot, m.config.TargetRoot)

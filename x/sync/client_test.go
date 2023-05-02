@@ -45,8 +45,7 @@ func sendRangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
@@ -75,8 +74,7 @@ func sendRangeRequest(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
+				require.NoError(handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes))
 			}() // should be on a goroutine so the test can make progress.
 			return nil
 		},
@@ -101,8 +99,7 @@ func sendRangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err = merkledb.Codec.EncodeRangeProof(merkledb.Version, response)
 			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
+			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
@@ -302,8 +299,7 @@ func sendChangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
@@ -332,8 +328,7 @@ func sendChangeRequest(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
+				require.NoError(handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes))
 			}() // should be on a goroutine so the test can make progress.
 			return nil
 		},
@@ -358,8 +353,7 @@ func sendChangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err = merkledb.Codec.EncodeChangeProof(merkledb.Version, response)
 			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
+			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
@@ -410,8 +404,7 @@ func TestGetChangeProof(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			err = view.Insert(context.Background(), key, val)
-			require.NoError(err)
+			require.NoError(view.Insert(context.Background(), key, val))
 		}
 
 		// delete a key
@@ -421,8 +414,7 @@ func TestGetChangeProof(t *testing.T) {
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(err)
+			require.NoError(view.Remove(context.Background(), it.Key()))
 		}
 		require.NoError(it.Error())
 		it.Release()
@@ -532,11 +524,10 @@ func TestGetChangeProof(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}

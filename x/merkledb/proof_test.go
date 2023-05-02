@@ -67,8 +67,7 @@ func Test_Proof_Empty(t *testing.T) {
 	require := require.New(t)
 
 	proof := &Proof{}
-	err := proof.Verify(context.Background(), ids.Empty)
-	require.ErrorIs(err, ErrNoProof)
+	require.ErrorIs(proof.Verify(context.Background(), ids.Empty), ErrNoProof)
 }
 
 func Test_Proof_MissingValue(t *testing.T) {
@@ -132,7 +131,7 @@ func Test_Proof_Marshal_Errors(t *testing.T) {
 func verifyPath(t *testing.T, path1, path2 []ProofNode) {
 	require := require.New(t)
 
-	require.Equal(len(path1), len(path2))
+	require.Len(path1, len(path2))
 	for i := range path1 {
 		require.True(bytes.Equal(path1[i].KeyPath.Value, path2[i].KeyPath.Value))
 		require.Equal(path1[i].KeyPath.hasOddLength(), path2[i].KeyPath.hasOddLength())
@@ -243,13 +242,12 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		[]byte{1},
 		[]byte{5, 5},
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
 
@@ -350,16 +348,11 @@ func Test_Proof(t *testing.T) {
 	trie, err := dbTrie.NewView()
 	require.NoError(err)
 
-	err = trie.Insert(context.Background(), []byte("key0"), []byte("value0"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key2"), []byte("value2"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key3"), []byte("value3"))
-	require.NoError(err)
-	err = trie.Insert(context.Background(), []byte("key4"), []byte("value4"))
-	require.NoError(err)
+	require.NoError(trie.Insert(context.Background(), []byte("key0"), []byte("value0")))
+	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
+	require.NoError(trie.Insert(context.Background(), []byte("key2"), []byte("value2")))
+	require.NoError(trie.Insert(context.Background(), []byte("key3"), []byte("value3")))
+	require.NoError(trie.Insert(context.Background(), []byte("key4"), []byte("value4")))
 
 	_, err = trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -377,13 +370,11 @@ func Test_Proof(t *testing.T) {
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	err = proof.Verify(context.Background(), expectedRootID)
-	require.NoError(err)
+	require.NoError(proof.Verify(context.Background(), expectedRootID))
 
 	proof.Path[0].ValueOrHash = Some([]byte("value2"))
 
-	err = proof.Verify(context.Background(), expectedRootID)
-	require.ErrorIs(err, ErrInvalidProof)
+	require.ErrorIs(proof.Verify(context.Background(), expectedRootID), ErrInvalidProof)
 }
 
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
@@ -584,13 +575,12 @@ func Test_RangeProof(t *testing.T) {
 	// only a single node here since others are duplicates in endproof
 	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Value)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		[]byte{1},
 		[]byte{3, 5},
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 }
 
 func Test_RangeProof_BadBounds(t *testing.T) {
@@ -611,16 +601,11 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key2"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key3"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key4"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key1"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key2"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key3"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key4"), []byte("value4")))
+	require.NoError(batch.Write())
 
 	val, err := db.Get([]byte("key1"))
 	require.NoError(err)
@@ -642,13 +627,12 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
 	require.Equal(newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		nil,
 		[]byte("key35"),
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 }
 
 func Test_RangeProof_NilEnd(t *testing.T) {
@@ -677,13 +661,12 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.Equal([]byte{0}, proof.EndProof[1].KeyPath.Value)
 	require.Equal([]byte{2}, proof.EndProof[2].KeyPath.Value)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		[]byte{1},
 		nil,
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 }
 
 func Test_RangeProof_EmptyValues(t *testing.T) {
@@ -692,14 +675,10 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key1"), nil)
-	require.NoError(err)
-	err = batch.Put([]byte("key12"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key2"), []byte{})
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key1"), nil))
+	require.NoError(batch.Put([]byte("key12"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key2"), []byte{}))
+	require.NoError(batch.Write())
 
 	val, err := db.Get([]byte("key12"))
 	require.NoError(err)
@@ -724,13 +703,12 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Equal(newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
 	require.Equal(newPath([]byte{}).Serialize(), proof.EndProof[0].KeyPath)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		[]byte("key1"),
 		[]byte("key2"),
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 }
 
 func Test_RangeProof_Marshal_Nil(t *testing.T) {
@@ -824,48 +802,30 @@ func Test_ChangeProof_Marshal(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key0"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key1"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key2"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key3"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key4"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key0"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key1"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key2"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key3"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key4"), []byte("value4")))
+	require.NoError(batch.Write())
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
 	batch = db.NewBatch()
-	err = batch.Put([]byte("key4"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key5"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key6"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key7"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key8"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key4"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key5"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key6"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key7"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key8"), []byte("value4")))
+	require.NoError(batch.Write())
 
 	batch = db.NewBatch()
-	err = batch.Put([]byte("key9"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key10"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key11"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key12"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key13"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key9"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key10"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key11"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key12"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key13"), []byte("value4")))
+	require.NoError(batch.Write())
 	endroot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
@@ -976,18 +936,12 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 	batch := db.NewBatch()
-	err = batch.Put([]byte("key20"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key21"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key22"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key23"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key24"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key20"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key21"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key22"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key23"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key24"), []byte("value4")))
+	require.NoError(batch.Write())
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
@@ -995,53 +949,33 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	dbClone, err := getBasicDB()
 	require.NoError(err)
 	batch = dbClone.NewBatch()
-	err = batch.Put([]byte("key20"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key21"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key22"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key23"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key24"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key20"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key21"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key22"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key23"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key24"), []byte("value4")))
+	require.NoError(batch.Write())
 
 	// the second db has started to sync some of the range outside of the range proof
 	batch = dbClone.NewBatch()
-	err = batch.Put([]byte("key31"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key31"), []byte("value1")))
+	require.NoError(batch.Write())
 
 	batch = db.NewBatch()
-	err = batch.Put([]byte("key25"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key26"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key27"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Put([]byte("key28"), []byte("value3"))
-	require.NoError(err)
-	err = batch.Put([]byte("key29"), []byte("value4"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key25"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key26"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key27"), []byte("value2")))
+	require.NoError(batch.Put([]byte("key28"), []byte("value3")))
+	require.NoError(batch.Put([]byte("key29"), []byte("value4")))
+	require.NoError(batch.Write())
 
 	batch = db.NewBatch()
-	err = batch.Put([]byte("key30"), []byte("value0"))
-	require.NoError(err)
-	err = batch.Put([]byte("key31"), []byte("value1"))
-	require.NoError(err)
-	err = batch.Put([]byte("key32"), []byte("value2"))
-	require.NoError(err)
-	err = batch.Delete([]byte("key21"))
-	require.NoError(err)
-	err = batch.Delete([]byte("key22"))
-	require.NoError(err)
-	err = batch.Write()
-	require.NoError(err)
+	require.NoError(batch.Put([]byte("key30"), []byte("value0")))
+	require.NoError(batch.Put([]byte("key31"), []byte("value1")))
+	require.NoError(batch.Put([]byte("key32"), []byte("value2")))
+	require.NoError(batch.Delete([]byte("key21")))
+	require.NoError(batch.Delete([]byte("key22")))
+	require.NoError(batch.Write())
 
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -1051,27 +985,23 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key21"), []byte("key30"), db.getMerkleRoot())
-	require.NoError(err)
+	require.NoError(proof.Verify(context.Background(), dbClone, []byte("key21"), []byte("key30"), db.getMerkleRoot()))
 
 	// low maxLength
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, db.getMerkleRoot())
-	require.NoError(err)
+	require.NoError(proof.Verify(context.Background(), dbClone, nil, nil, db.getMerkleRoot()))
 
 	// nil start/end
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, endRoot)
-	require.NoError(err)
+	require.NoError(proof.Verify(context.Background(), dbClone, nil, nil, endRoot))
 
-	err = dbClone.CommitChangeProof(context.Background(), proof)
-	require.NoError(err)
+	require.NoError(dbClone.CommitChangeProof(context.Background(), proof))
 
 	newRoot, err := dbClone.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -1081,8 +1011,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key20"), []byte("key30"), db.getMerkleRoot())
-	require.NoError(err)
+	require.NoError(proof.Verify(context.Background(), dbClone, []byte("key20"), []byte("key30"), db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
@@ -1372,8 +1301,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 }
 
 func TestVerifyKeyValues(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		start       []byte
@@ -1444,15 +1371,14 @@ func TestVerifyKeyValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyKeyValues(tt.kvs, tt.start, tt.end)
-			require.ErrorIs(err, tt.expectedErr)
+			require := require.New(t)
+
+			require.ErrorIs(verifyKeyValues(tt.kvs, tt.start, tt.end), tt.expectedErr)
 		})
 	}
 }
 
 func TestVerifyProofPath(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		path        []ProofNode
@@ -1581,8 +1507,9 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, newPath(tt.proofKey))
-			require.ErrorIs(err, tt.expectedErr)
+			require := require.New(t)
+
+			require.ErrorIs(verifyProofPath(tt.path, newPath(tt.proofKey)), tt.expectedErr)
 		})
 	}
 }
