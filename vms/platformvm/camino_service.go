@@ -626,8 +626,9 @@ func (s *CaminoService) GetRegisteredShortIDLink(_ *http.Request, args *api.JSON
 }
 
 type APIClaimable struct {
-	ValidatorRewards      utilsjson.Uint64 `json:"validatorRewards"`
-	ExpiredDepositRewards utilsjson.Uint64 `json:"expiredDepositRewards"`
+	RewardOwner           platformapi.Owner `json:"rewardOwner"`
+	ValidatorRewards      utilsjson.Uint64  `json:"validatorRewards"`
+	ExpiredDepositRewards utilsjson.Uint64  `json:"expiredDepositRewards"`
 }
 
 type GetClaimablesArgs struct {
@@ -642,7 +643,7 @@ type GetClaimablesReply struct {
 func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, response *GetClaimablesReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetClaimables called")
 
-	response.Claimables = make([]APIClaimable, len(args.Owners))
+	response.Claimables = make([]APIClaimable, 0, len(args.Owners))
 	for i := range args.Owners {
 		claimableOwner, err := s.secpOwnerFromAPI(&args.Owners[i])
 		if err != nil {
@@ -656,13 +657,16 @@ func (s *CaminoService) GetClaimables(_ *http.Request, args *GetClaimablesArgs, 
 
 		claimable, err := s.vm.state.GetClaimable(ownerID)
 		if err == database.ErrNotFound {
-			claimable = &state.Claimable{}
+			continue
 		} else if err != nil {
 			return err
 		}
 
-		response.Claimables[i].ValidatorRewards = utilsjson.Uint64(claimable.ValidatorReward)
-		response.Claimables[i].ExpiredDepositRewards = utilsjson.Uint64(claimable.ExpiredDepositReward)
+		response.Claimables = append(response.Claimables, APIClaimable{
+			RewardOwner:           args.Owners[i],
+			ValidatorRewards:      utilsjson.Uint64(claimable.ValidatorReward),
+			ExpiredDepositRewards: utilsjson.Uint64(claimable.ExpiredDepositReward),
+		})
 	}
 
 	return nil
