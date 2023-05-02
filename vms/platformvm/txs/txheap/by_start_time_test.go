@@ -4,6 +4,7 @@
 package txheap
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -96,7 +97,8 @@ func TestByStartTimeList(t *testing.T) {
 		cumulativeSum += tx.Size()
 		cumulativeSums[i] = cumulativeSum
 	}
-	require.Len(txHeap.List(), total)
+	res, _ := txHeap.ListWithLimit(math.MaxInt32)
+	require.Len(res, total)
 
 	// only returns the txs up to the index and its sum
 	maxSum := cumulativeSums[total-1]

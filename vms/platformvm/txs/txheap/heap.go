@@ -16,12 +16,10 @@ type Heap interface {
 	Add(tx *txs.Tx)
 	Get(txID ids.ID) *txs.Tx
 
-	// Returns all the transactions in the order of heap.
-	List() []*txs.Tx
-
 	// Lists with up to `maxTxsBytes`, in the order of heap.
 	// Returns all the transactions within the limit and the remaining bytes
-	// that is the number subtracted the used bytes from the `maxTxsBytes`
+	// that is the number subtracted the used bytes from the `maxTxsBytes`.
+	// Use `math.MaxInt32` to return all.
 	ListWithLimit(maxTxsBytes int) ([]*txs.Tx, int)
 
 	Remove(txID ids.ID) *txs.Tx

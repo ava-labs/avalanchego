@@ -6,6 +6,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	stdmath "math"
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -351,7 +352,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := vdrs.List()
+	validatorTxs, _ := vdrs.ListWithLimit(stdmath.MaxInt32)
 
 	// genesis holds the genesis state
 	g := genesis.Genesis{
