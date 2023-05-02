@@ -162,10 +162,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 }
 
 func TestFilterValidators(t *testing.T) {
-	require := require.New(t)
-
 	sk0, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
 		PublicKey:      pk0,
@@ -174,7 +172,7 @@ func TestFilterValidators(t *testing.T) {
 	}
 
 	sk1, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
 		PublicKey:      pk1,
@@ -243,11 +241,14 @@ func TestFilterValidators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedVdrs, vdrs)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedVdrs, vdrs)
 		})
 	}
 }
@@ -299,9 +300,10 @@ func TestSumWeight(t *testing.T) {
 
 			sum, err := SumWeight(tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedSum, sum)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedSum, sum)
 		})
 	}
 }

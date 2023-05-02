@@ -82,8 +82,6 @@ func BenchmarkInterface(b *testing.B) {
 }
 
 func TestHealthCheck(t *testing.T) {
-	require := require.New(t)
-
 	scenarios := []struct {
 		name         string
 		testDatabase *testDatabase
@@ -110,6 +108,8 @@ func TestHealthCheck(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			require := require.New(t)
+
 			baseDB := setupDB(t)
 			db := corruptabledb.New(baseDB.server)
 			defer db.Close()

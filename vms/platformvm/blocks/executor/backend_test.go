@@ -114,8 +114,6 @@ func TestBackendGetBlock(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name              string
 		backendF          func(*gomock.Controller) *backend
@@ -157,7 +155,7 @@ func TestGetTimestamp(t *testing.T) {
 
 			backend := tt.backendF(ctrl)
 			gotTimestamp := backend.getTimestamp(blkID)
-			require.Equal(tt.expectedTimestamp, gotTimestamp)
+			require.Equal(t, tt.expectedTimestamp, gotTimestamp)
 		})
 	}
 }

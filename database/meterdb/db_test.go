@@ -43,9 +43,7 @@ func BenchmarkInterface(b *testing.B) {
 		for _, bench := range database.Benchmarks {
 			baseDB := memdb.New()
 			db, err := New("", prometheus.NewRegistry(), baseDB)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 			bench(b, db, "meterdb", keys, values)
 		}
 	}

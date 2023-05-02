@@ -24,8 +24,6 @@ import (
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
-	require := require.New(t)
-
 	tests := map[string]struct {
 		configs  map[string]string
 		upgrades map[string]string
@@ -42,11 +40,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -67,6 +65,8 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
 			root := t.TempDir()
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
 			configFile := setupConfigJSON(t, root, configJSON)
@@ -128,6 +128,7 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
+
 			root := t.TempDir()
 			chainConfigDir := filepath.Join(root, "cdir")
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
@@ -171,8 +172,6 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 }
 
 func TestGetChainConfigsFromFlags(t *testing.T) {
-	require := require.New(t)
-
 	tests := map[string]struct {
 		fullConfigs map[string]chains.ChainConfig
 		expected    map[string]chains.ChainConfig
@@ -185,11 +184,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			fullConfigs: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -197,11 +196,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				require.NoError(err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -224,6 +223,8 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
 			jsonMaps, err := json.Marshal(test.fullConfigs)
 			require.NoError(err)
 			encodedFileContent := base64.StdEncoding.EncodeToString(jsonMaps)
@@ -269,6 +270,7 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
+
 			root := t.TempDir()
 			aliasPath := filepath.Join(root, "aliases.json")
 			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
@@ -311,6 +313,7 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
+
 			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
 
 			// build viper config

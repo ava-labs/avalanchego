@@ -17,12 +17,10 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	require := require.New(t)
-
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		require.NoError(t, shutdownEnvironment(env))
 	}()
 
 	type test struct {
@@ -52,6 +50,7 @@ func TestNewExportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

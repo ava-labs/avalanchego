@@ -37,8 +37,7 @@ func TestGetHRP(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.hrp, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(test.hrp, GetHRP(test.id))
+			require.Equal(t, test.hrp, GetHRP(test.id))
 		})
 	}
 }
@@ -71,8 +70,7 @@ func TestNetworkName(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(test.name, NetworkName(test.id))
+			require.Equal(t, test.name, NetworkName(test.id))
 		})
 	}
 }
@@ -127,6 +125,7 @@ func TestNetworkID(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
+
 			id, err := NetworkID(test.name)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.id, id)

@@ -25,8 +25,6 @@ import (
 var errCustom = errors.New("custom error")
 
 func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name   string
 		txFunc func(*gomock.Controller) *AddPermissionlessDelegatorTx
@@ -380,7 +378,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 }

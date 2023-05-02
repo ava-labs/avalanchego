@@ -12,8 +12,6 @@ import (
 )
 
 func TestVertexVerify(t *testing.T) {
-	require := require.New(t)
-
 	tooManyParents := make([]ids.ID, maxNumParents+1)
 	for i := range tooManyParents {
 		tooManyParents[i][0] = byte(i)
@@ -148,7 +146,7 @@ func TestVertexVerify(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.ErrorIs(test.vertex.Verify(), test.expectedErr)
+			require.ErrorIs(t, test.vertex.Verify(), test.expectedErr)
 		})
 	}
 }

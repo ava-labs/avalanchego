@@ -163,18 +163,14 @@ func TestAliasChain(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestGetChainAliases(t *testing.T) {
-	require := require.New(t)
-
 	t.Run("successful", func(t *testing.T) {
+		require := require.New(t)
+
 		expectedReply := []string{"alias1", "alias2"}
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{
 			Aliases: expectedReply,
@@ -187,10 +183,8 @@ func TestGetChainAliases(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errTest)}
-
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
-
-		require.ErrorIs(err, errTest)
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -202,18 +196,14 @@ func TestStacktrace(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Stacktrace(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestReloadInstalledVMs(t *testing.T) {
-	require := require.New(t)
-
 	t.Run("successful", func(t *testing.T) {
+		require := require.New(t)
+
 		expectedNewVMs := map[ids.ID][]string{
 			ids.GenerateTestID(): {"foo"},
 			ids.GenerateTestID(): {"bar"},
@@ -235,10 +225,8 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errTest)}
-
 		_, _, err := mockClient.LoadVMs(context.Background())
-
-		require.ErrorIs(err, errTest)
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -282,8 +270,6 @@ func TestSetLoggerLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			c := client{
 				requester: NewMockClient(&api.EmptyReply{}, tt.serviceErr),
 			}
@@ -293,7 +279,7 @@ func TestSetLoggerLevel(t *testing.T) {
 				tt.logLevel,
 				tt.displayLevel,
 			)
-			require.ErrorIs(err, tt.clientErr)
+			require.ErrorIs(t, err, tt.clientErr)
 		})
 	}
 }
@@ -341,9 +327,10 @@ func TestGetLoggerLevel(t *testing.T) {
 				tt.loggerName,
 			)
 			require.ErrorIs(err, tt.clientErr)
-			if tt.clientErr == nil {
-				require.Equal(tt.serviceResponse, res)
+			if tt.clientErr != nil {
+				return
 			}
+			require.Equal(tt.serviceResponse, res)
 		})
 	}
 }
@@ -379,9 +366,10 @@ func TestGetConfig(t *testing.T) {
 			}
 			res, err := c.GetConfig(context.Background())
 			require.ErrorIs(err, tt.clientErr)
-			if tt.clientErr == nil {
-				require.Equal(resp, res)
+			if tt.clientErr != nil {
+				return
 			}
+			require.Equal(resp, res)
 		})
 	}
 }

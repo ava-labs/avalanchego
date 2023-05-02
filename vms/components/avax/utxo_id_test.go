@@ -101,8 +101,7 @@ func TestUTXOIDLess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(tt.expected, tt.id1.Less(&tt.id2))
+			require.Equal(t, tt.expected, tt.id1.Less(&tt.id2))
 		})
 	}
 }
@@ -194,12 +193,12 @@ func TestUTXOIDFromString(t *testing.T) {
 
 			retrievedUTXOID, err := UTXOIDFromString(test.expectedStr)
 			require.ErrorIs(err, test.parseErr)
-
-			if err == nil {
-				require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
-				require.Equal(test.utxoID, retrievedUTXOID)
-				require.Equal(test.utxoID.String(), retrievedUTXOID.String())
+			if test.parseErr != nil {
+				return
 			}
+			require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
+			require.Equal(test.utxoID, retrievedUTXOID)
+			require.Equal(test.utxoID.String(), retrievedUTXOID.String())
 		})
 	}
 }

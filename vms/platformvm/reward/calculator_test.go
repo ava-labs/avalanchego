@@ -48,8 +48,6 @@ func TestLongerDurationBonus(t *testing.T) {
 }
 
 func TestRewards(t *testing.T) {
-	require := require.New(t)
-
 	c := NewCalculator(defaultConfig)
 	tests := []struct {
 		duration       time.Duration
@@ -132,7 +130,7 @@ func TestRewards(t *testing.T) {
 				test.stakeAmount,
 				test.existingAmount,
 			)
-			require.Equal(test.expectedReward, reward)
+			require.Equal(t, test.expectedReward, reward)
 		})
 	}
 }

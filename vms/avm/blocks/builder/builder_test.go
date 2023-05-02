@@ -47,8 +47,6 @@ var (
 )
 
 func TestBuilderBuildBlock(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		builderFunc func(*gomock.Controller) Builder
@@ -267,7 +265,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						require.IsType(&txexecutor.Executor{}, visitor)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
 						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
@@ -284,7 +282,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						require.IsType(&txexecutor.Executor{}, visitor)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
 						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
@@ -301,10 +299,10 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// and other fields are set correctly.
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
 					func(block *blocks.StandardBlock) snowman.Block {
-						require.Len(block.Transactions, 1)
-						require.Equal(tx1, block.Transactions[0])
-						require.Equal(preferredHeight+1, block.Height())
-						require.Equal(preferredID, block.Parent())
+						require.Len(t, block.Transactions, 1)
+						require.Equal(t, tx1, block.Transactions[0])
+						require.Equal(t, preferredHeight+1, block.Height())
+						require.Equal(t, preferredID, block.Parent())
 						return nil
 					},
 				)
@@ -366,7 +364,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
 					func(block *blocks.StandardBlock) snowman.Block {
-						require.Equal(preferredTimestamp.Unix(), block.Timestamp().Unix())
+						require.Equal(t, preferredTimestamp.Unix(), block.Timestamp().Unix())
 						return nil
 					},
 				)
@@ -376,7 +374,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						require.IsType(&txexecutor.Executor{}, visitor)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
 						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
@@ -440,7 +438,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
 					func(block *blocks.StandardBlock) snowman.Block {
-						require.Equal(now.Unix(), block.Timestamp().Unix())
+						require.Equal(t, now.Unix(), block.Timestamp().Unix())
 						return nil
 					},
 				)
@@ -450,7 +448,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						require.IsType(&txexecutor.Executor{}, visitor)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
 						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
@@ -494,7 +492,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 			builder := tt.builderFunc(ctrl)
 			_, err := builder.BuildBlock(context.Background())
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

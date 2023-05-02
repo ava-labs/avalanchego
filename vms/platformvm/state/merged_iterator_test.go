@@ -173,6 +173,7 @@ func TestMergedIterator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
 			it := NewMergedIterator(tt.iterators...)
 			for _, expected := range tt.expected {
 				require.True(it.Next())

@@ -643,15 +643,17 @@ func TestValidatorWeightDiff(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
 			diff := &ValidatorWeightDiff{}
 			errs := wrappers.Errs{}
 			for _, op := range tt.ops {
 				errs.Add(op(diff))
 			}
 			require.ErrorIs(errs.Err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				require.Equal(tt.expected, diff)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expected, diff)
 		})
 	}
 }

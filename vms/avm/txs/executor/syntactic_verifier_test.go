@@ -50,15 +50,13 @@ func newContext(t testing.TB) *snow.Context {
 }
 
 func TestSyntacticVerifierBaseTx(t *testing.T) {
-	require := require.New(t)
-
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -416,21 +414,19 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
-	require := require.New(t)
-
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1025,21 +1021,19 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierOperationTx(t *testing.T) {
-	require := require.New(t)
-
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1514,21 +1508,19 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierImportTx(t *testing.T) {
-	require := require.New(t)
-
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -1914,21 +1906,19 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
 
 func TestSyntacticVerifierExportTx(t *testing.T) {
-	require := require.New(t)
-
 	ctx := newContext(t)
 
 	fx := &secp256k1fx.Fx{}
 	parser, err := txs.NewParser([]fxs.Fx{
 		fx,
 	})
-	require.NoError(err)
+	require.NoError(t, err)
 
 	feeAssetID := ids.GenerateTestID()
 	asset := avax.Asset{
@@ -2326,7 +2316,7 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }

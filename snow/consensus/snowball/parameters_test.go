@@ -147,8 +147,6 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 }
 
 func TestParametersInvalidConcurrentRepolls(t *testing.T) {
-	require := require.New(t)
-
 	tests := []Parameters{
 		{
 			K:                     1,
@@ -174,7 +172,7 @@ func TestParametersInvalidConcurrentRepolls(t *testing.T) {
 	for _, p := range tests {
 		label := fmt.Sprintf("ConcurrentRepolls=%d", p.ConcurrentRepolls)
 		t.Run(label, func(t *testing.T) {
-			require.ErrorIs(p.Verify(), ErrParametersInvalid)
+			require.ErrorIs(t, p.Verify(), ErrParametersInvalid)
 		})
 	}
 }

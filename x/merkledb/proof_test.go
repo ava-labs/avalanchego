@@ -143,8 +143,6 @@ func verifyPath(t *testing.T, path1, path2 []ProofNode) {
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		malform     func(proof *Proof)
@@ -197,6 +195,8 @@ func Test_Proof_Verify_Bad_Data(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			db, err := getBasicDB()
 			require.NoError(err)
 
@@ -261,8 +261,6 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 }
 
 func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		malform     func(proof *RangeProof)
@@ -307,6 +305,8 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			db, err := getBasicDB()
 			require.NoError(err)
 			writeBasicBatch(t, db)
@@ -540,10 +540,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -1015,8 +1013,6 @@ func Test_ChangeProof_Verify(t *testing.T) {
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		malform     func(proof *ChangeProof)
@@ -1054,6 +1050,8 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			db, err := getBasicDB()
 			require.NoError(err)
 
@@ -1082,8 +1080,6 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 }
 
 func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		proof       *ChangeProof
@@ -1292,6 +1288,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			db, err := getBasicDB()
 			require.NoError(err)
 			err = tt.proof.Verify(context.Background(), db, tt.start, tt.end, ids.Empty)
@@ -1371,9 +1369,7 @@ func TestVerifyKeyValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			require.ErrorIs(verifyKeyValues(tt.kvs, tt.start, tt.end), tt.expectedErr)
+			require.ErrorIs(t, verifyKeyValues(tt.kvs, tt.start, tt.end), tt.expectedErr)
 		})
 	}
 }
@@ -1507,9 +1503,7 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			require.ErrorIs(verifyProofPath(tt.path, newPath(tt.proofKey)), tt.expectedErr)
+			require.ErrorIs(t, verifyProofPath(tt.path, newPath(tt.proofKey)), tt.expectedErr)
 		})
 	}
 }

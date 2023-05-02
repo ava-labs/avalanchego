@@ -462,8 +462,6 @@ func TestHandlerSubnetConnector(t *testing.T) {
 
 // Tests that messages are routed to the correct engine type
 func TestDynamicEngineTypeDispatch(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name                string
 		currentEngineType   p2p.EngineType
@@ -557,6 +555,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
 			messageReceived := make(chan struct{})
 			ctx := snow.DefaultConsensusContextTest()
 			vdrs := validators.NewSet()

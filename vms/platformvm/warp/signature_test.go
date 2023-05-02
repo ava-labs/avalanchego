@@ -126,6 +126,7 @@ func TestNumSigners(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
+
 			sig := tt.generateSignature()
 			count, err := sig.NumSigners()
 			require.Equal(tt.count, count)

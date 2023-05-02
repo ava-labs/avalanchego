@@ -265,8 +265,6 @@ func TestServiceExportImport(t *testing.T) {
 }
 
 func TestServiceDeleteUser(t *testing.T) {
-	require := require.New(t)
-
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	tests := []struct {
@@ -319,6 +317,8 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			require := require.New(t)
+
 			ksIntf, err := CreateTestKeystore()
 			require.NoError(err)
 			ks := ksIntf.(*keystore)

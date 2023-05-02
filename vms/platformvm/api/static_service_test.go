@@ -238,16 +238,15 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 }
 
 func TestUTXOLess(t *testing.T) {
-	require := require.New(t)
-
 	var (
 		smallerAddr = ids.ShortID{}
 		largerAddr  = ids.ShortID{1}
 	)
 	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr[:])
-	require.NoError(err)
+	require.NoError(t, err)
 	largerAddrStr, err := address.FormatBech32("avax", largerAddr[:])
-	require.NoError(err)
+	require.NoError(t, err)
+
 	type test struct {
 		name     string
 		utxo1    UTXO
@@ -317,7 +316,7 @@ func TestUTXOLess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(tt.expected, tt.utxo1.Less(tt.utxo2))
+			require.Equal(t, tt.expected, tt.utxo1.Less(tt.utxo2))
 		})
 	}
 }

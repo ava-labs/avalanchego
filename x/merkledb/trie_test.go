@@ -772,11 +772,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {
-	require := require.New(t)
-
 	randCount := int64(0)
 	for _, commitApproach := range []string{"never", "before", "after"} {
 		t.Run(commitApproach, func(t *testing.T) {
+			require := require.New(t)
+
 			r := rand.New(rand.NewSource(randCount)) // #nosec G404
 			randCount++
 			rdb := memdb.New()

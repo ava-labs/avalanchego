@@ -27,8 +27,6 @@ import (
 )
 
 func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		name        string
 		backendF    func(*gomock.Controller) *Backend
@@ -542,7 +540,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			)
 
 			err := verifyAddPermissionlessValidatorTx(backend, state, sTx, tx)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

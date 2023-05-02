@@ -78,10 +78,8 @@ func TestIDFromStringError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			require := require.New(t)
-
 			_, err := FromString(tt.in)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -104,8 +102,8 @@ func TestIDMarshalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			require := require.New(t)
-			out, err := tt.in.MarshalJSON()
 
+			out, err := tt.in.MarshalJSON()
 			require.ErrorIs(err, tt.err)
 			require.Equal(tt.out, out)
 		})
@@ -158,10 +156,7 @@ func TestIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			require := require.New(t)
-
-			result := tt.id.String()
-			require.Equal(tt.expected, result)
+			require.Equal(t, tt.expected, tt.id.String())
 		})
 	}
 }

@@ -286,12 +286,14 @@ func TestParseValidatorMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
 			var metadata validatorMetadata
 			err := parseValidatorMetadata(tt.bytes, &metadata)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expected, &metadata)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expected, &metadata)
 		})
 	}
 }

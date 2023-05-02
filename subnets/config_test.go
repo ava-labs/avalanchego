@@ -25,8 +25,6 @@ var validParameters = snowball.Parameters{
 }
 
 func TestValid(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name        string
 		s           Config
@@ -62,8 +60,7 @@ func TestValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.s.Valid()
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, tt.s.Valid(), tt.expectedErr)
 		})
 	}
 }

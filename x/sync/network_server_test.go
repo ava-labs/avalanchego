@@ -21,14 +21,12 @@ import (
 )
 
 func Test_Server_GetRangeProof(t *testing.T) {
-	require := require.New(t)
-
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
-	require.NoError(err)
+	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	tests := map[string]struct {
 		request                  *syncpb.RangeProofRequest
@@ -93,8 +91,10 @@ func Test_Server_GetRangeProof(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
+
 			sender := common.NewMockSender(ctrl)
 			var proofResult *merkledb.RangeProof
 			sender.EXPECT().SendAppResponse(
@@ -114,13 +114,13 @@ func Test_Server_GetRangeProof(t *testing.T) {
 					return nil
 				},
 			).AnyTimes()
+
 			handler := NewNetworkServer(sender, smallTrieDB, logging.NoLog{})
 			err := handler.HandleRangeProofRequest(context.Background(), test.nodeID, 0, test.request)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.proofNil {
 				require.Nil(proofResult)
 				return
@@ -141,46 +141,44 @@ func Test_Server_GetRangeProof(t *testing.T) {
 }
 
 func Test_Server_GetChangeProof(t *testing.T) {
-	require := require.New(t)
-
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 	trieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// create changes
 	for x := 0; x < 600; x++ {
 		view, err := trieDB.NewView()
-		require.NoError(err)
+		require.NoError(t, err)
 
 		key := make([]byte, r.Intn(100))
 		_, err = r.Read(key)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		val := make([]byte, r.Intn(100))
 		_, err = r.Read(val)
-		require.NoError(err)
+		require.NoError(t, err)
 
-		require.NoError(view.Insert(context.Background(), key, val))
+		require.NoError(t, view.Insert(context.Background(), key, val))
 
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			require.NoError(view.Remove(context.Background(), it.Key()))
+			require.NoError(t, view.Remove(context.Background(), it.Key()))
 		}
-		require.NoError(it.Error())
+		require.NoError(t, it.Error())
 		it.Release()
 
-		require.NoError(view.CommitToDB(context.Background()))
+		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
 	endRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	tests := map[string]struct {
 		request                  *syncpb.ChangeProofRequest
@@ -241,6 +239,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			sender := common.NewMockSender(ctrl)

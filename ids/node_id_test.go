@@ -54,10 +54,8 @@ func TestNodeIDFromStringError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			require := require.New(t)
-
 			_, err := FromString(tt.in)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -156,9 +154,7 @@ func TestNodeIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			require := require.New(t)
-
-			require.Equal(tt.expected, tt.id.String())
+			require.Equal(t, tt.expected, tt.id.String())
 		})
 	}
 }

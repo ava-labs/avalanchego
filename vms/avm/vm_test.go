@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -80,6 +79,8 @@ func init() {
 }
 
 func NewContext(tb testing.TB) *snow.Context {
+	require := require.New(tb)
+
 	genesisBytes := BuildGenesisTest(tb)
 
 	tx := GetAVAXTxFromGenesisTest(genesisBytes, tb)
@@ -92,16 +93,10 @@ func NewContext(tb testing.TB) *snow.Context {
 	ctx.CChainID = ids.Empty.Prefix(1)
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		aliaser.Alias(chainID, "X"),
-		aliaser.Alias(chainID, chainID.String()),
-		aliaser.Alias(constants.PlatformChainID, "P"),
-		aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()),
-	)
-	if errs.Errored() {
-		tb.Fatal(errs.Err)
-	}
+	require.NoError(aliaser.Alias(chainID, "X"))
+	require.NoError(aliaser.Alias(chainID, chainID.String()))
+	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
+	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
 
 	ctx.ValidatorState = &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
@@ -123,22 +118,18 @@ func NewContext(tb testing.TB) *snow.Context {
 //  1. tx in genesis that creates asset
 //  2. the index of the output
 func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
+	require := require.New(tb)
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 	})
-	if err != nil {
-		tb.Fatal(err)
-	}
+	require.NoError(err)
 
 	cm := parser.GenesisCodec()
 	genesis := Genesis{}
-	if _, err := cm.Unmarshal(genesisBytes, &genesis); err != nil {
-		tb.Fatal(err)
-	}
+	_, err = cm.Unmarshal(genesisBytes, &genesis)
+	require.NoError(err)
 
-	if len(genesis.Txs) == 0 {
-		tb.Fatal("genesis tx didn't have any txs")
-	}
+	require.NotEmpty(genesis.Txs)
 
 	var assetTx *GenesisAsset
 	for _, tx := range genesis.Txs {
@@ -147,17 +138,12 @@ func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 			break
 		}
 	}
-	if assetTx == nil {
-		tb.Fatal("there is no create tx")
-		return nil
-	}
+	require.NotNil(assetTx)
 
 	tx := &txs.Tx{
 		Unsigned: &assetTx.CreateAssetTx,
 	}
-	if err := parser.InitializeGenesisTx(tx); err != nil {
-		tb.Fatal(err)
-	}
+	require.NoError(parser.InitializeGenesisTx(tx))
 	return tx
 }
 
@@ -253,19 +239,15 @@ func BuildGenesisTest(tb testing.TB) []byte {
 
 // BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
 func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
+	require := require.New(tb)
+
 	ss := CreateStaticService()
 
 	reply := BuildGenesisReply{}
-	err := ss.BuildGenesis(nil, args, &reply)
-	if err != nil {
-		tb.Fatal(err)
-	}
+	require.NoError(ss.BuildGenesis(nil, args, &reply))
 
 	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
-	if err != nil {
-		tb.Fatal(err)
-	}
-
+	require.NoError(err)
 	return b
 }
 
@@ -274,6 +256,8 @@ func GenesisVM(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory)
 }
 
 func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	require := require.New(tb)
+
 	var genesisBytes []byte
 
 	if args != nil {
@@ -294,12 +278,8 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	ctx.Lock.Lock()
 
 	userKeystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if err := userKeystore.CreateUser(username, password); err != nil {
-		tb.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(userKeystore.CreateUser(username, password))
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
@@ -308,10 +288,8 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		CreateAssetTxFee: testTxFee,
 	}}
 	configBytes, err := stdjson.Marshal(Config{IndexTransactions: true})
-	if err != nil {
-		tb.Fatal("should not have caused error in creating avm config bytes")
-	}
-	err = vm.Initialize(
+	require.NoError(err)
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -333,19 +311,11 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 			additionalFxs...,
 		),
 		nil,
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
+	))
 	vm.batchTimeout = 0
 
-	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
-		tb.Fatal(err)
-	}
-
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
-		tb.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	return genesisBytes, issuer, vm, m
 }

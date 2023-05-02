@@ -2607,12 +2607,12 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 }
 
 func TestMixedQueryNumPushSet(t *testing.T) {
-	require := require.New(t)
-
 	for i := 0; i < 3; i++ {
 		t.Run(
 			fmt.Sprint(i),
 			func(t *testing.T) {
+				require := require.New(t)
+
 				engCfg := DefaultConfigs()
 				engCfg.Params.MixedQueryNumPushVdr = i
 				te, err := newTransitive(engCfg)
@@ -2624,8 +2624,6 @@ func TestMixedQueryNumPushSet(t *testing.T) {
 }
 
 func TestSendMixedQuery(t *testing.T) {
-	require := require.New(t)
-
 	type test struct {
 		isVdr bool
 	}
@@ -2637,6 +2635,8 @@ func TestSendMixedQuery(t *testing.T) {
 		t.Run(
 			fmt.Sprintf("is validator: %v", tt.isVdr),
 			func(t *testing.T) {
+				require := require.New(t)
+
 				engConfig := DefaultConfigs()
 				commonCfg := common.DefaultConfigTest()
 				// Override the parameters k and MixedQueryNumPushNonVdr,

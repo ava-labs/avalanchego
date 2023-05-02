@@ -17,8 +17,6 @@ import (
 var errTest = errors.New("hi mom")
 
 func TestLockOutVerify(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name             string
 		locktime         uint64
@@ -72,14 +70,12 @@ func TestLockOutVerify(t *testing.T) {
 				Locktime:        tt.locktime,
 				TransferableOut: tt.transferableOutF(ctrl),
 			}
-			require.ErrorIs(lockOut.Verify(), tt.expectedErr)
+			require.ErrorIs(t, lockOut.Verify(), tt.expectedErr)
 		})
 	}
 }
 
 func TestLockInVerify(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name            string
 		locktime        uint64
@@ -133,7 +129,7 @@ func TestLockInVerify(t *testing.T) {
 				Locktime:       tt.locktime,
 				TransferableIn: tt.transferableInF(ctrl),
 			}
-			require.ErrorIs(lockOut.Verify(), tt.expectedErr)
+			require.ErrorIs(t, lockOut.Verify(), tt.expectedErr)
 		})
 	}
 }

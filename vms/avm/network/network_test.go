@@ -30,8 +30,6 @@ import (
 var errTest = errors.New("test error")
 
 func TestNetworkAppGossip(t *testing.T) {
-	require := require.New(t)
-
 	testTx := &txs.Tx{
 		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
@@ -46,8 +44,8 @@ func TestNetworkAppGossip(t *testing.T) {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 	})
-	require.NoError(err)
-	require.NoError(parser.InitializeTx(testTx))
+	require.NoError(t, err)
+	require.NoError(t, parser.InitializeTx(testTx))
 
 	type test struct {
 		name          string
@@ -80,7 +78,7 @@ func TestNetworkAppGossip(t *testing.T) {
 					Tx: []byte{0x00},
 				}
 				msgBytes, err := message.Build(&msg)
-				require.NoError(err)
+				require.NoError(t, err)
 				return msgBytes
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
@@ -100,7 +98,7 @@ func TestNetworkAppGossip(t *testing.T) {
 					Tx: testTx.Bytes(),
 				}
 				msgBytes, err := message.Build(&msg)
-				require.NoError(err)
+				require.NoError(t, err)
 				return msgBytes
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
@@ -122,7 +120,7 @@ func TestNetworkAppGossip(t *testing.T) {
 					Tx: testTx.Bytes(),
 				}
 				msgBytes, err := message.Build(&msg)
-				require.NoError(err)
+				require.NoError(t, err)
 				return msgBytes
 			},
 			mempoolFunc: func(ctrl *gomock.Controller) mempool.Mempool {
@@ -140,6 +138,7 @@ func TestNetworkAppGossip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

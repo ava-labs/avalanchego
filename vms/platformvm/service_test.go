@@ -70,7 +70,7 @@ var (
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	require := require.New(t)
 
-	vm, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -380,7 +380,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	for _, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -409,7 +409,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -574,7 +574,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}

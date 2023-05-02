@@ -14,8 +14,6 @@ import (
 )
 
 func TestOptionsUnexpectedBlockType(t *testing.T) {
-	require := require.New(t)
-
 	tests := []blocks.Block{
 		&blocks.BanffAbortBlock{},
 		&blocks.BanffCommitBlock{},
@@ -25,11 +23,10 @@ func TestOptionsUnexpectedBlockType(t *testing.T) {
 		&blocks.ApricotStandardBlock{},
 		&blocks.ApricotAtomicBlock{},
 	}
-
 	for _, blk := range tests {
 		t.Run(fmt.Sprintf("%T", blk), func(t *testing.T) {
 			err := blk.Visit(&options{})
-			require.ErrorIs(err, snowman.ErrNotOracle)
+			require.ErrorIs(t, err, snowman.ErrNotOracle)
 		})
 	}
 }

@@ -34,8 +34,6 @@ func FuzzInterface(f *testing.F) {
 
 // TestCorruption tests to make sure corruptabledb wrapper works as expected.
 func TestCorruption(t *testing.T) {
-	require := require.New(t)
-
 	key := []byte("hello")
 	value := []byte("world")
 	tests := map[string]func(db database.Database) error{
@@ -55,9 +53,9 @@ func TestCorruption(t *testing.T) {
 		},
 		"corrupted batch": func(db database.Database) error {
 			corruptableBatch := db.NewBatch()
-			require.NotNil(corruptableBatch)
+			require.NotNil(t, corruptableBatch)
 
-			require.NoError(corruptableBatch.Put(key, value))
+			require.NoError(t, corruptableBatch.Put(key, value))
 
 			return corruptableBatch.Write()
 		},
@@ -72,7 +70,7 @@ func TestCorruption(t *testing.T) {
 	_ = corruptableDB.handleError(errTest)
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
-			require.ErrorIs(testFn(corruptableDB), errTest)
+			require.ErrorIs(tt, testFn(corruptableDB), errTest)
 		})
 	}
 }

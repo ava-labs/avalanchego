@@ -23,8 +23,6 @@ import (
 )
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
-	require := require.New(t)
-
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
@@ -46,19 +44,19 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		require.NoError(target.state.Commit())
+		require.NoError(t, target.state.Commit())
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -74,22 +72,22 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		require.NoError(target.state.Commit())
+		require.NoError(t, target.state.Commit())
 	}
 
-	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	dummyH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -203,13 +201,13 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				for _, utxoID := range utxoIDs {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
-				require.NoError(target.state.Commit())
+				require.NoError(t, target.state.Commit())
 			},
 			AP3Time:     defaultGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
@@ -242,7 +240,9 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+			require := require.New(t)
+
+			freshTH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				require.NoError(shutdownEnvironment(freshTH))
@@ -283,7 +283,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -716,7 +716,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

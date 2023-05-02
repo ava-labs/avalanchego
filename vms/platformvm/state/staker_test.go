@@ -20,8 +20,6 @@ import (
 var errCustom = errors.New("custom")
 
 func TestStakerLess(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name  string
 		left  *Staker
@@ -129,7 +127,7 @@ func TestStakerLess(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(test.less, test.left.Less(test.right))
+			require.Equal(t, test.less, test.left.Less(test.right))
 		})
 	}
 }

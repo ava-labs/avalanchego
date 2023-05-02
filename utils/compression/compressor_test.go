@@ -41,15 +41,15 @@ var (
 )
 
 func TestDecompressZipBombs(t *testing.T) {
-	require := require.New(t)
-
 	for compressionType, zipBomb := range zipBombs {
 		// Make sure that the hardcoded zip bomb would be a valid message.
-		require.Less(len(zipBomb), maxMessageSize)
+		require.Less(t, len(zipBomb), maxMessageSize)
 
 		newCompressorFunc := newCompressorFuncs[compressionType]
 
 		t.Run(compressionType.String(), func(t *testing.T) {
+			require := require.New(t)
+
 			compressor, err := newCompressorFunc(maxMessageSize)
 			require.NoError(err)
 
@@ -72,10 +72,10 @@ func TestDecompressZipBombs(t *testing.T) {
 }
 
 func TestCompressDecompress(t *testing.T) {
-	require := require.New(t)
-
 	for compressionType, newCompressorFunc := range newCompressorFuncs {
 		t.Run(compressionType.String(), func(t *testing.T) {
+			require := require.New(t)
+
 			data := utils.RandomBytes(4096)
 			data2 := utils.RandomBytes(4096)
 
@@ -148,9 +148,8 @@ func TestNewCompressorWithInvalidLimit(t *testing.T) {
 			continue
 		}
 		t.Run(compressionType.String(), func(t *testing.T) {
-			require := require.New(t)
 			_, err := compressorFunc(math.MaxInt64)
-			require.ErrorIs(err, ErrInvalidMaxSizeCompressor)
+			require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
 		})
 	}
 }
@@ -211,12 +210,14 @@ func BenchmarkCompress(b *testing.B) {
 		}
 		for _, size := range sizes {
 			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				require := require.New(b)
+
 				bytes := utils.RandomBytes(size)
 				compressor, err := newCompressorFunc(maxMessageSize)
-				require.NoError(b, err)
+				require.NoError(err)
 				for n := 0; n < b.N; n++ {
 					_, err := compressor.Compress(bytes)
-					require.NoError(b, err)
+					require.NoError(err)
 				}
 			})
 		}
@@ -237,16 +238,18 @@ func BenchmarkDecompress(b *testing.B) {
 		}
 		for _, size := range sizes {
 			b.Run(fmt.Sprintf("%s_%d", compressionType, size), func(b *testing.B) {
+				require := require.New(b)
+
 				bytes := utils.RandomBytes(size)
 				compressor, err := newCompressorFunc(maxMessageSize)
-				require.NoError(b, err)
+				require.NoError(err)
 
 				compressedBytes, err := compressor.Compress(bytes)
-				require.NoError(b, err)
+				require.NoError(err)
 
 				for n := 0; n < b.N; n++ {
 					_, err := compressor.Decompress(compressedBytes)
-					require.NoError(b, err)
+					require.NoError(err)
 				}
 			})
 		}
