@@ -499,6 +499,9 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.NoError(err)
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.Equal(uint64(2), jobs.state.numJobs)
 }
 
