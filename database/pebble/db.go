@@ -6,10 +6,6 @@ package pebble
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-)
-
-import (
 	"bytes"
 	"context"
 	"errors"
@@ -18,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
 	"golang.org/x/exp/slices"
@@ -57,7 +54,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func New(file string, cfg Config, log logging.Logger, _ string, /*reg*/_ prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
 
 	opts := &pebble.Options{
