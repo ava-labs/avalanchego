@@ -83,7 +83,7 @@ func TestTxsInMempool(t *testing.T) {
 		require.True(mempool.Has(txID))
 
 		retrieved := mempool.Get(txID)
-		require.True(retrieved != nil)
+		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
 
 		// tx exists in mempool

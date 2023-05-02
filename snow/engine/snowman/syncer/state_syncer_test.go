@@ -181,7 +181,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	require.Equal(localSummary, syncer.locallyAvailableSummary)
 	ws, ok := syncer.weightedSummaries[summaryID]
 	require.True(ok)
-	require.Equal(ws.summary.Bytes(), summaryBytes)
+	require.Equal(summaryBytes, ws.summary.Bytes())
 	require.Zero(ws.weight)
 }
 

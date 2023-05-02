@@ -106,7 +106,7 @@ func TestIndex(t *testing.T) {
 		require.Contains(containers, container.ID)
 		require.EqualValues(containers[container.ID], container.Bytes)
 		// Timestamps should be non-decreasing
-		require.True(container.Timestamp >= lastTimestamp)
+		require.GreaterOrEqual(container.Timestamp, lastTimestamp)
 		lastTimestamp = container.Timestamp
 		sawContainers.Add(container.ID)
 	}

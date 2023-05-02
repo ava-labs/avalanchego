@@ -68,7 +68,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
@@ -130,7 +130,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
