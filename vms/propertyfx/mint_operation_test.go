@@ -8,16 +8,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	op := (*MintOperation)(nil)
-	if err := op.Verify(); err == nil {
-		t.Fatalf("nil operation should have failed verification")
-	}
+	require.ErrorIs(op.Verify(), errNilMintOperation)
 }
 
 func TestMintOperationVerifyInvalidOutput(t *testing.T) {
+	require := require.New(t)
+
 	op := MintOperation{
 		OwnedOutput: OwnedOutput{
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -25,21 +28,20 @@ func TestMintOperationVerifyInvalidOutput(t *testing.T) {
 			},
 		},
 	}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("operation should have failed verification")
-	}
+	require.ErrorIs(op.Verify(), secp256k1fx.ErrOutputUnspendable)
 }
 
 func TestMintOperationOuts(t *testing.T) {
+	require := require.New(t)
+
 	op := MintOperation{}
-	if outs := op.Outs(); len(outs) != 2 {
-		t.Fatalf("Wrong number of outputs returned")
-	}
+	require.Len(op.Outs(), 2)
 }
 
 func TestMintOperationState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&MintOperation{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

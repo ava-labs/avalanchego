@@ -9,25 +9,28 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransferOutputVerifyNil(t *testing.T) {
+	require := require.New(t)
+
 	to := (*TransferOutput)(nil)
-	if err := to.Verify(); err == nil {
-		t.Fatalf("TransferOutput.Verify should have errored on nil")
-	}
+	require.ErrorIs(to.Verify(), errNilTransferOutput)
 }
 
 func TestTransferOutputLargePayload(t *testing.T) {
+	require := require.New(t)
+
 	to := TransferOutput{
 		Payload: make([]byte, MaxPayloadSize+1),
 	}
-	if err := to.Verify(); err == nil {
-		t.Fatalf("TransferOutput.Verify should have errored on too large of a payload")
-	}
+	require.ErrorIs(to.Verify(), errPayloadTooLarge)
 }
 
 func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
+	require := require.New(t)
+
 	to := TransferOutput{
 		OutputOwners: secp256k1fx.OutputOwners{
 			Addrs: []ids.ShortID{
@@ -36,14 +39,13 @@ func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
 			},
 		},
 	}
-	if err := to.Verify(); err == nil {
-		t.Fatalf("TransferOutput.Verify should have errored on too large of a payload")
-	}
+	require.ErrorIs(to.Verify(), secp256k1fx.ErrOutputUnoptimized)
 }
 
 func TestTransferOutputState(t *testing.T) {
+	require := require.New(t)
+
 	intf := interface{}(&TransferOutput{})
-	if _, ok := intf.(verify.State); !ok {
-		t.Fatalf("should be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.True(ok)
 }

@@ -78,25 +78,16 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		vm.state.AddUTXO(utxo)
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
+		_, err := vm.IssueTx(tx.Bytes())
+		require.NoError(err)
 
 		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
+		require.Equal(common.PendingTxs, <-issuer)
 		ctx.Lock.Lock()
 
 		// get pending transactions
 		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
+		require.Len(txs, 1)
 		parsedTx := txs[0]
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
@@ -110,8 +101,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		}
 
 		// index the transaction
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(err)
+		require.NoError(vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
 	}
 
 	// ensure length is 5
@@ -164,25 +154,16 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		vm.state.AddUTXO(utxo)
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
+		_, err := vm.IssueTx(tx.Bytes())
+		require.NoError(err)
 
 		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
+		require.Equal(common.PendingTxs, <-issuer)
 		ctx.Lock.Lock()
 
 		// get pending transactions
 		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
+		require.Len(txs, 1)
 		parsedTx := txs[0]
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		addressTxMap[addr] = uniqueParsedTX
@@ -196,8 +177,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		}
 
 		// index the transaction
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(err)
+		require.NoError(vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
 	}
 
 	// ensure length is same as keys length
@@ -309,25 +289,16 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		vm.state.AddUTXO(utxo)
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
+		_, err := vm.IssueTx(tx.Bytes())
+		require.NoError(err)
 
 		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
+		require.Equal(common.PendingTxs, <-issuer)
 		ctx.Lock.Lock()
 
 		// get pending transactions
 		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
+		require.Len(txs, 1)
 		parsedTx := txs[0]
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		addressTxMap[addr] = uniqueParsedTX
@@ -341,8 +312,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		}
 
 		// index the transaction, NOT calling Accept(ids.ID) method
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
-		require.NoError(err)
+		require.NoError(vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
 	}
 
 	// ensure length is same as keys length

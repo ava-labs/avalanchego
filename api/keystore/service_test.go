@@ -6,7 +6,6 @@ package keystore
 import (
 	"fmt"
 	"math/rand"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -232,9 +231,7 @@ func TestServiceExportImport(t *testing.T) {
 				},
 				User: exportReply.User,
 			}, &api.EmptyReply{})
-			if err == nil {
-				t.Fatal("Should have errored due to incorrect password")
-			}
+			require.ErrorIs(err, errIncorrectPassword)
 		}
 
 		{
@@ -245,9 +242,7 @@ func TestServiceExportImport(t *testing.T) {
 				},
 				User: exportReply.User,
 			}, &api.EmptyReply{})
-			if err == nil {
-				t.Fatal("Should have errored due to empty username")
-			}
+			require.ErrorIs(err, errEmptyUsername)
 		}
 
 		{
@@ -259,7 +254,7 @@ func TestServiceExportImport(t *testing.T) {
 				User:     exportReply.User,
 				Encoding: encoding,
 			}, &api.EmptyReply{})
-			require.NoError(err)
+			require.ErrorIs(err, nil)
 		}
 
 		{
@@ -278,23 +273,23 @@ func TestServiceDeleteUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	tests := []struct {
-		desc      string
-		setup     func(ks *keystore) error
-		request   *api.UserPass
-		want      *api.EmptyReply
-		wantError bool
+		desc        string
+		setup       func(ks *keystore) error
+		request     *api.UserPass
+		want        *api.EmptyReply
+		expectedErr error
 	}{{
-		desc:      "empty user name case",
-		request:   &api.UserPass{},
-		wantError: true,
+		desc:        "empty user name case",
+		request:     &api.UserPass{},
+		expectedErr: errEmptyUsername,
 	}, {
-		desc:      "user not exists case",
-		request:   &api.UserPass{Username: "dummy"},
-		wantError: true,
+		desc:        "user not exists case",
+		request:     &api.UserPass{Username: "dummy"},
+		expectedErr: errNonexistentUser,
 	}, {
-		desc:      "user exists and invalid password case",
-		request:   &api.UserPass{Username: testUser, Password: "password"},
-		wantError: true,
+		desc:        "user exists and invalid password case",
+		request:     &api.UserPass{Username: testUser, Password: "password"},
+		expectedErr: errNonexistentUser,
 	}, {
 		desc: "user exists and valid password case",
 		setup: func(ks *keystore) error {
@@ -337,18 +332,11 @@ func TestServiceDeleteUser(t *testing.T) {
 			}
 			got := &api.EmptyReply{}
 			err = s.DeleteUser(nil, tt.request, got)
-			if (err != nil) != tt.wantError {
-				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
-			}
-
-			if !tt.wantError && !reflect.DeepEqual(tt.want, got) {
-				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
-			}
-
-			if err == nil { // delete is successful
-				if _, ok := ks.usernameToPassword[testUser]; ok {
-					t.Fatalf("DeleteUser() failed: expected the user %s should be delete from users map", testUser)
-				}
+			require.ErrorIs(err, tt.expectedErr)
+			if err == nil {
+				require.Equal(tt.want, got)
+				_, ok := ks.usernameToPassword[testUser]
+				require.False(ok) // delete is successful
 
 				// deleted user details should be available to create user again.
 				require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))

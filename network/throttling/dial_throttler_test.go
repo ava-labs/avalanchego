@@ -29,7 +29,7 @@ func TestDialThrottler(t *testing.T) {
 		}()
 		select {
 		case <-time.After(10 * time.Millisecond):
-			t.Fatal("should have acquired immediately")
+			require.FailNow("should have acquired immediately")
 		case <-acquiredChan:
 		}
 		close(acquiredChan)
@@ -46,7 +46,7 @@ func TestDialThrottler(t *testing.T) {
 	select {
 	case <-time.After(25 * time.Millisecond):
 	case <-acquiredChan:
-		t.Fatal("should not have been able to acquire immediately")
+		require.FailNow("should not have been able to acquire immediately")
 	}
 
 	// Wait until the 6th Acquire() has returned. The time at which
@@ -56,9 +56,7 @@ func TestDialThrottler(t *testing.T) {
 	close(acquiredChan)
 	// Use 1.05 seconds instead of 1 second to give some "wiggle room"
 	// so test doesn't flake
-	if time.Since(startTime) > 1050*time.Millisecond {
-		t.Fatal("should not have blocked for so long")
-	}
+	require.Less(time.Since(startTime), 1050*time.Millisecond)
 }
 
 // Test that Acquire honors its specification about its context being canceled
@@ -78,7 +76,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		}()
 		select {
 		case <-time.After(10 * time.Millisecond):
-			t.Fatal("should have acquired immediately")
+			require.FailNow("should have acquired immediately")
 		case <-acquiredChan:
 		}
 		close(acquiredChan)
@@ -99,7 +97,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 	select {
 	case <-acquiredChan:
 	case <-time.After(10 * time.Millisecond):
-		t.Fatal("Acquire should have returned immediately upon context cancellation")
+		require.FailNow("Acquire should have returned immediately upon context cancellation")
 	}
 	close(acquiredChan)
 }

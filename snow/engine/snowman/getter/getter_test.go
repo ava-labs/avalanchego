@@ -169,7 +169,7 @@ func TestFilterAccepted(t *testing.T) {
 		case blkID2:
 			return nil, errUnknownBlock
 		}
-		t.Fatal(errUnknownBlock)
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 

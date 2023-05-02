@@ -14,13 +14,7 @@ func TestHash(t *testing.T) {
 
 	h := Hash{}
 	require.NoError(h.Set("heytherepal"))
-	if !h.Check("heytherepal") {
-		t.Fatalf("Should have verified the password")
-	}
-	if h.Check("heytherepal!") {
-		t.Fatalf("Shouldn't have verified the password")
-	}
-	if h.Check("") {
-		t.Fatalf("Shouldn't have verified the password")
-	}
+	require.True(h.Check("heytherepal"))
+	require.False(h.Check("heytherepal!"))
+	require.False(h.Check(""))
 }

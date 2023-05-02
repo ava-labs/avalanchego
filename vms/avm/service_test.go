@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -200,18 +200,14 @@ func TestServiceIssueTx(t *testing.T) {
 	txArgs := &api.FormattedTx{}
 	txReply := &api.JSONTxID{}
 	err := s.IssueTx(nil, txArgs, txReply)
-	if err == nil {
-		t.Fatal("Expected empty transaction to return an error")
-	}
+	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 	tx := NewTx(t, genesisBytes, vm)
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
 	txReply = &api.JSONTxID{}
 	require.NoError(s.IssueTx(nil, txArgs, txReply))
-	if txReply.TxID != tx.ID() {
-		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
-	}
+	require.Equal(tx.ID(), txReply.TxID)
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
@@ -1906,9 +1902,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			if test.shouldErr {
 				t.Fatal("should have erred")
 			}
-			if test.count != len(reply.UTXOs) {
-				t.Fatalf("Expected %d utxos, got %d", test.count, len(reply.UTXOs))
-			}
+			require.Len(reply.UTXOs, test.count)
 		})
 	}
 }
@@ -1930,12 +1924,8 @@ func TestGetAssetDescription(t *testing.T) {
 	}, &reply)
 	require.NoError(err)
 
-	if reply.Name != "AVAX" {
-		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Name)
-	}
-	if reply.Symbol != "SYMB" {
-		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Symbol)
-	}
+	require.Equal("AVAX", reply.Name)
+	require.Equal("SYMB", reply.Symbol)
 }
 
 func TestGetBalance(t *testing.T) {
@@ -1958,9 +1948,7 @@ func TestGetBalance(t *testing.T) {
 	}, &reply)
 	require.NoError(err)
 
-	if uint64(reply.Balance) != startBalance {
-		t.Fatalf("Wrong balance returned from GetBalance %d", reply.Balance)
-	}
+	require.Equal(startBalance, uint64(reply.Balance))
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
@@ -2050,9 +2038,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				vm:   vm,
 				txID: reply.AssetID,
 			}
-			if status := createAssetTx.Status(); status != choices.Processing {
-				t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
-			}
+			require.Equal(choices.Processing, createAssetTx.Status())
 			require.NoError(createAssetTx.Accept(context.Background()))
 
 			createdAssetID := reply.AssetID.String()
@@ -2078,9 +2064,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				txID: mintReply.TxID,
 			}
 
-			if status := mintTx.Status(); status != choices.Processing {
-				t.Fatalf("MintTx status should have been Processing, but was %s", status)
-			}
+			require.Equal(choices.Processing, mintTx.Status())
 			require.NoError(mintTx.Accept(context.Background()))
 
 			sendArgs := &SendArgs{
@@ -2100,9 +2084,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
 			require.NoError(s.Send(nil, sendArgs, sendReply))
-			if sendReply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
-			}
+			require.Equal(changeAddrStr, sendReply.ChangeAddr)
 		})
 	}
 }
@@ -2146,9 +2128,7 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 			createReply := &AssetIDChangeAddr{}
 			require.NoError(s.CreateNFTAsset(nil, createArgs, createReply))
-			if createReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
-			}
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			assetID := createReply.AssetID
 			createNFTTx := UniqueTx{
@@ -2156,9 +2136,7 @@ func TestNFTWorkflow(t *testing.T) {
 				txID: createReply.AssetID,
 			}
 			// Accept the transaction so that we can Mint NFTs for the test
-			if createNFTTx.Status() != choices.Processing {
-				t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
-			}
+			require.Equal(choices.Processing, createNFTTx.Status())
 			require.NoError(createNFTTx.Accept(context.Background()))
 			require.NoError(verifyTxFeeDeducted(t, s, fromAddrs, 1))
 
@@ -2181,17 +2159,13 @@ func TestNFTWorkflow(t *testing.T) {
 			mintReply := &api.JSONTxIDChangeAddr{}
 
 			require.NoError(s.MintNFT(nil, mintArgs, mintReply))
-			if createReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
-			}
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			mintNFTTx := UniqueTx{
 				vm:   vm,
 				txID: mintReply.TxID,
 			}
-			if mintNFTTx.Status() != choices.Processing {
-				t.Fatal("MintNFTTx should have been processing after minting the NFT")
-			}
+			require.Equal(choices.Processing, mintNFTTx.Status())
 
 			// Accept the transaction so that we can send the newly minted NFT
 			require.NoError(mintNFTTx.Accept(context.Background()))
@@ -2211,9 +2185,7 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
 			require.NoError(s.SendNFT(nil, sendArgs, sendReply))
-			if sendReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
-			}
+			require.Equal(fromAddrsStr[0], sendReply.ChangeAddr)
 		})
 	}
 }
@@ -2252,10 +2224,7 @@ func TestImportExportKey(t *testing.T) {
 	}
 	exportReply := &ExportKeyReply{}
 	require.NoError(s.ExportKey(nil, exportArgs, exportReply))
-
-	if !bytes.Equal(sk.Bytes(), exportReply.PrivateKey.Bytes()) {
-		t.Fatal("Unexpected key was found in ExportKeyReply")
-	}
+	require.Equal(sk.Bytes(), exportReply.PrivateKey.Bytes())
 }
 
 func TestImportAVMKeyNoDuplicates(t *testing.T) {
@@ -2284,16 +2253,12 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	expectedAddress, err := vm.FormatLocalAddress(sk.PublicKey().Address())
 	require.NoError(err)
 
-	if reply.Address != expectedAddress {
-		t.Fatalf("Reply address: %s did not match expected address: %s", reply.Address, expectedAddress)
-	}
+	require.Equal(expectedAddress, reply.Address)
 
 	reply2 := api.JSONAddress{}
 	require.NoError(s.ImportKey(nil, &args, &reply2))
 
-	if reply2.Address != expectedAddress {
-		t.Fatalf("Reply address: %s did not match expected address: %s", reply2.Address, expectedAddress)
-	}
+	require.Equal(expectedAddress, reply2.Address)
 
 	addrsArgs := api.UserPass{
 		Username: username,
@@ -2302,13 +2267,8 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	addrsReply := api.JSONAddresses{}
 	require.NoError(s.ListAddresses(nil, &addrsArgs, &addrsReply))
 
-	if len(addrsReply.Addresses) != 1 {
-		t.Fatal("Importing the same key twice created duplicate addresses")
-	}
-
-	if addrsReply.Addresses[0] != expectedAddress {
-		t.Fatal("List addresses returned an incorrect address")
-	}
+	require.Len(addrsReply.Addresses, 1)
+	require.Equal(expectedAddress, addrsReply.Addresses[0])
 }
 
 func TestSend(t *testing.T) {
@@ -2347,18 +2307,11 @@ func TestSend(t *testing.T) {
 	reply := &api.JSONTxIDChangeAddr{}
 	vm.timer.Cancel()
 	require.NoError(s.Send(nil, args, reply))
-	if reply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-	}
+	require.Equal(changeAddrStr, reply.ChangeAddr)
 
 	pendingTxs := vm.txs
-	if len(pendingTxs) != 1 {
-		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-	}
-
-	if reply.TxID != pendingTxs[0].ID() {
-		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
-	}
+	require.Len(pendingTxs, 1)
+	require.Equal(pendingTxs[0].ID(), reply.TxID)
 }
 
 func TestSendMultiple(t *testing.T) {
@@ -2406,22 +2359,13 @@ func TestSendMultiple(t *testing.T) {
 			reply := &api.JSONTxIDChangeAddr{}
 			vm.timer.Cancel()
 			require.NoError(s.SendMultiple(nil, args, reply))
-			if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			pendingTxs := vm.txs
-			if len(pendingTxs) != 1 {
-				t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-			}
-
-			if reply.TxID != pendingTxs[0].ID() {
-				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
-			}
-
-			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
-				t.Fatalf("Failed to retrieve created transaction: %s", err)
-			}
+			require.Len(pendingTxs, 1)
+			require.Equal(pendingTxs[0].ID(), reply.TxID)
+			_, err = vm.GetTx(context.Background(), reply.TxID)
+			require.NoError(err)
 		})
 	}
 }
@@ -2453,12 +2397,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 
 	require.NoError(s.ListAddresses(nil, listArgs, listReply))
 
-	for _, addr := range listReply.Addresses {
-		if addr == newAddr {
-			return
-		}
-	}
-	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
+	require.Contains(listReply.Addresses, newAddr)
 }
 
 func TestImport(t *testing.T) {
@@ -2490,15 +2429,13 @@ func TestImport(t *testing.T) {
 
 			peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 			utxoID := utxo.InputID()
-			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+			require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   utxoID[:],
 				Value: utxoBytes,
 				Traits: [][]byte{
 					addr0.Bytes(),
 				},
-			}}}}); err != nil {
-				t.Fatal(err)
-			}
+			}}}}))
 
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 			require.NoError(err)

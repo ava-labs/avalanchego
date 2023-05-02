@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -101,7 +103,8 @@ func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, cont
 		return nil
 	}
 	if s.T != nil {
-		s.T.Fatal(errAccept)
+		require := require.New(s.T)
+		require.FailNow(errAccept.Error())
 	}
 	return errAccept
 }
@@ -113,7 +116,8 @@ func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorI
 	if s.SendGetStateSummaryFrontierF != nil {
 		s.SendGetStateSummaryFrontierF(ctx, validatorIDs, requestID)
 	} else if s.CantSendGetStateSummaryFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGetStateSummaryFrontier")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGetStateSummaryFrontier")
 	}
 }
 
@@ -124,7 +128,8 @@ func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID i
 	if s.SendStateSummaryFrontierF != nil {
 		s.SendStateSummaryFrontierF(ctx, validatorID, requestID, summary)
 	} else if s.CantSendStateSummaryFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendStateSummaryFrontier")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendStateSummaryFrontier")
 	}
 }
 
@@ -135,7 +140,8 @@ func (s *SenderTest) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs se
 	if s.SendGetAcceptedStateSummaryF != nil {
 		s.SendGetAcceptedStateSummaryF(ctx, nodeIDs, requestID, heights)
 	} else if s.CantSendGetAcceptedStateSummary && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGetAcceptedStateSummaryF")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGetAcceptedStateSummaryF")
 	}
 }
 
@@ -146,7 +152,8 @@ func (s *SenderTest) SendAcceptedStateSummary(ctx context.Context, validatorID i
 	if s.SendAcceptedStateSummaryF != nil {
 		s.SendAcceptedStateSummaryF(ctx, validatorID, requestID, summaryIDs)
 	} else if s.CantSendAcceptedStateSummary && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendAcceptedStateSummary")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendAcceptedStateSummary")
 	}
 }
 
@@ -157,7 +164,8 @@ func (s *SenderTest) SendGetAcceptedFrontier(ctx context.Context, validatorIDs s
 	if s.SendGetAcceptedFrontierF != nil {
 		s.SendGetAcceptedFrontierF(ctx, validatorIDs, requestID)
 	} else if s.CantSendGetAcceptedFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGetAcceptedFrontier")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGetAcceptedFrontier")
 	}
 }
 
@@ -168,7 +176,8 @@ func (s *SenderTest) SendAcceptedFrontier(ctx context.Context, validatorID ids.N
 	if s.SendAcceptedFrontierF != nil {
 		s.SendAcceptedFrontierF(ctx, validatorID, requestID, containerIDs)
 	} else if s.CantSendAcceptedFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendAcceptedFrontier")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendAcceptedFrontier")
 	}
 }
 
@@ -179,7 +188,8 @@ func (s *SenderTest) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.No
 	if s.SendGetAcceptedF != nil {
 		s.SendGetAcceptedF(ctx, nodeIDs, requestID, containerIDs)
 	} else if s.CantSendGetAccepted && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGetAccepted")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGetAccepted")
 	}
 }
 
@@ -190,7 +200,8 @@ func (s *SenderTest) SendAccepted(ctx context.Context, validatorID ids.NodeID, r
 	if s.SendAcceptedF != nil {
 		s.SendAcceptedF(ctx, validatorID, requestID, containerIDs)
 	} else if s.CantSendAccepted && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendAccepted")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendAccepted")
 	}
 }
 
@@ -201,7 +212,8 @@ func (s *SenderTest) SendGet(ctx context.Context, vdr ids.NodeID, requestID uint
 	if s.SendGetF != nil {
 		s.SendGetF(ctx, vdr, requestID, vtxID)
 	} else if s.CantSendGet && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGet")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGet")
 	}
 }
 
@@ -212,7 +224,8 @@ func (s *SenderTest) SendGetAncestors(ctx context.Context, validatorID ids.NodeI
 	if s.SendGetAncestorsF != nil {
 		s.SendGetAncestorsF(ctx, validatorID, requestID, vtxID)
 	} else if s.CantSendGetAncestors && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendCantSendGetAncestors")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendCantSendGetAncestors")
 	}
 }
 
@@ -223,7 +236,8 @@ func (s *SenderTest) SendPut(ctx context.Context, vdr ids.NodeID, requestID uint
 	if s.SendPutF != nil {
 		s.SendPutF(ctx, vdr, requestID, vtx)
 	} else if s.CantSendPut && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendPut")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendPut")
 	}
 }
 
@@ -234,7 +248,8 @@ func (s *SenderTest) SendAncestors(ctx context.Context, vdr ids.NodeID, requestI
 	if s.SendAncestorsF != nil {
 		s.SendAncestorsF(ctx, vdr, requestID, vtxs)
 	} else if s.CantSendAncestors && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendAncestors")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendAncestors")
 	}
 }
 
@@ -245,7 +260,8 @@ func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs set.Set[ids.NodeID]
 	if s.SendPushQueryF != nil {
 		s.SendPushQueryF(ctx, vdrs, requestID, vtx)
 	} else if s.CantSendPushQuery && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendPushQuery")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendPushQuery")
 	}
 }
 
@@ -256,7 +272,8 @@ func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID]
 	if s.SendPullQueryF != nil {
 		s.SendPullQueryF(ctx, vdrs, requestID, vtxID)
 	} else if s.CantSendPullQuery && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendPullQuery")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendPullQuery")
 	}
 }
 
@@ -267,7 +284,8 @@ func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID ui
 	if s.SendChitsF != nil {
 		s.SendChitsF(ctx, vdr, requestID, votes, accepted)
 	} else if s.CantSendChits && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendChits")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendChits")
 	}
 }
 
@@ -278,7 +296,8 @@ func (s *SenderTest) SendGossip(ctx context.Context, container []byte) {
 	if s.SendGossipF != nil {
 		s.SendGossipF(ctx, container)
 	} else if s.CantSendGossip && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendGossip")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendGossip")
 	}
 }
 
@@ -286,7 +305,8 @@ func (s *SenderTest) SendCrossChainAppRequest(ctx context.Context, chainID ids.I
 	if s.SendCrossChainAppRequestF != nil {
 		s.SendCrossChainAppRequestF(ctx, chainID, requestID, appRequestBytes)
 	} else if s.CantSendCrossChainAppRequest && s.T != nil {
-		s.T.Fatal("Unexpectedly called SendCrossChainAppRequest")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendCrossChainAppRequest")
 	}
 	return nil
 }
@@ -295,7 +315,8 @@ func (s *SenderTest) SendCrossChainAppResponse(ctx context.Context, chainID ids.
 	if s.SendCrossChainAppResponseF != nil {
 		s.SendCrossChainAppResponseF(ctx, chainID, requestID, appResponseBytes)
 	} else if s.CantSendCrossChainAppResponse && s.T != nil {
-		s.T.Fatal("Unexpectedly called SendCrossChainAppResponse")
+		require := require.New(s.T)
+		require.FailNow("Unexpectedly called SendCrossChainAppResponse")
 	}
 	return nil
 }
@@ -308,7 +329,8 @@ func (s *SenderTest) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.Nod
 	case s.SendAppRequestF != nil:
 		return s.SendAppRequestF(ctx, nodeIDs, requestID, appRequestBytes)
 	case s.CantSendAppRequest && s.T != nil:
-		s.T.Fatal(errSendAppRequest)
+		require := require.New(s.T)
+		require.FailNow(errSendAppRequest.Error())
 	}
 	return errSendAppRequest
 }
@@ -321,7 +343,8 @@ func (s *SenderTest) SendAppResponse(ctx context.Context, nodeID ids.NodeID, req
 	case s.SendAppResponseF != nil:
 		return s.SendAppResponseF(ctx, nodeID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
-		s.T.Fatal(errSendAppResponse)
+		require := require.New(s.T)
+		require.FailNow(errSendAppResponse.Error())
 	}
 	return errSendAppResponse
 }
@@ -334,7 +357,8 @@ func (s *SenderTest) SendAppGossip(ctx context.Context, appGossipBytes []byte) e
 	case s.SendAppGossipF != nil:
 		return s.SendAppGossipF(ctx, appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
-		s.T.Fatal(errSendAppGossip)
+		require := require.New(s.T)
+		require.FailNow(errSendAppGossip.Error())
 	}
 	return errSendAppGossip
 }
@@ -347,7 +371,8 @@ func (s *SenderTest) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[
 	case s.SendAppGossipSpecificF != nil:
 		return s.SendAppGossipSpecificF(ctx, nodeIDs, appGossipBytes)
 	case s.CantSendAppGossipSpecific && s.T != nil:
-		s.T.Fatal(errSendAppGossipSpecific)
+		require := require.New(s.T)
+		require.FailNow(errSendAppGossipSpecific.Error())
 	}
 	return errSendAppGossipSpecific
 }

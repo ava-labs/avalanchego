@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -53,7 +55,8 @@ func (vm *TestVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return vm.BuildBlockF(ctx)
 	}
 	if vm.CantBuildBlock && vm.T != nil {
-		vm.T.Fatal(errBuildBlock)
+		require := require.New(vm.T)
+		require.FailNow(errBuildBlock.Error())
 	}
 	return nil, errBuildBlock
 }
@@ -63,7 +66,8 @@ func (vm *TestVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, erro
 		return vm.ParseBlockF(ctx, b)
 	}
 	if vm.CantParseBlock && vm.T != nil {
-		vm.T.Fatal(errParseBlock)
+		require := require.New(vm.T)
+		require.FailNow(errParseBlock.Error())
 	}
 	return nil, errParseBlock
 }
@@ -73,7 +77,8 @@ func (vm *TestVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error
 		return vm.GetBlockF(ctx, id)
 	}
 	if vm.CantGetBlock && vm.T != nil {
-		vm.T.Fatal(errGetBlock)
+		require := require.New(vm.T)
+		require.FailNow(errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }
@@ -83,7 +88,8 @@ func (vm *TestVM) SetPreference(ctx context.Context, id ids.ID) error {
 		return vm.SetPreferenceF(ctx, id)
 	}
 	if vm.CantSetPreference && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called SetPreference")
+		require := require.New(vm.T)
+		require.FailNow("Unexpectedly called SetPreference")
 	}
 	return nil
 }
@@ -93,7 +99,8 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.LastAcceptedF(ctx)
 	}
 	if vm.CantLastAccepted && vm.T != nil {
-		vm.T.Fatal(errLastAccepted)
+		require := require.New(vm.T)
+		require.FailNow(errLastAccepted.Error())
 	}
 	return ids.ID{}, errLastAccepted
 }

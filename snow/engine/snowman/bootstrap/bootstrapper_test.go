@@ -513,8 +513,8 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(database.ErrNotFound)
-			panic(database.ErrNotFound)
+			require.FailNow(database.ErrNotFound.Error())
+			return nil, database.ErrNotFound
 		}
 	}
 	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
@@ -532,7 +532,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes3):
 			return blk3, nil
 		}
-		t.Fatal(errUnknownBlock)
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -540,11 +540,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	requested := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
-		switch vtxID {
-		case blkID1, blkID2:
-		default:
-			t.Fatalf("should have requested blk1 or blk2")
-		}
+		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
 		*requestID = reqID
 		requested = vtxID
 	}
@@ -661,8 +657,8 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(database.ErrNotFound)
-			panic(database.ErrNotFound)
+			require.FailNow(database.ErrNotFound.Error())
+			return nil, database.ErrNotFound
 		}
 	}
 	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
@@ -680,7 +676,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes3):
 			return blk3, nil
 		}
-		t.Fatal(errUnknownBlock)
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -823,8 +819,8 @@ func TestBootstrapperAncestors(t *testing.T) {
 		case blkID3:
 			return blk3, nil
 		default:
-			t.Fatal(database.ErrNotFound)
-			panic(database.ErrNotFound)
+			require.FailNow(database.ErrNotFound.Error())
+			return nil, database.ErrNotFound
 		}
 	}
 	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
@@ -842,7 +838,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		case bytes.Equal(blkBytes, blkBytes3):
 			return blk3, nil
 		}
-		t.Fatal(errUnknownBlock)
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -850,11 +846,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	requested := ids.Empty
 	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		require.Equal(peerID, vdr)
-		switch vtxID {
-		case blkID1, blkID2:
-		default:
-			t.Fatalf("should have requested blk1 or blk2")
-		}
+		require.Contains([]ids.ID{blkID1, blkID2}, vtxID)
 		*requestID = reqID
 		requested = vtxID
 	}

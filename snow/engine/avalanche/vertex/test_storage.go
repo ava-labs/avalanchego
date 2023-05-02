@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
@@ -38,7 +40,8 @@ func (s *TestStorage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Verte
 		return s.GetVtxF(ctx, vtxID)
 	}
 	if s.CantGetVtx && s.T != nil {
-		s.T.Fatal(errGet)
+		require := require.New(s.T)
+		require.FailNow(errGet.Error())
 	}
 	return nil, errGet
 }
@@ -48,7 +51,8 @@ func (s *TestStorage) Edge(ctx context.Context) []ids.ID {
 		return s.EdgeF(ctx)
 	}
 	if s.CantEdge && s.T != nil {
-		s.T.Fatal(errEdge)
+		require := require.New(s.T)
+		require.FailNow(errEdge.Error())
 	}
 	return nil
 }
@@ -58,7 +62,8 @@ func (s *TestStorage) StopVertexAccepted(ctx context.Context) (bool, error) {
 		return s.StopVertexAcceptedF(ctx)
 	}
 	if s.CantStopVertexAccepted && s.T != nil {
-		s.T.Fatal(errStopVertexAccepted)
+		require := require.New(s.T)
+		require.FailNow(errStopVertexAccepted.Error())
 	}
 	return false, nil
 }

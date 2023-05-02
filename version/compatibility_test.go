@@ -40,9 +40,9 @@ func TestCompatibility(t *testing.T) {
 	require.Equal(v, compatibility.Version())
 
 	tests := []struct {
-		peer       *Application
-		time       time.Time
-		compatible bool
+		peer        *Application
+		time        time.Time
+		expectedErr error
 	}{
 		{
 			peer: &Application{
@@ -50,8 +50,7 @@ func TestCompatibility(t *testing.T) {
 				Minor: 5,
 				Patch: 0,
 			},
-			time:       minCompatableTime,
-			compatible: true,
+			time: minCompatableTime,
 		},
 		{
 			peer: &Application{
@@ -59,8 +58,7 @@ func TestCompatibility(t *testing.T) {
 				Minor: 3,
 				Patch: 5,
 			},
-			time:       time.Unix(8500, 0),
-			compatible: true,
+			time: time.Unix(8500, 0),
 		},
 		{
 			peer: &Application{
@@ -68,8 +66,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 1,
 				Patch: 0,
 			},
-			time:       minCompatableTime,
-			compatible: false,
+			time:        minCompatableTime,
+			expectedErr: errDifferentMajor,
 		},
 		{
 			peer: &Application{
@@ -77,8 +75,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 3,
 				Patch: 5,
 			},
-			time:       minCompatableTime,
-			compatible: false,
+			time:        minCompatableTime,
+			expectedErr: errIncompatible,
 		},
 		{
 			peer: &Application{
@@ -86,8 +84,8 @@ func TestCompatibility(t *testing.T) {
 				Minor: 2,
 				Patch: 5,
 			},
-			time:       time.Unix(8500, 0),
-			compatible: false,
+			time:        time.Unix(8500, 0),
+			expectedErr: errIncompatible,
 		},
 		{
 			peer: &Application{
@@ -95,19 +93,15 @@ func TestCompatibility(t *testing.T) {
 				Minor: 1,
 				Patch: 5,
 			},
-			time:       time.Unix(7500, 0),
-			compatible: false,
+			time:        time.Unix(7500, 0),
+			expectedErr: errIncompatible,
 		},
 	}
 	for _, test := range tests {
 		peer := test.peer
 		compatibility.clock.Set(test.time)
 		t.Run(fmt.Sprintf("%s-%s", peer, test.time), func(t *testing.T) {
-			if err := compatibility.Compatible(peer); test.compatible && err != nil {
-				t.Fatalf("incorrectly marked %s as incompatible with %s", peer, err)
-			} else if !test.compatible && err == nil {
-				t.Fatalf("incorrectly marked %s as compatible", peer)
-			}
+			require.ErrorIs(compatibility.Compatible(peer), test.expectedErr)
 		})
 	}
 }

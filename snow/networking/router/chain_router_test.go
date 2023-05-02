@@ -166,14 +166,14 @@ func TestShutdown(t *testing.T) {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	select {
 	case <-ticker.C:
-		t.Fatalf("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
+		require.FailNow("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
 	case <-shutdownCalled:
 	}
 
 	select {
 	case <-h.Stopped():
 	default:
-		t.Fatal("handler shutdown but never closed its closing channel")
+		require.FailNow("handler shutdown but never closed its closing channel")
 	}
 }
 
@@ -316,7 +316,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	select {
 	case <-bootstrapFinished:
-		t.Fatalf("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
+		require.FailNow("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
 	case <-shutdownFinished:
 	}
 }

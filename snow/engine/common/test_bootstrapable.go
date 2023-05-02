@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -36,23 +38,19 @@ func (b *BootstrapableTest) Default(cant bool) {
 func (b *BootstrapableTest) Clear() error {
 	if b.ClearF != nil {
 		return b.ClearF()
-	} else if b.CantClear {
-		if b.T != nil {
-			b.T.Fatalf("Unexpectedly called Clear")
-		}
-		return errClear
+	} else if b.CantClear && b.T != nil {
+		require := require.New(b.T)
+		require.FailNow(errClear.Error())
 	}
-	return nil
+	return errClear
 }
 
 func (b *BootstrapableTest) ForceAccepted(ctx context.Context, containerIDs []ids.ID) error {
 	if b.ForceAcceptedF != nil {
 		return b.ForceAcceptedF(ctx, containerIDs)
-	} else if b.CantForceAccepted {
-		if b.T != nil {
-			b.T.Fatalf("Unexpectedly called ForceAccepted")
-		}
-		return errForceAccepted
+	} else if b.CantForceAccepted && b.T != nil {
+		require := require.New(b.T)
+		require.FailNow(errForceAccepted.Error())
 	}
-	return nil
+	return errForceAccepted
 }
