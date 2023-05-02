@@ -174,9 +174,9 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.True(previouslyIndexed)
-	require.EqualValues(1, server.timesCalled)
-	require.EqualValues("index/chain1", server.bases[0])
-	require.EqualValues("/block", server.endpoints[0])
+	require.Equal(1, server.timesCalled)
+	require.Equal("index/chain1", server.bases[0])
+	require.Equal("/block", server.endpoints[0])
 	require.Len(idxr.blockIndices, 1)
 	require.Len(idxr.txIndices, 0)
 	require.Len(idxr.vtxIndices, 0)
@@ -207,7 +207,7 @@ func TestIndexer(t *testing.T) {
 	// Verify GetIndex is right
 	index, err := blkIdx.GetIndex(blkID)
 	require.NoError(err)
-	require.EqualValues(0, index)
+	require.Zero(index)
 
 	// Verify GetContainerByIndex is right
 	container, err = blkIdx.GetContainerByIndex(0)
@@ -257,7 +257,7 @@ func TestIndexer(t *testing.T) {
 	container, err = blkIdx.GetLastAccepted()
 	require.NoError(err)
 	require.Equal(blkID, container.ID)
-	require.EqualValues(1, server.timesCalled) // block index for chain
+	require.Equal(1, server.timesCalled) // block index for chain
 	require.Contains(server.endpoints, "/block")
 
 	// Register a DAG chain
@@ -272,7 +272,7 @@ func TestIndexer(t *testing.T) {
 	dagVM := vertex.NewMockLinearizableVM(ctrl)
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 	require.NoError(err)
-	require.EqualValues(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
+	require.Equal(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
 	require.Contains(server.bases, "index/chain2")
 	require.Contains(server.endpoints, "/block")
 	require.Contains(server.endpoints, "/vtx")
@@ -307,7 +307,7 @@ func TestIndexer(t *testing.T) {
 	// Verify GetIndex is right
 	index, err = vtxIdx.GetIndex(vtxID)
 	require.NoError(err)
-	require.EqualValues(0, index)
+	require.Zero(index)
 
 	// Verify GetContainerByIndex is right
 	vtx, err = vtxIdx.GetContainerByIndex(0)
@@ -356,7 +356,7 @@ func TestIndexer(t *testing.T) {
 	// Verify GetIndex is right
 	index, err = txIdx.GetIndex(txID)
 	require.NoError(err)
-	require.EqualValues(0, index)
+	require.Zero(index)
 
 	// Verify GetContainerByIndex is right
 	tx, err = txIdx.GetContainerByIndex(0)
@@ -373,13 +373,13 @@ func TestIndexer(t *testing.T) {
 	// happen on the block/tx index. Similar for tx.
 	lastAcceptedTx, err := txIdx.GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(txID, lastAcceptedTx.ID)
+	require.Equal(txID, lastAcceptedTx.ID)
 	lastAcceptedVtx, err := vtxIdx.GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(vtxID, lastAcceptedVtx.ID)
+	require.Equal(vtxID, lastAcceptedVtx.ID)
 	lastAcceptedBlk, err := blkIdx.GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(blkID, lastAcceptedBlk.ID)
+	require.Equal(blkID, lastAcceptedBlk.ID)
 
 	// Close the indexer again
 	require.NoError(config.DB.(*versiondb.Database).Commit())
@@ -397,13 +397,13 @@ func TestIndexer(t *testing.T) {
 	// Verify state
 	lastAcceptedTx, err = idxr.txIndices[chain2Ctx.ChainID].GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(txID, lastAcceptedTx.ID)
+	require.Equal(txID, lastAcceptedTx.ID)
 	lastAcceptedVtx, err = idxr.vtxIndices[chain2Ctx.ChainID].GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(vtxID, lastAcceptedVtx.ID)
+	require.Equal(vtxID, lastAcceptedVtx.ID)
 	lastAcceptedBlk, err = idxr.blockIndices[chain1Ctx.ChainID].GetLastAccepted()
 	require.NoError(err)
-	require.EqualValues(blkID, lastAcceptedBlk.ID)
+	require.Equal(blkID, lastAcceptedBlk.ID)
 }
 
 // Make sure the indexer doesn't allow incomplete indices unless explicitly allowed
