@@ -170,9 +170,8 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
-
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
@@ -370,8 +369,8 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 

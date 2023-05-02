@@ -35,8 +35,8 @@ func TestUnarySnowball(t *testing.T) {
 	UnarySnowballStateTest(t, sb, 2, 1, false)
 
 	sbCloneIntf := sb.Clone()
-	sbClone, ok := sbCloneIntf.(*unarySnowball)
-	require.True(ok)
+	require.IsType(&unarySnowball{}, sbCloneIntf)
+	sbClone := sbCloneIntf.(*unarySnowball)
 
 	UnarySnowballStateTest(t, sbClone, 2, 1, false)
 

@@ -25,8 +25,8 @@ func TestBandwidthThrottler(t *testing.T) {
 	}
 	throttlerIntf, err := newBandwidthThrottler(logging.NoLog{}, "", prometheus.NewRegistry(), config)
 	require.NoError(err)
-	throttler, ok := throttlerIntf.(*bandwidthThrottlerImpl)
-	require.True(ok)
+	require.IsType(&bandwidthThrottlerImpl{}, throttlerIntf)
+	throttler := throttlerIntf.(*bandwidthThrottlerImpl)
 	require.NotNil(throttler.log)
 	require.NotNil(throttler.limiters)
 	require.Equal(config.RefillRate, throttler.RefillRate)

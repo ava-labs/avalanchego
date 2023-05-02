@@ -1116,8 +1116,8 @@ func TestRestartBootstrapping(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	bs, ok := bsIntf.(*bootstrapper)
-	require.True(ok)
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1223,8 +1223,8 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	bs, ok := bsIntf.(*bootstrapper)
-	require.True(ok)
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	require.NoError(bs.Start(context.Background(), 0))
@@ -1294,8 +1294,8 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	bs, ok := bsIntf.(*bootstrapper)
-	require.True(ok)
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {

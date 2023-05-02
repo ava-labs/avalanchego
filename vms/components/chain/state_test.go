@@ -137,8 +137,7 @@ func cantBuildBlock(context.Context) (snowman.Block, error) {
 // correctly uniquified when calling GetBlock and ParseBlock.
 func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 	require := require.New(t)
-	_, ok := blk.(*BlockWrapper)
-	require.True(ok)
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	require.NoError(err)
@@ -156,8 +155,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // and GetBlock.
 func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
 	require := require.New(t)
-	_, ok := blk.(*BlockWrapper)
-	require.True(ok)
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	require.NoError(err)
@@ -444,15 +442,13 @@ func TestGetBlockInternal(t *testing.T) {
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	_, ok := genesisBlockInternal.(*TestBlock)
-	require.True(ok)
+	require.IsType(&TestBlock{}, genesisBlockInternal)
 	require.Equal(genesisBlock.ID(), genesisBlockInternal.ID())
 
 	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
 	require.NoError(err)
 
-	_, ok = blk.(*TestBlock)
-	require.True(ok)
+	require.IsType(&TestBlock{}, blk)
 	require.Equal(genesisBlock.ID(), blk.ID())
 }
 

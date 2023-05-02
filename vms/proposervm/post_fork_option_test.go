@@ -114,12 +114,11 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
-	_, ok = opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them
 	require.NoError(opts[0].Verify(context.Background()))
@@ -144,8 +143,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 	proChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok = proChild.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, proChild)
 	require.NoError(proChild.Verify(context.Background()))
 }
 
@@ -231,12 +229,11 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
-	_, ok = opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
 	require.NoError(opts[0].Verify(context.Background()))
@@ -340,8 +337,8 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	require.Equal(parentBlk.ID(), acceptedID)
 
 	// accept one of the options
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 
@@ -436,22 +433,22 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	// reject oracle block
 	require.NoError(builtBlk.Reject(context.Background()))
-	proBlk, ok := builtBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, builtBlk)
+	proBlk := builtBlk.(*postForkBlock)
 
 	require.Equal(choices.Rejected, proBlk.Status())
 
 	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
 
 	// reject an option
-	postForkOracleBlk, ok := builtBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, builtBlk)
+	postForkOracleBlk := builtBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 
 	require.NoError(opts[0].Reject(context.Background()))
-	proOpt, ok := opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
+	proOpt := opts[0].(*postForkOption)
 
 	require.Equal(choices.Rejected, proOpt.Status())
 
@@ -520,8 +517,8 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	postForkBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkBlk := parentBlk.(*postForkBlock)
 	_, err = postForkBlk.Options(context.Background())
 	require.ErrorIs(err, snowman.ErrNotOracle)
 

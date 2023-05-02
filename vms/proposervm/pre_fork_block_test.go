@@ -105,8 +105,8 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require.NoError(err)
 
 	// retrieve options ...
-	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, parentBlk)
+	preForkOracleBlk := parentBlk.(*preForkBlock)
 	opts, err := preForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 	require.NoError(opts[0].Verify(context.Background()))
@@ -130,8 +130,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	preForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok = preForkChild.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, preForkChild)
 }
 
 func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
@@ -197,8 +196,8 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require.NoError(err)
 
 	// retrieve options ...
-	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, parentBlk)
+	preForkOracleBlk := parentBlk.(*preForkBlock)
 	opts, err := preForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 	require.NoError(opts[0].Verify(context.Background()))
@@ -222,8 +221,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	postForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok = postForkChild.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, postForkChild)
 }
 
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
@@ -321,8 +319,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	// preFork block verifies if parent is before fork activation time
 	preForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok := preForkChild.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, preForkChild)
 
 	require.NoError(preForkChild.Verify(context.Background()))
 
@@ -384,8 +381,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 
 	lastPreForkBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok = lastPreForkBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, lastPreForkBlk)
 
 	require.NoError(lastPreForkBlk.Verify(context.Background()))
 
@@ -418,9 +414,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 
 	firstPostForkBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok = firstPostForkBlk.(*postForkBlock)
-	require.True(ok)
-
+	require.IsType(&postForkBlock{}, firstPostForkBlk)
 	require.NoError(firstPostForkBlk.Verify(context.Background()))
 }
 
@@ -449,8 +443,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	// postFork block verifies if parent is after fork activation time
 	postForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	_, ok := postForkChild.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, postForkChild)
 
 	require.NoError(postForkChild.Verify(context.Background()))
 
@@ -537,8 +530,8 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 	sb, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	proBlk, ok := sb.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, sb)
+	proBlk := sb.(*preForkBlock)
 
 	require.NoError(proBlk.Reject(context.Background()))
 	require.Equal(choices.Rejected, proBlk.Status())

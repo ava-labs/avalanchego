@@ -74,8 +74,8 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	bsIntf, err := New(manager, config)
 	require.NoError(err)
-	bs, ok := bsIntf.(*getter)
-	require.True(ok)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
@@ -121,8 +121,8 @@ func TestFilterAccepted(t *testing.T) {
 
 	bsIntf, err := New(manager, config)
 	require.NoError(err)
-	bs, ok := bsIntf.(*getter)
-	require.True(ok)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 

@@ -559,8 +559,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require.NoError(proVM.SetPreference(context.Background(), oracleBlk.ID()))
 
 	// retrieve one option and verify block built on it
-	postForkOracleBlk, ok := oracleBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, oracleBlk)
+	postForkOracleBlk := oracleBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 	parentBlk := opts[0]
@@ -835,8 +835,8 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 
 	sb, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-	proBlk, ok := sb.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, sb)
+	proBlk := sb.(*postForkBlock)
 
 	require.NoError(proBlk.Reject(context.Background()))
 
@@ -924,12 +924,11 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
-	_, ok = opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
 	require.NoError(opts[0].Verify(context.Background()))

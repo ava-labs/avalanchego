@@ -93,8 +93,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	commonSyncer := New(cfg, func(context.Context, uint32) error {
 		return nil
 	})
-	syncer, ok := commonSyncer.(*stateSyncer)
-	require.True(ok)
+	require.IsType(&stateSyncer{}, commonSyncer)
+	syncer := commonSyncer.(*stateSyncer)
 	require.NotNil(syncer.stateSyncVM)
 
 	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {

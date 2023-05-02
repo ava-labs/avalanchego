@@ -159,8 +159,8 @@ func TestTTLOldest(t *testing.T) {
 			TTL:     testTTL,
 		},
 	)
-	window, ok := windowIntf.(*window[int])
-	require.True(ok)
+	require.IsType(&window[int]{}, windowIntf)
+	window := windowIntf.(*window[int])
 	epochStart := time.Unix(0, 0)
 	clock.Set(epochStart)
 

@@ -110,8 +110,8 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	bsIntf, err := New(vm, config)
 	require.NoError(err)
-	bs, ok := bsIntf.(*getter)
-	require.True(ok)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	var accepted []ids.ID
 	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
@@ -156,8 +156,8 @@ func TestFilterAccepted(t *testing.T) {
 
 	bsIntf, err := New(vm, config)
 	require.NoError(err)
-	bs, ok := bsIntf.(*getter)
-	require.True(ok)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
