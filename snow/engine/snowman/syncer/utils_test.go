@@ -95,7 +95,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	})
 	syncer, ok := commonSyncer.(*stateSyncer)
 	require.True(ok)
-	require.Nil(syncer.stateSyncVM)
+	require.NotNil(syncer.stateSyncVM)
 
 	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound

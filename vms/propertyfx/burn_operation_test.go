@@ -18,7 +18,7 @@ func TestBurnOperationInvalid(t *testing.T) {
 	op := BurnOperation{Input: secp256k1fx.Input{
 		SigIndices: []uint32{1, 0},
 	}}
-	require.ErrorIs(op.Verify(), nil)
+	require.ErrorIs(op.Verify(), secp256k1fx.ErrInputIndicesNotSortedUnique)
 }
 
 func TestBurnOperationNumberOfOutput(t *testing.T) {

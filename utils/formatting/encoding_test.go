@@ -4,6 +4,7 @@
 package formatting
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
@@ -102,10 +103,34 @@ func TestEncodeNil(t *testing.T) {
 func TestDecodeHexInvalid(t *testing.T) {
 	require := require.New(t)
 
-	invalidHex := []string{"0", "x", "0xg", "0x0017afa0Zd", "0xafafafafaf"}
-	for _, str := range invalidHex {
-		_, err := Decode(Hex, str)
-		require.ErrorIs(err, errMissingHexPrefix)
+	tests := []struct {
+		inputStr    string
+		expectedErr error
+	}{
+		{
+			inputStr:    "0",
+			expectedErr: errMissingHexPrefix,
+		},
+		{
+			inputStr:    "x",
+			expectedErr: errMissingHexPrefix,
+		},
+		{
+			inputStr:    "0xg",
+			expectedErr: hex.InvalidByteError('g'),
+		},
+		{
+			inputStr:    "0x0017afa0Zd",
+			expectedErr: hex.InvalidByteError('Z'),
+		},
+		{
+			inputStr:    "0xafafafafaf",
+			expectedErr: errBadChecksum,
+		},
+	}
+	for _, test := range tests {
+		_, err := Decode(Hex, test.inputStr)
+		require.ErrorIs(err, test.expectedErr)
 	}
 }
 

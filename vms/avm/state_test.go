@@ -89,7 +89,7 @@ func TestSetsAndGets(t *testing.T) {
 	resultStatus, err := state.GetStatus(txID)
 	require.NoError(err)
 
-	require.Equal(1, resultUTXO.OutputIndex)
+	require.Equal(uint32(1), resultUTXO.OutputIndex)
 	require.Equal(tx.ID(), resultTx.ID())
 	require.Equal(choices.Accepted, resultStatus)
 }

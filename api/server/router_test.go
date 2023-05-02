@@ -25,10 +25,10 @@ func TestAliasing(t *testing.T) {
 	require.NoError(r.AddAlias("1", "4"))
 	require.NoError(r.AddAlias("5", "1"))
 	require.NoError(r.AddAlias("3", "6"))
-	require.ErrorIs(r.AddAlias("7", "4"), nil) // TODO
+	require.ErrorIs(r.AddAlias("7", "4"), errAlreadyReserved)
 
 	handler1 := &testHandler{}
-	require.ErrorIs(r.AddRouter("2", "", handler1), nil) // TODO
+	require.ErrorIs(r.AddRouter("2", "", handler1), errAlreadyReserved)
 	require.NoError(r.AddRouter("5", "", handler1))
 
 	handler, exists := r.routes["5"][""]
@@ -53,5 +53,5 @@ func TestBlock(t *testing.T) {
 	require.NoError(r.AddAlias("1", "1"))
 
 	handler1 := &testHandler{}
-	require.ErrorIs(r.AddRouter("1", "", handler1), nil) // TODO
+	require.ErrorIs(r.AddRouter("1", "", handler1), errAlreadyReserved)
 }
