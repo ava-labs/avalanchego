@@ -314,7 +314,7 @@ func TestBuildBlock(t *testing.T) {
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
 	require.NoError(err)
-	require.Len(chainState.verifiedBlocks, 0)
+	require.Empty(chainState.verifiedBlocks)
 
 	require.NoError(builtBlk.Verify(context.Background()))
 	require.Len(chainState.verifiedBlocks, 1)
@@ -356,7 +356,7 @@ func TestStateDecideBlock(t *testing.T) {
 	require.NoError(err)
 	require.ErrorIs(badBlk.Verify(context.Background()), errVerify)
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(chainState.verifiedBlocks, 0)
+	require.Empty(chainState.verifiedBlocks)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())

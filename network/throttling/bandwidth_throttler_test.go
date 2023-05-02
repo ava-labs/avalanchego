@@ -40,7 +40,7 @@ func TestBandwidthThrottler(t *testing.T) {
 
 	// Remove the node
 	throttler.RemoveNode(nodeID1)
-	require.Len(throttler.limiters, 0)
+	require.Empty(throttler.limiters)
 
 	// Add the node back
 	throttler.AddNode(nodeID1)

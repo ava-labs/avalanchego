@@ -29,7 +29,7 @@ func TestServiceListNoUsers(t *testing.T) {
 
 	reply := ListUsersReply{}
 	require.NoError(s.ListUsers(nil, nil, &reply))
-	require.Len(reply.Users, 0)
+	require.Empty(reply.Users)
 }
 
 func TestServiceCreateUser(t *testing.T) {

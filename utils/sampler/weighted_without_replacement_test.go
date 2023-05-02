@@ -128,7 +128,7 @@ func WeightedWithoutReplacementEmptyTest(
 
 	indices, err := s.Sample(0)
 	require.NoError(err)
-	require.Len(indices, 0, "shouldn't have selected any elements")
+	require.Empty(indices)
 }
 
 func WeightedWithoutReplacementSingletonTest(

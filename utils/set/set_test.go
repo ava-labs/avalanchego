@@ -53,11 +53,11 @@ func TestSetCappedList(t *testing.T) {
 
 	id := 0
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 
 	s.Add(id)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Equal(s.CappedList(1)[0], id)
 	require.Len(s.CappedList(2), 1)
@@ -66,7 +66,7 @@ func TestSetCappedList(t *testing.T) {
 	id2 := 1
 	s.Add(id2)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Len(s.CappedList(2), 2)
 	require.Len(s.CappedList(3), 2)
@@ -84,7 +84,7 @@ func TestSetClear(t *testing.T) {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Len(set, 0)
+	require.Empty(set)
 	set.Add(1337)
 	require.Len(set, 1)
 }

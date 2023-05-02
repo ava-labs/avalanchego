@@ -297,7 +297,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
+	require.Len(balanceReply.UTXOIDs, 1)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -307,8 +307,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	balanceReply = &GetBalanceReply{}
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Equal(uint64(0), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -340,7 +340,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337+1337), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 2, "should have only returned 2 utxoIDs")
+	require.Len(balanceReply.UTXOIDs, 2)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -350,8 +350,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	balanceReply = &GetBalanceReply{}
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Equal(uint64(0), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
@@ -385,7 +385,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337*3), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 3, "should have returned 3 utxoIDs")
+	require.Len(balanceReply.UTXOIDs, 3)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -395,8 +395,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	balanceReply = &GetBalanceReply{}
 	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Equal(uint64(0), uint64(balanceReply.Balance))
-	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 }
 
 func TestServiceGetTxs(t *testing.T) {
@@ -488,7 +488,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	}
 	reply = &GetAllBalancesReply{}
 	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
-	require.Len(reply.Balances, 0)
+	require.Empty(reply.Balances)
 
 	// A UTXO with a 1 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -529,7 +529,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	reply = &GetAllBalancesReply{}
 	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Len(reply.Balances, 0)
+	require.Empty(reply.Balances)
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
@@ -572,7 +572,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	reply = &GetAllBalancesReply{}
 	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Len(reply.Balances, 0)
+	require.Empty(reply.Balances)
 
 	// A UTXO for a different asset
 	otherAssetID := ids.GenerateTestID()
@@ -617,7 +617,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	reply = &GetAllBalancesReply{}
 	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(reply.Balances, 0)
+	require.Empty(reply.Balances)
 }
 
 func TestServiceGetTx(t *testing.T) {

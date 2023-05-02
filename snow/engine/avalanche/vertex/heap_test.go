@@ -88,7 +88,7 @@ func TestUniqueVertexHeapReturnsOrdered(t *testing.T) {
 	vtxD := h.Pop()
 	height, err = vtxD.Height()
 	require.NoError(err)
-	require.Equal(uint64(0), height)
+	require.Zero(height)
 	require.Equal(vtx0.ID(), vtxD.ID())
 
 	require.Zero(h.Len())

@@ -64,7 +64,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
-	require.Len(throttler.nodeToNumProcessingMsgs, 0)
+	require.Empty(throttler.nodeToNumProcessingMsgs)
 }
 
 // Test inboundMsgBufferThrottler when an acquire is cancelled

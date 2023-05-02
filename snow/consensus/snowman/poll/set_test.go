@@ -70,18 +70,14 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	var results []bag.Bag[ids.ID]
 
 	// vote out of order
-	results = s.Vote(1, vdr1, vtx1)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr2, vtx2)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr3, vtx2)
-	require.Len(results, 0)
+	require.Empty(s.Vote(1, vdr1, vtx1))
+	require.Empty(s.Vote(2, vdr2, vtx2))
+	require.Empty(s.Vote(2, vdr3, vtx2))
 
-	results = s.Vote(2, vdr1, vtx2) // poll 2 finished
-	require.Len(results, 0)         // expect 2 to not have finished because 1 is still pending
+	// poll 2 finished
+	require.Empty(s.Vote(2, vdr1, vtx2)) // expect 2 to not have finished because 1 is still pending
 
-	results = s.Vote(1, vdr2, vtx1)
-	require.Len(results, 0)
+	require.Empty(s.Vote(1, vdr2, vtx1))
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
 	require.Len(results, 2)
@@ -125,15 +121,11 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	var results []bag.Bag[ids.ID]
 
 	// vote out of order
-	results = s.Vote(1, vdr1, vtx1)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr2, vtx2)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr3, vtx2)
-	require.Len(results, 0)
+	require.Empty(s.Vote(1, vdr1, vtx1))
+	require.Empty(s.Vote(2, vdr2, vtx2))
+	require.Empty(s.Vote(2, vdr3, vtx2))
 
-	results = s.Vote(1, vdr2, vtx1)
-	require.Len(results, 0)
+	require.Empty(s.Vote(1, vdr2, vtx1))
 
 	results = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
 	require.Len(results, 1)         // because 1 is the oldest
@@ -188,26 +180,18 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
-	results = s.Vote(2, vdr3, vtx2)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr2, vtx2)
-	require.Len(results, 0)
-	results = s.Vote(2, vdr1, vtx2)
-	require.Len(results, 0)
+	require.Empty(s.Vote(2, vdr3, vtx2))
+	require.Empty(s.Vote(2, vdr2, vtx2))
+	require.Empty(s.Vote(2, vdr1, vtx2))
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
-	results = s.Vote(3, vdr2, vtx3)
-	require.Len(results, 0)
-	results = s.Vote(3, vdr3, vtx3)
-	require.Len(results, 0)
-	results = s.Vote(3, vdr1, vtx3)
-	require.Len(results, 0)
+	require.Empty(s.Vote(3, vdr2, vtx3))
+	require.Empty(s.Vote(3, vdr3, vtx3))
+	require.Empty(s.Vote(3, vdr1, vtx3))
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
-	results = s.Vote(1, vdr1, vtx1)
-	require.Len(results, 0)
-	results = s.Vote(1, vdr2, vtx1)
-	require.Len(results, 0)
+	require.Empty(s.Vote(1, vdr1, vtx1))
+	require.Empty(s.Vote(1, vdr2, vtx1))
 	results = s.Vote(1, vdr3, vtx1)
 	require.Len(results, 3)
 	require.Equal(vtx1, results[0].List()[0])
@@ -240,9 +224,9 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	require.Equal(1, s.Len())
 	require.False(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
-	require.Len(s.Vote(1, vdr1, vtxID), 0)
-	require.Len(s.Vote(0, vdr1, vtxID), 0)
-	require.Len(s.Vote(0, vdr1, vtxID), 0)
+	require.Empty(s.Vote(1, vdr1, vtxID))
+	require.Empty(s.Vote(0, vdr1, vtxID))
+	require.Empty(s.Vote(0, vdr1, vtxID))
 	results := s.Vote(0, vdr2, vtxID)
 	require.Len(results, 1)
 	list := results[0].List()
@@ -274,12 +258,12 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	require.Equal(1, s.Len())
 	require.False(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
-	require.Len(s.Drop(1, vdr1), 0)
-	require.Len(s.Drop(0, vdr1), 0)
-	require.Len(s.Drop(0, vdr1), 0)
+	require.Empty(s.Drop(1, vdr1))
+	require.Empty(s.Drop(0, vdr1))
+	require.Empty(s.Drop(0, vdr1))
 	results := s.Drop(0, vdr2)
 	require.Len(results, 1)
-	require.Len(results[0].List(), 0)
+	require.Empty(results[0].List())
 }
 
 func TestSetString(t *testing.T) {

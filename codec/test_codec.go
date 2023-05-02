@@ -143,13 +143,13 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myStructInstance)
 	require.NoError(err)
-	require.Equal(len(myStructBytes), bytesLen)
+	require.Len(myStructBytes, bytesLen)
 
 	myStructUnmarshaled := &myStruct{}
 	version, err := manager.Unmarshal(myStructBytes, myStructUnmarshaled)
 	require.NoError(err)
 
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myStructInstance, *myStructUnmarshaled)
 }
 
@@ -173,12 +173,12 @@ func TestUInt32(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, number)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var numberUnmarshaled uint32
 	version, err := manager.Unmarshal(bytes, &numberUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(number, numberUnmarshaled)
 }
 
@@ -206,12 +206,12 @@ func TestSlice(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, mySlice)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var sliceUnmarshaled []bool
 	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(mySlice, sliceUnmarshaled)
 }
 
@@ -230,12 +230,12 @@ func TestMaxSizeSlice(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, mySlice)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var sliceUnmarshaled []string
 	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(mySlice, sliceUnmarshaled)
 }
 
@@ -252,12 +252,12 @@ func TestBool(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myBool)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var boolUnmarshaled bool
 	version, err := manager.Unmarshal(bytes, &boolUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myBool, boolUnmarshaled)
 }
 
@@ -274,12 +274,12 @@ func TestArray(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myArr)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var myArrUnmarshaled [5]uint64
 	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myArr, myArrUnmarshaled)
 }
 
@@ -296,12 +296,12 @@ func TestBigArray(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myArr)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var myArrUnmarshaled [30000]uint64
 	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myArr, myArrUnmarshaled)
 }
 
@@ -318,12 +318,12 @@ func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myPtr)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var myPtrUnmarshaled *MyInnerStruct
 	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
@@ -353,12 +353,12 @@ func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, mySlice)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var mySliceUnmarshaled []MyInnerStruct3
 	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(mySlice, mySliceUnmarshaled)
 }
 
@@ -377,12 +377,12 @@ func TestInterface(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, &f)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var unmarshaledFoo Foo
 	version, err := manager.Unmarshal(bytes, &unmarshaledFoo)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(f, unmarshaledFoo)
 }
 
@@ -413,7 +413,7 @@ func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
 	var mySliceUnmarshaled []Foo
 	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(mySlice, mySliceUnmarshaled)
 }
 
@@ -439,12 +439,12 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myArray)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var myArrayUnmarshaled [2]Foo
 	version, err := manager.Unmarshal(bytes, &myArrayUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myArray, myArrayUnmarshaled)
 }
 
@@ -465,12 +465,12 @@ func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, &myPtr)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var myPtrUnmarshaled *Foo
 	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
@@ -487,12 +487,12 @@ func TestString(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myString)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var stringUnmarshaled string
 	version, err := manager.Unmarshal(bytes, &stringUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myString, stringUnmarshaled)
 }
 
@@ -513,12 +513,12 @@ func TestNilSlice(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myStruct)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	var structUnmarshaled structWithSlice
 	version, err := manager.Unmarshal(bytes, &structUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Empty(structUnmarshaled.Slice)
 }
 
@@ -568,12 +568,12 @@ func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myS)
 	require.NoError(err)
-	require.Equal(len(marshalled), bytesLen)
+	require.Len(marshalled, bytesLen)
 
 	unmarshalled := s{}
 	version, err := manager.Unmarshal(marshalled, &unmarshalled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 
 	expectedUnmarshalled := s{SerializedField: "Serialize me"}
 	require.Equal(expectedUnmarshalled, unmarshalled)
@@ -598,12 +598,12 @@ func TestNilSliceSerialization(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, val)
 	require.NoError(err)
-	require.Equal(len(result), bytesLen)
+	require.Len(result, bytesLen)
 
 	valUnmarshaled := &simpleSliceStruct{}
 	version, err := manager.Unmarshal(result, &valUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Empty(valUnmarshaled.Arr)
 }
 
@@ -626,12 +626,12 @@ func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, val)
 	require.NoError(err)
-	require.Equal(len(result), bytesLen)
+	require.Len(result, bytesLen)
 
 	valUnmarshaled := &simpleSliceStruct{}
 	version, err := manager.Unmarshal(result, &valUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(val, valUnmarshaled)
 }
 
@@ -658,13 +658,13 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, val)
 	require.NoError(err)
-	require.Equal(len(result), bytesLen)
+	require.Len(result, bytesLen)
 
 	unmarshaled := nestedSliceStruct{}
 	version, err := manager.Unmarshal(expected, &unmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
-	require.Equal(1000, len(unmarshaled.Arr))
+	require.Zero(version)
+	require.Len(unmarshaled.Arr, 1000)
 }
 
 func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB) {
@@ -722,12 +722,12 @@ func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
 
 	bytesLen, err := manager.Size(0, myS)
 	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
+	require.Len(bytes, bytesLen)
 
 	mySUnmarshaled := s{}
 	version, err := manager.Unmarshal(bytes, &mySUnmarshaled)
 	require.NoError(err)
-	require.Equal(uint16(0), version)
+	require.Zero(version)
 	require.Equal(myS, mySUnmarshaled)
 }
 
@@ -778,7 +778,7 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 		s := outer{}
 		version, err := manager.Unmarshal(bytes, &s)
 		require.NoError(err)
-		require.Equal(uint16(0), version)
+		require.Zero(version)
 	}
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 1}

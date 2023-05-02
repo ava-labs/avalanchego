@@ -160,8 +160,8 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	)
 
 	// ... and check returned values are as expected
-	require.NoError(err, "Error calling GetAncestors: %v", err)
-	require.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	require.NoError(err)
+	require.Len(res, 3)
 	require.Equal(res[0], builtBlk3.Bytes())
 	require.Equal(res[1], builtBlk2.Bytes())
 	require.Equal(res[2], builtBlk1.Bytes())
@@ -175,8 +175,8 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	require.NoError(err, "Error calling GetAncestors: %v", err)
-	require.Len(res, 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
+	require.NoError(err)
+	require.Len(res, 1)
 	require.Equal(res[0], builtBlk1.Bytes())
 
 	// a faulty call
@@ -324,8 +324,8 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	require.NoError(err, "Error calling GetAncestors: %v", err)
-	require.Len(res, 1, "GetAncestor returned %v entries instead of %v", len(res), 1)
+	require.NoError(err)
+	require.Len(res, 1)
 	require.Equal(res[0], builtBlk1.Bytes())
 
 	// a faulty call
@@ -496,8 +496,8 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	)
 
 	// ... and check returned values are as expected
-	require.NoError(err, "Error calling GetAncestors")
-	require.Len(res, 4, "Wrong GetAncestor response")
+	require.NoError(err)
+	require.Len(res, 4)
 	require.Equal(res[0], builtBlk4.Bytes())
 	require.Equal(res[1], builtBlk3.Bytes())
 	require.Equal(res[2], builtBlk2.Bytes())
@@ -515,8 +515,8 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	)
 
 	// ... and check returned values are as expected
-	require.NoError(err, "Error calling GetAncestors")
-	require.Len(res, 3, "Wrong GetAncestor response")
+	require.NoError(err)
+	require.Len(res, 3)
 	require.Equal(res[0], builtBlk4.Bytes())
 	require.Equal(res[1], builtBlk3.Bytes())
 	require.Equal(res[2], builtBlk2.Bytes())
@@ -530,8 +530,8 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	require.NoError(err, "Error calling GetAncestors")
-	require.Len(res, 1, "Wrong GetAncestor response")
+	require.NoError(err)
+	require.Len(res, 1)
 	require.Equal(res[0], builtBlk1.Bytes())
 
 	// a faulty call
@@ -658,8 +658,8 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		builtBlk3.Bytes(),
 	}
 	res, err := proRemoteVM.BatchedParseBlock(context.Background(), bytesToParse)
-	require.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	require.Len(res, 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
+	require.NoError(err)
+	require.Len(res, 3)
 	require.Equal(res[0].ID(), builtBlk1.ID())
 	require.Equal(res[1].ID(), builtBlk2.ID())
 	require.Equal(res[2].ID(), builtBlk3.ID())
@@ -764,8 +764,8 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		builtBlk3.Bytes(),
 	}
 	res, err := proRemoteVM.BatchedParseBlock(context.Background(), bytesToParse)
-	require.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	require.Len(res, 3, "BatchedParseBlock returned %v entries instead of %v", len(res), 3)
+	require.NoError(err)
+	require.Len(res, 3)
 	require.Equal(res[0].ID(), builtBlk1.ID())
 	require.Equal(res[1].ID(), builtBlk2.ID())
 	require.Equal(res[2].ID(), builtBlk3.ID())
@@ -926,8 +926,8 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 	}
 
 	res, err := proRemoteVM.BatchedParseBlock(context.Background(), bytesToParse)
-	require.NoError(err, "Error calling BatchedParseBlock: %v", err)
-	require.Len(res, 4, "BatchedParseBlock returned %v entries instead of %v", len(res), 4)
+	require.NoError(err)
+	require.Len(res, 4)
 	require.Equal(res[0].ID(), builtBlk4.ID())
 	require.Equal(res[1].ID(), builtBlk3.ID())
 	require.Equal(res[2].ID(), builtBlk2.ID())

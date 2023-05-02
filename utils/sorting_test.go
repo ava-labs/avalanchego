@@ -115,7 +115,7 @@ func TestSortByHash(t *testing.T) {
 
 	s := [][]byte{}
 	SortByHash(s)
-	require.Len(s, 0)
+	require.Empty(s)
 
 	s = [][]byte{{1}}
 	SortByHash(s)
