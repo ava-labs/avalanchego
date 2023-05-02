@@ -4,13 +4,13 @@
 package pebble
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"runtime"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
