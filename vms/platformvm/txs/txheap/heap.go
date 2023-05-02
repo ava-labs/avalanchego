@@ -75,7 +75,7 @@ func (h *txHeap) ListWithLimit(maxTxsBytes int) ([]*txs.Tx, int) {
 	}
 
 	remaining := maxTxsBytes
-	res := make([]*txs.Tx, 0)
+	res := make([]*txs.Tx, 0, len(h.txs))
 	for _, tx := range h.txs {
 		if remaining <= 0 {
 			break
