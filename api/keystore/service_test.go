@@ -111,10 +111,7 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 			Username: "bob",
 			Password: "weak",
 		}, &reply)
-
-		if err == nil {
-			t.Error("Expected error when testing weak password")
-		}
+		require.ErrorIs(err, password.ErrWeakPassword)
 	}
 }
 

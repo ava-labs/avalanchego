@@ -4,11 +4,12 @@
 package ids
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
 func TestNodeIDEquality(t *testing.T) {
@@ -35,18 +36,28 @@ func TestNodeIDFromString(t *testing.T) {
 
 func TestNodeIDFromStringError(t *testing.T) {
 	tests := []struct {
-		in string
+		in          string
+		expectedErr error
 	}{
-		{""},
-		{"foo"},
-		{"foobar"},
+		{
+			in:          "",
+			expectedErr: cb58.ErrBase58Decoding,
+		},
+		{
+			in:          "foo",
+			expectedErr: cb58.ErrMissingChecksum,
+		},
+		{
+			in:          "foobar",
+			expectedErr: cb58.ErrBadChecksum,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
+			require := require.New(t)
+
 			_, err := FromString(tt.in)
-			if err == nil {
-				t.Error("Unexpected success")
-			}
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -68,73 +79,68 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			out, err := tt.in.MarshalJSON()
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if !bytes.Equal(out, tt.out) {
-				t.Errorf("got %q, expected %q", out, tt.out)
-			}
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, out)
 		})
 	}
 }
 
 func TestNodeIDUnmarshalJSON(t *testing.T) {
 	tests := []struct {
-		label     string
-		in        []byte
-		out       NodeID
-		shouldErr bool
+		label       string
+		in          []byte
+		out         NodeID
+		expectedErr error
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, false},
+		{"NodeID{}", []byte("null"), NodeID{}, nil},
 		{
 			"NodeID(\"ava labs\")",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-			false,
+			nil,
 		},
 		{
 			"missing start quote",
 			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
 			NodeID{},
-			true,
+			errMissingQuotes,
 		},
 		{
 			"missing end quote",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
 			NodeID{},
-			true,
+			errMissingQuotes,
 		},
 		{
 			"NodeID-",
 			[]byte("\"NodeID-\""),
 			NodeID{},
-			true,
+			errShortNodeID,
 		},
 		{
 			"NodeID-1",
 			[]byte("\"NodeID-1\""),
 			NodeID{},
-			true,
+			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
 			[]byte("\"NodeID-1\""),
 			NodeID{},
-			true,
+			cb58.ErrMissingChecksum,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			foo := NodeID{}
 			err := foo.UnmarshalJSON(tt.in)
-			switch {
-			case err == nil && tt.shouldErr:
-				t.Errorf("Expected no error but got error %v", err)
-			case err != nil && !tt.shouldErr:
-				t.Errorf("unxpected error: %v", err)
-			case foo != tt.out:
-				t.Errorf("got %q, expected %q", foo, tt.out)
-			}
+			require.ErrorIs(err, tt.expectedErr)
+			require.Equal(tt.out, foo)
 		})
 	}
 }
@@ -150,10 +156,9 @@ func TestNodeIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			result := tt.id.String()
-			if result != tt.expected {
-				t.Errorf("got %q, expected %q", result, tt.expected)
-			}
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.id.String())
 		})
 	}
 }

@@ -1031,12 +1031,8 @@ func TestVMFormat(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.in.String(), func(t *testing.T) {
 			addrStr, err := vm.FormatLocalAddress(test.in)
-			if err != nil {
-				t.Error(err)
-			}
-			if test.expected != addrStr {
-				t.Errorf("Expected %q, got %q", test.expected, addrStr)
-			}
+			require.NoError(err)
+			require.Equal(test.expected, addrStr)
 		})
 	}
 }

@@ -158,7 +158,7 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
-	require.Equal([]ids.ID{id3, id4}, installedVMs)
+	require.ElementsMatch([]ids.ID{id3, id4}, installedVMs)
 	require.Empty(failedVMs)
 	require.NoError(err)
 }

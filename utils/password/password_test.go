@@ -75,7 +75,7 @@ func TestIsValid(t *testing.T) {
 		{
 			password:    "password",
 			expected:    Weak,
-			expectedErr: errWeakPassword,
+			expectedErr: ErrWeakPassword,
 		},
 	}
 	for _, test := range tests {

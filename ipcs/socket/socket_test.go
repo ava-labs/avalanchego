@@ -57,10 +57,10 @@ func newTestAcceptFn(t *testing.T) (acceptFn, chan net.Conn) {
 	connCh := make(chan net.Conn)
 
 	return func(s *Socket, l net.Listener) {
+		require := require.New(t)
+
 		conn, err := l.Accept()
-		if err != nil {
-			t.Error(err)
-		}
+		require.NoError(err)
 
 		s.connLock.Lock()
 		s.conns[conn] = struct{}{}

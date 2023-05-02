@@ -11,25 +11,22 @@ import (
 )
 
 func TestClockSet(t *testing.T) {
+	require := require.New(t)
+
 	clock := Clock{}
-	clock.Set(time.Unix(1000000, 0))
-	if clock.faked == false {
-		t.Error("Fake time was set, but .faked flag was not set")
-	}
-	if !clock.Time().Equal(time.Unix(1000000, 0)) {
-		t.Error("Fake time was set, but not returned")
-	}
+	time := time.Unix(1000000, 0)
+	clock.Set(time)
+	require.True(clock.faked)
+	require.Equal(time, clock.Time())
 }
 
 func TestClockSync(t *testing.T) {
+	require := require.New(t)
+
 	clock := Clock{true, time.Unix(0, 0)}
 	clock.Sync()
-	if clock.faked == true {
-		t.Error("Clock was synced, but .faked flag was set")
-	}
-	if clock.Time().Equal(time.Unix(0, 0)) {
-		t.Error("Clock was synced, but returned a fake time")
-	}
+	require.False(clock.faked)
+	require.NotEqual(time.Unix(0, 0), clock.Time())
 }
 
 func TestClockUnixTime(t *testing.T) {

@@ -4,13 +4,13 @@
 package ids
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
 func TestID(t *testing.T) {
@@ -60,18 +60,28 @@ func TestFromString(t *testing.T) {
 
 func TestIDFromStringError(t *testing.T) {
 	tests := []struct {
-		in string
+		in          string
+		expectedErr error
 	}{
-		{""},
-		{"foo"},
-		{"foobar"},
+		{
+			in:          "",
+			expectedErr: cb58.ErrBase58Decoding,
+		},
+		{
+			in:          "foo",
+			expectedErr: cb58.ErrMissingChecksum,
+		},
+		{
+			in:          "foobar",
+			expectedErr: cb58.ErrBadChecksum,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
+			require := require.New(t)
+
 			_, err := FromString(tt.in)
-			if err == nil {
-				t.Error("Unexpected success")
-			}
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -93,12 +103,11 @@ func TestIDMarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
 			out, err := tt.in.MarshalJSON()
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if !bytes.Equal(out, tt.out) {
-				t.Errorf("got %q, expected %q", out, tt.out)
-			}
+
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, out)
 		})
 	}
 }
@@ -120,13 +129,12 @@ func TestIDUnmarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			foo := ID{}
 			err := foo.UnmarshalJSON(tt.in)
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if foo != tt.out {
-				t.Errorf("got %q, expected %q", foo, tt.out)
-			}
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, foo)
 		})
 	}
 }
@@ -150,10 +158,10 @@ func TestIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			result := tt.id.String()
-			if result != tt.expected {
-				t.Errorf("got %q, expected %q", result, tt.expected)
-			}
+			require.Equal(tt.expected, result)
 		})
 	}
 }

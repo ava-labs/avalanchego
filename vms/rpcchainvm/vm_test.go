@@ -105,6 +105,8 @@ func TestHelperProcess(t *testing.T) {
 // TestVMServerInterface ensures that the RPCs methods defined by VMServer
 // interface are implemented.
 func TestVMServerInterface(t *testing.T) {
+	require := require.New(t)
+
 	var wantMethods, gotMethods []string
 	pb := reflect.TypeOf((*vmpb.VMServer)(nil)).Elem()
 	for i := 0; i < pb.NumMethod()-1; i++ {
@@ -118,9 +120,7 @@ func TestVMServerInterface(t *testing.T) {
 	}
 	slices.Sort(gotMethods)
 
-	if !reflect.DeepEqual(gotMethods, wantMethods) {
-		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
-	}
+	require.Equal(wantMethods, gotMethods)
 }
 
 func TestRuntimeSubprocessBootstrap(t *testing.T) {
