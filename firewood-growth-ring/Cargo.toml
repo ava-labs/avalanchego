@@ -1,6 +1,6 @@
 [package]
 name = "firewood-growth-ring"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 keywords = ["wal", "db", "futures"]
 license = "MIT"
@@ -9,7 +9,7 @@ description = "Simple and modular write-ahead-logging implementation."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-firewood-libaio= { version = "0.0.2", path = "../firewood-libaio", package = "firewood-libaio" }
+firewood-libaio= { version = "0.0.3", path = "../firewood-libaio", package = "firewood-libaio" }
 crc = "3.0.0"
 lru = "0.10.0"
 scan_fmt = "0.2.6"
