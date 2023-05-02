@@ -224,17 +224,12 @@ func (m *mempool) HasTxs() bool {
 }
 
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	txs := m.unissuedDecisionTxs.List()
-	txs = append(txs, m.unissuedStakerTxs.List()...)
-
-	size := 0
-	for i, tx := range txs {
-		size += len(tx.Bytes())
-		if size > maxTxsBytes {
-			return txs[:i]
-		}
+	txs, remaining := m.unissuedDecisionTxs.ListWithLimit(maxTxsBytes)
+	if remaining <= 0 {
+		return txs
 	}
-	return txs
+	txs2, _ := m.unissuedStakerTxs.ListWithLimit(remaining)
+	return append(txs, txs2...)
 }
 
 func (m *mempool) addDecisionTx(tx *txs.Tx) {
