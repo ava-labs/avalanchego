@@ -930,6 +930,7 @@ func verifyStopStakerTx(
 
 	stakersIt, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
+		stakersIt.Release()
 		return nil, time.Time{}, err
 	}
 	for stakersIt.Next() {
@@ -938,6 +939,7 @@ func verifyStopStakerTx(
 			break
 		}
 	}
+	stakersIt.Release()
 	if stakerToStop == nil {
 		return nil, time.Time{}, errors.New("could not find staker to stop among current ones")
 	}
@@ -975,6 +977,7 @@ func verifyStopStakerTx(
 	res := []*state.Staker{stakerToStop}
 	stakersIt, err = chainState.GetCurrentStakerIterator()
 	if err != nil {
+		stakersIt.Release()
 		return nil, time.Time{}, err
 	}
 	for stakersIt.Next() {
@@ -983,6 +986,7 @@ func verifyStopStakerTx(
 			res = append(res, staker)
 		}
 	}
+	stakersIt.Release()
 	return res, stakerToStop.EarliestStopTime(), nil
 }
 
