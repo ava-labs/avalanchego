@@ -73,7 +73,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 
 	require.IsType(&endpointClaims{}, token.Claims)
 	claims := token.Claims.(*endpointClaims)
-	require.ElementsMatch(endpoints, claims.Endpoints, "token has wrong endpoint claims")
+	require.Equal(endpoints, claims.Endpoints, "token has wrong endpoint claims")
 
 	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
 	require.Equal(shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")

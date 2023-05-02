@@ -182,7 +182,7 @@ func TestGetChainAliases(t *testing.T) {
 
 		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
 		require.NoError(err)
-		require.ElementsMatch(expectedReply, reply)
+		require.Equal(expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
