@@ -36,12 +36,12 @@ var (
 //	$ go test -run=NONE -bench=BenchmarkMarshalVersion > /tmp/cpu.before.txt
 //	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkMarshalVersion > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
+//	$ benchstat -alpha 0.03 /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
 //	$ go test -run=NONE -bench=BenchmarkMarshalVersion -benchmem > /tmp/mem.before.txt
 //	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkMarshalVersion -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
+//	$ benchstat -alpha 0.03 /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkMarshalVersion(b *testing.B) {
 	require := require.New(b)
 
@@ -90,12 +90,12 @@ func BenchmarkMarshalVersion(b *testing.B) {
 //	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.before.txt
 //	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
+//	$ benchstat -alpha 0.03 /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
 //	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.before.txt
 //	$ USE_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
+//	$ benchstat -alpha 0.03 /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkUnmarshalVersion(b *testing.B) {
 	require := require.New(b)
 

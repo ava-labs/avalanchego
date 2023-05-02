@@ -20,12 +20,12 @@ import (
 //	$ go test -run=NONE -bench=BenchmarkPeekTxs > /tmp/cpu.before.txt
 //	$ go test -run=NONE -bench=BenchmarkPeekTxs > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
+//	$ benchstat -alpha 0.03 /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
 //	$ go test -run=NONE -bench=BenchmarkPeekTxs -benchmem > /tmp/mem.before.txt
 //	$ go test -run=NONE -bench=BenchmarkPeekTxs -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
-//	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
+//	$ benchstat -alpha 0.03 /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkPeekTxs(b *testing.B) {
 	require := require.New(b)
 
