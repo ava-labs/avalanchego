@@ -83,11 +83,7 @@ func TestStartCPUProfiler(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StartCPUProfiler(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
@@ -99,11 +95,7 @@ func TestStopCPUProfiler(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StopCPUProfiler(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
@@ -115,11 +107,7 @@ func TestMemoryProfile(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.MemoryProfile(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
@@ -131,11 +119,7 @@ func TestLockProfile(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.LockProfile(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
@@ -147,11 +131,7 @@ func TestAlias(t *testing.T) {
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Alias(context.Background(), "alias", "alias2")
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		require.NoError(err)
+		require.ErrorIs(err, test.Err)
 	}
 }
 
