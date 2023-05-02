@@ -6,8 +6,9 @@ package propertyfx
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOutputState(t *testing.T) {
