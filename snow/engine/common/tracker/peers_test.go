@@ -27,6 +27,8 @@ func TestPeers(t *testing.T) {
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
+	err := p.Connected(context.Background(), nodeID, version.CurrentApp)
+	require.NoError(err)
 	require.Equal(uint64(5), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
