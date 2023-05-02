@@ -57,7 +57,7 @@ type Mempool interface {
 
 	// Following Banff activation, all mempool transactions,
 	// (both decision and staker) are included into Standard blocks.
-	// HasTxs allow to check for availability of any mempool transaction.
+	// HasTxs checks the availability of any mempool transaction.
 	HasTxs() bool
 	// PeekTxs returns the next txs for Banff blocks
 	// up to maxTxsBytes without removing them from the mempool.
@@ -69,16 +69,15 @@ type Mempool interface {
 	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
 	PeekStakerTx() *txs.Tx
 
-	// Note: dropped txs are added to droppedTxIDs but not
-	// not evicted from unissued decision/staker txs.
-	// This allows previously dropped txs to be possibly
-	// reissued.
+	// Note: dropped txs are added to droppedTxIDs but not evicted yet
+	// from the unissued decision/staker txs. This allows previously dropped
+	// txs to be possibly reissued.
 	MarkDropped(txID ids.ID, reason error)
 	GetDropReason(txID ids.ID) error
 }
 
-// Transactions from clients that have not yet been put into blocks and added to
-// consensus
+// Mempool contains the client transactions that have not yet been included in the blocks
+// and have not yet been issued to the consensus.
 type mempool struct {
 	// If true, drop transactions added to the mempool via Add.
 	dropIncoming bool
