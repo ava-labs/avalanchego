@@ -67,3 +67,54 @@ func TestByStartTime(t *testing.T) {
 	require.Equal(utx0.EndTime(), txHeap.Timestamp())
 	require.Equal(tx0, txHeap.Peek())
 }
+
+func TestByStartTimeList(t *testing.T) {
+	require := require.New(t)
+
+	txHeap := NewByStartTime()
+	baseTime := time.Now()
+
+	total := 100
+
+	// map index to the cumulative size
+	cumulativeSum := 0
+	cumulativeSums := make([]int, total)
+
+	for i := 0; i < total; i++ {
+		utx := &txs.AddValidatorTx{
+			Validator: txs.Validator{
+				NodeID: ids.NodeID{0},
+				Start:  uint64(baseTime.Unix()) + uint64(i) + 1,
+				End:    uint64(baseTime.Unix()) + uint64(i) + 1,
+			},
+			RewardsOwner: &secp256k1fx.OutputOwners{},
+		}
+		tx := &txs.Tx{Unsigned: utx}
+		require.NoError(tx.Initialize(txs.Codec))
+		txHeap.Add(tx)
+
+		cumulativeSum += tx.Size()
+		cumulativeSums[i] = cumulativeSum
+	}
+	require.Len(txHeap.List(), total)
+
+	// only returns the txs up to the index and its sum
+	maxSum := cumulativeSums[total-1]
+	for idx, cumulativeSum := range cumulativeSums {
+		// return all up to the index
+		res, remaining := txHeap.ListWithLimit(cumulativeSum)
+		require.Len(res, idx+1)
+		require.Equal(0, remaining)
+
+		// return all with maximum bytes
+		res, remaining = txHeap.ListWithLimit(maxSum)
+		require.Len(res, total)
+		require.Equal(0, remaining)
+
+		// return remaining with surplus bytes
+		surplus := 77777
+		res, remaining = txHeap.ListWithLimit(maxSum + surplus)
+		require.Len(res, total)
+		require.Equal(surplus, remaining)
+	}
+}

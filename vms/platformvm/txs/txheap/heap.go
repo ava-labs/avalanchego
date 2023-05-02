@@ -15,7 +15,15 @@ var _ Heap = (*txHeap)(nil)
 type Heap interface {
 	Add(tx *txs.Tx)
 	Get(txID ids.ID) *txs.Tx
+
+	// Returns all the transactions in the order of heap.
 	List() []*txs.Tx
+
+	// Lists with up to `maxTxsBytes`, in the order of heap.
+	// Returns all the transactions within the limit and the remaining bytes
+	// that is the number subtracted the used bytes from the `maxTxsBytes`
+	ListWithLimit(maxTxsBytes int) ([]*txs.Tx, int)
+
 	Remove(txID ids.ID) *txs.Tx
 	Peek() *txs.Tx
 	RemoveTop() *txs.Tx
@@ -59,6 +67,23 @@ func (h *txHeap) List() []*txs.Tx {
 		res = append(res, tx.tx)
 	}
 	return res
+}
+
+func (h *txHeap) ListWithLimit(maxTxsBytes int) ([]*txs.Tx, int) {
+	if maxTxsBytes <= 0 {
+		return nil, 0
+	}
+
+	remaining := maxTxsBytes
+	res := make([]*txs.Tx, 0)
+	for _, tx := range h.txs {
+		if remaining <= 0 {
+			break
+		}
+		remaining -= tx.tx.Size()
+		res = append(res, tx.tx)
+	}
+	return res, remaining
 }
 
 func (h *txHeap) Remove(txID ids.ID) *txs.Tx {

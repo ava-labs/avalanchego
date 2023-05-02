@@ -85,6 +85,11 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	return tx, nil
 }
 
+// Returns the size of the inner bytes.
+func (tx *Tx) Size() int {
+	return len(tx.bytes)
+}
+
 func (tx *Tx) Bytes() []byte {
 	return tx.bytes
 }
