@@ -22,7 +22,7 @@ func TestLockedCalculator(t *testing.T) {
 	defer ctrl.Finish()
 
 	lc := NewLockedCalculator()
-	require.NotNil(t)
+	require.NotNil(lc)
 
 	// Should still error because ctx is nil
 	nodeID := ids.GenerateTestNodeID()
