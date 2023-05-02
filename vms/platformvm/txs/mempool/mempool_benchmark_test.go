@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Benchmarks marshal-ing "Version" message.
+// Benchmarks mempool PeekTxs with limits.
 //
 // e.g.,
 //
