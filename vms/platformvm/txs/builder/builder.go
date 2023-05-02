@@ -166,6 +166,13 @@ type ProposalTxBuilder interface {
 	// RewardStakerTx creates a new transaction that proposes to remove the staker
 	// [validatorID] from the default validator set.
 	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
+
+	// NewStopStakerTx creates a new transaction that stops the staker with TxID txID.
+	NewStopStakerTx(
+		txID ids.ID,
+		keys []*secp256k1.PrivateKey,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
 }
 
 func New(
@@ -607,5 +614,39 @@ func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 		return nil, err
 	}
 
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewStopStakerTx(
+	txID ids.ID,
+	keys []*secp256k1.PrivateKey,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, outs, _, signers, err := b.Spend(b.state, keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	stopStakerAuth, subnetSigners, err := b.AuthorizeStopStaking(txID, b.state, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't authorize staker stopping: %w", err)
+	}
+	signers = append(signers, subnetSigners)
+
+	utx := &txs.StopStakerTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		TxID:       txID,
+		StakerAuth: stopStakerAuth,
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
 	return tx, tx.SyntacticVerify(b.ctx)
 }

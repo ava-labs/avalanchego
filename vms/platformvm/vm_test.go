@@ -1218,11 +1218,11 @@ func TestCreateChain(t *testing.T) {
 // test where we:
 // 1) Create a subnet
 // 2) Add a validator to the subnet's pending validator set
-// 3) Advance timestamp to validator's start time (moving the validator from pending to current)
+// 3) Stop the subnet validator at the end of its first staking period
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(ContinuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1269,13 +1269,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-	endTime := startTime.Add(defaultMinStakingDuration)
-	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		uint64(startTime.Unix()),
-		uint64(endTime.Unix()),
+		uint64(0),
+		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()), // seconds in defaultMinStakingDuration
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1289,7 +1286,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // add the validator to pending validator set
+	require.NoError(blk.Accept(context.Background())) // add the validator to validator set
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	txID := blk.(blocks.Block).Txs()[0].ID()
@@ -1298,26 +1295,34 @@ func TestCreateSubnet(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
-	require.NoError(err)
-
-	// Advance time to when new validator should start validating
-	// Create a block with an advance time tx that moves validator
-	// from pending to current validator set
-	vm.clock.Set(startTime)
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should be advance time tx
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // move validator addValidatorTx from pending to current
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
+	// Stop the subnet validator
+	stopTx, err := vm.txBuilder.NewStopStakerTx(
+		txID,
+		[]*secp256k1.PrivateKey{keys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(stopTx))
+	blk, err = vm.Builder.BuildBlock(context.Background()) // should make subnet validator as stopping
+	require.NoError(err)
+
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background())) // add the validator to validator set
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	staker, err := vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
+	require.NoError(err)
+
+	// there should be a finite end time set, since primary validator has finite end
+	require.True(staker.EndTime.Before(mockable.MaxTime))
+
 	// fast forward clock to time validator should stop validating
-	vm.clock.Set(endTime)
+	vm.clock.Set(staker.EndTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))

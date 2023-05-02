@@ -913,7 +913,7 @@ func verifyStopStakerTx(
 	sTx *txs.Tx,
 	tx *txs.StopStakerTx,
 ) ([]*state.Staker, time.Time, error) {
-	if backend.Config.IsContinuousStakingActivated(chainState.GetTimestamp()) {
+	if !backend.Config.IsContinuousStakingActivated(chainState.GetTimestamp()) {
 		return nil, time.Time{}, errors.New("StopStakerTx cannot be accepted before continuous staking fork activation")
 	}
 

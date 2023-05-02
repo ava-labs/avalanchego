@@ -80,6 +80,16 @@ type Spender interface {
 		[]*secp256k1.PrivateKey, // Keys that prove ownership
 		error,
 	)
+
+	AuthorizeStopStaking(
+		stakerTxID ids.ID,
+		state state.Chain,
+		keys []*secp256k1.PrivateKey,
+	) (
+		verify.Verifiable, // Input that names owners
+		[]*secp256k1.PrivateKey, // Keys that prove ownership
+		error,
+	)
 }
 
 type Verifier interface {
@@ -416,6 +426,70 @@ func (h *handler) Authorize(
 	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
+	}
+
+	// Add the keys to a keychain
+	kc := secp256k1fx.NewKeychain(keys...)
+
+	// Make sure that the operation is valid after a minimum time
+	now := uint64(h.clk.Time().Unix())
+
+	// Attempt to prove ownership of the subnet
+	indices, signers, matches := kc.Match(owner, now)
+	if !matches {
+		return nil, nil, errCantSign
+	}
+
+	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
+}
+
+func (h *handler) AuthorizeStopStaking(
+	stakerTxID ids.ID,
+	state state.Chain,
+	keys []*secp256k1.PrivateKey,
+) (
+	verify.Verifiable, // Input that names owners
+	[]*secp256k1.PrivateKey, // Keys that prove ownership
+	error,
+) {
+	stakerTx, _, err := state.GetTx(stakerTxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf(
+			"failed to fetch tx %s: %w",
+			stakerTxID,
+			err,
+		)
+	}
+	var stakerOwner fx.Owner
+	switch uStakerTx := stakerTx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		stakerOwner = uStakerTx.ValidationRewardsOwner()
+	case txs.DelegatorTx:
+		stakerOwner = uStakerTx.RewardsOwner()
+	case *txs.AddSubnetValidatorTx:
+		signedSubnetTx, _, err := state.GetTx(uStakerTx.Subnet)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"tx creating subnet not found %q: %v",
+				uStakerTx.Subnet,
+				err,
+			)
+		}
+		subnetTx, ok := signedSubnetTx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected *txs.CreateSubnetTx but got %T", signedSubnetTx.Unsigned)
+		}
+		stakerOwner = subnetTx.Owner
+	default:
+		return nil, nil, fmt.Errorf(
+			"unhandled staker type: %t",
+			uStakerTx,
+		)
+	}
+	// Make sure the owners of the subnet match the provided keys
+	owner, ok := stakerOwner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", stakerOwner)
 	}
 
 	// Add the keys to a keychain
