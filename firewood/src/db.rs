@@ -196,6 +196,23 @@ impl SubUniverse<Rc<CachedSpace>> {
     }
 }
 
+fn get_sub_universe_from_deltas(
+    sub_universe: &SubUniverse<Rc<CachedSpace>>,
+    meta_delta: StoreDelta,
+    payload_delta: StoreDelta,
+) -> SubUniverse<StoreRevShared> {
+    SubUniverse::new(
+        StoreRevShared::from_delta(sub_universe.meta.clone(), meta_delta),
+        StoreRevShared::from_delta(sub_universe.payload.clone(), payload_delta),
+    )
+}
+
+fn get_sub_universe_from_empty_delta(
+    sub_universe: &SubUniverse<Rc<CachedSpace>>,
+) -> SubUniverse<StoreRevShared> {
+    get_sub_universe_from_deltas(sub_universe, StoreDelta::default(), StoreDelta::default())
+}
+
 /// DB-wide metadata, it keeps track of the roots of the top-level tries.
 struct DBHeader {
     /// The root node of the account model storage. (Where the values are [Account] objects, which
@@ -710,14 +727,8 @@ impl DB {
         latest.flush_dirty().unwrap();
 
         let base = Universe {
-            merkle: SubUniverse::new(
-                StoreRevShared::from_delta(cached.merkle.meta.clone(), StoreDelta::new_empty()),
-                StoreRevShared::from_delta(cached.merkle.payload.clone(), StoreDelta::new_empty()),
-            ),
-            blob: SubUniverse::new(
-                StoreRevShared::from_delta(cached.blob.meta.clone(), StoreDelta::new_empty()),
-                StoreRevShared::from_delta(cached.blob.payload.clone(), StoreDelta::new_empty()),
-            ),
+            merkle: get_sub_universe_from_empty_delta(&cached.merkle),
+            blob: get_sub_universe_from_empty_delta(&cached.blob),
         };
 
         Ok(Self {
@@ -769,7 +780,7 @@ impl DB {
     ///
     /// The latest revision (nback) starts from 0, which is the current state.
     /// If nback equals is above the configured maximum number of revisions, this function returns None.
-    /// It also returns None in the case where the nback is larger than the number of revisions available.
+    /// Returns `None` if `nback` is greater than the configured maximum amount of revisions.
     pub fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<Revision> {
         let mut revisions = self.revisions.lock();
         let inner = self.inner.read();
@@ -1012,22 +1023,15 @@ impl WriteBatch {
 
         // update the rolling window of past revisions
         let new_base = Universe {
-            merkle: SubUniverse::new(
-                StoreRevShared::from_delta(
-                    rev_inner.cached.merkle.meta.clone(),
-                    old_merkle_meta_delta,
-                ),
-                StoreRevShared::from_delta(
-                    rev_inner.cached.merkle.payload.clone(),
-                    old_merkle_payload_delta,
-                ),
+            merkle: get_sub_universe_from_deltas(
+                &rev_inner.cached.merkle,
+                old_merkle_meta_delta,
+                old_merkle_payload_delta,
             ),
-            blob: SubUniverse::new(
-                StoreRevShared::from_delta(rev_inner.cached.blob.meta.clone(), old_blob_meta_delta),
-                StoreRevShared::from_delta(
-                    rev_inner.cached.blob.payload.clone(),
-                    old_blob_payload_delta,
-                ),
+            blob: get_sub_universe_from_deltas(
+                &rev_inner.cached.blob,
+                old_blob_meta_delta,
+                old_blob_payload_delta,
             ),
         };
 
@@ -1050,26 +1054,8 @@ impl WriteBatch {
         }
 
         let base = Universe {
-            merkle: SubUniverse::new(
-                StoreRevShared::from_delta(
-                    rev_inner.cached.merkle.meta.clone(),
-                    StoreDelta::new_empty(),
-                ),
-                StoreRevShared::from_delta(
-                    rev_inner.cached.merkle.payload.clone(),
-                    StoreDelta::new_empty(),
-                ),
-            ),
-            blob: SubUniverse::new(
-                StoreRevShared::from_delta(
-                    rev_inner.cached.blob.meta.clone(),
-                    StoreDelta::new_empty(),
-                ),
-                StoreRevShared::from_delta(
-                    rev_inner.cached.blob.payload.clone(),
-                    StoreDelta::new_empty(),
-                ),
-            ),
+            merkle: get_sub_universe_from_empty_delta(&rev_inner.cached.merkle),
+            blob: get_sub_universe_from_empty_delta(&rev_inner.cached.blob),
         };
         revisions.base = base;
 

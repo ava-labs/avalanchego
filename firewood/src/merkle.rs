@@ -43,7 +43,7 @@ impl fmt::Display for MerkleError {
 
 impl Error for MerkleError {}
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Hash(pub [u8; HASH_SIZE]);
 
 impl Hash {
@@ -76,6 +76,12 @@ impl Storable for Hash {
 
     fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         Cursor::new(to).write_all(&self.0).map_err(ShaleError::Io)
+    }
+}
+
+impl Debug for Hash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 

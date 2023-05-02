@@ -1,115 +1,143 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::{
+    db::{DBConfig, Revision, WALConfig, DB},
+    proof::Proof,
+};
 
 /// cargo run --example rev
 fn main() {
     let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
     {
-        let db = DB::new("rev_db", &cfg.clone().truncate(true).build()).unwrap();
+        let db = DB::new("rev_db", &cfg.clone().truncate(true).build())
+            .expect("db initiation should succeed");
         let items = vec![("dof", "verb"), ("doe", "reindeer"), ("dog", "puppy")];
         for (k, v) in items.iter() {
             db.new_writebatch()
                 .kv_insert(k, v.as_bytes().to_vec())
                 .unwrap()
                 .commit();
-            println!("{}", hex::encode(*db.kv_root_hash().unwrap()));
+
+            let root_hash = db
+                .kv_root_hash()
+                .expect("root-hash for current state should exist");
+            println!("{root_hash:?}");
         }
         db.kv_dump(&mut std::io::stdout()).unwrap();
-        println!(
-            "{}",
-            hex::encode(*db.get_revision(0, None).unwrap().kv_root_hash().unwrap())
-        );
-        // The latest committed revision matches with the current state without dirty writes.
-        assert_eq!(
-            db.kv_root_hash().unwrap(),
-            db.get_revision(0, None).unwrap().kv_root_hash().unwrap()
-        );
-        println!(
-            "{}",
-            hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
-        );
-        let root_hash = *db.get_revision(1, None).unwrap().kv_root_hash().unwrap();
-        println!(
-            "{}",
-            hex::encode(*db.get_revision(2, None).unwrap().kv_root_hash().unwrap())
-        );
-        let write = db.new_writebatch().kv_insert("k", vec![b'v']).unwrap();
+        let revision = db.get_revision(0, None).expect("revision-0 should exist");
+        let revision_root_hash = revision
+            .kv_root_hash()
+            .expect("root-hash for revision-0 should exist");
+        println!("{revision_root_hash:?}");
+
+        let current_root_hash = db
+            .kv_root_hash()
+            .expect("root-hash for current state should exist");
+        // The following is true as long as there are no dirty-writes.
+        assert_eq!(revision_root_hash, current_root_hash);
+
+        let revision = db.get_revision(2, None).expect("revision-2 should exist");
+        let revision_root_hash = revision
+            .kv_root_hash()
+            .expect("root-hash for revision-2 should exist");
+        println!("{revision_root_hash:?}");
 
         // Get a revision while a batch is active.
-        println!(
-            "{}",
-            hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
-        );
-        assert_eq!(
-            root_hash,
-            *db.get_revision(1, None).unwrap().kv_root_hash().unwrap()
-        );
+        let revision_root_hash = db
+            .get_revision(1, None)
+            .expect("revision-1 should exist")
+            .kv_root_hash()
+            .expect("root-hash for revision-1 should exist");
+        println!("{revision_root_hash:?}");
+
+        let write = db.new_writebatch().kv_insert("k", vec![b'v']).unwrap();
+
+        let actual_revision_root_hash = db
+            .get_revision(1, None)
+            .expect("revision-1 should exist")
+            .kv_root_hash()
+            .expect("root-hash for revision-1 should exist");
+        assert_eq!(revision_root_hash, actual_revision_root_hash);
 
         // Read the uncommitted value while the batch is still active.
         let val = db.kv_get("k").unwrap();
         assert_eq!("v".as_bytes().to_vec(), val);
 
         write.commit();
-        println!(
-            "{}",
-            hex::encode(*db.get_revision(1, None).unwrap().kv_root_hash().unwrap())
-        );
+        let new_revision_root_hash = db
+            .get_revision(1, None)
+            .expect("revision-1 should exist")
+            .kv_root_hash()
+            .expect("root-hash for revision-1 should exist");
+        assert_ne!(revision_root_hash, new_revision_root_hash);
+
         let val = db.kv_get("k").unwrap();
         assert_eq!("v".as_bytes().to_vec(), val);
     }
     {
-        let db = DB::new("rev_db", &cfg.truncate(false).build()).unwrap();
+        let db =
+            DB::new("rev_db", &cfg.truncate(false).build()).expect("db initiation should succeed");
         {
-            // The latest committed revision matches with the current state after replaying from WALs.
-            assert_eq!(
-                db.kv_root_hash().unwrap(),
-                db.get_revision(0, None).unwrap().kv_root_hash().unwrap()
-            );
+            let revision = db.get_revision(0, None).expect("revision-0 should exist");
+            let revision_root_hash = revision
+                .kv_root_hash()
+                .expect("root-hash for revision-0 should exist");
+            println!("{revision_root_hash:?}");
 
-            let rev = db.get_revision(1, None).unwrap();
-            println!("{}", hex::encode(*rev.kv_root_hash().unwrap()));
-            rev.kv_dump(&mut std::io::stdout()).unwrap();
+            let current_root_hash = db
+                .kv_root_hash()
+                .expect("root-hash for current state should exist");
+            // The following is true as long as the current state is fresh after replaying from WALs.
+            assert_eq!(revision_root_hash, current_root_hash);
 
-            let mut items_rev_1 = vec![("dof", "verb"), ("doe", "reindeer")];
-            items_rev_1.sort();
-            let (keys, vals) = items_rev_1.clone().into_iter().unzip();
+            let revision = db.get_revision(1, None).expect("revision-1 should exist");
+            revision.kv_dump(&mut std::io::stdout()).unwrap();
 
-            let mut proof = rev.prove(items_rev_1[0].0).unwrap();
-            let end_proof = rev.prove(items_rev_1[items_rev_1.len() - 1].0).unwrap();
-            proof.concat_proofs(end_proof);
+            let mut items_rev = vec![("dof", "verb"), ("doe", "reindeer")];
+            items_rev.sort();
+            let (keys, vals) = items_rev.clone().into_iter().unzip();
 
-            rev.verify_range_proof(
-                proof,
-                items_rev_1[0].0,
-                items_rev_1[items_rev_1.len() - 1].0,
-                keys,
-                vals,
-            )
-            .unwrap();
+            let proof = build_proof(&revision, &items_rev);
+            revision
+                .verify_range_proof(
+                    proof,
+                    items_rev[0].0,
+                    items_rev[items_rev.len() - 1].0,
+                    keys,
+                    vals,
+                )
+                .unwrap();
         }
         {
-            let rev = db.get_revision(2, None).unwrap();
-            print!("{}", hex::encode(*rev.kv_root_hash().unwrap()));
-            rev.kv_dump(&mut std::io::stdout()).unwrap();
+            let revision = db.get_revision(2, None).expect("revision-2 should exist");
+            let revision_root_hash = revision
+                .kv_root_hash()
+                .expect("root-hash for revision-2 should exist");
+            println!("{revision_root_hash:?}");
+            revision.kv_dump(&mut std::io::stdout()).unwrap();
 
-            let mut items_rev_2 = vec![("dof", "verb")];
-            items_rev_2.sort();
-            let (keys, vals) = items_rev_2.clone().into_iter().unzip();
+            let mut items_rev = vec![("dof", "verb")];
+            items_rev.sort();
+            let (keys, vals) = items_rev.clone().into_iter().unzip();
 
-            let mut proof = rev.prove(items_rev_2[0].0).unwrap();
-            let end_proof = rev.prove(items_rev_2[items_rev_2.len() - 1].0).unwrap();
-            proof.concat_proofs(end_proof);
-
-            rev.verify_range_proof(
-                proof,
-                items_rev_2[0].0,
-                items_rev_2[items_rev_2.len() - 1].0,
-                keys,
-                vals,
-            )
-            .unwrap();
+            let proof = build_proof(&revision, &items_rev);
+            revision
+                .verify_range_proof(
+                    proof,
+                    items_rev[0].0,
+                    items_rev[items_rev.len() - 1].0,
+                    keys,
+                    vals,
+                )
+                .unwrap();
         }
     }
+}
+
+fn build_proof(revision: &Revision, items: &[(&str, &str)]) -> Proof {
+    let mut proof = revision.prove(items[0].0).unwrap();
+    let end = revision.prove(items.last().unwrap().0).unwrap();
+    proof.concat_proofs(end);
+    proof
 }
