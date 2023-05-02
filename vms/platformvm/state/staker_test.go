@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -276,4 +277,143 @@ func TestNewPendingStaker(t *testing.T) {
 
 	_, err = NewPendingStaker(txID, stakerTx)
 	require.ErrorIs(err, errCustom)
+}
+
+func TestShiftStaker(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// create the staker
+	var (
+		start         = time.Now().Truncate(time.Second)
+		stakingPeriod = 6 * 30 * 24 * time.Hour
+		end           = mockable.MaxTime
+	)
+
+	// Shift with max end time
+	staker := &Staker{
+		StartTime:     start,
+		StakingPeriod: stakingPeriod,
+		NextTime:      start.Add(stakingPeriod),
+		EndTime:       end,
+	}
+	require.True(staker.NextTime.Before(staker.EndTime))
+
+	ShiftStakerAheadInPlace(staker)
+	require.Equal(start.Add(stakingPeriod), staker.StartTime)
+	require.Equal(stakingPeriod, staker.StakingPeriod)
+	require.Equal(start.Add(2*stakingPeriod), staker.NextTime)
+	require.Equal(end, staker.EndTime)
+	require.False(staker.NextTime.After(staker.EndTime)) // invariant
+
+	// Shift with finite end time set in the future
+	periods := 5
+	end = start.Add(time.Duration(periods) * stakingPeriod)
+	staker = &Staker{
+		StartTime:     start,
+		StakingPeriod: stakingPeriod,
+		NextTime:      start.Add(stakingPeriod),
+		EndTime:       end,
+	}
+	require.False(staker.NextTime.After(staker.EndTime)) // invariant
+
+	for i := 1; i < periods; i++ {
+		ShiftStakerAheadInPlace(staker)
+		require.Equal(start.Add(time.Duration(i)*stakingPeriod), staker.StartTime)
+		require.Equal(stakingPeriod, staker.StakingPeriod)
+		require.Equal(start.Add(time.Duration(i+1)*stakingPeriod), staker.NextTime)
+		require.Equal(end, staker.EndTime)
+		require.False(staker.NextTime.After(staker.EndTime)) // invariant
+	}
+	require.Equal(staker.EndTime, staker.NextTime)
+
+	// staker reached end of life, shift must be ineffective
+	cpy := *staker
+	ShiftStakerAheadInPlace(&cpy)
+	require.Equal(staker, &cpy)
+}
+
+func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// create the staker
+	nodeID := ids.GenerateTestNodeID()
+	subnetID := constants.PrimaryNetworkID
+	startTime := time.Now().Truncate(time.Second)
+	duration := 365 * 24 * time.Hour
+	endTime := mockable.MaxTime
+	currentPriority := txs.PrimaryNetworkValidatorCurrentPriority
+
+	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx.EXPECT().NodeID().Return(nodeID)
+	stakerTx.EXPECT().SubnetID().Return(subnetID)
+	stakerTx.EXPECT().StakingPeriod().Return(duration)
+	stakerTx.EXPECT().EndTime().Return(endTime)
+	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
+
+	stakerTx.EXPECT().PublicKey().Return(nil, true, nil)
+	stakerTx.EXPECT().Weight().Return(uint64(123))
+
+	txID := ids.GenerateTestID()
+	potentialReward := uint64(54321)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	require.NoError(err)
+
+	// stopTime should be at T+1 staking period
+	require.Equal(startTime.Add(duration), staker.NextTime)
+	require.Equal(mockable.MaxTime, staker.EndTime)
+	stopTime := staker.EarliestStopTime()
+	require.Equal(staker.NextTime.Add(staker.StakingPeriod), stopTime)
+
+	MarkStakerForRemovalInPlaceBeforeTime(staker, stopTime)
+	require.Equal(stopTime, staker.EndTime)
+	require.Equal(stopTime, staker.EarliestStopTime())
+
+	// staker shift must not change stop time
+	ShiftStakerAheadInPlace(staker)
+	require.Equal(stopTime, staker.EndTime)
+	require.Equal(stopTime, staker.EarliestStopTime())
+}
+
+func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// create the staker
+	nodeID := ids.GenerateTestNodeID()
+	subnetID := constants.PrimaryNetworkID
+	startTime := time.Now().Truncate(time.Second)
+	duration := 365 * 24 * time.Hour
+	endTime := mockable.MaxTime
+	currentPriority := txs.PrimaryNetworkDelegatorCurrentPriority
+
+	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx.EXPECT().NodeID().Return(nodeID)
+	stakerTx.EXPECT().SubnetID().Return(subnetID)
+	stakerTx.EXPECT().StakingPeriod().Return(duration)
+	stakerTx.EXPECT().EndTime().Return(endTime)
+	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
+
+	stakerTx.EXPECT().PublicKey().Return(nil, true, nil)
+	stakerTx.EXPECT().Weight().Return(uint64(123))
+
+	txID := ids.GenerateTestID()
+	potentialReward := uint64(54321)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	require.NoError(err)
+
+	// stopTime should be at end of staking period
+	require.Equal(startTime.Add(duration), staker.NextTime)
+	require.Equal(mockable.MaxTime, staker.EndTime)
+	stopTime := staker.EarliestStopTime()
+	require.Equal(staker.NextTime, stopTime)
+
+	MarkStakerForRemovalInPlaceBeforeTime(staker, stopTime)
+	require.Equal(stopTime, staker.NextTime)
+	require.Equal(stopTime, staker.EndTime)
+	require.Equal(stopTime, staker.EarliestStopTime())
 }

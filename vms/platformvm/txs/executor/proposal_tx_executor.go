@@ -164,7 +164,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		)
 	}
 
-	if err := verifyAddSubnetValidatorTx(
+	if _, err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,
@@ -212,7 +212,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		)
 	}
 
-	onAbortOuts, err := verifyAddDelegatorTx(
+	onAbortOuts, _, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,

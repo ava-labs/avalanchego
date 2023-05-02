@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -284,7 +285,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, mockable.MaxTime)
 	if err != nil {
 		return err
 	}
@@ -301,12 +302,13 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
+	primaryValidatorEndTime, err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -315,7 +317,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
 	if err != nil {
 		return err
 	}
@@ -331,12 +333,13 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
+	_, primaryValidatorEndTime, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -345,7 +348,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
 	if err != nil {
 		return err
 	}
@@ -439,12 +442,13 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if err := verifyAddPermissionlessValidatorTx(
+	primaryValidatorEndTime, err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -453,7 +457,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
 	if err != nil {
 		return err
 	}
@@ -470,12 +474,13 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if err := verifyAddPermissionlessDelegatorTx(
+	primaryValidatorEndTime, err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -484,7 +489,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
 	if err != nil {
 		return err
 	}
@@ -501,9 +506,40 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
+func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
+	stakers, stopTime, err := verifyStopStakerTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, toStop := range stakers {
+		state.MarkStakerForRemovalInPlaceBeforeTime(toStop, stopTime)
+		if toStop.Priority.IsValidator() {
+			err = e.State.UpdateCurrentValidator(toStop)
+		} else {
+			err = e.State.UpdateCurrentDelegator(toStop)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
 	chainTime time.Time,
+	endTimeBound time.Time,
 ) (*state.Staker, error) {
 	// Pre Continuous Staking fork, stakers are added as pending first, them promoted
 	// to current when chainTime reach their start time.
@@ -540,45 +576,11 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		updatedSupply := currentSupply + potentialReward
 		e.State.SetCurrentSupply(stakerTx.SubnetID(), updatedSupply)
 	}
-	return state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
-}
-
-func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
-	staker, relatedStakers, err := verifyStopStakerTx(
-		e.Backend,
-		e.State,
-		e.Tx,
-		tx,
-	)
+	staker, err := state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	state.MarkStakerForRemovalInPlace(staker)
-	if staker.Priority.IsValidator() {
-		err = e.State.UpdateCurrentValidator(staker)
-	} else {
-		err = e.State.UpdateCurrentDelegator(staker)
-	}
-	if err != nil {
-		return err
-	}
-
-	for _, toStop := range relatedStakers {
-		state.MarkStakerForRemovalInPlaceBeforeTime(toStop, staker.EndTime)
-		if toStop.Priority.IsValidator() {
-			err = e.State.UpdateCurrentValidator(toStop)
-		} else {
-			err = e.State.UpdateCurrentDelegator(toStop)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	txID := e.Tx.ID()
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
-	return nil
+	state.MarkStakerForRemovalInPlaceBeforeTime(staker, endTimeBound)
+	return staker, nil
 }

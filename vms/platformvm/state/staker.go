@@ -10,8 +10,8 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -155,35 +155,33 @@ func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
 }
 
 // ShiftStakerAheadInPlace moves staker times ahead.
-// Calling StartTime S, NextTime N and EndTime E, it works as follows:
-//
-// 1. Current continuous Staker
-// S-----N------------~ E
-// ......S-----N------~ E
-//
-// 2. Current non-continuous Staker
-// S-----NE
-// ......S-----NE
-//
-// 3. Pending Staker
-// SN-----E
-// ......SN-----E
 func ShiftStakerAheadInPlace(s *Staker) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers
+	}
+	if s.NextTime.Equal(s.EndTime) {
+		return // can't shift, staker reached EOL
+	}
 	s.StartTime = s.StartTime.Add(s.StakingPeriod)
 	s.NextTime = s.NextTime.Add(s.StakingPeriod)
-	if !s.EndTime.Equal(mockable.MaxTime) {
-		s.EndTime = s.EndTime.Add(s.StakingPeriod)
-	}
 }
 
-func MarkStakerForRemovalInPlace(s *Staker) {
-	// stop at T+1
-	s.EndTime = s.NextTime.Add(s.StakingPeriod)
+func (s *Staker) EarliestStopTime() time.Time {
+	candidateStopTime := s.NextTime
+	if s.Priority.IsValidator() && s.SubnetID == constants.PrimaryNetworkID {
+		candidateStopTime = s.NextTime.Add(s.StakingPeriod) // stop at T+1 for now
+	}
+	if candidateStopTime.Before(s.EndTime) {
+		return candidateStopTime
+	}
+	return s.EndTime
 }
 
 func MarkStakerForRemovalInPlaceBeforeTime(s *Staker, stopTime time.Time) {
-	s.EndTime = s.NextTime
-	for candidate := s.EndTime.Add(s.StakingPeriod); candidate.Before(stopTime); candidate = s.EndTime.Add(s.StakingPeriod) {
-		s.EndTime = candidate
+	if stopTime.Before(s.EndTime) {
+		end := s.NextTime
+		for ; end.Before(stopTime); end = end.Add(s.StakingPeriod) {
+		}
+		s.EndTime = end
 	}
 }
