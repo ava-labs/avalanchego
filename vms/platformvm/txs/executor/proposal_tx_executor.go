@@ -387,9 +387,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		} else {
 			e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
 			e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
-			// TODO ABENEGIA: make sure to handle delegator and subnetValidators
-			// related to this validator, which must not keep staking if the validator
-			// is removed from the validator set
 
 			// Refund the stake only when validator is about to leave
 			// the staking set
