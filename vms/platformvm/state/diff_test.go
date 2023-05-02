@@ -514,9 +514,10 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 			expectedChains, expectedErr := expected.GetChains(subnetID)
 			actualChains, actualErr := actual.GetChains(subnetID)
 			require.ErrorIs(expectedErr, actualErr)
-			if expectedErr == nil {
-				require.Equal(expectedChains, actualChains)
+			if expectedErr != nil {
+				continue
 			}
+			require.Equal(expectedChains, actualChains)
 		}
 	}
 }

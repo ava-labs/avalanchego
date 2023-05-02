@@ -330,14 +330,15 @@ func TestServiceDeleteUser(t *testing.T) {
 			got := &api.EmptyReply{}
 			err = s.DeleteUser(nil, tt.request, got)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.want, got)
-				_, ok := ks.usernameToPassword[testUser]
-				require.False(ok) // delete is successful
-
-				// deleted user details should be available to create user again.
-				require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.want, got)
+			_, ok := ks.usernameToPassword[testUser]
+			require.False(ok) // delete is successful
+
+			// deleted user details should be available to create user again.
+			require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))
 		})
 	}
 }

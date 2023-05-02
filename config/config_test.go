@@ -456,9 +456,10 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			v := setupViper(configFilePath)
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
 			require.ErrorIs(err, test.expectedErr)
-			if test.expectedErr == nil {
-				test.testF(require, subnetConfigs)
+			if test.expectedErr != nil {
+				return
 			}
+			test.testF(require, subnetConfigs)
 		})
 	}
 }
@@ -549,9 +550,10 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
 			require.ErrorIs(err, test.expectedErr)
-			if test.expectedErr == nil {
-				test.testF(require, subnetConfigs)
+			if test.expectedErr != nil {
+				return
 			}
+			test.testF(require, subnetConfigs)
 		})
 	}
 }
