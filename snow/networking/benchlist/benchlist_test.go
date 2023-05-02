@@ -117,8 +117,8 @@ func TestBenchlistAdd(t *testing.T) {
 
 	next := b.benchedQueue[0]
 	require.Equal(vdrID0, next.nodeID)
-	require.True(!next.benchedUntil.After(now.Add(duration)))
-	require.True(!next.benchedUntil.Before(now.Add(duration / 2)))
+	require.False(next.benchedUntil.After(now.Add(duration)))
+	require.False(next.benchedUntil.Before(now.Add(duration / 2)))
 	require.Empty(b.failureStreaks)
 	require.True(benched)
 	benchable.BenchedF = nil
@@ -271,7 +271,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID4}
 	for _, benchedVdr := range b.benchedQueue {
 		require.Contains(benchedIDs, benchedVdr.nodeID)
-		require.True(!benchedVdr.benchedUntil.Before(minEndTime))
+		require.False(benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
 	b.lock.Unlock()
@@ -357,7 +357,7 @@ func TestBenchlistRemove(t *testing.T) {
 	benchedIDs := []ids.NodeID{vdrID0, vdrID1, vdrID2}
 	for _, benchedVdr := range b.benchedQueue {
 		require.Contains(benchedIDs, benchedVdr.nodeID)
-		require.True(!benchedVdr.benchedUntil.Before(minEndTime))
+		require.False(benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
 	// Set the benchlist's clock past when all validators should be unbenched
