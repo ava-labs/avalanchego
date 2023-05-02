@@ -2413,7 +2413,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	gotBlk, ok := vm.innerBlkCache.Get(blkNearTip.ID())
 	require.True(ok)
 	require.Equal(mockInnerBlkNearTip, gotBlk)
-	require.EqualValues(0, vm.lastAcceptedHeight)
+	require.Zero(vm.lastAcceptedHeight)
 
 	// Clear the cache
 	vm.innerBlkCache.Flush()
