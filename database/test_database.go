@@ -587,7 +587,6 @@ func TestIteratorSnapshot(t *testing.T, db Database) {
 
 	iterator := db.NewIterator()
 	require.NotNil(iterator)
-
 	defer iterator.Release()
 
 	require.NoError(db.Put(key2, value2))
@@ -798,7 +797,6 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	{
 		iterator := db.NewIterator()
 		require.NotNil(iterator)
-
 		defer iterator.Release()
 
 		require.False(iterator.Next())
@@ -810,7 +808,6 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	{
 		iterator := db.NewIteratorWithPrefix(nil)
 		require.NotNil(iterator)
-
 		defer iterator.Release()
 
 		require.False(iterator.Next())
@@ -822,7 +819,6 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	{
 		iterator := db.NewIteratorWithStart(nil)
 		require.NotNil(iterator)
-
 		defer iterator.Release()
 
 		require.False(iterator.Next())
@@ -834,7 +830,6 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	{
 		iterator := db.NewIteratorWithStartAndPrefix(nil, nil)
 		require.NotNil(iterator)
-
 		defer iterator.Release()
 
 		require.False(iterator.Next())
@@ -863,7 +858,6 @@ func TestIteratorError(t *testing.T, db Database) {
 
 	iterator := db.NewIterator()
 	require.NotNil(iterator)
-
 	defer iterator.Release()
 
 	// Call Next() and ensure that if the database is closed, the iterator
