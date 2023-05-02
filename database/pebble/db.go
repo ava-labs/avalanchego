@@ -57,7 +57,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func New(file string, cfg Config, log logging.Logger, _ string, reg prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, _ string, /*reg*/_ prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
 
 	opts := &pebble.Options{
