@@ -147,5 +147,5 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	err = env.Builder.Add(tx)
 	require.NoError(err)
 
-	require.True(gossipedBytes == nil)
+	require.Nil(gossipedBytes)
 }
