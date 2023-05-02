@@ -109,10 +109,10 @@ func TestTTLAdd(t *testing.T) {
 
 	// Now the window should look like this:
 	// []
-	require.Equal(0, window.Length())
+	require.Zero(window.Length())
 
 	oldest, ok = window.Oldest()
-	require.Equal(0, oldest)
+	require.Zero(oldest)
 	require.False(ok)
 }
 
@@ -144,7 +144,7 @@ func TestTTLLength(t *testing.T) {
 	clock.Set(epochStart.Add(11 * time.Second))
 
 	// No more elements should be present in the window.
-	require.Equal(0, window.Length())
+	require.Zero(window.Length())
 }
 
 // TestTTLReadOnly tests that stale elements are still evicted on calling Oldest
@@ -181,9 +181,9 @@ func TestTTLOldest(t *testing.T) {
 
 	// Now there shouldn't be any elements in the window
 	oldest, ok = window.Oldest()
-	require.Equal(0, oldest)
+	require.Zero(oldest)
 	require.False(ok)
-	require.Equal(0, window.elements.Len())
+	require.Zero(window.elements.Len())
 }
 
 // Tests that we bound the amount of elements in the window

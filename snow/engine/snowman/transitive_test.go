@@ -958,8 +958,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(context.Background(), blk)
-	require.NoError(err)
+	require.NoError(te.issue(context.Background(), blk))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -972,14 +971,12 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
 
-	err = te.GetFailed(context.Background(), vdr, reqID)
-	require.NoError(err)
+	require.NoError(te.GetFailed(context.Background(), vdr, reqID))
 	require.Empty(te.blocked)
 }
 
@@ -1016,8 +1013,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(context.Background(), blk)
-	require.NoError(err)
+	require.NoError(te.issue(context.Background(), blk))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1030,8 +1026,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
@@ -1044,8 +1039,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	// Respond with an unexpected block and verify that the request is correctly
 	// cleared.
-	err = te.Put(context.Background(), vdr, reqID, gBlkBytes)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, reqID, gBlkBytes))
 	require.Empty(te.blocked)
 }
 
@@ -2814,8 +2808,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Give the engine the grandparent
-	err := te.Put(context.Background(), vdr, 0, grandParentBlk.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, grandParentBlk.BytesV))
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkA.BytesV, b)
@@ -2825,8 +2818,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	// Give the node [parentBlkA]/[parentBlkB].
 	// When it's parsed we get [parentBlkA] (not [parentBlkB]).
 	// [parentBlkA] fails verification and gets put into [te.nonVerifiedCache].
-	err = te.Put(context.Background(), vdr, 0, parentBlkA.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkB.BytesV, b)
@@ -2858,15 +2850,11 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	// When we fetch it using [GetBlockF] we get [parentBlkB].
 	// Note that [parentBlkB] doesn't fail verification and is issued into consensus.
 	// This evicts [parentBlkA] from [te.nonVerifiedCache].
-	err = te.Put(context.Background(), vdr, 0, parentBlkA.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	// Give 2 chits for [parentBlkA]/[parentBlkB]
-	err = te.Chits(context.Background(), vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV}, nil)
-	require.NoError(err)
-
-	err = te.Chits(context.Background(), vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV}, nil))
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
@@ -2883,8 +2871,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Should issue a new block and send a query for it.
-	err = te.Notify(context.Background(), common.PendingTxs)
-	require.NoError(err)
+	require.NoError(te.Notify(context.Background(), common.PendingTxs))
 	require.True(*sentQuery)
 }
 

@@ -45,8 +45,7 @@ func TestShutdown(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -182,8 +181,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	nodeID := ids.EmptyNodeID
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
@@ -373,8 +371,7 @@ func TestRouterTimeout(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -787,6 +784,8 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	}
 
 	{
+		engineType := p2p.EngineType(100)
+
 		requestID++
 		msg := message.InboundPushQuery(
 			ctx.ChainID,
@@ -794,16 +793,16 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			0,
 			nil,
 			nodeID,
-			100,
+			engineType,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.EqualValues(100, msg.EngineType)
+			require.Equal(engineType, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(0, chainRouter.timedRequests.Len())
+	require.Zero(chainRouter.timedRequests.Len())
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
@@ -845,8 +844,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1091,7 +1089,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(0, chainRouter.timedRequests.Len())
+	require.Zero(chainRouter.timedRequests.Len())
 }
 
 func TestValidatorOnlyMessageDrops(t *testing.T) {
@@ -1139,8 +1137,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
-	err = vdrs.Add(vID, nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -1560,8 +1557,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
-	err = vdrs.Add(vID, nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),

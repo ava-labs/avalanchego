@@ -23,8 +23,7 @@ func TestDialThrottler(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			err := throttler.Acquire(context.Background())
-			require.NoError(err)
+			require.NoError(throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -38,8 +37,7 @@ func TestDialThrottler(t *testing.T) {
 	acquiredChan := make(chan struct{}, 1)
 	go func() {
 		// Should block because 5 already taken within last second
-		err := throttler.Acquire(context.Background())
-		require.NoError(err)
+		require.NoError(throttler.Acquire(context.Background()))
 		acquiredChan <- struct{}{}
 	}()
 
@@ -70,8 +68,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			err := throttler.Acquire(context.Background())
-			require.NoError(err)
+			require.NoError(throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -109,8 +106,7 @@ func TestNoDialThrottler(t *testing.T) {
 	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
-		err := throttler.Acquire(context.Background()) // Should always immediately return
-		require.NoError(err)
+		require.NoError(throttler.Acquire(context.Background())) // Should always immediately return
 		require.WithinDuration(time.Now(), startTime, 25*time.Millisecond)
 	}
 }

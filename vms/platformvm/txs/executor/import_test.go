@@ -198,8 +198,7 @@ func TestNewImportTx(t *testing.T) {
 				StateVersions: env,
 				Tx:            tx,
 			}
-			err = tx.Unsigned.Visit(&verifier)
-			require.NoError(err)
+			require.NoError(tx.Unsigned.Visit(&verifier))
 		})
 	}
 }

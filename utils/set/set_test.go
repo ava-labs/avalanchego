@@ -106,12 +106,12 @@ func TestSetPop(t *testing.T) {
 	got, ok := s.Pop()
 	require.True(ok)
 	require.True(got == id1 || got == id2)
-	require.EqualValues(1, s.Len())
+	require.Equal(1, s.Len())
 
 	got, ok = s.Pop()
 	require.True(ok)
 	require.True(got == id1 || got == id2)
-	require.EqualValues(0, s.Len())
+	require.Zero(s.Len())
 
 	_, ok = s.Pop()
 	require.False(ok)
@@ -148,8 +148,7 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
 	set := Set[int]{}
 	{
-		err := set.UnmarshalJSON([]byte("[]"))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte("[]")))
 		require.Empty(set)
 	}
 	id1, id2 := 1, 2
@@ -158,29 +157,25 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	id2JSON, err := json.Marshal(id2)
 	require.NoError(err)
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON)))))
 		require.Len(set, 1)
 		require.Contains(set, id1)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
 		require.Len(set, 2)
 		require.Contains(set, id1)
 		require.Contains(set, id2)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
 		require.Contains(set, 5)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
@@ -189,10 +184,8 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	{
 		set1 := Set[int]{}
 		set2 := Set[int]{}
-		err := set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
-		err = set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
+		require.NoError(set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON)))))
 		require.Equal(set1, set2)
 	}
 }

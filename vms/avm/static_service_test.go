@@ -101,6 +101,5 @@ func TestBuildGenesis(t *testing.T) {
 		},
 	}
 	reply := BuildGenesisReply{}
-	err := ss.BuildGenesis(nil, &args, &reply)
-	require.NoError(err)
+	require.NoError(ss.BuildGenesis(nil, &args, &reply))
 }

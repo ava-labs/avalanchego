@@ -185,8 +185,7 @@ func TestIDMapMarshalling(t *testing.T) {
 	require.NoError(err)
 
 	var unmarshalledMap map[ID]int
-	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	require.NoError(err)
+	require.NoError(json.Unmarshal(mapJSON, &unmarshalledMap))
 
 	require.Equal(originalMap, unmarshalledMap)
 }

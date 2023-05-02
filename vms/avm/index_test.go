@@ -242,9 +242,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	}
 
 	// index the transaction
-	err := vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs())
-	require.NoError(err)
-	require.NoError(err)
+	require.NoError(vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs()))
 
 	assertIndexedTX(t, vm.db, uint64(0), addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 1)
@@ -514,7 +512,7 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	idxBytes, err := assetDB.Get([]byte("idx"))
 	require.NoError(err)
 
-	require.EqualValues(expectedIdxBytes, idxBytes)
+	require.Equal(expectedIdxBytes, idxBytes)
 }
 
 func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) error {
@@ -565,17 +563,14 @@ func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID,
 	binary.BigEndian.PutUint64(idxBytes, idx)
 	for _, txID := range testTxs {
 		txID := txID
-		err := assetPrefixDB.Put(idxBytes, txID[:])
-		require.NoError(err)
+		require.NoError(assetPrefixDB.Put(idxBytes, txID[:]))
 		idx++
 		binary.BigEndian.PutUint64(idxBytes, idx)
 	}
 	_, err := db.CommitBatch()
 	require.NoError(err)
 
-	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
-	require.NoError(err)
-	err = db.Commit()
-	require.NoError(err)
+	require.NoError(assetPrefixDB.Put([]byte("idx"), idxBytes))
+	require.NoError(db.Commit())
 	return testTxs
 }

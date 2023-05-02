@@ -45,11 +45,9 @@ func TestBuild(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 
-	err = builtBlock.Verify(true, chainID)
-	require.NoError(err)
+	require.NoError(builtBlock.Verify(true, chainID))
 
-	err = builtBlock.Verify(false, chainID)
-	require.ErrorIs(err, errUnexpectedProposer)
+	require.ErrorIs(builtBlock.Verify(false, chainID), errUnexpectedProposer)
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -69,11 +67,9 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
-	err = builtBlock.Verify(false, ids.Empty)
-	require.NoError(err)
+	require.NoError(builtBlock.Verify(false, ids.Empty))
 
-	err = builtBlock.Verify(true, ids.Empty)
-	require.ErrorIs(err, errMissingProposer)
+	require.ErrorIs(builtBlock.Verify(true, ids.Empty), errMissingProposer)
 }
 
 func TestBuildHeader(t *testing.T) {

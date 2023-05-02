@@ -57,8 +57,7 @@ func TestCorruption(t *testing.T) {
 			corruptableBatch := db.NewBatch()
 			require.NotNil(corruptableBatch)
 
-			err := corruptableBatch.Put(key, value)
-			require.NoError(err)
+			require.NoError(corruptableBatch.Put(key, value))
 
 			return corruptableBatch.Write()
 		},

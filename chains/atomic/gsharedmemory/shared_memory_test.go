@@ -37,11 +37,8 @@ func TestInterface(t *testing.T) {
 
 		test(t, chainID0, chainID1, sm0, sm1, testDB)
 
-		err := conn0.Close()
-		require.NoError(err)
-
-		err = conn1.Close()
-		require.NoError(err)
+		require.NoError(conn0.Close())
+		require.NoError(conn1.Close())
 	}
 }
 

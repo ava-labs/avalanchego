@@ -58,8 +58,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		err = target.state.Commit()
-		require.NoError(err)
+		require.NoError(target.state.Commit())
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -87,8 +86,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		err = target.state.Commit()
-		require.NoError(err)
+		require.NoError(target.state.Commit())
 	}
 
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
@@ -211,8 +209,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
-				err = target.state.Commit()
-				require.NoError(err)
+				require.NoError(target.state.Commit())
 			},
 			AP3Time:     defaultGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
@@ -353,8 +350,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Backend:       &env.backend,
 			Tx:            tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
-		require.NoError(err)
+		require.NoError(tx.Unsigned.Visit(&executor))
 	}
 
 	// Add a validator to pending validator set of primary network
@@ -418,8 +414,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
-	err = env.state.Commit()
-	require.NoError(err)
+	require.NoError(env.state.Commit())
 
 	// Node with ID key.PublicKey().Address() now a pending validator for primary network
 
@@ -509,8 +504,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Backend:       &env.backend,
 			Tx:            tx,
 		}
-		err = tx.Unsigned.Visit(&executor)
-		require.NoError(err)
+		require.NoError(tx.Unsigned.Visit(&executor))
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
@@ -572,8 +566,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
-	err = env.state.Commit()
-	require.NoError(err)
+	require.NoError(env.state.Commit())
 
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
@@ -606,8 +599,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	env.state.DeleteCurrentValidator(staker)
 	env.state.SetHeight(dummyHeight)
-	err = env.state.Commit()
-	require.NoError(err)
+	require.NoError(env.state.Commit())
 
 	{
 		// Case: Too few signatures
@@ -703,8 +695,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
-		err = env.state.Commit()
-		require.NoError(err)
+		require.NoError(env.state.Commit())
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
@@ -848,8 +839,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		env.state.AddTx(tx, status.Committed)
 		dummyHeight := uint64(1)
 		env.state.SetHeight(dummyHeight)
-		err = env.state.Commit()
-		require.NoError(err)
+		require.NoError(env.state.Commit())
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)

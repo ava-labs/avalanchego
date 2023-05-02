@@ -31,8 +31,7 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 		},
 	}}
 
-	err = msg.parseAddresses()
-	require.NoError(err)
+	require.NoError(msg.parseAddresses())
 
 	require.Len(msg.addressIds, 1)
 	require.Equal(addrID[:], msg.addressIds[0])

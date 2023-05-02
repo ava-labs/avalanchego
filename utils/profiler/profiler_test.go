@@ -19,29 +19,24 @@ func TestProfiler(t *testing.T) {
 	p := New(dir)
 
 	// Test Start and Stop CPU Profiler
-	err := p.StartCPUProfiler()
-	require.NoError(err)
+	require.NoError(p.StartCPUProfiler())
 
-	err = p.StopCPUProfiler()
-	require.NoError(err)
+	require.NoError(p.StopCPUProfiler())
 
-	_, err = os.Stat(filepath.Join(dir, cpuProfileFile))
+	_, err := os.Stat(filepath.Join(dir, cpuProfileFile))
 	require.NoError(err)
 
 	// Test Stop CPU Profiler without it running
-	err = p.StopCPUProfiler()
-	require.ErrorIs(err, errCPUProfilerNotRunning)
+	require.ErrorIs(p.StopCPUProfiler(), errCPUProfilerNotRunning)
 
 	// Test Memory Profiler
-	err = p.MemoryProfile()
-	require.NoError(err)
+	require.NoError(p.MemoryProfile())
 
 	_, err = os.Stat(filepath.Join(dir, memProfileFile))
 	require.NoError(err)
 
 	// Test Lock Profiler
-	err = p.LockProfile()
-	require.NoError(err)
+	require.NoError(p.LockProfile())
 
 	_, err = os.Stat(filepath.Join(dir, lockProfileFile))
 	require.NoError(err)

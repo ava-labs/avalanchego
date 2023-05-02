@@ -342,7 +342,7 @@ func TestGetLoggerLevel(t *testing.T) {
 			)
 			require.ErrorIs(err, tt.clientErr)
 			if tt.clientErr == nil {
-				require.EqualValues(tt.serviceResponse, res)
+				require.Equal(tt.serviceResponse, res)
 			}
 		})
 	}

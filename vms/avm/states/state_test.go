@@ -285,8 +285,7 @@ func TestInitializeChainState(t *testing.T) {
 
 	stopVertexID := ids.GenerateTestID()
 	genesisTimestamp := version.CortinaDefaultTime
-	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
-	require.NoError(err)
+	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
 
 	lastAcceptedID := s.GetLastAccepted()
 	genesis, err := s.GetBlock(lastAcceptedID)
@@ -305,11 +304,9 @@ func TestInitializeChainState(t *testing.T) {
 
 	s.AddBlock(childBlock)
 	s.SetLastAccepted(childBlock.ID())
-	err = s.Commit()
-	require.NoError(err)
+	require.NoError(s.Commit())
 
-	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
-	require.NoError(err)
+	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
 
 	lastAcceptedID = s.GetLastAccepted()
 	lastAccepted, err := s.GetBlock(lastAcceptedID)

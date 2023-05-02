@@ -61,8 +61,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	// Free lock because [AppGossip] waits for the context lock
 	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
-	err = env.AppGossip(context.Background(), nodeID, msgBytes)
-	require.NoError(err)
+	require.NoError(env.AppGossip(context.Background(), nodeID, msgBytes))
 	require.True(env.Builder.Has(txID))
 	// Grab lock back
 	env.ctx.Lock.Lock()
@@ -128,8 +127,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
 	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
@@ -145,8 +143,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
-	err = env.Builder.Add(tx)
-	require.NoError(err)
+	require.NoError(env.Builder.Add(tx))
 
 	require.Nil(gossipedBytes)
 }

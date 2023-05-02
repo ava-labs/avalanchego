@@ -75,7 +75,7 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -95,7 +95,7 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 }
@@ -107,7 +107,7 @@ func TestKeyEmptyValue(t *testing.T, db Database) {
 	val := []byte(nil)
 
 	_, err := db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Put(key, val))
 
@@ -128,7 +128,7 @@ func TestEmptyKey(t *testing.T, db Database) {
 
 	// Test that nil key can be retrieved by empty key
 	_, err := db.Get(nilKey)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Put(nilKey, val1))
 
@@ -157,7 +157,7 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -173,14 +173,14 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.NoError(db.Close())
 
 	_, err = db.Has(key)
-	require.Equal(ErrClosed, err)
+	require.ErrorIs(err, ErrClosed)
 
 	_, err = db.Get(key)
-	require.Equal(ErrClosed, err)
+	require.ErrorIs(err, ErrClosed)
 
-	require.Equal(ErrClosed, db.Put(key, value))
-	require.Equal(ErrClosed, db.Delete(key))
-	require.Equal(ErrClosed, db.Close())
+	require.ErrorIs(db.Put(key, value), ErrClosed)
+	require.ErrorIs(db.Delete(key), ErrClosed)
+	require.ErrorIs(db.Close(), ErrClosed)
 }
 
 // TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
@@ -232,7 +232,7 @@ func TestNewBatchClosed(t *testing.T, db Database) {
 
 	require.NoError(batch.Put(key, value))
 	require.Positive(batch.Size())
-	require.Equal(ErrClosed, batch.Write())
+	require.ErrorIs(batch.Write(), ErrClosed)
 }
 
 // TestBatchPut tests to make sure that batched writes work as expected.
@@ -264,7 +264,7 @@ func TestBatchPut(t *testing.T, db Database) {
 
 	require.NoError(batch.Put(key, value))
 	require.NoError(db.Close())
-	require.Equal(ErrClosed, batch.Write())
+	require.ErrorIs(batch.Write(), ErrClosed)
 }
 
 // TestBatchDelete tests to make sure that batched deletes work as expected.
@@ -287,7 +287,7 @@ func TestBatchDelete(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 }
@@ -489,13 +489,13 @@ func TestBatchReplayPropagateError(t *testing.T, db Database) {
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(ErrClosed).Times(1),
 	)
-	require.Equal(ErrClosed, batch.Replay(mockBatch))
+	require.ErrorIs(batch.Replay(mockBatch), ErrClosed)
 
 	mockBatch = NewMockBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
 	)
-	require.Equal(io.ErrClosedPipe, batch.Replay(mockBatch))
+	require.ErrorIs(batch.Replay(mockBatch), io.ErrClosedPipe)
 }
 
 // TestBatchInner tests to make sure that inner can be used to write to the
@@ -804,7 +804,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.ErrorIs(iterator.Error(), ErrClosed)
 	}
 
 	{
@@ -816,7 +816,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.ErrorIs(iterator.Error(), ErrClosed)
 	}
 
 	{
@@ -828,7 +828,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.ErrorIs(iterator.Error(), ErrClosed)
 	}
 
 	{
@@ -840,7 +840,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.ErrorIs(iterator.Error(), ErrClosed)
 	}
 }
 
@@ -877,7 +877,7 @@ func TestIteratorError(t *testing.T, db Database) {
 	require.False(iterator.Next())
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
-	require.Equal(ErrClosed, iterator.Error())
+	require.ErrorIs(iterator.Error(), ErrClosed)
 }
 
 // TestIteratorErrorAfterRelease tests to make sure that an iterator that was
@@ -899,7 +899,7 @@ func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
 	require.False(iterator.Next())
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
-	require.Equal(ErrClosed, iterator.Error())
+	require.ErrorIs(iterator.Error(), ErrClosed)
 }
 
 // TestCompactNoPanic tests to make sure compact never panics.
@@ -921,7 +921,7 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 
 	require.NoError(db.Compact(nil, nil))
 	require.NoError(db.Close())
-	require.Equal(ErrClosed, db.Compact(nil, nil))
+	require.ErrorIs(db.Compact(nil, nil), ErrClosed)
 }
 
 // TestClear tests to make sure the deletion helper works as expected.
@@ -949,7 +949,7 @@ func TestClear(t *testing.T, db Database) {
 
 	count, err = Count(db)
 	require.NoError(err)
-	require.Equal(0, count)
+	require.Zero(count)
 
 	require.NoError(db.Close())
 }
@@ -1163,6 +1163,6 @@ func FuzzKeyValue(f *testing.F, db Database) {
 		require.False(exists)
 
 		_, err = db.Get(key)
-		require.Equal(ErrNotFound, err)
+		require.ErrorIs(err, ErrNotFound)
 	})
 }

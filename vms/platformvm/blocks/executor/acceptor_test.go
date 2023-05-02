@@ -65,8 +65,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		recentlyAccepted: nil,
 	}
 
-	err = acceptor.ApricotProposalBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotProposalBlock(blk))
 
 	require.Equal(blkID, acceptor.backend.lastAccepted)
 
@@ -159,8 +158,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.ApricotAtomicBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotAtomicBlock(blk))
 }
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
@@ -253,8 +251,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.BanffStandardBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
@@ -350,8 +347,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.ApricotCommitBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotCommitBlock(blk))
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
@@ -447,7 +443,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.ApricotAbortBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotAbortBlock(blk))
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

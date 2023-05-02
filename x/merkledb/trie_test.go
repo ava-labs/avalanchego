@@ -727,7 +727,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	root, err = newTrie.getEditableNode(EmptyPath)
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
-	require.Equal(0, len(root.children))
+	require.Zero(len(root.children))
 }
 
 func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {

@@ -19,7 +19,7 @@ func TestMax(t *testing.T) {
 	require.Equal(maxUint64, Max(maxUint64, 0))
 	require.Equal(1, Max(1, 0))
 	require.Equal(1, Max(0, 1))
-	require.Equal(0, Max(0, 0))
+	require.Zero(Max(0, 0))
 	require.Equal(2, Max(2, 2))
 }
 
@@ -28,9 +28,9 @@ func TestMin(t *testing.T) {
 
 	require.Equal(uint64(0), Min(uint64(0), maxUint64))
 	require.Equal(uint64(0), Min(maxUint64, uint64(0)))
-	require.Equal(0, Min(1, 0))
-	require.Equal(0, Min(0, 1))
-	require.Equal(0, Min(0, 0))
+	require.Zero(Min(1, 0))
+	require.Zero(Min(0, 1))
+	require.Zero(Min(0, 0))
 	require.Equal(2, Min(2, 2))
 	require.Equal(1, Min(1, 2))
 }

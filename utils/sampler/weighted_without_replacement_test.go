@@ -99,10 +99,9 @@ func WeightedWithoutReplacementOutOfRangeTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize([]uint64{1})
-	require.NoError(err)
+	require.NoError(s.Initialize([]uint64{1}))
 
-	_, err = s.Sample(2)
+	_, err := s.Sample(2)
 	require.ErrorIs(err, ErrOutOfRange)
 }
 
@@ -112,12 +111,11 @@ func WeightedWithoutReplacementEmptyWithoutWeightTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize(nil)
-	require.NoError(err)
+	require.NoError(s.Initialize(nil))
 
 	indices, err := s.Sample(0)
 	require.NoError(err)
-	require.Len(indices, 0, "shouldn't have selected any elements")
+	require.Empty(indices)
 }
 
 func WeightedWithoutReplacementEmptyTest(
@@ -126,8 +124,7 @@ func WeightedWithoutReplacementEmptyTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize([]uint64{1})
-	require.NoError(err)
+	require.NoError(s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(0)
 	require.NoError(err)
@@ -140,8 +137,7 @@ func WeightedWithoutReplacementSingletonTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize([]uint64{1})
-	require.NoError(err)
+	require.NoError(s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(1)
 	require.NoError(err)
@@ -154,8 +150,7 @@ func WeightedWithoutReplacementWithZeroTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize([]uint64{0, 1})
-	require.NoError(err)
+	require.NoError(s.Initialize([]uint64{0, 1}))
 
 	indices, err := s.Sample(1)
 	require.NoError(err)
@@ -172,8 +167,7 @@ func WeightedWithoutReplacementDistributionTest(
 ) {
 	require := require.New(t)
 
-	err := s.Initialize([]uint64{1, 1, 2})
-	require.NoError(err)
+	require.NoError(s.Initialize([]uint64{1, 1, 2}))
 
 	indices, err := s.Sample(4)
 	require.NoError(err)

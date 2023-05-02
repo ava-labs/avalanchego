@@ -294,8 +294,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply := &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
@@ -306,8 +305,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Equal(uint64(0), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
@@ -339,8 +337,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337+1337), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 2, "should have only returned 2 utxoIDs")
@@ -351,8 +348,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Equal(uint64(0), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
@@ -386,8 +382,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337*3), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 3, "should have returned 3 utxoIDs")
@@ -398,8 +393,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	err = s.GetBalance(nil, balanceArgs, balanceReply)
-	require.NoError(err)
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Equal(uint64(0), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
@@ -431,16 +425,14 @@ func TestServiceGetTxs(t *testing.T) {
 		AssetID:     assetID.String(),
 	}
 	getTxsReply := &GetAddressTxsReply{}
-	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
-	require.NoError(err)
+	require.NoError(s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
 	require.Len(getTxsReply.TxIDs, 10)
 	require.Equal(getTxsReply.TxIDs, testTxs[:10])
 
 	// get the second page
 	getTxsArgs.Cursor = getTxsReply.Cursor
 	getTxsReply = &GetAddressTxsReply{}
-	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
-	require.NoError(err)
+	require.NoError(s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
 	require.Len(getTxsReply.TxIDs, 10)
 	require.Equal(getTxsReply.TxIDs, testTxs[10:20])
 }
@@ -484,8 +476,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply := &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
 	require.Equal(assetID.String(), reply.Balances[0].AssetID)
@@ -496,8 +487,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	require.Len(reply.Balances, 0)
 
 	// A UTXO with a 1 out of 2 multisig
@@ -526,8 +516,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
 	require.Equal(assetID.String(), reply.Balances[0].AssetID)
@@ -538,8 +527,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Len(reply.Balances, 0)
 
@@ -571,8 +559,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
@@ -583,8 +570,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Len(reply.Balances, 0)
 
@@ -614,8 +600,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 2)
 	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
@@ -630,8 +615,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, reply)
-	require.NoError(err)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 0)
 }
@@ -872,8 +856,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require.NoError(err)
 
 	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
-	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(err)
+	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
 	require.NoError(err)
@@ -967,8 +950,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
 	mintNFTTx := buildOperationTxWithOp(mintOp1, mintOp2)
 
-	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(err)
+	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
 	require.NoError(err)
@@ -1058,8 +1040,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require.NoError(err)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
-	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(err)
+	require.NoError(mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
 	require.NoError(err)
@@ -1155,8 +1136,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
 	mintSecpOpTx := buildOperationTxWithOp(op1, op2)
 
-	err = mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(err)
+	require.NoError(mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
 	require.NoError(err)
@@ -1247,8 +1227,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require.NoError(err)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
-	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}})
-	require.NoError(err)
+	require.NoError(mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
 	require.NoError(err)
@@ -1343,8 +1322,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
 	mintPropertyFxOpTx := buildOperationTxWithOp(op1, op2)
 
-	err = mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}})
-	require.NoError(err)
+	require.NoError(mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
 
 	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
 	require.NoError(err)

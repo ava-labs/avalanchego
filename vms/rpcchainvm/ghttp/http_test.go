@@ -47,8 +47,7 @@ func TestConvertWriteResponse(t *testing.T) {
 	for testName, scenerio := range scenerios {
 		t.Run(testName, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			err := convertWriteResponse(w, scenerio.resp)
-			require.NoError(err)
+			require.NoError(convertWriteResponse(w, scenerio.resp))
 		})
 	}
 }

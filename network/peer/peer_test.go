@@ -190,15 +190,11 @@ func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
 
 	peer0, peer1 := makeTestPeers(t)
 
-	err := peer0.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady := peer0.Ready()
-	require.True(isReady)
+	require.NoError(peer0.AwaitReady(context.Background()))
+	require.True(peer0.Ready())
 
-	err = peer1.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady = peer1.Ready()
-	require.True(isReady)
+	require.NoError(peer1.AwaitReady(context.Background()))
+	require.True(peer1.Ready())
 
 	return peer0, peer1
 }
@@ -221,8 +217,7 @@ func TestReady(t *testing.T) {
 		),
 	)
 
-	isReady := peer0.Ready()
-	require.False(isReady)
+	require.False(peer0.Ready())
 
 	peer1 := Start(
 		rawPeer1.config,
@@ -237,21 +232,15 @@ func TestReady(t *testing.T) {
 		),
 	)
 
-	err := peer0.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady = peer0.Ready()
-	require.True(isReady)
+	require.NoError(peer0.AwaitReady(context.Background()))
+	require.True(peer0.Ready())
 
-	err = peer1.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady = peer1.Ready()
-	require.True(isReady)
+	require.NoError(peer1.AwaitReady(context.Background()))
+	require.True(peer1.Ready())
 
 	peer0.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitClosed(context.Background()))
+	require.NoError(peer1.AwaitClosed(context.Background()))
 }
 
 func TestSend(t *testing.T) {
@@ -270,8 +259,6 @@ func TestSend(t *testing.T) {
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	peer1.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitClosed(context.Background()))
+	require.NoError(peer1.AwaitClosed(context.Background()))
 }
