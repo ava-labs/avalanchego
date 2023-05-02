@@ -149,7 +149,7 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 			&avax.TestTransferable{Val: 0},
 		},
 	}
-	require.Error(is.Verify(m, numFxs), ErrOutputsNotSorted)
+	require.ErrorIs(is.Verify(m, numFxs), ErrOutputsNotSorted)
 	is.Sort(m)
 	require.NoError(is.Verify(m, numFxs))
 }

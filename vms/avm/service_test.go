@@ -1893,15 +1893,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 		t.Run(test.label, func(t *testing.T) {
 			reply := &api.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
-			if err != nil {
-				if !test.shouldErr {
-					t.Fatal(err)
-				}
-				return
-			}
 			if test.shouldErr {
-				t.Fatal("should have erred")
+				return // TODO, test actual error
 			}
+			require.NoError(err)
 			require.Len(reply.UTXOs, test.count)
 		})
 	}
