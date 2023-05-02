@@ -30,7 +30,7 @@ func NewCalculator(c Config) Calculator {
 	}
 }
 
-// Reward returns the amount of tokens to reward the staker with.
+// Calculates the amount of tokens to reward the staker with.
 //
 // RemainingSupply = SupplyCap - ExistingSupply
 // PortionOfExistingSupply = StakedAmount / ExistingSupply
