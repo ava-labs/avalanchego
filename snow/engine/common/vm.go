@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-// VM describes the interface that all consensus VMs must implement
+// VM describes the interface that every virtual machine must implement.
 type VM interface {
 	AppHandler
 
@@ -94,7 +94,7 @@ type VM interface {
 	// Each extension can specify how locking is managed for convenience.
 	//
 	// For example, if this VM implements an account-based payments system,
-	// it have an extension called `accounts`, where clients could get
+	// it has an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers(context.Context) (map[string]*HTTPHandler, error)
 }

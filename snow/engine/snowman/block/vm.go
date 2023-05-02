@@ -13,10 +13,10 @@ import (
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
-// A Snowman VM is responsible for defining the representation of state,
-// the representation of operations on that state, the application of operations
-// on that state, and the creation of the operations. Consensus will decide on
-// if the operation is executed and the order operations are executed in.
+// A Snowman VM defines the representation of state, operations on that state,
+// application of the operations on that state, and the creation of the operations.
+// The consensus decides whether to execute the operation, and the order that
+// the operations are executed in.
 //
 // For example, suppose we have a VM that tracks an increasing number that
 // is agreed upon by the network.
@@ -44,9 +44,8 @@ type ChainVM interface {
 
 	// LastAccepted returns the ID of the last accepted block.
 	//
-	// If no blocks have been accepted by consensus yet, it is assumed there is
-	// a definitionally accepted block, the Genesis block, that will be
-	// returned.
+	// If no block has been accepted by consensus yet, it returns the Genesis block,
+	// that is definitionally accepted.
 	LastAccepted(context.Context) (ids.ID, error)
 }
 
