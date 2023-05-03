@@ -427,6 +427,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
 	}
 	require.IsType(&preForkBlock{}, lastPreForkBlk)
+
 	if err := lastPreForkBlk.Verify(context.Background()); err != nil {
 		t.Fatal("pre Fork blocks should verify before fork")
 	}
