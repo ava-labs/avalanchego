@@ -415,6 +415,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	firstPostForkBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, firstPostForkBlk)
+
 	require.NoError(firstPostForkBlk.Verify(context.Background()))
 }
 

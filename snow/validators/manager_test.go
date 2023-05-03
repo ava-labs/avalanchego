@@ -51,8 +51,7 @@ func TestAddWeight(t *testing.T) {
 
 	require.NoError(AddWeight(m, subnetID, nodeID, 1))
 
-	weight := s.Weight()
-	require.Equal(uint64(2), weight)
+	require.Equal(uint64(2), s.Weight())
 }
 
 func TestRemoveWeight(t *testing.T) {

@@ -155,6 +155,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // and GetBlock.
 func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
 	require := require.New(t)
+
 	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
@@ -423,7 +424,6 @@ func TestStateParent(t *testing.T) {
 
 func TestGetBlockInternal(t *testing.T) {
 	require := require.New(t)
-
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)

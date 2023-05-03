@@ -168,5 +168,5 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	require.ErrorIs(err, errNoContainerAtIndex)
 	gotContainer, err := idx.GetContainerByID(containerID)
 	require.NoError(err)
-	require.Equal(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")
+	require.Equal([]byte{1, 2, 3}, gotContainer.Bytes)
 }

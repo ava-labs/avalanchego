@@ -670,7 +670,6 @@ func TestPreFork_Initialize(t *testing.T) {
 func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
