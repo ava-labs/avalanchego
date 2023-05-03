@@ -40,7 +40,7 @@ message KeyChange {
 
 message Node {
   bytes key = 1;
-  bytes valueDigest = 2;
+  bytes value_digest = 2;
   map<uint32, bytes> children = 3;
 }
 
