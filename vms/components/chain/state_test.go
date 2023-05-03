@@ -136,6 +136,7 @@ func cantBuildBlock(context.Context) (snowman.Block, error) {
 // correctly uniquified when calling GetBlock and ParseBlock.
 func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 	require := require.New(t)
+
 	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
@@ -168,6 +169,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // and GetBlock.
 func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
 	require := require.New(t)
+
 	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
@@ -520,7 +522,6 @@ func TestStateParent(t *testing.T) {
 
 func TestGetBlockInternal(t *testing.T) {
 	require := require.New(t)
-
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -540,6 +541,9 @@ func TestGetBlockInternal(t *testing.T) {
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
 	require.IsType(&TestBlock{}, genesisBlockInternal)
+	if genesisBlockInternal.ID() != genesisBlock.ID() {
+		t.Fatalf("Expected LastAcceptedBlockInternal to be blk %s, but found %s", genesisBlock.ID(), genesisBlockInternal.ID())
+	}
 
 	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
 	if err != nil {
@@ -547,6 +551,9 @@ func TestGetBlockInternal(t *testing.T) {
 	}
 
 	require.IsType(&TestBlock{}, blk)
+	if blk.ID() != genesisBlock.ID() {
+		t.Fatalf("Expected GetBlock to be blk %s, but found %s", genesisBlock.ID(), blk.ID())
+	}
 }
 
 func TestGetBlockError(t *testing.T) {
