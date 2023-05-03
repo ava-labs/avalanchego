@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -67,7 +68,9 @@ func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 		IPPort:    ip,
 		Timestamp: s.clock.Unix(),
 	}
-	signedIP, err := unsignedIP.Sign(s.signer)
+
+	// TODO: support other signature hash + signature algorithm
+	signedIP, err := unsignedIP.Sign(s.signer, hashing.ComputeHash256, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}

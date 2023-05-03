@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/x509"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -22,11 +23,11 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(signer crypto.Signer, sigHashFunc func([]byte) []byte, sigAlgo crypto.SignerOpts) (*SignedIP, error) {
 	sig, err := signer.Sign(
 		rand.Reader,
-		hashing.ComputeHash256(ip.bytes()),
-		crypto.SHA256,
+		sigHashFunc(ip.bytes()),
+		sigAlgo,
 	)
 	return &SignedIP{
 		UnsignedIP: *ip,
@@ -55,4 +56,19 @@ func (ip *SignedIP) Verify(cert *x509.Certificate) error {
 		ip.UnsignedIP.bytes(),
 		ip.Signature,
 	)
+}
+
+var ErrSignatureAlgorithmNotSupported = errors.New("signature algorithm not supported")
+
+func deriveHash(sigAlgo x509.SignatureAlgorithm) (func([]byte) []byte, crypto.SignerOpts, error) {
+	switch sigAlgo {
+	case x509.SHA256WithRSA, x509.ECDSAWithSHA256, x509.SHA256WithRSAPSS:
+		return hashing.ComputeHash256, crypto.SHA256, nil
+	case x509.SHA384WithRSA, x509.ECDSAWithSHA384, x509.SHA384WithRSAPSS:
+		return hashing.ComputeHash384, crypto.SHA384, nil
+	case x509.SHA512WithRSA, x509.ECDSAWithSHA512, x509.SHA512WithRSAPSS:
+		return hashing.ComputeHash512, crypto.SHA512, nil
+	default:
+		return nil, nil, ErrSignatureAlgorithmNotSupported
+	}
 }

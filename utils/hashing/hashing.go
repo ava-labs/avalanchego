@@ -5,6 +5,7 @@ package hashing
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
 	"io"
 
@@ -12,15 +13,22 @@ import (
 )
 
 const (
-	HashLen = sha256.Size
-	AddrLen = ripemd160.Size
+	HashLen    = sha256.Size
+	Hash384Len = sha512.Size384
+	Hash512Len = sha512.Size
+	AddrLen    = ripemd160.Size
 )
 
-// Hash256 A 256 bit long hash value.
-type Hash256 = [HashLen]byte
+type (
+	// Hash256 A 256 bit long hash value.
+	Hash256 = [HashLen]byte
 
-// Hash160 A 160 bit long hash value.
-type Hash160 = [ripemd160.Size]byte
+	Hash384 = [Hash384Len]byte
+	Hash512 = [Hash512Len]byte
+
+	// Hash160 A 160 bit long hash value.
+	Hash160 = [ripemd160.Size]byte
+)
 
 // ComputeHash256Array computes a cryptographically strong 256 bit hash of the
 // input byte slice.
@@ -49,6 +57,32 @@ func ComputeHash256Ranges(buf []byte, ranges [][2]int) []byte {
 		}
 	}
 	return hashBuilder.Sum(nil)
+}
+
+// ComputeHash384Array Compute a cryptographically strong 512 bit hash of the
+// input byte slice.
+func ComputeHash384Array(buf []byte) Hash384 {
+	return sha512.Sum384(buf)
+}
+
+// ComputeHash384 Compute a cryptographically strong 512 bit hash of the input
+// byte slice.
+func ComputeHash384(buf []byte) []byte {
+	arr := ComputeHash384Array(buf)
+	return arr[:]
+}
+
+// ComputeHash512Array Compute a cryptographically strong 512 bit hash of the
+// input byte slice.
+func ComputeHash512Array(buf []byte) Hash512 {
+	return sha512.Sum512(buf)
+}
+
+// ComputeHash512 Compute a cryptographically strong 512 bit hash of the input
+// byte slice.
+func ComputeHash512(buf []byte) []byte {
+	arr := ComputeHash512Array(buf)
+	return arr[:]
 }
 
 // ComputeHash160Array computes a cryptographically strong 160 bit hash of the
