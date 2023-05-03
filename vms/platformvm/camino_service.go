@@ -683,7 +683,7 @@ type APIDeposit struct {
 	RewardOwner         platformapi.Owner `json:"rewardOwner"`
 }
 
-func (s *CaminoService) APIDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) (*APIDeposit, error) {
+func (s *CaminoService) apiDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) (*APIDeposit, error) {
 	rewardOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, errWrongOwnerType
@@ -730,7 +730,7 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 		if err != nil {
 			return err
 		}
-		reply.Deposits[i], err = s.APIDepositFromDeposit(args.DepositTxIDs[i], deposit)
+		reply.Deposits[i], err = s.apiDepositFromDeposit(args.DepositTxIDs[i], deposit)
 		if err != nil {
 			return err
 		}
@@ -888,32 +888,27 @@ func (s *CaminoService) apiOwnerFromSECP(secpOwner *secp256k1fx.OutputOwners) (*
 }
 
 type GetAllDepositOffersArgs struct {
-	Active bool `json:"active"`
+	Timestamp uint64 `json:"timestamp"`
 }
 
 type GetAllDepositOffersReply struct {
 	DepositOffers []*deposit.Offer `json:"depositOffers"`
 }
 
-// GetAllDepositOffers returns an array of all deposit offers. The array can be filtered to only return active offers.
+// GetAllDepositOffers returns an array of all deposit offers that are active at given timestamp
 func (s *CaminoService) GetAllDepositOffers(_ *http.Request, args *GetAllDepositOffersArgs, response *GetAllDepositOffersReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetAllDepositOffers called")
 
-	depositOffers, err := s.vm.state.GetAllDepositOffers()
+	allDepositOffers, err := s.vm.state.GetAllDepositOffers()
 	if err != nil {
 		return err
 	}
 
-	if args.Active {
-		var activeOffers []*deposit.Offer
-		for _, offer := range depositOffers {
-			if offer.Flags&deposit.OfferFlagLocked == 0 {
-				activeOffers = append(activeOffers, offer)
-			}
+	for _, offer := range allDepositOffers {
+		if offer.Start <= args.Timestamp && offer.End >= args.Timestamp {
+			response.DepositOffers = append(response.DepositOffers, offer)
 		}
-		depositOffers = activeOffers
 	}
 
-	response.DepositOffers = depositOffers
 	return nil
 }

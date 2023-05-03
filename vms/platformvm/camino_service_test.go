@@ -226,75 +226,58 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 		wantErr error
 		prepare func(service CaminoService)
 	}{
-		"success - only active offers": {
+		"OK": {
 			fields: fields{
 				Service: *defaultCaminoService(t, api.Camino{}, []api.UTXO{}),
 			},
 			args: args{
 				depositOffersArgs: &GetAllDepositOffersArgs{
-					Active: true,
+					Timestamp: 50,
 				},
 				response: &GetAllDepositOffersReply{},
 			},
 			want: []*deposit.Offer{
 				{
-					ID:    ids.ID{0},
-					Flags: 0,
+					ID:    ids.ID{1},
+					Start: 0,
+					End:   50,
 				},
 				{
-					ID:    ids.ID{1},
-					Flags: 0,
+					ID:    ids.ID{2},
+					Start: 0,
+					End:   100,
+				},
+				{
+					ID:    ids.ID{3},
+					Start: 50,
+					End:   100,
 				},
 			},
 			prepare: func(service CaminoService) {
 				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{0},
-					Flags: 0,
+					Start: 0,
+					End:   49, // end before timestamp
 				})
 				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{1},
-					Flags: 0,
+					Start: 0,
+					End:   50, // end at timestamp
 				})
 				service.vm.state.SetDepositOffer(&deposit.Offer{
 					ID:    ids.ID{2},
-					Flags: 1,
-				})
-			},
-		},
-		"success": {
-			fields: fields{
-				Service: *defaultCaminoService(t, api.Camino{}, []api.UTXO{}),
-			},
-			args: args{
-				depositOffersArgs: &GetAllDepositOffersArgs{},
-				response:          &GetAllDepositOffersReply{},
-			},
-			want: []*deposit.Offer{
-				{
-					ID:    ids.ID{0},
-					Flags: 0,
-				},
-				{
-					ID:    ids.ID{1},
-					Flags: 0,
-				},
-				{
-					ID:    ids.ID{2},
-					Flags: 1,
-				},
-			},
-			prepare: func(service CaminoService) {
-				service.vm.state.SetDepositOffer(&deposit.Offer{
-					ID:    ids.ID{0},
-					Flags: 0,
+					Start: 0,
+					End:   100,
 				})
 				service.vm.state.SetDepositOffer(&deposit.Offer{
-					ID:    ids.ID{1},
-					Flags: 0,
+					ID:    ids.ID{3},
+					Start: 50, // start at timestamp
+					End:   100,
 				})
 				service.vm.state.SetDepositOffer(&deposit.Offer{
-					ID:    ids.ID{2},
-					Flags: 1,
+					ID:    ids.ID{4},
+					Start: 51, // start after timestamp
+					End:   100,
 				})
 			},
 		},
