@@ -125,7 +125,8 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 		return
 	}
 
-	// if the new item merged with the items before and after it, then combine the before and after items into a single item
+	// if the new item should be merged with both the item before and the item after,
+	// we can combine the before item with the after item
 	if mergedBefore != nil && mergedAfter != nil {
 		// combine the two ranges
 		mergedBefore.workItem.end = mergedAfter.workItem.end
