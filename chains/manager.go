@@ -241,7 +241,7 @@ type manager struct {
 	unblockChainCreatorCh  chan struct{}
 	chainCreatorShutdownCh chan struct{}
 
-	subnetsLock sync.Mutex
+	subnetsLock sync.RWMutex
 	// Key: Subnet's ID
 	// Value: Subnet description
 	subnets map[ids.ID]subnets.Subnet
@@ -322,9 +322,9 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	m.subnetsLock.Lock()
+	m.subnetsLock.RLock()
 	sb := m.subnets[chainParams.SubnetID]
-	m.subnetsLock.Unlock()
+	m.subnetsLock.RUnlock()
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -1285,8 +1285,8 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
-	m.subnetsLock.Lock()
-	defer m.subnetsLock.Unlock()
+	m.subnetsLock.RLock()
+	defer m.subnetsLock.RUnlock()
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
@@ -1323,8 +1323,8 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 		return errNoPlatformSubnetConfig
 	}
 
-	m.subnetsLock.Lock()
 	sb := subnets.New(m.NodeID, sbConfig)
+	m.subnetsLock.Lock()
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)
 	m.subnetsLock.Unlock()
