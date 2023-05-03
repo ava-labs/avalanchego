@@ -732,6 +732,9 @@ func TestPreFork_Initialize(t *testing.T) {
 	}
 
 	require.IsType(&preForkBlock{}, rtvdBlk)
+	if !bytes.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes()) {
+		t.Fatal("Stored block is not genesis")
+	}
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
@@ -754,7 +757,16 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
+	if err != nil {
+		t.Fatal("proposerVM could not build block")
+	}
 	require.IsType(t, &preForkBlock{}, builtBlk)
+	if builtBlk.ID() != coreBlk.ID() {
+		t.Fatal("unexpected built block")
+	}
+	if !bytes.Equal(builtBlk.Bytes(), coreBlk.Bytes()) {
+		t.Fatal("unexpected built block")
+	}
 
 	// test
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
