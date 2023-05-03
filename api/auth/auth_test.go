@@ -51,8 +51,6 @@ func TestNewTokenWrongPassword(t *testing.T) {
 }
 
 func TestNewTokenHappyPath(t *testing.T) {
-	require := require.New(t)
-
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	now := time.Now()
@@ -61,7 +59,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -69,14 +67,14 @@ func TestNewTokenHappyPath(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return auth.password.Password[:], nil
 	})
-	require.NoError(err, "couldn't parse new token")
+	require.NoError(t, err, "couldn't parse new token")
 
-	require.IsType(&endpointClaims{}, token.Claims)
+	require.IsType(t, &endpointClaims{}, token.Claims)
 	claims := token.Claims.(*endpointClaims)
-	require.Equal(endpoints, claims.Endpoints)
+	require.Equal(t, endpoints, claims.Endpoints, "token has wrong endpoint claims")
 
 	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
-	require.Equal(shouldExpireAt, claims.ExpiresAt)
+	require.Equal(t, shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")
 }
 
 func TestTokenHasWrongSig(t *testing.T) {
