@@ -25,6 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// To profile a specific benchmark, say BenchmarkGetCanonicalValidatorSetByDepth, run:
+// go test -run=^$ -bench ^BenchmarkGetCanonicalValidatorSetByDepth$ github.com/ava-labs/avalanchego/vms/platformvm/warp/benchmarks -cpuprofile=cpuprofile.out
+//
+// To analyze results run:
+// go tool pprof -web cpuprofile.out
+
 func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 	b.StopTimer()
 	require := require.New(b)
