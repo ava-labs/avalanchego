@@ -4,10 +4,6 @@
 package pebble
 
 import (
-	"go.uber.org/zap"
-)
-
-import (
 	"bytes"
 	"context"
 	"errors"
@@ -16,13 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/exp/slices"
 )
 
@@ -39,9 +34,9 @@ type Database struct {
 
 	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
 	// in the config
-	metrics   metrics
-	closed    utils.Atomic[bool]
-	closeOnce sync.Once
+	metrics metrics
+	closed  utils.Atomic[bool]
+	// closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
 	// closeWg is used to wait for all goroutines created by New() to exit.
@@ -133,11 +128,14 @@ func New(file string, cfg Config, log logging.Logger, namespace string, reg prom
 			}()
 
 			for {
-				if err := wrappedDB.updateMetrics(); err != nil {
-					log.Warn("failed to update leveldb metrics",
-						zap.Error(err),
-					)
-				}
+				/*
+					if err := wrappedDB.updateMetrics(); err != nil {
+						log.Warn("failed to update leveldb metrics",
+							zap.Error(err),
+						)
+					}
+				*/
+				wrappedDB.updateMetrics()
 
 				select {
 				case <-t.C:

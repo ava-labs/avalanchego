@@ -11,7 +11,7 @@ import (
 	// "go.uber.org/zap"
 )
 
-var levelLabels = []string{"level"}
+// var levelLabels = []string{"level"}
 
 type metrics struct {
 	/*
@@ -227,7 +227,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 	return m, errs.Err
 }
 
-func (db *Database) updateMetrics() error {
+func (db *Database) updateMetrics() {
 	metrics := &db.metrics
 
 	priorMetrics := metrics.priorMetrics
@@ -235,7 +235,7 @@ func (db *Database) updateMetrics() error {
 	// Retrieve the database stats
 	currentMetrics := db.db.Metrics()
 	metrics.compactEstimatedDebt.Add(float64(currentMetrics.Compact.EstimatedDebt - priorMetrics.Compact.EstimatedDebt))
-	//metrics.compactInProgressBytes.Add(float64(currentMetrics.Compact.InProgressBytes - priorMetrics.Compact.InProgressBytes))
+	// metrics.compactInProgressBytes.Add(float64(currentMetrics.Compact.InProgressBytes - priorMetrics.Compact.InProgressBytes))
 	/*
 		metrics.writesDelayedDuration.Add(float64(currentStats.WriteDelayDuration - priorStats.WriteDelayDuration))
 		if currentStats.WritePaused {
@@ -277,5 +277,4 @@ func (db *Database) updateMetrics() error {
 	// update the priorStats to update the counters correctly next time this
 	// method is called
 	metrics.priorMetrics = currentMetrics
-	return nil
 }
