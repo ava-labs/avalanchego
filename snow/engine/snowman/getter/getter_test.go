@@ -82,8 +82,6 @@ func testSetup(
 }
 
 func TestAcceptedFrontier(t *testing.T) {
-	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -104,13 +102,15 @@ func TestAcceptedFrontier(t *testing.T) {
 		return blkID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, bID ids.ID) (snowman.Block, error) {
-		require.Equal(blkID, bID)
+		require.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
 
 	bsIntf, err := New(vm, config)
-	require.NoError(err)
-	require.IsType(&getter{}, bsIntf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.IsType(t, &getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
 	var accepted []ids.ID
@@ -118,15 +118,19 @@ func TestAcceptedFrontier(t *testing.T) {
 		accepted = frontier
 	}
 
-	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
+		t.Fatal(err)
+	}
 
-	require.Len(accepted, 1)
-	require.Equal(blkID, accepted[0])
+	if len(accepted) != 1 {
+		t.Fatalf("Only one block should be accepted")
+	}
+	if accepted[0] != blkID {
+		t.Fatalf("Blk should be accepted")
+	}
 }
 
 func TestFilterAccepted(t *testing.T) {
-	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -150,13 +154,15 @@ func TestFilterAccepted(t *testing.T) {
 		return blk1.ID(), nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(blk1.ID(), blkID)
+		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil
 	}
 
 	bsIntf, err := New(vm, config)
-	require.NoError(err)
-	require.IsType(&getter{}, bsIntf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.IsType(t, &getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
@@ -169,7 +175,7 @@ func TestFilterAccepted(t *testing.T) {
 		case blkID2:
 			return nil, errUnknownBlock
 		}
-		require.FailNow(errUnknownBlock.Error())
+		t.Fatal(errUnknownBlock)
 		return nil, errUnknownBlock
 	}
 
@@ -178,13 +184,23 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
+	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs); err != nil {
+		t.Fatal(err)
+	}
 
 	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
-	require.Len(acceptedSet, 2)
-	require.Contains(acceptedSet, blkID0)
-	require.Contains(acceptedSet, blkID1)
-	require.NotContains(acceptedSet, blkID2)
+	if acceptedSet.Len() != 2 {
+		t.Fatalf("Two blocks should be accepted")
+	}
+	if !acceptedSet.Contains(blkID0) {
+		t.Fatalf("Blk should be accepted")
+	}
+	if !acceptedSet.Contains(blkID1) {
+		t.Fatalf("Blk should be accepted")
+	}
+	if acceptedSet.Contains(blkID2) {
+		t.Fatalf("Blk shouldn't be accepted")
+	}
 }

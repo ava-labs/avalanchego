@@ -70,8 +70,6 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	*fullVM,
 	*common.SenderTest,
 ) {
-	require := require.New(t)
-
 	sender := &common.SenderTest{T: t}
 	commonCfg.Sender = sender
 
@@ -84,16 +82,16 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
-	require.NoError(err)
+	require.NoError(t, err)
 	commonSyncer := New(cfg, func(context.Context, uint32) error {
 		return nil
 	})
-	require.IsType(&stateSyncer{}, commonSyncer)
+	require.IsType(t, &stateSyncer{}, commonSyncer)
 	syncer := commonSyncer.(*stateSyncer)
-	require.NotNil(syncer.stateSyncVM)
+	require.True(t, syncer.stateSyncVM != nil)
 
 	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
