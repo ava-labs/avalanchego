@@ -232,7 +232,6 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 				zap.Uint32("requestID", requestID),
 			)
 		}
-
 	}
 }
 
