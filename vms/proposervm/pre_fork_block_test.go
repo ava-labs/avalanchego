@@ -227,8 +227,6 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 }
 
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
-	require := require.New(t)
-
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 

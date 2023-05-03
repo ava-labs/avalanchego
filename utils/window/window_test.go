@@ -143,6 +143,8 @@ func TestTTLLength(t *testing.T) {
 
 // TestTTLReadOnly tests that stale elements are still evicted on calling Oldest
 func TestTTLOldest(t *testing.T) {
+	require := require.New(t)
+
 	clock := mockable.Clock{}
 	windowIntf := New[int](
 		Config{
@@ -151,8 +153,8 @@ func TestTTLOldest(t *testing.T) {
 			TTL:     testTTL,
 		},
 	)
-	window, ok := windowIntf.(*window[int])
-	require.True(t, ok)
+	require.IsType(&window[int]{}, windowIntf)
+	window := windowIntf.(*window[int])
 	epochStart := time.Unix(0, 0)
 	clock.Set(epochStart)
 

@@ -725,7 +725,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

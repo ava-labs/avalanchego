@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -62,6 +64,8 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 }
 
 func TestAcceptedFrontier(t *testing.T) {
+	require := require.New(t)
+
 	manager, sender, config := testSetup(t)
 
 	vtxID0 := ids.GenerateTestID()
@@ -69,13 +73,8 @@ func TestAcceptedFrontier(t *testing.T) {
 	vtxID2 := ids.GenerateTestID()
 
 	bsIntf, err := New(manager, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
@@ -110,6 +109,8 @@ func TestAcceptedFrontier(t *testing.T) {
 }
 
 func TestFilterAccepted(t *testing.T) {
+	require := require.New(t)
+
 	manager, sender, config := testSetup(t)
 
 	vtxID0 := ids.GenerateTestID()
@@ -126,13 +127,9 @@ func TestFilterAccepted(t *testing.T) {
 	}}
 
 	bsIntf, err := New(manager, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.NoError(err)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 

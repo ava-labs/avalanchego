@@ -754,7 +754,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	require.IsType(&preForkBlock{}, builtBlk)
+	require.IsType(t, &preForkBlock{}, builtBlk)
 
 	// test
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
