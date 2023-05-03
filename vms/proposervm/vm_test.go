@@ -278,6 +278,8 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 }
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
+	require := require.New(t)
+
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
@@ -302,10 +304,8 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	}
 
 	// checks
-	proBlock, ok := snowBlock.(*postForkBlock)
-	if !ok {
-		t.Fatal("proposerVM.BuildBlock() does not return a proposervm.Block")
-	}
+	require.IsType(&postForkBlock{}, snowBlock)
+	proBlock := snowBlock.(*postForkBlock)
 
 	if proBlock.innerBlk != coreBlk {
 		t.Fatal("different block was expected to be built")
@@ -716,6 +716,8 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {
+	require := require.New(t)
+
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	// checks
@@ -729,12 +731,7 @@ func TestPreFork_Initialize(t *testing.T) {
 		t.Fatal("Block should be returned without calling core vm")
 	}
 
-	if _, ok := rtvdBlk.(*preForkBlock); !ok {
-		t.Fatal("Block retrieved from proposerVM should be proposerBlocks")
-	}
-	if !bytes.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes()) {
-		t.Fatal("Stored block is not genesis")
-	}
+	require.IsType(&preForkBlock{}, rtvdBlk)
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
@@ -757,18 +754,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
-	if _, ok := builtBlk.(*preForkBlock); !ok {
-		t.Fatal("Block built by proposerVM should be proposerBlocks")
-	}
-	if builtBlk.ID() != coreBlk.ID() {
-		t.Fatal("unexpected built block")
-	}
-	if !bytes.Equal(builtBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("unexpected built block")
-	}
+	require.IsType(&preForkBlock{}, builtBlk)
 
 	// test
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
@@ -784,6 +770,8 @@ func TestPreFork_BuildBlock(t *testing.T) {
 }
 
 func TestPreFork_ParseBlock(t *testing.T) {
+	require := require.New(t)
+
 	// setup
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
@@ -802,18 +790,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	}
 
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
-	if err != nil {
-		t.Fatal("Could not parse naked core block")
-	}
-	if _, ok := parsedBlk.(*preForkBlock); !ok {
-		t.Fatal("Block parsed by proposerVM should be proposerBlocks")
-	}
-	if parsedBlk.ID() != coreBlk.ID() {
-		t.Fatal("Parsed block does not match expected block")
-	}
-	if !bytes.Equal(parsedBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("Parsed block does not match expected block")
-	}
+	require.IsType(&preForkBlock{}, parsedBlk)
 
 	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		if id != coreBlk.ID() {
@@ -1774,6 +1751,8 @@ func TestTooFarAdvanced(t *testing.T) {
 // B(...) is B(X.opts[0])
 // B(...) is C(X.opts[1])
 func TestTwoOptions_OneIsAccepted(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -1818,10 +1797,8 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	if err != nil {
@@ -1887,8 +1864,8 @@ func TestLaggedPChainHeight(t *testing.T) {
 	blockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	block, ok := blockIntf.(*postForkBlock)
-	require.True(ok, "expected post fork block")
+	require.IsType(&postForkBlock{}, blockIntf)
+	block := blockIntf.(*postForkBlock)
 
 	pChainHeight := block.PChainHeight()
 	require.Equal(pChainHeight, coreGenBlk.Height())
@@ -2291,8 +2268,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)

@@ -44,8 +44,8 @@ func TestGetBlock(t *testing.T) {
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())
-		innerBlk, ok := gotBlk.(*Block)
-		require.True(ok)
+		require.IsType(&Block{}, gotBlk)
+		innerBlk := gotBlk.(*Block)
 		require.Equal(statelessBlk, innerBlk.Block)
 		require.Equal(manager, innerBlk.manager)
 	}
@@ -57,14 +57,16 @@ func TestGetBlock(t *testing.T) {
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())
-		innerBlk, ok := gotBlk.(*Block)
-		require.True(ok)
+		require.IsType(&Block{}, gotBlk)
+		innerBlk := gotBlk.(*Block)
 		require.Equal(statelessBlk, innerBlk.Block)
 		require.Equal(manager, innerBlk.manager)
 	}
 }
 
 func TestManagerLastAccepted(t *testing.T) {
+	require := require.New(t)
+
 	lastAcceptedID := ids.GenerateTestID()
 	manager := &manager{
 		backend: &backend{
@@ -72,5 +74,5 @@ func TestManagerLastAccepted(t *testing.T) {
 		},
 	}
 
-	require.Equal(t, lastAcceptedID, manager.LastAccepted())
+	require.Equal(lastAcceptedID, manager.LastAccepted())
 }

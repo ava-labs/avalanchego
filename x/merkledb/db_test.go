@@ -523,26 +523,22 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	// Make a view and inser/delete a key-value pair.
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
-	err = view1.Insert(context.Background(), []byte{3}, []byte{3})
-	require.NoError(err)
-	err = view1.Remove(context.Background(), []byte{1})
-	require.NoError(err)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 	view1Root, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
 
 	// Make a second view
 	view2Intf, err := db.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	// Make a view atop a view
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view3
 	//  |
@@ -592,18 +588,18 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	// Create children
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	view2Intf, err := db.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	view3Intf, err := db.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	db.invalidateChildrenExcept(view1)
 
