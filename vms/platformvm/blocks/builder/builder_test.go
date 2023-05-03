@@ -678,7 +678,7 @@ func TestBuildBlock(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(require), gotBlk)
+			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

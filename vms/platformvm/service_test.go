@@ -441,7 +441,7 @@ func TestGetStake(t *testing.T) {
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.EqualValues(uint64(defaultWeight), uint64(response.Staked))
+		require.Equal(defaultWeight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -453,8 +453,8 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.EqualValues(defaultWeight, out.Amount())
-		require.EqualValues(1, out.Threshold)
+		require.Equal(defaultWeight, out.Amount())
+		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
 		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
 		require.Zero(out.Locktime)
@@ -469,7 +469,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	require.Equal(len(genesis.Validators)*int(defaultWeight), int(response.Staked))
 	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -481,13 +481,13 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.EqualValues(defaultWeight, out.Amount())
-		require.EqualValues(1, out.Threshold)
+		require.Equal(defaultWeight, out.Amount())
+		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := uint64(defaultWeight)
+	oldStake := defaultWeight
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
@@ -519,7 +519,7 @@ func TestGetStake(t *testing.T) {
 	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
+	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 2)
 
 	// Unmarshal into transferable outputs
@@ -532,7 +532,7 @@ func TestGetStake(t *testing.T) {
 	}
 
 	// Make sure the stake amount is as expected
-	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	require.Equal(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -565,7 +565,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(oldStake+stakeAmount, response.Staked)
+	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 3)
 
 	// Unmarshal
@@ -578,7 +578,7 @@ func TestGetStake(t *testing.T) {
 	}
 
 	// Make sure the stake amount is as expected
-	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	require.Equal(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
