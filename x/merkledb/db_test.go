@@ -525,6 +525,10 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
+	err = view1.Insert(context.Background(), []byte{3}, []byte{3})
+	require.NoError(err)
+	err = view1.Remove(context.Background(), []byte{1})
+	require.NoError(err)
 	view1Root, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
 
