@@ -29,8 +29,8 @@ func TestBandwidthThrottler(t *testing.T) {
 	throttler := throttlerIntf.(*bandwidthThrottlerImpl)
 	require.NotNil(throttler.log)
 	require.NotNil(throttler.limiters)
-	require.EqualValues(throttler.RefillRate, 8)
-	require.EqualValues(throttler.MaxBurstSize, 10)
+	require.Equal(config.RefillRate, throttler.RefillRate)
+	require.Equal(config.MaxBurstSize, throttler.MaxBurstSize)
 	require.Len(throttler.limiters, 0)
 
 	// Add a node

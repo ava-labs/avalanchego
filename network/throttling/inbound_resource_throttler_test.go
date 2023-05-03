@@ -42,10 +42,10 @@ func TestNewSystemThrottler(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&systemThrottler{}, throttlerIntf)
 	throttler := throttlerIntf.(*systemThrottler)
-	require.EqualValues(clock, config.Clock)
-	require.EqualValues(time.Second, config.MaxRecheckDelay)
-	require.EqualValues(cpuTracker, throttler.tracker)
-	require.EqualValues(targeter, throttler.targeter)
+	require.Equal(clock, config.Clock)
+	require.Equal(time.Second, config.MaxRecheckDelay)
+	require.Equal(cpuTracker, throttler.tracker)
+	require.Equal(targeter, throttler.targeter)
 }
 
 func TestSystemThrottler(t *testing.T) {
