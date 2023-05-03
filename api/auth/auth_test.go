@@ -69,14 +69,14 @@ func TestNewTokenHappyPath(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return auth.password.Password[:], nil
 	})
-	require.NoError(err, "couldn't parse new token")
+	require.NoError(err)
 
 	require.IsType(&endpointClaims{}, token.Claims)
 	claims := token.Claims.(*endpointClaims)
-	require.Equal(endpoints, claims.Endpoints, "token has wrong endpoint claims")
+	require.Equal(endpoints, claims.Endpoints)
 
 	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
-	require.Equal(shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")
+	require.Equal(shouldExpireAt, claims.ExpiresAt)
 }
 
 func TestTokenHasWrongSig(t *testing.T) {
@@ -124,7 +124,7 @@ func TestChangePassword(t *testing.T) {
 	require.ErrorIs(err, password.ErrEmptyPassword)
 
 	require.NoError(auth.ChangePassword(testPassword, password2))
-	require.True(auth.password.Check(password2), "password should have been changed")
+	require.True(auth.password.Check(password2))
 
 	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
 
@@ -145,8 +145,8 @@ func TestRevokeToken(t *testing.T) {
 	require.NoError(err)
 
 	err = auth.RevokeToken(tokenStr, testPassword)
-	require.NoError(err, "should have succeeded")
-	require.Len(auth.revoked, 1, "revoked token list is incorrect")
+	require.NoError(err)
+	require.Len(auth.revoked, 1)
 }
 
 func TestWrapHandlerHappyPath(t *testing.T) {
