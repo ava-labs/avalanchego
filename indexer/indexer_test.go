@@ -67,8 +67,8 @@ func TestNewIndexer(t *testing.T) {
 
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr := idxrIntf.(*indexer)
 	require.NotNil(idxr.codec)
 	require.NotNil(idxr.log)
 	require.NotNil(idxr.db)
@@ -118,8 +118,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr := idxrIntf.(*indexer)
 	require.True(idxr.hasRunBefore)
 	require.NoError(idxr.Close())
 	shutdown.Wait()
@@ -150,8 +150,8 @@ func TestIndexer(t *testing.T) {
 	// Create indexer
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr := idxrIntf.(*indexer)
 	now := time.Now()
 	idxr.clock.Set(now)
 
@@ -232,10 +232,10 @@ func TestIndexer(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr = idxrIntf.(*indexer)
 	now = time.Now()
 	idxr.clock.Set(now)
-	require.True(ok)
 	require.Len(idxr.blockIndices, 0)
 	require.Len(idxr.txIndices, 0)
 	require.Len(idxr.vtxIndices, 0)
@@ -389,8 +389,8 @@ func TestIndexer(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr = idxrIntf.(*indexer)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 
@@ -427,8 +427,8 @@ func TestIncompleteIndex(t *testing.T) {
 	}
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr := idxrIntf.(*indexer)
 	require.False(idxr.indexingEnabled)
 
 	// Register a chain
@@ -454,8 +454,8 @@ func TestIncompleteIndex(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr = idxrIntf.(*indexer)
 	require.True(idxr.indexingEnabled)
 
 	// Register the chain again. Should die due to incomplete index.
@@ -470,8 +470,8 @@ func TestIncompleteIndex(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	idxr, ok = idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr = idxrIntf.(*indexer)
 	require.True(idxr.allowIncompleteIndex)
 
 	// Register the chain again. Should be OK
@@ -486,8 +486,7 @@ func TestIncompleteIndex(t *testing.T) {
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
 	require.NoError(err)
-	_, ok = idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
 }
 
 // Ensure we only index chains in the primary network
@@ -513,8 +512,8 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	// Create indexer
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
-	idxr, ok := idxrIntf.(*indexer)
-	require.True(ok)
+	require.IsType(&indexer{}, idxrIntf)
+	idxr := idxrIntf.(*indexer)
 
 	// Assert state is right
 	chain1Ctx := snow.DefaultConsensusContextTest()
