@@ -2789,7 +2789,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		require.Equal(inVdrs, vdrSet)
+		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.Bytes(), blkBytes)
 	}
 	// this engine now answers the "Get" request, and this should allow [blk1] to be issued
