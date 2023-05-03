@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "cargo-update-all-revs",
   "firewood-growth-ring",
   "firewood-libaio",
   "firewood-shale",
