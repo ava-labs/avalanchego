@@ -76,8 +76,8 @@ import (
 )
 
 const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
+	testNetworkID        = 10 // To be used in tests
+	defaultWeight uint64 = 10000
 )
 
 var (
