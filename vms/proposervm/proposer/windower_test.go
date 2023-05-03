@@ -32,7 +32,7 @@ func TestWindowerNoValidators(t *testing.T) {
 
 	delay, err := w.Delay(context.Background(), 1, 0, nodeID)
 	require.NoError(err)
-	require.Equal(time.Duration(0), delay)
+	require.Zero(delay)
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {
@@ -58,7 +58,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	validatorDelay, err := w.Delay(context.Background(), 1, 0, validatorID)
 	require.NoError(err)
-	require.Equal(time.Duration(0), validatorDelay)
+	require.Zero(validatorDelay)
 
 	nonValidatorDelay, err := w.Delay(context.Background(), 1, 0, nonValidatorID)
 	require.NoError(err)
