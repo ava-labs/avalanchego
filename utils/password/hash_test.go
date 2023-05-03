@@ -3,9 +3,7 @@
 
 package password
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestHash(t *testing.T) {
 	h := Hash{}

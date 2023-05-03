@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func UnarySnowballStateTest(t *testing.T, sb *unarySnowball, expectedNumSuccessfulPolls, expectedConfidence int, expectedFinalized bool) {
 	if numSuccessfulPolls := sb.numSuccessfulPolls; numSuccessfulPolls != expectedNumSuccessfulPolls {

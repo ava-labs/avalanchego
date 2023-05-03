@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
 	if confidence := sf.confidence; confidence != expectedConfidence {
