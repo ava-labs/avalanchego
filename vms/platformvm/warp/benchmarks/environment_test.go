@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
@@ -104,7 +105,7 @@ func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
-func newEnvironment(subnetIDToRegister ids.ID) *environment {
+func newEnvironment(b *testing.B, subnetIDToRegister ids.ID) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
@@ -113,7 +114,19 @@ func newEnvironment(subnetIDToRegister ids.ID) *environment {
 	res.config.TrackedSubnets.Add(subnetIDToRegister)
 	res.isBootstrapped.Set(true)
 
-	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
+	dir := b.TempDir()
+	baseDBManager, err := manager.NewLevelDB(
+		dir,
+		nil,
+		logging.NoLog{},
+		version.Semantic1_0_0,
+		"",
+		prometheus.NewRegistry(),
+	)
+	if err != nil {
+		panic(fmt.Errorf("failed to create mempool: %w", err))
+	}
+
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
 	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
@@ -150,7 +163,6 @@ func newEnvironment(subnetIDToRegister ids.ID) *environment {
 
 	metrics := metrics.Noop
 
-	var err error
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))

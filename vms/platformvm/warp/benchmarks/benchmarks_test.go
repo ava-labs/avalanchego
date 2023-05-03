@@ -31,7 +31,7 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 
 	// Prepare the bench environment (don't time it)
 	subnetID := ids.GenerateTestID()
-	env := newEnvironment(subnetID)
+	env := newEnvironment(b, subnetID)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
