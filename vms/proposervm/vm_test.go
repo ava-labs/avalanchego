@@ -790,7 +790,16 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	}
 
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
+	if err != nil {
+		t.Fatal("Could not parse naked core block")
+	}
 	require.IsType(&preForkBlock{}, parsedBlk)
+	if parsedBlk.ID() != coreBlk.ID() {
+		t.Fatal("Parsed block does not match expected block")
+	}
+	if !bytes.Equal(parsedBlk.Bytes(), coreBlk.Bytes()) {
+		t.Fatal("Parsed block does not match expected block")
+	}
 
 	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		if id != coreBlk.ID() {

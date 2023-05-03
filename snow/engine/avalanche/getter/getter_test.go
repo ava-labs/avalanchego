@@ -73,6 +73,9 @@ func TestAcceptedFrontier(t *testing.T) {
 	vtxID2 := ids.GenerateTestID()
 
 	bsIntf, err := New(manager, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.IsType(&getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
@@ -127,7 +130,9 @@ func TestFilterAccepted(t *testing.T) {
 	}}
 
 	bsIntf, err := New(manager, config)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.IsType(&getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 

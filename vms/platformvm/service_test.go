@@ -353,6 +353,12 @@ func TestGetTx(t *testing.T) {
 
 						commit := options[0].(*blockexecutor.Block)
 						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+
+						err := commit.Verify(context.Background())
+						require.NoError(err)
+
+						err = commit.Accept(context.Background())
+						require.NoError(err)
 					}
 				}
 
