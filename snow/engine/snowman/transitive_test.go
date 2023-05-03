@@ -2768,7 +2768,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.False(*asked)
-		require.Equal(blkID, blk1.ID())
+		require.Equal(blk1.ID(), blkID)
 		require.Equal(vdr, inVdr)
 		*asked = true
 	}
