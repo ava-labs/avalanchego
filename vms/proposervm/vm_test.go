@@ -738,7 +738,8 @@ func TestPreFork_Initialize(t *testing.T) {
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
-	// setup
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
@@ -760,7 +761,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("proposerVM could not build block")
 	}
-	require.IsType(t, &preForkBlock{}, builtBlk)
+	require.IsType(&preForkBlock{}, builtBlk)
 	if builtBlk.ID() != coreBlk.ID() {
 		t.Fatal("unexpected built block")
 	}
