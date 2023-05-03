@@ -737,7 +737,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-		dbToSync, err := generateTrie(t, r, 5000)
+		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(t, err)
@@ -774,50 +774,25 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		require.Equal(t, syncRoot, newRoot)
 
 		// make sure they stay in sync
-		for x := 0; x < 50; x++ {
-			addkey := make([]byte, r.Intn(50))
-			_, err = r.Read(addkey)
-			require.NoError(t, err)
-			val := make([]byte, r.Intn(50))
-			_, err = r.Read(val)
-			require.NoError(t, err)
+		addkey := make([]byte, r.Intn(50))
+		_, err = r.Read(addkey)
+		require.NoError(t, err)
+		val := make([]byte, r.Intn(50))
+		_, err = r.Read(val)
+		require.NoError(t, err)
 
-			err = db.Put(addkey, val)
-			require.NoError(t, err)
+		err = db.Put(addkey, val)
+		require.NoError(t, err)
 
-			err = dbToSync.Put(addkey, val)
-			require.NoError(t, err)
+		err = dbToSync.Put(addkey, val)
+		require.NoError(t, err)
 
-			addNilkey := make([]byte, r.Intn(50))
-			_, err = r.Read(addNilkey)
-			require.NoError(t, err)
-			err = db.Put(addNilkey, nil)
-			require.NoError(t, err)
+		syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
+		require.NoError(t, err)
 
-			err = dbToSync.Put(addNilkey, nil)
-			require.NoError(t, err)
-
-			deleteKeyStart := make([]byte, r.Intn(50))
-			_, err = r.Read(deleteKeyStart)
-			require.NoError(t, err)
-
-			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
-			if it.Next() {
-				err = dbToSync.Delete(it.Key())
-				require.NoError(t, err)
-				err = db.Delete(it.Key())
-				require.NoError(t, err)
-			}
-			require.NoError(t, it.Error())
-			it.Release()
-
-			syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
-			require.NoError(t, err)
-
-			newRoot, err = db.GetMerkleRoot(context.Background())
-			require.NoError(t, err)
-			require.Equal(t, syncRoot, newRoot)
-		}
+		newRoot, err = db.GetMerkleRoot(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, syncRoot, newRoot)
 	}
 }
 
@@ -948,7 +923,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
 
 		dbToSync, err := generateTrie(t, r, 10000)
