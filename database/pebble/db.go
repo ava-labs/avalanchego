@@ -4,11 +4,17 @@
 package pebble
 
 import (
+	"go.uber.org/zap"
+)
+
+import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -31,7 +37,17 @@ var (
 type Database struct {
 	db *pebble.DB
 
-	closed utils.Atomic[bool]
+	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
+	// in the config
+	metrics   metrics
+	closed    utils.Atomic[bool]
+	closeOnce sync.Once
+	// closeCh is closed when Close() is called.
+	closeCh chan struct{}
+	// closeWg is used to wait for all goroutines created by New() to exit.
+	// This avoids racy behavior when Close() is called at the same time as
+	// Stats(). See: https://github.com/syndtr/goleveldb/issues/418
+	closeWg sync.WaitGroup
 }
 
 type Config struct {
@@ -54,7 +70,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
 
 	opts := &pebble.Options{
@@ -91,12 +107,52 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	if err != nil {
 		return nil, err
 	}
-	return &Database{db: db}, nil
+	// return &Database{db: db}, nil
+
+	wrappedDB := &Database{
+		db:      db,
+		closeCh: make(chan struct{}),
+	}
+
+	// if parsedConfig.MetricUpdateFrequency > 0 {
+	if true {
+		metrics, err := newMetrics(namespace, reg)
+		if err != nil {
+			// Drop any close error to report the original error
+			_ = db.Close()
+			return nil, err
+		}
+		wrappedDB.metrics = metrics
+		wrappedDB.closeWg.Add(1)
+		go func() {
+			// t := time.NewTicker(parsedConfig.MetricUpdateFrequency)
+			t := time.NewTicker(100)
+			defer func() {
+				t.Stop()
+				wrappedDB.closeWg.Done()
+			}()
+
+			for {
+				if err := wrappedDB.updateMetrics(); err != nil {
+					log.Warn("failed to update leveldb metrics",
+						zap.Error(err),
+					)
+				}
+
+				select {
+				case <-t.C:
+				case <-wrappedDB.closeCh:
+					return
+				}
+			}
+		}()
+	}
+	return wrappedDB, nil
 }
 
 func (db *Database) Close() error {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return database.ErrClosed
+		return herr
 	}
 	db.closed.Set(true)
 	return updateError(db.db.Close())
@@ -112,7 +168,7 @@ func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return false, database.ErrClosed
+		return false, herr
 	}
 
 	_, closer, err := db.db.Get(key)
@@ -127,7 +183,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return nil, database.ErrClosed
+		return nil, herr
 	}
 
 	data, closer, err := db.db.Get(key)
@@ -146,7 +202,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	// waiting for the WAL to sync reduces performance by 20%.
 
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return database.ErrClosed
+		return herr
 	}
 	return updateError(db.db.Set(key, value, pebble.NoSync))
 }
@@ -154,14 +210,14 @@ func (db *Database) Put(key []byte, value []byte) error {
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return database.ErrClosed
+		return herr
 	}
 	return updateError(db.db.Delete(key, pebble.NoSync))
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return database.ErrClosed
+		return herr
 	}
 	return updateError(db.db.Compact(start, limit, true))
 }
@@ -195,7 +251,7 @@ func (b *batch) Size() int { return b.size }
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
 	if _, herr := b.db.HealthCheck(context.TODO()); herr != nil {
-		return database.ErrClosed
+		return herr
 	}
 	return updateError(b.batch.Commit(pebble.NoSync))
 }

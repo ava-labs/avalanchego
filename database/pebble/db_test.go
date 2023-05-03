@@ -22,7 +22,7 @@ func TestInterface(t *testing.T) {
 
 		folder := t.TempDir()
 		cfg := NewDefaultConfig()
-		db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
+		db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
 		if err != nil {
 			t.Fatalf("pebble.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
