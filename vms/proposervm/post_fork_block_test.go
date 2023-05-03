@@ -10,14 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/stretchr/testify/require"
 )
 
 var errDuplicateVerify = errors.New("duplicate verify")
@@ -631,20 +630,32 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	oracleBlk, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build post fork oracle block")
+	}
 
-	require.NoError(oracleBlk.Verify(context.Background()))
-	require.NoError(proVM.SetPreference(context.Background(), oracleBlk.ID()))
+	if err := oracleBlk.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(context.Background(), oracleBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// retrieve one option and verify block built on it
 	require.IsType(&postForkBlock{}, oracleBlk)
 	postForkOracleBlk := oracleBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not retrieve options from post fork oracle block")
+	}
 	parentBlk := opts[0]
 
-	require.NoError(parentBlk.Verify(context.Background()))
-	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
+	if err := parentBlk.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	prntBlkPChainHeight := pChainHeight
 
@@ -668,7 +679,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	childProBlk := postForkBlock{
 		SignedBlock: childSlb,
 		postForkCommonComponents: postForkCommonComponents{
@@ -678,7 +691,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		},
 	}
 
-	require.ErrorIs(childProBlk.Verify(context.Background()), errTimeTooAdvanced)
+	if err := childProBlk.Verify(context.Background()); err == nil {
+		t.Fatal("ProBlock's P-Chain-Height cannot be lower than parent ProBlock's one")
+	}
 
 	// child P-Chain height can be equal to parent P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -687,11 +702,15 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		prntBlkPChainHeight,
 		childCoreBlk.Bytes(),
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	childProBlk.SignedBlock = childSlb
 
 	proVM.Set(childCoreBlk.Timestamp())
-	require.NoError(childProBlk.Verify(context.Background()))
+	if err := childProBlk.Verify(context.Background()); err != nil {
+		t.Fatalf("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one: %s", err)
+	}
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
@@ -701,9 +720,13 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		prntBlkPChainHeight+1,
 		childCoreBlk.Bytes(),
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	childProBlk.SignedBlock = childSlb
-	require.NoError(childProBlk.Verify(context.Background()))
+	if err := childProBlk.Verify(context.Background()); err != nil {
+		t.Fatal("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one")
+	}
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
@@ -713,9 +736,13 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		currPChainHeight,
 		childCoreBlk.Bytes(),
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	childProBlk.SignedBlock = childSlb
-	require.NoError(childProBlk.Verify(context.Background()))
+	if err := childProBlk.Verify(context.Background()); err != nil {
+		t.Fatal("ProBlock's P-Chain-Height can be equal to current p chain height")
+	}
 
 	// block P-Chain height cannot be at higher than current P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -724,9 +751,13 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		currPChainHeight*2,
 		childCoreBlk.Bytes(),
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	childProBlk.SignedBlock = childSlb
-	require.ErrorIs(childProBlk.Verify(context.Background()), errPChainHeightNotReached)
+	if err := childProBlk.Verify(context.Background()); err != errPChainHeightNotReached {
+		t.Fatal("ProBlock's P-Chain-Height cannot be larger than current p chain height")
+	}
 }
 
 func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
@@ -931,14 +962,23 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	}
 
 	sb, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build block")
+	}
 	require.IsType(&postForkBlock{}, sb)
 	proBlk := sb.(*postForkBlock)
 
-	require.NoError(proBlk.Reject(context.Background()))
+	if err := proBlk.Reject(context.Background()); err != nil {
+		t.Fatal("could not reject block")
+	}
 
-	require.Equal(choices.Rejected, proBlk.Status())
-	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
+	if proBlk.Status() != choices.Rejected {
+		t.Fatal("block rejection did not set state properly")
+	}
+
+	if proBlk.innerBlk.Status() == choices.Rejected {
+		t.Fatal("block rejection unduly changed inner block status")
+	}
 }
 
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
@@ -1015,21 +1055,33 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	}
 
 	parentBlk, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not build post fork oracle block")
+	}
 
-	require.NoError(parentBlk.Verify(context.Background()))
-	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
+	if err := parentBlk.Verify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := proVM.SetPreference(context.Background(), parentBlk.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	// retrieve options ...
 	require.IsType(&postForkBlock{}, parentBlk)
 	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("could not retrieve options from post fork oracle block")
+	}
 	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
-	require.NoError(opts[0].Verify(context.Background()))
-	require.NoError(opts[1].Verify(context.Background()))
+	if err := opts[0].Verify(context.Background()); err != nil {
+		t.Fatal("option 0 should verify")
+	}
+	if err := opts[1].Verify(context.Background()); err != nil {
+		t.Fatal("option 1 should verify")
+	}
 
 	// Build the child
 	statelessChild, err := block.Build(
@@ -1041,7 +1093,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	require.NoError(err)
+	if err != nil {
+		t.Fatal("failed to build new child block")
+	}
 
 	invalidChild, err := proVM.ParseBlock(context.Background(), statelessChild.Bytes())
 	if err != nil {
@@ -1049,7 +1103,10 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		return
 	}
 
-	require.ErrorIs(invalidChild.Verify(context.Background()), errUnexpectedBlockType)
+	err = invalidChild.Verify(context.Background())
+	if err == nil {
+		t.Fatal("Should have failed to verify a child that was signed when it should be an oracle block")
+	}
 }
 
 func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
