@@ -1237,6 +1237,9 @@ func TestRestartBootstrapping(t *testing.T) {
 			return nil
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.IsType(&bootstrapper{}, bsIntf)
 	bs := bsIntf.(*bootstrapper)
 
@@ -1376,6 +1379,9 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 			return nil
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.IsType(&bootstrapper{}, bsIntf)
 	bs := bsIntf.(*bootstrapper)
 
@@ -1462,6 +1468,9 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 			return nil
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	require.IsType(&bootstrapper{}, bsIntf)
 	bs := bsIntf.(*bootstrapper)
 
