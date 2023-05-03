@@ -2816,29 +2816,10 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			require.FailNow("Unexpectedly sent a Get request for blk1")
-		case blk2.ID():
-			*sendReqID = requestID
-			*reqVdr = inVdr
-			return
-		default:
-			require.FailNow("Unexpectedly sent a Get request for unknown block")
-		}
-	}
+		require.Equal(blk2.ID(), blkID)
 
-	// this VM expects to receive "Chits" in response to the "PullQuery"
-	// not to send out a "PullQuery"
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			require.FailNow("Unexpectedly sent a PullQuery request for blk1")
-		case blk2.ID():
-			require.FailNow("Unexpectedly sent a PullQuery request for blk2")
-		default:
-			require.FailNow("Unexpectedly sent a PullQuery request for unknown block")
-		}
+		*sendReqID = requestID
+		*reqVdr = inVdr
 	}
 
 	// Now we are expecting a Chits message, and we receive it for [blk2] instead of [blk1].
