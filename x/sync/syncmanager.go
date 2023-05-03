@@ -201,7 +201,7 @@ func (m *StateSyncManager) sync(ctx context.Context) {
 	}
 }
 
-// Called when there is a fatal error or sync is complete.
+// Close will stop the syncing process
 func (m *StateSyncManager) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
