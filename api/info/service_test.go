@@ -69,16 +69,12 @@ func TestGetVMsSuccess(t *testing.T) {
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	reply := GetVMsReply{}
-	err := resources.info.GetVMs(nil, nil, &reply)
-
+	require.NoError(resources.info.GetVMs(nil, nil, &reply))
 	require.Equal(expectedVMRegistry, reply.VMs)
-	require.NoError(err)
 }
 
 // Tests GetVMs if we fail to list our vms.
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
-	require := require.New(t)
-
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -87,13 +83,11 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-	require.ErrorIs(err, errTest)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
 func TestGetVMsGetAliasesFails(t *testing.T) {
-	require := require.New(t)
-
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -109,5 +103,5 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
-	require.ErrorIs(err, errTest)
+	require.ErrorIs(t, err, errTest)
 }
