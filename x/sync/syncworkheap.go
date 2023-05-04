@@ -119,12 +119,6 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 			return false
 		})
 
-	if mergedBefore == nil && mergedAfter == nil {
-		// We didn't merge [item] with an existing one; put it in the heap.
-		heap.Push(wh, &heapItem{workItem: item})
-		return
-	}
-
 	// if the new item should be merged with both the item before and the item after,
 	// we can combine the before item with the after item
 	if mergedBefore != nil && mergedAfter != nil {
@@ -135,6 +129,13 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 		// update the priority
 		mergedBefore.workItem.priority = math.Max(mergedBefore.workItem.priority, mergedAfter.workItem.priority)
 		heap.Fix(wh, mergedBefore.heapIndex)
+	}
+
+	// nothing was merged, so add new item to the heap
+	if mergedBefore == nil && mergedAfter == nil {
+		// We didn't merge [item] with an existing one; put it in the heap.
+		heap.Push(wh, &heapItem{workItem: item})
+		return
 	}
 }
 
