@@ -52,8 +52,7 @@ function test_license_header {
 }
 
 function test_single_import {
-  grep --version
-  if grep -R -zo -e 'import (\n\t".*"\n)' .; then
+  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
     return 1
   fi
 }
