@@ -32,6 +32,7 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
+	ErrMissingValidator    = errors.New("missing validator")
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
@@ -178,7 +179,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	currentPrimaryNetworkValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
-		return nil, ErrMissingValidatorSet
+		return nil, ErrMissingValidator
 	}
 
 	currentSubnetValidatorList := currentSubnetValidators.List()
@@ -187,7 +188,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
 		if !ok {
 			// This should never happen
-			return nil, fmt.Errorf("%w: %s", ErrMissingValidatorSet, vdr.NodeID)
+			return nil, fmt.Errorf("%w: %s", ErrMissingValidator, vdr.NodeID)
 		}
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
@@ -197,60 +198,9 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(i, subnetID)
+		err := m.applyValidatorDiffs(vdrSet, subnetID, height)
 		if err != nil {
 			return nil, err
-		}
-
-		for nodeID, weightDiff := range weightDiffs {
-			vdr, ok := vdrSet[nodeID]
-			if !ok {
-				// This node isn't in the current validator set.
-				vdr = &validators.GetValidatorOutput{
-					NodeID: nodeID,
-				}
-				vdrSet[nodeID] = vdr
-			}
-
-			// The weight of this node changed at this block.
-			var op func(uint64, uint64) (uint64, error)
-			if weightDiff.Decrease {
-				// The validator's weight was decreased at this block, so in the
-				// prior block it was higher.
-				op = math.Add64
-			} else {
-				// The validator's weight was increased at this block, so in the
-				// prior block it was lower.
-				op = math.Sub[uint64]
-			}
-
-			// Apply the weight change.
-			vdr.Weight, err = op(vdr.Weight, weightDiff.Amount)
-			if err != nil {
-				return nil, err
-			}
-
-			if vdr.Weight == 0 {
-				// The validator's weight was 0 before this block so
-				// they weren't in the validator set.
-				delete(vdrSet, nodeID)
-			}
-		}
-
-		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(i)
-		if err != nil {
-			return nil, err
-		}
-
-		for nodeID, pk := range pkDiffs {
-			// pkDiffs includes all primary network key diffs, if we are
-			// fetching a subnet's validator set, we should ignore non-subnet
-			// validators.
-			if vdr, ok := vdrSet[nodeID]; ok {
-				// The validator's public key was removed at this block, so it
-				// was in the validator set before.
-				vdr.PublicKey = pk
-			}
 		}
 	}
 
@@ -262,6 +212,65 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
 	m.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
+}
+
+func (m *manager) applyValidatorDiffs(
+	vdrSet map[ids.NodeID]*validators.GetValidatorOutput,
+	subnetID ids.ID,
+	height uint64,
+) error {
+	weightDiffs, err := m.state.GetValidatorWeightDiffs(height, subnetID)
+	if err != nil {
+		return err
+	}
+
+	for nodeID, weightDiff := range weightDiffs {
+		vdr, ok := vdrSet[nodeID]
+		if !ok {
+			// This node isn't in the current validator set.
+			vdr = &validators.GetValidatorOutput{
+				NodeID: nodeID,
+			}
+			vdrSet[nodeID] = vdr
+		}
+
+		// The weight of this node changed at this block.
+		if weightDiff.Decrease {
+			// The validator's weight was decreased at this block, so in the
+			// prior block it was higher.
+			vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
+		} else {
+			// The validator's weight was increased at this block, so in the
+			// prior block it was lower.
+			vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
+		}
+		if err != nil {
+			return err
+		}
+
+		if vdr.Weight == 0 {
+			// The validator's weight was 0 before this block so
+			// they weren't in the validator set.
+			delete(vdrSet, nodeID)
+		}
+	}
+
+	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(height)
+	if err != nil {
+		return err
+	}
+
+	for nodeID, pk := range pkDiffs {
+		// pkDiffs includes all primary network key diffs, if we are
+		// fetching a subnet's validator set, we should ignore non-subnet
+		// validators.
+		if vdr, ok := vdrSet[nodeID]; ok {
+			// The validator's public key was removed at this block, so it
+			// was in the validator set before.
+			vdr.PublicKey = pk
+		}
+	}
+	return nil
 }
 
 // GetSubnetID returns subnetID of the specified chainID
