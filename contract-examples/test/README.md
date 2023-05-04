@@ -1,6 +1,6 @@
 # Testing Precompiles
 
-If you can, put all of your test logic into DS-test tests. Prefix test functions with `test_`. There's also a `setUp` function that gets called before the test contract is deployed. The current best-practice is to re-deploy one test contract per `test` function called in `*.ts` test definitions. The `setUp` method should be called once, then `test_` functions passed in as the 2nd argument to `test("<description>", <test_function_name_OR_array_of_test_function_names>)` will be called in order. `test.only` and `test.skip` behave the same way as `it.only` and `it.skip`. There's also a `test.debug` that combines `test.only` with some extra event logging (you can use `emit log_string` to help debug Solidity test code).
+If you can, put all of your test logic into DS-test tests. Prefix test functions with `step_`. There's also a `setUp` function that gets called before the test contract is deployed. The current best-practice is to re-deploy one test contract per `test` function called in `*.ts` test definitions. The `setUp` method should be called once, then `step_` functions passed in as the 2nd argument to `test("<description>", <step_function_name_OR_array_of_step_function_names>)` will be called in order. `test.only` and `test.skip` behave the same way as `it.only` and `it.skip`. There's also a `test.debug` that combines `test.only` with some extra event logging (you can use `emit log_string` to help debug Solidity test code).
 
 The `test` function is a wrapper around Mocha's `it` function. It provides a normalized framework for running the
 majority of your test assertions inside of a smart-contract, using `DS-Test`.
@@ -37,7 +37,7 @@ test(
 Many contract functions can be called as a part of the same test:
 
 ```ts
-test("<test_name>", ["<test_fn1>", "<test_fn2>", "<test_fn3>"])
+test("<test_name>", ["<step_fn1>", "<step_fn2>", "<step_fn3>"])
 ```
 
 Individual test functions can describe their own overrides with the `overrides` property.
