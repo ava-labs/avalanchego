@@ -79,7 +79,7 @@ type activeFork uint8
 
 const (
 	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
+	defaultWeight uint64 = 10000
 
 	ApricotFork           activeFork = 0
 	BanffFork             activeFork = 1
@@ -884,11 +884,9 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -928,12 +926,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -982,12 +978,10 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -1023,12 +1017,10 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -1077,12 +1069,10 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -1119,12 +1109,10 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2130,7 +2118,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			require.NoError(err)
-			require.EqualValues(defaultWeight, amount)
+			require.Equal(defaultWeight, amount)
 		})
 	}
 }
@@ -2240,12 +2228,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2283,12 +2269,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2383,12 +2367,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
@@ -2411,12 +2393,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.BanffAbortBlock)
-	require.True(ok)
+	require.IsType(&blocks.BanffAbortBlock{}, abort.Block)
 
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
