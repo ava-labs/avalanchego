@@ -197,8 +197,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 
-	for i := lastAcceptedHeight; i > height; i-- {
-		err := m.applyValidatorDiffs(vdrSet, subnetID, height)
+	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
+		err := m.applyValidatorDiffs(vdrSet, subnetID, diffHeight)
 		if err != nil {
 			return nil, err
 		}
