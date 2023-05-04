@@ -4,20 +4,20 @@
 package executor
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/golang/mock/gomock"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
@@ -510,28 +511,55 @@ func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortI
 	}
 }
 
-func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32) ([]*crypto.PrivateKeySECP256K1R, *multisig.AliasWithNonce, *secp256k1fx.OutputOwners, *secp256k1fx.OutputOwners) {
-	keys := make([]*crypto.PrivateKeySECP256K1R, addrsCount)
+// msgOwnersWithKeys is created in order to be able to sort both keys and owners by address
+type msgOwnersWithKeys struct {
+	Owners *secp256k1fx.OutputOwners
+	Keys   []*crypto.PrivateKeySECP256K1R
+}
 
-	aliasOwners := &secp256k1fx.OutputOwners{
-		Threshold: threshold,
-		Addrs:     make([]ids.ShortID, addrsCount),
+func (mo msgOwnersWithKeys) Len() int {
+	return len(mo.Keys)
+}
+
+func (mo msgOwnersWithKeys) Swap(i, j int) {
+	mo.Owners.Addrs[i], mo.Owners.Addrs[j] = mo.Owners.Addrs[j], mo.Owners.Addrs[i]
+	mo.Keys[i], mo.Keys[j] = mo.Keys[j], mo.Keys[i]
+}
+
+func (mo msgOwnersWithKeys) Less(i, j int) bool {
+	return bytes.Compare(mo.Owners.Addrs[i].Bytes(), mo.Owners.Addrs[j].Bytes()) < 0
+}
+
+func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32, sorted bool) ([]*crypto.PrivateKeySECP256K1R, *multisig.AliasWithNonce, *secp256k1fx.OutputOwners, *secp256k1fx.OutputOwners) {
+	msgOwners := msgOwnersWithKeys{
+		Owners: &secp256k1fx.OutputOwners{
+			Threshold: threshold,
+			Addrs:     make([]ids.ShortID, addrsCount),
+		},
+		Keys: make([]*crypto.PrivateKeySECP256K1R, addrsCount),
 	}
+
 	for i := uint32(0); i < addrsCount; i++ {
 		key, err := testKeyfactory.NewPrivateKey()
 		require.NoError(t, err)
 		secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
 		require.True(t, ok)
-		aliasOwners.Addrs[i] = secpKey.Address()
-		keys[i] = secpKey
+		msgOwners.Owners.Addrs[i] = secpKey.Address()
+		msgOwners.Keys[i] = secpKey
+	}
+
+	if sorted {
+		sort.Sort(msgOwners)
+	} else {
+		sort.Sort(sort.Reverse(msgOwners))
 	}
 
 	alias := &multisig.AliasWithNonce{Alias: multisig.Alias{
 		ID:     ids.GenerateTestShortID(),
-		Owners: aliasOwners,
+		Owners: msgOwners.Owners,
 	}}
 
-	return keys, alias, aliasOwners, &secp256k1fx.OutputOwners{
+	return msgOwners.Keys, alias, msgOwners.Owners, &secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{alias.ID},
 	}

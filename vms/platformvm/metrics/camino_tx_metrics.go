@@ -19,7 +19,8 @@ type caminoTxMetrics struct {
 	numClaimTxs,
 	numRegisterNodeTxs,
 	numRewardsImportTxs,
-	numBaseTxs prometheus.Counter
+	numBaseTxs,
+	numMultisigAliasTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -42,6 +43,7 @@ func newCaminoTxMetrics(
 		numRegisterNodeTxs:  newTxMetric(namespace, "register_node", registerer, &errs),
 		numRewardsImportTxs: newTxMetric(namespace, "rewards_import", registerer, &errs),
 		numBaseTxs:          newTxMetric(namespace, "base", registerer, &errs),
+		numMultisigAliasTxs: newTxMetric(namespace, "multisig_alias", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -76,6 +78,10 @@ func (*txMetrics) BaseTx(*txs.BaseTx) error {
 	return nil
 }
 
+func (*txMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
+	return nil
+}
+
 // camino metrics
 
 func (m *caminoTxMetrics) AddressStateTx(*txs.AddressStateTx) error {
@@ -104,11 +110,16 @@ func (m *caminoTxMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
 }
 
 func (m *caminoTxMetrics) RewardsImportTx(*txs.RewardsImportTx) error {
-	m.numRegisterNodeTxs.Inc()
+	m.numRewardsImportTxs.Inc()
 	return nil
 }
 
 func (m *caminoTxMetrics) BaseTx(*txs.BaseTx) error {
 	m.numBaseTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
+	m.numMultisigAliasTxs.Inc()
 	return nil
 }

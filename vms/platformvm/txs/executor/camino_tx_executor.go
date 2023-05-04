@@ -18,13 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 )
 
 // Max number of items allowed in a page
@@ -65,6 +66,8 @@ var (
 	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
 	errWrongClaimedAmount           = errors.New("claiming more than was available to claim")
 	errNoUnlock                     = errors.New("no tokens unlocked")
+	errAliasCredentialMismatch      = errors.New("alias credential isn't matching")
+	errAliasNotFound                = errors.New("alias not found on state")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -1302,6 +1305,83 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	baseCreds := e.Tx.Creds[:len(e.Tx.Creds)]
+
+	var aliasID ids.ShortID
+	nonce := uint64(0)
+
+	txID := e.Tx.ID()
+
+	// Update existing multisig definition
+
+	if tx.MultisigAlias.ID != ids.ShortEmpty {
+		alias, err := e.State.GetMultisigAlias(tx.MultisigAlias.ID)
+		if err != nil {
+			return fmt.Errorf("%w, alias: %s", errAliasNotFound, tx.MultisigAlias.ID)
+		}
+
+		baseCreds = e.Tx.Creds[:len(e.Tx.Creds)-1]
+
+		if err := e.Backend.Fx.VerifyMultisigPermission(
+			e.Tx.Unsigned,
+			tx.Auth,
+			e.Tx.Creds[len(e.Tx.Creds)-1],
+			alias.Owners,
+			e.State,
+		); err != nil {
+			return fmt.Errorf("%w: %s", errAliasCredentialMismatch, err)
+		}
+
+		aliasID = alias.ID
+		nonce = alias.Nonce + 1
+	} else {
+		aliasID = multisig.ComputeAliasID(txID)
+	}
+
+	// verify the flowcheck
+
+	if err := e.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		baseCreds,
+		0,
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+		locked.StateUnlocked,
+	); err != nil {
+		return err
+	}
+
+	// update state
+
+	e.State.SetMultisigAlias(&multisig.AliasWithNonce{
+		Alias: multisig.Alias{
+			ID:     aliasID,
+			Memo:   tx.MultisigAlias.Memo,
+			Owners: tx.MultisigAlias.Owners,
+		},
+		Nonce: nonce,
+	})
+
+	// Consume the UTXOS
+	utxo.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	utxo.Produce(e.State, txID, tx.Outs)
 
 	return nil
 }

@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,9 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCaminoEnv(t *testing.T) {
@@ -3237,9 +3237,9 @@ func TestCaminoStandardTxExecutorClaimTx(t *testing.T) {
 	claimableOwnerKey2, _, claimableOwner2 := generateKeyAndOwner(t)
 	_, claimToOwnerAddr1, claimToOwner1 := generateKeyAndOwner(t)
 	_, claimToOwnerAddr2, claimToOwner2 := generateKeyAndOwner(t)
-	depositRewardMsigKeys, depositRewardMsigAlias, depositRewardMsigAliasOwner, depositRewardMsigOwner := generateMsigAliasAndKeys(t, 1, 2)
-	claimableMsigKeys, claimableMsigAlias, claimableMsigAliasOwner, claimableMsigOwner := generateMsigAliasAndKeys(t, 2, 3)
-	feeMsigKeys, feeMsigAlias, feeMsigAliasOwner, feeMsigOwner := generateMsigAliasAndKeys(t, 2, 2)
+	depositRewardMsigKeys, depositRewardMsigAlias, depositRewardMsigAliasOwner, depositRewardMsigOwner := generateMsigAliasAndKeys(t, 1, 2, false)
+	claimableMsigKeys, claimableMsigAlias, claimableMsigAliasOwner, claimableMsigOwner := generateMsigAliasAndKeys(t, 2, 3, false)
+	feeMsigKeys, feeMsigAlias, feeMsigAliasOwner, feeMsigOwner := generateMsigAliasAndKeys(t, 2, 2, false)
 
 	feeUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
 	msigFeeUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, *feeMsigOwner, ids.Empty, ids.Empty)
@@ -4127,7 +4127,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 
 	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
 	consortiumMemberKey, consortiumMemberAddr, _ := generateKeyAndOwner(t)
-	consortiumMemberMsigKeys, consortiumMemberMsigAlias, consortiumMemberMsigAliasOwner, _ := generateMsigAliasAndKeys(t, 2, 3)
+	consortiumMemberMsigKeys, consortiumMemberMsigAlias, consortiumMemberMsigAliasOwner, _ := generateMsigAliasAndKeys(t, 2, 3, false)
 	nodeKey1, nodeAddr1, _ := generateKeyAndOwner(t)
 	nodeKey2, nodeAddr2, _ := generateKeyAndOwner(t)
 	nodeID1 := ids.NodeID(nodeAddr1)
@@ -5117,6 +5117,226 @@ func TestCaminoCrossExport(t *testing.T) {
 
 			err := executor.ExportTx(exportTx)
 			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
+	ctx, _ := defaultCtx(nil)
+
+	ownerKey, ownerAddr, owner := generateKeyAndOwner(t)
+	msigKeys, msigAlias, msigAliasOwners, msigOwner := generateMsigAliasAndKeys(t, 2, 2, true)
+	_, newMsigAlias, _, _ := generateMsigAliasAndKeys(t, 2, 2, true)
+
+	ownerUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, owner, ids.Empty, ids.Empty)
+	msigUTXO := generateTestUTXO(ids.GenerateTestID(), ctx.AVAXAssetID, defaultTxFee, *msigOwner, ids.Empty, ids.Empty)
+
+	caminoGenesisConf := api.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+
+	baseState := func(addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) func(c *gomock.Controller) *state.MockState {
+		return func(c *gomock.Controller) *state.MockState {
+			s := stateExpectingShutdownCaminoEnvironment(c)
+			// utxo handler, used in ins fx VerifyMultisigTransfer and outs VerifyMultisigOwner for baseTx verification
+			expectStateGetMultisigAliases(s, addrs, aliases)
+			return s
+		}
+	}
+
+	tests := map[string]struct {
+		baseState   func(*gomock.Controller) *state.MockState
+		state       func(*gomock.Controller, *txs.MultisigAliasTx, ids.ID) *state.MockDiff
+		utx         *txs.MultisigAliasTx
+		signers     [][]*crypto.PrivateKeySECP256K1R
+		expectedErr error
+	}{
+		"Updating alias which does not exist": {
+			baseState: stateExpectingShutdownCaminoEnvironment,
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(nil, database.ErrNotFound)
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(ownerUTXO, []uint32{0})},
+					},
+				},
+				MultisigAlias: msigAlias.Alias,
+				Auth:          &secp256k1fx.Input{SigIndices: []uint32{0, 1}},
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{ownerKey},
+				{msigKeys[0], msigKeys[1]},
+			},
+			expectedErr: errAliasNotFound,
+		},
+		"Updating existing alias with less signatures than threshold": {
+			baseState: stateExpectingShutdownCaminoEnvironment,
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
+				expectVerifyMultisigPermission(s, []ids.ShortID{
+					msigAliasOwners.Addrs[0],
+					msigAliasOwners.Addrs[1],
+				}, []*multisig.AliasWithNonce{})
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(ownerUTXO, []uint32{0})},
+					},
+				},
+				MultisigAlias: msigAlias.Alias,
+				Auth:          &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{ownerKey},
+				{msigKeys[0]},
+			},
+			expectedErr: errAliasCredentialMismatch,
+		},
+		"OK, update existing alias": {
+			baseState: baseState([]ids.ShortID{ownerAddr}, nil),
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
+				expectVerifyMultisigPermission(s, []ids.ShortID{
+					msigAliasOwners.Addrs[0],
+					msigAliasOwners.Addrs[1],
+				}, []*multisig.AliasWithNonce{})
+				expectVerifyLock(s, utx.Ins, []*avax.UTXO{ownerUTXO})
+				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
+					Alias: msigAlias.Alias,
+					Nonce: msigAlias.Nonce + 1,
+				})
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(ownerUTXO, []uint32{0})},
+					},
+				},
+				MultisigAlias: msigAlias.Alias,
+				Auth:          &secp256k1fx.Input{SigIndices: []uint32{0, 1}},
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{ownerKey},
+				{msigKeys[0], msigKeys[1]},
+			},
+		},
+		"OK, add new alias": {
+			baseState: baseState([]ids.ShortID{ownerAddr}, nil),
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				expectVerifyLock(s, utx.Ins, []*avax.UTXO{ownerUTXO})
+				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
+					Alias: multisig.Alias{
+						ID:     multisig.ComputeAliasID(txID),
+						Memo:   msigAlias.Memo,
+						Owners: msigAlias.Owners,
+					},
+					Nonce: 0,
+				})
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(ownerUTXO, []uint32{0})},
+					},
+				},
+				MultisigAlias: multisig.Alias{
+					ID:     ids.ShortID{},
+					Memo:   msigAlias.Memo,
+					Owners: msigAlias.Owners,
+				},
+				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{ownerKey},
+			},
+		},
+		"OK, add new alias with multisig sender": {
+			baseState: baseState([]ids.ShortID{
+				msigAlias.ID,
+				msigAliasOwners.Addrs[0],
+				msigAliasOwners.Addrs[1],
+			}, []*multisig.AliasWithNonce{msigAlias}),
+			state: func(c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				expectVerifyLock(s, utx.Ins, []*avax.UTXO{msigUTXO})
+				s.EXPECT().SetMultisigAlias(&multisig.AliasWithNonce{
+					Alias: multisig.Alias{
+						ID:     multisig.ComputeAliasID(txID),
+						Memo:   newMsigAlias.Memo,
+						Owners: newMsigAlias.Owners,
+					},
+					Nonce: 0,
+				})
+				expectConsumeUTXOs(s, utx.Ins)
+				expectProduceUTXOs(s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.MultisigAliasTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{generateTestInFromUTXO(msigUTXO, []uint32{0, 1})},
+					},
+				},
+				MultisigAlias: multisig.Alias{
+					ID:     ids.ShortID{},
+					Memo:   newMsigAlias.Memo,
+					Owners: newMsigAlias.Owners,
+				},
+				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{msigKeys[0], msigKeys[1]},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			env := newCaminoEnvironmentWithMocks(caminoGenesisConf, tt.baseState(ctrl), nil)
+
+			defer func() { require.NoError(shutdownCaminoEnvironment(env)) }() //nolint:revive
+
+			avax.SortTransferableInputsWithSigners(tt.utx.Ins, tt.signers)
+
+			tx, err := txs.NewSigned(tt.utx, txs.Codec, tt.signers)
+			require.NoError(err)
+
+			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   tt.state(ctrl, tt.utx, tx.ID()),
+					Tx:      tx,
+				},
+			})
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

@@ -38,6 +38,10 @@ func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 	return b.baseTx(tx)
 }
 
+func (b *backendVisitor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 // signer
 
 func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -85,6 +89,14 @@ func (*signerVisitor) RewardsImportTx(*txs.RewardsImportTx) error {
 }
 
 func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
+func (s *signerVisitor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

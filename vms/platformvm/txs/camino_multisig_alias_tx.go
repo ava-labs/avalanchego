@@ -13,9 +13,8 @@ import (
 )
 
 var (
-	errNonExecutableTx = errors.New("this tx type can't be executed, its genesis-only")
-
-	_ UnsignedTx = (*MultisigAliasTx)(nil)
+	_                            UnsignedTx = (*MultisigAliasTx)(nil)
+	errFailedToVerifyAliasOrAuth            = errors.New("failed to verify alias or auth")
 )
 
 // MultisigAliasTx is an unsigned multisig alias tx
@@ -23,9 +22,9 @@ type MultisigAliasTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Multisig alias definition. MultisigAlias.ID must be empty, if its the new alias
-	MultisigAlias multisig.Alias `serialize:"true"`
+	MultisigAlias multisig.Alias `serialize:"true" json:"multisigAlias"`
 	// Auth that allows existing owners to change an alias
-	ChangeAuth verify.Verifiable `serialize:"true" json:"changeAuthorization"`
+	Auth verify.Verifiable `serialize:"true" json:"auth"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -48,8 +47,8 @@ func (tx *MultisigAliasTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.MultisigAlias, tx.ChangeAuth); err != nil {
-		return fmt.Errorf("failed to verify owner or change auth: %w", err)
+	if err := verify.All(&tx.MultisigAlias, tx.Auth); err != nil {
+		return fmt.Errorf("%w: %s", errFailedToVerifyAliasOrAuth, err.Error())
 	}
 
 	// cache that this is valid
@@ -57,6 +56,6 @@ func (tx *MultisigAliasTx) SyntacticVerify(ctx *snow.Context) error {
 	return nil
 }
 
-func (*MultisigAliasTx) Visit(_ Visitor) error {
-	return errNonExecutableTx
+func (tx *MultisigAliasTx) Visit(visitor Visitor) error {
+	return visitor.MultisigAliasTx(tx)
 }
