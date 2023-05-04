@@ -235,7 +235,7 @@ func (s *State) Flush() {
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
 func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
-	if blk, ok := s.getCachedBlock(blkID); ok {
+	if blk := s.getCachedBlock(blkID); blk != nil {
 		return blk, nil
 	}
 
@@ -258,22 +258,22 @@ func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, erro
 	return s.addBlockOutsideConsensus(ctx, blk)
 }
 
-// getCachedBlock checks the caches for [blkID] by priority. Returning
-// true if [blkID] is found in one of the caches.
-func (s *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
+// getCachedBlock checks the caches for [blkID] by priority.
+// Returning a non-nil block if found in one of the caches.
+func (s *State) getCachedBlock(blkID ids.ID) snowman.Block {
 	if blk, ok := s.verifiedBlocks[blkID]; ok {
-		return blk, true
+		return blk
 	}
 
 	if blk, ok := s.decidedBlocks.Get(blkID); ok {
-		return blk, true
+		return blk
 	}
 
 	if blk, ok := s.unverifiedBlocks.Get(blkID); ok {
-		return blk, true
+		return blk
 	}
 
-	return nil, false
+	return nil
 }
 
 // GetBlockInternal returns the internal representation of [blkID]
@@ -293,7 +293,7 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 	cachedBlkID, blkIDCached := s.bytesToIDCache.Get(string(b))
 	if blkIDCached {
 		// See if we have this block cached
-		if cachedBlk, ok := s.getCachedBlock(cachedBlkID); ok {
+		if cachedBlk := s.getCachedBlock(cachedBlkID); cachedBlk != nil {
 			return cachedBlk, nil
 		}
 	}
@@ -312,7 +312,7 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 		// Check for an existing block, so we can return a unique block
 		// if processing or simply allow this block to be immediately
 		// garbage collected if it is already cached.
-		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+		if cachedBlk := s.getCachedBlock(blkID); cachedBlk != nil {
 			return cachedBlk, nil
 		}
 	}
@@ -342,7 +342,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 		}
 
 		// See if we have this block cached
-		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+		if cachedBlk := s.getCachedBlock(blkID); cachedBlk != nil {
 			blks[i] = cachedBlk
 		} else {
 			unparsedBlksBytes = append(unparsedBlksBytes, blkBytes)
@@ -389,7 +389,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 			// Check for an existing block, so we can return a unique block
 			// if processing or simply allow this block to be immediately
 			// garbage collected if it is already cached.
-			if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+			if cachedBlk := s.getCachedBlock(blkID); cachedBlk != nil {
 				blks[i] = cachedBlk
 				continue
 			}
@@ -436,7 +436,7 @@ func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Blo
 	blkID := blk.ID()
 	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.
-	if existingBlk, ok := s.getCachedBlock(blkID); ok {
+	if existingBlk := s.getCachedBlock(blkID); existingBlk != nil {
 		return existingBlk, nil
 	}
 	// Evict the produced block from missing blocks in case it was previously
