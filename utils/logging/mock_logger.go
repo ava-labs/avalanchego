@@ -54,6 +54,20 @@ func (mr *MockLoggerMockRecorder) Debug(arg0 interface{}, arg1 ...interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Debug", reflect.TypeOf((*MockLogger)(nil).Debug), varargs...)
 }
 
+// Enabled mocks base method.
+func (m *MockLogger) Enabled(arg0 Level) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Enabled", arg0)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Enabled indicates an expected call of Enabled.
+func (mr *MockLoggerMockRecorder) Enabled(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Enabled", reflect.TypeOf((*MockLogger)(nil).Enabled), arg0)
+}
+
 // Error mocks base method.
 func (m *MockLogger) Error(arg0 string, arg1 ...zapcore.Field) {
 	m.ctrl.T.Helper()
