@@ -105,16 +105,16 @@ func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
-func newEnvironment(b *testing.B, subnetIDToRegister ids.ID) *environment {
-	res := &environment{
+func newEnvironment(tb testing.TB, subnetIDToRegister ids.ID) *environment {
+	env := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
-	res.config.TrackedSubnets.Add(subnetIDToRegister)
-	res.isBootstrapped.Set(true)
+	env.config.TrackedSubnets.Add(subnetIDToRegister)
+	env.isBootstrapped.Set(true)
 
-	dir := b.TempDir()
+	dir := tb.TempDir()
 	baseDBManager, err := manager.NewLevelDB(
 		dir,
 		nil,
@@ -124,66 +124,66 @@ func newEnvironment(b *testing.B, subnetIDToRegister ids.ID) *environment {
 		prometheus.NewRegistry(),
 	)
 	if err != nil {
-		panic(fmt.Errorf("failed to create mempool: %w", err))
+		panic(fmt.Errorf("failed to create database: %w", err))
 	}
 
-	res.baseDB = versiondb.New(baseDBManager.Current().Database)
-	res.ctx = defaultCtx(res.baseDB)
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
+	env.baseDB = versiondb.New(baseDBManager.Current().Database)
+	env.ctx = defaultCtx(env.baseDB)
+	env.fx = defaultFx(env.clk, env.ctx.Log, env.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
+	rewardsCalc := reward.NewCalculator(env.config.RewardConfig)
+	env.atomicUTXOs = avax.NewAtomicUTXOManager(env.ctx.SharedMemory, txs.Codec)
 
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
-	res.uptimes = uptime.NewManager(res.state)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
-	res.txBuilder = p_tx_builder.New(
-		res.ctx,
-		res.config,
-		res.clk,
-		res.fx,
-		res.state,
-		res.atomicUTXOs,
-		res.utxosHandler,
+	env.state = defaultState(env.config, env.ctx, env.baseDB, rewardsCalc)
+	env.uptimes = uptime.NewManager(env.state)
+	env.utxosHandler = utxo.NewHandler(env.ctx, env.clk, env.fx)
+	env.txBuilder = p_tx_builder.New(
+		env.ctx,
+		env.config,
+		env.clk,
+		env.fx,
+		env.state,
+		env.atomicUTXOs,
+		env.utxosHandler,
 	)
 
-	res.backend = &executor.Backend{
-		Config:       res.config,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
-		Uptimes:      res.uptimes,
+	env.backend = &executor.Backend{
+		Config:       env.config,
+		Ctx:          env.ctx,
+		Clk:          env.clk,
+		Bootstrapped: env.isBootstrapped,
+		Fx:           env.fx,
+		FlowChecker:  env.utxosHandler,
+		Uptimes:      env.uptimes,
 		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &common.SenderTest{}
+	env.sender = &common.SenderTest{}
 
 	metrics := metrics.Noop
 
-	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	env.mempool, err = mempool.NewMempool("mempool", registerer, env)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
 
-	res.validatorsManager = pvalidators.NewManager(
-		*res.config,
-		res.state,
+	env.validatorsManager = pvalidators.NewManager(
+		*env.config,
+		env.state,
 		metrics,
-		res.clk,
+		env.clk,
 	)
 
-	res.blkManager = blockexecutor.NewManager(
-		res.mempool,
+	env.blkManager = blockexecutor.NewManager(
+		env.mempool,
 		metrics,
-		res.state,
-		res.backend,
-		res.validatorsManager,
+		env.state,
+		env.backend,
+		env.validatorsManager,
 	)
 
-	return res
+	return env
 }
 
 func defaultState(
@@ -209,10 +209,6 @@ func defaultState(
 
 	// persist and reload to init a bunch of in-memory stuff
 	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-	state.SetHeight( /*height*/ 0)
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
