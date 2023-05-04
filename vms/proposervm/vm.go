@@ -195,6 +195,8 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
+
+	// creates uncancelable context before passing across goroutines
 	detachedCtx := utils.Detach(ctx)
 	context, cancel := context.WithCancel(detachedCtx)
 	vm.context = context
@@ -392,6 +394,10 @@ func (vm *VM) repair(ctx context.Context) error {
 
 			// innerVM index is incomplete. Wait for completion and retry
 			select {
+			case <-ctx.Done():
+				// "repair" is called with uncancelable context, so this won't be selected
+				// "Done" is here for the code completeness
+				return
 			case <-vm.context.Done():
 				return
 			case <-ticker.C:
@@ -446,7 +452,7 @@ func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 	}
 
 	// Revert accepted blocks that weren't committed to the database.
-	for {
+	for ctx.Err() == nil {
 		lastAccepted, err := vm.getPostForkBlock(ctx, lastAcceptedID)
 		if err == database.ErrNotFound {
 			// If the post fork block can't be found, it's because we're
@@ -502,6 +508,7 @@ func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 			return err
 		}
 	}
+	return ctx.Err()
 }
 
 func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {

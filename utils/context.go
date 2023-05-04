@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// Context that does not inherit the cancellation of its parent context.
+// Cannot cancel this context, and this context never returns on "Done".
+// Only used for context key-values.
 type detachedContext struct {
 	ctx context.Context
 }

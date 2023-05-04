@@ -216,6 +216,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 				}
 				// Nothing to do with the error within the goroutine
 				_ = msgClient.Notify(msg)
+			case <-ctx.Done():
+				return
 			case <-vm.closed:
 				return
 			}

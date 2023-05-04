@@ -36,7 +36,7 @@ func (vm *VM) GetAncestors(
 
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit
-	for {
+	for ctx.Err() == nil {
 		blk, err := vm.getStatelessBlk(blkID)
 		if err != nil {
 			// maybe we have hit the proposerVM fork here?
@@ -59,6 +59,9 @@ func (vm *VM) GetAncestors(
 		if len(res) >= maxBlocksNum {
 			return res, nil
 		}
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	// snowman++ fork may have been hit.
