@@ -38,38 +38,10 @@ type metrics struct {
 
 		Levels [numLevels]LevelMetrics
 
-		Snapshots struct {
-			// A running tally of keys written to sstables during flushes or
-			// compactions that would've been elided if it weren't for open
-			// snapshots.
-			PinnedKeys uint64
-			// A running cumulative sum of the size of keys and values written to
-			// sstables during flushes or compactions that would've been elided if
-			// it weren't for open snapshots.
-			PinnedSize uint64
-		}
-
-		Table struct {
-			// The count of obsolete tables.
-			ObsoleteCount int64
-			// The number of bytes present in zombie tables which are no longer
-			// referenced by the current DB state but are still in use by an iterator.
-			ZombieSize uint64
-			// The count of zombie tables.
-			ZombieCount int64
-		}
-
 		TableCache CacheMetrics
 
 		// Count of the number of open sstable iterators.
 		TableIters int64
-
-		WAL struct {
-			// Number of logical bytes written to the WAL.
-			BytesIn uint64
-			// Number of bytes written to the WAL.
-			BytesWritten uint64
-		}
 
 		LogWriter struct {
 			record.LogWriterMetrics
@@ -143,9 +115,29 @@ type metrics struct {
 	// The sequence number of the earliest, currently open snapshot.
 	snapshotsEarliestSeqNum prometheus.Gauge
 
+	// A running tally of keys written to sstables during flushes or
+	// compactions that would've been elided if it weren't for open
+	// snapshots.
+	snapshotsPinnedKeys prometheus.Gauge
+
+	// A running cumulative sum of the size of keys and values written to
+	// sstables during flushes or compactions that would've been elided if
+	// it weren't for open snapshots.
+	snapshotsPinnedSize prometheus.Gauge
+
 	// The number of bytes present in obsolete tables which are no longer
 	// referenced by the current DB state or any open iterators.
-	tableObsoleteSize prometheus.Counter
+	tableObsoleteSize prometheus.Gauge
+
+	// The count of obsolete tables.
+	tableObsoleteCount prometheus.Gauge
+
+	// The number of bytes present in zombie tables which are no longer
+	// referenced by the current DB state but are still in use by an iterator.
+	tableZombieSize prometheus.Gauge
+
+	// The count of zombie tables.
+	tableZombieCount prometheus.Gauge
 
 	// Number of live WAL files.
 	walFiles prometheus.Gauge
@@ -163,6 +155,12 @@ type metrics struct {
 	// Physical size of the WAL files on-disk. With WAL file recycling,
 	// this is greater than the live data in WAL files.
 	walPhysicalSize prometheus.Gauge
+
+	// Number of logical bytes written to the WAL.
+	walBytesIn prometheus.Counter
+
+	// Number of bytes written to the WAL.
+	walBytesWritten prometheus.Counter
 
 	logwriterFsyncLatency prometheus.Histogram
 
@@ -273,10 +271,40 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Help:      "The sequence number of the earliest, currently open snapshot.",
 		}),
 
-		tableObsoleteSize: prometheus.NewCounter(prometheus.CounterOpts{
+		snapshotsPinnedKeys: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "snapshots_pinned_keys",
+			Help:      "A running tally of keys written to sstables during flushes or compactions that would've been elided if it weren't for open snapshots.",
+		}),
+
+		snapshotsPinnedSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "snapshots_pinned_size",
+			Help:      "A running cumulative sum of the size of keys and values written to sstables during flushes or compactions that would've been elided if it weren't for open snapshots.",
+		}),
+
+		tableObsoleteSize: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "table_obsolete_size",
 			Help:      "The number of bytes present in obsolete tables",
+		}),
+
+		tableObsoleteCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "table_obsolete_count",
+			Help:      "The count of obsolete tables.",
+		}),
+
+		tableZombieSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "table_zombie_size",
+			Help:      "the number of bytes present in zombie tables which are no longer referenced by the current DB state but are still in use by an iterator.",
+		}),
+
+		tableZombieCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "table_zombie_count",
+			Help:      "The count of zombie tables.",
 		}),
 
 		walFiles: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -309,6 +337,18 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Help:      "Physical size of the WAL files on-disk.",
 		}),
 
+		walBytesIn: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "wal_bytes_in",
+			Help:      "Number of logical bytes written to the WAL.",
+		}),
+
+		walBytesWritten: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "wal_bytes_written",
+			Help:      "Number of bytes written to the WAL.",
+		}),
+
 		logwriterFsyncLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "logwrite_fsync_latency",
@@ -339,14 +379,21 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 
 		reg.Register(m.snapshotsCount),
 		reg.Register(m.snapshotsEarliestSeqNum),
+		reg.Register(m.snapshotsPinnedKeys),
+		reg.Register(m.snapshotsPinnedSize),
 
 		reg.Register(m.tableObsoleteSize),
+		reg.Register(m.tableObsoleteCount),
+		reg.Register(m.tableZombieSize),
+		reg.Register(m.tableZombieCount),
 
 		reg.Register(m.walFiles),
 		reg.Register(m.walObsoleteFiles),
 		reg.Register(m.walObsoletePhysicalSize),
 		reg.Register(m.walSize),
 		reg.Register(m.walPhysicalSize),
+		reg.Register(m.walBytesIn),
+		reg.Register(m.walBytesWritten),
 
 		reg.Register(m.logwriterFsyncLatency),
 	)
@@ -381,16 +428,23 @@ func (db *Database) updateMetrics() {
 
 	metrics.snapshotsCount.Add(float64(currentMetrics.Snapshots.Count))
 	metrics.snapshotsEarliestSeqNum.Add(float64(currentMetrics.Snapshots.EarliestSeqNum))
+	metrics.snapshotsPinnedKeys.Add(float64(currentMetrics.Snapshots.PinnedKeys))
+	metrics.snapshotsPinnedSize.Add(float64(currentMetrics.Snapshots.PinnedSize))
 
 	metrics.tableObsoleteSize.Add(float64(currentMetrics.Table.ObsoleteSize))
+	metrics.tableObsoleteCount.Add(float64(currentMetrics.Table.ObsoleteCount))
+	metrics.tableZombieSize.Add(float64(currentMetrics.Table.ZombieSize))
+	metrics.tableZombieCount.Add(float64(currentMetrics.Table.ZombieCount))
 
 	metrics.walFiles.Add(float64(currentMetrics.WAL.Files))
 	metrics.walObsoleteFiles.Add(float64(currentMetrics.WAL.ObsoleteFiles))
 	metrics.walObsoletePhysicalSize.Add(float64(currentMetrics.WAL.ObsoletePhysicalSize))
 	metrics.walSize.Add(float64(currentMetrics.WAL.Size))
 	metrics.walPhysicalSize.Add(float64(currentMetrics.WAL.PhysicalSize))
+	metrics.walBytesIn.Add(float64(currentMetrics.WAL.BytesIn))
+	metrics.walBytesWritten.Add(float64(currentMetrics.WAL.BytesWritten))
 
-	// metrics.logwriterFsyncLatency.Count(currentMetrics.LogWriter.FsyncLatency)
+	// metrics.logwriterFsyncLatency.histogram_quantile(currentMetrics.LogWriter.FsyncLatency)
 
 	/*
 		metrics.writesDelayedDuration.Add(float64(currentStats.WriteDelayDuration - priorStats.WriteDelayDuration))
