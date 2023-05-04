@@ -135,7 +135,6 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	if mergedBefore == nil && mergedAfter == nil {
 		// We didn't merge [item] with an existing one; put it in the heap.
 		heap.Push(wh, &heapItem{workItem: item})
-		return
 	}
 }
 
