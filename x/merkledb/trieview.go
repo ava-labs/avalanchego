@@ -997,10 +997,8 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 			if err := t.removeFromTrie(key); err != nil {
 				return err
 			}
-		} else {
-			if _, err := t.insertIntoTrie(key, change); err != nil {
-				return err
-			}
+		} else if _, err := t.insertIntoTrie(key, change); err != nil {
+			return err
 		}
 	}
 	return nil

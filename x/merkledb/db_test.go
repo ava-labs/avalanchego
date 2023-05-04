@@ -710,10 +710,8 @@ func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
 			if err := view.Remove(context.Background(), op.key); err != nil {
 				return nil, err
 			}
-		} else {
-			if err := view.Insert(context.Background(), op.key, op.value); err != nil {
-				return nil, err
-			}
+		} else if err := view.Insert(context.Background(), op.key, op.value); err != nil {
+			return nil, err
 		}
 	}
 	return view, nil
