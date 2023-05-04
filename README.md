@@ -56,6 +56,40 @@ These crates will either be heavily modified or removed prior to the production
 launch of firewood. If they are retained, all changes made will be shared
 upstream.
 
+## Termimology
+
+* `Revision` - A point-in-time state/version of the trie. This represents the entire
+  trie, including all `Key`/`Value`s at that point in time, and all `Node`s.
+* `View` - This is a synonym for a `Revision`.
+* `Node` - A node is a portion of a trie. A trie consists of nodes that are linked
+  together. Nodes can point to other nodes and/or contain `Key`/`Value` pairs.
+* `Hash` - In this context, this refers to the merkle hash for a specific node.
+* `Root Hash` - The hash of the root node for a specific revision.
+* `Key` - Represents an individual byte array used to index into a trie. A `Key`
+  usually has a specific `Value`.
+* `Value` - Represents a byte array for the value of a specific `Key`. Values can
+  contain 0-N bytes. In particular, a zero-length `Value` is valid.
+* `Key Proof` - A proof that a `Key` exists within a specific revision of a trie.
+  This includes the hash for the node containing the `Key` as well as all parents.
+* `Range Proof` - A proof that consists of two `Key Proof`s, one for the start of
+  the range, and one for the end of the range, as well as a list of all `Key`/`Value`
+  pairs in between the two. A `Range Proof` can be validated independently of an
+  actual database by constructing a trie from the `Key`/`Value`s provided.
+* `Change Proof` - A proof that consists of a set of all changes between two
+  revisions.
+* `Put` - An operation for a `Key`/`Value` pair. A put means "create if it doesn't
+  exist, or update it if it does. A put operation is how you add a `Value` for a
+  specific `Key`.
+* `Delete` - A operation indicating that a `Key` that should be removed from the trie.
+* `Batch Operation` - An operation of either `Put` or `Delete`.
+* `Batch` - An ordered set of `Batch Operation`s.
+* `Proposal` - A proposal consists of a base `Root Hash` and a `Batch`, but is not
+  yet committed to the trie. In firewood's most recent API, a `Proposal` is required
+  to `Commit`.
+* `Commit` - The operation of applying one or more `Proposal`s to the most recent
+  `Revision`.
+
+
 ## Roadmap
 ### Green Milestone
 This milestone will focus on additional code cleanup, including supporting
