@@ -315,6 +315,6 @@ func (a *acceptor) commonAccept(b blocks.Block) error {
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
 	a.state.AddStatelessBlock(b, choices.Accepted)
-	a.validators.Track(blkID)
+	a.validators.OnAcceptedBlockID(blkID)
 	return nil
 }

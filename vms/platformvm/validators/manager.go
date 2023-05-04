@@ -35,20 +35,22 @@ var (
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
-// P-chain must be able to provide information about validators active
-// at different heights. [QueryManager] interface encapsulates all the machinery
-// to achieve this.
+// QueryManager encapsulates the logic that allows the P-chain to provide
+// information about validators active at different heights.
 type QueryManager interface {
 	validators.State
 
 	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
 }
 
-// Manager interface adds to QueribleSet the ability to blocks IDs
+// Manager interface adds to QueryManager the ability to blocks IDs
 // to serve GetMinimumHeight
 type Manager interface {
 	QueryManager
-	Track(blkID ids.ID)
+
+	// OnAcceptedBlockID register the ID of the latest accepted block.
+	// It is used to update [recentlyAccepted] sliding window.
+	OnAcceptedBlockID(blkID ids.ID)
 }
 
 func NewManager(
@@ -102,9 +104,9 @@ type manager struct {
 // height which is likely (but not guaranteed) to also be older than the
 // window's configured TTL.
 //
-// If [UseCurrentHeight] is true, we will always return the last accepted block
-// height as the minimum. This is used to trigger the proposervm on recently
-// created subnets before [recentlyAcceptedWindowTTL].
+// If [UseCurrentHeight] is true, we override the block selection policy
+// described above and we will always return the last accepted block height
+// as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if m.cfg.UseCurrentHeight {
 		return m.GetCurrentHeight(ctx)
@@ -262,7 +264,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	return vdrSet, nil
 }
 
-// GetCurrentHeight returns the height of the last accepted block
+// GetSubnetID returns subnetID of the specified chainID
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
@@ -298,6 +300,6 @@ func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
 	return validatorIDs, true
 }
 
-func (m *manager) Track(blkID ids.ID) {
+func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
 }
