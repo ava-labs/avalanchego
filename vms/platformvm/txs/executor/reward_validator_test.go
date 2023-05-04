@@ -462,8 +462,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	utxo, err := onCommitState.GetUTXO(delRewardUTXOID.InputID())
 	require.NoError(err)
-	castUTXO, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
+	require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+	castUTXO := utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(delRewardAmt*3/4, castUTXO.Amt, "expected delegator balance to increase by 3/4 of reward amount")
 	require.True(delDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to delDestSet")
 
@@ -510,8 +510,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	utxo, err = onCommitState.GetUTXO(vdrRewardUTXOID.InputID())
 	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
+	require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+	castUTXO = utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(vdrRewardAmt, castUTXO.Amt, "expected validator to be rewarded")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
@@ -523,8 +523,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	utxo, err = onCommitState.GetUTXO(onCommitVdrDelRewardUTXOID.InputID())
 	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
+	require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+	castUTXO = utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
@@ -536,8 +536,8 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	utxo, err = onAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
 	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
+	require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+	castUTXO = utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 
@@ -697,8 +697,8 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	utxo, err := vdrOnAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
 	require.NoError(err)
-	castUTXO, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
+	require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
+	castUTXO := utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
 

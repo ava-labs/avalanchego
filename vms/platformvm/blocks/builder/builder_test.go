@@ -61,8 +61,8 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
-	blk, ok := blkIntf.(*blockexecutor.Block)
-	require.True(ok)
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
 	require.Len(blk.Txs(), 1)
 	require.Equal(txID, blk.Txs()[0].ID())
 
@@ -678,7 +678,7 @@ func TestBuildBlock(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(require), gotBlk)
+			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

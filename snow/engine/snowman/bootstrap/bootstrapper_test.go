@@ -1104,6 +1104,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 }
 
 func TestRestartBootstrapping(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, vm := newConfig(t)
 
 	blkID0 := ids.Empty.Prefix(0)
@@ -1238,10 +1240,8 @@ func TestRestartBootstrapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*bootstrapper)
-	if !ok {
-		t.Fatal("unexpected bootstrapper type")
-	}
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	if err := bs.Start(context.Background(), 0); err != nil {
@@ -1322,6 +1322,8 @@ func TestRestartBootstrapping(t *testing.T) {
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
+	require := require.New(t)
+
 	config, peerID, sender, vm := newConfig(t)
 
 	blk0 := &snowman.TestBlock{
@@ -1380,10 +1382,8 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*bootstrapper)
-	if !ok {
-		t.Fatal("unexpected bootstrapper type")
-	}
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
 	if err := bs.Start(context.Background(), 0); err != nil {
@@ -1423,6 +1423,8 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 }
 
 func TestBootstrapContinueAfterHalt(t *testing.T) {
+	require := require.New(t)
+
 	config, _, _, vm := newConfig(t)
 
 	blk0 := &snowman.TestBlock{
@@ -1469,10 +1471,8 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*bootstrapper)
-	if !ok {
-		t.Fatal("unexpected bootstrapper type")
-	}
+	require.IsType(&bootstrapper{}, bsIntf)
+	bs := bsIntf.(*bootstrapper)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {

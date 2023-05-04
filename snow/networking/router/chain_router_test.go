@@ -783,6 +783,8 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	}
 
 	{
+		engineType := p2p.EngineType(100)
+
 		requestID++
 		msg := message.InboundPushQuery(
 			ctx.ChainID,
@@ -790,11 +792,11 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			0,
 			nil,
 			nodeID,
-			100,
+			engineType,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.EqualValues(100, msg.EngineType)
+			require.Equal(engineType, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
