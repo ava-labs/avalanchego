@@ -473,7 +473,7 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 type ClaimedAmount struct {
 	DepositTxID    ids.ID            `json:"depositTxID"`
 	ClaimableOwner platformapi.Owner `json:"claimableOwner"`
-	Amount         uint64            `json:"amount"`
+	Amount         utilsjson.Uint64  `json:"amount"`
 	ClaimType      txs.ClaimType     `json:"claimType"`
 }
 
@@ -523,7 +523,7 @@ func (s *CaminoService) Claim(_ *http.Request, args *ClaimArgs, reply *api.JSONT
 		default:
 			return txs.ErrWrongClaimType
 		}
-		claimables[i].Amount = args.Claimables[i].Amount
+		claimables[i].Amount = uint64(args.Claimables[i].Amount)
 		claimables[i].Type = args.Claimables[i].ClaimType
 	}
 
@@ -552,7 +552,7 @@ type TransferArgs struct {
 	api.JSONFromAddrs
 	Change     platformapi.Owner `json:"change"`
 	TransferTo platformapi.Owner `json:"transferTo"`
-	Amount     uint64            `json:"amount"`
+	Amount     utilsjson.Uint64  `json:"amount"`
 }
 
 // Transfer issues an BaseTx
@@ -576,7 +576,7 @@ func (s *CaminoService) Transfer(_ *http.Request, args *TransferArgs, reply *api
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewBaseTx(
-		args.Amount,
+		uint64(args.Amount),
 		transferTo,
 		privKeys,
 		change,
@@ -887,12 +887,28 @@ func (s *CaminoService) apiOwnerFromSECP(secpOwner *secp256k1fx.OutputOwners) (*
 	return apiOwner, nil
 }
 
+type APIDepositOffer struct {
+	ID                      ids.ID              `json:"id"`
+	InterestRateNominator   utilsjson.Uint64    `json:"interestRateNominator"`   // deposit.Amount * (interestRateNominator / interestRateDenominator) == reward for deposit with 1 year duration
+	Start                   utilsjson.Uint64    `json:"start"`                   // Unix time in seconds, when this offer becomes active (can be used to create new deposits)
+	End                     utilsjson.Uint64    `json:"end"`                     // Unix time in seconds, when this offer becomes inactive (can't be used to create new deposits)
+	MinAmount               utilsjson.Uint64    `json:"minAmount"`               // Minimum amount that can be deposited with this offer
+	TotalMaxAmount          utilsjson.Uint64    `json:"totalMaxAmount"`          // Maximum amount that can be deposited with this offer in total (across all deposits)
+	DepositedAmount         utilsjson.Uint64    `json:"depositedAmount"`         // Amount that was already deposited with this offer
+	MinDuration             uint32              `json:"minDuration"`             // Minimum duration of deposit created with this offer
+	MaxDuration             uint32              `json:"maxDuration"`             // Maximum duration of deposit created with this offer
+	UnlockPeriodDuration    uint32              `json:"unlockPeriodDuration"`    // Duration of period during which tokens deposited with this offer will be unlocked. The unlock period starts at the end of deposit minus unlockPeriodDuration
+	NoRewardsPeriodDuration uint32              `json:"noRewardsPeriodDuration"` // Duration of period during which rewards won't be accumulated. No rewards period starts at the end of deposit minus unlockPeriodDuration
+	Memo                    types.JSONByteSlice `json:"memo"`                    // Arbitrary offer memo
+	Flags                   utilsjson.Uint64    `json:"flags"`                   // Bitfield with flags
+}
+
 type GetAllDepositOffersArgs struct {
-	Timestamp uint64 `json:"timestamp"`
+	Timestamp utilsjson.Uint64 `json:"timestamp"`
 }
 
 type GetAllDepositOffersReply struct {
-	DepositOffers []*deposit.Offer `json:"depositOffers"`
+	DepositOffers []*APIDepositOffer `json:"depositOffers"`
 }
 
 // GetAllDepositOffers returns an array of all deposit offers that are active at given timestamp
@@ -904,11 +920,30 @@ func (s *CaminoService) GetAllDepositOffers(_ *http.Request, args *GetAllDeposit
 		return err
 	}
 
+	timestamp := uint64(args.Timestamp)
 	for _, offer := range allDepositOffers {
-		if offer.Start <= args.Timestamp && offer.End >= args.Timestamp {
-			response.DepositOffers = append(response.DepositOffers, offer)
+		if offer.Start <= timestamp && offer.End >= timestamp {
+			response.DepositOffers = append(response.DepositOffers, apiOfferFromOffer(offer))
 		}
 	}
 
 	return nil
+}
+
+func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
+	return &APIDepositOffer{
+		ID:                      offer.ID,
+		InterestRateNominator:   utilsjson.Uint64(offer.InterestRateNominator),
+		Start:                   utilsjson.Uint64(offer.Start),
+		End:                     utilsjson.Uint64(offer.End),
+		MinAmount:               utilsjson.Uint64(offer.MinAmount),
+		TotalMaxAmount:          utilsjson.Uint64(offer.TotalMaxAmount),
+		DepositedAmount:         utilsjson.Uint64(offer.DepositedAmount),
+		MinDuration:             offer.MinDuration,
+		MaxDuration:             offer.MaxDuration,
+		UnlockPeriodDuration:    offer.UnlockPeriodDuration,
+		NoRewardsPeriodDuration: offer.NoRewardsPeriodDuration,
+		Memo:                    offer.Memo,
+		Flags:                   utilsjson.Uint64(offer.Flags),
+	}
 }

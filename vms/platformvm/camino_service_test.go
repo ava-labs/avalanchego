@@ -222,7 +222,7 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 	tests := map[string]struct {
 		fields  fields
 		args    args
-		want    []*deposit.Offer
+		want    []*APIDepositOffer
 		wantErr error
 		prepare func(service CaminoService)
 	}{
@@ -236,7 +236,7 @@ func TestCaminoService_GetAllDepositOffers(t *testing.T) {
 				},
 				response: &GetAllDepositOffersReply{},
 			},
-			want: []*deposit.Offer{
+			want: []*APIDepositOffer{
 				{
 					ID:    ids.ID{1},
 					Start: 0,
