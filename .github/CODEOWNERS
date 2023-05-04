@@ -10,6 +10,7 @@
 
 # Specific directories:
 
-peer/ @anusha-ctrl
-contract-examples/ @anusha-ctrl
-scripts/ @anusha-ctrl
+peer/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
+contract-examples/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
+scripts/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
+
