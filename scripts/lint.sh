@@ -53,6 +53,7 @@ function test_license_header {
 
 function test_single_import {
   if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+    echo ""
     return 1
   fi
 }
