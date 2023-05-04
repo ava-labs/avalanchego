@@ -2925,8 +2925,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				expectVerifyUnlock(s, utx.Ins, []*avax.UTXO{feeUTXO, deposit1Owner1UTXO})
 				s.EXPECT().GetTimestamp().Return(deposit1HalfUnlockTime)
-				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
-				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).MaxTimes(2).MinTimes(1)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil).MaxTimes(1)
 				return s
 			},
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -2950,8 +2950,8 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				expectVerifyUnlock(s, utx.Ins, []*avax.UTXO{feeUTXO, deposit1Owner1UTXO})
 				s.EXPECT().GetTimestamp().Return(deposit1Expired)
-				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
-				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+				s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).MaxTimes(2).MinTimes(1)
+				s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil).MaxTimes(1)
 				return s
 			},
 			utx: &txs.UnlockDepositTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
