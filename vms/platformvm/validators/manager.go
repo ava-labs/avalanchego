@@ -32,23 +32,26 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
+	ErrMissingValidator    = errors.New("missing validator")
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
-// P-chain must be able to provide information about validators active
-// at different heights. [QueryManager] interface encapsulates all the machinery
-// to achieve this.
+// QueryManager encapsulates the logic that allows the P-chain to provide
+// information about validators active at different heights.
 type QueryManager interface {
 	validators.State
 
 	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
 }
 
-// Manager interface adds to QueribleSet the ability to blocks IDs
+// Manager interface adds to QueryManager the ability to blocks IDs
 // to serve GetMinimumHeight
 type Manager interface {
 	QueryManager
-	Track(blkID ids.ID)
+
+	// OnAcceptedBlockID register the ID of the latest accepted block.
+	// It is used to update [recentlyAccepted] sliding window.
+	OnAcceptedBlockID(blkID ids.ID)
 }
 
 func NewManager(
@@ -102,9 +105,9 @@ type manager struct {
 // height which is likely (but not guaranteed) to also be older than the
 // window's configured TTL.
 //
-// If [UseCurrentHeight] is true, we will always return the last accepted block
-// height as the minimum. This is used to trigger the proposervm on recently
-// created subnets before [recentlyAcceptedWindowTTL].
+// If [UseCurrentHeight] is true, we override the block selection policy
+// described above and we will always return the last accepted block height
+// as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if m.cfg.UseCurrentHeight {
 		return m.GetCurrentHeight(ctx)
@@ -176,7 +179,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	currentPrimaryNetworkValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
-		return nil, ErrMissingValidatorSet
+		return nil, ErrMissingValidator
 	}
 
 	currentSubnetValidatorList := currentSubnetValidators.List()
@@ -185,7 +188,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
 		if !ok {
 			// This should never happen
-			return nil, fmt.Errorf("%w: %s", ErrMissingValidatorSet, vdr.NodeID)
+			return nil, fmt.Errorf("%w: %s", ErrMissingValidator, vdr.NodeID)
 		}
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
@@ -194,61 +197,10 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 
-	for i := lastAcceptedHeight; i > height; i-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(i, subnetID)
+	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
+		err := m.applyValidatorDiffs(vdrSet, subnetID, diffHeight)
 		if err != nil {
 			return nil, err
-		}
-
-		for nodeID, weightDiff := range weightDiffs {
-			vdr, ok := vdrSet[nodeID]
-			if !ok {
-				// This node isn't in the current validator set.
-				vdr = &validators.GetValidatorOutput{
-					NodeID: nodeID,
-				}
-				vdrSet[nodeID] = vdr
-			}
-
-			// The weight of this node changed at this block.
-			var op func(uint64, uint64) (uint64, error)
-			if weightDiff.Decrease {
-				// The validator's weight was decreased at this block, so in the
-				// prior block it was higher.
-				op = math.Add64
-			} else {
-				// The validator's weight was increased at this block, so in the
-				// prior block it was lower.
-				op = math.Sub[uint64]
-			}
-
-			// Apply the weight change.
-			vdr.Weight, err = op(vdr.Weight, weightDiff.Amount)
-			if err != nil {
-				return nil, err
-			}
-
-			if vdr.Weight == 0 {
-				// The validator's weight was 0 before this block so
-				// they weren't in the validator set.
-				delete(vdrSet, nodeID)
-			}
-		}
-
-		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(i)
-		if err != nil {
-			return nil, err
-		}
-
-		for nodeID, pk := range pkDiffs {
-			// pkDiffs includes all primary network key diffs, if we are
-			// fetching a subnet's validator set, we should ignore non-subnet
-			// validators.
-			if vdr, ok := vdrSet[nodeID]; ok {
-				// The validator's public key was removed at this block, so it
-				// was in the validator set before.
-				vdr.PublicKey = pk
-			}
 		}
 	}
 
@@ -262,7 +214,66 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	return vdrSet, nil
 }
 
-// GetCurrentHeight returns the height of the last accepted block
+func (m *manager) applyValidatorDiffs(
+	vdrSet map[ids.NodeID]*validators.GetValidatorOutput,
+	subnetID ids.ID,
+	height uint64,
+) error {
+	weightDiffs, err := m.state.GetValidatorWeightDiffs(height, subnetID)
+	if err != nil {
+		return err
+	}
+
+	for nodeID, weightDiff := range weightDiffs {
+		vdr, ok := vdrSet[nodeID]
+		if !ok {
+			// This node isn't in the current validator set.
+			vdr = &validators.GetValidatorOutput{
+				NodeID: nodeID,
+			}
+			vdrSet[nodeID] = vdr
+		}
+
+		// The weight of this node changed at this block.
+		if weightDiff.Decrease {
+			// The validator's weight was decreased at this block, so in the
+			// prior block it was higher.
+			vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
+		} else {
+			// The validator's weight was increased at this block, so in the
+			// prior block it was lower.
+			vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
+		}
+		if err != nil {
+			return err
+		}
+
+		if vdr.Weight == 0 {
+			// The validator's weight was 0 before this block so
+			// they weren't in the validator set.
+			delete(vdrSet, nodeID)
+		}
+	}
+
+	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(height)
+	if err != nil {
+		return err
+	}
+
+	for nodeID, pk := range pkDiffs {
+		// pkDiffs includes all primary network key diffs, if we are
+		// fetching a subnet's validator set, we should ignore non-subnet
+		// validators.
+		if vdr, ok := vdrSet[nodeID]; ok {
+			// The validator's public key was removed at this block, so it
+			// was in the validator set before.
+			vdr.PublicKey = pk
+		}
+	}
+	return nil
+}
+
+// GetSubnetID returns subnetID of the specified chainID
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
@@ -298,6 +309,6 @@ func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
 	return validatorIDs, true
 }
 
-func (m *manager) Track(blkID ids.ID) {
+func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
 }

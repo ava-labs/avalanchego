@@ -40,9 +40,6 @@ var defaultRewardConfig = reward.Config{
 }
 
 func TestVM_GetValidatorSet(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	// Populate the validator set to use below
 	var (
 		numVdrs       = 4
@@ -71,10 +68,10 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		currentPrimaryNetworkValidators []*validators.Validator
 		currentSubnetValidators         []*validators.Validator
 		// Diff at tip, block before tip, etc.
-		// This must have [height] - [lastAcceptedHeight] elements
+		// This must have [lastAcceptedHeight] - [height] elements
 		weightDiffs []map[ids.NodeID]*state.ValidatorWeightDiff
 		// Diff at tip, block before tip, etc.
-		// This must have [height] - [lastAcceptedHeight] elements
+		// This must have [lastAcceptedHeight] - [height] elements
 		pkDiffs        []map[ids.NodeID]*bls.PublicKey
 		expectedVdrSet map[ids.NodeID]*validators.GetValidatorOutput
 		expectedErr    error
@@ -368,6 +365,8 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
 			// setup validators set
 			vdrs := validators.NewMockManager(ctrl)

@@ -306,12 +306,9 @@ func TestMeterDBManager(t *testing.T) {
 	dbs := manager.GetDatabases()
 	require.Len(dbs, 3)
 
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	require.False(ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	require.False(ok)
+	require.IsType(&meterdb.Database{}, dbs[0].Database)
+	require.IsType(&memdb.Database{}, dbs[1].Database)
+	require.IsType(&memdb.Database{}, dbs[2].Database)
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewMeterDBManager("", registry)
@@ -355,12 +352,9 @@ func TestCompleteMeterDBManager(t *testing.T) {
 	dbs := manager.GetDatabases()
 	require.Len(dbs, 3)
 
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	require.True(ok)
+	require.IsType(&meterdb.Database{}, dbs[0].Database)
+	require.IsType(&meterdb.Database{}, dbs[1].Database)
+	require.IsType(&meterdb.Database{}, dbs[2].Database)
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewCompleteMeterDBManager("", registry)

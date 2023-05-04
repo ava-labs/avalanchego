@@ -33,4 +33,4 @@ func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.Nod
 func (testManager) GetValidatorIDs(ids.ID) ([]ids.NodeID, bool) {
 	return nil, false
 }
-func (testManager) Track(ids.ID) {}
+func (testManager) OnAcceptedBlockID(ids.ID) {}
