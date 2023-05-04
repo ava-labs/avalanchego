@@ -69,8 +69,8 @@ func TestNewTokenHappyPath(t *testing.T) {
 	})
 	require.NoError(t, err, "couldn't parse new token")
 
-	claims, ok := token.Claims.(*endpointClaims)
-	require.True(t, ok, "expected auth token's claims to be type endpointClaims but is different type")
+	require.IsType(t, &endpointClaims{}, token.Claims)
+	claims := token.Claims.(*endpointClaims)
 	require.ElementsMatch(t, endpoints, claims.Endpoints, "token has wrong endpoint claims")
 
 	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
