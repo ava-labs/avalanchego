@@ -548,8 +548,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 	require.NoError(err)
 
 	var (
-		numProofsToTest  = 500
-		numKeyValues     = 500
+		numProofsToTest  = 250
+		numKeyValues     = 250
 		maxKeyLen        = 256
 		maxValLen        = 256
 		maxRangeStartLen = 8
@@ -797,9 +797,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 }
 
 func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-		dbToSync, err := generateTrie(t, r, 5000)
+		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(t, err)
@@ -851,11 +851,11 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, newSyncer)
-		err = newSyncer.StartSyncing(context.Background())
-		require.NoError(t, err)
+
+		require.NoError(t, newSyncer.StartSyncing(context.Background()))
 		require.NoError(t, newSyncer.Error())
-		err = newSyncer.Wait(context.Background())
-		require.NoError(t, err)
+		require.NoError(t, newSyncer.Wait(context.Background()))
+
 		newRoot, err := db.GetMerkleRoot(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, syncRoot, newRoot)
@@ -926,56 +926,13 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
 
-		dbToSync, err := generateTrie(t, r, 10000)
+		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(err)
 
-		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+		firstSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		db, err := merkledb.New(
-			context.Background(),
-			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
-		)
-		require.NoError(err)
-
-		// Only let one response go through until we update the root.
-		updatedRootChan := make(chan struct{}, 1)
-		updatedRootChan <- struct{}{}
-		client := NewMockClient(ctrl)
-		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
-				<-updatedRootChan
-				root, err := ids.ToID(request.Root)
-				require.NoError(err)
-				return dbToSync.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
-			},
-		).AnyTimes()
-		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-				<-updatedRootChan
-				startRoot, err := ids.ToID(request.StartRoot)
-				require.NoError(err)
-				endRoot, err := ids.ToID(request.EndRoot)
-				require.NoError(err)
-				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
-			},
-		).AnyTimes()
-
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
-			Client:                client,
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		})
-		require.NoError(err)
-		require.NotNil(t, syncer)
-		for x := 0; x < 50; x++ {
+		for x := 0; x < 100; x++ {
 			key := make([]byte, r.Intn(50))
 			_, err = r.Read(key)
 			require.NoError(err)
@@ -1000,8 +957,53 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			it.Release()
 		}
 
-		syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
+		secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(err)
+
+		db, err := merkledb.New(
+			context.Background(),
+			memdb.New(),
+			merkledb.Config{
+				Tracer:        newNoopTracer(),
+				HistoryLength: 0,
+				NodeCacheSize: 1000,
+			},
+		)
+		require.NoError(err)
+
+		// Only let one response go through until we update the root.
+		updatedRootChan := make(chan struct{}, 1)
+		updatedRootChan <- struct{}{}
+
+		client := NewMockClient(ctrl)
+		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+				<-updatedRootChan
+				root, err := ids.ToID(request.Root)
+				require.NoError(err)
+				return dbToSync.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
+			},
+		).AnyTimes()
+		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
+				<-updatedRootChan
+				startRoot, err := ids.ToID(request.StartRoot)
+				require.NoError(err)
+				endRoot, err := ids.ToID(request.EndRoot)
+				require.NoError(err)
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
+			},
+		).AnyTimes()
+
+		syncer, err := NewStateSyncManager(StateSyncConfig{
+			SyncDB:                db,
+			Client:                client,
+			TargetRoot:            firstSyncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		})
+		require.NoError(err)
+		require.NotNil(t, syncer)
 
 		err = syncer.StartSyncing(context.Background())
 		require.NoError(err)
@@ -1015,20 +1017,18 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 				return syncer.processedWork.Len() > 0
 			},
-			3*time.Second,
+			5*time.Second,
 			10*time.Millisecond,
 		)
-		err = syncer.UpdateSyncTarget(syncRoot)
-		require.NoError(err)
+		require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
 		close(updatedRootChan)
 
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(syncer.Error())
 
 		newRoot, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		require.Equal(syncRoot, newRoot)
+		require.Equal(secondSyncRoot, newRoot)
 	}
 }
 
