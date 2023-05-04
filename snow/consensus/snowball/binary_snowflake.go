@@ -3,7 +3,9 @@
 
 package snowball
 
-import "fmt"
+import (
+	"fmt"
+)
 
 var _ BinarySnowflake = (*binarySnowflake)(nil)
 
