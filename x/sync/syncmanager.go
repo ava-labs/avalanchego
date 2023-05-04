@@ -291,21 +291,12 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	largestHandledKey := workItem.end
 	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeproof.KeyValues)+len(changeproof.DeletedKeys) > 0 {
+	if len(changeproof.KeyChanges) > 0 {
 		if err := m.config.SyncDB.CommitChangeProof(ctx, changeproof); err != nil {
 			m.setError(err)
 			return
 		}
-
-		if len(changeproof.KeyValues) > 0 {
-			largestHandledKey = changeproof.KeyValues[len(changeproof.KeyValues)-1].Key
-		}
-		if len(changeproof.DeletedKeys) > 0 {
-			lastDeletedKey := changeproof.DeletedKeys[len(changeproof.DeletedKeys)-1]
-			if len(changeproof.KeyValues) == 0 || bytes.Compare(lastDeletedKey, largestHandledKey) == 1 {
-				largestHandledKey = lastDeletedKey
-			}
-		}
+		largestHandledKey = changeproof.KeyChanges[len(changeproof.KeyChanges)-1].Key
 	}
 
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeproof.EndProof)

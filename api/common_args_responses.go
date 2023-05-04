@@ -69,7 +69,7 @@ type GetBlockArgs struct {
 
 // GetBlockByHeightArgs is the parameters supplied to the GetBlockByHeight API
 type GetBlockByHeightArgs struct {
-	Height   uint64              `json:"height"`
+	Height   json.Uint64         `json:"height"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
