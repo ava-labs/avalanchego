@@ -21,7 +21,7 @@ message RangeProofRequest {
   uint32 bytes_limit = 5;
 }
 
-/* A ChangeProofRequest request a proof for all cahnges between two revisions */
+/* A ChangeProofRequest request a proof for all changes between two revisions */
 message ChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
@@ -59,7 +59,11 @@ message RangeProofResponse {
   repeated KeyValue key_values = 3;
 }
 
-/* RangeProofResponse is the response for a RangeProofRequest */
+/* ChangeProof is a possible response to a ChangeProofRequests
+   which is in a shorter form: it only consists of a proof of the
+   lowest changed key, the high changed key, and the keys that
+   have changed between those. Some keys may be deleted (hence
+   the use of KeyChange instead of KeyValue) */
 message ChangeProof {
   repeated KeyProof start_proof = 1;
   repeated KeyProof end_proof = 2;
