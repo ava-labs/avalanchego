@@ -44,8 +44,8 @@ func TestNewUpdater(t *testing.T) {
 	)
 
 	// Assert NewUpdater returns expected type
-	updater, ok := updaterIntf.(*updater)
-	require.True(ok)
+	require.IsType(&updater{}, updaterIntf)
+	updater := updaterIntf.(*updater)
 
 	// Assert fields set
 	require.Equal(dynamicIP, updater.dynamicIP)

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -142,13 +143,16 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 			ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 		}
 	} else {
-		ss.Ctx.Log.Debug("failed to parse summary",
-			zap.Error(err),
-		)
-		ss.Ctx.Log.Verbo("failed to parse summary",
-			zap.Binary("summary", summaryBytes),
-			zap.Error(err),
-		)
+		if ss.Ctx.Log.Enabled(logging.Verbo) {
+			ss.Ctx.Log.Verbo("failed to parse summary",
+				zap.Binary("summary", summaryBytes),
+				zap.Error(err),
+			)
+		} else {
+			ss.Ctx.Log.Debug("failed to parse summary",
+				zap.Error(err),
+			)
+		}
 	}
 
 	return ss.receivedStateSummaryFrontier(ctx)

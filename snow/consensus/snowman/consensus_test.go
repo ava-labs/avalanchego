@@ -626,8 +626,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics := gatherCounterGauge(t, registerer)
-	require.EqualValues(0, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Zero(metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -635,8 +635,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics = gatherCounterGauge(t, registerer)
-	require.EqualValues(1, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Equal(float64(1), metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {

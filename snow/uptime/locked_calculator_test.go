@@ -50,7 +50,7 @@ func TestLockedCalculator(t *testing.T) {
 	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.EqualValues(errStillBootstrapping, err)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	vmState.Set(snow.SubnetSynced)
 
