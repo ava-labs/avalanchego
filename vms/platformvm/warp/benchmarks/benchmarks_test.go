@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -52,22 +52,13 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 		nodeID := ids.GenerateTestNodeID()
 
 		// create primary network validator tx
-		addPrimaryValidatorTx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(env.state.GetTimestamp().Unix()),
-			uint64(mockable.MaxTime.Unix()),
-			nodeID,
-			ids.ShortEmpty, // reward address
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty,
-		)
+		addPrimaryValidatorTx, err := benchPrimaryNetworkValidatorTx(env.state, nodeID)
 		require.NoError(err)
 
 		// store corresponding primaryStaker in the diff
 		primaryStaker, err := state.NewCurrentStaker(
 			addPrimaryValidatorTx.ID(),
-			addPrimaryValidatorTx.Unsigned.(*txs.AddValidatorTx),
+			addPrimaryValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
 			10000, // potential reward
 		)
 		require.NoError(err)
@@ -75,69 +66,7 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 		diff.AddTx(addPrimaryValidatorTx, status.Committed)
 
 		// create subnet validator tx
-		blsPrivateKey, err := bls.NewSecretKey()
-		require.NoError(err)
-
-		uPermissionlessValidatorTx := &txs.AddPermissionlessValidatorTx{
-			BaseTx: txs.BaseTx{
-				BaseTx: avax.BaseTx{
-					NetworkID:    1,
-					BlockchainID: ids.GenerateTestID(),
-					Outs: []*avax.TransferableOutput{{
-						Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: uint64(1234),
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-							},
-						},
-					}},
-					Ins: []*avax.TransferableInput{{
-						UTXOID: avax.UTXOID{
-							TxID:        ids.ID{'t', 'x', 'I', 'D'},
-							OutputIndex: 2,
-						},
-						Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-						In: &secp256k1fx.TransferInput{
-							Amt:   uint64(5678),
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-						},
-					}},
-					Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
-				},
-			},
-			Validator: txs.Validator{
-				NodeID: nodeID,
-				Start:  uint64(env.state.GetTimestamp().Unix()),
-				End:    uint64(mockable.MaxTime.Unix()),
-				Wght:   20,
-			},
-			Subnet: subnetID,
-			Signer: signer.NewProofOfPossession(blsPrivateKey),
-			StakeOuts: []*avax.TransferableOutput{{
-				Asset: avax.Asset{
-					ID: ids.GenerateTestID(), // customAssetID
-				},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-					},
-				},
-			}},
-			ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				Threshold: 1,
-			},
-			DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				Threshold: 1,
-			},
-			DelegationShares: reward.PercentDenominator,
-		}
-		permissionlessValidatorTx, err := txs.NewSigned(uPermissionlessValidatorTx, txs.Codec, nil)
+		permissionlessValidatorTx, err := benchSubnetValidatorTx(env.state, subnetID, nodeID)
 		require.NoError(err)
 
 		// store corresponding staker in the diff
@@ -180,13 +109,14 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 	} {
 		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := warp.GetCanonicalValidatorSet(
+				vals, _, err := warp.GetCanonicalValidatorSet(
 					context.Background(),
 					env.validatorsManager,
 					pChainHeight,
 					subnetID,
 				)
 				require.NoError(err)
+				require.True(len(vals) != 0)
 			}
 		})
 	}
@@ -217,22 +147,13 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 		primaryValidatorIDs = append(primaryValidatorIDs, nodeID)
 
 		// create primary network validator tx
-		addPrimaryValidatorTx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,
-			uint64(env.state.GetTimestamp().Unix()),
-			uint64(mockable.MaxTime.Unix()),
-			nodeID,
-			ids.ShortEmpty, // reward address
-			reward.PercentDenominator,
-			[]*secp256k1.PrivateKey{preFundedKeys[0]},
-			ids.ShortEmpty,
-		)
+		addPrimaryValidatorTx, err := benchPrimaryNetworkValidatorTx(env.state, nodeID)
 		require.NoError(err)
 
 		// store corresponding primaryStaker in the diff
 		primaryStaker, err := state.NewCurrentStaker(
 			addPrimaryValidatorTx.ID(),
-			addPrimaryValidatorTx.Unsigned.(*txs.AddValidatorTx),
+			addPrimaryValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
 			10000, // potential reward
 		)
 		require.NoError(err)
@@ -268,69 +189,7 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 			nodeID := primaryValidatorIDs[nodeIdx]
 
 			// create subnet validator tx
-			blsPrivateKey, err := bls.NewSecretKey()
-			require.NoError(err)
-
-			uPermissionlessValidatorTx := &txs.AddPermissionlessValidatorTx{
-				BaseTx: txs.BaseTx{
-					BaseTx: avax.BaseTx{
-						NetworkID:    1,
-						BlockchainID: ids.GenerateTestID(),
-						Outs: []*avax.TransferableOutput{{
-							Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-							Out: &secp256k1fx.TransferOutput{
-								Amt: uint64(1234),
-								OutputOwners: secp256k1fx.OutputOwners{
-									Threshold: 1,
-									Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-								},
-							},
-						}},
-						Ins: []*avax.TransferableInput{{
-							UTXOID: avax.UTXOID{
-								TxID:        ids.ID{'t', 'x', 'I', 'D'},
-								OutputIndex: 2,
-							},
-							Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-							In: &secp256k1fx.TransferInput{
-								Amt:   uint64(5678),
-								Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-							},
-						}},
-						Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
-					},
-				},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(env.state.GetTimestamp().Unix()),
-					End:    uint64(mockable.MaxTime.Unix()),
-					Wght:   20,
-				},
-				Subnet: subnetID,
-				Signer: signer.NewProofOfPossession(blsPrivateKey),
-				StakeOuts: []*avax.TransferableOutput{{
-					Asset: avax.Asset{
-						ID: ids.GenerateTestID(), // customAssetID
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-						},
-					},
-				}},
-				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-					Threshold: 1,
-				},
-				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-					Threshold: 1,
-				},
-				DelegationShares: reward.PercentDenominator,
-			}
-			permissionlessValidatorTx, err := txs.NewSigned(uPermissionlessValidatorTx, txs.Codec, nil)
+			permissionlessValidatorTx, err := benchSubnetValidatorTx(env.state, subnetID, nodeID)
 			require.NoError(err)
 
 			// store corresponding staker in the diff
@@ -367,15 +226,155 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 	for depth := uint64(0); depth < heightsRange; depth++ {
 		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := warp.GetCanonicalValidatorSet(
+				vals, _, err := warp.GetCanonicalValidatorSet(
 					context.Background(),
 					env.validatorsManager,
 					heightsRange-depth,
 					subnetID,
 				)
 				require.NoError(err)
+				require.True(len(vals) != 0)
 			}
 		})
 	}
 	b.StopTimer() // done testing
+}
+
+// benchmarks above require a primary network validator. We move their
+// creation in [benchPrimaryNetworkValidatorTx] to reduce clutter
+func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (*txs.Tx, error) {
+	blsPrivateKey, err := bls.NewSecretKey()
+	if err != nil {
+		return nil, err
+	}
+
+	uPermissionlessPrimaryValidatorTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    1,
+				BlockchainID: ids.GenerateTestID(),
+				Outs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: uint64(1234),
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+						},
+					},
+				}},
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID:        ids.ID{'t', 'x', 'I', 'D'},
+						OutputIndex: 2,
+					},
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+					In: &secp256k1fx.TransferInput{
+						Amt:   uint64(5678),
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+			},
+		},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(chainState.GetTimestamp().Unix()),
+			End:    uint64(mockable.MaxTime.Unix()),
+			Wght:   20,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: signer.NewProofOfPossession(blsPrivateKey),
+		StakeOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{
+				ID: ids.GenerateTestID(), // customAssetID
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			},
+		}},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			Threshold: 1,
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			Threshold: 1,
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+
+	return txs.NewSigned(uPermissionlessPrimaryValidatorTx, txs.Codec, nil)
+}
+
+func benchSubnetValidatorTx(chainState state.State, subnetID ids.ID, nodeID ids.NodeID) (*txs.Tx, error) {
+	uPermissionlessValidatorTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    1,
+				BlockchainID: ids.GenerateTestID(),
+				Outs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: uint64(1234),
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+						},
+					},
+				}},
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID:        ids.ID{'t', 'x', 'I', 'D'},
+						OutputIndex: 2,
+					},
+					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
+					In: &secp256k1fx.TransferInput{
+						Amt:   uint64(5678),
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+			},
+		},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(chainState.GetTimestamp().Unix()),
+			End:    uint64(mockable.MaxTime.Unix()),
+			Wght:   20,
+		},
+		Subnet: subnetID,
+
+		// Note: the corresponding primary network validator has the BLS key
+		// that is returned by GetCanonicalValidatorSet. Returning an empty signer here
+		Signer: &signer.Empty{},
+
+		StakeOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{
+				ID: ids.GenerateTestID(), // customAssetID
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			},
+		}},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			Threshold: 1,
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			Threshold: 1,
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+
+	return txs.NewSigned(uPermissionlessValidatorTx, txs.Codec, nil)
 }
