@@ -4,11 +4,9 @@
 package pebble
 
 import (
-	// "strconv"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/cockroachdb/pebble"
 	"github.com/prometheus/client_golang/prometheus"
-	// "go.uber.org/zap"
 )
 
 // var levelLabels = []string{"level"}
@@ -32,53 +30,15 @@ type metrics struct {
 		}
 
 		Flush struct {
-			// The total number of flushes.
-			Count           int64
+
 			WriteThroughput ThroughputMetric
-			// Number of flushes that are in-progress. In the current implementation
-			// this will always be zero or one.
-			NumInProgress int64
-			// AsIngestCount is a monotonically increasing counter of flush operations
-			// handling ingested tables.
-			AsIngestCount uint64
-			// AsIngestCount is a monotonically increasing counter of tables ingested as
-			// flushables.
-			AsIngestTableCount uint64
-			// AsIngestBytes is a monotonically increasing counter of the bytes flushed
-			// for flushables that originated as ingestion operations.
-			AsIngestBytes uint64
 		}
 
 		Filter FilterMetrics
 
 		Levels [numLevels]LevelMetrics
 
-		MemTable struct {
-			// The number of bytes allocated by memtables and large (flushable)
-			// batches.
-			Size uint64
-			// The count of memtables.
-			Count int64
-			// The number of bytes present in zombie memtables which are no longer
-			// referenced by the current DB state but are still in use by an iterator.
-			ZombieSize uint64
-			// The count of zombie memtables.
-			ZombieCount int64
-		}
-
-		Keys struct {
-			// The approximate count of internal range key set keys in the database.
-			RangeKeySetsCount uint64
-			// The approximate count of internal tombstones (DEL, SINGLEDEL and
-			// RANGEDEL key kinds) within the database.
-			TombstoneCount uint64
-		}
-
 		Snapshots struct {
-			// The number of currently open snapshots.
-			Count int
-			// The sequence number of the earliest, currently open snapshot.
-			EarliestSeqNum uint64
 			// A running tally of keys written to sstables during flushes or
 			// compactions that would've been elided if it weren't for open
 			// snapshots.
@@ -90,9 +50,6 @@ type metrics struct {
 		}
 
 		Table struct {
-			// The number of bytes present in obsolete tables which are no longer
-			// referenced by the current DB state or any open iterators.
-			ObsoleteSize uint64
 			// The count of obsolete tables.
 			ObsoleteCount int64
 			// The number of bytes present in zombie tables which are no longer
@@ -108,18 +65,6 @@ type metrics struct {
 		TableIters int64
 
 		WAL struct {
-			// Number of live WAL files.
-			Files int64
-			// Number of obsolete WAL files.
-			ObsoleteFiles int64
-			// Physical size of the obsolete WAL files.
-			ObsoletePhysicalSize uint64
-			// Size of the live data in the WAL files. Note that with WAL file
-			// recycling this is less than the actual on-disk size of the WAL files.
-			Size uint64
-			// Physical size of the WAL files on-disk. With WAL file recycling,
-			// this is greater than the live data in WAL files.
-			PhysicalSize uint64
 			// Number of logical bytes written to the WAL.
 			BytesIn uint64
 			// Number of bytes written to the WAL.
@@ -127,7 +72,6 @@ type metrics struct {
 		}
 
 		LogWriter struct {
-			FsyncLatency prometheus.Histogram
 			record.LogWriterMetrics
 		}
 
@@ -153,6 +97,74 @@ type metrics struct {
 	// compaction. Such files are compacted in a rewrite compaction
 	// when no other compactions are picked.
 	compactMarkedFiles prometheus.Counter
+
+	// The total number of flushes.
+	flushCount prometheus.Counter
+
+	// Number of flushes that are in-progress. In the current implementation
+	// this will always be zero or one.
+	flushNumInProgress prometheus.Gauge
+
+	// AsIngestCount is a monotonically increasing counter of flush operations
+	// handling ingested tables.
+	flushAsIngestCount prometheus.Counter
+
+	// AsIngestTableCount is a monotonically increasing counter of tables ingested as
+	// flushables.
+	flushAsIngestTableCount prometheus.Counter
+
+	// AsIngestBytes is a monotonically increasing counter of the bytes flushed
+	// for flushables that originated as ingestion operations.
+	flushAsIngestBytes prometheus.Counter
+
+	// The number of bytes allocated by memtables and large (flushable) batches.
+	memtableSize prometheus.Counter
+
+	// The count of memtables.
+	memtableCount prometheus.Counter
+
+	// The number of bytes present in zombie memtables which are no longer
+	// referenced by the current DB state but are still in use by an iterator.
+	memtableZombieSize prometheus.Counter
+
+	// The count of zombie memtables.
+	memtableZombieCount prometheus.Gauge
+
+	// The approximate count of internal range key set keys in the database.
+	keysRangeKeySetsCount prometheus.Counter
+
+	// The approximate count of internal tombstones (DEL, SINGLEDEL and
+	// RANGEDEL key kinds) within the database.
+	keysTombstoneCount prometheus.Counter
+
+	// The number of currently open snapshots.
+	snapshotsCount prometheus.Counter
+
+	// The sequence number of the earliest, currently open snapshot.
+	snapshotsEarliestSeqNum prometheus.Gauge
+
+	// The number of bytes present in obsolete tables which are no longer
+	// referenced by the current DB state or any open iterators.
+	tableObsoleteSize prometheus.Counter
+
+	// Number of live WAL files.
+	walFiles prometheus.Gauge
+
+	// Number of obsolete WAL files.
+	walObsoleteFiles prometheus.Gauge
+
+	// Physical size of the obsolete WAL files.
+	walObsoletePhysicalSize prometheus.Gauge
+
+	// Size of the live data in the WAL files. Note that with WAL file
+	// recycling this is less than the actual on-disk size of the WAL files.
+	walSize prometheus.Gauge
+
+	// Physical size of the WAL files on-disk. With WAL file recycling,
+	// this is greater than the live data in WAL files.
+	walPhysicalSize prometheus.Gauge
+
+	logwriterFsyncLatency prometheus.Histogram
 
 	priorMetrics *pebble.Metrics
 }
@@ -183,6 +195,126 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Help:      "count of files that are marked for compaction",
 		}),
 
+		flushCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "flush_count",
+			Help:      "The total number of flushes",
+		}),
+
+		flushNumInProgress: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "flush_numinprogress",
+			Help:      "Number of flushes that are in-progress",
+		}),
+
+		flushAsIngestCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "flush_ingest_count",
+			Help:      "counter of flush operations handling ingested tables.",
+		}),
+
+		flushAsIngestTableCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "flush_ingestitable_count",
+			Help:      "counter of tables ingested as flushables",
+		}),
+
+		flushAsIngestBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "flush_asingest_bytes",
+			Help:      "counter of the bytes flushed for flushables that originated as ingestion operations.",
+		}),
+
+		memtableSize: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "memtable_size",
+			Help:      "The number of bytes allocated by memtables and large (flushable) batches",
+		}),
+
+		memtableCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "memtable_count",
+			Help:      "The count of memtables",
+		}),
+
+		memtableZombieSize: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "memtable_zombiesize",
+			Help:      "The number of bytes present in zombie memtables",
+		}),
+
+		memtableZombieCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "memtable_zombiesize",
+			Help:      "The count of zombie memtables",
+		}),
+
+		keysRangeKeySetsCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "keys_rangekey_count",
+			Help:      "The approximate count of internal range key set keys in the database",
+		}),
+
+		keysTombstoneCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "keys_tombstone_count",
+			Help:      "The approximate count of internal tombstones (DEL, SINGLEDEL and RANGEDEL key kinds) within the database.",
+		}),
+
+		snapshotsCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "snapshots_count",
+			Help:      "The number of currently open snapshots.",
+		}),
+
+		snapshotsEarliestSeqNum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "snapshots_earliest_seqnum",
+			Help:      "The sequence number of the earliest, currently open snapshot.",
+		}),
+
+		tableObsoleteSize: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "table_obsolete_size",
+			Help:      "The number of bytes present in obsolete tables",
+		}),
+
+		walFiles: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "wal_files",
+			Help:      "Number of live WAL files",
+		}),
+
+		walObsoleteFiles: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "wal_obsolete_files",
+			Help:      "Number of obsolete WAL files.",
+		}),
+
+		walObsoletePhysicalSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "wal_obsolete_physicalsize",
+			Help:      "Physical size of the obsolete WAL files",
+		}),
+
+		walSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "wal_size",
+			Help:      "Size of the live data in the WAL files.",
+		}),
+
+		walPhysicalSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "wal_physicalsize",
+			Help:      "Physical size of the WAL files on-disk.",
+		}),
+
+		logwriterFsyncLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Name:      "logwrite_fsync_latency",
+			Help:      "logwriter fsync latency",
+		}),
+
 		priorMetrics: &pebble.Metrics{},
 	}
 
@@ -192,6 +324,31 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 		reg.Register(m.compactInProgressBytes),
 		reg.Register(m.compactNumInProgress),
 		reg.Register(m.compactMarkedFiles),
+
+		reg.Register(m.flushCount),
+		reg.Register(m.flushNumInProgress),
+		reg.Register(m.flushAsIngestCount),
+		reg.Register(m.flushAsIngestTableCount),
+		reg.Register(m.flushAsIngestBytes),
+
+		reg.Register(m.memtableSize),
+		reg.Register(m.memtableCount),
+
+		reg.Register(m.keysRangeKeySetsCount),
+		reg.Register(m.keysTombstoneCount),
+
+		reg.Register(m.snapshotsCount),
+		reg.Register(m.snapshotsEarliestSeqNum),
+
+		reg.Register(m.tableObsoleteSize),
+
+		reg.Register(m.walFiles),
+		reg.Register(m.walObsoleteFiles),
+		reg.Register(m.walObsoletePhysicalSize),
+		reg.Register(m.walSize),
+		reg.Register(m.walPhysicalSize),
+
+		reg.Register(m.logwriterFsyncLatency),
 	)
 	return m, errs.Err
 }
@@ -207,6 +364,34 @@ func (db *Database) updateMetrics() {
 	metrics.compactInProgressBytes.Add(float64(currentMetrics.Compact.InProgressBytes))
 	metrics.compactInProgressBytes.Add(float64(currentMetrics.Compact.NumInProgress))
 	metrics.compactInProgressBytes.Add(float64(currentMetrics.Compact.MarkedFiles))
+
+	metrics.flushCount.Add(float64(currentMetrics.Flush.Count))
+	metrics.flushNumInProgress.Add(float64(currentMetrics.Flush.NumInProgress))
+	metrics.flushAsIngestCount.Add(float64(currentMetrics.Flush.AsIngestCount))
+	metrics.flushAsIngestTableCount.Add(float64(currentMetrics.Flush.AsIngestTableCount))
+	metrics.flushAsIngestBytes.Add(float64(currentMetrics.Flush.AsIngestBytes))
+
+	metrics.memtableSize.Add(float64(currentMetrics.MemTable.Size))
+	metrics.memtableCount.Add(float64(currentMetrics.MemTable.Count))
+	metrics.memtableZombieSize.Add(float64(currentMetrics.MemTable.ZombieSize))
+	metrics.memtableZombieCount.Add(float64(currentMetrics.MemTable.ZombieCount))
+
+	metrics.keysRangeKeySetsCount.Add(float64(currentMetrics.Keys.RangeKeySetsCount))
+	metrics.keysTombstoneCount.Add(float64(currentMetrics.Keys.TombstoneCount))
+
+	metrics.snapshotsCount.Add(float64(currentMetrics.Snapshots.Count))
+	metrics.snapshotsEarliestSeqNum.Add(float64(currentMetrics.Snapshots.EarliestSeqNum))
+
+	metrics.tableObsoleteSize.Add(float64(currentMetrics.Table.ObsoleteSize))
+
+	metrics.walFiles.Add(float64(currentMetrics.WAL.Files))
+	metrics.walObsoleteFiles.Add(float64(currentMetrics.WAL.ObsoleteFiles))
+	metrics.walObsoletePhysicalSize.Add(float64(currentMetrics.WAL.ObsoletePhysicalSize))
+	metrics.walSize.Add(float64(currentMetrics.WAL.Size))
+	metrics.walPhysicalSize.Add(float64(currentMetrics.WAL.PhysicalSize))
+
+	// metrics.logwriterFsyncLatency.Count(currentMetrics.LogWriter.FsyncLatency)
+
 	/*
 		metrics.writesDelayedDuration.Add(float64(currentStats.WriteDelayDuration - priorStats.WriteDelayDuration))
 		if currentStats.WritePaused {
