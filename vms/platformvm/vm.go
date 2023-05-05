@@ -681,9 +681,10 @@ func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
 }
 
-// Returns the percentage of the total stake of the subnet connected to this
+// Returns the fraction of the total stake of the subnet connected to this
 // node.
-func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
+// If total validator set weight is 0, it returns 1.
+func (vm *VM) getConnectedInFraction(subnetID ids.ID) (float64, error) {
 	vdrSet, exists := vm.Validators.Get(subnetID)
 	if !exists {
 		return 0, errMissingValidatorSet

@@ -22,13 +22,13 @@ var errNotEnoughStake = errors.New("not connected to enough stake")
 
 func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	// Returns nil if this node is connected to > alpha percent of the Primary Network's stake
-	primaryPercentConnected, err := vm.getPercentConnected(constants.PrimaryNetworkID)
+	primaryConnectedFraction, err := vm.getConnectedInFraction(constants.PrimaryNetworkID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get percent connected: %w", err)
 	}
-	vm.metrics.SetPercentConnected(primaryPercentConnected)
+	vm.metrics.SetPercentConnected(primaryConnectedFraction)
 	details := map[string]float64{
-		"primary-percentConnected": primaryPercentConnected,
+		"primary-percentConnected": primaryConnectedFraction,
 	}
 
 	localPrimaryValidator, err := vm.state.GetCurrentValidator(
@@ -57,17 +57,17 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	var errorReasons []string
-	if primaryPercentConnected < primaryMinPercentConnected {
+	if primaryConnectedFraction < primaryMinPercentConnected {
 		errorReasons = append(errorReasons,
 			fmt.Sprintf("connected to %f%% of primary network stake; should be connected to at least %f%%",
-				primaryPercentConnected*100,
+				primaryConnectedFraction*100,
 				primaryMinPercentConnected*100,
 			),
 		)
 	}
 
 	for subnetID := range vm.TrackedSubnets {
-		percentConnected, err := vm.getPercentConnected(subnetID)
+		connectedFraction, err := vm.getConnectedInFraction(subnetID)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get percent connected for %q: %w", subnetID, err)
 		}
@@ -76,9 +76,9 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 			minPercentConnected = primaryMinPercentConnected
 		}
 
-		vm.metrics.SetSubnetPercentConnected(subnetID, percentConnected)
+		vm.metrics.SetSubnetPercentConnected(subnetID, connectedFraction)
 		key := fmt.Sprintf("%s-percentConnected", subnetID)
-		details[key] = percentConnected
+		details[key] = connectedFraction
 
 		localSubnetValidator, err := vm.state.GetCurrentValidator(
 			subnetID,
@@ -93,10 +93,10 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 			return nil, fmt.Errorf("couldn't get current subnet validator of %q: %w", subnetID, err)
 		}
 
-		if percentConnected < minPercentConnected {
+		if connectedFraction < minPercentConnected {
 			errorReasons = append(errorReasons,
 				fmt.Sprintf("connected to %f%% of %q weight; should be connected to at least %f%%",
-					percentConnected*100,
+					connectedFraction*100,
 					subnetID,
 					minPercentConnected*100,
 				),

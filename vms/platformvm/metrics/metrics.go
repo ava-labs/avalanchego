@@ -62,13 +62,13 @@ func New(
 		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "percent_connected",
-			Help:      "Percent of connected stake",
+			Help:      "Percent of connected stake (fraction of 1)",
 		}),
 		subnetPercentConnected: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "percent_connected_subnet",
-				Help:      "Percent of connected subnet weight",
+				Help:      "Percent of connected subnet weight (fraction of 1)",
 			},
 			[]string{"subnetID"},
 		),
