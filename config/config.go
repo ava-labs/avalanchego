@@ -691,7 +691,7 @@ func getStakingTLSCertFromFile(v *viper.Viper) (tls.Certificate, error) {
 		}
 	} else {
 		// Create the staking key/cert if [stakingKeyPath] and [stakingCertPath] don't exist
-		if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath); err != nil {
+		if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath, nil); err != nil {
 			return tls.Certificate{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
 		}
 	}
