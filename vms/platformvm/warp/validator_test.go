@@ -111,7 +111,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 					map[ids.NodeID]*validators.GetValidatorOutput{
 						testVdrs[0].nodeID: {
 							NodeID:    testVdrs[0].nodeID,
-							PublicKey: validators.PublicKey{},
+							PublicKey: nil,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
 						testVdrs[1].nodeID: {
@@ -149,10 +149,14 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Equal(len(tt.expectedVdrs), len(vdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
-				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey.PublicKey)
-				gotPKBytes := bls.PublicKeyToBytes(gotVdr.PublicKey.PublicKey)
+				expectedPK, err := expectedVdr.PublicKey.Key()
+				require.NoError(err)
+				expectedPKBytes := bls.PublicKeyToBytes(expectedPK)
+				gotPK, err := gotVdr.PublicKey.Key()
+				require.NoError(err)
+				gotPKBytes := bls.PublicKeyToBytes(gotPK)
 				require.Equal(expectedPKBytes, gotPKBytes)
-				require.Equal(expectedVdr.PublicKey.Serialize(), gotVdr.PublicKey.Serialize())
+				require.Equal(expectedVdr.PublicKey.Bytes(), gotVdr.PublicKey.Bytes())
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
 				require.ElementsMatch(expectedVdr.NodeIDs, gotVdr.NodeIDs)
 			}
@@ -165,22 +169,16 @@ func TestFilterValidators(t *testing.T) {
 	require.NoError(t, err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
-		PublicKey: validators.PublicKey{
-			PublicKey: pk0,
-			Bytes:     pk0.Serialize(),
-		},
-		Weight: 1,
+		PublicKey: validators.NewPublicKey(pk0),
+		Weight:    1,
 	}
 
 	sk1, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
-		PublicKey: validators.PublicKey{
-			PublicKey: pk1,
-			Bytes:     pk1.Serialize(),
-		},
-		Weight: 2,
+		PublicKey: validators.NewPublicKey(pk1),
+		Weight:    2,
 	}
 
 	type test struct {
@@ -321,54 +319,10 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
 			NodeID: nodeID,
-			PublicKey: validators.PublicKey{
-				PublicKey: blsPublicKey,
-				Bytes:     nil,
-			},
-			Weight: 20,
-		})
-	}
-
-	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
-		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-		for i := 0; i < size; i++ {
-			validator := getValidatorOutputs[i]
-			getValidatorsOutput[validator.NodeID] = validator
-		}
-		validatorState := &validators.TestState{
-			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-				return getValidatorsOutput, nil
-			},
-		}
-
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				_, _, err := GetCanonicalValidatorSet(context.Background(), validatorState, pChainHeight, subnetID)
-				require.NoError(b, err)
-			}
-		})
-	}
-}
-
-func BenchmarkGetCanonicalValidatorSetCachedKey(b *testing.B) {
-	pChainHeight := uint64(1)
-	subnetID := ids.GenerateTestID()
-	numNodes := 10_000
-	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
-	for i := 0; i < numNodes; i++ {
-		nodeID := ids.GenerateTestNodeID()
-		blsPrivateKey, err := bls.NewSecretKey()
-		require.NoError(b, err)
-		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
-		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
-			NodeID: nodeID,
-			PublicKey: validators.PublicKey{
-				PublicKey: blsPublicKey,
-				// assuming that the pchain state caches the serialized form of
-				// the key
-				Bytes: blsPublicKey.Serialize(),
-			},
-			Weight: 20,
+			// assumes that the grpc client caches public keys to avoid the
+			// re-serialization overhead
+			PublicKey: validators.NewPublicKeyFromBytes(blsPublicKey.Serialize()),
+			Weight:    20,
 		})
 	}
 

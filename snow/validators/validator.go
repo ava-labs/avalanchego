@@ -4,9 +4,13 @@
 package validators
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
+
+var errFailedPublicKeyDeserialize = errors.New("couldn't deserialize public key")
 
 // Validator is a struct that contains the base values representing a validator
 // of the Avalanche Network.
@@ -30,15 +34,49 @@ type GetValidatorOutput struct {
 	Weight    uint64
 }
 
-type PublicKey struct {
-	*bls.PublicKey
-	Bytes []byte
+type PublicKey interface {
+	Key() (*bls.PublicKey, error)
+	Bytes() []byte
 }
 
-func (pk PublicKey) Serialize() []byte {
-	if pk.Bytes == nil {
-		pk.Bytes = pk.PublicKey.Serialize()
+func NewPublicKey(key *bls.PublicKey) *CachedPublicKey {
+	return &CachedPublicKey{
+		key:   key,
+		bytes: nil,
+	}
+}
+func NewPublicKeyFromBytes(bytes []byte) *CachedPublicKey {
+	return &CachedPublicKey{
+		key:   nil,
+		bytes: bytes,
+	}
+}
+
+// CachedPublicKey lazily serializes/deserializes the validator's key.
+// At least one of (key, bytes) must be provided.
+// This data structure is NOT thread-safe.
+type CachedPublicKey struct {
+	key   *bls.PublicKey
+	bytes []byte
+}
+
+func (k *CachedPublicKey) Key() (*bls.PublicKey, error) {
+	if k.key == nil {
+		pk := new(bls.PublicKey).Deserialize(k.bytes)
+		if pk == nil {
+			return nil, errFailedPublicKeyDeserialize
+		}
+
+		k.key = pk
 	}
 
-	return pk.Bytes
+	return k.key, nil
+}
+
+func (k *CachedPublicKey) Bytes() []byte {
+	if len(k.bytes) == 0 {
+		k.bytes = k.key.Serialize()
+	}
+
+	return k.bytes
 }

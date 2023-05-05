@@ -148,29 +148,23 @@ func TestGetValidatorSet(t *testing.T) {
 	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &validators.GetValidatorOutput{
-		NodeID: ids.GenerateTestNodeID(),
-		PublicKey: validators.PublicKey{
-			PublicKey: pk0,
-			Bytes:     pk0.Serialize(),
-		},
-		Weight: 1,
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: validators.NewPublicKeyFromBytes(pk0.Serialize()),
+		Weight:    1,
 	}
 
 	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &validators.GetValidatorOutput{
-		NodeID: ids.GenerateTestNodeID(),
-		PublicKey: validators.PublicKey{
-			PublicKey: pk1,
-			Bytes:     pk1.Serialize(),
-		},
-		Weight: 2,
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: validators.NewPublicKeyFromBytes(pk1.Serialize()),
+		Weight:    2,
 	}
 
 	vdr2 := &validators.GetValidatorOutput{
 		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: validators.PublicKey{},
+		PublicKey: nil,
 		Weight:    3,
 	}
 
@@ -249,12 +243,9 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	for i := 0; i < size; i++ {
 		id := ids.GenerateTestNodeID()
 		set[id] = &validators.GetValidatorOutput{
-			NodeID: id,
-			PublicKey: validators.PublicKey{
-				PublicKey: pk,
-				Bytes:     nil,
-			},
-			Weight: uint64(i),
+			NodeID:    id,
+			PublicKey: validators.NewPublicKey(pk),
+			Weight:    uint64(i),
 		}
 	}
 	return set

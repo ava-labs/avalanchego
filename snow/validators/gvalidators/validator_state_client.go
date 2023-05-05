@@ -5,21 +5,16 @@ package gvalidators
 
 import (
 	"context"
-	"errors"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
 
-var (
-	_                             validators.State = (*Client)(nil)
-	errFailedPublicKeyDeserialize                  = errors.New("couldn't deserialize public key")
-)
+var _ validators.State = (*Client)(nil)
 
 type Client struct {
 	client pb.ValidatorStateClient
@@ -74,26 +69,16 @@ func (c *Client) GetValidatorSet(
 		if err != nil {
 			return nil, err
 		}
-		var publicKey *bls.PublicKey
-		if len(validator.PublicKey) > 0 {
-			// This is a performance optimization to avoid the cost of compression
-			// and key re-verification with PublicKeyFromBytes. We can safely
-			// assume that the BLS Public Keys are verified before being added
-			// to the P-Chain and served by the gRPC server.
-			publicKey = new(bls.PublicKey).Deserialize(validator.PublicKey)
-			if publicKey == nil {
-				return nil, errFailedPublicKeyDeserialize
-			}
-		}
-		vdrs[nodeID] = &validators.GetValidatorOutput{
-			NodeID: nodeID,
+		var publicKey validators.PublicKey
+		if len(validator.PublicKey) != 0 {
 			// As an optimization, we pre-populate the cached deserialized key
 			// since it was given to us off gRPC.
-			PublicKey: validators.PublicKey{
-				PublicKey: publicKey,
-				Bytes:     validator.PublicKey,
-			},
-			Weight: validator.Weight,
+			publicKey = validators.NewPublicKeyFromBytes(validator.PublicKey)
+		}
+		vdrs[nodeID] = &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: publicKey,
+			Weight:    validator.Weight,
 		}
 	}
 	return vdrs, nil
