@@ -27,7 +27,7 @@ var (
 )
 
 type Validator struct {
-	PublicKey validators.PublicKey
+	PublicKey *validators.PublicKey
 	Weight    uint64
 	NodeIDs   []ids.NodeID
 }

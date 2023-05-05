@@ -30,37 +30,32 @@ type Validator struct {
 // a validator of the Avalanche Network for the output of GetValidator.
 type GetValidatorOutput struct {
 	NodeID    ids.NodeID
-	PublicKey PublicKey
+	PublicKey *PublicKey
 	Weight    uint64
 }
 
-type PublicKey interface {
-	Key() (*bls.PublicKey, error)
-	Bytes() []byte
-}
-
-func NewPublicKey(key *bls.PublicKey) *CachedPublicKey {
-	return &CachedPublicKey{
+func NewPublicKey(key *bls.PublicKey) *PublicKey {
+	return &PublicKey{
 		key:   key,
 		bytes: nil,
 	}
 }
-func NewPublicKeyFromBytes(bytes []byte) *CachedPublicKey {
-	return &CachedPublicKey{
+func NewPublicKeyFromBytes(bytes []byte) *PublicKey {
+	return &PublicKey{
 		key:   nil,
 		bytes: bytes,
 	}
 }
 
-// CachedPublicKey lazily serializes/deserializes the validator's key.
+// PublicKey lazily serializes/deserializes the validator's key.
 // At least one of (key, bytes) must be provided.
 // This data structure is NOT thread-safe.
-type CachedPublicKey struct {
+type PublicKey struct {
 	key   *bls.PublicKey
 	bytes []byte
 }
 
-func (k *CachedPublicKey) Key() (*bls.PublicKey, error) {
+func (k *PublicKey) Key() (*bls.PublicKey, error) {
 	if k.key == nil {
 		pk := new(bls.PublicKey).Deserialize(k.bytes)
 		if pk == nil {
@@ -73,7 +68,7 @@ func (k *CachedPublicKey) Key() (*bls.PublicKey, error) {
 	return k.key, nil
 }
 
-func (k *CachedPublicKey) Bytes() []byte {
+func (k *PublicKey) Bytes() []byte {
 	if len(k.bytes) == 0 {
 		k.bytes = k.key.Serialize()
 	}
