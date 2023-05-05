@@ -88,29 +88,31 @@ func TestSetClear(t *testing.T) {
 }
 
 func TestSetPop(t *testing.T) {
+	require := require.New(t)
+
 	var s Set[int]
 	_, ok := s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	s = make(Set[int])
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	id1, id2 := 0, 1
 	s.Add(id1, id2)
 
 	got, ok := s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 1, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.Equal(1, s.Len())
 
 	got, ok = s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 0, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.Zero(s.Len())
 
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 }
 
 func TestSetMarshalJSON(t *testing.T) {
