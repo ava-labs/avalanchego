@@ -435,7 +435,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %w ; consensus: %v", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w; consensus: %w", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {
@@ -789,22 +789,22 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-	if blk, ok := blk.(snowman.OracleBlock); ok {
-		options, err := blk.Options(ctx)
+	if oracleBlk, ok := blk.(snowman.OracleBlock); ok {
+		options, err := oracleBlk.Options(ctx)
 		if err != snowman.ErrNotOracle {
 			if err != nil {
 				return err
 			}
 
-			for _, blk := range options {
-				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blk)
+			for _, blkOpt := range options {
+				blkAdded, err := t.addUnverifiedBlockToConsensus(ctx, blkOpt)
 				if err != nil {
 					return err
 				}
 				if blkAdded {
-					added = append(added, blk)
+					added = append(added, blkOpt)
 				} else {
-					dropped = append(dropped, blk)
+					dropped = append(dropped, blkOpt)
 				}
 			}
 		}
@@ -821,19 +821,19 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
 	}
 
 	t.blocked.Fulfill(ctx, blkID)
-	for _, blk := range added {
-		if t.Consensus.IsPreferred(blk) {
-			t.sendMixedQuery(ctx, blk)
+	for _, addedBlk := range added {
+		if t.Consensus.IsPreferred(addedBlk) {
+			t.sendMixedQuery(ctx, addedBlk)
 		}
 
-		blkID := blk.ID()
-		t.removeFromPending(blk)
+		blkID := addedBlk.ID()
+		t.removeFromPending(addedBlk)
 		t.blocked.Fulfill(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
-	for _, blk := range dropped {
-		blkID := blk.ID()
-		t.removeFromPending(blk)
+	for _, droppedBlk := range dropped {
+		blkID := droppedBlk.ID()
+		t.removeFromPending(droppedBlk)
 		t.blocked.Abandon(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
