@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
 var _ UnsignedTx = (*UnlockDepositTx)(nil)
@@ -28,6 +29,10 @@ func (tx *UnlockDepositTx) SyntacticVerify(ctx *snow.Context) error {
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, true); err != nil {
+		return err
 	}
 
 	// cache that this is valid

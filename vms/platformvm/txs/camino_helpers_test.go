@@ -6,6 +6,7 @@ package txs
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -98,4 +99,12 @@ func generateTestIn(assetID ids.ID, amount uint64, depositTxID, bondTxID ids.ID,
 		Asset:  avax.Asset{ID: assetID},
 		In:     in,
 	}
+}
+
+func defaultContext() *snow.Context {
+	ctx := snow.DefaultContextTest()
+	ctx.AVAXAssetID = ids.ID{'C', 'A', 'M'}
+	ctx.NetworkID = 5
+	ctx.ChainID = ids.ID{'T', 'E', 'S', 'T'}
+	return ctx
 }

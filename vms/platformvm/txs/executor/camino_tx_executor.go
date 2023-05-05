@@ -68,6 +68,10 @@ var (
 	errNoUnlock                     = errors.New("no tokens unlocked")
 	errAliasCredentialMismatch      = errors.New("alias credential isn't matching")
 	errAliasNotFound                = errors.New("alias not found on state")
+	errUnlockedMoreThanAvailable      = errors.New("unlocked more deposited tokens, than was available for unlock")
+	errMixedDeposits                  = errors.New("tx has expired deposit input and active-deposit/unlocked input")
+	errExpiredDepositNotFullyUnlocked = errors.New("unlocked only part of expired deposit")
+	errBurnedDepositUnlock            = errors.New("burned undeposited tokens")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -718,45 +722,111 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		return errWrongLockMode
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
-		return err
-	}
-
 	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
 		return err
 	}
 
-	newUnlockedAmounts, err := e.FlowChecker.VerifyUnlockDeposit(
+	chainTimestamp := uint64(e.State.GetTimestamp().Unix())
+	consumedDepositedAmounts := make(map[ids.ID]uint64)
+	producedDepositedAmounts := make(map[ids.ID]uint64)
+	hasExpiredDeposits := false
+	hasActiveDepositsOrUnlockedIns := false
+	consumed := uint64(0)
+
+	for _, input := range tx.Ins {
+		if lockedIn, ok := input.In.(*locked.In); ok && lockedIn.DepositTxID != ids.Empty {
+			if _, ok := consumedDepositedAmounts[lockedIn.DepositTxID]; !ok {
+				deposit, err := e.State.GetDeposit(lockedIn.DepositTxID)
+				if err != nil {
+					return err
+				}
+
+				isExpired := deposit.IsExpired(chainTimestamp)
+
+				if hasExpiredDeposits && !isExpired || hasActiveDepositsOrUnlockedIns && isExpired {
+					return errMixedDeposits
+				}
+
+				hasExpiredDeposits = isExpired
+				hasActiveDepositsOrUnlockedIns = !isExpired
+			}
+
+			consumedDepositedAmounts[lockedIn.DepositTxID], err = math.Add64(consumedDepositedAmounts[lockedIn.DepositTxID], lockedIn.Amount())
+			if err != nil {
+				return err
+			}
+		} else if !ok && hasExpiredDeposits {
+			return errMixedDeposits
+		} else if !ok {
+			hasActiveDepositsOrUnlockedIns = true
+		}
+		consumed, err = math.Add64(consumed, input.In.Amount())
+		if err != nil {
+			return err
+		}
+	}
+
+	if hasExpiredDeposits && len(e.Tx.Creds) > 0 {
+		return errWrongCredentialsNumber
+	}
+
+	produced := uint64(0)
+	for _, output := range tx.Outs {
+		if lockedOut, ok := output.Out.(*locked.Out); ok && lockedOut.DepositTxID != ids.Empty {
+			producedDepositedAmounts[lockedOut.DepositTxID], err = math.Add64(producedDepositedAmounts[lockedOut.DepositTxID], lockedOut.Amount())
+			if err != nil {
+				return err
+			}
+		}
+		produced, err = math.Add64(produced, output.Out.Amount())
+		if err != nil {
+			return err
+		}
+	}
+
+	if hasExpiredDeposits && consumed != produced {
+		return errBurnedDepositUnlock
+	}
+
+	amountToBurn := e.Config.TxFee
+	if hasExpiredDeposits {
+		amountToBurn = 0
+	}
+
+	if err := e.FlowChecker.VerifyUnlockDeposit(
 		e.State,
 		tx,
 		tx.Ins,
 		tx.Outs,
 		e.Tx.Creds,
-		e.Config.TxFee,
+		amountToBurn,
 		e.Ctx.AVAXAssetID,
-	)
-	if err != nil {
+		!hasExpiredDeposits,
+	); err != nil {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
-	txID := e.Tx.ID()
-
-	for depositTxID, newlyUnlockedAmount := range newUnlockedAmounts {
-		if newlyUnlockedAmount == 0 {
-			return errNoUnlock
-		}
-
+	for depositTxID, consumedDepositedAmount := range consumedDepositedAmounts {
 		deposit, err := e.State.GetDeposit(depositTxID)
 		if err != nil {
 			return err
 		}
 
-		newUnlockedAmount, err := math.Add64(newlyUnlockedAmount, deposit.UnlockedAmount)
+		unlockedAmount := consumedDepositedAmount - producedDepositedAmounts[depositTxID]
+		newTotalUnlockedAmount, err := math.Add64(unlockedAmount, deposit.UnlockedAmount)
 		if err != nil {
 			return err
 		}
 
-		if newUnlockedAmount == deposit.Amount { // full unlock
+		if newTotalUnlockedAmount == deposit.UnlockedAmount {
+			return errNoUnlock
+		}
+
+		if deposit.IsExpired(chainTimestamp) {
+			if newTotalUnlockedAmount != deposit.Amount {
+				return errExpiredDepositNotFullyUnlocked
+			}
+
 			offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
 			if err != nil {
 				return err
@@ -794,10 +864,19 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				e.State.SetClaimable(claimableOwnerID, newClaimable)
 			}
 			e.State.RemoveDeposit(depositTxID, deposit)
-		} else { // partial unlock
+		} else {
+			offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+			if err != nil {
+				return err
+			}
+
+			if unlockableAmount := deposit.UnlockableAmount(offer, chainTimestamp); unlockableAmount < newTotalUnlockedAmount {
+				return errUnlockedMoreThanAvailable
+			}
+
 			e.State.ModifyDeposit(depositTxID, &deposits.Deposit{
 				DepositOfferID:      deposit.DepositOfferID,
-				UnlockedAmount:      newUnlockedAmount,
+				UnlockedAmount:      newTotalUnlockedAmount,
 				ClaimedRewardAmount: deposit.ClaimedRewardAmount,
 				Amount:              deposit.Amount,
 				Start:               deposit.Start,
@@ -806,6 +885,8 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 			})
 		}
 	}
+
+	txID := e.Tx.ID()
 
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)

@@ -101,16 +101,15 @@ func (mr *MockVerifierMockRecorder) VerifySpendUTXOs(arg0, arg1, arg2, arg3, arg
 }
 
 // VerifyUnlockDeposit mocks base method.
-func (m *MockVerifier) VerifyUnlockDeposit(arg0 state.Chain, arg1 txs.UnsignedTx, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID) (map[ids.ID]uint64, error) {
+func (m *MockVerifier) VerifyUnlockDeposit(arg0 avax.UTXOGetter, arg1 txs.UnsignedTx, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID, arg7 bool)  error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyUnlockDeposit", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-	ret0, _ := ret[0].(map[ids.ID]uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "VerifyUnlockDeposit", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // VerifyUnlockDeposit indicates an expected call of VerifyUnlockDeposit.
-func (mr *MockVerifierMockRecorder) VerifyUnlockDeposit(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
+func (mr *MockVerifierMockRecorder) VerifyUnlockDeposit(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUnlockDeposit", reflect.TypeOf((*MockVerifier)(nil).VerifyUnlockDeposit), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyUnlockDeposit", reflect.TypeOf((*MockVerifier)(nil).VerifyUnlockDeposit), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
