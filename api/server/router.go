@@ -17,6 +17,7 @@ import (
 var (
 	errUnknownBaseURL  = errors.New("unknown base url")
 	errUnknownEndpoint = errors.New("unknown endpoint")
+	errAlreadyReserved = errors.New("route is either already aliased or already maps to a handle")
 )
 
 type router struct {
@@ -71,7 +72,7 @@ func (r *router) AddRouter(base, endpoint string, handler http.Handler) error {
 
 func (r *router) addRouter(base, endpoint string, handler http.Handler) error {
 	if r.reservedRoutes.Contains(base) {
-		return fmt.Errorf("couldn't route to %s as that route is either aliased or already maps to a handler", base)
+		return fmt.Errorf("%w: %s", errAlreadyReserved, base)
 	}
 
 	return r.forceAddRouter(base, endpoint, handler)
@@ -116,7 +117,7 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 
 	for _, alias := range aliases {
 		if r.reservedRoutes.Contains(alias) {
-			return fmt.Errorf("couldn't alias to %s as that route is either already aliased or already maps to a handler", alias)
+			return fmt.Errorf("%w: %s", errAlreadyReserved, alias)
 		}
 	}
 
