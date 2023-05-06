@@ -25,6 +25,20 @@ var (
 	assetID = ids.GenerateTestID()
 )
 
+func TestInvalidBlock(t *testing.T) {
+	require := require.New(t)
+
+	parser, err := NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	require.NoError(err)
+
+	blkBytes := []byte{}
+
+	_, err = parser.ParseBlock(blkBytes)
+	require.ErrorIs(err, codec.ErrCantUnpackVersion)
+}
+
 func TestStandardBlocks(t *testing.T) {
 	// check standard block can be built and parsed
 	require := require.New(t)
