@@ -153,7 +153,6 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if _, has := n.recentTxs.Get(txID); has {
 		return nil
 	}
-	n.recentTxs.Put(txID, struct{}{})
 
 	n.ctx.Log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
@@ -164,5 +163,11 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
-	return n.appSender.SendAppGossip(context.TODO(), msgBytes)
+
+	err = n.appSender.SendAppGossip(context.TODO(), msgBytes)
+	if err == nil {
+		// only cache iff successful
+		n.recentTxs.Put(txID, struct{}{})
+	}
+	return err
 }

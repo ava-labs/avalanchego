@@ -131,8 +131,8 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
-		// If the transaction is already in the mempool - then it looks the same
-		// as if it was successfully added
+		// transaction already in the mempool means the transaction
+		// was successfully gossiped to its peers
 		return nil
 	}
 
@@ -147,10 +147,14 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return err
 	}
 
-	if err := b.Mempool.Add(tx); err != nil {
-		return err
+	err := b.GossipTx(tx)
+	if err == nil {
+		// only add it to mempool on successful gossip
+		if merr := b.Mempool.Add(tx); merr != nil {
+			return merr
+		}
 	}
-	return b.GossipTx(tx)
+	return err
 }
 
 // BuildBlock builds a block to be added to consensus.

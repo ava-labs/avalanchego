@@ -5,6 +5,7 @@ package builder
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -148,4 +149,38 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	require.NoError(err)
 
 	require.Nil(gossipedBytes)
+}
+
+// Only successfully sent app gossip cached
+func TestGossipTxSendAppGossipFailed(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	sendAppGossipErr := errors.New("failSendAppGossip")
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		return sendAppGossipErr
+	}
+
+	// only successful app gossip send adds this tx to the cache and mempool
+	tx := getValidTx(env.txBuilder, t)
+	require.ErrorIs(env.Builder.AddUnverifiedTx(tx), sendAppGossipErr)
+
+	var gossipedBytes []byte
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		gossipedBytes = b
+		return nil
+	}
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
+	require.True(gossipedBytes != nil)
+
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
+		require.FailNow("SendAppGossip should not be called since already gossiped")
+		return nil
+	}
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
 }
