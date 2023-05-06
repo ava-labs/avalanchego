@@ -273,47 +273,57 @@ func TestServiceDeleteUser(t *testing.T) {
 		request     *api.UserPass
 		want        *api.EmptyReply
 		expectedErr error
-	}{{
-		desc:        "empty user name case",
-		request:     &api.UserPass{},
-		expectedErr: errEmptyUsername,
-	}, {
-		desc:        "user not exists case",
-		request:     &api.UserPass{Username: "dummy"},
-		expectedErr: errNonexistentUser,
-	}, {
-		desc:        "user exists and invalid password case",
-		request:     &api.UserPass{Username: testUser, Password: "password"},
-		expectedErr: errNonexistentUser,
-	}, {
-		desc: "user exists and valid password case",
-		setup: func(ks *keystore) error {
-			s := service{ks: ks}
-			return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+	}{
+		{
+			desc:        "empty user name case",
+			request:     &api.UserPass{},
+			expectedErr: errEmptyUsername,
 		},
-		request: &api.UserPass{Username: testUser, Password: password},
-		want:    &api.EmptyReply{},
-	}, {
-		desc: "delete a user, imported from import api case",
-		setup: func(ks *keystore) error {
-			s := service{ks: ks}
-
-			reply := api.EmptyReply{}
-			if err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &reply); err != nil {
-				return err
-			}
-
-			// created data in bob db
-			db, err := ks.GetDatabase(ids.Empty, testUser, password)
-			if err != nil {
-				return err
-			}
-
-			return db.Put([]byte("hello"), []byte("world"))
+		{
+			desc:        "user not exists case",
+			request:     &api.UserPass{Username: "dummy"},
+			expectedErr: errNonexistentUser,
 		},
-		request: &api.UserPass{Username: testUser, Password: password},
-		want:    &api.EmptyReply{},
-	}}
+		{
+			desc: "user exists and invalid password case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+				return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+			},
+			request:     &api.UserPass{Username: testUser, Password: "password"},
+			expectedErr: errIncorrectPassword,
+		},
+		{
+			desc: "user exists and valid password case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+				return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+			},
+			request: &api.UserPass{Username: testUser, Password: password},
+			want:    &api.EmptyReply{},
+		},
+		{
+			desc: "delete a user, imported from import api case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+
+				reply := api.EmptyReply{}
+				if err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &reply); err != nil {
+					return err
+				}
+
+				// created data in bob db
+				db, err := ks.GetDatabase(ids.Empty, testUser, password)
+				if err != nil {
+					return err
+				}
+
+				return db.Put([]byte("hello"), []byte("world"))
+			},
+			request: &api.UserPass{Username: testUser, Password: password},
+			want:    &api.EmptyReply{},
+		},
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
