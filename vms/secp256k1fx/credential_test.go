@@ -23,7 +23,8 @@ func TestCredentialVerify(t *testing.T) {
 func TestCredentialVerifyNil(t *testing.T) {
 	require := require.New(t)
 	cred := (*Credential)(nil)
-	require.ErrorIs(cred.Verify(), ErrNilCredential)
+	err := cred.Verify()
+	require.ErrorIs(err, ErrNilCredential)
 }
 
 func TestCredentialSerialize(t *testing.T) {
