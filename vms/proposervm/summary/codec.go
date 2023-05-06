@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	lc := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	lc := linearcodec.NewDefault(linearcodec.WithMaxSliceLen(math.MaxUint32))
 	c = codec.NewManager(math.MaxInt32)
 	if err := c.RegisterCodec(codecVersion, lc); err != nil {
 		panic(err)

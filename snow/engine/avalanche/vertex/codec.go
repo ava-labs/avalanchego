@@ -21,8 +21,8 @@ const (
 var c codec.Manager
 
 func init() {
-	lc := linearcodec.New([]string{reflectcodec.DefaultTagName + "V0"}, maxSize)
-	lc2 := linearcodec.New([]string{reflectcodec.DefaultTagName + "V1"}, maxSize)
+	lc := linearcodec.New(linearcodec.WithTagName(reflectcodec.DefaultTagName+"V0"), linearcodec.WithMaxSliceLen(maxSize))
+	lc2 := linearcodec.New(linearcodec.WithTagName(reflectcodec.DefaultTagName+"V1"), linearcodec.WithMaxSliceLen(maxSize))
 
 	c = codec.NewManager(maxSize)
 	// for backward compatibility, still register the initial codec version

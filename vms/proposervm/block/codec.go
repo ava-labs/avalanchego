@@ -21,7 +21,7 @@ const codecVersion = 0
 var c codec.Manager
 
 func init() {
-	linearCodec := linearcodec.NewCustomMaxLength(math.MaxUint32)
+	linearCodec := linearcodec.NewDefault(linearcodec.WithMaxSliceLen(math.MaxUint32))
 	c = codec.NewManager(math.MaxInt)
 
 	errs := wrappers.Errs{}

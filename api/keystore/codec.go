@@ -19,7 +19,7 @@ const (
 var c codec.Manager
 
 func init() {
-	lc := linearcodec.NewCustomMaxLength(maxSliceLength)
+	lc := linearcodec.NewDefault(linearcodec.WithMaxSliceLen(maxSliceLength))
 	c = codec.NewManager(maxPackerSize)
 	if err := c.RegisterCodec(codecVersion, lc); err != nil {
 		panic(err)

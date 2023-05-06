@@ -58,7 +58,7 @@ func NewCustomParser(
 	log logging.Logger,
 	fxs []fxs.Fx,
 ) (Parser, error) {
-	gc := linearcodec.New([]string{reflectcodec.DefaultTagName}, 1<<20)
+	gc := linearcodec.New(linearcodec.WithTagName(reflectcodec.DefaultTagName), linearcodec.WithMaxSliceLen(1<<20))
 	c := linearcodec.NewDefault()
 
 	gcm := codec.NewManager(math.MaxInt32)

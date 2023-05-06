@@ -98,7 +98,7 @@ func NewIndexer(config Config) (Indexer, error) {
 
 	if err := indexer.codec.RegisterCodec(
 		codecVersion,
-		linearcodec.NewCustomMaxLength(math.MaxUint32),
+		linearcodec.NewDefault(linearcodec.WithMaxSliceLen(math.MaxUint32)),
 	); err != nil {
 		return nil, fmt.Errorf("couldn't register codec: %w", err)
 	}

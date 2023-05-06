@@ -29,7 +29,6 @@ var (
 type Codec interface {
 	codec.Registry
 	codec.Codec
-	SkipRegistrations(int)
 }
 
 // Codec handles marshaling and unmarshaling of structs
@@ -42,33 +41,62 @@ type linearCodec struct {
 	typeToTypeID map[reflect.Type]uint32
 }
 
-// New returns a new, concurrency-safe codec; it allow to specify
-// both tagNames and maxSlicelenght
-func New(tagNames []string, maxSliceLen uint32) Codec {
+// New returns a new, concurrency-safe codec.
+// tagNames and maxSlicelength must be specified.
+func New(opts ...Option) Codec {
+	o := &Options{}
+	o.applyOptions(opts)
+
 	hCodec := &linearCodec{
-		nextTypeID:   0,
+		nextTypeID:   o.nextTypeID,
 		typeIDToType: map[uint32]reflect.Type{},
 		typeToTypeID: map[reflect.Type]uint32{},
 	}
-	hCodec.Codec = reflectcodec.New(hCodec, tagNames, maxSliceLen)
+	hCodec.Codec = reflectcodec.New(hCodec, o.tagNames, o.maxSliceLen)
 	return hCodec
 }
 
-// NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault() Codec {
-	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+// NewDefault is a convenience constructor; it returns a new codec with reasonable default values.
+func NewDefault(opts ...Option) Codec {
+	return New(append([]Option{WithTagName(reflectcodec.DefaultTagName), WithMaxSliceLen(defaultMaxSliceLength)}, opts...)...)
 }
 
-// NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
-func NewCustomMaxLength(maxSliceLen uint32) Codec {
-	return New([]string{reflectcodec.DefaultTagName}, maxSliceLen)
+type Option func(*Options)
+
+type Options struct {
+	tagNames    []string
+	maxSliceLen uint32
+	nextTypeID  uint32
 }
 
-// Skip some number of type IDs
-func (c *linearCodec) SkipRegistrations(num int) {
-	c.lock.Lock()
-	c.nextTypeID += uint32(num)
-	c.lock.Unlock()
+func (o *Options) applyOptions(ops []Option) {
+	for _, op := range ops {
+		op(o)
+	}
+}
+
+func WithTagName(tagName string) Option {
+	return func(o *Options) {
+		o.tagNames = append(o.tagNames, tagName)
+	}
+}
+
+func WithTagNames(tagNames []string) Option {
+	return func(o *Options) {
+		o.tagNames = tagNames
+	}
+}
+
+func WithMaxSliceLen(maxSliceLen uint32) Option {
+	return func(o *Options) {
+		o.maxSliceLen = maxSliceLen
+	}
+}
+
+func WithNextTypeID(nextTypeID uint32) Option {
+	return func(o *Options) {
+		o.nextTypeID = nextTypeID
+	}
 }
 
 // RegisterType is used to register types that may be unmarshaled into an interface
@@ -95,9 +123,8 @@ func (*linearCodec) PrefixSize(reflect.Type) int {
 
 func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	typeID, ok := c.typeToTypeID[valueType] // Get the type ID of the value being marshaled
+	c.lock.RUnlock()
 	if !ok {
 		return fmt.Errorf("can't marshal unregistered type %q", valueType)
 	}
@@ -106,18 +133,19 @@ func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) err
 }
 
 func (c *linearCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type) (reflect.Value, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	typeID := p.UnpackInt() // Get the type ID
 	if p.Err != nil {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %w", p.Err)
 	}
+
 	// Get a type that implements the interface
+	c.lock.RLock()
 	implementingType, ok := c.typeIDToType[typeID]
+	c.lock.RUnlock()
 	if !ok {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: unknown type ID %d", typeID)
 	}
+
 	// Ensure type actually does implement the interface
 	if !implementingType.Implements(valueType) {
 		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %s %w %s",
