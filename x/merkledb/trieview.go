@@ -423,6 +423,7 @@ func (t *trieView) GetRangeProof(
 		err    error
 	)
 
+	// TODO: Replace This With Iterator
 	result.KeyValues, err = t.getKeyValues(
 		start,
 		end,
@@ -717,140 +718,6 @@ func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
 		return ids.Empty, err
 	}
 	return t.root.id, nil
-}
-
-// Returns up to [maxLength] key/values from keys in closed range [start, end].
-// Acts similarly to the merge step of a merge sort to combine state from the view
-// with state from the parent trie.
-// If [lock], grabs [t.lock]'s read lock.
-// Otherwise assumes [t.lock]'s read lock is held.
-func (t *trieView) getKeyValues(
-	start []byte,
-	end []byte,
-	maxLength int,
-	keysToIgnore set.Set[string],
-	lock bool,
-) ([]KeyValue, error) {
-	if lock {
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-	}
-
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	}
-
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	// collect all values that have changed or been deleted
-	changes := make([]KeyValue, 0, len(t.changes.values))
-	for key, change := range t.changes.values {
-		if change.after.IsNothing() {
-			// This was deleted
-			keysToIgnore.Add(string(key.Serialize().Value))
-		} else {
-			changes = append(changes, KeyValue{
-				Key:   key.Serialize().Value,
-				Value: change.after.value,
-			})
-		}
-	}
-	// sort [changes] so they can be merged with the parent trie's state
-	slices.SortFunc(changes, func(a, b KeyValue) bool {
-		return bytes.Compare(a.Key, b.Key) == -1
-	})
-
-	baseKeyValues, err := t.getParentTrie().getKeyValues(
-		start,
-		end,
-		maxLength,
-		keysToIgnore,
-		true, /*lock*/
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		// True if there are more key/value pairs from [baseKeyValues] to add to result
-		baseKeyValuesFinished = false
-		// True if there are more key/value pairs from [changes] to add to result
-		changesFinished = false
-		// The index of the next key/value pair to add from [baseKeyValues].
-		baseKeyValuesIndex = 0
-		// The index of the next key/value pair to add from [changes].
-		changesIndex    = 0
-		remainingLength = maxLength
-		hasUpperBound   = len(end) > 0
-		result          = make([]KeyValue, 0, len(baseKeyValues))
-	)
-
-	// keep adding key/value pairs until one of the following:
-	// * a key that is lexicographically larger than the end key is hit
-	// * the maxLength is hit
-	// * no more values are available to add
-	for remainingLength > 0 {
-		// the baseKeyValues iterator is finished when we have run out of keys or hit a key greater than the end key
-		baseKeyValuesFinished = baseKeyValuesFinished ||
-			(baseKeyValuesIndex >= len(baseKeyValues) || (hasUpperBound && bytes.Compare(baseKeyValues[baseKeyValuesIndex].Key, end) == 1))
-
-		// the changes iterator is finished when we have run out of keys or hit a key greater than the end key
-		changesFinished = changesFinished ||
-			(changesIndex >= len(changes) || (hasUpperBound && bytes.Compare(changes[changesIndex].Key, end) == 1))
-
-		// if both the base state and changes are finished, return the result of the merge
-		if baseKeyValuesFinished && changesFinished {
-			return result, nil
-		}
-
-		// one or both iterators still have values, so one will be added to the result
-		remainingLength--
-
-		// both still have key/values available, so add the smallest key
-		if !changesFinished && !baseKeyValuesFinished {
-			currentChangeState := changes[changesIndex]
-			currentKeyValues := baseKeyValues[baseKeyValuesIndex]
-
-			switch bytes.Compare(currentChangeState.Key, currentKeyValues.Key) {
-			case -1:
-				result = append(result, currentChangeState)
-				changesIndex++
-			case 0:
-				// the keys are the same, so override the base value with the changed value
-				result = append(result, currentChangeState)
-				changesIndex++
-				baseKeyValuesIndex++
-			case 1:
-				result = append(result, currentKeyValues)
-				baseKeyValuesIndex++
-			}
-			continue
-		}
-
-		// the base state is not finished, but the changes is finished.
-		// add the next base state value.
-		if !baseKeyValuesFinished {
-			currentBaseState := baseKeyValues[baseKeyValuesIndex]
-			result = append(result, currentBaseState)
-			baseKeyValuesIndex++
-			continue
-		}
-
-		// the base state is finished, but the changes is not finished.
-		// add the next changes value.
-		currentChangeState := changes[changesIndex]
-		result = append(result, currentChangeState)
-		changesIndex++
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	return result, nil
 }
 
 func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
