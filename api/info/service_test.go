@@ -69,10 +69,8 @@ func TestGetVMsSuccess(t *testing.T) {
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	reply := GetVMsReply{}
-	err := resources.info.GetVMs(nil, nil, &reply)
-
+	require.NoError(resources.info.GetVMs(nil, nil, &reply))
 	require.Equal(expectedVMRegistry, reply.VMs)
-	require.NoError(err)
 }
 
 // Tests GetVMs if we fail to list our vms.

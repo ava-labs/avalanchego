@@ -34,8 +34,7 @@ func TestSufficientlyStrong(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
-			require := require.New(t)
-			require.True(SufficientlyStrong(test.password, test.expected))
+			require.True(t, SufficientlyStrong(test.password, test.expected))
 		})
 	}
 }
@@ -80,8 +79,8 @@ func TestIsValid(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s-%d", test.password, test.expected), func(t *testing.T) {
-			require := require.New(t)
-			require.ErrorIs(IsValid(test.password, test.expected), test.expectedErr)
+			err := IsValid(test.password, test.expected)
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }
