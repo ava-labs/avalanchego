@@ -62,7 +62,7 @@ func NewDefault(opts ...Option) Codec {
 	return New(append([]Option{WithTagName(reflectcodec.DefaultTagName), WithMaxSliceLen(defaultMaxSliceLength)}, opts...)...)
 }
 
-// Skip some number of type IDs
+// DEPRECATED Skip some number of type IDs
 func (c *linearCodec) SkipRegistrations(num int) {
 	c.lock.Lock()
 	c.nextTypeID += uint32(num)
