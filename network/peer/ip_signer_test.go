@@ -51,5 +51,5 @@ func TestIPSigner(t *testing.T) {
 	require.NoError(err)
 	require.Equal(dynIP.IPPort(), signedIP3.IPPort)
 	require.Equal(uint64(11), signedIP3.Timestamp)
-	require.NotEqualValues(signedIP2.Signature, signedIP3.Signature)
+	require.NotEqual(signedIP2.Signature, signedIP3.Signature)
 }
