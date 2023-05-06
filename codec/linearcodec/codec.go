@@ -29,6 +29,7 @@ var (
 type Codec interface {
 	codec.Registry
 	codec.Codec
+	SkipRegistrations(int)
 }
 
 // Codec handles marshaling and unmarshaling of structs
@@ -59,6 +60,13 @@ func New(opts ...Option) Codec {
 // NewDefault is a convenience constructor; it returns a new codec with reasonable default values.
 func NewDefault(opts ...Option) Codec {
 	return New(append([]Option{WithTagName(reflectcodec.DefaultTagName), WithMaxSliceLen(defaultMaxSliceLength)}, opts...)...)
+}
+
+// Skip some number of type IDs
+func (c *linearCodec) SkipRegistrations(num int) {
+	c.lock.Lock()
+	c.nextTypeID += uint32(num)
+	c.lock.Unlock()
 }
 
 type Option func(*Options)
