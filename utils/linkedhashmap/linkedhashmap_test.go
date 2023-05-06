@@ -108,7 +108,7 @@ func TestIterator(t *testing.T) {
 		require.False(iter.Next())
 		require.False(iter.Next())
 		// Should be empty
-		require.EqualValues(ids.Empty, iter.Key())
+		require.Equal(ids.Empty, iter.Key())
 		require.Zero(iter.Value())
 	}
 
@@ -119,16 +119,16 @@ func TestIterator(t *testing.T) {
 		require.NotNil(iter)
 		lh.Put(id1, 1)
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(1, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(1, iter.Value())
 		// Should be empty
 		require.False(iter.Next())
 		// Re-assign id1 --> 10
 		lh.Put(id1, 10)
 		iter = lh.NewIterator() // New iterator
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(10, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(10, iter.Value())
 		// Should be empty
 		require.False(iter.Next())
 		// Delete id1
@@ -148,14 +148,14 @@ func TestIterator(t *testing.T) {
 		iter := lh.NewIterator()
 		// Should give back all 3 elements
 		require.True(iter.Next())
-		require.EqualValues(id1, iter.Key())
-		require.EqualValues(1, iter.Value())
+		require.Equal(id1, iter.Key())
+		require.Equal(1, iter.Value())
 		require.True(iter.Next())
-		require.EqualValues(id2, iter.Key())
-		require.EqualValues(2, iter.Value())
+		require.Equal(id2, iter.Key())
+		require.Equal(2, iter.Value())
 		require.True(iter.Next())
-		require.EqualValues(id3, iter.Key())
-		require.EqualValues(3, iter.Value())
+		require.Equal(id3, iter.Key())
+		require.Equal(3, iter.Value())
 		// Should be exhausted
 		require.False(iter.Next())
 	}
@@ -172,8 +172,8 @@ func TestIterator(t *testing.T) {
 		lh.Delete(id1)
 		lh.Delete(id2)
 		require.True(iter.Next())
-		require.EqualValues(id3, iter.Key())
-		require.EqualValues(3, iter.Value())
+		require.Equal(id3, iter.Key())
+		require.Equal(3, iter.Value())
 		// Should be exhausted
 		require.False(iter.Next())
 	}

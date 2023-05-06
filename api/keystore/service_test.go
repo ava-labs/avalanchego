@@ -4,15 +4,16 @@
 package keystore
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/password"
 )
 
 // strongPassword defines a password used for the following tests that
@@ -20,26 +21,22 @@ import (
 var strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 
 func TestServiceListNoUsers(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	reply := ListUsersReply{}
-	if err := s.ListUsers(nil, nil, &reply); err != nil {
-		t.Fatal(err)
-	}
-	if len(reply.Users) != 0 {
-		t.Fatalf("No users should have been created yet")
-	}
+	require.NoError(s.ListUsers(nil, nil, &reply))
+	require.Empty(reply.Users)
 }
 
 func TestServiceCreateUser(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -47,22 +44,14 @@ func TestServiceCreateUser(t *testing.T) {
 			Username: "bob",
 			Password: strongPassword,
 		}, &api.EmptyReply{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 	}
 
 	{
 		reply := ListUsersReply{}
-		if err := s.ListUsers(nil, nil, &reply); err != nil {
-			t.Fatal(err)
-		}
-		if len(reply.Users) != 1 {
-			t.Fatalf("One user should have been created")
-		}
-		if user := reply.Users[0]; user != "bob" {
-			t.Fatalf("'bob' should have been a user that was created")
-		}
+		require.NoError(s.ListUsers(nil, nil, &reply))
+		require.Len(reply.Users, 1)
+		require.Equal("bob", reply.Users[0])
 	}
 }
 
@@ -76,10 +65,10 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -88,10 +77,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 			Username: genStr(maxUserLen + 1),
 			Password: strongPassword,
 		}, &reply)
-
-		if err != errUserMaxLength {
-			t.Fatal("User was created when it should have been rejected due to too long a Username, err =", err)
-		}
+		require.ErrorIs(err, errUserMaxLength)
 	}
 
 	{
@@ -100,31 +86,23 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 			Username: "shortuser",
 			Password: genStr(maxUserLen + 1),
 		}, &reply)
-
-		if err == nil {
-			t.Fatal("User was created when it should have been rejected due to too long a Password, err =", err)
-		}
+		require.ErrorIs(err, password.ErrPassMaxLength)
 	}
 
 	{
 		reply := ListUsersReply{}
-		if err := s.ListUsers(nil, nil, &reply); err != nil {
-			t.Fatal(err)
-		}
-
-		if len(reply.Users) > 0 {
-			t.Fatalf("A user exists when there should be none")
-		}
+		require.NoError(s.ListUsers(nil, nil, &reply))
+		require.Empty(reply.Users)
 	}
 }
 
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -133,18 +111,15 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 			Username: "bob",
 			Password: "weak",
 		}, &reply)
-
-		if err == nil {
-			t.Error("Expected error when testing weak password")
-		}
+		require.ErrorIs(err, password.ErrWeakPassword)
 	}
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -152,9 +127,7 @@ func TestServiceCreateDuplicate(t *testing.T) {
 			Username: "bob",
 			Password: strongPassword,
 		}, &api.EmptyReply{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 	}
 
 	{
@@ -162,32 +135,29 @@ func TestServiceCreateDuplicate(t *testing.T) {
 			Username: "bob",
 			Password: strongPassword,
 		}, &api.EmptyReply{})
-		if err == nil {
-			t.Fatalf("Should have errored due to the username already existing")
-		}
+		require.ErrorIs(err, errUserAlreadyExists)
 	}
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	reply := api.EmptyReply{}
-	if err := s.CreateUser(nil, &api.UserPass{
+	err = s.CreateUser(nil, &api.UserPass{
 		Password: strongPassword,
-	}, &reply); err == nil {
-		t.Fatalf("Shouldn't have allowed empty username")
-	}
+	}, &reply)
+	require.ErrorIs(err, errEmptyUsername)
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
+	require := require.New(t)
+
 	ks, err := CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	s := service{ks: ks.(*keystore)}
 
 	{
@@ -195,41 +165,31 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 			Username: "bob",
 			Password: strongPassword,
 		}, &api.EmptyReply{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 	}
 
 	{
 		db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := db.Put([]byte("hello"), []byte("world")); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
+		require.NoError(db.Put([]byte("hello"), []byte("world")))
 	}
 
 	{
 		db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if val, err := db.Get([]byte("hello")); err != nil {
-			t.Fatal(err)
-		} else if !bytes.Equal(val, []byte("world")) {
-			t.Fatalf("Should have read '%s' from the db", "world")
-		}
+		require.NoError(err)
+		val, err := db.Get([]byte("hello"))
+		require.NoError(err)
+		require.Equal([]byte("world"), val)
 	}
 }
 
 func TestServiceExportImport(t *testing.T) {
+	require := require.New(t)
+
 	encodings := []formatting.Encoding{formatting.Hex}
 	for _, encoding := range encodings {
 		ks, err := CreateTestKeystore()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		s := service{ks: ks.(*keystore)}
 
 		{
@@ -237,19 +197,13 @@ func TestServiceExportImport(t *testing.T) {
 				Username: "bob",
 				Password: strongPassword,
 			}, &api.EmptyReply{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 		}
 
 		{
 			db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := db.Put([]byte("hello"), []byte("world")); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
+			require.NoError(db.Put([]byte("hello"), []byte("world")))
 		}
 
 		exportArgs := ExportUserArgs{
@@ -260,14 +214,10 @@ func TestServiceExportImport(t *testing.T) {
 			Encoding: encoding,
 		}
 		exportReply := ExportUserReply{}
-		if err := s.ExportUser(nil, &exportArgs, &exportReply); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(s.ExportUser(nil, &exportArgs, &exportReply))
 
 		newKS, err := CreateTestKeystore()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		newS := service{ks: newKS.(*keystore)}
 
 		{
@@ -278,9 +228,7 @@ func TestServiceExportImport(t *testing.T) {
 				},
 				User: exportReply.User,
 			}, &api.EmptyReply{})
-			if err == nil {
-				t.Fatal("Should have errored due to incorrect password")
-			}
+			require.ErrorIs(err, errIncorrectPassword)
 		}
 
 		{
@@ -291,9 +239,7 @@ func TestServiceExportImport(t *testing.T) {
 				},
 				User: exportReply.User,
 			}, &api.EmptyReply{})
-			if err == nil {
-				t.Fatal("Should have errored due to empty username")
-			}
+			require.ErrorIs(err, errEmptyUsername)
 		}
 
 		{
@@ -305,21 +251,15 @@ func TestServiceExportImport(t *testing.T) {
 				User:     exportReply.User,
 				Encoding: encoding,
 			}, &api.EmptyReply{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.ErrorIs(err, nil)
 		}
 
 		{
 			db, err := newKS.GetDatabase(ids.Empty, "bob", strongPassword)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if val, err := db.Get([]byte("hello")); err != nil {
-				t.Fatal(err)
-			} else if !bytes.Equal(val, []byte("world")) {
-				t.Fatalf("Should have read '%s' from the db", "world")
-			}
+			require.NoError(err)
+			val, err := db.Get([]byte("hello"))
+			require.NoError(err)
+			require.Equal([]byte("world"), val)
 		}
 	}
 }
@@ -328,88 +268,86 @@ func TestServiceDeleteUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
 	tests := []struct {
-		desc      string
-		setup     func(ks *keystore) error
-		request   *api.UserPass
-		want      *api.EmptyReply
-		wantError bool
-	}{{
-		desc:      "empty user name case",
-		request:   &api.UserPass{},
-		wantError: true,
-	}, {
-		desc:      "user not exists case",
-		request:   &api.UserPass{Username: "dummy"},
-		wantError: true,
-	}, {
-		desc:      "user exists and invalid password case",
-		request:   &api.UserPass{Username: testUser, Password: "password"},
-		wantError: true,
-	}, {
-		desc: "user exists and valid password case",
-		setup: func(ks *keystore) error {
-			s := service{ks: ks}
-			return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+		desc        string
+		setup       func(ks *keystore) error
+		request     *api.UserPass
+		want        *api.EmptyReply
+		expectedErr error
+	}{
+		{
+			desc:        "empty user name case",
+			request:     &api.UserPass{},
+			expectedErr: errEmptyUsername,
 		},
-		request: &api.UserPass{Username: testUser, Password: password},
-		want:    &api.EmptyReply{},
-	}, {
-		desc: "delete a user, imported from import api case",
-		setup: func(ks *keystore) error {
-			s := service{ks: ks}
-
-			reply := api.EmptyReply{}
-			if err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &reply); err != nil {
-				return err
-			}
-
-			// created data in bob db
-			db, err := ks.GetDatabase(ids.Empty, testUser, password)
-			if err != nil {
-				return err
-			}
-
-			return db.Put([]byte("hello"), []byte("world"))
+		{
+			desc:        "user not exists case",
+			request:     &api.UserPass{Username: "dummy"},
+			expectedErr: errNonexistentUser,
 		},
-		request: &api.UserPass{Username: testUser, Password: password},
-		want:    &api.EmptyReply{},
-	}}
+		{
+			desc: "user exists and invalid password case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+				return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+			},
+			request:     &api.UserPass{Username: testUser, Password: "password"},
+			expectedErr: errIncorrectPassword,
+		},
+		{
+			desc: "user exists and valid password case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+				return s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+			},
+			request: &api.UserPass{Username: testUser, Password: password},
+			want:    &api.EmptyReply{},
+		},
+		{
+			desc: "delete a user, imported from import api case",
+			setup: func(ks *keystore) error {
+				s := service{ks: ks}
+
+				reply := api.EmptyReply{}
+				if err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &reply); err != nil {
+					return err
+				}
+
+				// created data in bob db
+				db, err := ks.GetDatabase(ids.Empty, testUser, password)
+				if err != nil {
+					return err
+				}
+
+				return db.Put([]byte("hello"), []byte("world"))
+			},
+			request: &api.UserPass{Username: testUser, Password: password},
+			want:    &api.EmptyReply{},
+		},
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
+			require := require.New(t)
+
 			ksIntf, err := CreateTestKeystore()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			ks := ksIntf.(*keystore)
 			s := service{ks: ks}
 
 			if tt.setup != nil {
-				if err := tt.setup(ks); err != nil {
-					t.Fatalf("failed to create user setup in keystore: %v", err)
-				}
+				require.NoError(tt.setup(ks))
 			}
 			got := &api.EmptyReply{}
 			err = s.DeleteUser(nil, tt.request, got)
-			if (err != nil) != tt.wantError {
-				t.Fatalf("DeleteUser() failed: error %v, wantError %v", err, tt.wantError)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.want, got)
+			require.NotContains(ks.usernameToPassword, testUser) // delete is successful
 
-			if !tt.wantError && !reflect.DeepEqual(tt.want, got) {
-				t.Fatalf("DeleteUser() failed: got %v, want %v", got, tt.want)
-			}
-
-			if err == nil { // delete is successful
-				if _, ok := ks.usernameToPassword[testUser]; ok {
-					t.Fatalf("DeleteUser() failed: expected the user %s should be delete from users map", testUser)
-				}
-
-				// deleted user details should be available to create user again.
-				err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
-				if err != nil {
-					t.Fatalf("failed to create user: %v", err)
-				}
-			}
+			// deleted user details should be available to create user again.
+			require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))
 		})
 	}
 }
