@@ -116,7 +116,6 @@ func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
 	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
-
 	if !exists {
 		return nil, ErrUnknownVersion
 	}
@@ -139,22 +138,19 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 		return 0, errUnmarshalNil
 	}
 
-	m.lock.RLock()
 	if byteLen := len(bytes); byteLen > m.maxSize {
-		m.lock.RUnlock()
 		return 0, fmt.Errorf("%w: %d > %d", errUnmarshalTooBig, byteLen, m.maxSize)
 	}
 
 	p := wrappers.Packer{
 		Bytes: bytes,
 	}
-
 	version := p.UnpackShort()
 	if p.Errored() { // Make sure the codec version is correct
-		m.lock.RUnlock()
 		return 0, errCantUnpackVersion
 	}
 
+	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
 	if !exists {
