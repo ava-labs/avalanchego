@@ -157,7 +157,7 @@ func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	require.NoError(codec.RegisterType(&MyInnerStruct{}))
-	require.Error(codec.RegisterType(&MyInnerStruct{}))
+	require.ErrorIs(codec.RegisterType(&MyInnerStruct{}), ErrDuplicateType)
 }
 
 func TestUInt32(codec GeneralCodec, t testing.TB) {
@@ -193,7 +193,7 @@ func TestUIntPtr(codec GeneralCodec, t testing.TB) {
 
 	number := uintptr(500)
 	_, err = manager.Marshal(0, number)
-	require.Error(err)
+	require.ErrorIs(err, ErrUnsupportedType)
 }
 
 func TestSlice(codec GeneralCodec, t testing.TB) {
@@ -562,10 +562,10 @@ func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 
 	_, err = manager.Marshal(0, myS)
-	require.Error(err)
+	require.ErrorIs(err, ErrUnexportedField)
 
 	_, err = manager.Size(0, myS)
-	require.Error(err)
+	require.ErrorIs(err, ErrUnexportedField)
 }
 
 func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
@@ -709,7 +709,7 @@ func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB
 		Arr: make([]emptyStruct, math.MaxInt32),
 	}
 	_, err = manager.Marshal(0, val)
-	require.Error(err)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 
 	bytesLen, err := manager.Size(0, val)
 	require.NoError(err)
@@ -726,7 +726,7 @@ func TestSliceTooLarge(codec GeneralCodec, t testing.TB) {
 	val := []struct{}{}
 	b := []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0xff}
 	_, err = manager.Unmarshal(b, &val)
-	require.Error(err)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 // Ensure serializing structs with negative number members works
@@ -774,7 +774,7 @@ func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
 
 	s := inner{}
 	_, err = manager.Unmarshal(bytes, &s)
-	require.Error(err)
+	require.ErrorIs(err, errUnmarshalTooBig)
 }
 
 type outerInterface interface {
@@ -813,7 +813,7 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
 		_, err := manager.Unmarshal(bytes, &s)
-		require.Error(err)
+		require.ErrorIs(err, ErrDoesNotImplementInterface)
 	}
 }
 
@@ -832,11 +832,11 @@ func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
 
 	s := inner{}
 	_, err = manager.Unmarshal(bytes, &s)
-	require.Error(err)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 
 	s.Bytes = []byte{0, 1, 2}
 	_, err = manager.Marshal(0, s)
-	require.Error(err)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 // Test unmarshaling something with extra data
@@ -851,7 +851,7 @@ func TestExtraSpace(codec GeneralCodec, t testing.TB) {
 	byteSlice := []byte{0x00, 0x00, 0x01, 0x02}
 	var b byte
 	_, err = manager.Unmarshal(byteSlice, &b)
-	require.Error(err)
+	require.ErrorIs(err, ErrExtraSpace)
 }
 
 // Ensure deserializing slices that have been length restricted errors correctly
@@ -874,7 +874,7 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 
 	s := inner{}
 	_, err = manager.Unmarshal(bytes, &s)
-	require.Error(err)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 type MultipleVersionsStruct struct {

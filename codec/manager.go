@@ -23,12 +23,14 @@ const (
 )
 
 var (
+	ErrUnknownVersion    = errors.New("unknown codec version")
 	ErrMarshalNil        = errors.New("can't marshal nil pointer or interface")
 	ErrUnmarshalNil      = errors.New("can't unmarshal nil")
 	ErrCantPackVersion   = errors.New("couldn't pack codec version")
 	ErrCantUnpackVersion = errors.New("couldn't unpack codec version")
-	ErrUnknownVersion    = errors.New("unknown codec version")
 	ErrDuplicatedVersion = errors.New("duplicated codec version")
+
+	errUnmarshalTooBig = errors.New("byte array exceeds maximum length")
 )
 
 var _ Manager = (*manager)(nil)
@@ -149,9 +151,9 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 	}
 
 	m.lock.RLock()
-	if len(bytes) > m.maxSize {
+	if byteLen := len(bytes); byteLen > m.maxSize {
 		m.lock.RUnlock()
-		return 0, fmt.Errorf("byte array exceeds maximum length, %d", m.maxSize)
+		return 0, fmt.Errorf("%w: %d > %d", errUnmarshalTooBig, byteLen, m.maxSize)
 	}
 
 	p := wrappers.Packer{

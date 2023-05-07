@@ -23,6 +23,7 @@ var (
 	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
 	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
+	errIncorrectBlockHeight                       = errors.New("incorrect block height")
 	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
@@ -307,7 +308,8 @@ func (v *verifier) commonBlock(b blocks.Block) error {
 	height := b.Height()
 	if expectedHeight != height {
 		return fmt.Errorf(
-			"expected block to have height %d, but found %d",
+			"%w expected %d, but found %d",
+			errIncorrectBlockHeight,
 			expectedHeight,
 			height,
 		)
