@@ -46,10 +46,11 @@ func TestMintOutputVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 			err := tt.out.Verify()
-			require.ErrorIs(t, err, tt.expectedErr)
+			require.ErrorIs(err, tt.expectedErr)
 			err = tt.out.VerifyState()
-			require.ErrorIs(t, err, tt.expectedErr)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
