@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -225,6 +226,9 @@ type batch struct {
 	batch *pebble.Batch
 	db    *Database
 	size  int
+
+	// Support BATCH_REWRITE
+	applied atomic.Bool
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
@@ -251,6 +255,23 @@ func (b *batch) Write() error {
 	if _, herr := b.db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
+
+	// Support BATCH_REWRITE
+	// the underline pebble db doesn't support batch rewrite got panic instead
+	// we have to create a new batch which is a kind of duplicate of the given
+	// batch(arg b) and commit this new batch on behalf of the given batch
+	if b.applied.Load() {
+		// the given batch b has already been committed
+		// Don't Commit it again, got panic otherwise
+		// Create a new batch to do Commit
+		newbatch := &batch{db: b.db, batch: b.db.db.NewBatch()}
+		// duplicate b.batch to newbatch.batch
+		newbatch.batch.Apply(b.batch, nil)
+		return updateError(newbatch.batch.Commit(pebble.NoSync))
+	}
+	// mark it for alerady committed
+	b.applied.Store(true)
+
 	return updateError(b.batch.Commit(pebble.NoSync))
 }
 
