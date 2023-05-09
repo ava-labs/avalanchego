@@ -265,8 +265,11 @@ func (b *batch) Write() error {
 		// Don't Commit it again, got panic otherwise
 		// Create a new batch to do Commit
 		newbatch := &batch{db: b.db, batch: b.db.db.NewBatch()}
+
 		// duplicate b.batch to newbatch.batch
-		newbatch.batch.Apply(b.batch, nil)
+		if err := newbatch.batch.Apply(b.batch, nil); err != nil {
+			return err
+		}
 		return updateError(newbatch.batch.Commit(pebble.NoSync))
 	}
 	// mark it for alerady committed
