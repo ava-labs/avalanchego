@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
@@ -76,9 +75,8 @@ type Database struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	// versiondb that the other dbs are built on.
-	// Allows the changes made to the snapshot and [nodeDB] to be atomic.
-	nodeDB *versiondb.Database
+	nodeDB       database.Database
+	currentBatch database.Batch
 
 	// Stores data about the database's current state.
 	metadataDB database.Database
@@ -113,12 +111,14 @@ func newDatabase(
 ) (*Database, error) {
 	trieDB := &Database{
 		metrics:    metrics,
-		nodeDB:     versiondb.New(prefixdb.New(nodePrefix, db)),
+		nodeDB:     prefixdb.New(nodePrefix, db),
 		metadataDB: prefixdb.New(metadataPrefix, db),
 		history:    newTrieHistory(config.HistoryLength),
 		tracer:     config.Tracer,
 		childViews: make([]*trieView, 0, defaultPreallocationSize),
 	}
+
+	trieDB.currentBatch = trieDB.nodeDB.NewBatch()
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
@@ -202,8 +202,7 @@ func (db *Database) rebuild(ctx context.Context) error {
 				return err
 			}
 			currentViewSize++
-		}
-		if err := db.nodeDB.Delete(key); err != nil {
+		} else if err := db.nodeDB.Delete(key); err != nil {
 			return err
 		}
 	}
@@ -294,7 +293,7 @@ func (db *Database) Close() error {
 		return err
 	}
 
-	if err := db.nodeDB.Commit(); err != nil {
+	if err := db.commitCurrentBatch(); err != nil {
 		return err
 	}
 
@@ -806,19 +805,12 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return errNoNewRoot
 	}
 
-	// commit any outstanding cache evicted nodes.
-	// Note that we do this here because below we may Abort
-	// [db.nodeDB], which would cause us to lose these changes.
-	if err := db.nodeDB.Commit(); err != nil {
-		return err
-	}
-
 	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			db.metrics.IOKeyWrite()
-			if err := db.nodeDB.Delete(key.Bytes()); err != nil {
-				db.nodeDB.Abort()
+			if err := db.currentBatch.Delete(key.Bytes()); err != nil {
+				db.currentBatch.Reset()
 				nodesSpan.End()
 				return err
 			}
@@ -832,13 +824,13 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			db.metrics.IOKeyWrite()
 			nodeBytes, err := nodeChange.after.marshal()
 			if err != nil {
-				db.nodeDB.Abort()
+				db.currentBatch.Reset()
 				nodesSpan.End()
 				return err
 			}
 
-			if err := db.nodeDB.Put(key.Bytes(), nodeBytes); err != nil {
-				db.nodeDB.Abort()
+			if err := db.currentBatch.Put(key.Bytes(), nodeBytes); err != nil {
+				db.currentBatch.Reset()
 				nodesSpan.End()
 				return err
 			}
@@ -847,10 +839,10 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	nodesSpan.End()
 
 	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
-	err := db.nodeDB.Commit()
+	err := db.commitCurrentBatch()
 	commitSpan.End()
 	if err != nil {
-		db.nodeDB.Abort()
+		db.currentBatch.Reset()
 		return err
 	}
 
@@ -936,11 +928,19 @@ func (db *Database) initializeRootIfNeeded() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	if err := db.nodeDB.Put(rootKey, rootBytes); err != nil {
+	if err := db.currentBatch.Put(rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, db.nodeDB.Commit()
+	return db.root.id, db.commitCurrentBatch()
+}
+
+func (db *Database) commitCurrentBatch() error {
+	if err := db.currentBatch.Write(); err != nil {
+		return err
+	}
+	db.currentBatch.Reset()
+	return nil
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
