@@ -1751,7 +1751,8 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	require.ErrorIs(sm.Add(context.Background(), block0), errDuplicateAdd)
+	err := sm.Add(context.Background(), block0)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
@@ -1789,7 +1790,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 	}
 
 	require.NoError(sm.Add(context.Background(), block0))
-	require.ErrorIs(sm.Add(context.Background(), block1), errDuplicateAdd)
+	err := sm.Add(context.Background(), block1)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
