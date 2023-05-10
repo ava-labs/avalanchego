@@ -19,6 +19,16 @@ var (
 	_ state.StakerIterator = (*stakersStorageIteratorModel)(nil)
 )
 
+// stakersStorageModel is the executable reference model of how we expect
+// P-chain state and diffs to behave with respect to stakers.
+// stakersStorageModel abstracts away the complexity related to
+// P-chain state persistence and to the state.Diff flushing mechanisms.
+// stakersStorageModel represents how we expect state.Diff and state.State to behave
+// in a single threaded environment when stakers are written to or read from them.
+// The utility of stakersStorageModel as an executable reference model is that
+// we can write automatic tests asserting that state.Diff and state.State conform
+// to stakersStorageModel.
+
 type subnetNodeKey struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID

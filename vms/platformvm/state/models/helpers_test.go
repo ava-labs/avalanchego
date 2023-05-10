@@ -4,6 +4,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,9 +32,10 @@ import (
 var (
 	_ state.Versions = (*versionsHolder)(nil)
 
-	xChainID    = ids.Empty.Prefix(0)
-	cChainID    = ids.Empty.Prefix(1)
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
+	testNetworkID = uint32(10) // To be used in tests
+	xChainID      = ids.Empty.Prefix(0)
+	cChainID      = ids.Empty.Prefix(1)
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -42,7 +44,7 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
 
-	testNetworkID = 10 // To be used in tests
+	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
 )
 
 type versionsHolder struct {
@@ -60,7 +62,7 @@ func buildChainState() (state.State, error) {
 	cfg := defaultConfig()
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
+	ctx.NetworkID = testNetworkID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
@@ -107,19 +109,17 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
+		BanffTime:         defaultValidateEndTime,
+		CortinaTime:       defaultValidateEndTime,
 	}
 }
 
 func buildGenesisTest(ctx *snow.Context) ([]byte, error) {
-	// no UTXOs, not nor validators in this genesis
-	genesisUTXOs := make([]api.UTXO, 0)
-	genesisValidators := make([]api.PermissionlessValidator, 0)
 	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   ctx.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
+		UTXOs:         nil, // no UTXOs in this genesis. Not relevant to package tests.
+		Validators:    nil, // no validators in this genesis. Tests will handle them.
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),

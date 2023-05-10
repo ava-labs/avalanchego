@@ -20,6 +20,10 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
+// stakerGenerator helps creating random yet reproducible  state.Staker objects, which
+// can be used in our property tests.
+// stakerGenerator takes care of enforcing some state.Staker invariants on each and every random sample.
+// TestGeneratedStakersValidity documents and verifies the enforced invariants.
 func stakerGenerator(prio priorityType, subnet *ids.ID, nodeID *ids.NodeID) gopter.Gen {
 	return genStakerTimeData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
