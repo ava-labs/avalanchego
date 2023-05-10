@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -154,7 +155,16 @@ func (db *Database) Close() error {
 		return herr
 	}
 	db.closed.Set(true)
-	return updateError(db.db.Close())
+
+	err := updateError(db.db.Close())
+	if err != nil {
+		if strings.Contains(err.Error(), "leaked iterator") {
+			// avalanche database support close db w/o error
+			// even if there is an iterator which is not released
+			return nil
+		}
+	}
+	return err
 }
 
 func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
@@ -340,6 +350,12 @@ type iter struct {
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+		return &iter{
+			db: db,
+		}
+	}
+
 	return &iter{
 		db:   db,
 		iter: db.db.NewIter(&pebble.IterOptions{}),
@@ -349,6 +365,12 @@ func (db *Database) NewIterator() database.Iterator {
 // NewIteratorWithStart creates a lexicographically ordered iterator over the
 // database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+		return &iter{
+			db: db,
+		}
+	}
+
 	return &iter{
 		db:   db,
 		iter: db.db.NewIter(&pebble.IterOptions{LowerBound: start}),
@@ -374,6 +396,12 @@ func bytesPrefix(prefix []byte) *pebble.IterOptions {
 // NewIteratorWithPrefix creates a lexicographically ordered iterator over the
 // database ignoring keys that do not start with the provided prefix
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+		return &iter{
+			db: db,
+		}
+	}
+
 	return &iter{
 		db:   db,
 		iter: db.db.NewIter(bytesPrefix(prefix)),
@@ -387,6 +415,12 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 // Prefix should be some key contained within [start] or else the lower bound
 // of the iteration will be overwritten with [start].
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+		return &iter{
+			db: db,
+		}
+	}
+
 	iterRange := bytesPrefix(prefix)
 	if bytes.Compare(start, prefix) == 1 {
 		iterRange.LowerBound = start
@@ -399,7 +433,8 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 
 func (it *iter) Next() bool {
 	// Short-circuit and set an error if the underlying database has been closed.
-	if it.db.closed.Get() {
+	db := it.db
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		it.valid = false
 		it.err = database.ErrClosed
 		return false
@@ -437,7 +472,14 @@ func (it *iter) Value() []byte {
 	return slices.Clone(it.iter.Value())
 }
 
-func (it *iter) Release() { it.iter.Close() }
+func (it *iter) Release() {
+	db := it.db
+	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+		return
+	}
+
+	it.iter.Close()
+}
 
 // updateError casts pebble-specific errors to errors that Avalanche VMs expect
 // to see (they do not know which type of db may be provided).

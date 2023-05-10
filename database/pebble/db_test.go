@@ -15,11 +15,7 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for idx, test := range database.Tests {
-		if idx == 20 || idx == 21 || idx == 22 {
-			continue
-		}
-
+	for _, test := range database.Tests {
 		folder := t.TempDir()
 		cfg := NewDefaultConfig()
 		db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
