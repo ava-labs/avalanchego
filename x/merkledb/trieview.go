@@ -485,6 +485,43 @@ func (t *trieView) GetRangeProof(
 	return &result, nil
 }
 
+// Returns up to [maxLength] key/values from keys in closed range [start, end].
+// Acts similarly to the merge step of a merge sort to combine state from the view
+// with state from the parent trie.
+// If [lock], grabs [t.lock]'s read lock.
+// Otherwise assumes [t.lock]'s read lock is held.
+func (t *trieView) getKeyValues(
+	start []byte,
+	end []byte,
+	maxLength int,
+	keysToIgnore set.Set[string],
+	lock bool,
+) ([]KeyValue, error) {
+	if lock {
+		t.lock.RLock()
+		defer t.lock.RUnlock()
+	}
+
+	if maxLength <= 0 {
+		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
+	}
+
+	if t.isInvalid() {
+		return nil, ErrInvalid
+	}
+
+	kv := make([]KeyValue, 0)
+	it := t.NewIteratorWithStart(start)
+	for it.Next() {
+		kv = append(kv, KeyValue{Key: it.Key(), Value: it.Value()})
+		if bytes.Equal(it.Key(), end) {
+			break
+		}
+	}
+
+	return kv, nil
+}
+
 // CommitToDB commits changes from this trie to the underlying DB.
 func (t *trieView) CommitToDB(ctx context.Context) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
