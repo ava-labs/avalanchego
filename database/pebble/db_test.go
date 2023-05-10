@@ -16,7 +16,7 @@ import (
 
 func TestInterface(t *testing.T) {
 	for idx, test := range database.Tests {
-		if idx == 20 || idx == 21 || idx == 22 || idx == 23 {
+		if idx == 20 || idx == 21 || idx == 22 {
 			continue
 		}
 

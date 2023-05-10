@@ -214,11 +214,30 @@ func (db *Database) Delete(key []byte) error {
 	return updateError(db.db.Delete(key, pebble.NoSync))
 }
 
+// If start and limit are the same based on the compare function in pebble
+// pebble returns error but we like to return nil
 func (db *Database) Compact(start []byte, limit []byte) error {
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
-	return updateError(db.db.Compact(start, limit, true))
+
+	err := updateError(db.db.Compact(start, limit, true))
+	if err != nil {
+		// The default compare function of pebble is bytes.Compare.
+		// Use this default compare function since we don't setup
+		// the compare function when we create pebble db.
+		// It's imporssible to retrieve this default
+		// compare function from the pebble package since
+		// it's defined in internal.
+		if bytes.Compare(start, limit) == 0 {
+			// Don't return error if it is caused
+			// by the same of start and limit
+			// Do nothing just ignore the error
+			// since there is no need to compact
+			err = nil
+		}
+	}
+	return err
 }
 
 // batch is a wrapper around a pebbleDB batch to contain sizes.
