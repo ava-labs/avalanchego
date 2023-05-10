@@ -513,8 +513,14 @@ func (t *trieView) getKeyValues(
 	kv := make([]KeyValue, 0)
 	it := t.NewIteratorWithStart(start)
 	for it.Next() {
+		if len(kv) >= maxLength {
+			// stop when hit the limit
+			break
+		}
+
 		kv = append(kv, KeyValue{Key: it.Key(), Value: it.Value()})
 		if bytes.Equal(it.Key(), end) {
+			// stop when meet the end point
 			break
 		}
 	}

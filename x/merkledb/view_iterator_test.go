@@ -86,33 +86,53 @@ func Test_View_Iteration_getValues(t *testing.T) {
 	require.NotNil(t, dbTrie)
 	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0}, []byte{0}))
 	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0, 1}, []byte{1}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 1}, []byte{2}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 0}, []byte{3}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 1}, []byte{4}))
+	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 0}, []byte{2}))
+	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 1}, []byte{3}))
+	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 0}, []byte{4}))
+	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 1}, []byte{5}))
 
 	trieView, verr := newTrieView(dbTrie, dbTrie, dbTrie.root.clone(), 10)
 	require.NoError(t, verr)
 	require.NotNil(t, trieView)
 
+	// if maxLength is zero, get nothing
 	kv, kverr := trieView.getKeyValues([]byte{0, 1}, []byte{1, 1},
+		0, /*maxLength*/
+		set.Set[string]{},
+		false /*lock*/)
+	require.NotNil(t, kverr)
+
+	// There are 3 outputs
+	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{1, 1},
 		10, /*maxLength*/
 		set.Set[string]{},
 		false /*lock*/)
-
 	require.Nil(t, kverr)
-	require.Equal(t, 2, len(kv))
+	require.Equal(t, 3, len(kv))
 	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{2}}, kv[1])
+	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
+	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[2])
 
+	// There are 5 outputs
 	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{2, 1},
 		10, /*maxLength*/
 		set.Set[string]{},
 		false /*lock*/)
-
 	require.Nil(t, kverr)
-	require.Equal(t, 4, len(kv))
+	require.Equal(t, 5, len(kv))
 	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{2}}, kv[1])
-	require.Equal(t, KeyValue{Key: []byte{2, 0}, Value: []byte{3}}, kv[2])
-	require.Equal(t, KeyValue{Key: []byte{2, 1}, Value: []byte{4}}, kv[3])
+	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
+	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[2])
+	require.Equal(t, KeyValue{Key: []byte{2, 0}, Value: []byte{4}}, kv[3])
+	require.Equal(t, KeyValue{Key: []byte{2, 1}, Value: []byte{5}}, kv[4])
+
+	// there are 2 outputs
+	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{2, 1},
+		2, /*maxLength*/
+		set.Set[string]{},
+		false /*lock*/)
+	require.Nil(t, kverr)
+	require.Equal(t, 2, len(kv))
+	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
+	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
 }
