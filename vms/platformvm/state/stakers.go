@@ -135,9 +135,9 @@ type baseStaker struct {
 	delegators *btree.BTreeG[*Staker]
 
 	// delegatorsByTxID allows retrieving delegator
-	// to be updated by TxID. We cannot query delegators
+	// to be updated by TxID. We cannot query delegators Tree
 	// for it since updated Stakers can have different NextTime
-	// (Tree uses Staker.Less to identify a staker instead of Staker.TxID)
+	// (and Tree uses Staker.Less to identify a staker instead of Staker.TxID)
 	delegatorsByTxID map[ids.ID]*Staker
 }
 
@@ -189,8 +189,8 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 	prevStaker := validator.validator
 
 	// Explicitly remove prevStaker from stakers tree. This is because stakers tree
-	// identify stakers via stakers.Less function, so stakers with updated start or end time
-	// would be treated as a different staker and not replaced by ReplaceOrInsert call.
+	// identifies stakers via stakers.Less function, so a staker with updated Start/EndTime
+	// would be treated as a different staker and not be replaced by ReplaceOrInsert call.
 	v.stakers.Delete(prevStaker)
 	v.stakers.ReplaceOrInsert(staker)
 
@@ -380,7 +380,7 @@ type diffValidator struct {
 	// validator stakerAndStatus
 	validator stakerAndStatus
 
-	// added/updated/deletedStakers should be mutually non-overlapping
+	// Invariant: added/updated/deletedStakers should be mutually non-overlapping
 	// TODO ABENEGIA: consider enforcing state exclusivity via construction rather than verification
 	addedDelegators   *btree.BTreeG[*Staker]
 	updatedDelegators map[ids.ID]*Staker
