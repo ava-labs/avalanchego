@@ -2013,13 +2013,14 @@ func (s *state) writeMetadata() error {
 
 // TODO: Remove after next hard-fork when everybody has run this.
 func (s *state) populateBlockHeightIndex() error {
-	blk, _, err := s.GetStatelessBlock(s.lastAccepted)
+	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve last accepted block from local disk: %w", err)
 	}
 
-	heightKey := database.PackUInt64(blk.Height())
-	if _, err := database.GetID(s.blockIDDB, heightKey); err == nil {
+	lastAcceptedHeight := lastAcceptedBlk.Height()
+	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
+	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
 		// If the last accepted block is in [s.blockIDDB], no backfilling is required.
 		return nil
 	}
@@ -2043,6 +2044,12 @@ func (s *state) populateBlockHeightIndex() error {
 		blkHeight := blkState.Blk.Height()
 		blkID := blkState.Blk.ID()
 
+		// During the indexing process, we skip [lastAcceptedHeight] as we use it to
+		// determine if the index is complete.
+		if blkHeight == lastAcceptedHeight {
+			continue
+		}
+
 		// Populate the in-memory cache with the [blockIDCacheSize] most recent blocks
 		if math.AbsDiff(s.currentHeight, blkHeight) <= blockIDCacheSize {
 			s.addedBlockIDs[blkHeight] = blkID
@@ -2053,6 +2060,10 @@ func (s *state) populateBlockHeightIndex() error {
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
+	}
+
+	if err := database.PutID(s.blockIDDB, lastAcceptedHeightKey, s.lastAccepted); err != nil {
+		return fmt.Errorf("failed to add blockID: %w", err)
 	}
 
 	return nil
