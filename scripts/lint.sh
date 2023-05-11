@@ -40,7 +40,7 @@ function find_go_files {
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
-  go install -v github.com/palantir/go-license@latest
+  go install -v github.com/palantir/go-license@v1.25.0
   local files=()
   while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go')
 
