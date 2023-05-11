@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
@@ -18,7 +17,7 @@ import (
 )
 
 var (
-	_ state.Versions   = (*sysUnderTest)(nil)
+	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
@@ -27,7 +26,7 @@ var (
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
-// system made of a stack of state.Diffs built on top of a state.State conforms to
+// system made of a stack of Diffs built on top of a State conforms to
 // our stakersStorageModel. It achieves this by:
 //  1. randomly generating a sequence of stakers writes as well as
 //     some persistence operations (commit/diff apply),
@@ -48,21 +47,21 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 
 type sysUnderTest struct {
 	diffBlkIDSeed uint64
-	baseState     state.State
+	baseState     State
 	sortedDiffIDs []ids.ID
-	diffsMap      map[ids.ID]state.Diff
+	diffsMap      map[ids.ID]Diff
 }
 
-func newSysUnderTest(baseState state.State) *sysUnderTest {
+func newSysUnderTest(baseState State) *sysUnderTest {
 	sys := &sysUnderTest{
 		baseState:     baseState,
-		diffsMap:      map[ids.ID]state.Diff{},
+		diffsMap:      map[ids.ID]Diff{},
 		sortedDiffIDs: []ids.ID{},
 	}
 	return sys
 }
 
-func (s *sysUnderTest) GetState(blkID ids.ID) (state.Chain, bool) {
+func (s *sysUnderTest) GetState(blkID ids.ID) (Chain, bool) {
 	if state, found := s.diffsMap[blkID]; found {
 		return state, found
 	}
@@ -77,7 +76,7 @@ func (s *sysUnderTest) addDiffOnTop() {
 	} else {
 		topBlkID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
 	}
-	newTopDiff, err := state.NewDiff(topBlkID, s)
+	newTopDiff, err := NewDiff(topBlkID, s)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +85,7 @@ func (s *sysUnderTest) addDiffOnTop() {
 }
 
 // getTopChainState returns top diff or baseState
-func (s *sysUnderTest) getTopChainState() state.Chain {
+func (s *sysUnderTest) getTopChainState() Chain {
 	var topChainStateID ids.ID
 	if len(s.sortedDiffIDs) != 0 {
 		topChainStateID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
@@ -181,10 +180,10 @@ var stakersCommands = &commands.ProtoCommands{
 }
 
 // PutCurrentValidator section
-type putCurrentValidatorCommand state.Staker
+type putCurrentValidatorCommand Staker
 
 func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	staker := (*state.Staker)(v)
+	staker := (*Staker)(v)
 	sys := sut.(*sysUnderTest)
 	topChainState := sys.getTopChainState()
 	topChainState.PutCurrentValidator(staker)
@@ -192,7 +191,7 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 }
 
 func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	staker := (*state.Staker)(v)
+	staker := (*Staker)(v)
 	cmdState.(*stakersStorageModel).PutCurrentValidator(staker)
 	return cmdState
 }
@@ -219,7 +218,7 @@ func (v *putCurrentValidatorCommand) String() string {
 }
 
 var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil).Map(
-	func(staker state.Staker) commands.Command {
+	func(staker Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
 	},
@@ -239,7 +238,7 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	}
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -267,7 +266,7 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -441,13 +440,13 @@ func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) b
 		return false
 	}
 
-	modelStakers := make([]*state.Staker, 0)
+	modelStakers := make([]*Staker, 0)
 	for modelIt.Next() {
 		modelStakers = append(modelStakers, modelIt.Value())
 	}
 	modelIt.Release()
 
-	sysStakers := make([]*state.Staker, 0)
+	sysStakers := make([]*Staker, 0)
 	for sysIt.Next() {
 		sysStakers = append(sysStakers, sysIt.Value())
 	}

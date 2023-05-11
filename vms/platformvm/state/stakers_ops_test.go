@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
 	"fmt"
@@ -11,22 +11,21 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
 )
 
-// TestSimpleStakersOperations checks that state.State and state.Diff conform our stakersStorageModel.
-// TestSimpleStakersOperations tests state.State and state.Diff in isolation, over simple operations.
+// TestSimpleStakersOperations checks that State and Diff conform our stakersStorageModel.
+// TestSimpleStakersOperations tests State and Diff in isolation, over simple operations.
 // TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like
-// mix of state.State and state.Diffs.
+// mix of State and Diffs.
 func TestSimpleStakersOperations(t *testing.T) {
-	storeCreators := map[string]func() (state.Stakers, error){
-		"base state": func() (state.Stakers, error) {
+	storeCreators := map[string]func() (Stakers, error){
+		"base state": func() (Stakers, error) {
 			return buildChainState()
 		},
-		"diff": func() (state.Stakers, error) {
+		"diff": func() (Stakers, error) {
 			baseState, err := buildChainState()
 			if err != nil {
 				return nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
@@ -36,13 +35,13 @@ func TestSimpleStakersOperations(t *testing.T) {
 			versions := &versionsHolder{
 				baseState: baseState,
 			}
-			store, err := state.NewDiff(genesisID, versions)
+			store, err := NewDiff(genesisID, versions)
 			if err != nil {
 				return nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
 			}
 			return store, nil
 		},
-		"storage model": func() (state.Stakers, error) { //nolint:golint,unparam
+		"storage model": func() (Stakers, error) { //nolint:golint,unparam
 			return newStakersStorageModel(), nil
 		},
 	}
@@ -55,11 +54,11 @@ func TestSimpleStakersOperations(t *testing.T) {
 	}
 }
 
-func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *gopter.Properties {
+func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("some current validator ops", prop.ForAll(
-		func(s state.Staker) string {
+		func(s Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -127,7 +126,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 	))
 
 	properties.Property("some pending validator ops", prop.ForAll(
-		func(s state.Staker) string {
+		func(s Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -199,7 +198,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 		nodeID   = ids.GenerateTestNodeID()
 	)
 	properties.Property("some current delegators ops", prop.ForAll(
-		func(val state.Staker, dels []state.Staker) string {
+		func(val Staker, dels []Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -329,7 +328,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 		stakerGenerator(currentValidator, &subnetID, &nodeID),
 		gen.SliceOfN(10, stakerGenerator(currentDelegator, &subnetID, &nodeID)).
 			SuchThat(func(v interface{}) bool {
-				stakersList := v.([]state.Staker)
+				stakersList := v.([]Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
 				for _, staker := range stakersList {
 					uniqueTxIDs.Add(staker.TxID)
@@ -341,7 +340,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 	))
 
 	properties.Property("some pending delegators ops", prop.ForAll(
-		func(val state.Staker, dels []state.Staker) string {
+		func(val Staker, dels []Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
@@ -471,7 +470,7 @@ func simpleStakerStateProperties(storeCreatorF func() (state.Stakers, error)) *g
 		stakerGenerator(currentValidator, &subnetID, &nodeID),
 		gen.SliceOfN(10, stakerGenerator(pendingDelegator, &subnetID, &nodeID)).
 			SuchThat(func(v interface{}) bool {
-				stakersList := v.([]state.Staker)
+				stakersList := v.([]Staker)
 				uniqueTxIDs := set.NewSet[ids.ID](len(stakersList))
 				for _, staker := range stakersList {
 					uniqueTxIDs.Add(staker.TxID)

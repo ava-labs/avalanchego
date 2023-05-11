@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
 	"errors"
@@ -25,12 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	_ state.Versions = (*versionsHolder)(nil)
+	_ Versions = (*versionsHolder)(nil)
 
 	testNetworkID = uint32(10) // To be used in tests
 	xChainID      = ids.Empty.Prefix(0)
@@ -48,14 +47,14 @@ var (
 )
 
 type versionsHolder struct {
-	baseState state.State
+	baseState State
 }
 
-func (h *versionsHolder) GetState(blkID ids.ID) (state.Chain, bool) {
+func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildChainState() (state.State, error) {
+func buildChainState() (State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
@@ -73,7 +72,7 @@ func buildChainState() (state.State, error) {
 	}
 
 	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	return state.New(
+	return New(
 		baseDB,
 		genesisBytes,
 		prometheus.NewRegistry(),
