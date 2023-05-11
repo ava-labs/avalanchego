@@ -157,7 +157,8 @@ func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	require.NoError(codec.RegisterType(&MyInnerStruct{}))
-	require.ErrorIs(codec.RegisterType(&MyInnerStruct{}), ErrDuplicateType)
+	err := codec.RegisterType(&MyInnerStruct{})
+	require.ErrorIs(err, ErrDuplicateType)
 }
 
 func TestUInt32(codec GeneralCodec, t testing.TB) {
