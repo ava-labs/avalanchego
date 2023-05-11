@@ -115,6 +115,7 @@ type PendingStakers interface {
 	GetPendingStakerIterator() (StakerIterator, error)
 }
 
+// baseStakers is the container for current and pending stakers in State (not Diff)
 type baseStakers struct {
 	// subnetID --> nodeID --> current state for the validator of the subnet
 	// Note: validators supports iteration of stakers over a specific subnetID/nodeID pair
@@ -168,13 +169,13 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	validator.validator = staker
 
+	v.stakers.ReplaceOrInsert(staker)
+
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
 	validatorDiff.validator = stakerAndStatus{
 		staker: staker,
 		status: added,
 	}
-
-	v.stakers.ReplaceOrInsert(staker)
 }
 
 func (v *baseStakers) UpdateValidator(staker *Staker) error {
@@ -187,14 +188,13 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 		)
 	}
 	prevStaker := validator.validator
+	validator.validator = staker
 
 	// Explicitly remove prevStaker from stakers tree. This is because stakers tree
 	// identifies stakers via stakers.Less function, so a staker with updated Start/EndTime
 	// would be treated as a different staker and not be replaced by ReplaceOrInsert call.
 	v.stakers.Delete(prevStaker)
 	v.stakers.ReplaceOrInsert(staker)
-
-	validator.validator = staker
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
 	validatorDiff.validator = stakerAndStatus{
@@ -210,15 +210,14 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 		nodeID   = staker.NodeID
 	)
 	validator := v.getOrCreateValidator(subnetID, nodeID)
-
-	// for sake of generality, we assume staker may be an updated version
-	// of validator.validator. We explicitly remove the previous version of
-	// staker to handle this case.
 	prevStaker := validator.validator
-	v.stakers.Delete(prevStaker)
-
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
+
+	// for sake of generality, we assume we could delete an updated version
+	// of validator.validator. We explicitly remove the previous version of
+	// staker to handle this case.
+	v.stakers.Delete(prevStaker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, subnetID, nodeID)
 	validatorDiff.validator = stakerAndStatus{
@@ -348,6 +347,7 @@ func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	}
 }
 
+// diffStakers is the container for current and pending stakers in Diff (not State)
 type diffStakers struct {
 	// subnetID --> nodeID --> diff for that validator
 	// validatorDiffs helps tracking diffs to be pushed to lower level diff/state upon Apply

@@ -246,7 +246,7 @@ func (*updateCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 
 func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top
+	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. query the staker
 	// 4. Rotate staker times and update the staker
 
@@ -345,7 +345,7 @@ func (*updateCurrentValidatorCommand) PostCondition(cmdState commands.State, res
 }
 
 func (*updateCurrentValidatorCommand) String() string {
-	return "UpdateCurrentValidator"
+	return "AddDiffAndUpdateCurrentValidator"
 }
 
 var genUpdateCurrentValidatorCommand = gen.IntRange(1, 2).Map(
@@ -579,7 +579,7 @@ func (*updateCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 
 func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top
+	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. Rotate staker times and update the staker
 
 	chain := sys.getTopChainState()
@@ -669,7 +669,7 @@ func (*updateCurrentDelegatorCommand) PostCondition(cmdState commands.State, res
 }
 
 func (*updateCurrentDelegatorCommand) String() string {
-	return "UpdateCurrentDelegator"
+	return "AddDiffAndUpdateCurrentDelegator"
 }
 
 var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
