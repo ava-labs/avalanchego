@@ -36,17 +36,16 @@ function find_go_files {
 }
 
 # automatically checks license headers
-# to modify the file headers (if missing), remove "--check" flag
-# TESTS='license_header' ADDLICENSE_FLAGS="-v" ./scripts/lint.sh
-_addlicense_flags=${ADDLICENSE_FLAGS:-"--check -v"}
+# to modify the file headers (if missing), remove "--verify" flag
+# TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
+_addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
-  go install -v github.com/google/addlicense@latest
-  local target="${1}"
+  go install -v github.com/palantir/go-license@latest
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find_go_files "${target}")
+  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go')
 
-  addlicense \
-  -f ./LICENSE.header \
+  go-license \
+  --config=./license.yml \
   ${_addlicense_flags} \
   "${files[@]}"
 }
