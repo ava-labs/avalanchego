@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
@@ -19,7 +18,7 @@ import (
 )
 
 var (
-	_ state.Versions   = (*sysUnderTest)(nil)
+	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*updateCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
@@ -32,7 +31,7 @@ var (
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
-// system made of a stack of state.Diffs built on top of a state.State conforms to
+// system made of a stack of Diffs built on top of a State conforms to
 // our stakersStorageModel. It achieves this by:
 //  1. randomly generating a sequence of stakers writes as well as
 //     some persistence operations (commit/diff apply),
@@ -53,21 +52,21 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 
 type sysUnderTest struct {
 	diffBlkIDSeed uint64
-	baseState     state.State
+	baseState     State
 	sortedDiffIDs []ids.ID
-	diffsMap      map[ids.ID]state.Diff
+	diffsMap      map[ids.ID]Diff
 }
 
-func newSysUnderTest(baseState state.State) *sysUnderTest {
+func newSysUnderTest(baseState State) *sysUnderTest {
 	sys := &sysUnderTest{
 		baseState:     baseState,
-		diffsMap:      map[ids.ID]state.Diff{},
+		diffsMap:      map[ids.ID]Diff{},
 		sortedDiffIDs: []ids.ID{},
 	}
 	return sys
 }
 
-func (s *sysUnderTest) GetState(blkID ids.ID) (state.Chain, bool) {
+func (s *sysUnderTest) GetState(blkID ids.ID) (Chain, bool) {
 	if state, found := s.diffsMap[blkID]; found {
 		return state, found
 	}
@@ -82,7 +81,7 @@ func (s *sysUnderTest) addDiffOnTop() {
 	} else {
 		topBlkID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
 	}
-	newTopDiff, err := state.NewDiff(topBlkID, s)
+	newTopDiff, err := NewDiff(topBlkID, s)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +90,7 @@ func (s *sysUnderTest) addDiffOnTop() {
 }
 
 // getTopChainState returns top diff or baseState
-func (s *sysUnderTest) getTopChainState() state.Chain {
+func (s *sysUnderTest) getTopChainState() Chain {
 	var topChainStateID ids.ID
 	if len(s.sortedDiffIDs) != 0 {
 		topChainStateID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
@@ -189,10 +188,10 @@ var stakersCommands = &commands.ProtoCommands{
 }
 
 // PutCurrentValidator section
-type putCurrentValidatorCommand state.Staker
+type putCurrentValidatorCommand Staker
 
 func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	staker := (*state.Staker)(v)
+	staker := (*Staker)(v)
 	sys := sut.(*sysUnderTest)
 	topChainState := sys.getTopChainState()
 	topChainState.PutCurrentValidator(staker)
@@ -200,7 +199,7 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 }
 
 func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	staker := (*state.Staker)(v)
+	staker := (*Staker)(v)
 	cmdState.(*stakersStorageModel).PutCurrentValidator(staker)
 	return cmdState
 }
@@ -226,8 +225,8 @@ func (v *putCurrentValidatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentValidatorCommand = state.StakerGenerator(state.CurrentValidator, nil, nil, math.MaxUint64).Map(
-	func(staker state.Staker) commands.Command {
+var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
+	func(staker Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
 	},
@@ -261,7 +260,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	var (
 		found  = false
-		staker *state.Staker
+		staker *Staker
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
@@ -288,7 +287,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	// 4. Rotate staker times and update the staker
 	updatedStaker := *staker
-	state.RotateStakerTimesInPlace(&updatedStaker)
+	RotateStakerTimesInPlace(&updatedStaker)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -310,7 +309,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 
 	var (
 		found  = false
-		staker *state.Staker
+		staker *Staker
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
@@ -326,7 +325,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	state.RotateStakerTimesInPlace(&updatedStaker)
+	RotateStakerTimesInPlace(&updatedStaker)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -369,7 +368,7 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	}
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -397,7 +396,7 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -442,10 +441,10 @@ var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // PutCurrentValidator section
-type putCurrentDelegatorCommand state.Staker
+type putCurrentDelegatorCommand Staker
 
 func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	candidateDelegator := (*state.Staker)(v)
+	candidateDelegator := (*Staker)(v)
 	sys := sut.(*sysUnderTest)
 	err := addCurrentDelegatorInSystem(sys, candidateDelegator)
 	if err != nil {
@@ -454,7 +453,7 @@ func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.
 	return sys
 }
 
-func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *state.Staker) error {
+func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) error {
 	// 1. check if there is a current validator, already inserted. If not return
 	// 2. Update candidateDelegator attributes to make it delegator of selected validator
 	// 3. Add delegator to picked validator
@@ -468,7 +467,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *state.St
 
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -493,7 +492,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *state.St
 }
 
 func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
-	candidateDelegator := (*state.Staker)(v)
+	candidateDelegator := (*Staker)(v)
 	model := cmdState.(*stakersStorageModel)
 	err := addCurrentDelegatorInModel(model, candidateDelegator)
 	if err != nil {
@@ -502,7 +501,7 @@ func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands
 	return cmdState
 }
 
-func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *state.Staker) error {
+func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *Staker) error {
 	// 1. check if there is a current validator, already inserted. If not return
 	// 2. Update candidateDelegator attributes to make it delegator of selected validator
 	// 3. Add delegator to picked validator
@@ -515,7 +514,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *
 
 	var (
 		found     = false
-		validator *state.Staker
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
@@ -559,8 +558,8 @@ func (v *putCurrentDelegatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentDelegatorCommand = state.StakerGenerator(state.CurrentDelegator, nil, nil, 1000).Map(
-	func(staker state.Staker) commands.Command {
+var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
+	func(staker Staker) commands.Command {
 		cmd := (*putCurrentDelegatorCommand)(&staker)
 		return cmd
 	},
@@ -593,7 +592,7 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	var (
 		found     = false
-		delegator *state.Staker
+		delegator *Staker
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
@@ -613,7 +612,7 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. Rotate delegator times and update the staker
 	updatedDelegator := *delegator
-	state.RotateStakerTimesInPlace(&updatedDelegator)
+	RotateStakerTimesInPlace(&updatedDelegator)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -635,7 +634,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 
 	var (
 		found     = false
-		delegator *state.Staker
+		delegator *Staker
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
@@ -650,7 +649,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	state.RotateStakerTimesInPlace(&updatedDelegator)
+	RotateStakerTimesInPlace(&updatedDelegator)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -693,7 +692,7 @@ func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 	}
 	var (
 		found     = false
-		delegator *state.Staker
+		delegator *Staker
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
@@ -720,7 +719,7 @@ func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) command
 
 	var (
 		found     = false
-		delegator *state.Staker
+		delegator *Staker
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
@@ -893,13 +892,13 @@ func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) b
 		return false
 	}
 
-	modelStakers := make([]*state.Staker, 0)
+	modelStakers := make([]*Staker, 0)
 	for modelIt.Next() {
 		modelStakers = append(modelStakers, modelIt.Value())
 	}
 	modelIt.Release()
 
-	sysStakers := make([]*state.Staker, 0)
+	sysStakers := make([]*Staker, 0)
 	for sysIt.Next() {
 		sysStakers = append(sysStakers, sysIt.Value())
 	}
