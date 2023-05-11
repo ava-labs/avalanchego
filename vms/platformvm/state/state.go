@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/btree"
+
 	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
