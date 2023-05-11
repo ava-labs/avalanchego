@@ -74,6 +74,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Test VM validators
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 	require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, nodeID))
@@ -539,6 +540,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	// Check VM Validators are removed successfully
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 	require.False(validators.Contains(env.config.Validators, subnetID, subnetVdr2NodeID))
@@ -611,6 +613,7 @@ func TestTrackedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			require.NoError(executor.OnCommitState.Apply(env.state))
+
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
 			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
@@ -660,6 +663,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -719,6 +723,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -763,6 +768,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -817,6 +823,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
