@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/btree"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -2025,6 +2026,9 @@ func (s *state) populateBlockHeightIndex() error {
 		return nil
 	}
 
+	s.ctx.Log.Info("populating platformvm block height index")
+	startTime := time.Now()
+
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
 	for blockIterator.Next() {
@@ -2059,6 +2063,8 @@ func (s *state) populateBlockHeightIndex() error {
 	if err := database.PutID(s.blockIDDB, lastAcceptedHeightKey, s.lastAccepted); err != nil {
 		return fmt.Errorf("failed to add blockID: %w", err)
 	}
+
+	s.ctx.Log.Info("populated platformvm block height index", zap.Duration("elapsed", time.Since(startTime)))
 
 	return nil
 }
