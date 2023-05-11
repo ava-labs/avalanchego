@@ -58,7 +58,8 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
+	err = tx.Unsigned.Visit(&txExecutor)
+	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -79,7 +80,8 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
+	err = tx.Unsigned.Visit(&txExecutor)
+	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
@@ -159,7 +161,8 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveStakerTooEarly)
+	err = tx.Unsigned.Visit(&txExecutor)
+	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -174,7 +177,8 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	require.ErrorIs(tx.Unsigned.Visit(&txExecutor), ErrRemoveWrongStaker)
+	err = tx.Unsigned.Visit(&txExecutor)
+	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
