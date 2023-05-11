@@ -275,7 +275,6 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 }
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
-	// setup
 	require := require.New(t)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
@@ -298,8 +297,8 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	require.NoError(err)
 
 	// checks
-	proBlock, ok := snowBlock.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, snowBlock)
+	proBlock := snowBlock.(*postForkBlock)
 	require.Equal(coreBlk, proBlock.innerBlk)
 }
 
@@ -676,14 +675,13 @@ func TestPreFork_Initialize(t *testing.T) {
 	rtvdBlk, err := proVM.GetBlock(context.Background(), blkID)
 	require.NoError(err)
 
-	_, ok := rtvdBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, rtvdBlk)
 	require.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes())
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
-	// setup
 	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
@@ -703,9 +701,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-
-	_, ok := builtBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, builtBlk)
 	require.Equal(coreBlk.ID(), builtBlk.ID())
 	require.Equal(coreBlk.Bytes(), builtBlk.Bytes())
 
@@ -719,7 +715,6 @@ func TestPreFork_BuildBlock(t *testing.T) {
 }
 
 func TestPreFork_ParseBlock(t *testing.T) {
-	// setup
 	require := require.New(t)
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 
@@ -738,8 +733,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
 	require.NoError(err)
 
-	_, ok := parsedBlk.(*preForkBlock)
-	require.True(ok)
+	require.IsType(&preForkBlock{}, parsedBlk)
 	require.Equal(coreBlk.ID(), parsedBlk.ID())
 	require.Equal(coreBlk.Bytes(), parsedBlk.Bytes())
 
@@ -1654,8 +1648,8 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
@@ -1710,8 +1704,8 @@ func TestLaggedPChainHeight(t *testing.T) {
 	blockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	block, ok := blockIntf.(*postForkBlock)
-	require.True(ok, "expected post fork block")
+	require.IsType(&postForkBlock{}, blockIntf)
+	block := blockIntf.(*postForkBlock)
 
 	pChainHeight := block.PChainHeight()
 	require.Equal(pChainHeight, coreGenBlk.Height())
@@ -2123,8 +2117,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
@@ -2251,7 +2245,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	gotBlk, ok := vm.innerBlkCache.Get(blkNearTip.ID())
 	require.True(ok)
 	require.Equal(mockInnerBlkNearTip, gotBlk)
-	require.EqualValues(0, vm.lastAcceptedHeight)
+	require.Zero(vm.lastAcceptedHeight)
 
 	// Clear the cache
 	vm.innerBlkCache.Flush()

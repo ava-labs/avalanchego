@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/stretchr/testify/require"
 )
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
@@ -172,9 +173,8 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
-
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
@@ -383,8 +383,8 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)

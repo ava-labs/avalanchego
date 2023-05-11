@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/stretchr/testify/require"
 )
 
 var _ snowman.OracleBlock = (*TestOptionsBlock)(nil)
@@ -116,14 +117,13 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	require.NoError(err)
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 
-	_, ok = opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them
 	err = opts[0].Verify(context.Background())
@@ -153,8 +153,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	proChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	_, ok = proChild.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, proChild)
 
 	err = proChild.Verify(context.Background())
 	require.NoError(err)
@@ -244,14 +243,13 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	require.NoError(err)
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 
-	_, ok = opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
 	err = opts[0].Verify(context.Background())
@@ -361,8 +359,8 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	require.Equal(acceptedID, parentBlk.ID())
 
 	// accept one of the options
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
@@ -461,14 +459,14 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	err = builtBlk.Reject(context.Background())
 	require.NoError(err)
 
-	proBlk, ok := builtBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, builtBlk)
+	proBlk := builtBlk.(*postForkBlock)
 	require.Equal(choices.Rejected, proBlk.Status())
 	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
 
 	// reject an option
-	postForkOracleBlk, ok := builtBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, builtBlk)
+	postForkOracleBlk := builtBlk.(*postForkBlock)
 
 	opts, err := postForkOracleBlk.Options(context.Background())
 	require.NoError(err)
@@ -476,8 +474,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	err = opts[0].Reject(context.Background())
 	require.NoError(err)
 
-	proOpt, ok := opts[0].(*postForkOption)
-	require.True(ok)
+	require.IsType(&postForkOption{}, opts[0])
+	proOpt := opts[0].(*postForkOption)
 
 	require.Equal(choices.Rejected, proOpt.Status())
 	require.NotEqual(choices.Rejected, proOpt.innerBlk.Status())
@@ -544,8 +542,8 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	postForkBlk, ok := parentBlk.(*postForkBlock)
-	require.True(ok)
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkBlk := parentBlk.(*postForkBlock)
 
 	_, err = postForkBlk.Options(context.Background())
 	require.True(errors.Is(err, snowman.ErrNotOracle))

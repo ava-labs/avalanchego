@@ -346,7 +346,7 @@ func TestSend(t *testing.T) {
 	toSend := set.Set[ids.NodeID]{}
 	toSend.Add(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, subnets.NoOpAllower)
-	require.EqualValues(toSend, sentTo)
+	require.Equal(toSend, sentTo)
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -441,7 +441,8 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	dialer, listeners, nodeIDs, configs, err := newTestNetwork(t, 2)
+	require.NoError(err)
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
@@ -537,7 +538,8 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 func TestDialDeletesNonValidators(t *testing.T) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	dialer, listeners, nodeIDs, configs, err := newTestNetwork(t, 2)
+	require.NoError(err)
 
 	primaryVdrs := validators.NewSet()
 	for _, nodeID := range nodeIDs {
@@ -595,7 +597,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	}
 
 	config := configs[0]
-	signer := peer.NewIPSigner(config.MyIPPort, config.TLSKey)
+	signer := peer.NewIPSigner(config.MyIPPort, config.IPSigner)
 	ip, err := signer.GetSignedIP()
 	require.NoError(err)
 
@@ -607,7 +609,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 				Cert:      config.TLSConfig.Certificates[0].Leaf,
 				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
-				Signature: ip.Signature,
+				Signature: ip.TLSSignature,
 			}})
 			require.NoError(err)
 			// peerAcks is empty because we aren't actually connected to
