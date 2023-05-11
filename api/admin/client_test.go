@@ -76,74 +76,62 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 }
 
 func TestStartCPUProfiler(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StartCPUProfiler(context.Background())
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
 func TestStopCPUProfiler(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StopCPUProfiler(context.Background())
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
 func TestMemoryProfile(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.MemoryProfile(context.Background())
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
 func TestLockProfile(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.LockProfile(context.Background())
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
 func TestAlias(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Alias(context.Background(), "alias", "alias2")
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
 func TestAliasChain(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
@@ -169,14 +157,12 @@ func TestGetChainAliases(t *testing.T) {
 }
 
 func TestStacktrace(t *testing.T) {
-	require := require.New(t)
-
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Stacktrace(context.Background())
-		require.ErrorIs(err, test.Err)
+		require.ErrorIs(t, err, test.Err)
 	}
 }
 
