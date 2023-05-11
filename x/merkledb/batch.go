@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var _ database.Batch = &batch{}
+var _ database.Batch = (*batch)(nil)
 
 // batch is a write-only database that commits changes to its host database
 // when Write is called.
