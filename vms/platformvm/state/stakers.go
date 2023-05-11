@@ -130,7 +130,7 @@ type baseStakers struct {
 }
 
 type baseStaker struct {
-	validator *Staker
+	validator *Staker // if deleted is nil
 
 	// delegators ordered for iterations
 	delegators *btree.BTreeG[*Staker]
@@ -210,18 +210,18 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 		nodeID   = staker.NodeID
 	)
 	validator := v.getOrCreateValidator(subnetID, nodeID)
-	prevStaker := validator.validator
+	storedStaker := validator.validator
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
 
 	// for sake of generality, we assume we could delete an updated version
-	// of validator.validator. We explicitly remove the previous version of
-	// staker to handle this case.
-	v.stakers.Delete(prevStaker)
+	// of validator.validator. We explicitly remove the currently stored
+	// version of the staker to handle this case.
+	v.stakers.Delete(storedStaker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, subnetID, nodeID)
 	validatorDiff.validator = stakerAndStatus{
-		staker: prevStaker,
+		staker: storedStaker,
 		status: deleted,
 	}
 }
@@ -269,10 +269,11 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	}
 	prevDelegator, found := validator.delegatorsByTxID[staker.TxID]
 	if !found {
-		return fmt.Errorf("%w, subnetID %v, nodeID %v",
+		return fmt.Errorf("%w, subnetID %v, nodeID %v, txID %v",
 			ErrUpdatingUnknownStaker,
 			staker.SubnetID,
 			staker.NodeID,
+			staker.TxID,
 		)
 	}
 	validator.delegators.Delete(prevDelegator)
