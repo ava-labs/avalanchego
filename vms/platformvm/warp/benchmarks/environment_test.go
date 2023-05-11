@@ -315,7 +315,7 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
-// buildGenesisTest creates the genesis bytes required to initialized state.State
+// buildGenesisTest creates the genesis bytes required to initialize state.State
 // (in prod code they are passed via vm.Initialize). The test genesis contains three
 // test validators whose control keys are available for tests
 func buildGenesisTest(ctx *snow.Context) []byte {

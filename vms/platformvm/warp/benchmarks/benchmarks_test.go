@@ -240,8 +240,7 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 	b.StopTimer() // done testing
 }
 
-// benchmarks above require a primary network validator. We move their
-// creation in [benchPrimaryNetworkValidatorTx] to reduce clutter
+// benchPrimaryNetworkValidatorTx returns a tx used in benchmarks to add a primary network validator.
 func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (*txs.Tx, error) {
 	blsPrivateKey, err := bls.NewSecretKey()
 	if err != nil {
@@ -311,6 +310,7 @@ func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (
 	return txs.NewSigned(uPermissionlessPrimaryValidatorTx, txs.Codec, nil)
 }
 
+// benchSubnetValidatorTx returns a tx used in benchmarks to add a subnet validator.
 func benchSubnetValidatorTx(chainState state.State, subnetID ids.ID, nodeID ids.NodeID) (*txs.Tx, error) {
 	uPermissionlessValidatorTx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{
