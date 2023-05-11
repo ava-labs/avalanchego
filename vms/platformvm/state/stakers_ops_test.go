@@ -58,7 +58,7 @@ func TestSimpleStakersOperations(t *testing.T) {
 func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
-	properties.Property("some current validator ops", prop.ForAll(
+	properties.Property("add, delete and query current validators", prop.ForAll(
 		func(s Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {

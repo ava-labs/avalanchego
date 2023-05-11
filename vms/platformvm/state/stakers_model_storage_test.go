@@ -440,7 +440,7 @@ var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 	},
 )
 
-// PutCurrentValidator section
+// PutCurrentDelegator section
 type putCurrentDelegatorCommand Staker
 
 func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
@@ -678,7 +678,7 @@ var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 	},
 )
 
-// DeleteCurrentValidator section
+// DeleteCurrentDelegator section
 type deleteCurrentDelegatorCommand struct{}
 
 func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
