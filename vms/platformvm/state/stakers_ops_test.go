@@ -65,15 +65,12 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 
 			// no staker before insertion
-			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID)
+			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
 
-			// it's fine deleting unknown validator
-			store.DeleteCurrentValidator(&s)
-
-			currIT, err := store.GetCurrentStakerIterator()
+			currIT, err := store.GetCurrentStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
@@ -82,9 +79,25 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 			currIT.Release()
 
-			// staker after insertion
+			// it's fine deleting unknown validator
+			store.DeleteCurrentValidator(&s)
+			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID) // check version 1
+			if err != database.ErrNotFound {
+				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+			}
+
+			currIT, err = store.GetCurrentStakerIterator() // check version 2
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+			}
+			if currIT.Next() {
+				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
+			}
+			currIT.Release()
+
+			// insert the staker and show it can be found
 			store.PutCurrentValidator(&s)
-			retrievedStaker, err := store.GetCurrentValidator(s.SubnetID, s.NodeID)
+			retrievedStaker, err := store.GetCurrentValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != nil {
 				return fmt.Sprintf("expected no error, got %v", err)
 			}
@@ -92,7 +105,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
 			}
 
-			currIT, err = store.GetCurrentStakerIterator()
+			currIT, err = store.GetCurrentStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
@@ -104,14 +117,14 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 			currIT.Release()
 
-			// no staker after deletion
+			// delete the staker and show it won't be found anymore
 			store.DeleteCurrentValidator(&s)
-			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID)
+			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
 
-			currIT, err = store.GetCurrentStakerIterator()
+			currIT, err = store.GetCurrentStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
@@ -133,26 +146,39 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 
 			// no staker before insertion
-			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID)
+			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
 
-			// it's fine deleting unknown validator
-			store.DeletePendingValidator(&s)
-
-			currIT, err := store.GetPendingStakerIterator()
+			pendIt, err := store.GetPendingStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
-			if currIT.Next() {
-				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
+			if pendIt.Next() {
+				return fmt.Sprintf("expected empty iterator, got at least element %v", pendIt.Value())
 			}
-			currIT.Release()
+			pendIt.Release()
 
-			// staker after insertion
+			// it's fine deleting unknown validator
+			store.DeletePendingValidator(&s)
+			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID) // check version 1
+			if err != database.ErrNotFound {
+				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+			}
+
+			pendIt, err = store.GetPendingStakerIterator() // check version 2
+			if err != nil {
+				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+			}
+			if pendIt.Next() {
+				return fmt.Sprintf("expected empty iterator, got at least element %v", pendIt.Value())
+			}
+			pendIt.Release()
+
+			// insert the staker and show it can be found
 			store.PutPendingValidator(&s)
-			retrievedStaker, err := store.GetPendingValidator(s.SubnetID, s.NodeID)
+			retrievedStaker, err := store.GetPendingValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != nil {
 				return fmt.Sprintf("expected no error, got %v", err)
 			}
@@ -160,33 +186,33 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
 			}
 
-			currIT, err = store.GetPendingStakerIterator()
+			pendIt, err = store.GetPendingStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
-			if !currIT.Next() {
+			if !pendIt.Next() {
 				return errNonEmptyIteratorExpected.Error()
 			}
-			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
+			if !reflect.DeepEqual(pendIt.Value(), retrievedStaker) {
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
 			}
-			currIT.Release()
+			pendIt.Release()
 
-			// no staker after deletion
+			// delete the staker and show it won't be found anymore
 			store.DeletePendingValidator(&s)
-			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID)
+			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID) // check version 1
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
 
-			currIT, err = store.GetPendingStakerIterator()
+			pendIt, err = store.GetPendingStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
-			if currIT.Next() {
-				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
+			if pendIt.Next() {
+				return fmt.Sprintf("expected empty iterator, got at least element %v", pendIt.Value())
 			}
-			currIT.Release()
+			pendIt.Release()
 
 			return ""
 		},
@@ -206,9 +232,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 
 			// store validator
 			store.PutCurrentValidator(&val)
-
-			// check validator - version 1
-			retrievedValidator, err := store.GetCurrentValidator(val.SubnetID, val.NodeID)
+			retrievedValidator, err := store.GetCurrentValidator(val.SubnetID, val.NodeID) // check version 1
 			if err != nil {
 				return fmt.Sprintf("expected no error, got %v", err)
 			}
@@ -216,8 +240,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
 			}
 
-			// check validator - version 2
-			valIt, err := store.GetCurrentStakerIterator()
+			valIt, err := store.GetCurrentStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
@@ -279,7 +302,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 			delIt.Release()
 
-			// check no missing delegators if whole staker set
+			// check no missing delegators in the whole staker set
 			for _, del := range dels {
 				found := false
 				fullDelIt, err := store.GetCurrentStakerIterator()
@@ -348,9 +371,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 
 			// store validator
 			store.PutCurrentValidator(&val)
-
-			// check validator - version 1
-			retrievedValidator, err := store.GetCurrentValidator(val.SubnetID, val.NodeID)
+			retrievedValidator, err := store.GetCurrentValidator(val.SubnetID, val.NodeID) // check version 1
 			if err != nil {
 				return fmt.Sprintf("expected no error, got %v", err)
 			}
@@ -358,8 +379,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
 			}
 
-			// check validator - version 2
-			valIt, err := store.GetCurrentStakerIterator()
+			valIt, err := store.GetCurrentStakerIterator() // check version 2
 			if err != nil {
 				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
 			}
@@ -421,7 +441,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			}
 			delIt.Release()
 
-			// check no missing delegators if whole staker set
+			// check no missing delegators in the whole staker set
 			for _, del := range dels {
 				found := false
 				fullDelIt, err := store.GetPendingStakerIterator()
