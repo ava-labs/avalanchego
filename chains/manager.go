@@ -627,10 +627,6 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// Passes messages from the avalanche engines to the network
 	avalancheMessageSender, err := sender.New(
 		ctx,
@@ -726,6 +722,10 @@ func (m *manager) createAvalancheChain(
 	}
 
 	ctx.Context.Metrics = avalancheRegisterer
+
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
@@ -1000,10 +1000,6 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
 		ctx,
@@ -1116,6 +1112,10 @@ func (m *manager) createSnowmanChain(
 	if m.TracingEnabled {
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
+
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
 
 	if err := vm.Initialize(
 		context.TODO(),
