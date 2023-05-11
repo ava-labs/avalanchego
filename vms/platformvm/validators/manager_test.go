@@ -422,12 +422,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			if tt.expectedErr != nil {
 				return
 			}
-			r.Equal(len(tt.expectedVdrSet), len(gotVdrSet))
-			for nodeID, vdr := range tt.expectedVdrSet {
-				otherVdr, ok := gotVdrSet[nodeID]
-				r.True(ok)
-				r.Equal(vdr, otherVdr)
-			}
+			r.Equal(tt.expectedVdrSet, gotVdrSet)
 		})
 	}
 }

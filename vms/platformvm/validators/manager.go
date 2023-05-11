@@ -49,7 +49,7 @@ type QueryManager interface {
 type Manager interface {
 	QueryManager
 
-	// OnAcceptedBlockID register the ID of the latest accepted block.
+	// OnAcceptedBlockID registers the ID of the latest accepted block.
 	// It is used to update [recentlyAccepted] sliding window.
 	OnAcceptedBlockID(blkID ids.ID)
 }
