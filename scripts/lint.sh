@@ -60,7 +60,7 @@ function test_require_error_is_no_funcs_as_params {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if ggrep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
