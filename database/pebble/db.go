@@ -240,7 +240,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		// compare function from the pebble package since
 		// it's defined in internal.
 		// We use bytes.Equal instead of bytes.Compare
-		// because golangci_lint recommands
+		// because golangci_lint recommends
 		if bytes.Equal(start, limit) {
 			// Don't return error if it is caused
 			// by the same of start and limit
