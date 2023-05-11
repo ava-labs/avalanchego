@@ -31,6 +31,15 @@ var (
 	_ commands.Command = (*commitBottomStateCommand)(nil)
 )
 
+// TestStateAndDiffComparisonToStorageModel verifies that a production-like
+// system made of a stack of state.Diffs built on top of a state.State conforms to
+// our stakersStorageModel. It achieves this by:
+//  1. randomly generating a sequence of stakers writes as well as
+//     some persistence operations (commit/diff apply),
+//  2. applying the sequence to both our stakersStorageModel and the production-like system.
+//  3. checking that both stakersStorageModel and the production-like system have
+//     the same state after each operation.
+
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 

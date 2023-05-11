@@ -21,6 +21,10 @@ import (
 
 var errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
 
+// TestSimpleStakersOperations checks that state.State and state.Diff conform our stakersStorageModel.
+// TestSimpleStakersOperations tests state.State and state.Diff in isolation, over simple operations.
+// TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like
+// mix of state.State and state.Diffs.
 func TestSimpleStakersOperations(t *testing.T) {
 	storeCreators := map[string]func() (state.Stakers, error){
 		"base state": func() (state.Stakers, error) {
