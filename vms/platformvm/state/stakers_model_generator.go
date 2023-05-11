@@ -34,7 +34,7 @@ func stakerGenerator(
 	prio generatorPriorityType,
 	subnet *ids.ID,
 	nodeID *ids.NodeID,
-	maxWeight uint64, // helps avoiding overflowS in delegator tests,
+	maxWeight uint64, // helps avoiding overflows in delegator tests,
 ) gopter.Gen {
 	return genStakerTimeData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
