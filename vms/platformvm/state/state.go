@@ -2015,7 +2015,7 @@ func (s *state) writeMetadata() error {
 func (s *state) populateBlockHeightIndex() error {
 	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve last accepted block from local disk: %w", err)
+		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
 	}
 
 	lastAcceptedHeight := lastAcceptedBlk.Height()
