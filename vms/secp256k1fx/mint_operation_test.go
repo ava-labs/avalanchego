@@ -123,7 +123,8 @@ func TestMintOperationVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, tt.op.Verify(), tt.expectedErr)
+			err := tt.op.Verify()
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
