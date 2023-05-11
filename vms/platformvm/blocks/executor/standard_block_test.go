@@ -264,7 +264,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(banffChildBlk)
-		require.ErrorIs(block.Verify(context.Background()), errBanffStandardBlockWithoutChanges)
+		err = block.Verify(context.Background())
+		require.ErrorIs(err, errBanffStandardBlockWithoutChanges)
 	}
 
 	{
