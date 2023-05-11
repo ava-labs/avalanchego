@@ -21,7 +21,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params"}
+TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params interface_compliance_nil"}
 
 function test_golangci_lint {
   go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
@@ -53,6 +53,13 @@ function test_license_header {
 
 function test_require_error_is_no_funcs_as_params {
   if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+    echo ""
+    return 1
+  fi
+}
+
+function test_interface_compliance_nil {
+  if ggrep -R -o -P '_ .+? = &.+?\{\}' .; then
     echo ""
     return 1
   fi
