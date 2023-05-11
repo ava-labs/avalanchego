@@ -164,7 +164,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		)
 	}
 
-	if _, err := verifyAddSubnetValidatorTx(
+	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,

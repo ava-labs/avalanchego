@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -302,7 +303,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	primaryValidatorEndTime, err := verifyAddSubnetValidatorTx(
+	err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -317,7 +318,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		chainTime = e.State.GetTimestamp()
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
+	staker, err := e.addStakerFromStakerTx(tx, chainTime, chainTime.Add(tx.StakingPeriod()))
 	if err != nil {
 		return err
 	}
@@ -442,7 +443,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	primaryValidatorEndTime, err := verifyAddPermissionlessValidatorTx(
+	err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -455,9 +456,15 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	var (
 		txID      = e.Tx.ID()
 		chainTime = e.State.GetTimestamp()
+		staker    *state.Staker
 	)
 
-	staker, err := e.addStakerFromStakerTx(tx, chainTime, primaryValidatorEndTime)
+	if tx.SubnetID() == constants.PrimaryNetworkID {
+		staker, err = e.addStakerFromStakerTx(tx, chainTime, mockable.MaxTime)
+	} else {
+		staker, err = e.addStakerFromStakerTx(tx, chainTime, chainTime.Add(tx.StakingPeriod()))
+	}
+
 	if err != nil {
 		return err
 	}

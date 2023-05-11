@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -161,55 +160,37 @@ func verifyAddValidatorTx(
 
 // verifyAddSubnetValidatorTx carries out the validation for an
 // AddSubnetValidatorTx.
-// Returns the primary network validator EndTime, which bounds
-// subnet staker endTime
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
-) (time.Time, error) {
+) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	stakingPeriod := tx.StakingPeriod()
 	switch {
 	case stakingPeriod < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return time.Time{}, ErrStakeTooShort
+		return ErrStakeTooShort
 
 	case stakingPeriod > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return time.Time{}, ErrStakeTooLong
-	}
-
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == database.ErrNotFound {
-		return time.Time{}, fmt.Errorf(
-			"%s %w of the primary network",
-			tx.Validator.NodeID,
-			ErrNotValidator,
-		)
-	}
-	if err != nil {
-		return time.Time{}, fmt.Errorf(
-			"failed to fetch the primary network validator for %s: %w",
-			tx.Validator.NodeID,
-			err,
-		)
+		return ErrStakeTooLong
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return primaryNetworkValidator.EndTime, nil
+		return nil
 	}
 
-	currentChainTime := chainState.GetTimestamp()
+	currentTimestamp := chainState.GetTimestamp()
 	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
+	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		if startTime != txs.StakerZeroTime {
-			return time.Time{}, fmt.Errorf(
+			return fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
 				startTime,
@@ -217,18 +198,19 @@ func verifyAddSubnetValidatorTx(
 		}
 	} else {
 		// Ensure the proposed validator starts after the current timestamp
-		if !currentChainTime.Before(startTime) {
-			return time.Time{}, fmt.Errorf(
+		if !currentTimestamp.Before(startTime) {
+			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
-				currentChainTime,
+				currentTimestamp,
 				startTime,
 			)
 		}
 	}
 
-	if _, err = GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID); err == nil {
-		return time.Time{}, fmt.Errorf(
+	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	if err == nil {
+		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
@@ -236,34 +218,43 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 	if err != database.ErrNotFound {
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to find whether %s is a subnet validator: %w",
 			tx.Validator.NodeID,
 			err,
 		)
 	}
 
-	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
-		if stakingPeriod > primaryNetworkValidator.StakingPeriod {
-			return time.Time{}, ErrValidatorSubset
-		}
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if err == database.ErrNotFound {
+		return fmt.Errorf(
+			"%s %w of the primary network",
+			tx.Validator.NodeID,
+			ErrNotValidator,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf(
+			"failed to fetch the primary network validator for %s: %w",
+			tx.Validator.NodeID,
+			err,
+		)
+	}
 
-		// TODO ABENEGIA: we assume that the subnet validator may be accepted
-		// if its primary network counterpart will validate for at least another
-		// period. We may change this
-		firstStakinPeriodEndTime := currentChainTime.Add(stakingPeriod)
-		if firstStakinPeriodEndTime.After(primaryNetworkValidator.EndTime) {
-			return time.Time{}, ErrValidatorSubset
+	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		primaryNetworkValDuration := primaryNetworkValidator.EndTime.Sub(primaryNetworkValidator.StartTime)
+		if tx.Validator.StakingPeriod() > primaryNetworkValDuration {
+			return ErrValidatorSubset
 		}
 	} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
-		return time.Time{}, ErrValidatorSubset
+		return ErrValidatorSubset
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	// Verify the flowcheck
@@ -277,7 +268,7 @@ func verifyAddSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddSubnetValidatorFee,
 		},
 	); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -286,12 +277,12 @@ func verifyAddSubnetValidatorTx(
 	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
 	// (start time is zero). I didn't bother guarding the check (which must be the
 	// last one made).
-	maxStartTime := currentChainTime.Add(MaxFutureStartTime)
+	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
-		return time.Time{}, ErrFutureStakeTime
+		return ErrFutureStakeTime
 	}
 
-	return primaryNetworkValidator.EndTime, nil
+	return nil
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -497,38 +488,36 @@ func verifyAddPermissionlessValidatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessValidatorTx,
-) (time.Time, error) {
+) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	var (
 		primaryNetworkValidator *state.Staker
-		primaryValidatorEndTime = mockable.MaxTime
 		err                     error
 	)
 	if tx.Subnet != constants.PlatformChainID {
 		primaryNetworkValidator, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
-			return time.Time{}, fmt.Errorf(
+			return fmt.Errorf(
 				"failed to fetch the primary network validator for %s: %w",
 				tx.Validator.NodeID,
 				err,
 			)
 		}
-		primaryValidatorEndTime = primaryNetworkValidator.EndTime
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return primaryValidatorEndTime, nil
+		return nil
 	}
 
 	currentChainTime := chainState.GetTimestamp()
 	startTime := tx.StartTime()
 	if backend.Config.IsContinuousStakingActivated(currentChainTime) {
 		if startTime != txs.StakerZeroTime {
-			return time.Time{}, fmt.Errorf(
+			return fmt.Errorf(
 				"%w: %s",
 				ErrStartTimeMustBeZero,
 				startTime,
@@ -537,7 +526,7 @@ func verifyAddPermissionlessValidatorTx(
 	} else {
 		// Ensure the proposed validator starts after the current time
 		if !currentChainTime.Before(startTime) {
-			return time.Time{}, fmt.Errorf(
+			return fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentChainTime,
@@ -548,7 +537,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	var (
@@ -558,27 +547,27 @@ func verifyAddPermissionlessValidatorTx(
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return time.Time{}, ErrWeightTooSmall
+		return ErrWeightTooSmall
 
 	case tx.Validator.Wght > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
-		return time.Time{}, ErrWeightTooLarge
+		return ErrWeightTooLarge
 
 	case tx.DelegationShares < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return time.Time{}, ErrInsufficientDelegationFee
+		return ErrInsufficientDelegationFee
 
 	case stakingPeriod < validatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return time.Time{}, ErrStakeTooShort
+		return ErrStakeTooShort
 
 	case stakingPeriod > validatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
-		return time.Time{}, ErrStakeTooLong
+		return ErrStakeTooLong
 
 	case stakedAssetID != validatorRules.assetID:
 		// Wrong assetID used
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: %s != %s",
 			ErrWrongStakedAssetID,
 			validatorRules.assetID,
@@ -588,7 +577,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	_, err = GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err == nil {
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: %s on %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
@@ -596,7 +585,7 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 	if err != database.ErrNotFound {
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			tx.Validator.NodeID,
 			tx.Subnet,
@@ -608,7 +597,7 @@ func verifyAddPermissionlessValidatorTx(
 	if tx.Subnet != constants.PrimaryNetworkID {
 		if backend.Config.IsContinuousStakingActivated(currentChainTime) {
 			if stakingPeriod > primaryNetworkValidator.StakingPeriod {
-				return time.Time{}, ErrValidatorSubset
+				return ErrValidatorSubset
 			}
 
 			// TODO ABENEGIA: we assume that the subnet validator may be accepted
@@ -616,12 +605,12 @@ func verifyAddPermissionlessValidatorTx(
 			// period. We may change this
 			candidateEndTime := currentChainTime.Add(stakingPeriod)
 			if candidateEndTime.After(primaryNetworkValidator.EndTime) {
-				return time.Time{}, ErrValidatorSubset
+				return ErrValidatorSubset
 			}
 		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
 			// Ensure that the period this validator validates the specified subnet
 			// is a subset of the time they validate the primary network.
-			return time.Time{}, ErrValidatorSubset
+			return ErrValidatorSubset
 		}
 
 		txFee = backend.Config.AddSubnetValidatorFee
@@ -644,7 +633,7 @@ func verifyAddPermissionlessValidatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -655,10 +644,10 @@ func verifyAddPermissionlessValidatorTx(
 	// last one made).
 	maxStartTime := currentChainTime.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
-		return time.Time{}, ErrFutureStakeTime
+		return ErrFutureStakeTime
 	}
 
-	return primaryValidatorEndTime, nil
+	return nil
 }
 
 type addValidatorRules struct {

@@ -467,19 +467,7 @@ func (h *handler) AuthorizeStopStaking(
 	case txs.DelegatorTx:
 		stakerOwner = uStakerTx.RewardsOwner()
 	case *txs.AddSubnetValidatorTx:
-		signedSubnetTx, _, err := state.GetTx(uStakerTx.Subnet)
-		if err != nil {
-			return nil, nil, fmt.Errorf(
-				"tx creating subnet not found %q: %v",
-				uStakerTx.Subnet,
-				err,
-			)
-		}
-		subnetTx, ok := signedSubnetTx.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
-			return nil, nil, fmt.Errorf("expected *txs.CreateSubnetTx but got %T", signedSubnetTx.Unsigned)
-		}
-		stakerOwner = subnetTx.Owner
+		return nil, nil, errors.New("cannot stop subnet validator")
 	default:
 		return nil, nil, fmt.Errorf(
 			"unhandled staker type: %t",

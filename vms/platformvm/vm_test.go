@@ -1206,8 +1206,7 @@ func TestCreateChain(t *testing.T) {
 // test where we:
 // 1) Create a subnet
 // 2) Add a validator to the subnet's pending validator set
-// 3) Stop the subnet validator at the end of its first staking period
-// 4) Advance timestamp to validator's end time (removing validator from current)
+// 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(ContinuousStakingFork)
@@ -1288,29 +1287,9 @@ func TestCreateSubnet(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
 	require.NoError(err)
 
-	// Stop the subnet validator
-	stopTx, err := vm.txBuilder.NewStopStakerTx(
-		txID,
-		[]*secp256k1.PrivateKey{keys[0]},
-		ids.ShortEmpty, // change addr
-	)
-	require.NoError(err)
-	require.NoError(vm.Builder.AddUnverifiedTx(stopTx))
-	blk, err = vm.Builder.BuildBlock(context.Background()) // should make subnet validator as stopping
-	require.NoError(err)
-
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // add the validator to validator set
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	staker, err := vm.state.GetCurrentValidator(createSubnetTx.ID(), nodeID)
-	require.NoError(err)
-
-	// there should be a finite end time set, since primary validator has finite end
-	require.True(staker.EndTime.Before(mockable.MaxTime))
-
 	// fast forward clock to time validator should stop validating
-	vm.clock.Set(staker.EndTime)
+	endTime := vm.clock.Time().Add(defaultMinStakingDuration)
+	vm.clock.Set(endTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
