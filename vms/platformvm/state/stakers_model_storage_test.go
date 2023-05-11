@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -20,6 +21,8 @@ var (
 	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
+	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
 	_ commands.Command = (*commitBottomStateCommand)(nil)
@@ -169,8 +172,9 @@ var stakersCommands = &commands.ProtoCommands{
 		return gen.OneGenOf(
 			genPutCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
-			// genPutCurrentDelegatorCommand,
-			// genDeleteCurrentDelegatorCommand,
+
+			genPutCurrentDelegatorCommand,
+			genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
@@ -217,7 +221,7 @@ func (v *putCurrentValidatorCommand) String() string {
 		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
 }
 
-var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil).Map(
+var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
 	func(staker Staker) commands.Command {
 		cmd := (*putCurrentValidatorCommand)(&staker)
 		return cmd
@@ -307,6 +311,215 @@ func (*deleteCurrentValidatorCommand) String() string {
 var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &deleteCurrentValidatorCommand{}
+	},
+)
+
+// PutCurrentDelegator section
+type putCurrentDelegatorCommand Staker
+
+func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	candidateDelegator := (*Staker)(v)
+	sys := sut.(*sysUnderTest)
+	err := addCurrentDelegatorInSystem(sys, candidateDelegator)
+	if err != nil {
+		panic(err)
+	}
+	return sys
+}
+
+func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) error {
+	// 1. check if there is a current validator, already inserted. If not return
+	// 2. Update candidateDelegator attributes to make it delegator of selected validator
+	// 3. Add delegator to picked validator
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a current validator. If not, nothing to do
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return nil // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	// 2. Add a delegator to it
+	delegator := candidateDelegator
+	delegator.SubnetID = validator.SubnetID
+	delegator.NodeID = validator.NodeID
+
+	chain.PutCurrentDelegator(delegator)
+	return nil
+}
+
+func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	candidateDelegator := (*Staker)(v)
+	model := cmdState.(*stakersStorageModel)
+	err := addCurrentDelegatorInModel(model, candidateDelegator)
+	if err != nil {
+		panic(err)
+	}
+	return cmdState
+}
+
+func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *Staker) error {
+	// 1. check if there is a current validator, already inserted. If not return
+	// 2. Update candidateDelegator attributes to make it delegator of selected validator
+	// 3. Add delegator to picked validator
+
+	// 1. check if there is a current validator. If not, nothing to do
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		validator *Staker
+	)
+	for !found && stakerIt.Next() {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return nil // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	// 2. Add a delegator to it
+	delegator := candidateDelegator
+	delegator.SubnetID = validator.SubnetID
+	delegator.NodeID = validator.NodeID
+
+	model.PutCurrentDelegator(delegator)
+	return nil
+}
+
+func (*putCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
+	if checkSystemAndModelContent(model, sys) {
+		return &gopter.PropResult{Status: gopter.PropTrue}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropFalse}
+}
+
+func (v *putCurrentDelegatorCommand) String() string {
+	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+}
+
+var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
+	func(staker Staker) commands.Command {
+		cmd := (*putCurrentDelegatorCommand)(&staker)
+		return cmd
+	},
+)
+
+// DeleteCurrentDelegator section
+type deleteCurrentDelegatorCommand struct{}
+
+func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	// delete first validator, if any
+	sys := sut.(*sysUnderTest)
+	topDiff := sys.getTopChainState()
+
+	stakerIt, err := topDiff.GetCurrentStakerIterator()
+	if err != nil {
+		panic(err)
+	}
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
+			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return sys // no current validator to delete
+	}
+	stakerIt.Release()
+
+	topDiff.DeleteCurrentDelegator(delegator)
+	return sys // returns sys to allow comparison with state in PostCondition
+}
+
+func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
+			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+			found = true
+		}
+	}
+	if !found {
+		return cmdState // no current validator to add delegator to
+	}
+	stakerIt.Release()
+
+	model.DeleteCurrentDelegator(delegator)
+	return cmdState
+}
+
+func (*deleteCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
+	if checkSystemAndModelContent(model, sys) {
+		return &gopter.PropResult{Status: gopter.PropTrue}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropFalse}
+}
+
+func (*deleteCurrentDelegatorCommand) String() string {
+	return "DeleteCurrentDelegator"
+}
+
+var genDeleteCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &deleteCurrentDelegatorCommand{}
 	},
 )
 

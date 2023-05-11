@@ -30,7 +30,12 @@ const (
 // which can be used in our property tests. stakerGenerator takes care of
 // enforcing some Staker invariants on each and every random sample.
 // TestGeneratedStakersValidity documents and verifies the enforced invariants.
-func stakerGenerator(prio generatorPriorityType, subnet *ids.ID, nodeID *ids.NodeID) gopter.Gen {
+func stakerGenerator(
+	prio generatorPriorityType,
+	subnet *ids.ID,
+	nodeID *ids.NodeID,
+	maxWeight uint64, // helps avoiding overflows in delegator tests
+) gopter.Gen {
 	return genStakerTimeData(prio).FlatMap(
 		func(v interface{}) gopter.Gen {
 			macro := v.(stakerTimeData)
@@ -49,7 +54,7 @@ func stakerGenerator(prio generatorPriorityType, subnet *ids.ID, nodeID *ids.Nod
 				"NodeID":          genStakerNodeID,
 				"PublicKey":       genBlsKey,
 				"SubnetID":        genStakerSubnetID,
-				"Weight":          gen.UInt64(),
+				"Weight":          gen.UInt64Range(0, maxWeight),
 				"StartTime":       gen.Const(macro.StartTime),
 				"EndTime":         gen.Const(macro.EndTime),
 				"PotentialReward": gen.UInt64(),

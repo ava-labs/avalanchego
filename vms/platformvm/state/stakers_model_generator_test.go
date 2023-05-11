@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,7 +27,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("NextTime coherent with priority", prop.ForAll(
@@ -59,7 +60,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 				return fmt.Sprintf("priority %v unhandled in test", p)
 			}
 		},
-		stakerGenerator(anyPriority, nil, nil),
+		stakerGenerator(anyPriority, nil, nil, math.MaxUint64),
 	))
 
 	subnetID := ids.GenerateTestID()
@@ -76,7 +77,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 			return ""
 		},
-		stakerGenerator(anyPriority, &subnetID, &nodeID),
+		stakerGenerator(anyPriority, &subnetID, &nodeID, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
