@@ -2050,12 +2050,6 @@ func (s *state) populateBlockHeightIndex() error {
 			continue
 		}
 
-		// Populate the in-memory cache with the [blockIDCacheSize] most recent blocks
-		if math.AbsDiff(s.currentHeight, blkHeight) <= blockIDCacheSize {
-			s.addedBlockIDs[blkHeight] = blkID
-			s.blockIDCache.Put(blkHeight, blkID)
-		}
-
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
