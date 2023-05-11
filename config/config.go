@@ -49,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -84,7 +83,6 @@ var (
 	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
-	errZstdNotSupported              = errors.New("zstd compression not supported until v1.10")
 	errCannotReadDirectory           = errors.New("cannot read directory")
 	errUnmarshalling                 = errors.New("unmarshalling failed")
 	errFileDoesNotExist              = errors.New("file does not exist")
@@ -309,7 +307,6 @@ func getNetworkConfig(
 	v *viper.Viper,
 	stakingEnabled bool,
 	halflife time.Duration,
-	networkID uint32, // TODO remove after cortina upgrade
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -339,13 +336,7 @@ func getNetworkConfig(
 		}
 	}
 
-	cortinaTime := version.GetCortinaTime(networkID)
-	if compressionType == compression.TypeZstd && !time.Now().After(cortinaTime) {
-		// TODO remove after cortina upgrade
-		return network.Config{}, errZstdNotSupported
-	}
 	config := network.Config{
-		// Throttling
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
 			InboundConnUpgradeThrottlerConfig: throttling.InboundConnUpgradeThrottlerConfig{
@@ -1386,7 +1377,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife, nodeConfig.NetworkID)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
 	}
