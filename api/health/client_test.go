@@ -27,10 +27,8 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 }
 
 func TestNewClient(t *testing.T) {
-	require := require.New(t)
-
 	c := NewClient("")
-	require.NotNil(c)
+	require.NotNil(t, c)
 }
 
 func TestClient(t *testing.T) {
