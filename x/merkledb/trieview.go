@@ -26,6 +26,8 @@ import (
 const defaultPreallocationSize = 100
 
 var (
+	_ TrieView = (*trieView)(nil)
+
 	ErrCommitted          = errors.New("view has been committed")
 	ErrInvalid            = errors.New("the trie this view was based on has changed, rendering this view invalid")
 	ErrOddLengthWithValue = errors.New(
@@ -35,8 +37,6 @@ var (
 	ErrStartAfterEnd    = errors.New("start key > end key")
 	ErrViewIsNotAChild  = errors.New("passed in view is required to be a child of the current view")
 	ErrNoValidRoot      = errors.New("a valid root was not provided to the trieView constructor")
-
-	_ TrieView = &trieView{}
 
 	numCPU = runtime.NumCPU()
 )
