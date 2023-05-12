@@ -67,7 +67,7 @@ function test_require_equal_zero {
 }
 
 function test_require_len_zero {
-  if grep -R -zo -P 'require\.Len\((t, )?.+?, 0\)' .; then
+  if grep -R -o -P 'require\.Len\((t, )?.+?, 0\)' .; then
     echo ""
     echo "Use require.Empty instead of require.Len when testing for 0 length."
     echo ""
