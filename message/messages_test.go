@@ -872,7 +872,7 @@ func TestNilInboundMessage(t *testing.T) {
 	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	pingMsg, ok := parsedMsg.message.(*p2p.Ping)
-	require.True(ok)
+	require.IsType(&p2p.Ping{}, parsedMsg.message)
+	pingMsg := parsedMsg.message.(*p2p.Ping)
 	require.NotNil(pingMsg)
 }
