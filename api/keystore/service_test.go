@@ -251,7 +251,7 @@ func TestServiceExportImport(t *testing.T) {
 				User:     exportReply.User,
 				Encoding: encoding,
 			}, &api.EmptyReply{})
-			require.ErrorIs(err, nil)
+			require.NoError(err)
 		}
 
 		{
