@@ -279,8 +279,10 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0x10}, []byte{1}))
-	require.NoError(t, db.Put([]byte{0x11, 0x11}, []byte{2}))
+	err = db.Put([]byte{0x10}, []byte{1})
+	require.NoError(t, err)
+	err = db.Put([]byte{0x11, 0x11}, []byte{2})
+	require.NoError(t, err)
 
 	syncRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -303,7 +305,8 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.NoError(t, err)
 
 	// there is now another value in the range that needs to be sync'ed
-	require.NoError(t, db.Put([]byte{0x13}, []byte{3}))
+	err = db.Put([]byte{0x13}, []byte{3})
+	require.NoError(t, err)
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x12}, []byte{0x20}, noExtraNodeProof.Path)
 	require.NoError(t, err)
@@ -325,8 +328,10 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
-	require.NoError(t, db.Put([]byte{0x11, 0x11}, []byte{2}))
+	err = db.Put([]byte{0x11}, []byte{1})
+	require.NoError(t, err)
+	err = db.Put([]byte{0x11, 0x11}, []byte{2})
+	require.NoError(t, err)
 
 	syncRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -341,7 +346,8 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		Log:                   logging.NoLog{},
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0x12}, []byte{4}))
+	err = db.Put([]byte{0x12}, []byte{4})
+	require.NoError(t, err)
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, []byte{0x20}, proof.Path)
 	require.NoError(t, err)
@@ -359,9 +365,12 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
-	require.NoError(t, db.Put([]byte{0x12}, []byte{2}))
-	require.NoError(t, db.Put([]byte{0x11, 0x11}, []byte{3}))
+	err = db.Put([]byte{0x11}, []byte{1})
+	require.NoError(t, err)
+	err = db.Put([]byte{0x12}, []byte{2})
+	require.NoError(t, err)
+	err = db.Put([]byte{0x11, 0x11}, []byte{3})
+	require.NoError(t, err)
 
 	syncRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -376,7 +385,8 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		Log:                   logging.NoLog{},
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.Delete([]byte{0x12}))
+	err = db.Delete([]byte{0x12})
+	require.NoError(t, err)
 
 	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, []byte{0x20}, proof.Path)
 	require.NoError(t, err)
@@ -766,7 +776,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 		err = syncer.Wait(context.Background())
 		require.NoError(t, err)
-		require.NoError(t, syncer.Error())
+		err = syncer.Error()
+		require.NoError(t, err)
 
 		// new db has fully sync'ed and should be at the same root as the original db
 		newRoot, err := db.GetMerkleRoot(context.Background())
@@ -808,7 +819,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				err = db.Delete(it.Key())
 				require.NoError(t, err)
 			}
-			require.NoError(t, it.Error())
+			err := it.Error()
+			require.NoError(t, err)
 			it.Release()
 
 			syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
@@ -878,7 +890,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		require.NotNil(t, newSyncer)
 		err = newSyncer.StartSyncing(context.Background())
 		require.NoError(t, err)
-		require.NoError(t, newSyncer.Error())
+		err = newSyncer.Error()
+		require.NoError(t, err)
 		err = newSyncer.Wait(context.Background())
 		require.NoError(t, err)
 		newRoot, err := db.GetMerkleRoot(context.Background())
@@ -1021,7 +1034,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				err = dbToSync.Delete(it.Key())
 				require.NoError(err)
 			}
-			require.NoError(it.Error())
+			err = it.Error()
+			require.NoError(err)
 			it.Release()
 		}
 
@@ -1049,7 +1063,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 		err = syncer.Wait(context.Background())
 		require.NoError(err)
-		require.NoError(syncer.Error())
+		err = syncer.Error()
+		require.NoError(err)
 
 		newRoot, err := db.GetMerkleRoot(context.Background())
 		require.NoError(err)

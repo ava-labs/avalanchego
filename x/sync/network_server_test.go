@@ -172,10 +172,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			err = view.Remove(context.Background(), it.Key())
 			require.NoError(t, err)
 		}
-		require.NoError(t, it.Error())
+		err = it.Error()
+		require.NoError(t, err)
 		it.Release()
 
-		require.NoError(t, view.CommitToDB(context.Background()))
+		err = view.CommitToDB(context.Background())
+		require.NoError(t, err)
 	}
 
 	endRoot, err := trieDB.GetMerkleRoot(context.Background())

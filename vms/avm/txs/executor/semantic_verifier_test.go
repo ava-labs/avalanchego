@@ -85,7 +85,8 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		FeeAssetID:    ids.GenerateTestID(),
 		Bootstrapped:  true,
 	}
-	require.NoError(t, secpFx.Bootstrapped())
+	err = secpFx.Bootstrapped()
+	require.NoError(t, err)
 
 	outputOwners := secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -463,7 +464,8 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		FeeAssetID:    ids.GenerateTestID(),
 		Bootstrapped:  true,
 	}
-	require.NoError(t, secpFx.Bootstrapped())
+	err = secpFx.Bootstrapped()
+	require.NoError(t, err)
 
 	outputOwners := secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -843,7 +845,8 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		FeeAssetID:    ids.GenerateTestID(),
 		Bootstrapped:  true,
 	}
-	require.NoError(secpFx.Bootstrapped())
+	err = secpFx.Bootstrapped()
+	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{
 		Threshold: 1,

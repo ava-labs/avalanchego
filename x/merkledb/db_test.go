@@ -29,7 +29,8 @@ func newNoopTracer() trace.Tracer {
 func Test_MerkleDB_Get_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+	err = db.Put([]byte{0}, []byte{0, 1, 2})
+	require.NoError(t, err)
 
 	val, err := db.Get([]byte{0})
 	require.NoError(t, err)
@@ -44,7 +45,8 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
-	require.NoError(t, db.Put([]byte{0}, []byte{0, 1, 2}))
+	err = db.Put([]byte{0}, []byte{0, 1, 2})
+	require.NoError(t, err)
 
 	vals, errs := db.GetValues(context.Background(), [][]byte{{0}})
 	require.Len(t, errs, 1)
@@ -99,14 +101,17 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	require.NoError(err)
 	for i := 0; i < 100; i++ {
 		k := []byte(strconv.Itoa(i))
-		require.NoError(view.Insert(context.Background(), k, hashing.ComputeHash256(k)))
+		err = view.Insert(context.Background(), k, hashing.ComputeHash256(k))
+		require.NoError(err)
 	}
-	require.NoError(view.commitToDB(context.Background()))
+	err = view.commitToDB(context.Background())
+	require.NoError(err)
 
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	require.NoError(db.Close())
+	err = db.Close()
+	require.NoError(err)
 
 	// reloading the DB, should set the root back to the one that was saved to the memdb
 	db, err = New(
@@ -148,14 +153,17 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require.NoError(err)
 	for i := 0; i < initialSize; i++ {
 		k := []byte(strconv.Itoa(i))
-		require.NoError(view.Insert(context.Background(), k, hashing.ComputeHash256(k)))
+		err = view.Insert(context.Background(), k, hashing.ComputeHash256(k))
+		require.NoError(err)
 	}
-	require.NoError(view.CommitToDB(context.Background()))
+	err = view.CommitToDB(context.Background())
+	require.NoError(err)
 
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	require.NoError(db.rebuild(context.Background()))
+	err = db.rebuild(context.Background())
+	require.NoError(err)
 
 	rebuiltRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -247,8 +255,10 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(t, sibling1.(*trieView).isInvalid())
 	require.False(t, sibling2.(*trieView).isInvalid())
 
-	require.NoError(t, viewToCommit.Insert(context.Background(), []byte{0}, []byte{0}))
-	require.NoError(t, viewToCommit.CommitToDB(context.Background()))
+	err = viewToCommit.Insert(context.Background(), []byte{0}, []byte{0})
+	require.NoError(t, err)
+	err = viewToCommit.CommitToDB(context.Background())
+	require.NoError(t, err)
 
 	require.True(t, sibling1.(*trieView).isInvalid())
 	require.True(t, sibling2.(*trieView).isInvalid())

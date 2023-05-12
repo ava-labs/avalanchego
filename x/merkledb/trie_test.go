@@ -65,7 +65,8 @@ func Test_GetValue_Safety(t *testing.T) {
 	trieView, err := db.NewView()
 	require.NoError(err)
 
-	require.NoError(trieView.Insert(context.Background(), []byte{0}, []byte{0}))
+	err = trieView.Insert(context.Background(), []byte{0}, []byte{0})
+	require.NoError(err)
 	trieVal, err := trieView.GetValue(context.Background(), []byte{0})
 	require.NoError(err)
 	require.Equal([]byte{0}, trieVal)
@@ -86,7 +87,8 @@ func Test_GetValues_Safety(t *testing.T) {
 	trieView, err := db.NewView()
 	require.NoError(err)
 
-	require.NoError(trieView.Insert(context.Background(), []byte{0}, []byte{0}))
+	err = trieView.Insert(context.Background(), []byte{0}, []byte{0})
+	require.NoError(err)
 	trieVals, errs := trieView.GetValues(context.Background(), [][]byte{{0}})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
@@ -196,14 +198,16 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 	err = committedTrie.Insert(context.Background(), []byte{0}, []byte{0})
 	require.NoError(t, err)
 
-	require.NoError(t, committedTrie.CommitToDB(context.Background()))
+	err = committedTrie.CommitToDB(context.Background())
+	require.NoError(t, err)
 
 	newView, err := committedTrie.NewView()
 	require.NoError(t, err)
 
 	err = newView.Insert(context.Background(), []byte{1}, []byte{1})
 	require.NoError(t, err)
-	require.NoError(t, newView.CommitToDB(context.Background()))
+	err = newView.CommitToDB(context.Background())
+	require.NoError(t, err)
 
 	val0, err := dbTrie.GetValue(context.Background(), []byte{0})
 	require.NoError(t, err)
@@ -652,10 +656,14 @@ func Test_Trie_BatchApply(t *testing.T) {
 	trie, err := dbTrie.NewView()
 	require.NoError(err)
 
-	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
-	require.NoError(trie.Insert(context.Background(), []byte("key12"), []byte("value12")))
-	require.NoError(trie.Insert(context.Background(), []byte("key134"), []byte("value134")))
-	require.NoError(trie.Remove(context.Background(), []byte("key1")))
+	err = trie.Insert(context.Background(), []byte("key1"), []byte("value1"))
+	require.NoError(err)
+	err = trie.Insert(context.Background(), []byte("key12"), []byte("value12"))
+	require.NoError(err)
+	err = trie.Insert(context.Background(), []byte("key134"), []byte("value134"))
+	require.NoError(err)
+	err = trie.Remove(context.Background(), []byte("key1"))
+	require.NoError(err)
 
 	value, err := getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -752,8 +760,10 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(t, sibling1.(*trieView).isInvalid())
 	require.False(t, sibling2.(*trieView).isInvalid())
 
-	require.NoError(t, viewToCommit.Insert(context.Background(), []byte{0}, []byte{0}))
-	require.NoError(t, viewToCommit.CommitToDB(context.Background()))
+	err = viewToCommit.Insert(context.Background(), []byte{0}, []byte{0})
+	require.NoError(t, err)
+	err = viewToCommit.CommitToDB(context.Background())
+	require.NoError(t, err)
 
 	require.True(t, sibling1.(*trieView).isInvalid())
 	require.True(t, sibling2.(*trieView).isInvalid())
@@ -840,7 +850,8 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			for i := 0; i < initialSet; i++ {
 				k := []byte(strconv.Itoa(i))
 				kv = append(kv, k)
-				require.NoError(t, root.Insert(context.Background(), k, hashing.ComputeHash256(k)))
+				err := root.Insert(context.Background(), k, hashing.ComputeHash256(k))
+				require.NoError(t, err)
 			}
 
 			// Get initial root
@@ -848,7 +859,8 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			require.NoError(t, err)
 
 			if commitApproach == "before" {
-				require.NoError(t, root.CommitToDB(context.Background()))
+				err := root.CommitToDB(context.Background())
+				require.NoError(t, err)
 			}
 
 			// Populate additional states
@@ -860,7 +872,8 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			}
 
 			if commitApproach == "after" {
-				require.NoError(t, root.CommitToDB(context.Background()))
+				err := root.CommitToDB(context.Background())
+				require.NoError(t, err)
 			}
 
 			// Process ops
@@ -870,7 +883,8 @@ func Test_Trie_MultipleStates(t *testing.T) {
 					// New Key
 					for _, state := range concurrentStates {
 						k := []byte(strconv.Itoa(newStart))
-						require.NoError(t, state.Insert(context.Background(), k, hashing.ComputeHash256(k)))
+						err := state.Insert(context.Background(), k, hashing.ComputeHash256(k))
+						require.NoError(t, err)
 					}
 					newStart++
 				} else {
@@ -885,7 +899,8 @@ func Test_Trie_MultipleStates(t *testing.T) {
 						} else {
 							require.Equal(t, pastV, v, "lookup mismatch")
 						}
-						require.NoError(t, state.Insert(context.Background(), selectedKey, hashing.ComputeHash256(v)))
+						err = state.Insert(context.Background(), selectedKey, hashing.ComputeHash256(v))
+						require.NoError(t, err)
 					}
 				}
 			}
@@ -1213,15 +1228,18 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 		wg.Add(3)
 		go func() {
 			defer wg.Done()
-			require.NoError(t, parentView.CommitToParent(context.Background()))
+			err := parentView.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 		go func() {
 			defer wg.Done()
-			require.NoError(t, childView1.CommitToParent(context.Background()))
+			err := childView1.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 		go func() {
 			defer wg.Done()
-			require.NoError(t, childView2.CommitToParent(context.Background()))
+			err := childView2.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 
 		wg.Wait()
@@ -1265,15 +1283,18 @@ func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
 		wg.Add(3)
 		go func() {
 			defer wg.Done()
-			require.NoError(t, parentView.CommitToParent(context.Background()))
+			err := parentView.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 		go func() {
 			defer wg.Done()
-			require.NoError(t, childView1.CommitToParent(context.Background()))
+			err := childView1.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 		go func() {
 			defer wg.Done()
-			require.NoError(t, childView2.CommitToParent(context.Background()))
+			err := childView2.CommitToParent(context.Background())
+			require.NoError(t, err)
 		}()
 
 		wg.Wait()

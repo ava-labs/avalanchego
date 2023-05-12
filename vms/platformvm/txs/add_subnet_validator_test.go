@@ -88,7 +88,8 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: valid tx
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
-	require.NoError(stx.SyntacticVerify(ctx))
+	err = stx.SyntacticVerify(ctx)
+	require.NoError(err)
 
 	// Case: Wrong network ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
@@ -199,7 +200,8 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	// Case: valid tx
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
-	require.NoError(stx.SyntacticVerify(ctx))
+	err = stx.SyntacticVerify(ctx)
+	require.NoError(err)
 
 	txBytes, err := Codec.Marshal(Version, stx)
 	require.NoError(err)
@@ -207,7 +209,8 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	parsedTx, err := Parse(Codec, txBytes)
 	require.NoError(err)
 
-	require.NoError(parsedTx.SyntacticVerify(ctx))
+	err = parsedTx.SyntacticVerify(ctx)
+	require.NoError(err)
 	require.Equal(stx, parsedTx)
 }
 

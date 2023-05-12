@@ -63,7 +63,8 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	err := peers.Add(peer, nil, ids.Empty, 1)
+	require.NoError(err)
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
 	require.NoError(err)
@@ -155,7 +156,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
@@ -201,7 +203,8 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err)
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -264,7 +267,8 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID1}
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -306,12 +310,14 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		}
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err) // should request vtx0
 	require.Equal(vtxID0, reqVtxID)
 
 	oldReqID := *requestID
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})) // send unexpected vertex
-	require.NotEqual(oldReqID, *requestID)                                                       // should have sent a new request
+	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})
+	require.NoError(err)                   // send unexpected vertex
+	require.NotEqual(oldReqID, *requestID) // should have sent a new request
 
 	oldReqID = *requestID
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -340,8 +346,9 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
-	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
+	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})
+	require.NoError(err)                // send expected vertex and vertex that should not be accepted
+	require.Equal(oldReqID, *requestID) // shouldn't have sent a new request
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -431,7 +438,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID1}
 
@@ -466,7 +474,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err) // should request vtx0
 
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
@@ -495,7 +504,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
+	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})
+	require.NoError(err)
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, tx0.Status())
 	require.Equal(choices.Accepted, tx1.Status())
@@ -557,7 +567,8 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID2}
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -598,10 +609,12 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx1
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err) // should request vtx1
 	require.Equal(vtxID1, requested)
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
+	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})
+	require.NoError(err) // Provide vtx1; should request vtx0
 	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
 	require.Equal(vtxID0, requested)
 
@@ -619,7 +632,8 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		return nil
 	}
 
-	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
+	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})
+	require.NoError(err) // Provide vtx0; can finish now
 	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -668,7 +682,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1}
 	parsedVtx0 := false
@@ -713,11 +728,13 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx0 and vtx1
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err) // should request vtx0 and vtx1
 	require.Contains(requestIDs, vtxID1)
 
 	reqID := requestIDs[vtxID1]
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}))
+	err = bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0})
+	require.NoError(err)
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -735,7 +752,8 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	reqID = requestIDs[vtxID0]
-	require.NoError(bs.GetAncestorsFailed(context.Background(), peerID, reqID))
+	err = bs.GetAncestorsFailed(context.Background(), peerID, reqID)
+	require.NoError(err)
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -795,7 +813,8 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	require.NoError(err)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	acceptedIDs := []ids.ID{vtxID2}
 	parsedVtx0 := false
@@ -848,7 +867,8 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs)) // should request vtx2
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
+	require.NoError(err) // should request vtx2
 	require.Contains(requestIDs, vtxID2)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -866,7 +886,8 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	reqID := requestIDs[vtxID2]
-	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
+	err = bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0})
+	require.NoError(err)
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
@@ -961,7 +982,8 @@ func TestRestartBootstrapping(t *testing.T) {
 	bs := bsIntf.(*bootstrapper)
 
 	vm.CantSetState = false
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 
 	parsedVtx0 := false
 	parsedVtx1 := false
@@ -1040,12 +1062,14 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{vtxID3, vtxID4})) // should request vtx3 and vtx4
+	err = bs.ForceAccepted(context.Background(), []ids.ID{vtxID3, vtxID4})
+	require.NoError(err) // should request vtx3 and vtx4
 	require.Contains(requestIDs, vtxID3)
 	require.Contains(requestIDs, vtxID4)
 
 	vtx3ReqID := requestIDs[vtxID3]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}))
+	err = bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2})
+	require.NoError(err)
 	require.Contains(requestIDs, vtxID1)
 	require.True(bs.OutstandingRequests.RemoveAny(vtxID4))
 	require.True(bs.OutstandingRequests.RemoveAny(vtxID1))
@@ -1053,14 +1077,16 @@ func TestRestartBootstrapping(t *testing.T) {
 	bs.needToFetch.Clear()
 	requestIDs = map[ids.ID]uint32{}
 
-	require.NoError(bs.ForceAccepted(context.Background(), []ids.ID{vtxID5, vtxID3}))
+	err = bs.ForceAccepted(context.Background(), []ids.ID{vtxID5, vtxID3})
+	require.NoError(err)
 	require.Contains(requestIDs, vtxID1)
 	require.Contains(requestIDs, vtxID4)
 	require.Contains(requestIDs, vtxID5)
 	require.NotContains(requestIDs, vtxID3)
 
 	vtx5ReqID := requestIDs[vtxID5]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}))
+	err = bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1})
+	require.NoError(err)
 	require.Contains(requestIDs, vtxID0)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -1078,7 +1104,8 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	vtx1ReqID := requestIDs[vtxID1]
-	require.NoError(bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
+	err = bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0})
+	require.NoError(err)
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())

@@ -29,7 +29,8 @@ func TestVerifyFxUsage(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		err := vm.Shutdown(context.Background())
+		require.NoError(err)
 		ctx.Lock.Unlock()
 	}()
 
@@ -58,8 +59,10 @@ func TestVerifyFxUsage(t *testing.T) {
 	require.NoError(err)
 	vm.batchTimeout = 0
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	err = vm.SetState(context.Background(), snow.Bootstrapping)
+	require.NoError(err)
+	err = vm.SetState(context.Background(), snow.NormalOp)
+	require.NoError(err)
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -96,7 +99,8 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(vm.parser.InitializeTx(createAssetTx))
+	err = vm.parser.InitializeTx(createAssetTx)
+	require.NoError(err)
 
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
@@ -122,7 +126,8 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	err = mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}})
+	require.NoError(err)
 
 	_, err = vm.IssueTx(mintNFTTx.Bytes())
 	require.NoError(err)
@@ -144,7 +149,8 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		}},
 	}}}
-	require.NoError(spendTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	err = spendTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}})
+	require.NoError(err)
 
 	_, err = vm.IssueTx(spendTx.Bytes())
 	require.NoError(err)

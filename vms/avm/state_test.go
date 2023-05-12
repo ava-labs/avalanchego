@@ -181,7 +181,8 @@ func TestFundingAddresses(t *testing.T) {
 	}
 
 	state.AddUTXO(utxo)
-	require.NoError(t, state.Commit())
+	err := state.Commit()
+	require.NoError(t, err)
 
 	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	require.NoError(t, err)
@@ -189,7 +190,8 @@ func TestFundingAddresses(t *testing.T) {
 	require.Equal(t, utxo.InputID(), utxos[0])
 
 	state.DeleteUTXO(utxo.InputID())
-	require.NoError(t, state.Commit())
+	err = state.Commit()
+	require.NoError(t, err)
 
 	utxos, err = state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
 	require.NoError(t, err)

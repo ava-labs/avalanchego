@@ -45,7 +45,8 @@ func TestNetworkAppGossip(t *testing.T) {
 		&secp256k1fx.Fx{},
 	})
 	require.NoError(t, err)
-	require.NoError(t, parser.InitializeTx(testTx))
+	err = parser.InitializeTx(testTx)
+	require.NoError(t, err)
 
 	type test struct {
 		name          string

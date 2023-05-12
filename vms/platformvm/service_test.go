@@ -406,7 +406,8 @@ func TestGetBalance(t *testing.T) {
 		}
 		reply := GetBalanceResponse{}
 
-		require.NoError(service.GetBalance(nil, &request, &reply))
+		err := service.GetBalance(nil, &request, &reply)
+		require.NoError(err)
 
 		require.Equal(json.Uint64(defaultBalance), reply.Balance)
 		require.Equal(json.Uint64(defaultBalance), reply.Unlocked)
@@ -421,7 +422,8 @@ func TestGetStake(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown(context.Background()))
+		err := service.vm.Shutdown(context.Background())
+		require.NoError(err)
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -439,7 +441,8 @@ func TestGetStake(t *testing.T) {
 			Encoding: formatting.Hex,
 		}
 		response := GetStakeReply{}
-		require.NoError(service.GetStake(nil, &args, &response))
+		err := service.GetStake(nil, &args, &response)
+		require.NoError(err)
 		require.Equal(defaultWeight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
@@ -467,7 +470,8 @@ func TestGetStake(t *testing.T) {
 		Encoding: formatting.Hex,
 	}
 	response := GetStakeReply{}
-	require.NoError(service.GetStake(nil, &args, &response))
+	err := service.GetStake(nil, &args, &response)
+	require.NoError(err)
 	require.Equal(len(genesis.Validators)*int(defaultWeight), int(response.Staked))
 	require.Len(response.Outputs, len(genesis.Validators))
 
@@ -512,12 +516,14 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	require.NoError(service.vm.state.Commit())
+	err = service.vm.state.Commit()
+	require.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
-	require.NoError(service.GetStake(nil, &args, &response))
+	err = service.GetStake(nil, &args, &response)
+	require.NoError(err)
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 2)
 
@@ -560,10 +566,12 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	require.NoError(service.vm.state.Commit())
+	err = service.vm.state.Commit()
+	require.NoError(err)
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
-	require.NoError(service.GetStake(nil, &args, &response))
+	err = service.GetStake(nil, &args, &response)
+	require.NoError(err)
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 3)
 
@@ -690,12 +698,15 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
-	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
-	require.NoError(service.vm.state.Commit())
+	err = service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000)
+	require.NoError(err)
+	err = service.vm.state.Commit()
+	require.NoError(err)
 
 	// Call getValidators
 	response = GetCurrentValidatorsReply{}
-	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	err = service.GetCurrentValidators(nil, &args, &response)
+	require.NoError(err)
 	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range response.Validators {
@@ -712,18 +723,21 @@ func TestGetTimestamp(t *testing.T) {
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown(context.Background()))
+		err := service.vm.Shutdown(context.Background())
+		require.NoError(err)
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	err := service.GetTimestamp(nil, nil, &reply)
+	require.NoError(err)
 	require.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
 	service.vm.state.SetTimestamp(newTimestamp)
 
-	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	err = service.GetTimestamp(nil, nil, &reply)
+	require.NoError(err)
 	require.Equal(newTimestamp, reply.Timestamp)
 }
 
@@ -776,8 +790,10 @@ func TestGetBlock(t *testing.T) {
 
 			block := service.vm.manager.NewBlock(statelessBlock)
 
-			require.NoError(block.Verify(context.Background()))
-			require.NoError(block.Accept(context.Background()))
+			err = block.Verify(context.Background())
+			require.NoError(err)
+			err = block.Accept(context.Background())
+			require.NoError(err)
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

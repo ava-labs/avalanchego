@@ -190,21 +190,27 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 	require.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(vdr0, nil, ids.Empty, startupAlpha/2))
-	require.NoError(bs.Connected(context.Background(), vdr0, version.CurrentApp))
+	err = peers.Add(vdr0, nil, ids.Empty, startupAlpha/2)
+	require.NoError(err)
+	err = bs.Connected(context.Background(), vdr0, version.CurrentApp)
+	require.NoError(err)
 
-	require.NoError(bs.Start(context.Background(), 0))
+	err = bs.Start(context.Background(), 0)
+	require.NoError(err)
 	require.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(vdr, nil, ids.Empty, startupAlpha))
-	require.NoError(bs.Connected(context.Background(), vdr, version.CurrentApp))
+	err = peers.Add(vdr, nil, ids.Empty, startupAlpha)
+	require.NoError(err)
+	err = bs.Connected(context.Background(), vdr, version.CurrentApp)
+	require.NoError(err)
 	require.True(frontierRequested)
 }
 
@@ -1532,12 +1538,14 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	err := peers.Add(peer, nil, ids.Empty, 1)
+	require.NoError(err)
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
 	peers.RegisterCallbackListener(startupTracker)
-	require.NoError(startupTracker.Connected(context.Background(), peer, version.CurrentApp))
+	err = startupTracker.Connected(context.Background(), peer, version.CurrentApp)
+	require.NoError(err)
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -1594,7 +1602,8 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	require.NoError(err)
 	require.True(pushed)
 
-	require.NoError(blocker.Commit())
+	err = blocker.Commit()
+	require.NoError(err)
 
 	vm.GetBlockF = nil
 

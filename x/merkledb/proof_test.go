@@ -31,12 +31,18 @@ func getBasicDB() (*Database, error) {
 
 func writeBasicBatch(t *testing.T, db *Database) {
 	batch := db.NewBatch()
-	require.NoError(t, batch.Put([]byte{0}, []byte{0}))
-	require.NoError(t, batch.Put([]byte{1}, []byte{1}))
-	require.NoError(t, batch.Put([]byte{2}, []byte{2}))
-	require.NoError(t, batch.Put([]byte{3}, []byte{3}))
-	require.NoError(t, batch.Put([]byte{4}, []byte{4}))
-	require.NoError(t, batch.Write())
+	err := batch.Put([]byte{0}, []byte{0})
+	require.NoError(t, err)
+	err = batch.Put([]byte{1}, []byte{1})
+	require.NoError(t, err)
+	err = batch.Put([]byte{2}, []byte{2})
+	require.NoError(t, err)
+	err = batch.Put([]byte{3}, []byte{3})
+	require.NoError(t, err)
+	err = batch.Put([]byte{4}, []byte{4})
+	require.NoError(t, err)
+	err = batch.Write()
+	require.NoError(t, err)
 }
 
 func Test_Proof_Marshal(t *testing.T) {
@@ -72,10 +78,14 @@ func Test_Proof_MissingValue(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, trie)
 
-	require.NoError(t, trie.Insert(context.Background(), []byte{1}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 2}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 2, 4}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 3}, []byte{0}))
+	err = trie.Insert(context.Background(), []byte{1}, []byte{0})
+	require.NoError(t, err)
+	err = trie.Insert(context.Background(), []byte{1, 2}, []byte{0})
+	require.NoError(t, err)
+	err = trie.Insert(context.Background(), []byte{1, 2, 4}, []byte{0})
+	require.NoError(t, err)
+	err = trie.Insert(context.Background(), []byte{1, 3}, []byte{0})
+	require.NoError(t, err)
 
 	// get a proof for a value not in the db
 	proof, err := trie.GetProof(context.Background(), []byte{1, 2, 3})
@@ -860,20 +870,32 @@ func Test_ChangeProof_Marshal_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	batch := db.NewBatch()
-	require.NoError(t, batch.Put([]byte{5}, []byte{5}))
-	require.NoError(t, batch.Put([]byte{6}, []byte{6}))
-	require.NoError(t, batch.Put([]byte{7}, []byte{7}))
-	require.NoError(t, batch.Put([]byte{8}, []byte{8}))
-	require.NoError(t, batch.Delete([]byte{0}))
-	require.NoError(t, batch.Write())
+	err = batch.Put([]byte{5}, []byte{5})
+	require.NoError(t, err)
+	err = batch.Put([]byte{6}, []byte{6})
+	require.NoError(t, err)
+	err = batch.Put([]byte{7}, []byte{7})
+	require.NoError(t, err)
+	err = batch.Put([]byte{8}, []byte{8})
+	require.NoError(t, err)
+	err = batch.Delete([]byte{0})
+	require.NoError(t, err)
+	err = batch.Write()
+	require.NoError(t, err)
 
 	batch = db.NewBatch()
-	require.NoError(t, batch.Put([]byte{9}, []byte{9}))
-	require.NoError(t, batch.Put([]byte{10}, []byte{10}))
-	require.NoError(t, batch.Put([]byte{11}, []byte{11}))
-	require.NoError(t, batch.Put([]byte{12}, []byte{12}))
-	require.NoError(t, batch.Delete([]byte{1}))
-	require.NoError(t, batch.Write())
+	err = batch.Put([]byte{9}, []byte{9})
+	require.NoError(t, err)
+	err = batch.Put([]byte{10}, []byte{10})
+	require.NoError(t, err)
+	err = batch.Put([]byte{11}, []byte{11})
+	require.NoError(t, err)
+	err = batch.Put([]byte{12}, []byte{12})
+	require.NoError(t, err)
+	err = batch.Delete([]byte{1})
+	require.NoError(t, err)
+	err = batch.Write()
+	require.NoError(t, err)
 	endroot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
@@ -905,7 +927,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require.NotNil(t, proof)
 	require.False(t, proof.HadRootsInHistory)
 
-	require.NoError(t, proof.Verify(context.Background(), db, nil, nil, db.getMerkleRoot()))
+	err = proof.Verify(context.Background(), db, nil, nil, db.getMerkleRoot())
+	require.NoError(t, err)
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -915,7 +938,8 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	require.NoError(t, db.Insert(context.Background(), []byte{0}, []byte{0}))
+	err = db.Insert(context.Background(), []byte{0}, []byte{0})
+	require.NoError(t, err)
 
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(t, err)

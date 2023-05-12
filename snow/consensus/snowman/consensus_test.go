@@ -594,7 +594,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.NoError(err)
 
 	firstBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -613,15 +614,18 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), firstBlock))
-	require.NoError(sm.Add(context.Background(), secondBlock))
+	err = sm.Add(context.Background(), firstBlock)
+	require.NoError(err)
+	err = sm.Add(context.Background(), secondBlock)
+	require.NoError(err)
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(firstBlock.ID())
 	votes.Add(secondBlock.ID())
 
 	// The first poll will accept shared bits
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	err = sm.RecordPoll(context.Background(), votes)
+	require.NoError(err)
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.False(sm.Finalized())
 
@@ -630,7 +634,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.Equal(float64(1), metrics["polls_successful"])
 
 	// The second poll will do nothing
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	err = sm.RecordPoll(context.Background(), votes)
+	require.NoError(err)
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.False(sm.Finalized())
 
@@ -1191,7 +1196,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.NoError(err)
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1226,8 +1232,10 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		HeightV: block2.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	require.NoError(sm.Add(context.Background(), block1))
+	err = sm.Add(context.Background(), block0)
+	require.NoError(err)
+	err = sm.Add(context.Background(), block1)
+	require.NoError(err)
 
 	// When voting for [block0], we end up finalizing the first bit as 0. The
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
@@ -1235,17 +1243,20 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// [block0].
 	votes0 := bag.Bag[ids.ID]{}
 	votes0.Add(block0.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes0))
+	err = sm.RecordPoll(context.Background(), votes0)
+	require.NoError(err)
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	require.NoError(sm.Add(context.Background(), block2))
+	err = sm.Add(context.Background(), block2)
+	require.NoError(err)
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	require.NoError(sm.Add(context.Background(), block3))
+	err = sm.Add(context.Background(), block3)
+	require.NoError(err)
 
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
@@ -1271,7 +1282,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// will never happen.
 	votes3 := bag.Bag[ids.ID]{}
 	votes3.Add(block3.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes3))
+	err = sm.RecordPoll(context.Background(), votes3)
+	require.NoError(err)
 
 	require.False(sm.Finalized(), "finalized too early")
 	require.Equal(choices.Processing, block0.Status())
@@ -1741,7 +1753,8 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.NoError(err)
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1751,7 +1764,7 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	err := sm.Add(context.Background(), block0)
+	err = sm.Add(context.Background(), block0)
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
@@ -1770,7 +1783,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
+	require.NoError(err)
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1789,8 +1803,9 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		HeightV: block0.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(context.Background(), block0))
-	err := sm.Add(context.Background(), block1)
+	err = sm.Add(context.Background(), block0)
+	require.NoError(err)
+	err = sm.Add(context.Background(), block1)
 	require.ErrorIs(err, errDuplicateAdd)
 }
 
