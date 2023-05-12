@@ -468,8 +468,7 @@ func TestGetStake(t *testing.T) {
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	totalWeight := len(genesis.Validators) * int(defaultWeight)
-	require.Equal(totalWeight, int(response.Staked))
+	require.Equal(len(genesis.Validators)*int(defaultWeight), int(response.Staked))
 	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
