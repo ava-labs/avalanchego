@@ -181,7 +181,7 @@ func TestNewSortsDatabases(t *testing.T) {
 	require.Zero(cmp, "incorrect version on previous database")
 
 	dbs := manager.GetDatabases()
-	require.Equal(len(vers), len(dbs))
+	require.Len(dbs, len(vers))
 
 	for i, db := range dbs {
 		cmp = db.Version.Compare(vers[i])
