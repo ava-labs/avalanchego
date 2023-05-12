@@ -28,13 +28,6 @@ function test_golangci_lint {
   golangci-lint run --config .golangci.yml
 }
 
-# find_go_files [package]
-# all go files except generated ones
-function find_go_files {
-  local target="${1}"
-  go fmt -n "${target}"  | grep -Eo "([^ ]*)$" | grep -vE "(\\.pb\\.go|\\.pb\\.gw.go)"
-}
-
 # automatically checks license headers
 # to modify the file headers (if missing), remove "--verify" flag
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
