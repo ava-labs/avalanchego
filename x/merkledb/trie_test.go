@@ -109,8 +109,8 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	trieIntf, err := db.NewView()
 	require.NoError(err)
-	trie, ok := trieIntf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, trieIntf)
+	trie := trieIntf.(*trieView)
 
 	path, err := trie.getPathTo(newPath(nil))
 	require.NoError(err)
@@ -549,8 +549,8 @@ func Test_Trie_CommitChanges(t *testing.T) {
 
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	err = view1.Insert(context.Background(), []byte{1}, []byte{1})
 	require.NoError(err)
@@ -588,8 +588,8 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	// Make more views atop the existing one
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	err = view2.Insert(context.Background(), []byte{2}, []byte{2})
 	require.NoError(err)
@@ -604,13 +604,13 @@ func Test_Trie_CommitChanges(t *testing.T) {
 
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	view4Intf, err := view2.NewView()
 	require.NoError(err)
-	view4, ok := view4Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view4Intf)
+	view4 := view4Intf.(*trieView)
 
 	// view4
 	//   |
@@ -914,8 +914,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	// Create a view
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	// view1
 	//   |
@@ -943,8 +943,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	// Create a new view on the committed view
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	// view2
 	//   |
@@ -965,8 +965,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	// Make another view
 	view3Intf, err := view2.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view3
 	//   |
@@ -1022,14 +1022,14 @@ func Test_TrieView_NewView(t *testing.T) {
 	// Create a view
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	// Create a view atop view1
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	// view2
 	//   |
@@ -1049,8 +1049,8 @@ func Test_TrieView_NewView(t *testing.T) {
 	// Make another view atop view1
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view3
 	//   |
@@ -1080,19 +1080,19 @@ func TestTrieViewInvalidate(t *testing.T) {
 	// Create a view
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	// Create 2 views atop view1
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view2  view3
 	//   |    /
@@ -1118,20 +1118,20 @@ func TestTrieViewMoveChildViewsToView(t *testing.T) {
 	// Create a view
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	// Create a view atop view1
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	// Create a view atop view2
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view3
 	//   |
@@ -1158,19 +1158,19 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	// Create a view
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	// Create 2 views atop view1
 	view2Intf, err := view1.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	view1.invalidateChildrenExcept(view2)
 
