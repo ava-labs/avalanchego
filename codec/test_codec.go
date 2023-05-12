@@ -690,7 +690,7 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	version, err := manager.Unmarshal(expected, &unmarshaled)
 	require.NoError(err)
 	require.Zero(version)
-	require.Equal(1000, len(unmarshaled.Arr))
+	require.Len(unmarshaled.Arr, 1000)
 }
 
 func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB) {

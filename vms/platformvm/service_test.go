@@ -676,7 +676,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(vdr.NodeID, innerVdr.NodeID)
 
 		require.NotNil(innerVdr.Delegators)
-		require.Equal(1, len(*innerVdr.Delegators))
+		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)

@@ -688,7 +688,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(t, err)
 	root, err := newTrie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(root.children))
+	require.Len(t, root.children, 1)
 
 	err = newTrie.Remove(context.Background(), []byte("k"))
 	require.NoError(t, err)
@@ -782,15 +782,15 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(t, err)
 	root, err := trie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(root.children))
+	require.Len(t, root.children, 1)
 
 	root, err = trie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(root.children))
+	require.Len(t, root.children, 1)
 
 	firstNode, err := trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(t, err)
-	require.Equal(t, 1, len(firstNode.children))
+	require.Len(t, firstNode.children, 1)
 
 	// delete the middle values
 	err = trie.Remove(context.Background(), []byte("k"))
@@ -805,11 +805,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 
 	root, err = trie.getEditableNode(EmptyPath)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(root.children))
+	require.Len(t, root.children, 1)
 
 	firstNode, err = trie.getEditableNode(root.getSingleChildPath())
 	require.NoError(t, err)
-	require.Equal(t, 2, len(firstNode.children))
+	require.Len(t, firstNode.children, 2)
 }
 
 func Test_Trie_MultipleStates(t *testing.T) {
