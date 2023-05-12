@@ -24,7 +24,8 @@ import (
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(t, err)
 	}()
 
 	type test struct {

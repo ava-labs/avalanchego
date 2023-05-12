@@ -72,5 +72,6 @@ func TestLedger(t *testing.T) {
 	}
 
 	// Disconnect
-	require.NoError(device.Disconnect())
+	err = device.Disconnect()
+	require.NoError(err)
 }

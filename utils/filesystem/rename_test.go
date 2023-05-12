@@ -19,7 +19,8 @@ func TestRenameIfExists(t *testing.T) {
 	a := f.Name()
 	b := a + ".2"
 
-	require.NoError(t, f.Close())
+	err = f.Close()
+	require.NoError(t, err)
 
 	// rename "a" to "b"
 	renamed, err := RenameIfExists(a, b)
@@ -32,7 +33,8 @@ func TestRenameIfExists(t *testing.T) {
 	require.NoError(t, err)
 
 	// remove "a", but rename "a"->"b" should NOT error
-	require.NoError(t, os.RemoveAll(a))
+	err = os.RemoveAll(a)
+	require.NoError(t, err)
 	renamed, err = RenameIfExists(a, b)
 	require.False(t, renamed)
 	require.NoError(t, err)

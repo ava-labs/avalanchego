@@ -51,7 +51,7 @@ function test_single_import {
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -o -P 'require.(ErrorIs|NoError)\(.+?\).*\)$' .; then
     echo ""
     return 1
   fi

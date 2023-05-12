@@ -1275,7 +1275,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// Set up validators
 	vdrs := validators.NewSet()
-	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
+	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
 	requester := snow.DefaultConsensusContextTest()

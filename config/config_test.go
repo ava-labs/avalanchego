@@ -133,7 +133,8 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := filepath.Join(root, test.structure)
-			require.NoError(os.MkdirAll(dirToCreate, 0o700))
+			err := os.MkdirAll(dirToCreate, 0o700)
+			require.NoError(err)
 
 			for key, value := range test.file {
 				setupFile(t, dirToCreate, key, value)
@@ -562,15 +563,18 @@ func TestCalcMinConnectedStake(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
-	require.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
+	err := os.WriteFile(configFilePath, []byte(value), 0o600)
+	require.NoError(t, err)
 	return configFilePath
 }
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	require.NoError(t, os.MkdirAll(path, 0o700))
+	err := os.MkdirAll(path, 0o700)
+	require.NoError(t, err)
 	filePath := filepath.Join(path, fileName)
-	require.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
+	err = os.WriteFile(filePath, []byte(value), 0o600)
+	require.NoError(t, err)
 }
 
 func setupViperFlags() *viper.Viper {

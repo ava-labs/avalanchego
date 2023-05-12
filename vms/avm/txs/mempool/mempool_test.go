@@ -77,7 +77,8 @@ func TestTxsInMempool(t *testing.T) {
 		require.False(mempool.Has(txID))
 
 		// we can insert
-		require.NoError(mempool.Add(tx))
+		err := mempool.Add(tx)
+		require.NoError(err)
 
 		// we can get it
 		require.True(mempool.Has(txID))
@@ -96,7 +97,8 @@ func TestTxsInMempool(t *testing.T) {
 		require.Nil(mempool.Get(txID))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mempool.Add(tx))
+		err = mempool.Add(tx)
+		require.NoError(err)
 	}
 
 	mempool.RequestBuildBlock()

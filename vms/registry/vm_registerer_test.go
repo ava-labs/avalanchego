@@ -224,7 +224,8 @@ func TestRegisterHappyCase(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	require.NoError(t, resources.registerer.Register(context.Background(), id, vmFactory))
+	err := resources.registerer.Register(context.Background(), id, vmFactory)
+	require.NoError(t, err)
 }
 
 // RegisterWithReadLock should succeed even if we can't register a VM
@@ -428,7 +429,8 @@ func TestRegisterWithReadLockHappyCase(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	require.NoError(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory))
+	err := resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory)
+	require.NoError(t, err)
 }
 
 type vmRegistererTestResources struct {

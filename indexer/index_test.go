@@ -82,8 +82,10 @@ func TestIndex(t *testing.T) {
 	}
 
 	// Create a new index with the same database and ensure contents still there
-	require.NoError(db.Commit())
-	require.NoError(idx.Close())
+	err = db.Commit()
+	require.NoError(err)
+	err = idx.Close()
+	require.NoError(err)
 	db = versiondb.New(baseDB)
 	indexIntf, err = newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
 	require.NoError(err)
@@ -167,8 +169,10 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 
 	// Accept the same container twice
 	containerID := ids.GenerateTestID()
-	require.NoError(idx.Accept(ctx, containerID, []byte{1, 2, 3}))
-	require.NoError(idx.Accept(ctx, containerID, []byte{4, 5, 6}))
+	err = idx.Accept(ctx, containerID, []byte{1, 2, 3})
+	require.NoError(err)
+	err = idx.Accept(ctx, containerID, []byte{4, 5, 6})
+	require.NoError(err)
 	_, err = idx.GetContainerByIndex(1)
 	require.ErrorIs(err, errNoContainerAtIndex)
 	gotContainer, err := idx.GetContainerByID(containerID)

@@ -546,7 +546,8 @@ func TestClearAll(t *testing.T) {
 		}
 	}
 
-	require.NoError(jobs.Clear())
+	err = jobs.Clear()
+	require.NoError(err)
 	hasJob0, err := jobs.Has(job0.ID())
 	require.NoError(err)
 	require.False(hasJob0)

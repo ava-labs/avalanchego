@@ -151,7 +151,8 @@ func Test_History_Large(t *testing.T) {
 				err = db.Delete(it.Key())
 				require.NoError(err)
 			}
-			require.NoError(it.Error())
+			err = it.Error()
+			require.NoError(err)
 			it.Release()
 
 			root, err := db.GetMerkleRoot(context.Background())

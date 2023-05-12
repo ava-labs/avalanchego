@@ -53,7 +53,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer func() {
-				require.NoError(shutdownEnvironment(env))
+				err := shutdownEnvironment(env)
+				require.NoError(err)
 			}()
 
 			ins, outs, _, signers, err := env.utxosHandler.Spend(env.state, preFundedKeys, 0, test.fee, ids.ShortEmpty)
@@ -70,7 +71,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+			err = tx.Sign(txs.Codec, signers)
+			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

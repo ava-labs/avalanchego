@@ -106,7 +106,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// Case: valid tx
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	require.NoError(err)
-	require.NoError(stx.SyntacticVerify(ctx))
+	err = stx.SyntacticVerify(ctx)
+	require.NoError(err)
 
 	// Case: Wrong network ID
 	addDelegatorTx.SyntacticallyVerified = false

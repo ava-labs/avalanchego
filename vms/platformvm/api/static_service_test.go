@@ -225,7 +225,8 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	reply := BuildGenesisReply{}
 
 	ss := StaticService{}
-	require.NoError(ss.BuildGenesis(nil, &args, &reply))
+	err = ss.BuildGenesis(nil, &args, &reply)
+	require.NoError(err)
 
 	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	require.NoError(err)

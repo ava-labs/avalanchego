@@ -74,7 +74,8 @@ func TestParseApplication(t *testing.T) {
 	require.Equal(t, 1, v.Major)
 	require.Equal(t, 2, v.Minor)
 	require.Equal(t, 3, v.Patch)
-	require.NoError(t, v.Compatible(v))
+	err = v.Compatible(v)
+	require.NoError(t, err)
 	require.False(t, v.Before(v))
 
 	tests := []struct {

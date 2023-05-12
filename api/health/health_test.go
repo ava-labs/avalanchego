@@ -59,15 +59,18 @@ func TestDuplicatedRegistations(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	require.NoError(h.RegisterReadinessCheck("check", check))
+	err = h.RegisterReadinessCheck("check", check)
+	require.NoError(err)
 	err = h.RegisterReadinessCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 
-	require.NoError(h.RegisterHealthCheck("check", check))
+	err = h.RegisterHealthCheck("check", check)
+	require.NoError(err)
 	err = h.RegisterHealthCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 
-	require.NoError(h.RegisterLivenessCheck("check", check))
+	err = h.RegisterLivenessCheck("check", check)
+	require.NoError(err)
 	err = h.RegisterLivenessCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 }
@@ -83,7 +86,8 @@ func TestDefaultFailing(t *testing.T) {
 	require.NoError(err)
 
 	{
-		require.NoError(h.RegisterReadinessCheck("check", check))
+		err := h.RegisterReadinessCheck("check", check)
+		require.NoError(err)
 
 		readinessResult, readiness := h.Readiness()
 		require.Len(readinessResult, 1)
@@ -93,7 +97,8 @@ func TestDefaultFailing(t *testing.T) {
 	}
 
 	{
-		require.NoError(h.RegisterHealthCheck("check", check))
+		err := h.RegisterHealthCheck("check", check)
+		require.NoError(err)
 
 		healthResult, health := h.Health()
 		require.Len(healthResult, 1)
@@ -103,7 +108,8 @@ func TestDefaultFailing(t *testing.T) {
 	}
 
 	{
-		require.NoError(h.RegisterLivenessCheck("check", check))
+		err := h.RegisterLivenessCheck("check", check)
+		require.NoError(err)
 
 		livenessResult, liveness := h.Liveness()
 		require.Len(livenessResult, 1)
@@ -123,9 +129,12 @@ func TestPassingChecks(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	require.NoError(h.RegisterReadinessCheck("check", check))
-	require.NoError(h.RegisterHealthCheck("check", check))
-	require.NoError(h.RegisterLivenessCheck("check", check))
+	err = h.RegisterReadinessCheck("check", check)
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check", check)
+	require.NoError(err)
+	err = h.RegisterLivenessCheck("check", check)
+	require.NoError(err)
 
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
@@ -187,9 +196,12 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	require.NoError(h.RegisterReadinessCheck("check", check))
-	require.NoError(h.RegisterHealthCheck("check", check))
-	require.NoError(h.RegisterLivenessCheck("check", check))
+	err = h.RegisterReadinessCheck("check", check)
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check", check)
+	require.NoError(err)
+	err = h.RegisterLivenessCheck("check", check)
+	require.NoError(err)
 
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
@@ -264,11 +276,16 @@ func TestTags(t *testing.T) {
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(h.RegisterHealthCheck("check1", check))
-	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))
-	require.NoError(h.RegisterHealthCheck("check3", check, "tag2"))
-	require.NoError(h.RegisterHealthCheck("check4", check, "tag1", "tag2"))
-	require.NoError(h.RegisterHealthCheck("check5", check, GlobalTag))
+	err = h.RegisterHealthCheck("check1", check)
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check2", check, "tag1")
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check3", check, "tag2")
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check4", check, "tag1", "tag2")
+	require.NoError(err)
+	err = h.RegisterHealthCheck("check5", check, GlobalTag)
+	require.NoError(err)
 
 	// default checks
 	{
@@ -358,7 +375,8 @@ func TestTags(t *testing.T) {
 
 	{
 		// now we'll add a new check which is unhealthy by default (notYetRunResult)
-		require.NoError(h.RegisterHealthCheck("check6", check, "tag1"))
+		err := h.RegisterHealthCheck("check6", check, "tag1")
+		require.NoError(err)
 
 		awaitHealthy(t, h, false)
 
@@ -379,7 +397,8 @@ func TestTags(t *testing.T) {
 		require.True(health)
 
 		// add global tag
-		require.NoError(h.RegisterHealthCheck("check7", check, GlobalTag))
+		err = h.RegisterHealthCheck("check7", check, GlobalTag)
+		require.NoError(err)
 
 		awaitHealthy(t, h, false)
 

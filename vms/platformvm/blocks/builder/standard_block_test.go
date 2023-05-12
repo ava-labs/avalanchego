@@ -25,7 +25,8 @@ func TestAtomicTxImports(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	utxoID := avax.UTXOID{
@@ -73,12 +74,15 @@ func TestAtomicTxImports(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.Builder.Add(tx))
+	err = env.Builder.Add(tx)
+	require.NoError(err)
 	b, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	// Test multiple verify calls work
-	require.NoError(b.Verify(context.Background()))
-	require.NoError(b.Accept(context.Background()))
+	err = b.Verify(context.Background())
+	require.NoError(err)
+	err = b.Accept(context.Background())
+	require.NoError(err)
 	_, txStatus, err := env.state.GetTx(tx.ID())
 	require.NoError(err)
 	// Ensure transaction is in the committed state

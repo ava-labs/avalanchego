@@ -13,11 +13,15 @@ import (
 func TestStatusValid(t *testing.T) {
 	require := require.New(t)
 
-	require.NoError(Accepted.Valid())
-	require.NoError(Rejected.Valid())
-	require.NoError(Processing.Valid())
-	require.NoError(Unknown.Valid())
-	err := Status(math.MaxInt32).Valid()
+	err := Accepted.Valid()
+	require.NoError(err)
+	err = Rejected.Valid()
+	require.NoError(err)
+	err = Processing.Valid()
+	require.NoError(err)
+	err = Unknown.Valid()
+	require.NoError(err)
+	err = Status(math.MaxInt32).Valid()
 	require.ErrorIs(err, errUnknownStatus)
 }
 

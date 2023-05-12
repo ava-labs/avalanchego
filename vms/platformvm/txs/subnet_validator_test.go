@@ -34,6 +34,7 @@ func TestSubnetValidatorVerifySubnetID(t *testing.T) {
 			},
 		}
 
-		require.NoError(vdr.Verify())
+		err := vdr.Verify()
+		require.NoError(err)
 	}
 }

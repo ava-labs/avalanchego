@@ -123,7 +123,8 @@ func TestChangePassword(t *testing.T) {
 	err = auth.ChangePassword(testPassword, "")
 	require.ErrorIs(err, password.ErrEmptyPassword)
 
-	require.NoError(auth.ChangePassword(testPassword, password2))
+	err = auth.ChangePassword(testPassword, password2)
+	require.NoError(err)
 	require.True(auth.password.Check(password2))
 
 	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
@@ -131,7 +132,8 @@ func TestChangePassword(t *testing.T) {
 	err = auth.ChangePassword(testPassword, password3)
 	require.ErrorIs(err, errWrongPassword)
 
-	require.NoError(auth.ChangePassword(password2, password3))
+	err = auth.ChangePassword(password2, password3)
+	require.NoError(err)
 }
 
 func TestRevokeToken(t *testing.T) {
@@ -180,7 +182,8 @@ func TestWrapHandlerRevokedToken(t *testing.T) {
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	require.NoError(err)
 
-	require.NoError(auth.RevokeToken(tokenStr, testPassword))
+	err = auth.RevokeToken(tokenStr, testPassword)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
@@ -318,7 +321,8 @@ func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	require.NoError(err)
 
-	require.NoError(auth.RevokeToken(tokenStr, testPassword))
+	err = auth.RevokeToken(tokenStr, testPassword)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 

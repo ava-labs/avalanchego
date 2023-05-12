@@ -30,8 +30,9 @@ func TestOptionalGathererDuplicated(t *testing.T) {
 	g := NewOptionalGatherer()
 	og := NewOptionalGatherer()
 
-	require.NoError(g.Register(og))
 	err := g.Register(og)
+	require.NoError(err)
+	err = g.Register(og)
 	require.ErrorIs(err, errDuplicatedRegister)
 }
 
@@ -44,7 +45,8 @@ func TestOptionalGathererAddedError(t *testing.T) {
 		err: errTest,
 	}
 
-	require.NoError(g.Register(tg))
+	err := g.Register(tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.ErrorIs(err, errTest)
@@ -62,7 +64,8 @@ func TestMultiGathererAdded(t *testing.T) {
 		}},
 	}
 
-	require.NoError(g.Register(tg))
+	err := g.Register(tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.NoError(err)

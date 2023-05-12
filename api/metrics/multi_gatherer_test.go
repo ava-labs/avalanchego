@@ -27,12 +27,14 @@ func TestMultiGathererDuplicatedPrefix(t *testing.T) {
 	g := NewMultiGatherer()
 	og := NewOptionalGatherer()
 
-	require.NoError(g.Register("", og))
-
 	err := g.Register("", og)
+	require.NoError(err)
+
+	err = g.Register("", og)
 	require.ErrorIs(err, errDuplicatedPrefix)
 
-	require.NoError(g.Register("lol", og))
+	err = g.Register("lol", og)
+	require.NoError(err)
 }
 
 func TestMultiGathererAddedError(t *testing.T) {
@@ -44,7 +46,8 @@ func TestMultiGathererAddedError(t *testing.T) {
 		err: errTest,
 	}
 
-	require.NoError(g.Register("", tg))
+	err := g.Register("", tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.ErrorIs(err, errTest)
@@ -62,7 +65,8 @@ func TestMultiGathererNoAddedPrefix(t *testing.T) {
 		}},
 	}
 
-	require.NoError(g.Register("", tg))
+	err := g.Register("", tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.NoError(err)
@@ -81,7 +85,8 @@ func TestMultiGathererAddedPrefix(t *testing.T) {
 		}},
 	}
 
-	require.NoError(g.Register(hello, tg))
+	err := g.Register(hello, tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.NoError(err)
@@ -98,7 +103,8 @@ func TestMultiGathererJustPrefix(t *testing.T) {
 		mfs: []*dto.MetricFamily{{}},
 	}
 
-	require.NoError(g.Register(hello, tg))
+	err := g.Register(hello, tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.NoError(err)
@@ -124,7 +130,8 @@ func TestMultiGathererSorted(t *testing.T) {
 		},
 	}
 
-	require.NoError(g.Register("", tg))
+	err := g.Register("", tg)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
 	require.NoError(err)

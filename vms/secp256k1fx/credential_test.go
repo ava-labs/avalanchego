@@ -17,7 +17,8 @@ import (
 func TestCredentialVerify(t *testing.T) {
 	require := require.New(t)
 	cred := Credential{}
-	require.NoError(cred.Verify())
+	err := cred.Verify()
+	require.NoError(err)
 }
 
 func TestCredentialVerifyNil(t *testing.T) {
@@ -31,7 +32,8 @@ func TestCredentialSerialize(t *testing.T) {
 	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	require.NoError(m.RegisterCodec(0, c))
+	err := m.RegisterCodec(0, c)
+	require.NoError(err)
 
 	expected := []byte{
 		// Codec version
@@ -83,7 +85,8 @@ func TestCredentialSerialize(t *testing.T) {
 			0x00,
 		},
 	}}
-	require.NoError(cred.Verify())
+	err = cred.Verify()
+	require.NoError(err)
 
 	result, err := m.Marshal(0, &cred)
 	require.NoError(err)

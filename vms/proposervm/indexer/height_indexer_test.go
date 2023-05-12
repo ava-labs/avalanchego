@@ -49,7 +49,8 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		err = storedState.PutBlock(postForkStatelessBlk, choices.Accepted)
+		require.NoError(err)
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -87,8 +88,10 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	require.NoError(hIndex.state.SetCheckpoint(lastBlkID))
-	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	err := hIndex.state.SetCheckpoint(lastBlkID)
+	require.NoError(err)
+	err = hIndex.RepairHeightIndex(context.Background())
+	require.NoError(err)
 	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
@@ -129,7 +132,8 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		err = storedState.PutBlock(postForkStatelessBlk, choices.Accepted)
+		require.NoError(err)
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -167,8 +171,10 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	require.NoError(hIndex.state.SetCheckpoint(lastBlkID))
-	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	err := hIndex.state.SetCheckpoint(lastBlkID)
+	require.NoError(err)
+	err = hIndex.RepairHeightIndex(context.Background())
+	require.NoError(err)
 	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
@@ -213,7 +219,8 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			blockBytes[:],
 		)
 		require.NoError(err)
-		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		err = storedState.PutBlock(postForkStatelessBlk, choices.Accepted)
+		require.NoError(err)
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -259,12 +266,14 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		}
 
 		checkpointBlk = blk
-		require.NoError(hIndex.state.SetCheckpoint(checkpointBlk.ID()))
+		err := hIndex.state.SetCheckpoint(checkpointBlk.ID())
+		require.NoError(err)
 		break
 	}
 
 	// perform repair and show index is built
-	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	err := hIndex.RepairHeightIndex(context.Background())
+	require.NoError(err)
 	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built

@@ -20,7 +20,8 @@ func TestNewExportTx(t *testing.T) {
 	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(t, err)
 	}()
 
 	type test struct {

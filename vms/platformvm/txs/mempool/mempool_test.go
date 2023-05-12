@@ -73,7 +73,8 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		err := mpool.Add(tx)
+		require.NoError(err)
 
 		// we can get it
 		require.True(mpool.Has(tx.ID()))
@@ -103,7 +104,8 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		err = mpool.Add(tx)
+		require.NoError(err)
 	}
 }
 
@@ -127,7 +129,8 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		require.NoError(mpool.Add(tx))
+		err := mpool.Add(tx)
+		require.NoError(err)
 
 		// we can get it
 		require.True(mpool.HasStakerTx())
@@ -168,7 +171,8 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		require.NoError(mpool.Add(tx))
+		err = mpool.Add(tx)
+		require.NoError(err)
 	}
 }
 

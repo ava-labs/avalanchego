@@ -236,7 +236,8 @@ func TestGenesisFromFile(t *testing.T) {
 			var customFile string
 			if len(test.customConfig) > 0 {
 				customFile = filepath.Join(t.TempDir(), "config.json")
-				require.NoError(perms.WriteFile(customFile, test.customConfig, perms.ReadWrite))
+				err := perms.WriteFile(customFile, test.customConfig, perms.ReadWrite)
+				require.NoError(err)
 			}
 
 			if len(test.missingFilepath) > 0 {

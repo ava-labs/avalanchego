@@ -31,8 +31,10 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestNodeID()
 	vdr2ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
-	require.NoError(vdrs.Add(vdr2ID, nil, ids.Empty, 1))
+	err := vdrs.Add(vdr1ID, nil, ids.Empty, 1)
+	require.NoError(err)
+	err = vdrs.Add(vdr2ID, nil, ids.Empty, 1)
+	require.NoError(err)
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
 		"",
@@ -176,7 +178,8 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	}
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
+	err := vdrs.Add(vdr1ID, nil, ids.Empty, 1)
+	require.NoError(err)
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
 		"",
@@ -225,7 +228,8 @@ func TestBypassThrottling(t *testing.T) {
 	}
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vdr1ID, nil, ids.Empty, 1))
+	err := vdrs.Add(vdr1ID, nil, ids.Empty, 1)
+	require.NoError(err)
 	throttlerIntf, err := NewSybilOutboundMsgThrottler(
 		logging.NoLog{},
 		"",

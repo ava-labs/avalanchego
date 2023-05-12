@@ -134,9 +134,12 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	manager := NewDefaultManager()
 	// Register the types that may be unmarshaled into interfaces
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
-	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
-	require.NoError(manager.RegisterCodec(0, codec))
+	err := codec.RegisterType(&MyInnerStruct{})
+	require.NoError(err)
+	err = codec.RegisterType(&MyInnerStruct2{})
+	require.NoError(err)
+	err = manager.RegisterCodec(0, codec)
+	require.NoError(err)
 
 	myStructBytes, err := manager.Marshal(0, myStructInstance)
 	require.NoError(err)
@@ -156,8 +159,9 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
 	err := codec.RegisterType(&MyInnerStruct{})
+	require.NoError(err)
+	err = codec.RegisterType(&MyInnerStruct{})
 	require.ErrorIs(err, ErrDuplicateType)
 }
 
@@ -799,9 +803,12 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	manager := NewDefaultManager()
-	require.NoError(codec.RegisterType(&innerInterface{}))
-	require.NoError(codec.RegisterType(&innerNoInterface{}))
-	require.NoError(manager.RegisterCodec(0, codec))
+	err := codec.RegisterType(&innerInterface{})
+	require.NoError(err)
+	err = codec.RegisterType(&innerNoInterface{})
+	require.NoError(err)
+	err = manager.RegisterCodec(0, codec)
+	require.NoError(err)
 
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 0}

@@ -247,7 +247,8 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
-				require.NoError(shutdownEnvironment(freshTH))
+				err := shutdownEnvironment(freshTH)
+				require.NoError(err)
 			}()
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
@@ -288,7 +289,8 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	nodeID := preFundedKeys[0].PublicKey().Address()
@@ -727,7 +729,8 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	nodeID := ids.GenerateTestNodeID()

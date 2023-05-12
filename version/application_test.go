@@ -18,7 +18,8 @@ func TestNewDefaultApplication(t *testing.T) {
 	}
 
 	require.Equal(t, "avalanche/1.2.3", v.String())
-	require.NoError(t, v.Compatible(v))
+	err := v.Compatible(v)
+	require.NoError(t, err)
 	require.False(t, v.Before(v))
 }
 

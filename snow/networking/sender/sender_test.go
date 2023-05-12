@@ -185,7 +185,8 @@ func TestTimeout(t *testing.T) {
 	cancel()
 
 	failed := func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
-		require.NoError(ctx.Err())
+		err := ctx.Err()
+		require.NoError(err)
 
 		failedLock.Lock()
 		defer failedLock.Unlock()
@@ -204,7 +205,8 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.QueryFailedF = failed
 	bootstrapper.AppRequestFailedF = failed
 	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, _ uint32) error {
-		require.NoError(ctx.Err())
+		err := ctx.Err()
+		require.NoError(err)
 
 		failedLock.Lock()
 		defer failedLock.Unlock()

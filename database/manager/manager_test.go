@@ -205,10 +205,14 @@ func TestPrefixDBManager(t *testing.T) {
 	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
 	v1 := []byte{'w', 'u', 'r', 's', 't'}
 
-	require.NoError(db0.Put(k0, v0))
-	require.NoError(db1.Put(k1, v1))
-	require.NoError(db0.Close())
-	require.NoError(db1.Close())
+	err := db0.Put(k0, v0)
+	require.NoError(err)
+	err = db1.Put(k1, v1)
+	require.NoError(err)
+	err = db0.Close()
+	require.NoError(err)
+	err = db1.Close()
+	require.NoError(err)
 
 	m := &manager{databases: []*VersionedDatabase{
 		{
@@ -245,10 +249,14 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	k1 := []byte{'c', 'u', 'r', 'r', 'y'}
 	v1 := []byte{'w', 'u', 'r', 's', 't'}
 
-	require.NoError(db0.Put(k0, v0))
-	require.NoError(db1.Put(k1, v1))
-	require.NoError(db0.Close())
-	require.NoError(db1.Close())
+	err := db0.Put(k0, v0)
+	require.NoError(err)
+	err = db1.Put(k1, v1)
+	require.NoError(err)
+	err = db0.Close()
+	require.NoError(err)
+	err = db1.Close()
+	require.NoError(err)
 
 	m := &manager{databases: []*VersionedDatabase{
 		{

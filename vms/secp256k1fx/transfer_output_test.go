@@ -41,7 +41,8 @@ func TestOutputVerify(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(out.Verify())
+	err := out.Verify()
+	require.NoError(err)
 }
 
 func TestOutputVerifyNil(t *testing.T) {
@@ -137,7 +138,8 @@ func TestOutputSerialize(t *testing.T) {
 	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	require.NoError(m.RegisterCodec(0, c))
+	err := m.RegisterCodec(0, c)
+	require.NoError(err)
 
 	expected := []byte{
 		// Codec version
@@ -178,7 +180,8 @@ func TestOutputSerialize(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(out.Verify())
+	err = out.Verify()
+	require.NoError(err)
 
 	result, err := m.Marshal(0, &out)
 	require.NoError(err)
@@ -206,7 +209,8 @@ func TestOutputAddresses(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(out.Verify())
+	err := out.Verify()
+	require.NoError(err)
 	require.Equal([][]byte{
 		out.Addrs[0].Bytes(),
 		out.Addrs[1].Bytes(),

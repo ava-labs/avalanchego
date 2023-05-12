@@ -103,7 +103,8 @@ func TestState(t *testing.T) {
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
-	require.NoError(t, s.Commit())
+	err = s.Commit()
+	require.NoError(t, err)
 
 	s, err = New(vdb, parser, prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -122,7 +123,8 @@ func TestDiff(t *testing.T) {
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
-	require.NoError(t, s.Commit())
+	err = s.Commit()
+	require.NoError(t, err)
 
 	parentID := ids.GenerateTestID()
 	d, err := NewDiff(parentID, &versions{
@@ -191,7 +193,8 @@ func ChainTxTest(t *testing.T, c Chain) {
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		BlockchainID: ids.GenerateTestID(),
 	}}}
-	require.NoError(parser.InitializeTx(tx))
+	err = parser.InitializeTx(tx)
+	require.NoError(err)
 	txID := tx.ID()
 
 	_, err = c.GetTx(txID)

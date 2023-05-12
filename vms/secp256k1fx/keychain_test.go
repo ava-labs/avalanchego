@@ -102,7 +102,8 @@ func TestKeychainMatch(t *testing.T) {
 			sks[2].PublicKey().Address(),
 		},
 	}
-	require.NoError(owners.Verify())
+	err := owners.Verify()
+	require.NoError(err)
 
 	_, _, ok := kc.Match(&owners, 0)
 	require.False(ok)
@@ -145,9 +146,10 @@ func TestKeychainSpendMint(t *testing.T) {
 			sks[2].PublicKey().Address(),
 		},
 	}}
-	require.NoError(mint.Verify())
+	err := mint.Verify()
+	require.NoError(err)
 
-	_, _, err := kc.Spend(&mint, 0)
+	_, _, err = kc.Spend(&mint, 0)
 	require.ErrorIs(err, errCantSpend)
 
 	kc.Add(sks[0])
@@ -159,7 +161,8 @@ func TestKeychainSpendMint(t *testing.T) {
 
 	require.IsType(&Input{}, vinput)
 	input := vinput.(*Input)
-	require.NoError(input.Verify())
+	err = input.Verify()
+	require.NoError(err)
 	require.Equal([]uint32{0, 1}, input.SigIndices)
 	require.Len(keys, 2)
 	require.Equal(sks[1].PublicKey().Address(), keys[0].PublicKey().Address())
@@ -191,9 +194,10 @@ func TestKeychainSpendTransfer(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(transfer.Verify())
+	err := transfer.Verify()
+	require.NoError(err)
 
-	_, _, err := kc.Spend(&transfer, 54321)
+	_, _, err = kc.Spend(&transfer, 54321)
 	require.ErrorIs(err, errCantSpend)
 
 	kc.Add(sks[0])
@@ -208,7 +212,8 @@ func TestKeychainSpendTransfer(t *testing.T) {
 
 	require.IsType(&TransferInput{}, vinput)
 	input := vinput.(*TransferInput)
-	require.NoError(input.Verify())
+	err = input.Verify()
+	require.NoError(err)
 	require.Equal(uint64(12345), input.Amount())
 	require.Equal([]uint32{0, 1}, input.SigIndices)
 	require.Len(keys, 2)

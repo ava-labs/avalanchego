@@ -16,7 +16,8 @@ func TestProofOfPossession(t *testing.T) {
 
 	blsPOP, err := newProofOfPossession()
 	require.NoError(err)
-	require.NoError(blsPOP.Verify())
+	err = blsPOP.Verify()
+	require.NoError(err)
 	require.NotNil(blsPOP.Key())
 
 	blsPOP, err = newProofOfPossession()

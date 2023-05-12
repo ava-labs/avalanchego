@@ -115,10 +115,11 @@ func TestHealthCheck(t *testing.T) {
 			baseDB := setupDB(t)
 			db := corruptabledb.New(baseDB.server)
 			defer db.Close()
-			require.NoError(scenario.testFn(db))
+			err := scenario.testFn(db)
+			require.NoError(err)
 
 			// check db HealthCheck
-			_, err := db.HealthCheck(context.Background())
+			_, err = db.HealthCheck(context.Background())
 			if err == nil && scenario.wantErr {
 				t.Fatalf("wanted error got nil")
 				return

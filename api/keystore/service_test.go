@@ -28,7 +28,8 @@ func TestServiceListNoUsers(t *testing.T) {
 	s := service{ks: ks.(*keystore)}
 
 	reply := ListUsersReply{}
-	require.NoError(s.ListUsers(nil, nil, &reply))
+	err = s.ListUsers(nil, nil, &reply)
+	require.NoError(err)
 	require.Empty(reply.Users)
 }
 
@@ -49,7 +50,8 @@ func TestServiceCreateUser(t *testing.T) {
 
 	{
 		reply := ListUsersReply{}
-		require.NoError(s.ListUsers(nil, nil, &reply))
+		err := s.ListUsers(nil, nil, &reply)
+		require.NoError(err)
 		require.Len(reply.Users, 1)
 		require.Equal("bob", reply.Users[0])
 	}
@@ -91,7 +93,8 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 
 	{
 		reply := ListUsersReply{}
-		require.NoError(s.ListUsers(nil, nil, &reply))
+		err := s.ListUsers(nil, nil, &reply)
+		require.NoError(err)
 		require.Empty(reply.Users)
 	}
 }
@@ -171,7 +174,8 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 	{
 		db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
 		require.NoError(err)
-		require.NoError(db.Put([]byte("hello"), []byte("world")))
+		err = db.Put([]byte("hello"), []byte("world"))
+		require.NoError(err)
 	}
 
 	{
@@ -203,7 +207,8 @@ func TestServiceExportImport(t *testing.T) {
 		{
 			db, err := ks.GetDatabase(ids.Empty, "bob", strongPassword)
 			require.NoError(err)
-			require.NoError(db.Put([]byte("hello"), []byte("world")))
+			err = db.Put([]byte("hello"), []byte("world"))
+			require.NoError(err)
 		}
 
 		exportArgs := ExportUserArgs{
@@ -214,7 +219,8 @@ func TestServiceExportImport(t *testing.T) {
 			Encoding: encoding,
 		}
 		exportReply := ExportUserReply{}
-		require.NoError(s.ExportUser(nil, &exportArgs, &exportReply))
+		err = s.ExportUser(nil, &exportArgs, &exportReply)
+		require.NoError(err)
 
 		newKS, err := CreateTestKeystore()
 		require.NoError(err)
@@ -335,7 +341,8 @@ func TestServiceDeleteUser(t *testing.T) {
 			s := service{ks: ks}
 
 			if tt.setup != nil {
-				require.NoError(tt.setup(ks))
+				err := tt.setup(ks)
+				require.NoError(err)
 			}
 			got := &api.EmptyReply{}
 			err = s.DeleteUser(nil, tt.request, got)
@@ -347,7 +354,8 @@ func TestServiceDeleteUser(t *testing.T) {
 			require.NotContains(ks.usernameToPassword, testUser) // delete is successful
 
 			// deleted user details should be available to create user again.
-			require.NoError(s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}))
+			err = s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+			require.NoError(err)
 		})
 	}
 }

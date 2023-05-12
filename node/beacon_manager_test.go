@@ -31,7 +31,9 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	for i := 0; i < numValidators; i++ {
 		nodeID := ids.GenerateTestNodeID()
 
-		require.NoError(validatorSet.Add(nodeID, nil, ids.Empty, 1))
+		err := validatorSet.Add(nodeID, nil, ids.Empty, 1)
+		require.NoError(err)
+
 		validatorIDs = append(validatorIDs, nodeID)
 	}
 

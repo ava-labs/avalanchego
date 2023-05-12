@@ -32,7 +32,8 @@ func TestTransferInputVerify(t *testing.T) {
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	require.NoError(in.Verify())
+	err := in.Verify()
+	require.NoError(err)
 }
 
 func TestTransferInputVerifyNil(t *testing.T) {
@@ -82,7 +83,8 @@ func TestTransferInputSerialize(t *testing.T) {
 	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	require.NoError(m.RegisterCodec(0, c))
+	err := m.RegisterCodec(0, c)
+	require.NoError(err)
 
 	expected := []byte{
 		// Codec version
@@ -102,7 +104,8 @@ func TestTransferInputSerialize(t *testing.T) {
 			SigIndices: []uint32{3, 7},
 		},
 	}
-	require.NoError(in.Verify())
+	err = in.Verify()
+	require.NoError(err)
 
 	result, err := m.Marshal(0, &in)
 	require.NoError(err)

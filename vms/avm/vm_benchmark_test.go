@@ -100,7 +100,8 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 		vm.state.AddUTXO(utxo)
 	}
-	require.NoError(b, vm.state.Commit())
+	err := vm.state.Commit()
+	require.NoError(b, err)
 
 	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)

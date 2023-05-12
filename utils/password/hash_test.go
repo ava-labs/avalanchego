@@ -13,7 +13,8 @@ func TestHash(t *testing.T) {
 	require := require.New(t)
 
 	h := Hash{}
-	require.NoError(h.Set("heytherepal"))
+	err := h.Set("heytherepal")
+	require.NoError(err)
 	require.True(h.Check("heytherepal"))
 	require.False(h.Check("heytherepal!"))
 	require.False(h.Check(""))

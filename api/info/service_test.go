@@ -69,7 +69,8 @@ func TestGetVMsSuccess(t *testing.T) {
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	reply := GetVMsReply{}
-	require.NoError(resources.info.GetVMs(nil, nil, &reply))
+	err := resources.info.GetVMs(nil, nil, &reply)
+	require.NoError(err)
 	require.Equal(expectedVMRegistry, reply.VMs)
 }
 

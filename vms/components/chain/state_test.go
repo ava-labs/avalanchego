@@ -853,7 +853,8 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	require.NoError(err)
 	require.Empty(chainState.verifiedBlocks)
 
-	require.NoError(builtBlk.Verify(context.Background()))
+	err = builtBlk.Verify(context.Background())
+	require.NoError(err)
 	require.Len(chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)

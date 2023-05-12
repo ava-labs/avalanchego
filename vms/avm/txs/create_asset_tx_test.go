@@ -198,7 +198,8 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	})
 	require.NoError(err)
 
-	require.NoError(parser.InitializeTx(tx))
+	err = parser.InitializeTx(tx)
+	require.NoError(err)
 
 	result := tx.Bytes()
 	require.Equal(expected, result)
@@ -366,7 +367,8 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 		&secp256k1fx.Fx{},
 	})
 	require.NoError(err)
-	require.NoError(parser.InitializeTx(tx))
+	err = parser.InitializeTx(tx)
+	require.NoError(err)
 
 	result := tx.Bytes()
 	require.Equal(expected, result)

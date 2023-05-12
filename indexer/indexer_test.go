@@ -110,8 +110,10 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	idxrIntf, err := NewIndexer(config)
 	require.NoError(err)
 	require.False(idxrIntf.(*indexer).hasRunBefore)
-	require.NoError(db.Commit())
-	require.NoError(idxrIntf.Close())
+	err = db.Commit()
+	require.NoError(err)
+	err = idxrIntf.Close()
+	require.NoError(err)
 	shutdown.Wait()
 	shutdown.Add(1)
 
@@ -121,7 +123,8 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	require.IsType(&indexer{}, idxrIntf)
 	idxr := idxrIntf.(*indexer)
 	require.True(idxr.hasRunBefore)
-	require.NoError(idxr.Close())
+	err = idxr.Close()
+	require.NoError(err)
 	shutdown.Wait()
 }
 
@@ -189,7 +192,8 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	require.NoError(config.BlockAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
+	err = config.BlockAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes)
+	require.NoError(err)
 
 	blkIdx := idxr.blockIndices[chain1Ctx.ChainID]
 	require.NotNil(blkIdx)
@@ -221,11 +225,14 @@ func TestIndexer(t *testing.T) {
 	require.Equal(expectedContainer, containers[0])
 
 	// Close the indexer
-	require.NoError(db.Commit())
-	require.NoError(idxr.Close())
+	err = db.Commit()
+	require.NoError(err)
+	err = idxr.Close()
+	require.NoError(err)
 	require.True(idxr.closed)
 	// Calling Close again should be fine
-	require.NoError(idxr.Close())
+	err = idxr.Close()
+	require.NoError(err)
 	server.timesCalled = 0
 
 	// Re-open the indexer
@@ -289,7 +296,8 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	require.NoError(config.VertexAcceptorGroup.Accept(chain2Ctx, vtxID, vtxBytes))
+	err = config.VertexAcceptorGroup.Accept(chain2Ctx, vtxID, vtxBytes)
+	require.NoError(err)
 
 	vtxIdx := idxr.vtxIndices[chain2Ctx.ChainID]
 	require.NotNil(vtxIdx)
@@ -338,7 +346,8 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).AnyTimes()
 
-	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
+	err = config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes)
+	require.NoError(err)
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	require.NotNil(txIdx)
@@ -382,8 +391,10 @@ func TestIndexer(t *testing.T) {
 	require.Equal(blkID, lastAcceptedBlk.ID)
 
 	// Close the indexer again
-	require.NoError(config.DB.(*versiondb.Database).Commit())
-	require.NoError(idxr.Close())
+	err = config.DB.(*versiondb.Database).Commit()
+	require.NoError(err)
+	err = idxr.Close()
+	require.NoError(err)
 
 	// Re-open one more time and re-register chains
 	config.DB = versiondb.New(baseDB)
@@ -448,8 +459,10 @@ func TestIncompleteIndex(t *testing.T) {
 	require.Empty(idxr.blockIndices)
 
 	// Close and re-open the indexer, this time with indexing enabled
-	require.NoError(config.DB.(*versiondb.Database).Commit())
-	require.NoError(idxr.Close())
+	err = config.DB.(*versiondb.Database).Commit()
+	require.NoError(err)
+	err = idxr.Close()
+	require.NoError(err)
 	config.IndexingEnabled = true
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
@@ -459,13 +472,15 @@ func TestIncompleteIndex(t *testing.T) {
 	require.True(idxr.indexingEnabled)
 
 	// Register the chain again. Should die due to incomplete index.
-	require.NoError(config.DB.(*versiondb.Database).Commit())
+	err = config.DB.(*versiondb.Database).Commit()
+	require.NoError(err)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	require.True(idxr.closed)
 
 	// Close and re-open the indexer, this time with indexing enabled
 	// and incomplete index allowed.
-	require.NoError(idxr.Close())
+	err = idxr.Close()
+	require.NoError(err)
 	config.AllowIncompleteIndex = true
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
@@ -480,7 +495,8 @@ func TestIncompleteIndex(t *testing.T) {
 
 	// Close the indexer and re-open with indexing disabled and
 	// incomplete index not allowed.
-	require.NoError(idxr.Close())
+	err = idxr.Close()
+	require.NoError(err)
 	config.AllowIncompleteIndex = false
 	config.IndexingEnabled = false
 	config.DB = versiondb.New(baseDB)

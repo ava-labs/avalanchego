@@ -476,7 +476,8 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	require.NoError(vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil))
+	err := vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil)
+	require.NoError(err)
 
 	blkID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
@@ -504,7 +505,8 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Setting state to bootstrapping duly update last accepted block
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	err = vm.SetState(context.Background(), snow.Bootstrapping)
+	require.NoError(err)
 
 	blkID, err = vm.LastAccepted(context.Background())
 	require.NoError(err)

@@ -42,10 +42,14 @@ func newContext(t testing.TB) *snow.Context {
 	ctx.CChainID = ids.GenerateTestID()
 
 	aliaser := ctx.BCLookup.(ids.Aliaser)
-	require.NoError(aliaser.Alias(ctx.XChainID, "X"))
-	require.NoError(aliaser.Alias(ctx.XChainID, ctx.XChainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
+	err := aliaser.Alias(ctx.XChainID, "X")
+	require.NoError(err)
+	err = aliaser.Alias(ctx.XChainID, ctx.XChainID.String())
+	require.NoError(err)
+	err = aliaser.Alias(constants.PlatformChainID, "P")
+	require.NoError(err)
+	err = aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String())
+	require.NoError(err)
 	return ctx
 }
 

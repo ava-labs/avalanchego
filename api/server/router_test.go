@@ -21,23 +21,29 @@ func TestAliasing(t *testing.T) {
 
 	r := newRouter()
 
-	require.NoError(r.AddAlias("1", "2", "3"))
-	require.NoError(r.AddAlias("1", "4"))
-	require.NoError(r.AddAlias("5", "1"))
-	require.NoError(r.AddAlias("3", "6"))
-	err := r.AddAlias("7", "4")
+	err := r.AddAlias("1", "2", "3")
+	require.NoError(err)
+	err = r.AddAlias("1", "4")
+	require.NoError(err)
+	err = r.AddAlias("5", "1")
+	require.NoError(err)
+	err = r.AddAlias("3", "6")
+	require.NoError(err)
+	err = r.AddAlias("7", "4")
 	require.ErrorIs(err, errAlreadyReserved)
 
 	handler1 := &testHandler{}
 	err = r.AddRouter("2", "", handler1)
 	require.ErrorIs(err, errAlreadyReserved)
-	require.NoError(r.AddRouter("5", "", handler1))
+	err = r.AddRouter("5", "", handler1)
+	require.NoError(err)
 
 	handler, exists := r.routes["5"][""]
 	require.True(exists)
 	require.Equal(handler1, handler)
 
-	require.NoError(r.AddAlias("5", "7"))
+	err = r.AddAlias("5", "7")
+	require.NoError(err)
 
 	handler, exists = r.routes["7"][""]
 	require.True(exists)
@@ -52,9 +58,10 @@ func TestBlock(t *testing.T) {
 	require := require.New(t)
 	r := newRouter()
 
-	require.NoError(r.AddAlias("1", "1"))
+	err := r.AddAlias("1", "1")
+	require.NoError(err)
 
 	handler1 := &testHandler{}
-	err := r.AddRouter("1", "", handler1)
+	err = r.AddRouter("1", "", handler1)
 	require.ErrorIs(err, errAlreadyReserved)
 }

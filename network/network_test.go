@@ -623,7 +623,8 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	network := networks[1].(*network)
-	require.NoError(primaryVdrs.RemoveWeight(nodeIDs[0], 1))
+	err = primaryVdrs.RemoveWeight(nodeIDs[0], 1)
+	require.NoError(err)
 	require.Eventually(
 		func() bool {
 			network.peersLock.RLock()

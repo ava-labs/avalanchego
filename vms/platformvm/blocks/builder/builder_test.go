@@ -41,7 +41,8 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	// add a tx to it
@@ -76,7 +77,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	// create candidate tx
@@ -84,7 +86,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
-	require.NoError(env.mempool.Add(tx))
+	err := env.mempool.Add(tx)
+	require.NoError(err)
 	require.True(env.mempool.Has(txID))
 	reason := env.mempool.GetDropReason(txID)
 	require.NoError(reason)
@@ -98,7 +101,8 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
 	env.mempool.Remove([]*txs.Tx{tx})
-	require.NoError(env.mempool.Add(tx))
+	err = env.mempool.Add(tx)
+	require.NoError(err)
 
 	require.True(env.mempool.Has(txID))
 	reason = env.mempool.GetDropReason(txID)
@@ -111,7 +115,8 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	env.isBootstrapped.Set(false)
 	env.ctx.Log = logging.NoWarn{}
 	defer func() {
-		require.NoError(t, shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(t, err)
 	}()
 
 	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic

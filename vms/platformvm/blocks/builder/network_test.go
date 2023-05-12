@@ -39,7 +39,8 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	var gossipedBytes []byte
@@ -87,7 +88,8 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	// create a tx and mark as invalid
@@ -114,7 +116,8 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(shutdownEnvironment(env))
+		err := shutdownEnvironment(env)
+		require.NoError(err)
 	}()
 
 	var gossipedBytes []byte

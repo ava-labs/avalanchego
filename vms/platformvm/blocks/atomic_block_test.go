@@ -31,7 +31,8 @@ func TestNewApricotAtomicBlock(t *testing.T) {
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+	err := tx.Initialize(txs.Codec)
+	require.NoError(err)
 
 	blk, err := NewApricotAtomicBlock(
 		parentID,

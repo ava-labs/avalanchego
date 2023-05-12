@@ -3425,7 +3425,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+	err := vals.Add(vdr, nil, ids.Empty, 1)
+	require.NoError(err)
 
 	sender := &common.SenderTest{T: t}
 	engCfg.Sender = sender
@@ -3455,7 +3456,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	te, err := newTransitive(engCfg)
 	require.NoError(err)
-	require.NoError(te.Start(context.Background(), 0))
+	err = te.Start(context.Background(), 0)
+	require.NoError(err)
 
 	vm.LastAcceptedF = nil
 
@@ -3476,7 +3478,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		*queryRequestID = requestID
 	}
 
-	require.NoError(te.issue(context.Background(), blk))
+	err = te.issue(context.Background(), blk)
+	require.NoError(err)
 
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
@@ -3498,11 +3501,13 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	}
 
 	blkIDs := []ids.ID{blk.ID()}
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blkIDs, blkIDs))
+	err = te.Chits(context.Background(), vdr, *queryRequestID, blkIDs, blkIDs)
+	require.NoError(err)
 
 	require.Equal(choices.Processing, blk.Status())
 
-	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
+	err = te.QueryFailed(context.Background(), vdr, *queryRequestID)
+	require.NoError(err)
 
 	require.Equal(choices.Accepted, blk.Status())
 }
