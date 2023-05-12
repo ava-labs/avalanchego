@@ -242,7 +242,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	// same start/end roots should yield an empty changelist
 	changes, err := db.history.getValueChanges(endRoot, endRoot, nil, nil, 10)
 	require.NoError(err)
-	require.Len(changes.values, 0)
+	require.Empty(changes.values)
 }
 
 func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
