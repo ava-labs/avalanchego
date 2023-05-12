@@ -1851,7 +1851,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		},
 		{
 			label:       "get UTXOs from multiple chains",
-			expectedErr: address.ErrNoSeparator,
+			expectedErr: avax.ErrMismatchedChainIDs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
@@ -1861,7 +1861,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		},
 		{
 			label:       "get UTXOs for an address on a different chain",
-			expectedErr: address.ErrNoSeparator,
+			expectedErr: avax.ErrMismatchedChainIDs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
