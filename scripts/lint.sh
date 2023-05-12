@@ -64,6 +64,13 @@ function test_require_equal_zero {
     echo ""
     return 1
   fi
+
+  if grep -R -zo -P 'require\.Equal\(.+?, (u?int\d+\(0\)|0)\)\n' .; then
+    echo ""
+    echo "Use require.Zero instead of require.Equal when testing for 0."
+    echo ""
+    return 1
+  fi
 }
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
