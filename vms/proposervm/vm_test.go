@@ -478,7 +478,8 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	require.ErrorIs(blk.Verify(context.Background()), errInnerParentMismatch)
+	err = blk.Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 // VM.ParseBlock tests section
@@ -1528,7 +1529,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(bBlock.Verify(context.Background()), errProposerWindowNotStarted)
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1548,7 +1550,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(bBlock.Verify(context.Background()), errTimeTooAdvanced)
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errTimeTooAdvanced)
 }
 
 // Ensure that Accepting a PostForkOption (B) causes both the other option and

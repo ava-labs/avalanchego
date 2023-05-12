@@ -62,7 +62,8 @@ func TestRemoveWeight(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 
-	require.ErrorIs(RemoveWeight(m, subnetID, nodeID, 1), errMissingValidators)
+	err := RemoveWeight(m, subnetID, nodeID, 1)
+	require.ErrorIs(err, errMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)

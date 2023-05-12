@@ -47,7 +47,8 @@ func TestBuild(t *testing.T) {
 
 	require.NoError(builtBlock.Verify(true, chainID))
 
-	require.ErrorIs(builtBlock.Verify(false, chainID), errUnexpectedProposer)
+	err = builtBlock.Verify(false, chainID)
+	require.ErrorIs(err, errUnexpectedProposer)
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -69,7 +70,8 @@ func TestBuildUnsigned(t *testing.T) {
 
 	require.NoError(builtBlock.Verify(false, ids.Empty))
 
-	require.ErrorIs(builtBlock.Verify(true, ids.Empty), errMissingProposer)
+	err = builtBlock.Verify(true, ids.Empty)
+	require.ErrorIs(err, errMissingProposer)
 }
 
 func TestBuildHeader(t *testing.T) {

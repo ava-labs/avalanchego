@@ -10,15 +10,11 @@ import (
 )
 
 func TestMetaDataVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	md := (*Metadata)(nil)
-	require.ErrorIs(md.Verify(), errNilMetadata)
+	require.ErrorIs(t, md.Verify(), errNilMetadata)
 }
 
 func TestMetaDataVerifyUninitialized(t *testing.T) {
-	require := require.New(t)
-
 	md := &Metadata{}
-	require.ErrorIs(md.Verify(), errMetadataNotInitialize)
+	require.ErrorIs(t, md.Verify(), errMetadataNotInitialize)
 }

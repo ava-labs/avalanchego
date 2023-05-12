@@ -84,7 +84,8 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	require.ErrorIs(parsedBlock.Verify(context.Background()), errUnknownBlock)
+	err = parsedBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnknownBlock)
 }
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
@@ -184,11 +185,13 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		// It's okay for this block not to be parsed
 		return
 	}
-	require.ErrorIs(yBlock.Verify(context.Background()), errUnexpectedBlockType)
+	err = yBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
-	require.ErrorIs(yBlock.Verify(context.Background()), errUnexpectedBlockType)
+	err = yBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
@@ -279,12 +282,14 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	require.NoError(aBlock.Verify(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
-	require.ErrorIs(bBlock.Verify(context.Background()), errUnexpectedBlockType)
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
-	require.ErrorIs(bBlock.Verify(context.Background()), errUnexpectedBlockType)
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
@@ -375,8 +380,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(aBlock.Verify(context.Background()))
-	require.ErrorIs(opts[0].Verify(context.Background()), errInnerParentMismatch)
-	require.ErrorIs(opts[1].Verify(context.Background()), errInnerParentMismatch)
+	err = opts[0].Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
+	err = opts[1].Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 //	  ,--G ----.
@@ -482,7 +489,8 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(outerOption.Verify(context.Background()), errUnexpectedBlockType)
+	err = outerOption.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	// generate A from X and O2
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -666,7 +674,8 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		t.Skip(err)
 	}
 
-	require.ErrorIs(invalidBlk.Verify(context.Background()), database.ErrNotFound)
+	err = invalidBlk.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Note that the invalidBlk.ID() is the same as the correct blk ID because
 	// the signature isn't part of the blk ID.

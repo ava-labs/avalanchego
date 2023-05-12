@@ -179,7 +179,8 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 
 	// Put another key. This should evict the first key (0)
 	// and return an error since 0 is even.
-	require.ErrorIs(cache.Put(maxSize, maxSize), errTest)
+	err := cache.Put(maxSize, maxSize)
+	require.ErrorIs(err, errTest)
 
 	// Cache has [1,2]
 	require.Equal(evicted, []int{0})

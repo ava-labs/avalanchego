@@ -146,7 +146,8 @@ func TestVertexVerify(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.ErrorIs(t, test.vertex.Verify(), test.expectedErr)
+			err := test.vertex.Verify()
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }

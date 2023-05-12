@@ -157,7 +157,8 @@ func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
 	}
 
 	utxos := []interface{}{}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongNumberOfUTXOs)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, errWrongNumberOfUTXOs)
 }
 
 func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
@@ -218,7 +219,8 @@ func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
 	}
 
 	utxos := []interface{}{nil}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongUTXOType)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, errWrongUTXOType)
 }
 
 func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
@@ -255,7 +257,8 @@ func TestFxVerifyMintOperationFailingVerification(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), secp256k1fx.ErrAddrsNotSortedUnique)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, secp256k1fx.ErrAddrsNotSortedUnique)
 }
 
 func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
@@ -291,7 +294,8 @@ func TestFxVerifyMintOperationInvalidGroupID(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongMintOutput)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, errWrongMintOutput)
 }
 
 func TestFxVerifyTransferOperation(t *testing.T) {
@@ -353,7 +357,8 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 	}}
 
 	utxos := []interface{}{nil}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), errWrongUTXOType)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, errWrongUTXOType)
 }
 
 func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
@@ -387,7 +392,8 @@ func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
 	}}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, cred, utxos), secp256k1fx.ErrInputIndicesNotSortedUnique)
+	err := fx.VerifyOperation(tx, op, cred, utxos)
+	require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 }
 
 func TestFxVerifyOperationUnknownOperation(t *testing.T) {

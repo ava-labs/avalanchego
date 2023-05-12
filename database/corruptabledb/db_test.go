@@ -70,7 +70,8 @@ func TestCorruption(t *testing.T) {
 	_ = corruptableDB.handleError(errTest)
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
-			require.ErrorIs(tt, testFn(corruptableDB), errTest)
+			err := testFn(corruptableDB)
+			require.ErrorIs(tt, err, errTest)
 		})
 	}
 }

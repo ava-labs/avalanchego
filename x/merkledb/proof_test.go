@@ -64,10 +64,9 @@ func Test_Proof_Marshal(t *testing.T) {
 }
 
 func Test_Proof_Empty(t *testing.T) {
-	require := require.New(t)
-
 	proof := &Proof{}
-	require.ErrorIs(proof.Verify(context.Background(), ids.Empty), ErrNoProof)
+	err := proof.Verify(context.Background(), ids.Empty)
+	require.ErrorIs(t, err, ErrNoProof)
 }
 
 func Test_Proof_MissingValue(t *testing.T) {

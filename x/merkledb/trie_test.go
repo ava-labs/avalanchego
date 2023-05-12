@@ -539,7 +539,8 @@ func Test_Trie_CommitChanges(t *testing.T) {
 
 	// Case: Committing to an invalid view
 	view1.invalidated = true
-	require.ErrorIs(view1.commitChanges(context.Background(), &trieView{}), ErrInvalid)
+	err = view1.commitChanges(context.Background(), &trieView{})
+	require.ErrorIs(err, ErrInvalid)
 	view1.invalidated = false // Reset
 
 	// Case: Committing a nil view is a no-op
@@ -551,7 +552,8 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	require.Equal(oldRoot, newRoot)
 
 	// Case: Committing a view with the wrong parent.
-	require.ErrorIs(view1.commitChanges(context.Background(), &trieView{}), ErrViewIsNotAChild)
+	err = view1.commitChanges(context.Background(), &trieView{})
+	require.ErrorIs(err, ErrViewIsNotAChild)
 
 	// Case: Committing a view which is invalid
 	err = view1.commitChanges(context.Background(), &trieView{

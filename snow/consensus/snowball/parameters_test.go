@@ -62,8 +62,6 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 }
 
 func TestParametersInvalidK(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     0,
 		Alpha:                 1,
@@ -75,12 +73,11 @@ func TestParametersInvalidK(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidAlpha(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 0,
@@ -92,12 +89,11 @@ func TestParametersInvalidAlpha(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaVirtuous(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -109,12 +105,11 @@ func TestParametersInvalidBetaVirtuous(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaRogue(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -126,12 +121,11 @@ func TestParametersInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -143,7 +137,8 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidConcurrentRepolls(t *testing.T) {
@@ -172,14 +167,13 @@ func TestParametersInvalidConcurrentRepolls(t *testing.T) {
 	for _, p := range tests {
 		label := fmt.Sprintf("ConcurrentRepolls=%d", p.ConcurrentRepolls)
 		t.Run(label, func(t *testing.T) {
-			require.ErrorIs(t, p.Verify(), ErrParametersInvalid)
+			err := p.Verify()
+			require.ErrorIs(t, err, ErrParametersInvalid)
 		})
 	}
 }
 
 func TestParametersInvalidOptimalProcessing(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -191,12 +185,11 @@ func TestParametersInvalidOptimalProcessing(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -208,12 +201,11 @@ func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -225,5 +217,6 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 		MaxItemProcessingTime: 0,
 	}
 
-	require.ErrorIs(p.Verify(), ErrParametersInvalid)
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }

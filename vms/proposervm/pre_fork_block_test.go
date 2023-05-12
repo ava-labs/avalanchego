@@ -286,7 +286,8 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 
 	// child block referring unknown parent does not verify
 	childCoreBlk.ParentV = ids.Empty
-	require.ErrorIs(childProBlk.Verify(context.Background()), database.ErrNotFound)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// child block referring known parent does verify
 	childCoreBlk.ParentV = prntProBlk.ID()
@@ -344,7 +345,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	require.True(postForkChild.Timestamp().Before(activationTime))
-	require.ErrorIs(postForkChild.Verify(context.Background()), errProposersNotActivated)
+	err = postForkChild.Verify(context.Background())
+	require.ErrorIs(err, errProposersNotActivated)
 
 	// once activation time is crossed postForkBlock are produced
 	postActivationTime := activationTime.Add(time.Second)
@@ -719,7 +721,8 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		return
 	}
 
-	require.ErrorIs(invalidChild.Verify(context.Background()), errUnexpectedBlockType)
+	err = invalidChild.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext

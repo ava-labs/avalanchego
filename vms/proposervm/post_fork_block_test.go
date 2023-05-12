@@ -163,7 +163,8 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	}
 
 	// child block referring unknown parent does not verify
-	require.ErrorIs(childProBlk.Verify(context.Background()), database.ErrNotFound)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// child block referring known parent does verify
 	childSlb, err = block.BuildUnsigned(
@@ -262,7 +263,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(childProBlk.Verify(context.Background()), errTimeNotMonotonic)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errTimeNotMonotonic)
 
 	// block cannot arrive before its creator window starts
 	blkWinDelay, err := proVM.Delay(context.Background(), childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID)
@@ -281,7 +283,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
 
-	require.ErrorIs(childProBlk.Verify(context.Background()), errProposerWindowNotStarted)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	// block can arrive at its creator window starts
 	atWindowStart := prntTimestamp.Add(blkWinDelay)
@@ -342,7 +345,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
-	require.ErrorIs(childProBlk.Verify(context.Background()), errTimeTooAdvanced)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errTimeTooAdvanced)
 }
 
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
@@ -426,7 +430,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(childProBlk.Verify(context.Background()), errTimeTooAdvanced)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errTimeTooAdvanced)
 
 	// child P-Chain height can be equal to parent P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -474,7 +479,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
-	require.ErrorIs(childProBlk.Verify(context.Background()), errPChainHeightNotReached)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errPChainHeightNotReached)
 }
 
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
@@ -600,7 +606,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		},
 	}
 
-	require.ErrorIs(childProBlk.Verify(context.Background()), errTimeTooAdvanced)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errTimeTooAdvanced)
 
 	// child P-Chain height can be equal to parent P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -648,7 +655,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	)
 	require.NoError(err)
 	childProBlk.SignedBlock = childSlb
-	require.ErrorIs(childProBlk.Verify(context.Background()), errPChainHeightNotReached)
+	err = childProBlk.Verify(context.Background())
+	require.ErrorIs(err, errPChainHeightNotReached)
 }
 
 func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {

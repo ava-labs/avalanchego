@@ -57,7 +57,8 @@ func TestSetAddWeightZeroWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	require.ErrorIs(s.AddWeight(nodeID, 0), errZeroWeight)
+	err := s.AddWeight(nodeID, 0)
+	require.ErrorIs(err, errZeroWeight)
 }
 
 func TestSetAddWeightOverflow(t *testing.T) {
@@ -123,7 +124,8 @@ func TestSetRemoveWeightZeroWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	require.ErrorIs(s.RemoveWeight(nodeID, 0), errZeroWeight)
+	err := s.RemoveWeight(nodeID, 0)
+	require.ErrorIs(err, errZeroWeight)
 }
 
 func TestSetRemoveWeightMissingValidator(t *testing.T) {

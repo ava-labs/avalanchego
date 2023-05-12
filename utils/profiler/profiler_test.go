@@ -27,7 +27,8 @@ func TestProfiler(t *testing.T) {
 	require.NoError(err)
 
 	// Test Stop CPU Profiler without it running
-	require.ErrorIs(p.StopCPUProfiler(), errCPUProfilerNotRunning)
+	err = p.StopCPUProfiler()
+	require.ErrorIs(err, errCPUProfilerNotRunning)
 
 	// Test Memory Profiler
 	require.NoError(p.MemoryProfile())

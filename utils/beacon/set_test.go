@@ -53,7 +53,8 @@ func TestSet(t *testing.T) {
 	require.Equal("0.0.0.0:0", ipsArg)
 	require.Equal(1, s.Len())
 
-	require.ErrorIs(s.Add(b0), errDuplicateID)
+	err := s.Add(b0)
+	require.ErrorIs(err, errDuplicateID)
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)

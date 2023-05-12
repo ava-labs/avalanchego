@@ -190,7 +190,8 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	require.NoError(batch.Put([]byte("key1"), []byte("1")))
 	require.NoError(batch.Put([]byte("key2"), []byte("2")))
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
-	require.ErrorIs(batch.Write(), database.ErrClosed)
+	err = batch.Write()
+	require.ErrorIs(err, database.ErrClosed)
 }
 
 func Test_MerkleDB_Value_Cache(t *testing.T) {
