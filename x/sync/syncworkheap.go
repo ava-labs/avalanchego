@@ -10,7 +10,7 @@ import (
 	"github.com/google/btree"
 )
 
-var _ heap.Interface = &syncWorkHeap{}
+var _ heap.Interface = (*syncWorkHeap)(nil)
 
 type heapItem struct {
 	workItem  *syncWorkItem
