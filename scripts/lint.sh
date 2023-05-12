@@ -96,21 +96,21 @@ function test_require_equal_len {
 function test_require_nil {
   if grep -R -o -P 'require\..+?!= nil' .; then
     echo ""
-    echo "Use require.NotNil for nil inequality."
+    echo "Use require.NotNil when testing for nil inequality."
     echo ""
     return 1
   fi
 
   if grep -R -o -P 'require\..+?== nil' .; then
     echo ""
-    echo "Use require.Nil to test for nil equality."
+    echo "Use require.Nil when testing for nil equality."
     echo ""
     return 1
   fi
 
   if grep -R -zo -P 'require\.ErrorIs.+?nil\)\n' .; then
     echo ""
-    echo "Use require.NoError instead of require.ErrorIs nil."
+    echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
     echo ""
     return 1
   fi
