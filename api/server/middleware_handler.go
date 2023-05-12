@@ -3,9 +3,7 @@
 
 package server
 
-import (
-	"net/http"
-)
+import "net/http"
 
 type middlewareHandler struct {
 	before, after func()
