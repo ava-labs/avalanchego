@@ -79,7 +79,8 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				State:   stateDiff,
 				Tx:      tx,
 			}
-			require.ErrorIs(tx.Unsigned.Visit(&executor), test.expectedErr)
+			err = tx.Unsigned.Visit(&executor)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

@@ -934,7 +934,8 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 
 	require.NoError(syncer.StartSyncing(context.Background()))
 
-	require.ErrorIs(syncer.Wait(context.Background()), errInvalidRangeProof)
+	err = syncer.Wait(context.Background())
+	require.ErrorIs(err, errInvalidRangeProof)
 }
 
 func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {

@@ -29,24 +29,20 @@ func (o *testOperable) Outs() []verify.State {
 }
 
 func TestOperationVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	op := (*Operation)(nil)
-	require.ErrorIs(op.Verify(), ErrNilOperation)
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNilOperation)
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
-	require := require.New(t)
-
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 	}
-	require.ErrorIs(op.Verify(), ErrNilFxOperation)
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNilFxOperation)
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
-	require := require.New(t)
-
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -61,12 +57,11 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	require.ErrorIs(op.Verify(), ErrNotSortedAndUniqueUTXOIDs)
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNotSortedAndUniqueUTXOIDs)
 }
 
 func TestOperationVerify(t *testing.T) {
-	require := require.New(t)
-
 	assetID := ids.GenerateTestID()
 	op := &Operation{
 		Asset: avax.Asset{ID: assetID},
@@ -78,7 +73,7 @@ func TestOperationVerify(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	require.NoError(op.Verify())
+	require.NoError(t, op.Verify())
 }
 
 func TestOperationSorting(t *testing.T) {
@@ -129,9 +124,7 @@ func TestOperationSorting(t *testing.T) {
 }
 
 func TestOperationTxNotState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&OperationTx{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

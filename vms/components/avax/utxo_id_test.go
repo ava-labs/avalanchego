@@ -15,11 +15,9 @@ import (
 )
 
 func TestUTXOIDVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	utxoID := (*UTXOID)(nil)
-
-	require.ErrorIs(utxoID.Verify(), errNilUTXOID)
+	err := utxoID.Verify()
+	require.ErrorIs(t, err, errNilUTXOID)
 }
 
 func TestUTXOID(t *testing.T) {

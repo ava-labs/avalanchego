@@ -38,21 +38,18 @@ var (
 )
 
 func TestFxInitialize(t *testing.T) {
-	require := require.New(t)
-
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	require.NoError(fx.Initialize(&vm))
+	require.NoError(t, fx.Initialize(&vm))
 }
 
 func TestFxInitializeInvalid(t *testing.T) {
-	require := require.New(t)
-
 	fx := Fx{}
-	require.ErrorIs(fx.Initialize(nil), secp256k1fx.ErrWrongVMType)
+	err := fx.Initialize(nil)
+	require.ErrorIs(t, err, secp256k1fx.ErrWrongVMType)
 }
 
 func TestFxVerifyMintOperation(t *testing.T) {
@@ -127,7 +124,8 @@ func TestFxVerifyMintOperationWrongTx(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(nil, op, cred, utxos), errWrongTxType)
+	err := fx.VerifyOperation(nil, op, cred, utxos)
+	require.ErrorIs(err, errWrongTxType)
 }
 
 func TestFxVerifyMintOperationWrongNumberUTXOs(t *testing.T) {
@@ -189,7 +187,8 @@ func TestFxVerifyMintOperationWrongCredential(t *testing.T) {
 	}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, op, nil, utxos), errWrongCredentialType)
+	err := fx.VerifyOperation(tx, op, nil, utxos)
+	require.ErrorIs(err, errWrongCredentialType)
 }
 
 func TestFxVerifyMintOperationInvalidUTXO(t *testing.T) {
@@ -424,7 +423,8 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 	}}
 
 	utxos := []interface{}{utxo}
-	require.ErrorIs(fx.VerifyOperation(tx, nil, cred, utxos), errWrongOperationType)
+	err := fx.VerifyOperation(tx, nil, cred, utxos)
+	require.ErrorIs(err, errWrongOperationType)
 }
 
 func TestFxVerifyTransfer(t *testing.T) {
@@ -439,5 +439,6 @@ func TestFxVerifyTransfer(t *testing.T) {
 
 	fx := Fx{}
 	require.NoError(fx.Initialize(&vm))
-	require.ErrorIs(fx.VerifyTransfer(nil, nil, nil, nil), errCantTransfer)
+	err := fx.VerifyTransfer(nil, nil, nil, nil)
+	require.ErrorIs(err, errCantTransfer)
 }

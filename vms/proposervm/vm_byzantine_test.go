@@ -577,7 +577,8 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	require.ErrorIs(outerOption.Verify(context.Background()), errInnerParentMismatch)
+	err = outerOption.Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 func TestGetBlock_MutatedSignature(t *testing.T) {

@@ -353,7 +353,8 @@ func TestStateDecideBlock(t *testing.T) {
 	// Parse badVerifyBlk (which should fail verification)
 	badBlk, err := chainState.ParseBlock(context.Background(), badVerifyBlk.Bytes())
 	require.NoError(err)
-	require.ErrorIs(badBlk.Verify(context.Background()), errVerify)
+	err = badBlk.Verify(context.Background())
+	require.ErrorIs(err, errVerify)
 	// Ensure a block that fails verification is not marked as processing
 	require.Empty(chainState.verifiedBlocks)
 
@@ -363,7 +364,8 @@ func TestStateDecideBlock(t *testing.T) {
 	require.NoError(badBlk.Verify(context.Background()))
 	require.Len(chainState.verifiedBlocks, 1)
 
-	require.ErrorIs(badBlk.Accept(context.Background()), errAccept)
+	err = badBlk.Accept(context.Background())
+	require.ErrorIs(err, errAccept)
 
 	// Ensure that an error during block reject is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badRejectBlk.Bytes())
@@ -375,7 +377,8 @@ func TestStateDecideBlock(t *testing.T) {
 	numProcessing := len(chainState.verifiedBlocks)
 	require.Contains([]int{1, 2}, numProcessing)
 
-	require.ErrorIs(badBlk.Reject(context.Background()), errReject)
+	err = badBlk.Reject(context.Background())
+	require.ErrorIs(err, errReject)
 }
 
 func TestStateParent(t *testing.T) {

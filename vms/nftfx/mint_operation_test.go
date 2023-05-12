@@ -13,45 +13,38 @@ import (
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	op := (*MintOperation)(nil)
-	require.ErrorIs(op.Verify(), errNilMintOperation)
+	err := op.Verify()
+	require.ErrorIs(t, err, errNilMintOperation)
 }
 
 func TestMintOperationVerifyTooLargePayload(t *testing.T) {
-	require := require.New(t)
-
 	op := MintOperation{
 		Payload: make([]byte, MaxPayloadSize+1),
 	}
-	require.ErrorIs(op.Verify(), errPayloadTooLarge)
+	err := op.Verify()
+	require.ErrorIs(t, err, errPayloadTooLarge)
 }
 
 func TestMintOperationVerifyInvalidOutput(t *testing.T) {
-	require := require.New(t)
-
 	op := MintOperation{
 		Outputs: []*secp256k1fx.OutputOwners{{
 			Threshold: 1,
 		}},
 	}
-	require.ErrorIs(op.Verify(), secp256k1fx.ErrOutputUnspendable)
+	err := op.Verify()
+	require.ErrorIs(t, err, secp256k1fx.ErrOutputUnspendable)
 }
 
 func TestMintOperationOuts(t *testing.T) {
-	require := require.New(t)
-
 	op := MintOperation{
 		Outputs: []*secp256k1fx.OutputOwners{{}},
 	}
-	require.Len(op.Outs(), 1)
+	require.Len(t, op.Outs(), 1)
 }
 
 func TestMintOperationState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&MintOperation{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

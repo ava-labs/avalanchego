@@ -1452,7 +1452,8 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block0.ID())
-	require.ErrorIs(sm.RecordPoll(context.Background(), votes), errTest)
+	err := sm.RecordPoll(context.Background(), votes)
+	require.ErrorIs(err, errTest)
 }
 
 func RandomizedConsistencyTest(t *testing.T, factory Factory) {

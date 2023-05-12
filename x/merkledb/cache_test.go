@@ -193,7 +193,8 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	require.True(ok)
 
 	// Flush the cache. Should error on last element (2).
-	require.ErrorIs(cache.Flush(), errTest)
+	err = cache.Flush()
+	require.ErrorIs(err, errTest)
 
 	// Should still be empty.
 	require.Zero(cache.fifo.Len())

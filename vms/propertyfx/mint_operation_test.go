@@ -13,15 +13,12 @@ import (
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	op := (*MintOperation)(nil)
-	require.ErrorIs(op.Verify(), errNilMintOperation)
+	err := op.Verify()
+	require.ErrorIs(t, err, errNilMintOperation)
 }
 
 func TestMintOperationVerifyInvalidOutput(t *testing.T) {
-	require := require.New(t)
-
 	op := MintOperation{
 		OwnedOutput: OwnedOutput{
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -29,20 +26,17 @@ func TestMintOperationVerifyInvalidOutput(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(op.Verify(), secp256k1fx.ErrOutputUnspendable)
+	err := op.Verify()
+	require.ErrorIs(t, err, secp256k1fx.ErrOutputUnspendable)
 }
 
 func TestMintOperationOuts(t *testing.T) {
-	require := require.New(t)
-
 	op := MintOperation{}
-	require.Len(op.Outs(), 2)
+	require.Len(t, op.Outs(), 2)
 }
 
 func TestMintOperationState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&MintOperation{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

@@ -11,10 +11,12 @@ import (
 
 func TestMetaDataVerifyNil(t *testing.T) {
 	md := (*Metadata)(nil)
-	require.ErrorIs(t, md.Verify(), errNilMetadata)
+	err := md.Verify()
+	require.ErrorIs(t, err, errNilMetadata)
 }
 
 func TestMetaDataVerifyUninitialized(t *testing.T) {
 	md := &Metadata{}
-	require.ErrorIs(t, md.Verify(), errMetadataNotInitialize)
+	err := md.Verify()
+	require.ErrorIs(t, err, errMetadataNotInitialize)
 }

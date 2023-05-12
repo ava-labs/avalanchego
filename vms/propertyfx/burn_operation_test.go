@@ -13,25 +13,20 @@ import (
 )
 
 func TestBurnOperationInvalid(t *testing.T) {
-	require := require.New(t)
-
 	op := BurnOperation{Input: secp256k1fx.Input{
 		SigIndices: []uint32{1, 0},
 	}}
-	require.ErrorIs(op.Verify(), secp256k1fx.ErrInputIndicesNotSortedUnique)
+	err := op.Verify()
+	require.ErrorIs(t, err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 }
 
 func TestBurnOperationNumberOfOutput(t *testing.T) {
-	require := require.New(t)
-
 	op := BurnOperation{}
-	require.Empty(op.Outs())
+	require.Empty(t, op.Outs())
 }
 
 func TestBurnOperationState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&BurnOperation{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

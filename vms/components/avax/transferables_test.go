@@ -16,17 +16,15 @@ import (
 )
 
 func TestTransferableOutputVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	to := (*TransferableOutput)(nil)
-	require.ErrorIs(to.Verify(), ErrNilTransferableOutput)
+	err := to.Verify()
+	require.ErrorIs(t, err, ErrNilTransferableOutput)
 }
 
 func TestTransferableOutputVerifyNilFx(t *testing.T) {
-	require := require.New(t)
-
 	to := &TransferableOutput{Asset: Asset{ID: ids.Empty}}
-	require.ErrorIs(to.Verify(), ErrNilTransferableFxOutput)
+	err := to.Verify()
+	require.ErrorIs(t, err, ErrNilTransferableFxOutput)
 }
 
 func TestTransferableOutputVerify(t *testing.T) {
@@ -147,20 +145,18 @@ func TestTransferableOutputSerialization(t *testing.T) {
 }
 
 func TestTransferableInputVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	ti := (*TransferableInput)(nil)
-	require.ErrorIs(ti.Verify(), ErrNilTransferableInput)
+	err := ti.Verify()
+	require.ErrorIs(t, err, ErrNilTransferableInput)
 }
 
 func TestTransferableInputVerifyNilFx(t *testing.T) {
-	require := require.New(t)
-
 	ti := &TransferableInput{
 		UTXOID: UTXOID{TxID: ids.Empty},
 		Asset:  Asset{ID: ids.Empty},
 	}
-	require.ErrorIs(ti.Verify(), ErrNilTransferableFxInput)
+	err := ti.Verify()
+	require.ErrorIs(t, err, ErrNilTransferableFxInput)
 }
 
 func TestTransferableInputVerify(t *testing.T) {

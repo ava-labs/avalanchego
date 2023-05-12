@@ -33,7 +33,8 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 	require.ErrorAs(json.Unmarshal(jsonBytes, &enc), &serr)
 
 	jsonBytes = []byte(`""`)
-	require.ErrorIs(json.Unmarshal(jsonBytes, &enc), errInvalidEncoding)
+	err := json.Unmarshal(jsonBytes, &enc)
+	require.ErrorIs(err, errInvalidEncoding)
 }
 
 func TestEncodingString(t *testing.T) {

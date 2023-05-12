@@ -15,22 +15,18 @@ import (
 )
 
 func TestUTXOVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	utxo := (*UTXO)(nil)
-
-	require.ErrorIs(utxo.Verify(), errNilUTXO)
+	err := utxo.Verify()
+	require.ErrorIs(t, err, errNilUTXO)
 }
 
 func TestUTXOVerifyEmpty(t *testing.T) {
-	require := require.New(t)
-
 	utxo := &UTXO{
 		UTXOID: UTXOID{TxID: ids.Empty},
 		Asset:  Asset{ID: ids.Empty},
 	}
-
-	require.ErrorIs(utxo.Verify(), errEmptyUTXO)
+	err := utxo.Verify()
+	require.ErrorIs(t, err, errEmptyUTXO)
 }
 
 func TestUTXOSerialize(t *testing.T) {

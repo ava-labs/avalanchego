@@ -1103,7 +1103,8 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	require.Len(txs, 1)
 
 	parsedFirstTx := txs[0]
-	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
+	err = parsedFirstTx.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestTxVerifyAfterGet(t *testing.T) {
@@ -1125,7 +1126,8 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
-	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
+	err = parsedFirstTx.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
@@ -1181,7 +1183,8 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
-	require.ErrorIs(parsedFirstTx.Verify(context.Background()), database.ErrNotFound)
+	err = parsedFirstTx.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestImportTxSerialization(t *testing.T) {
@@ -1565,7 +1568,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 	parsedTx, err := vm.ParseTx(context.Background(), tx.Bytes())
 	require.NoError(err)
 
-	require.ErrorIs(parsedTx.Verify(context.Background()), database.ErrNotFound)
+	err = parsedTx.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	require.NoError(parsedTx.Accept(context.Background()))
 

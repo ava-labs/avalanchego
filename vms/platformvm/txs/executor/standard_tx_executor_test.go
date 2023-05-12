@@ -796,7 +796,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			State:   onAcceptState,
 			Tx:      tx,
 		}
-		require.ErrorIs(tx.Unsigned.Visit(&executor), ErrDuplicateValidator)
+		err = tx.Unsigned.Visit(&executor)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 }
 

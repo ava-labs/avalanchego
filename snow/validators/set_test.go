@@ -149,7 +149,8 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	require.ErrorIs(s.RemoveWeight(nodeID, 2), math.ErrUnderflow)
+	err := s.RemoveWeight(nodeID, 2)
+	require.ErrorIs(err, math.ErrUnderflow)
 
 	require.Equal(uint64(2), s.Weight())
 }

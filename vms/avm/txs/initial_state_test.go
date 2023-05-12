@@ -85,7 +85,8 @@ func TestInitialStateVerifyNil(t *testing.T) {
 	numFxs := 1
 
 	is := (*InitialState)(nil)
-	require.ErrorIs(is.Verify(m, numFxs), ErrNilInitialState)
+	err := is.Verify(m, numFxs)
+	require.ErrorIs(err, ErrNilInitialState)
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
@@ -99,7 +100,8 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	is := InitialState{
 		FxIndex: 1,
 	}
-	require.ErrorIs(is.Verify(m, numFxs), ErrUnknownFx)
+	err := is.Verify(m, numFxs)
+	require.ErrorIs(err, ErrUnknownFx)
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
@@ -114,7 +116,8 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 		FxIndex: 0,
 		Outs:    []verify.State{nil},
 	}
-	require.ErrorIs(is.Verify(m, numFxs), ErrNilFxOutput)
+	err := is.Verify(m, numFxs)
+	require.ErrorIs(err, ErrNilFxOutput)
 }
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
@@ -130,7 +133,8 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 		FxIndex: 0,
 		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
 	}
-	require.ErrorIs(is.Verify(m, numFxs), errTest)
+	err := is.Verify(m, numFxs)
+	require.ErrorIs(err, errTest)
 }
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
@@ -149,7 +153,8 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 			&avax.TestTransferable{Val: 0},
 		},
 	}
-	require.ErrorIs(is.Verify(m, numFxs), ErrOutputsNotSorted)
+	err := is.Verify(m, numFxs)
+	require.ErrorIs(err, ErrOutputsNotSorted)
 	is.Sort(m)
 	require.NoError(is.Verify(m, numFxs))
 }

@@ -14,17 +14,15 @@ import (
 )
 
 func TestAssetVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	id := (*Asset)(nil)
-	require.ErrorIs(id.Verify(), errNilAssetID)
+	err := id.Verify()
+	require.ErrorIs(t, err, errNilAssetID)
 }
 
 func TestAssetVerifyEmpty(t *testing.T) {
-	require := require.New(t)
-
 	id := Asset{}
-	require.ErrorIs(id.Verify(), errEmptyAssetID)
+	err := id.Verify()
+	require.ErrorIs(t, err, errEmptyAssetID)
 }
 
 func TestAssetID(t *testing.T) {

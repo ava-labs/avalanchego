@@ -14,24 +14,20 @@ import (
 )
 
 func TestTransferOutputVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	to := (*TransferOutput)(nil)
-	require.ErrorIs(to.Verify(), errNilTransferOutput)
+	err := to.Verify()
+	require.ErrorIs(t, err, errNilTransferOutput)
 }
 
 func TestTransferOutputLargePayload(t *testing.T) {
-	require := require.New(t)
-
 	to := TransferOutput{
 		Payload: make([]byte, MaxPayloadSize+1),
 	}
-	require.ErrorIs(to.Verify(), errPayloadTooLarge)
+	err := to.Verify()
+	require.ErrorIs(t, err, errPayloadTooLarge)
 }
 
 func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
-	require := require.New(t)
-
 	to := TransferOutput{
 		OutputOwners: secp256k1fx.OutputOwners{
 			Addrs: []ids.ShortID{
@@ -40,13 +36,12 @@ func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(to.Verify(), secp256k1fx.ErrOutputUnoptimized)
+	err := to.Verify()
+	require.ErrorIs(t, err, secp256k1fx.ErrOutputUnoptimized)
 }
 
 func TestTransferOutputState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&TransferOutput{})
 	_, ok := intf.(verify.State)
-	require.True(ok)
+	require.True(t, ok)
 }

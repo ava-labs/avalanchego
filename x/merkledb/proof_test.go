@@ -373,7 +373,8 @@ func Test_Proof(t *testing.T) {
 
 	proof.Path[0].ValueOrHash = Some([]byte("value2"))
 
-	require.ErrorIs(proof.Verify(context.Background(), expectedRootID), ErrInvalidProof)
+	err = proof.Verify(context.Background(), expectedRootID)
+	require.ErrorIs(err, ErrInvalidProof)
 }
 
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
@@ -1368,7 +1369,8 @@ func TestVerifyKeyValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, verifyKeyValues(tt.kvs, tt.start, tt.end), tt.expectedErr)
+			err := verifyKeyValues(tt.kvs, tt.start, tt.end)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -1502,7 +1504,8 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, verifyProofPath(tt.path, newPath(tt.proofKey)), tt.expectedErr)
+			err := verifyProofPath(tt.path, newPath(tt.proofKey))
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

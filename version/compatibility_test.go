@@ -101,7 +101,8 @@ func TestCompatibility(t *testing.T) {
 		peer := test.peer
 		compatibility.clock.Set(test.time)
 		t.Run(fmt.Sprintf("%s-%s", peer, test.time), func(t *testing.T) {
-			require.ErrorIs(compatibility.Compatible(peer), test.expectedErr)
+			err := compatibility.Compatible(peer)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

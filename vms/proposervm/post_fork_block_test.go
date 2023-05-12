@@ -960,7 +960,8 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		return
 	}
 
-	require.ErrorIs(invalidChild.Verify(context.Background()), errUnexpectedBlockType)
+	err = invalidChild.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
@@ -1014,5 +1015,6 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		return
 	}
 
-	require.ErrorIs(invalidChild.Verify(context.Background()), errPChainHeightTooLow)
+	err = invalidChild.Verify(context.Background())
+	require.ErrorIs(err, errPChainHeightTooLow)
 }

@@ -501,7 +501,8 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	invalidView, err := db.NewView()
 	require.NoError(err)
 	invalidView.(*trieView).invalidate()
-	require.ErrorIs(invalidView.commitToDB(context.Background()), ErrInvalid)
+	err = invalidView.commitToDB(context.Background())
+	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
 	require.NoError(db.Put([]byte{1}, []byte{1}))

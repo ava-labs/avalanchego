@@ -13,34 +13,28 @@ import (
 )
 
 func TestTransferOperationVerifyNil(t *testing.T) {
-	require := require.New(t)
-
 	op := (*TransferOperation)(nil)
-	require.ErrorIs(op.Verify(), errNilTransferOperation)
+	err := op.Verify()
+	require.ErrorIs(t, err, errNilTransferOperation)
 }
 
 func TestTransferOperationInvalid(t *testing.T) {
-	require := require.New(t)
-
 	op := TransferOperation{Input: secp256k1fx.Input{
 		SigIndices: []uint32{1, 0},
 	}}
-	require.ErrorIs(op.Verify(), secp256k1fx.ErrInputIndicesNotSortedUnique)
+	err := op.Verify()
+	require.ErrorIs(t, err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 }
 
 func TestTransferOperationOuts(t *testing.T) {
-	require := require.New(t)
-
 	op := TransferOperation{
 		Output: TransferOutput{},
 	}
-	require.Len(op.Outs(), 1)
+	require.Len(t, op.Outs(), 1)
 }
 
 func TestTransferOperationState(t *testing.T) {
-	require := require.New(t)
-
 	intf := interface{}(&TransferOperation{})
 	_, ok := intf.(verify.State)
-	require.False(ok)
+	require.False(t, ok)
 }

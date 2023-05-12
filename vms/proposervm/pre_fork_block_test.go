@@ -455,7 +455,8 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 		Block: coreBlock,
 		vm:    proVM,
 	}
-	require.ErrorIs(preForkChild.Verify(context.Background()), errUnexpectedBlockType)
+	err = preForkChild.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
