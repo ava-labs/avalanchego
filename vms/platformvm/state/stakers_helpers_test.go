@@ -44,6 +44,7 @@ var (
 	defaultTxFee              = uint64(100)
 
 	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
+	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
 )
 
 type versionsHolder struct {
@@ -54,11 +55,12 @@ func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildChainState() (State, error) {
+func buildChainState(trackedSubnets []ids.ID) (State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
 	cfg := defaultConfig()
+	cfg.TrackedSubnets.Add(trackedSubnets...)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = testNetworkID

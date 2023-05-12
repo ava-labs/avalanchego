@@ -24,10 +24,10 @@ import (
 func TestGeneralStakerContainersProperties(t *testing.T) {
 	storeCreators := map[string]func() (Stakers, error){
 		"base state": func() (Stakers, error) {
-			return buildChainState()
+			return buildChainState(nil)
 		},
 		"diff": func() (Stakers, error) {
-			diff, err := buildDiffOnTopOfBaseState()
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
 			return diff, err
 		},
 		"storage model": func() (Stakers, error) { //nolint:golint,unparam
@@ -650,7 +650,7 @@ func TestStateStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	properties.Property("cannot update unknown validator", prop.ForAll(
 		func(s Staker) string {
-			baseState, err := buildChainState()
+			baseState, err := buildChainState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
 			}
@@ -667,7 +667,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 	properties.Property("cannot update deleted validator", prop.ForAll(
 		func(s Staker) string {
-			baseState, err := buildChainState()
+			baseState, err := buildChainState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
 			}
@@ -686,7 +686,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 	properties.Property("cannot update delegator from unknown subnetID/nodeID", prop.ForAll(
 		func(s Staker) string {
-			baseState, err := buildChainState()
+			baseState, err := buildChainState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
 			}
@@ -707,7 +707,7 @@ func TestStateStakersProperties(t *testing.T) {
 	)
 	properties.Property("cannot update unknown delegator from known subnetID/nodeID", prop.ForAll(
 		func(val, del Staker) string {
-			baseState, err := buildChainState()
+			baseState, err := buildChainState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
 			}
@@ -732,7 +732,7 @@ func TestDiffStakersProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	properties.Property("updating unknown validator won't err", prop.ForAll(
 		func(s Staker) string {
-			diff, err := buildDiffOnTopOfBaseState()
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
 			}
@@ -749,7 +749,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 	properties.Property("updating deleted validator does err", prop.ForAll(
 		func(s Staker) string {
-			diff, err := buildDiffOnTopOfBaseState()
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
 			}
@@ -768,7 +768,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 	properties.Property("updating unknown delegator won't err", prop.ForAll(
 		func(s Staker) string {
-			diff, err := buildDiffOnTopOfBaseState()
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
 			}
@@ -785,7 +785,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 	properties.Property("updating deleted delegator does err", prop.ForAll(
 		func(s Staker) string {
-			diff, err := buildDiffOnTopOfBaseState()
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
 			if err != nil {
 				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
 			}
@@ -805,10 +805,152 @@ func TestDiffStakersProperties(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-func buildDiffOnTopOfBaseState() (Diff, error) {
-	baseState, err := buildChainState()
+// TestValidatorSetOperations verifies that validators set is duly updated
+// upon different stakers operations
+func TestValidatorSetOperations(t *testing.T) {
+	properties := gopter.NewProperties(nil)
+
+	trackedSubnet := ids.GenerateTestID()
+	properties.Property("validator is added upon staker insertion", prop.ForAll(
+		func(s Staker) string {
+			diff, baseState, err := buildDiffOnTopOfBaseState([]ids.ID{trackedSubnet})
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			diff.PutCurrentValidator(&s)
+
+			err = diff.Apply(baseState)
+			if err != nil {
+				return fmt.Sprintf("could not apply diff, err %v", err)
+			}
+			err = baseState.Commit()
+			if err != nil {
+				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			var (
+				subnetID = s.SubnetID
+				nodeID   = s.NodeID
+			)
+
+			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			if !found {
+				return errMissingValidatorSet.Error()
+			}
+
+			if !set.Contains(nodeID) {
+				return errValidatorSetUpdate.Error()
+			}
+
+			if set.GetWeight(nodeID) != s.Weight {
+				return "inserted staker's weight does not match with validator's weight in validator set"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, &trackedSubnet, nil, math.MaxUint64),
+	))
+
+	properties.Property("validator is updated upon staker update", prop.ForAll(
+		func(s Staker) string {
+			diff, baseState, err := buildDiffOnTopOfBaseState([]ids.ID{trackedSubnet})
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			diff.PutCurrentValidator(&s)
+
+			updatedStaker := s
+			updatedStaker.Weight *= 2
+			err = diff.UpdateCurrentValidator(&updatedStaker)
+			if err != nil {
+				return fmt.Sprintf("could not update current validator, err %v", err)
+			}
+
+			err = diff.Apply(baseState)
+			if err != nil {
+				return fmt.Sprintf("could not apply diff, err %v", err)
+			}
+			err = baseState.Commit()
+			if err != nil {
+				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			var (
+				subnetID = s.SubnetID
+				nodeID   = s.NodeID
+			)
+
+			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			if !found {
+				return errMissingValidatorSet.Error()
+			}
+
+			if !set.Contains(nodeID) {
+				return errValidatorSetUpdate.Error()
+			}
+
+			if set.GetWeight(nodeID) != updatedStaker.Weight {
+				return "inserted staker's weight does not match with validator's weight in validator set"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, &trackedSubnet, nil, math.MaxUint64),
+	))
+
+	properties.Property("validator is deleted upon staker delete", prop.ForAll(
+		func(mainVal, companionVal Staker) string {
+			diff, baseState, err := buildDiffOnTopOfBaseState([]ids.ID{trackedSubnet})
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			diff.PutCurrentValidator(&mainVal)
+			diff.PutCurrentValidator(&companionVal)
+			diff.DeleteCurrentValidator(&mainVal)
+
+			err = diff.Apply(baseState)
+			if err != nil {
+				return fmt.Sprintf("could not apply diff, err %v", err)
+			}
+			err = baseState.Commit()
+			if err != nil {
+				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			var (
+				subnetID = mainVal.SubnetID
+				nodeID   = mainVal.NodeID
+			)
+
+			set, found := baseState.(*state).cfg.Validators.Get(subnetID)
+			if !found {
+				return errMissingValidatorSet.Error()
+			}
+
+			if set.Contains(nodeID) {
+				return errValidatorSetUpdate.Error()
+			}
+
+			if set.GetWeight(nodeID) != 0 {
+				return "deleted validators's weight is not zero"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, &trackedSubnet, nil, math.MaxUint64),
+		stakerGenerator(currentValidator, &trackedSubnet, nil, math.MaxUint64),
+	))
+
+	properties.TestingRun(t)
+}
+
+func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
+	baseState, err := buildChainState(trackedSubnets)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
+		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
 	}
 
 	genesisID := baseState.GetLastAccepted()
@@ -817,7 +959,7 @@ func buildDiffOnTopOfBaseState() (Diff, error) {
 	}
 	diff, err := NewDiff(genesisID, versions)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
+		return nil, nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
 	}
-	return diff, nil
+	return diff, baseState, nil
 }
