@@ -499,7 +499,7 @@ func Test_Bits_Bytes(t *testing.T) {
 			bytes := b.Bytes()
 			fromBytes := BitsFromBytes(bytes)
 
-			require.Len(tt.elts, fromBytes.Len())
+			require.Equal(len(tt.elts), fromBytes.Len())
 			for _, elt := range tt.elts {
 				require.True(fromBytes.Contains(elt))
 			}
