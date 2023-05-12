@@ -17,11 +17,11 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
-// TestSimpleStakersOperations checks that State and Diff conform our stakersStorageModel.
-// TestSimpleStakersOperations tests State and Diff in isolation, over simple operations.
+// TestGeneralStakerContainersProperties checks that State and Diff conform our stakersStorageModel.
+// TestGeneralStakerContainersProperties tests State and Diff in isolation, over simple operations.
 // TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like
 // mix of State and Diffs.
-func TestSimpleStakersOperations(t *testing.T) {
+func TestGeneralStakerContainersProperties(t *testing.T) {
 	storeCreators := map[string]func() (Stakers, error){
 		"base state": func() (Stakers, error) {
 			return buildChainState()
@@ -49,13 +49,13 @@ func TestSimpleStakersOperations(t *testing.T) {
 
 	for storeType, storeCreatorF := range storeCreators {
 		t.Run(storeType, func(t *testing.T) {
-			properties := simpleStakerStateProperties(storeCreatorF)
+			properties := generalStakerContainersProperties(storeCreatorF)
 			properties.TestingRun(t)
 		})
 	}
 }
 
-func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
+func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
@@ -289,7 +289,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 		subnetID = ids.GenerateTestID()
 		nodeID   = ids.GenerateTestNodeID()
 	)
-	properties.Property("some current delegators ops", prop.ForAll(
+	properties.Property("add, delete and query current delegators", prop.ForAll(
 		func(val Staker, dels []Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
@@ -655,4 +655,86 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 	))
 
 	return properties
+}
+
+// TestStateStakersProperties verifies properties specific to State, but not to Diff
+func TestStateStakersProperties(t *testing.T) {
+	properties := gopter.NewProperties(nil)
+	properties.Property("cannot update unknown validator", prop.ForAll(
+		func(s Staker) string {
+			baseState, err := buildChainState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			err = baseState.UpdateCurrentValidator(&s)
+			if err == nil {
+				return "unexpected update of unknown validator"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
+	))
+
+	properties.Property("cannot update deleted validator", prop.ForAll(
+		func(s Staker) string {
+			baseState, err := buildChainState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			baseState.PutCurrentValidator(&s)
+			baseState.DeleteCurrentValidator(&s)
+			err = baseState.UpdateCurrentValidator(&s)
+			if err == nil {
+				return "unexpected update of unknown validator"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
+	))
+
+	properties.Property("cannot update delegator from unknown subnetID/nodeID", prop.ForAll(
+		func(s Staker) string {
+			baseState, err := buildChainState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			err = baseState.UpdateCurrentDelegator(&s)
+			if err == nil {
+				return "unexpected update of delegator from unknown subnetID/nodeID"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentDelegator, nil, nil, math.MaxUint64),
+	))
+
+	var (
+		subnetID = ids.GenerateTestID()
+		nodeID   = ids.GenerateTestNodeID()
+	)
+	properties.Property("cannot update unknown delegator from known subnetID/nodeID", prop.ForAll(
+		func(val, del Staker) string {
+			baseState, err := buildChainState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+			}
+
+			baseState.PutCurrentValidator(&val)
+			err = baseState.UpdateCurrentDelegator(&del)
+			if err == nil {
+				return "unexpected update of unknown delegator from known subnetID/nodeID"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, &subnetID, &nodeID, math.MaxUint64),
+		stakerGenerator(currentDelegator, &subnetID, &nodeID, math.MaxUint64),
+	))
+
+	properties.TestingRun(t)
 }

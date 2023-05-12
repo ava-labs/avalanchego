@@ -236,6 +236,8 @@ func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) S
 }
 
 func (v *baseStakers) PutDelegator(staker *Staker) {
+	// Note: a delegator may be inserted before its validator
+	// hence we use v.getOrCreateValidator instead of v.getValidator
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 	if validator.delegators == nil {
 		validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
