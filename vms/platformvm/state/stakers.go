@@ -151,12 +151,8 @@ func newBaseStakers() *baseStakers {
 }
 
 func (v *baseStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
-	subnetValidators, ok := v.validators[subnetID]
-	if !ok {
-		return nil, database.ErrNotFound
-	}
-	validator, ok := subnetValidators[nodeID]
-	if !ok {
+	validator, found := v.getValidator(subnetID, nodeID)
+	if !found {
 		return nil, database.ErrNotFound
 	}
 	if validator.validator == nil {
@@ -179,8 +175,8 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 }
 
 func (v *baseStakers) UpdateValidator(staker *Staker) error {
-	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-	if validator.validator == nil {
+	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
+	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
 			ErrUpdatingDeletedStaker,
 			staker.SubnetID,
@@ -209,7 +205,12 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 		subnetID = staker.SubnetID
 		nodeID   = staker.NodeID
 	)
-	validator := v.getOrCreateValidator(subnetID, nodeID)
+	validator, found := v.getValidator(subnetID, nodeID)
+	if !found {
+		// attempt deleting an non-existing staker
+		// TODO ABENEGIA: consider err-ing
+		return
+	}
 	storedStaker := validator.validator
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
@@ -227,12 +228,8 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 }
 
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
-	subnetValidators, ok := v.validators[subnetID]
-	if !ok {
-		return EmptyIterator
-	}
-	validator, ok := subnetValidators[nodeID]
-	if !ok {
+	validator, found := v.getValidator(subnetID, nodeID)
+	if !found {
 		return EmptyIterator
 	}
 	return NewTreeIterator(validator.delegators)
@@ -259,8 +256,8 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 }
 
 func (v *baseStakers) UpdateDelegator(staker *Staker) error {
-	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-	if validator.delegatorsByTxID == nil {
+	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
+	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
 			ErrUpdatingUnknownStaker,
 			staker.SubnetID,
@@ -298,7 +295,12 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 }
 
 func (v *baseStakers) DeleteDelegator(staker *Staker) {
-	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
+	if !found {
+		// attempt deleting an non-existing staker
+		// TODO ABENEGIA: consider err-ing
+		return
+	}
 	if validator.delegators != nil {
 		validator.delegators.Delete(staker)
 	}
@@ -317,17 +319,29 @@ func (v *baseStakers) GetStakerIterator() StakerIterator {
 	return NewTreeIterator(v.stakers)
 }
 
+func (v *baseStakers) getValidator(subnetID ids.ID, nodeID ids.NodeID) (*baseStaker, bool) {
+	subnetValidators, found := v.validators[subnetID]
+	if !found {
+		return nil, false
+	}
+	validator, found := subnetValidators[nodeID]
+	return validator, found
+}
+
 func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseStaker {
-	subnetValidators, ok := v.validators[subnetID]
-	if !ok {
+	validator, found := v.getValidator(subnetID, nodeID)
+	if found {
+		return validator
+	}
+	// not found, create it
+	subnetValidators, found := v.validators[subnetID]
+	if !found {
 		subnetValidators = make(map[ids.NodeID]*baseStaker)
 		v.validators[subnetID] = subnetValidators
 	}
-	validator, ok := subnetValidators[nodeID]
-	if !ok {
-		validator = &baseStaker{}
-		subnetValidators[nodeID] = validator
-	}
+
+	validator = &baseStaker{}
+	subnetValidators[nodeID] = validator
 	return validator
 }
 
