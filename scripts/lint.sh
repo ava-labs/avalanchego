@@ -59,7 +59,7 @@ function test_require_error_is_no_funcs_as_params {
 
 function test_require_equal_zero {
   # check if the first arg, other than t, is 0
-  if grep -R -o -P 'require\.Equal\((t, )?(u?int\d+\(0\)|0)' .; then
+  if grep -R -o -P 'require\.Equal\((t, )?(u?int\d*\(0\)|0)' .; then
     echo ""
     echo "Use require.Zero instead of require.Equal when testing for 0."
     echo ""
@@ -67,7 +67,7 @@ function test_require_equal_zero {
   fi
 
   # check if the last arg is 0
-  if grep -R -zo -P 'require\.Equal\(.+?, (u?int\d+\(0\)|0)\)\n' .; then
+  if grep -R -zo -P 'require\.Equal\(.+?, (u?int\d*\(0\)|0)\)\n' .; then
     echo ""
     echo "Use require.Zero instead of require.Equal when testing for 0."
     echo ""
