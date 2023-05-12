@@ -12,6 +12,8 @@ import (
 
 	stdjson "encoding/json"
 
+	"github.com/btcsuite/btcd/btcutil/bech32"
+
 	"github.com/golang/mock/gomock"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1709,64 +1711,64 @@ func TestServiceGetUTXOs(t *testing.T) {
 	require.NoError(err)
 
 	tests := []struct {
-		label     string
-		count     int
-		shouldErr bool
-		args      *api.GetUTXOsArgs
+		label       string
+		count       int
+		expectedErr error
+		args        *api.GetUTXOsArgs
 	}{
 		{
-			label:     "invalid address: ''",
-			shouldErr: true,
+			label:       "invalid address: ''",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{""},
 			},
 		},
 		{
-			label:     "invalid address: '-'",
-			shouldErr: true,
+			label:       "invalid address: '-'",
+			expectedErr: bech32.ErrInvalidLength(0),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"-"},
 			},
 		},
 		{
-			label:     "invalid address: 'foo'",
-			shouldErr: true,
+			label:       "invalid address: 'foo'",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo"},
 			},
 		},
 		{
-			label:     "invalid address: 'foo-bar'",
-			shouldErr: true,
+			label:       "invalid address: 'foo-bar'",
+			expectedErr: bech32.ErrInvalidLength(3),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo-bar"},
 			},
 		},
 		{
-			label:     "invalid address: '<ChainID>'",
-			shouldErr: true,
+			label:       "invalid address: '<ChainID>'",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{vm.ctx.ChainID.String()},
 			},
 		},
 		{
-			label:     "invalid address: '<ChainID>-'",
-			shouldErr: true,
+			label:       "invalid address: '<ChainID>-'",
+			expectedErr: bech32.ErrInvalidLength(0),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())},
 			},
 		},
 		{
-			label:     "invalid address: '<Unknown ID>-<addr>'",
-			shouldErr: true,
+			label:       "invalid address: '<Unknown ID>-<addr>'",
+			expectedErr: ids.ErrNoIDWithAlias,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{unknownChainAddr},
 			},
 		},
 		{
-			label:     "no addresses",
-			shouldErr: true,
-			args:      &api.GetUTXOsArgs{},
+			label:       "no addresses",
+			expectedErr: errNoAddresses,
+			args:        &api.GetUTXOsArgs{},
 		},
 		{
 			label: "get all X-chain UTXOs",
@@ -1827,9 +1829,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "invalid source chain ID",
-			shouldErr: true,
-			count:     numUTXOs,
+			label:       "invalid source chain ID",
+			expectedErr: ids.ErrNoIDWithAlias,
+			count:       numUTXOs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
@@ -1848,8 +1850,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "get UTXOs from multiple chains",
-			shouldErr: true,
+			label:       "get UTXOs from multiple chains",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
@@ -1858,8 +1860,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "get UTXOs for an address on a different chain",
-			shouldErr: true,
+			label:       "get UTXOs for an address on a different chain",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
@@ -1871,11 +1873,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 		t.Run(test.label, func(t *testing.T) {
 			reply := &api.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
-			if test.shouldErr {
-				return // TODO, test actual error
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr == nil {
+				require.Len(reply.UTXOs, test.count)
 			}
-			require.NoError(err)
-			require.Len(reply.UTXOs, test.count)
 		})
 	}
 }
