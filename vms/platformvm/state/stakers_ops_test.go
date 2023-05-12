@@ -27,20 +27,8 @@ func TestGeneralStakerContainersProperties(t *testing.T) {
 			return buildChainState()
 		},
 		"diff": func() (Stakers, error) {
-			baseState, err := buildChainState()
-			if err != nil {
-				return nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
-			}
-
-			genesisID := baseState.GetLastAccepted()
-			versions := &versionsHolder{
-				baseState: baseState,
-			}
-			store, err := NewDiff(genesisID, versions)
-			if err != nil {
-				return nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
-			}
-			return store, nil
+			diff, err := buildDiffOnTopOfBaseState()
+			return diff, err
 		},
 		"storage model": func() (Stakers, error) { //nolint:golint,unparam
 			return newStakersStorageModel(), nil
@@ -737,4 +725,99 @@ func TestStateStakersProperties(t *testing.T) {
 	))
 
 	properties.TestingRun(t)
+}
+
+// TestDiffStakersProperties verifies properties specific to Diff, but not to State
+func TestDiffStakersProperties(t *testing.T) {
+	properties := gopter.NewProperties(nil)
+	properties.Property("updating unknown validator won't err", prop.ForAll(
+		func(s Staker) string {
+			diff, err := buildDiffOnTopOfBaseState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			err = diff.UpdateCurrentValidator(&s)
+			if err != nil {
+				return fmt.Sprintf("unexpected error while updating unknown validator in diff, %v", err)
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
+	))
+
+	properties.Property("updating deleted validator does err", prop.ForAll(
+		func(s Staker) string {
+			diff, err := buildDiffOnTopOfBaseState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			diff.DeleteCurrentValidator(&s) // mark validator as deleted
+
+			err = diff.UpdateCurrentValidator(&s)
+			if err == nil {
+				return "expected error while updating validator in diff, got nil"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentValidator, nil, nil, math.MaxUint64),
+	))
+
+	properties.Property("updating unknown delegator won't err", prop.ForAll(
+		func(s Staker) string {
+			diff, err := buildDiffOnTopOfBaseState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			err = diff.UpdateCurrentDelegator(&s)
+			if err != nil {
+				return fmt.Sprintf("unexpected error while updating unknown delegator in diff, %v", err)
+			}
+
+			return ""
+		},
+		stakerGenerator(currentDelegator, nil, nil, math.MaxUint64),
+	))
+
+	properties.Property("updating deleted delegator does err", prop.ForAll(
+		func(s Staker) string {
+			diff, err := buildDiffOnTopOfBaseState()
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			diff.DeleteCurrentDelegator(&s) // mark delegator as deleted
+
+			err = diff.UpdateCurrentDelegator(&s)
+			if err == nil {
+				return "expected error while updating delegator in diff, got nil"
+			}
+
+			return ""
+		},
+		stakerGenerator(currentDelegator, nil, nil, math.MaxUint64),
+	))
+
+	properties.TestingRun(t)
+}
+
+func buildDiffOnTopOfBaseState() (Diff, error) {
+	baseState, err := buildChainState()
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
+	}
+
+	genesisID := baseState.GetLastAccepted()
+	versions := &versionsHolder{
+		baseState: baseState,
+	}
+	diff, err := NewDiff(genesisID, versions)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
+	}
+	return diff, nil
 }
