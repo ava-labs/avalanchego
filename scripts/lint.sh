@@ -99,7 +99,7 @@ function test_require_equal_len {
 }
 
 function test_require_nil {
-  if grep -R -zo -P 'require.+?nil\)\n' .; then
+  if grep -R -o -P 'require\..+?(!|=)= nil' .; then
     echo ""
     echo "Use a require function to test for 'nil'"
     echo ""
