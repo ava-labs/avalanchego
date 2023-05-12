@@ -490,6 +490,8 @@ func (t *trieView) GetRangeProof(
 // with state from the parent trie.
 // If [lock], grabs [t.lock]'s read lock.
 // Otherwise assumes [t.lock]'s read lock is held.
+// If [start] is nil, all keys are considered > [start].
+// If  [end] is nil, all keys are considered < [end].
 func (t *trieView) getKeyValues(
 	start []byte,
 	end []byte,
@@ -518,11 +520,12 @@ func (t *trieView) getKeyValues(
 			break
 		}
 
-		kv = append(kv, KeyValue{Key: it.Key(), Value: it.Value()})
-		if bytes.Equal(it.Key(), end) {
+		if len(end) > 0 && bytes.Compare(it.Key(), end) > 0 {
 			// stop when meet the end point
 			break
 		}
+
+		kv = append(kv, KeyValue{Key: it.Key(), Value: it.Value()})
 	}
 
 	return kv, nil

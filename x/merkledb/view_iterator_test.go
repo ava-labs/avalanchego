@@ -234,9 +234,24 @@ func Test_View_Iteration_getValues(t *testing.T) {
 		set.Set[string]{},
 		false /*lock*/)
 	require.NotNil(t, kverr)
+	require.Equal(t, 0, len(kv))
+
+	// output all dbTrie 6 nodes
+	kv, kverr = trieView.getKeyValues(nil, nil,
+		10, /*maxLength*/
+		set.Set[string]{},
+		false /*lock*/)
+	require.Nil(t, kverr)
+	require.Equal(t, 6, len(kv))
+	require.Equal(t, KeyValue{Key: []byte{0}, Value: []byte{0}}, kv[0])
+	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[1])
+	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[2])
+	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[3])
+	require.Equal(t, KeyValue{Key: []byte{2, 0}, Value: []byte{4}}, kv[4])
+	require.Equal(t, KeyValue{Key: []byte{2, 1}, Value: []byte{5}}, kv[5])
 
 	// There are 3 outputs
-	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{1, 1},
+	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{1, 2}, /* same as  []byte{1, 1} */
 		10, /*maxLength*/
 		set.Set[string]{},
 		false /*lock*/)
@@ -247,7 +262,7 @@ func Test_View_Iteration_getValues(t *testing.T) {
 	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[2])
 
 	// There are 5 outputs
-	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{2, 1},
+	kv, kverr = trieView.getKeyValues([]byte{0, 1}, nil, /* same as []byte{2, 1} */
 		10, /*maxLength*/
 		set.Set[string]{},
 		false /*lock*/)
