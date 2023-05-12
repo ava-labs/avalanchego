@@ -85,14 +85,7 @@ function test_require_len_zero {
 }
 
 function test_require_equal_len {
-  if grep -R -o -P 'require\.Equal\((t, )?\d+, len\(' .; then
-    echo ""
-    echo "Use require.Len instead of require.Equal when testing for length."
-    echo ""
-    return 1
-  fi
-
-  if grep -R -o -P 'require\.Equal\((t, )?len\(' .; then
+  if grep -R -o -P 'require\.Equal\((t, )?.*, len\(' .; then
     echo ""
     echo "Use require.Len instead of require.Equal when testing for length."
     echo ""

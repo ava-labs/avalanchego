@@ -699,12 +699,12 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
-	for i := 0; i < len(response.Validators); i++ {
-		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+	for _, vdr := range response.Validators {
+		castVdr := vdr.(pchainapi.PermissionlessValidator)
+		if castVdr.NodeID != validatorNodeID {
 			continue
 		}
-		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
+		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))
 	}
 }
 

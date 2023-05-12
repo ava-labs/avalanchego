@@ -648,7 +648,7 @@ func FuzzUnboundedSliceDeque(f *testing.F) {
 			}
 
 			list := b.List()
-			require.Len(input, len(list))
+			require.Len(list, len(input))
 			for i, n := range input {
 				require.Equal(n, list[i])
 			}
