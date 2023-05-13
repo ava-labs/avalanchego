@@ -55,12 +55,14 @@ type fullVM struct {
 }
 
 func buildTestPeers(t *testing.T) validators.Set {
+	require := require.New(t)
+
 	// we consider more than common.MaxOutstandingBroadcastRequests peers
 	// so to test the effect of cap on number of requests sent out
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
+		require.NoError(vdrs.Add(beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
 }
@@ -70,6 +72,8 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	*fullVM,
 	*common.SenderTest,
 ) {
+	require := require.New(t)
+
 	sender := &common.SenderTest{T: t}
 	commonCfg.Sender = sender
 
@@ -82,16 +86,16 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
-	require.NoError(t, err)
+	require.NoError(err)
 	commonSyncer := New(cfg, func(context.Context, uint32) error {
 		return nil
 	})
-	require.IsType(t, &stateSyncer{}, commonSyncer)
+	require.IsType(&stateSyncer{}, commonSyncer)
 	syncer := commonSyncer.(*stateSyncer)
-	require.NotNil(t, syncer.stateSyncVM)
+	require.NotNil(syncer.stateSyncVM)
 
 	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound

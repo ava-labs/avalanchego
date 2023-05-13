@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
@@ -63,7 +65,8 @@ func (vm *TestBatchedVM) GetAncestors(
 		)
 	}
 	if vm.CantGetAncestors && vm.T != nil {
-		vm.T.Fatal(errGetAncestor)
+		require := require.New(vm.T)
+		require.FailNow(errGetAncestor.Error())
 	}
 	return nil, errGetAncestor
 }
@@ -76,7 +79,8 @@ func (vm *TestBatchedVM) BatchedParseBlock(
 		return vm.BatchedParseBlockF(ctx, blks)
 	}
 	if vm.CantBatchParseBlock && vm.T != nil {
-		vm.T.Fatal(errBatchedParseBlock)
+		require := require.New(vm.T)
+		require.FailNow(errBatchedParseBlock.Error())
 	}
 	return nil, errBatchedParseBlock
 }

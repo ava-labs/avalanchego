@@ -50,6 +50,7 @@ var defaultSubnetConfig = subnets.Config{
 
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
+
 	vdrs := validators.NewSet()
 	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
@@ -318,8 +319,10 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestReliableMessages(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := validators.NewSet()
-	require.NoError(t, vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -333,7 +336,7 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	go tm.Dispatch()
 
@@ -347,9 +350,9 @@ func TestReliableMessages(t *testing.T) {
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.NoError(t, chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -377,7 +380,7 @@ func TestReliableMessages(t *testing.T) {
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, defaultSubnetConfig),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -386,7 +389,7 @@ func TestReliableMessages(t *testing.T) {
 		meter.ContinuousFactory{},
 		time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -397,7 +400,7 @@ func TestReliableMessages(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -465,9 +468,11 @@ func TestReliableMessages(t *testing.T) {
 }
 
 func TestReliableMessagesToMyself(t *testing.T) {
+	require := require.New(t)
+
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
-	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -480,7 +485,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	go tm.Dispatch()
 
@@ -494,9 +499,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.NoError(t, chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -524,7 +529,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		subnets.New(ctx.NodeID, defaultSubnetConfig),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -533,7 +538,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		meter.ContinuousFactory{},
 		time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -544,7 +549,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{

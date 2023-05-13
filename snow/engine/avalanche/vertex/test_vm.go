@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -43,7 +45,8 @@ func (vm *TestVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return vm.LinearizeF(ctx, stopVertexID)
 	}
 	if vm.CantLinearize && vm.T != nil {
-		vm.T.Fatal(errLinearize)
+		require := require.New(vm.T)
+		require.FailNow(errLinearize.Error())
 	}
 	return errLinearize
 }
@@ -53,7 +56,8 @@ func (vm *TestVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
 		return vm.PendingTxsF(ctx)
 	}
 	if vm.CantPendingTxs && vm.T != nil {
-		vm.T.Fatal(errPending)
+		require := require.New(vm.T)
+		require.FailNow(errPending.Error())
 	}
 	return nil
 }
@@ -63,7 +67,8 @@ func (vm *TestVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 		return vm.ParseTxF(ctx, b)
 	}
 	if vm.CantParse && vm.T != nil {
-		vm.T.Fatal(errParse)
+		require := require.New(vm.T)
+		require.FailNow(errParse.Error())
 	}
 	return nil, errParse
 }
@@ -73,7 +78,8 @@ func (vm *TestVM) GetTx(ctx context.Context, txID ids.ID) (snowstorm.Tx, error) 
 		return vm.GetTxF(ctx, txID)
 	}
 	if vm.CantGet && vm.T != nil {
-		vm.T.Fatal(errGet)
+		require := require.New(vm.T)
+		require.FailNow(errGet.Error())
 	}
 	return nil, errGet
 }

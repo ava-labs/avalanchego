@@ -50,12 +50,8 @@ func TestTarget(t *testing.T) {
 	totalVdrWeight := uint64(10)
 	nonVdr := ids.NodeID{2}
 	vdrs := validators.NewSet()
-	if err := vdrs.Add(vdr, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vdrs.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{
@@ -123,9 +119,11 @@ func TestTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			tt.setup()
 			target := targeter.TargetUsage(tt.nodeID)
-			require.Equal(t, tt.expectedTarget, target)
+			require.Equal(tt.expectedTarget, target)
 		})
 	}
 }

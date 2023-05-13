@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -44,7 +46,8 @@ func (s *TestStateSummary) Accept(ctx context.Context) (StateSyncMode, error) {
 		return s.AcceptF(ctx)
 	}
 	if s.CantAccept && s.T != nil {
-		s.T.Fatal(errAccept)
+		require := require.New(s.T)
+		require.FailNow(errAccept.Error())
 	}
 	return StateSyncSkipped, errAccept
 }
