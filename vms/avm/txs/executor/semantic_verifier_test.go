@@ -131,13 +131,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: nil,
@@ -158,13 +157,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errAssetIDMismatch,
@@ -190,13 +188,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -215,13 +212,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[1]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: secp256k1fx.ErrWrongSig,
@@ -239,13 +235,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: database.ErrNotFound,
@@ -270,13 +265,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: secp256k1fx.ErrMismatchedAmounts,
@@ -309,11 +303,10 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -332,13 +325,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: database.ErrNotFound,
@@ -361,13 +353,12 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errNotAnAsset,
@@ -509,13 +500,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: nil,
@@ -536,13 +526,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errAssetIDMismatch,
@@ -568,13 +557,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -593,13 +581,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[1]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: secp256k1fx.ErrWrongSig,
@@ -617,13 +604,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: database.ErrNotFound,
@@ -648,13 +634,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: secp256k1fx.ErrMismatchedAmounts,
@@ -687,11 +672,10 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -710,13 +694,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: database.ErrNotFound,
@@ -739,13 +722,12 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[0]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errNotAnAsset,
@@ -877,13 +859,12 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	tx := &txs.Tx{
 		Unsigned: &exportTx,
 	}
-	err = tx.SignSECP256K1Fx(
+	require.NoError(tx.SignSECP256K1Fx(
 		codec,
 		[][]*secp256k1.PrivateKey{
 			{keys[0]},
 		},
-	)
-	require.NoError(err)
+	))
 
 	err = tx.Unsigned.Visit(&SemanticVerifier{
 		Backend: backend,

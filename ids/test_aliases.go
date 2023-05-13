@@ -23,7 +23,6 @@ func AliaserLookupErrorTest(require *require.Assertions, r AliaserReader, _ Alia
 
 func AliaserLookupTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'K', 'a', 't', 'e', ' ', 'K', 'a', 'n', 'e'}
-
 	require.NoError(w.Alias(id, "Batwoman"))
 
 	res, err := r.Lookup("Batwoman")

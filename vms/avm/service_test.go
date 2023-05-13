@@ -624,7 +624,6 @@ func TestServiceGetAllBalances(t *testing.T) {
 
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
-
 	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -634,10 +633,9 @@ func TestServiceGetTx(t *testing.T) {
 	txID := genesisTx.ID()
 
 	reply := api.GetTxReply{}
-	err := s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID: txID,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx.(string))
 	require.NoError(err)
 	require.Equal(genesisTx.Bytes(), txBytes)
@@ -669,11 +667,10 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require.NoError(txs[0].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -711,11 +708,10 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require.NoError(txs[0].Accept(context.Background()))
 
 	reply := api.GetTxReply{}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -743,7 +739,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -766,8 +762,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -789,11 +784,10 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -822,7 +816,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -845,8 +839,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -854,7 +847,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
@@ -876,11 +869,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -913,7 +905,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -936,8 +928,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -945,7 +936,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
@@ -970,11 +961,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -1006,7 +996,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1029,8 +1019,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1038,7 +1027,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
@@ -1060,11 +1049,10 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -1099,7 +1087,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1122,8 +1110,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1131,7 +1118,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
@@ -1156,11 +1143,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -1193,7 +1179,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1216,8 +1202,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1225,7 +1210,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
@@ -1247,11 +1232,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)
@@ -1285,7 +1269,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1308,8 +1292,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1317,7 +1300,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
@@ -1342,11 +1325,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.JSON,
-	}, &reply)
-	require.NoError(err)
+	}, &reply))
 
 	require.Equal(reply.Encoding, formatting.JSON)
 	jsonTxBytes, err := stdjson.Marshal(reply.Tx)

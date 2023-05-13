@@ -101,9 +101,8 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	msgBytes, err := message.Build(&msg)
 	require.NoError(err)
 	env.ctx.Lock.Unlock()
-	err = env.AppGossip(context.Background(), nodeID, msgBytes)
+	require.NoError(env.AppGossip(context.Background(), nodeID, msgBytes))
 	env.ctx.Lock.Lock()
-	require.NoError(err)
 	require.False(env.Builder.Has(txID))
 }
 

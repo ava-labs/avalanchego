@@ -75,10 +75,8 @@ func TestLoadVMsSuccess(t *testing.T) {
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
+	require.NoError(resources.admin.LoadVMs(&http.Request{}, nil, &reply))
 	require.Equal(expectedVMRegistry, reply.NewVMs)
-	require.NoError(err)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.

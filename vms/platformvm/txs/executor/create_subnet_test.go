@@ -27,9 +27,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "pre-fork - correctly priced",
-			time: defaultGenesisTime,
-			fee:  0,
+			name:        "pre-fork - correctly priced",
+			time:        defaultGenesisTime,
+			fee:         0,
+			expectedErr: nil,
 		},
 		{
 			name:        "post-fork - incorrectly priced",
@@ -38,9 +39,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			expectedErr: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
-			name: "post-fork - correctly priced",
-			time: ap3Time,
-			fee:  100 * defaultTxFee,
+			name:        "post-fork - correctly priced",
+			time:        ap3Time,
+			fee:         100 * defaultTxFee,
+			expectedErr: nil,
 		},
 	}
 	for _, test := range tests {

@@ -60,7 +60,6 @@ func Test_History_Simple(t *testing.T) {
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("k"), []byte("v")))
-	require.NoError(err)
 	require.NoError(batch.Write())
 	newProof, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)

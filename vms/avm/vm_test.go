@@ -701,7 +701,6 @@ func TestIssueNFT(t *testing.T) {
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
-
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
@@ -712,7 +711,7 @@ func TestIssueProperty(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		manager.NewMemDB(version.Semantic1_0_0),
@@ -735,12 +734,10 @@ func TestIssueProperty(t *testing.T) {
 			},
 		},
 		nil,
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
@@ -765,7 +762,7 @@ func TestIssueProperty(t *testing.T) {
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
 
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
@@ -795,10 +792,9 @@ func TestIssueProperty(t *testing.T) {
 	}}
 
 	codec := vm.parser.Codec()
-	err = mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
+	require.NoError(mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{keys[0]},
-	})
-	require.NoError(err)
+	}))
 
 	_, err = vm.IssueTx(mintPropertyTx.Bytes())
 	require.NoError(err)
@@ -818,10 +814,9 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	err = burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
+	require.NoError(burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{},
-	})
-	require.NoError(err)
+	}))
 
 	_, err = vm.IssueTx(burnPropertyTx.Bytes())
 	require.NoError(err)
@@ -1589,7 +1584,6 @@ func TestImportTxNotState(t *testing.T) {
 // Test issuing an import transaction.
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
-
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)

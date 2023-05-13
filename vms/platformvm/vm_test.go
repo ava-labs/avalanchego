@@ -392,7 +392,10 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	require := require.New(t)
-	var genesisBytes []byte
+	var (
+		genesisBytes []byte
+		err          error
+	)
 
 	if args != nil {
 		_, genesisBytes = BuildGenesisTestWithArgs(t, args)
@@ -436,7 +439,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDBManager,
@@ -446,8 +449,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -523,7 +525,7 @@ func TestGenesis(t *testing.T) {
 	require.True(ok)
 
 	currentValidators := vdrSet.List()
-	require.Equal(len(currentValidators), len(genesisState.Validators))
+	require.Len(genesisState.Validators, len(currentValidators))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
@@ -1304,7 +1306,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
@@ -1317,8 +1319,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	},
-	)
-	require.NoError(err)
+	))
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
@@ -1442,7 +1443,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(
+	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
 		firstDB,
@@ -1452,8 +1453,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		firstMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	genesisID, err := firstVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1527,7 +1527,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(
+	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
 		secondDB,
@@ -1537,8 +1537,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	lastAccepted, err := secondVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1587,7 +1586,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	err = vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		vmDBManager,
@@ -1597,8 +1596,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -1667,7 +1665,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		timeoutManager,
@@ -1679,8 +1677,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
@@ -1902,7 +1899,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1912,8 +1909,7 @@ func TestUnverifiedParent(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	// include a tx1 to make the block be accepted
 	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
@@ -2232,7 +2228,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		db,
@@ -2242,8 +2238,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2727,7 +2722,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			if tt.expectedErr != nil {
 				return
 			}
-			require.Equal(len(tt.expectedVdrSet), len(gotVdrSet))
+			require.Len(gotVdrSet, len(tt.expectedVdrSet))
 			for nodeID, vdr := range tt.expectedVdrSet {
 				otherVdr, ok := gotVdrSet[nodeID]
 				require.True(ok)

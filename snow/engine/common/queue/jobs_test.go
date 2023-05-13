@@ -376,7 +376,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.NoError(jobs.SetParser(context.Background(), parser))
 
 	missingIDs := jobs.MissingIDs()
-	require.Equal(1, len(missingIDs))
+	require.Len(missingIDs, 1)
 
 	require.Equal(missingIDs[0], job0.ID())
 
