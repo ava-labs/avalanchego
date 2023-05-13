@@ -126,7 +126,7 @@ function test_require_no_error_inline_func {
 }
 
 function test_require_equal_error {
-  if ggrep -R -o -P 'require.Equal.+?err(\)|,)' .; then
+  if grep -R -o -P 'require.Equal.+?err(\)|,)' .; then
     echo ""
     echo "Use require.ErrorIs instead of require.Equal when testing for error."
     echo ""
