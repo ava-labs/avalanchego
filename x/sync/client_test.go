@@ -401,8 +401,7 @@ func TestGetChangeProof(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(t, err)
 
-			err = view.Insert(context.Background(), key, val)
-			require.NoError(t, err)
+			require.NoError(t, view.Insert(context.Background(), key, val))
 		}
 
 		// delete a key
@@ -412,8 +411,7 @@ func TestGetChangeProof(t *testing.T) {
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
+			require.NoError(t, view.Remove(context.Background(), it.Key()))
 		}
 		require.NoError(t, it.Error())
 		it.Release()

@@ -43,8 +43,7 @@ const (
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -178,8 +177,7 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
@@ -840,8 +838,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1132,8 +1129,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
-	err = vdrs.Add(vID, nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(vID, nil, ids.Empty, 1))
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -1547,8 +1543,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
-	err = vdrs.Add(vID, nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(vID, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),

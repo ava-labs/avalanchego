@@ -309,11 +309,10 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &baseTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -687,11 +686,10 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &exportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: errIncompatibleFx,

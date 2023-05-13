@@ -72,8 +72,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
-	err := ks.CreateUser(testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(t, ks.CreateUser(testUsername, testPassword))
 
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{
@@ -95,8 +94,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	require.NoError(t, err)
 
-	err = user.PutKeys(pk, keys[0])
-	require.NoError(t, err)
+	require.NoError(t, user.PutKeys(pk, keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
@@ -110,10 +108,9 @@ func TestAddValidator(t *testing.T) {
 func TestCreateBlockchainArgsParsing(t *testing.T) {
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(t, err)
+	require.NoError(t, stdjson.Unmarshal([]byte(jsonString), &args))
 
-	_, err = stdjson.Marshal(args.GenesisData)
+	_, err := stdjson.Marshal(args.GenesisData)
 	require.NoError(t, err)
 }
 

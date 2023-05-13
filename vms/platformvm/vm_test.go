@@ -412,7 +412,10 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	require := require.New(t)
-	var genesisBytes []byte
+	var (
+		genesisBytes []byte
+		err          error
+	)
 
 	if args != nil {
 		_, genesisBytes = BuildGenesisTestWithArgs(t, args)
@@ -456,7 +459,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDBManager,
@@ -466,8 +469,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -1922,7 +1924,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1932,8 +1934,7 @@ func TestUnverifiedParent(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	// include a tx1 to make the block be accepted
 	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
@@ -2253,7 +2254,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		db,
@@ -2263,8 +2264,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2363,8 +2363,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
-	err := vm.Initialize(context.Background(), ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender)
-	require.NoError(t, err)
+	require.NoError(t, vm.Initialize(context.Background(), ctx, db, genesisBytes, nil, nil, msgChan, nil, appSender))
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()

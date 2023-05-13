@@ -36,6 +36,5 @@ func TestNoopHandler(t *testing.T) {
 		Log: logging.NoLog{},
 	}
 
-	err := handler.HandleTx(ids.EmptyNodeID, 0, nil)
-	require.NoError(t, err)
+	require.NoError(t, handler.HandleTx(ids.EmptyNodeID, 0, nil))
 }

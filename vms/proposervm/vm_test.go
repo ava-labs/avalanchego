@@ -2530,7 +2530,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		snowCtx,
 		dummyDBManager,
@@ -2540,8 +2540,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	{
 		pChainHeight := uint64(0)
@@ -2563,14 +2562,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
 
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 
 		// Call VerifyWithContext again but with a different P-Chain height
 		blk.EXPECT().setInnerBlk(innerBlk).AnyTimes()
@@ -2581,14 +2579,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 			},
 		).Return(nil)
 
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 	}
 
 	{
@@ -2606,14 +2603,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: 1,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 	}
 
 	{

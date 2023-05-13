@@ -56,8 +56,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(t, target.state.Commit())
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -85,8 +84,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		err = target.state.Commit()
-		require.NoError(t, err)
+		require.NoError(t, target.state.Commit())
 	}
 
 	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
@@ -209,8 +207,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
-				err = target.state.Commit()
-				require.NoError(t, err)
+				require.NoError(t, target.state.Commit())
 			},
 			AP3Time:     defaultGenesisTime,
 			expectedErr: ErrFlowCheckFailed,
