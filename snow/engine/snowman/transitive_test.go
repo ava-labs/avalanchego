@@ -2772,8 +2772,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		require.Equal(vdr, inVdr)
 		*asked = true
 	}
-	// this engine receives Gossip message for [blk2] which is "unknown" in this engine
-	// thus sending a Get request for its ancestor [blk1]
+	// This engine receives a Gossip message for [blk2] which was "unknown" in this engine.
+	// The engine thus learns about its ancestor [blk1] and should send a Get request for it.
 	// (see above for expected "Get" request)
 	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
 	require.True(*asked)
