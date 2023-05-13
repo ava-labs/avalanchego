@@ -72,7 +72,7 @@ func TestNewImportTx(t *testing.T) {
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
-			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 				env.ctx.ChainID: {
 					PutRequests: []*atomic.Element{
 						{
@@ -84,9 +84,7 @@ func TestNewImportTx(t *testing.T) {
 						},
 					},
 				},
-			},
-			)
-			require.NoError(t, err)
+			}))
 		}
 
 		return sm

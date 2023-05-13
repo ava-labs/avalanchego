@@ -239,15 +239,14 @@ func TestServiceExportImport(t *testing.T) {
 		}
 
 		{
-			err := newS.ImportUser(nil, &ImportUserArgs{
+			require.NoError(newS.ImportUser(nil, &ImportUserArgs{
 				UserPass: api.UserPass{
 					Username: "bob",
 					Password: strongPassword,
 				},
 				User:     exportReply.User,
 				Encoding: encoding,
-			}, &api.EmptyReply{})
-			require.NoError(err)
+			}, &api.EmptyReply{}))
 		}
 
 		{

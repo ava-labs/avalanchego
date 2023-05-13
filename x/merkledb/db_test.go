@@ -747,13 +747,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			}
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 100)
 			require.NoError(err)
-			err = rangeProof.Verify(
+			require.NoError(rangeProof.Verify(
 				context.Background(),
 				step.key,
 				step.value,
 				root,
-			)
-			require.NoError(err)
+			))
 			require.LessOrEqual(len(rangeProof.KeyValues), 100)
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
@@ -769,14 +768,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			err = changeProof.Verify(
+			require.NoError(changeProof.Verify(
 				context.Background(),
 				changeProofDB,
 				step.key,
 				step.value,
 				root,
-			)
-			require.NoError(err)
+			))
 			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())

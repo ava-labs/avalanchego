@@ -227,13 +227,12 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(
+	require.NoError(t, proof.Verify(
 		context.Background(),
 		[]byte{1},
 		[]byte{5, 5},
 		db.root.id,
-	)
-	require.NoError(t, err)
+	))
 
 	proof.KeyValues = append(proof.KeyValues, KeyValue{Key: []byte{5}, Value: []byte{5}})
 
@@ -556,13 +555,12 @@ func Test_RangeProof(t *testing.T) {
 	// only a single node here since others are duplicates in endproof
 	require.Equal([]byte{1}, proof.StartProof[0].KeyPath.Value)
 
-	err = proof.Verify(
+	require.NoError(proof.Verify(
 		context.Background(),
 		[]byte{1},
 		[]byte{3, 5},
 		db.root.id,
-	)
-	require.NoError(err)
+	))
 }
 
 func Test_RangeProof_BadBounds(t *testing.T) {
@@ -605,13 +603,12 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal(t, SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
 	require.Equal(t, newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
 
-	err = proof.Verify(
+	require.NoError(t, proof.Verify(
 		context.Background(),
 		nil,
 		[]byte("key35"),
 		db.root.id,
-	)
-	require.NoError(t, err)
+	))
 }
 
 func Test_RangeProof_NilEnd(t *testing.T) {
@@ -638,13 +635,12 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	require.Equal(t, []byte{0}, proof.EndProof[1].KeyPath.Value)
 	require.Equal(t, []byte{2}, proof.EndProof[2].KeyPath.Value)
 
-	err = proof.Verify(
+	require.NoError(t, proof.Verify(
 		context.Background(),
 		[]byte{1},
 		nil,
 		db.root.id,
-	)
-	require.NoError(t, err)
+	))
 }
 
 func Test_RangeProof_EmptyValues(t *testing.T) {
@@ -679,13 +675,12 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Equal(t, newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
 	require.Equal(t, newPath([]byte{}).Serialize(), proof.EndProof[0].KeyPath)
 
-	err = proof.Verify(
+	require.NoError(t, proof.Verify(
 		context.Background(),
 		[]byte("key1"),
 		[]byte("key2"),
 		db.root.id,
-	)
-	require.NoError(t, err)
+	))
 }
 
 func Test_RangeProof_Marshal_Nil(t *testing.T) {

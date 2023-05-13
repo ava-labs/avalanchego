@@ -583,12 +583,11 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Commit the proof to the local database as we do
 		// in the actual syncer.
-		err = localDB.CommitRangeProof(
+		require.NoError(localDB.CommitRangeProof(
 			context.Background(),
 			rangeStart,
 			remoteProof,
-		)
-		require.NoError(err)
+		))
 
 		localProof, err := localDB.GetProof(
 			context.Background(),

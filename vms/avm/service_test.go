@@ -642,29 +642,22 @@ func TestServiceGetAllBalances(t *testing.T) {
 }
 
 func TestServiceGetTx(t *testing.T) {
+	require := require.New(t)
 	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	txID := genesisTx.ID()
 
 	reply := api.GetTxReply{}
-	err := s.GetTx(nil, &api.GetTxArgs{
+	require.NoError(s.GetTx(nil, &api.GetTxArgs{
 		TxID: txID,
-	}, &reply)
-	require.NoError(t, err)
-	if err != nil {
-		t.Fatal(err)
-	}
+	}, &reply))
 	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx.(string))
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
+	require.NoError(err)
+	require.Equal(genesisTx.Bytes(), txBytes)
 }
 
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
@@ -1022,7 +1015,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1045,8 +1038,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1054,7 +1046,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
@@ -1206,7 +1198,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -1229,8 +1221,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			},
 		},
 		&common.SenderTest{T: t},
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -1238,7 +1229,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))

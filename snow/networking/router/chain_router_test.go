@@ -61,7 +61,7 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -73,8 +73,7 @@ func TestShutdown(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	shutdownCalled := make(chan struct{}, 1)
 
@@ -198,7 +197,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -210,8 +209,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		HealthConfig{},
 		"",
 		metrics,
-	)
-	require.NoError(t, err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -337,8 +335,7 @@ func TestRouterTimeout(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -350,8 +347,7 @@ func TestRouterTimeout(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	// Create bootstrapper, engine and handler
 	var (
@@ -694,7 +690,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -706,8 +702,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	h := handler.NewMockHandler(ctrl)
 
@@ -820,7 +815,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -832,8 +827,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
@@ -1106,7 +1100,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -1118,8 +1112,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1253,7 +1246,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	// Create chain router
 	nodeID := ids.GenerateTestNodeID()
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		nodeID,
 		logging.NoLog{},
 		tm,
@@ -1265,8 +1258,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	// Set up validators
 	vdrs := validators.NewSet()
@@ -1404,7 +1396,7 @@ func TestConnectedSubnet(t *testing.T) {
 	trackedSubnets := set.Set[ids.ID]{}
 	trackedSubnets.Add(subnetID0, subnetID1)
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		myNodeID,
 		logging.NoLog{},
 		tm,
@@ -1416,8 +1408,7 @@ func TestConnectedSubnet(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	// Create bootstrapper, engine and handler
 	platform := snow.DefaultConsensusContextTest()
@@ -1516,7 +1507,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -1528,8 +1519,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	// Create bootstrapper, engine and handler
 	calledF := false

@@ -1326,7 +1326,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
@@ -1339,8 +1339,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	},
-	)
-	require.NoError(err)
+	))
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
@@ -1464,7 +1463,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(
+	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
 		firstDB,
@@ -1474,8 +1473,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		firstMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	genesisID, err := firstVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1549,7 +1547,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(
+	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
 		secondDB,
@@ -1559,8 +1557,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	lastAccepted, err := secondVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1609,7 +1606,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	err = vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		vmDBManager,
@@ -1619,8 +1616,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -1689,7 +1685,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		timeoutManager,
@@ -1701,8 +1697,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
@@ -2078,7 +2073,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(
+	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
 		firstDB,
@@ -2088,8 +2083,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		firstMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -2124,7 +2118,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(
+	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
 		secondDB,
@@ -2134,8 +2128,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		secondMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))

@@ -225,13 +225,12 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	origProof, err := db.GetRangeProof(context.Background(), []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(origProof)
-	err = origProof.Verify(
+	require.NoError(origProof.Verify(
 		context.Background(),
 		[]byte("k"),
 		[]byte("key3"),
 		origRootID,
-	)
-	require.NoError(err)
+	))
 
 	// write a new value into the db, now there should be 2 roots in the history
 	batch = db.NewBatch()
@@ -242,13 +241,12 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	err = newProof.Verify(
+	require.NoError(newProof.Verify(
 		context.Background(),
 		[]byte("k"),
 		[]byte("key3"),
 		origRootID,
-	)
-	require.NoError(err)
+	))
 
 	// trigger a new root to be added to the history, which should cause rollover since there can only be 2
 	batch = db.NewBatch()

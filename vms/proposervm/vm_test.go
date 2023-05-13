@@ -2006,7 +2006,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2016,8 +2016,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -2215,7 +2214,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2225,8 +2224,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil

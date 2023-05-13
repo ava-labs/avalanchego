@@ -80,7 +80,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -92,8 +92,7 @@ func TestTimeout(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
@@ -350,7 +349,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -362,8 +361,7 @@ func TestReliableMessages(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 
@@ -498,7 +496,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -510,8 +508,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 

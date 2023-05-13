@@ -590,7 +590,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
+	require.NoError(peerSharedMemory.Apply(
 		map[ids.ID]*atomic.Requests{
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
@@ -601,8 +601,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 				},
 			},
 		},
-	)
-	require.NoError(err)
+	))
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
@@ -839,7 +838,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
+	require.NoError(peerSharedMemory.Apply(
 		map[ids.ID]*atomic.Requests{
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
@@ -850,8 +849,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 				},
 			},
 		},
-	)
-	require.NoError(err)
+	))
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.

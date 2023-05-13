@@ -192,7 +192,7 @@ func TestGetTxStatus(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		service.vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
@@ -204,8 +204,7 @@ func TestGetTxStatus(t *testing.T) {
 				},
 			},
 		},
-	})
-	require.NoError(err)
+	}))
 
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
