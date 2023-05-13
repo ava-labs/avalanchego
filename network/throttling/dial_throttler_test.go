@@ -102,7 +102,7 @@ func TestNoDialThrottler(t *testing.T) {
 	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
-		require.NoError(t, throttler.Acquire(context.Background()) // Should always immediately return)
+		require.NoError(t, throttler.Acquire(context.Background())) // Should always immediately return
 		require.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
 	}
 }
