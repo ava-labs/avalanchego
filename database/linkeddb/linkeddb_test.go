@@ -26,7 +26,7 @@ func TestLinkedDB(t *testing.T) {
 	require.False(has, "db unexpectedly had key %s", key)
 
 	_, err = ldb.Get(key)
-	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.ErrorIs(err, database.ErrNotFound, "Expected db.Get to return a Not Found error.")
 
 	require.NoError(ldb.Delete(key))
 
@@ -47,7 +47,7 @@ func TestLinkedDB(t *testing.T) {
 	require.False(has, "db unexpectedly had key %s", key)
 
 	_, err = ldb.Get(key)
-	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.ErrorIs(err, database.ErrNotFound, "Expected db.Get to return a Not Found error.")
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
@@ -401,7 +401,7 @@ func TestLinkedDBHeadKey(t *testing.T) {
 	ldb := NewDefault(db)
 
 	_, err := ldb.HeadKey()
-	require.Equal(database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")
@@ -434,7 +434,7 @@ func TestLinkedDBHead(t *testing.T) {
 	ldb := NewDefault(db)
 
 	_, _, err := ldb.Head()
-	require.Equal(database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")

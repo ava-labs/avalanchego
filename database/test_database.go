@@ -75,7 +75,7 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -95,7 +95,7 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 }
@@ -107,7 +107,7 @@ func TestKeyEmptyValue(t *testing.T, db Database) {
 	val := []byte(nil)
 
 	_, err := db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Put(key, val))
 
@@ -128,7 +128,7 @@ func TestEmptyKey(t *testing.T, db Database) {
 
 	// Test that nil key can be retrieved by empty key
 	_, err := db.Get(nilKey)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Put(nilKey, val1))
 
@@ -157,7 +157,7 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -173,10 +173,10 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.NoError(db.Close())
 
 	_, err = db.Has(key)
-	require.Equal(ErrClosed, err)
+	require.ErrorIs(err, ErrClosed)
 
 	_, err = db.Get(key)
-	require.Equal(ErrClosed, err)
+	require.ErrorIs(err, ErrClosed)
 
 	require.Equal(ErrClosed, db.Put(key, value))
 	require.Equal(ErrClosed, db.Delete(key))
@@ -287,7 +287,7 @@ func TestBatchDelete(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.ErrorIs(err, ErrNotFound)
 
 	require.NoError(db.Delete(key))
 }
@@ -1160,6 +1160,6 @@ func FuzzKeyValue(f *testing.F, db Database) {
 		require.False(exists)
 
 		_, err = db.Get(key)
-		require.Equal(ErrNotFound, err)
+		require.ErrorIs(err, ErrNotFound)
 	})
 }

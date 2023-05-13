@@ -70,7 +70,7 @@ func TestLockOutVerify(t *testing.T) {
 				Locktime:        tt.locktime,
 				TransferableOut: tt.transferableOutF(ctrl),
 			}
-			require.Equal(t, tt.expectedErr, lockOut.Verify())
+			require.ErrorIs(t, lockOut.Verify(), tt.expectedErr)
 		})
 	}
 }
@@ -129,7 +129,7 @@ func TestLockInVerify(t *testing.T) {
 				Locktime:       tt.locktime,
 				TransferableIn: tt.transferableInF(ctrl),
 			}
-			require.Equal(t, tt.expectedErr, lockOut.Verify())
+			require.ErrorIs(t, lockOut.Verify(), tt.expectedErr)
 		})
 	}
 }

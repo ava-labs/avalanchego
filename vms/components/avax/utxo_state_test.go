@@ -58,10 +58,10 @@ func TestUTXOState(t *testing.T) {
 	s := NewUTXOState(db, manager)
 
 	_, err := s.GetUTXO(utxoID)
-	require.Equal(database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = s.GetUTXO(utxoID)
-	require.Equal(database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	require.NoError(s.DeleteUTXO(utxoID))
 
@@ -78,7 +78,7 @@ func TestUTXOState(t *testing.T) {
 	require.NoError(s.DeleteUTXO(utxoID))
 
 	_, err = s.GetUTXO(utxoID)
-	require.Equal(database.ErrNotFound, err)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	require.NoError(s.PutUTXO(utxo))
 

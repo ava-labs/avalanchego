@@ -100,7 +100,7 @@ func TestBackendGetBlock(t *testing.T) {
 		blkID := ids.GenerateTestID()
 		state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
 		_, err := b.GetBlock(blkID)
-		require.Equal(database.ErrNotFound, err)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 
 	{
