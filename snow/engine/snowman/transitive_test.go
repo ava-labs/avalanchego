@@ -2792,8 +2792,9 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.Bytes(), blkBytes)
 	}
-	// this engine now answers the "Get" request, and this should allow [blk1] to be issued
-	// and cause [blk2] to fail verification.
+	// This engine now handles the response to the "Get" request. This should cause [blk1] to be issued
+	// which will result in attempting to issue [blk2]. However, [blk2] should fail verification and be dropped.
+	// By issuing [blk1], this node should fire a "PushQuery" request for [blk1].
 	// (see above for expected "PushQuery" request)
 	require.NoError(te.Put(context.Background(), vdr, *reqID, blk1.Bytes()))
 	require.True(*asked)
