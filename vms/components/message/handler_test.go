@@ -27,8 +27,7 @@ func TestHandleTx(t *testing.T) {
 	handler := CounterHandler{}
 	msg := Tx{}
 
-	err := msg.Handle(&handler, ids.EmptyNodeID, 0)
-	require.NoError(err)
+	require.NoError(msg.Handle(&handler, ids.EmptyNodeID, 0))
 	require.Equal(1, handler.Tx)
 }
 

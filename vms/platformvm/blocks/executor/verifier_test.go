@@ -98,8 +98,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Visit the block
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
@@ -115,8 +114,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require.Equal(status.Aborted, gotStatus)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
@@ -195,8 +193,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
@@ -206,8 +203,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 }
 
 func TestVerifierVisitStandardBlock(t *testing.T) {
@@ -297,8 +293,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
@@ -308,8 +303,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 }
 
 func TestVerifierVisitCommitBlock(t *testing.T) {
@@ -371,8 +365,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
@@ -381,8 +374,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 }
 
 func TestVerifierVisitAbortBlock(t *testing.T) {
@@ -444,8 +436,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
@@ -454,8 +445,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 }
 
 // Assert that a block with an unverified parent fails verification.

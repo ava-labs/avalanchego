@@ -25,8 +25,7 @@ func TestIndex(t *testing.T) {
 	pageSize := uint64(64)
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultConsensusContextTest()
@@ -44,8 +43,7 @@ func TestIndex(t *testing.T) {
 	// Accept each container and after each, make assertions
 	i := uint64(0)
 	for containerID, containerBytes := range containers {
-		err = idx.Accept(ctx, containerID, containerBytes)
-		require.NoError(err)
+		require.NoError(idx.Accept(ctx, containerID, containerBytes))
 
 		lastAcceptedIndex, ok := idx.lastAcceptedIndex()
 		require.True(ok)
@@ -116,8 +114,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	// Setup
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
@@ -126,8 +123,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 
 	// Insert [MaxFetchedByRange] + 1 containers
 	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
-		err = idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32))
-		require.NoError(err)
+		require.NoError(idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32)))
 	}
 
 	// Page size too large
@@ -158,8 +154,7 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
 	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})

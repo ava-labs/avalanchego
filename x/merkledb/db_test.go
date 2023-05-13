@@ -384,8 +384,7 @@ func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(err)
+	require.NoError(db.Put([]byte("key"), []byte("value")))
 
 	value, err = db.Get([]byte("key"))
 	require.NoError(err)
@@ -459,12 +458,10 @@ func TestDatabaseNewUntrackedView(t *testing.T) {
 	require.Empty(db.childViews)
 
 	// Write to the untracked view.
-	err = view.Insert(context.Background(), []byte{1}, []byte{1})
-	require.NoError(err)
+	require.NoError(view.Insert(context.Background(), []byte{1}, []byte{1}))
 
 	// Commit the view
-	err = view.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view.CommitToDB(context.Background()))
 
 	// The untracked view should not be tracked by the parent database.
 	require.Empty(db.childViews)
@@ -483,12 +480,10 @@ func TestDatabaseNewPreallocatedViewTracked(t *testing.T) {
 	require.Len(db.childViews, 1)
 
 	// Write to the  view.
-	err = view.Insert(context.Background(), []byte{1}, []byte{1})
-	require.NoError(err)
+	require.NoError(view.Insert(context.Background(), []byte{1}, []byte{1}))
 
 	// Commit the view
-	err = view.CommitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view.CommitToDB(context.Background()))
 
 	// The untracked view should be tracked by the parent database.
 	require.Contains(db.childViews, view)
@@ -503,8 +498,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	dbRoot := db.getMerkleRoot()
 
 	// Committing a nil view should be a no-op.
-	err = db.commitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(db.commitToDB(context.Background()))
 	require.Equal(dbRoot, db.getMerkleRoot()) // Root didn't change
 
 	// Committing an invalid view should fail.
@@ -515,20 +509,16 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
-	err = db.Put([]byte{1}, []byte{1})
-	require.NoError(err)
-	err = db.Put([]byte{2}, []byte{2})
-	require.NoError(err)
+	require.NoError(db.Put([]byte{1}, []byte{1}))
+	require.NoError(db.Put([]byte{2}, []byte{2}))
 
 	// Make a view and inser/delete a key-value pair.
 	view1Intf, err := db.NewView()
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
-	err = view1.Insert(context.Background(), []byte{3}, []byte{3})
-	require.NoError(err)
-	err = view1.Remove(context.Background(), []byte{1})
-	require.NoError(err)
+	require.NoError(view1.Insert(context.Background(), []byte{3}, []byte{3}))
+	require.NoError(view1.Remove(context.Background(), []byte{1}))
 	view1Root, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
 
@@ -551,8 +541,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	//      db
 
 	// Commit view1
-	err = view1.commitToDB(context.Background())
-	require.NoError(err)
+	require.NoError(view1.commitToDB(context.Background()))
 
 	// Make sure the key-value pairs are correct.
 	_, err = db.Get([]byte{1})
@@ -773,13 +762,11 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		require.LessOrEqual(i, len(rt))
 		switch step.op {
 		case opUpdate:
-			err := currentBatch.Put(step.key, step.value)
-			require.NoError(err)
+			require.NoError(currentBatch.Put(step.key, step.value))
 			currentValues[newPath(step.key)] = step.value
 			delete(deleteValues, newPath(step.key))
 		case opDelete:
-			err := currentBatch.Delete(step.key)
-			require.NoError(err)
+			require.NoError(currentBatch.Delete(step.key))
 			deleteValues[newPath(step.key)] = struct{}{}
 			delete(currentValues, newPath(step.key))
 		case opGenerateRangeProof:
@@ -824,8 +811,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			err = currentBatch.Write()
-			require.NoError(err)
+			require.NoError(currentBatch.Write())
 			for key, value := range currentValues {
 				values[key] = value
 			}
@@ -873,8 +859,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			localTrie := Trie(dbTrie)
 			for key, value := range values {
-				err := localTrie.Insert(context.Background(), key.Serialize().Value, value)
-				require.NoError(err)
+				require.NoError(localTrie.Insert(context.Background(), key.Serialize().Value, value))
 			}
 			calculatedRoot, err := localTrie.GetMerkleRoot(context.Background())
 			require.NoError(err)

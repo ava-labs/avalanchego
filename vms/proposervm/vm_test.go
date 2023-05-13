@@ -2022,11 +2022,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex(context.Background()) != nil {
@@ -2055,8 +2053,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct inner block Y and outer block B
 	yBlock := &snowman.TestBlock{
@@ -2087,12 +2084,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	}
 
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// accept A
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
@@ -2100,8 +2095,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.Equal(aBlock.ID(), blkID)
 
 	// reject B
-	err = bBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Reject(context.Background()))
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
 	require.NoError(err)
@@ -2237,11 +2231,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex(context.Background()) != nil {
@@ -2296,20 +2288,16 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	bBlock := opts[0]
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Verify(context.Background()))
 
 	cBlock := opts[1]
-	err = cBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(cBlock.Verify(context.Background()))
 
 	// accept A
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
@@ -2317,8 +2305,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.Equal(aBlock.ID(), blkID)
 
 	// accept B
-	err = bBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.opts[0].ID())
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), bBlock.Height())
@@ -2326,8 +2313,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.Equal(bBlock.ID(), blkID)
 
 	// reject C
-	err = cBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(cBlock.Reject(context.Background()))
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), cBlock.Height())
 	require.NoError(err)
@@ -2369,7 +2355,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2379,8 +2365,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 	state := state.NewMockState(ctrl) // mock state
 	vm.State = state
 
@@ -2479,17 +2464,10 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	bBlock, err := proVM.ParseBlock(context.Background(), bBlockBytes)
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
-
-	err = bBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(bBlock.Verify(context.Background()))
+	require.NoError(aBlock.Accept(context.Background()))
+	require.NoError(bBlock.Reject(context.Background()))
 
 	require.Equal(
 		choices.Accepted,
@@ -2651,7 +2629,6 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
-		err = vm.verifyAndRecordInnerBlk(context.Background(), nil, blk)
-		require.NoError(err)
+		require.NoError(vm.verifyAndRecordInnerBlk(context.Background(), nil, blk))
 	}
 }

@@ -563,8 +563,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			key := make([]byte, rand.Intn(maxKeyLen))
 			_, _ = rand.Read(key)
 			val := make([]byte, rand.Intn(maxValLen))
-			err := db.Put(key, val)
-			require.NoError(err)
+			require.NoError(db.Put(key, val))
 		}
 	}
 
@@ -936,8 +935,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(t, syncer)
 
-	err = syncer.StartSyncing(context.Background())
-	require.NoError(err)
+	require.NoError(syncer.StartSyncing(context.Background()))
 
 	err = syncer.Wait(context.Background())
 	require.ErrorIs(err, errInvalidRangeProof)
@@ -1009,8 +1007,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(err)
 
-			err = dbToSync.Put(key, val)
-			require.NoError(err)
+			require.NoError(dbToSync.Put(key, val))
 
 			deleteKeyStart := make([]byte, r.Intn(50))
 			_, err = r.Read(deleteKeyStart)
@@ -1018,8 +1015,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 			it := dbToSync.NewIteratorWithStart(deleteKeyStart)
 			if it.Next() {
-				err = dbToSync.Delete(it.Key())
-				require.NoError(err)
+				require.NoError(dbToSync.Delete(it.Key()))
 			}
 			require.NoError(it.Error())
 			it.Release()
@@ -1028,8 +1024,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		syncRoot, err = dbToSync.GetMerkleRoot(context.Background())
 		require.NoError(err)
 
-		err = syncer.StartSyncing(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.StartSyncing(context.Background()))
 
 		// Wait until we've processed some work
 		// before updating the sync target.
@@ -1043,12 +1038,10 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			3*time.Second,
 			10*time.Millisecond,
 		)
-		err = syncer.UpdateSyncTarget(syncRoot)
-		require.NoError(err)
+		require.NoError(syncer.UpdateSyncTarget(syncRoot))
 		close(updatedRootChan)
 
-		err = syncer.Wait(context.Background())
-		require.NoError(err)
+		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(syncer.Error())
 
 		newRoot, err := db.GetMerkleRoot(context.Background())
@@ -1095,8 +1088,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 
 	<-startedWaiting
 	newSyncRoot := ids.GenerateTestID()
-	err = m.UpdateSyncTarget(newSyncRoot)
-	require.NoError(err)
+	require.NoError(m.UpdateSyncTarget(newSyncRoot))
 	<-gotSignalChan
 
 	require.Equal(newSyncRoot, m.config.TargetRoot)
