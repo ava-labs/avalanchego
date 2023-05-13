@@ -117,7 +117,7 @@ function test_require_nil {
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?=.*\n\t+require\.NoError\((t, )?err\)' .; then
+  if grep -R -zo -P '\t+err :?= (.|\n)*?(?:require\.NoError\((t, )?err\))' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
