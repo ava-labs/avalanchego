@@ -180,8 +180,10 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 
 	err = db.Put(key, value)
 	require.ErrorIs(err, ErrClosed)
+
 	err = db.Delete(key)
 	require.ErrorIs(err, ErrClosed)
+
 	err = db.Close()
 	require.ErrorIs(err, ErrClosed)
 }
