@@ -1898,7 +1898,6 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
@@ -1939,7 +1938,6 @@ func TestCreateFixedCapAsset(t *testing.T) {
 }
 
 func TestCreateVariableCapAsset(t *testing.T) {
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
@@ -2034,7 +2032,6 @@ func TestCreateVariableCapAsset(t *testing.T) {
 }
 
 func TestNFTWorkflow(t *testing.T) {
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
@@ -2259,7 +2256,6 @@ func TestSend(t *testing.T) {
 }
 
 func TestSendMultiple(t *testing.T) {
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
@@ -2345,7 +2341,6 @@ func TestCreateAndListAddresses(t *testing.T) {
 }
 
 func TestImport(t *testing.T) {
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
