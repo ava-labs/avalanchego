@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -432,15 +433,18 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
-	h.ctx.Log.Debug("forwarding sync message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-	)
-	h.ctx.Log.Verbo("forwarding sync message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-		zap.Any("message", body),
-	)
+	if h.ctx.Log.Enabled(logging.Verbo) {
+		h.ctx.Log.Verbo("forwarding sync message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Any("message", body),
+		)
+	} else {
+		h.ctx.Log.Debug("forwarding sync message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+		)
+	}
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
