@@ -52,20 +52,18 @@ func init() {
 }
 
 func TestFxInitialize(t *testing.T) {
-	require := require.New(t)
 	vm := TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},
 	}
 	fx := Fx{}
-	require.NoError(fx.Initialize(&vm))
+	require.NoError(t, fx.Initialize(&vm))
 }
 
 func TestFxInitializeInvalid(t *testing.T) {
-	require := require.New(t)
 	fx := Fx{}
 	err := fx.Initialize(nil)
-	require.ErrorIs(err, ErrWrongVMType)
+	require.ErrorIs(t, err, ErrWrongVMType)
 }
 
 func TestFxVerifyTransfer(t *testing.T) {

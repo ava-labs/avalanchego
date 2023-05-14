@@ -23,13 +23,13 @@ const (
 )
 
 var (
-	ErrUnknownVersion = errors.New("unknown codec version")
+	ErrUnknownVersion    = errors.New("unknown codec version")
+	ErrCantUnpackVersion = errors.New("couldn't unpack codec version")
 
 	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil      = errors.New("can't unmarshal nil")
 	errUnmarshalTooBig   = errors.New("byte array exceeds maximum length")
 	errCantPackVersion   = errors.New("couldn't pack codec version")
-	errCantUnpackVersion = errors.New("couldn't unpack codec version")
 	errDuplicatedVersion = errors.New("duplicated codec version")
 )
 
@@ -147,7 +147,7 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 	}
 	version := p.UnpackShort()
 	if p.Errored() { // Make sure the codec version is correct
-		return 0, errCantUnpackVersion
+		return 0, ErrCantUnpackVersion
 	}
 
 	m.lock.RLock()

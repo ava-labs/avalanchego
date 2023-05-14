@@ -43,8 +43,7 @@ func TestSet(t *testing.T) {
 	require.Equal("", idsArg)
 	ipsArg := s.IPsArg()
 	require.Equal("", ipsArg)
-	len := s.Len()
-	require.Zero(len)
+	require.Zero(s.Len())
 
 	require.NoError(s.Add(b0))
 
@@ -52,8 +51,7 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:0", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
+	require.Equal(1, s.Len())
 
 	err := s.Add(b0)
 	require.ErrorIs(err, errDuplicateID)
@@ -62,8 +60,7 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:0", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
+	require.Equal(1, s.Len())
 
 	require.NoError(s.Add(b1))
 
@@ -71,8 +68,7 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:0,0.0.0.0:1", ipsArg)
-	len = s.Len()
-	require.Equal(2, len)
+	require.Equal(2, s.Len())
 
 	require.NoError(s.Add(b2))
 
@@ -80,8 +76,7 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt,NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:0,0.0.0.0:1,0.0.0.0:2", ipsArg)
-	len = s.Len()
-	require.Equal(3, len)
+	require.Equal(3, s.Len())
 
 	require.NoError(s.RemoveByID(b0.ID()))
 
@@ -89,8 +84,7 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:2,0.0.0.0:1", ipsArg)
-	len = s.Len()
-	require.Equal(2, len)
+	require.Equal(2, s.Len())
 
 	require.NoError(s.RemoveByIP(b1.IP()))
 
@@ -98,6 +92,5 @@ func TestSet(t *testing.T) {
 	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)
 	ipsArg = s.IPsArg()
 	require.Equal("0.0.0.0:2", ipsArg)
-	len = s.Len()
-	require.Equal(1, len)
+	require.Equal(1, s.Len())
 }

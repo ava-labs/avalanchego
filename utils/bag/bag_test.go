@@ -146,6 +146,8 @@ func TestBagSplit(t *testing.T) {
 }
 
 func TestBagString(t *testing.T) {
+	require := require.New(t)
+
 	elt0 := 123
 
 	bag := Bag[int]{}
@@ -155,7 +157,7 @@ func TestBagString(t *testing.T) {
 	expected := "Bag: (Size = 1337)\n" +
 		"    123: 1337"
 
-	require.Equal(t, expected, bag.String())
+	require.Equal(expected, bag.String())
 }
 
 func TestBagRemove(t *testing.T) {

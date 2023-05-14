@@ -245,9 +245,10 @@ func TestFilterValidators(t *testing.T) {
 
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedVdrs, vdrs)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedVdrs, vdrs)
 		})
 	}
 }
@@ -299,9 +300,10 @@ func TestSumWeight(t *testing.T) {
 
 			sum, err := SumWeight(tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedSum, sum)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedSum, sum)
 		})
 	}
 }

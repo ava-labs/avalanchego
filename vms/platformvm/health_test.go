@@ -20,14 +20,14 @@ const defaultMinConnectedStake = 0.8
 func TestHealthCheckPrimaryNetwork(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
-	genesisState, _ := defaultGenesis()
+	genesisState, _ := defaultGenesis(t)
 	for index, validator := range genesisState.Validators {
 		require.NoError(vm.Connected(context.Background(), validator.NodeID, version.CurrentApp))
 		details, err := vm.HealthCheck(context.Background())
@@ -58,7 +58,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _ := defaultVM(t)
 			vm.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))
@@ -77,7 +77,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			require.True(ok)
 
 			// connect to all primary network validators first
-			genesisState, _ := defaultGenesis()
+			genesisState, _ := defaultGenesis(t)
 			for _, validator := range genesisState.Validators {
 				require.NoError(vm.Connected(context.Background(), validator.NodeID, version.CurrentApp))
 			}
