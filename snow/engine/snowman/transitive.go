@@ -128,17 +128,20 @@ func newTransitive(config Config) (*Transitive, error) {
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Error(err),
-		)
-		t.Ctx.Log.Verbo("failed to parse block",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Binary("block", blkBytes),
-			zap.Error(err),
-		)
+		if t.Ctx.Log.Enabled(logging.Verbo) {
+			t.Ctx.Log.Verbo("failed to parse block",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Binary("block", blkBytes),
+				zap.Error(err),
+			)
+		} else {
+			t.Ctx.Log.Debug("failed to parse block",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
+		}
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
