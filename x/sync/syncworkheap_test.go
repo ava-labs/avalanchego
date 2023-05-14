@@ -78,11 +78,8 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	item1.workItem.priority = lowPriority
 	require.True(h.Less(0, 1))
 
-	gotItem = h.Pop().(*heapItem)
-	require.Equal(item1, gotItem)
-
-	gotItem = h.Pop().(*heapItem)
-	require.Equal(item2, gotItem)
+	require.Equal(item1, h.Pop().(*heapItem))
+	require.Equal(item2, h.Pop().(*heapItem))
 
 	require.Zero(h.Len())
 	require.Empty(h.priorityHeap)
@@ -128,14 +125,10 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	require.Equal([]*syncWorkItem{item1, item2, item3}, got)
 
 	// Ensure priorities are in right order.
-	gotItem := h.GetWork()
-	require.Equal(item3, gotItem)
-	gotItem = h.GetWork()
-	require.Equal(item2, gotItem)
-	gotItem = h.GetWork()
-	require.Equal(item1, gotItem)
-	gotItem = h.GetWork()
-	require.Nil(gotItem)
+	require.Equal(item3, h.GetWork())
+	require.Equal(item2, h.GetWork())
+	require.Equal(item1, h.GetWork())
+	require.Nil(h.GetWork())
 
 	require.Zero(h.Len())
 }

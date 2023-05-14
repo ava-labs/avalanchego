@@ -523,11 +523,10 @@ func TestGetChangeProof(t *testing.T) {
 			require := require.New(t)
 
 			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}

@@ -115,11 +115,10 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			).AnyTimes()
 			handler := NewNetworkServer(sender, smallTrieDB, logging.NoLog{})
 			err := handler.HandleRangeProofRequest(context.Background(), test.nodeID, 0, test.request)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.proofNil {
 				require.Nil(proofResult)
 				return
@@ -262,11 +261,10 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			).AnyTimes()
 			handler := NewNetworkServer(sender, trieDB, logging.NoLog{})
 			err := handler.HandleChangeProofRequest(context.Background(), test.nodeID, 0, test.request)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.proofNil {
 				require.Nil(proofResult)
 				return
