@@ -57,6 +57,7 @@ func TestPublicKey_GetKey(t *testing.T) {
 		})
 	}
 }
+
 func TestPublicKey_GetBytes(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
