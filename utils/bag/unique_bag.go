@@ -93,10 +93,10 @@ func (b *UniqueBag[T]) Bag(threshold int) Bag[T] {
 	return bag
 }
 
-func (b *UniqueBag[_]) PrefixedString(prefix string) string {
+func (b *UniqueBag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("UniqueBag: (Size = %d)", len(*b)))
+	sb.WriteString(fmt.Sprintf("UniqueBag[%T]: (Size = %d)", *new(T), len(*b)))
 	for key, set := range *b {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %s", prefix, key, set))
 	}
