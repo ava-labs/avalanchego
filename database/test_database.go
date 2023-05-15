@@ -949,7 +949,7 @@ func TestClear(t *testing.T, db Database) {
 
 	count, err = Count(db)
 	require.NoError(err)
-	require.Equal(0, count)
+	require.Zero(count)
 
 	require.NoError(db.Close())
 }
