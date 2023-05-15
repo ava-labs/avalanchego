@@ -3,9 +3,7 @@
 
 package block
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 type Header interface {
 	ChainID() ids.ID

@@ -26,7 +26,7 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ Client = &mockClient{}
+var _ Client = (*mockClient)(nil)
 
 func newNoopTracer() trace.Tracer {
 	tracer, _ := trace.New(trace.Config{Enabled: false})
@@ -120,7 +120,7 @@ func Test_Completion(t *testing.T) {
 		err = syncer.Wait(context.Background())
 		require.NoError(t, err)
 		syncer.workLock.Lock()
-		require.Equal(t, 0, syncer.unprocessedWork.Len())
+		require.Zero(t, syncer.unprocessedWork.Len())
 		require.Equal(t, 1, syncer.processedWork.Len())
 		syncer.workLock.Unlock()
 	}
@@ -1100,7 +1100,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	<-gotSignalChan
 
 	require.Equal(newSyncRoot, m.config.TargetRoot)
-	require.Equal(0, m.processedWork.Len())
+	require.Zero(m.processedWork.Len())
 	require.Equal(1, m.unprocessedWork.Len())
 }
 
