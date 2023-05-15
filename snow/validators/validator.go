@@ -41,6 +41,8 @@ func NewPublicKey(key *bls.PublicKey) *PublicKey {
 	}
 }
 
+// NewPublicKeyFromBytes assumes that the caller is responsible for providing
+// a valid serialized key.
 func NewPublicKeyFromBytes(bytes []byte) *PublicKey {
 	return &PublicKey{
 		key:   nil,
@@ -58,6 +60,7 @@ type PublicKey struct {
 
 func (k *PublicKey) Key() (*bls.PublicKey, error) {
 	if k.key == nil {
+		// We blindly assume that the key is valid if it passes deserialization.
 		pk := new(bls.PublicKey).Deserialize(k.bytes)
 		if pk == nil {
 			return nil, errFailedPublicKeyDeserialize
