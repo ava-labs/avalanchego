@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -34,10 +33,7 @@ var (
 type Database struct {
 	db *pebble.DB
 
-	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
-	// in the config
-	metrics metrics
-	closed  utils.Atomic[bool]
+	closed utils.Atomic[bool]
 	// closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
@@ -111,46 +107,12 @@ func New(file string, cfg Config, log logging.Logger, namespace string, reg prom
 		closeCh: make(chan struct{}),
 	}
 
-	// if parsedConfig.MetricUpdateFrequency > 0 {
-	if true {
-		metrics, err := newMetrics(namespace, reg)
-		if err != nil {
-			// Drop any close error to report the original error
-			_ = db.Close()
-			return nil, err
-		}
-		wrappedDB.metrics = metrics
-		wrappedDB.closeWg.Add(1)
-		go func() {
-			// t := time.NewTicker(parsedConfig.MetricUpdateFrequency)
-			t := time.NewTicker(100)
-			defer func() {
-				t.Stop()
-				wrappedDB.closeWg.Done()
-			}()
-
-			for {
-				/*
-					if err := wrappedDB.updateMetrics(); err != nil {
-						log.Warn("failed to update leveldb metrics",
-							zap.Error(err),
-						)
-					}
-				*/
-				wrappedDB.updateMetrics()
-
-				select {
-				case <-t.C:
-				case <-wrappedDB.closeCh:
-					return
-				}
-			}
-		}()
-	}
+	// TODO: add metrics support
 	return wrappedDB, nil
 }
 
 func (db *Database) Close() error {
+	// close a db twice will trigger panic by pebble instead of error
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
@@ -210,6 +172,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	// persisted to the WAL before returning. Basic benchmarking indicates that
 	// waiting for the WAL to sync reduces performance by 20%.
 
+	// Put causes panic if the db has already been closed
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
@@ -218,15 +181,18 @@ func (db *Database) Put(key []byte, value []byte) error {
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
+	// Delete causes panic if the db has already been closed
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
+
 	return updateError(db.db.Delete(key, pebble.NoSync))
 }
 
 // If start and limit are the same based on the compare function in pebble
 // pebble returns error but we like to return nil
 func (db *Database) Compact(start []byte, limit []byte) error {
+	// Compact causes panic if the db has already been closed
 	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
 		return herr
 	}
@@ -288,7 +254,7 @@ func (b *batch) Write() error {
 	}
 
 	// Support BATCH_REWRITE
-	// the underline pebble db doesn't support batch rewrite got panic instead
+	// the underline pebble db doesn't support batch rewrite but got panic instead
 	// we have to create a new batch which is a kind of duplicate of the given
 	// batch(arg b) and commit this new batch on behalf of the given batch
 	if b.applied.Load() {
