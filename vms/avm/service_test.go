@@ -2748,10 +2748,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			reply := &api.GetBlockResponse{}
 			err := service.GetBlockByHeight(nil, args, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.encoding, reply.Encoding)
-				require.Equal(expected, reply.Block)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.encoding, reply.Encoding)
+			require.Equal(expected, reply.Block)
 		})
 	}
 }
