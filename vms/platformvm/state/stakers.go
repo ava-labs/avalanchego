@@ -130,16 +130,20 @@ type baseStakers struct {
 }
 
 type baseStaker struct {
-	validator *Staker // if deleted is nil
+	validator *Staker // if deleted, it is nil
 
-	// sortedDelegators ordered for iterations
-	sortedDelegators *btree.BTreeG[*Staker]
-
-	// delegators allows retrieving delegator
-	// to be updated by TxID. We cannot query delegators Tree
-	// for it since updated Stakers can have different NextTime
-	// (and Tree uses Staker.Less to identify a staker instead of Staker.TxID)
+	// delegators lists all non-deleted delegators by their TxID
+	// delegators has same content as sortedDelegators, but unlike sortedDelegators
+	// it allows querying delegators. Note that sortedDelegators identify stakers
+	// via Staker.Less function, so an updated delegator with different NextTime than
+	// its previous version would be treated by sortedDelegators as a different staker.
+	// delegators identify stakers by their TxID, so it allows correctly querying stakers.
 	delegators map[ids.ID]*Staker
+
+	// sortedDelegators ordered for iterations. sortedDelegators has same content
+	// as delegators, but must not be used for stakers queries. We update and sortedDelegators
+	// as soon as stakers are inserted/updated/deleted instead of building it up upon interation.
+	sortedDelegators *btree.BTreeG[*Staker]
 }
 
 func newBaseStakers() *baseStakers {
@@ -241,10 +245,10 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	if validator.sortedDelegators == nil {
 		validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
-	validator.sortedDelegators.ReplaceOrInsert(staker)
 	if validator.delegators == nil {
 		validator.delegators = make(map[ids.ID]*Staker)
 	}
+	validator.sortedDelegators.ReplaceOrInsert(staker)
 	validator.delegators[staker.TxID] = staker
 
 	v.stakers.ReplaceOrInsert(staker)
@@ -304,6 +308,7 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	if validator.sortedDelegators != nil {
 		validator.sortedDelegators.Delete(staker)
 	}
+	delete(validator.delegators, staker.TxID)
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
@@ -353,7 +358,7 @@ func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	if validator.validator != nil {
 		return
 	}
-	if validator.sortedDelegators != nil && validator.sortedDelegators.Len() > 0 {
+	if len(validator.delegators) > 0 {
 		return
 	}
 	delete(subnetValidators, nodeID)

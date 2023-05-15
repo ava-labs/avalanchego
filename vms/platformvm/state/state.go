@@ -919,15 +919,11 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 			return err
 		}
 
-		delegatorIterator := NewTreeIterator(validator.sortedDelegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
+		for _, delegator := range validator.delegators {
+			if err := vdrs.AddWeight(nodeID, delegator.Weight); err != nil {
 				return err
 			}
 		}
-		delegatorIterator.Release()
 	}
 	return nil
 }
@@ -1229,7 +1225,11 @@ func (s *state) loadCurrentValidators() error {
 			if validator.sortedDelegators == nil {
 				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
+			if validator.delegators == nil {
+				validator.delegators = make(map[ids.ID]*Staker)
+			}
 			validator.sortedDelegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1315,7 +1315,11 @@ func (s *state) loadPendingValidators() error {
 			if validator.sortedDelegators == nil {
 				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
+			if validator.delegators == nil {
+				validator.delegators = make(map[ids.ID]*Staker)
+			}
 			validator.sortedDelegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
