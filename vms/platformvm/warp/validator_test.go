@@ -326,7 +326,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		})
 	}
 
-	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
+	for _, size := range []int{10_000} {
 		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
 		for i := 0; i < size; i++ {
 			validator := getValidatorOutputs[i]

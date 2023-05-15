@@ -40,6 +40,7 @@ func NewPublicKey(key *bls.PublicKey) *PublicKey {
 		bytes: nil,
 	}
 }
+
 func NewPublicKeyFromBytes(bytes []byte) *PublicKey {
 	return &PublicKey{
 		key:   nil,
