@@ -21,7 +21,7 @@ func TestPublicKey_GetKey(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		Key      PublicKey
+		Key      *PublicKey
 		expected expected
 	}{
 		{
@@ -65,7 +65,7 @@ func TestPublicKey_GetBytes(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		key      PublicKey
+		key      *PublicKey
 		expected []byte
 	}{
 		{

@@ -69,7 +69,7 @@ func (c *Client) GetValidatorSet(
 		if err != nil {
 			return nil, err
 		}
-		var publicKey validators.PublicKey
+		var publicKey *validators.PublicKey
 		if len(validator.PublicKey) != 0 {
 			// As an optimization, we pre-populate the cached deserialized key
 			// since it was given to us off gRPC.
