@@ -30,6 +30,61 @@ var (
 	_ commands.Command = (*commitBottomStateCommand)(nil)
 )
 
+// func TestReproduceSimplifiedScenario(t *testing.T) {
+// 	require := require.New(t)
+// 	baseState, err := buildChainState(nil)
+// 	require.NoError(err)
+// 	sys := &sysUnderTest{
+// 		baseState:     baseState,
+// 		diffsMap:      map[ids.ID]Diff{},
+// 		sortedDiffIDs: []ids.ID{},
+// 	}
+
+// 	// 1. PutCurrentValidator
+// 	validator := &Staker{
+// 		SubnetID:  ids.GenerateTestID(),
+// 		NodeID:    ids.GenerateTestNodeID(),
+// 		TxID:      ids.GenerateTestID(),
+// 		Priority:  9,
+// 		StartTime: time.Unix(0, 0),
+// 		EndTime:   time.Unix(0, 0).Add(5466 * time.Hour),
+// 	}
+// 	topChainState := sys.getTopChainState()
+// 	topChainState.PutCurrentValidator(validator)
+
+// 	// 2. PutCurrentDelegator
+// 	delegator := &Staker{
+// 		SubnetID:  validator.SubnetID,
+// 		NodeID:    validator.NodeID,
+// 		TxID:      ids.GenerateTestID(),
+// 		Priority:  8,
+// 		StartTime: time.Unix(0, 0), // TODO: FIX
+// 		EndTime:   time.Unix(0, 0).Add(6657 * time.Hour),
+// 	}
+// 	require.NoError(addCurrentDelegatorInSystem(sys, delegator))
+
+// 	// 3. AddDiffAndUpdateCurrentDelegator
+// 	require.NoError(updateCurrentDelegatorInSystem(sys))
+
+// 	// 4. DeleteCurrentDelegator
+// 	_, err = deleteCurrentDelegator(sys)
+// 	require.NoError(err)
+
+// 	// 5. ApplyBottomDiffCommand
+// 	sys.flushBottomDiff()
+
+// 	// Check delegator is deleted
+// 	topDiff := sys.getTopChainState()
+// 	sysIt, err := topDiff.GetCurrentStakerIterator()
+// 	require.NoError(err)
+
+// 	for sysIt.Next() {
+// 		staker := sysIt.Value()
+// 		require.True(staker.TxID != delegator.TxID)
+// 	}
+// 	sysIt.Release()
+// }
+
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
 // system made of a stack of Diffs built on top of a State conforms to
 // our stakersStorageModel. It achieves this by:
@@ -222,7 +277,7 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 
 func (v *putCurrentValidatorCommand) String() string {
 	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime, v.EndTime.Sub(v.StartTime))
 }
 
 var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
@@ -554,8 +609,8 @@ func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res co
 }
 
 func (v *putCurrentDelegatorCommand) String() string {
-	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime.Unix(), v.EndTime.Sub(v.StartTime))
+	return fmt.Sprintf("PutCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime, v.EndTime.Sub(v.StartTime))
 }
 
 var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
@@ -682,13 +737,21 @@ var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 type deleteCurrentDelegatorCommand struct{}
 
 func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	// delete first validator, if any
 	sys := sut.(*sysUnderTest)
+	_, err := deleteCurrentDelegator(sys)
+	if err != nil {
+		panic(err)
+	}
+	return sys // returns sys to allow comparison with state in PostCondition
+}
+
+func deleteCurrentDelegator(sys *sysUnderTest) (bool, error) {
+	// delete first validator, if any
 	topDiff := sys.getTopChainState()
 
 	stakerIt, err := topDiff.GetCurrentStakerIterator()
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 	var (
 		found     = false
@@ -702,12 +765,12 @@ func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 		}
 	}
 	if !found {
-		return sys // no current validator to delete
+		return false, nil // no current validator to delete
 	}
 	stakerIt.Release()
 
 	topDiff.DeleteCurrentDelegator(delegator)
-	return sys // returns sys to allow comparison with state in PostCondition
+	return true, nil
 }
 
 func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
