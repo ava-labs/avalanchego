@@ -919,7 +919,7 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 			return err
 		}
 
-		delegatorIterator := NewTreeIterator(validator.delegators)
+		delegatorIterator := NewTreeIterator(validator.sortedDelegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
 			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
@@ -1226,10 +1226,10 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1312,10 +1312,10 @@ func (s *state) loadPendingValidators() error {
 			}
 
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}

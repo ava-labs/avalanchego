@@ -132,14 +132,14 @@ type baseStakers struct {
 type baseStaker struct {
 	validator *Staker // if deleted is nil
 
-	// delegators ordered for iterations
-	delegators *btree.BTreeG[*Staker]
+	// sortedDelegators ordered for iterations
+	sortedDelegators *btree.BTreeG[*Staker]
 
-	// delegatorsByTxID allows retrieving delegator
+	// delegators allows retrieving delegator
 	// to be updated by TxID. We cannot query delegators Tree
 	// for it since updated Stakers can have different NextTime
 	// (and Tree uses Staker.Less to identify a staker instead of Staker.TxID)
-	delegatorsByTxID map[ids.ID]*Staker
+	delegators map[ids.ID]*Staker
 }
 
 func newBaseStakers() *baseStakers {
@@ -207,8 +207,7 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	)
 	validator, found := v.getValidator(subnetID, nodeID)
 	if !found {
-		// attempt deleting an non-existing staker
-		// TODO ABENEGIA: consider err-ing
+		// deleting an non-existing staker. Nothing to do.
 		return
 	}
 	storedStaker := validator.validator
@@ -232,21 +231,21 @@ func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) S
 	if !found {
 		return EmptyIterator
 	}
-	return NewTreeIterator(validator.delegators)
+	return NewTreeIterator(validator.sortedDelegators)
 }
 
 func (v *baseStakers) PutDelegator(staker *Staker) {
 	// Note: a delegator may be inserted before its validator
 	// hence we use v.getOrCreateValidator instead of v.getValidator
 	validator := v.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+	if validator.sortedDelegators == nil {
+		validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+	}
+	validator.sortedDelegators.ReplaceOrInsert(staker)
 	if validator.delegators == nil {
-		validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+		validator.delegators = make(map[ids.ID]*Staker)
 	}
-	validator.delegators.ReplaceOrInsert(staker)
-	if validator.delegatorsByTxID == nil {
-		validator.delegatorsByTxID = make(map[ids.ID]*Staker)
-	}
-	validator.delegatorsByTxID[staker.TxID] = staker
+	validator.delegators[staker.TxID] = staker
 
 	v.stakers.ReplaceOrInsert(staker)
 
@@ -266,7 +265,7 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 			staker.NodeID,
 		)
 	}
-	prevDelegator, found := validator.delegatorsByTxID[staker.TxID]
+	prevDelegator, found := validator.delegators[staker.TxID]
 	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v, txID %v",
 			ErrUpdatingUnknownStaker,
@@ -275,9 +274,9 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 			staker.TxID,
 		)
 	}
-	validator.delegators.Delete(prevDelegator)
-	validator.delegators.ReplaceOrInsert(staker)
-	validator.delegatorsByTxID[staker.TxID] = staker
+	validator.sortedDelegators.Delete(prevDelegator)
+	validator.sortedDelegators.ReplaceOrInsert(staker)
+	validator.delegators[staker.TxID] = staker
 
 	v.stakers.Delete(prevDelegator)
 	v.stakers.ReplaceOrInsert(staker)
@@ -299,12 +298,11 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
 	if !found {
-		// attempt deleting an non-existing staker
-		// TODO ABENEGIA: consider err-ing
+		// deleting an non-existing staker. Nothing to do.
 		return
 	}
-	if validator.delegators != nil {
-		validator.delegators.Delete(staker)
+	if validator.sortedDelegators != nil {
+		validator.sortedDelegators.Delete(staker)
 	}
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
@@ -355,7 +353,7 @@ func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 	if validator.validator != nil {
 		return
 	}
-	if validator.delegators != nil && validator.delegators.Len() > 0 {
+	if validator.sortedDelegators != nil && validator.sortedDelegators.Len() > 0 {
 		return
 	}
 	delete(subnetValidators, nodeID)
