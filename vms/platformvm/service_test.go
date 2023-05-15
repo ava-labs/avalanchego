@@ -807,7 +807,6 @@ func TestGetBlock(t *testing.T) {
 }
 
 func TestServiceGetBlockByHeight(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -816,7 +815,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 	type test struct {
 		name                        string
-		serviceAndExpectedBlockFunc func(ctrl *gomock.Controller) (*Service, interface{})
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
 		encoding                    formatting.Encoding
 		expectedErr                 error
 	}
@@ -824,7 +823,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "block height not found",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetBlockID(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
@@ -844,7 +843,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
@@ -865,7 +864,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 
@@ -889,7 +888,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hex format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -898,7 +897,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := blockexecutor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -917,7 +916,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -926,7 +925,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := blockexecutor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -945,7 +944,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -954,7 +953,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := blockexecutor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -975,7 +974,9 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service, expected := tt.serviceAndExpectedBlockFunc(ctrl)
+			require := require.New(t)
+
+			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
 
 			args := &api.GetBlockByHeightArgs{
 				Height:   json.Uint64(blockHeight),
@@ -984,10 +985,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			reply := &api.GetBlockResponse{}
 			err := service.GetBlockByHeight(nil, args, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.encoding, reply.Encoding)
-				require.Equal(expected, reply.Block)
+			if tt.expectedErr == nil {
+				return
 			}
+			require.Equal(tt.encoding, reply.Encoding)
+			require.Equal(expected, reply.Block)
 		})
 	}
 }
