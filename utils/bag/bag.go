@@ -154,10 +154,10 @@ func (b *Bag[T]) Remove(elt T) {
 	b.size -= count
 }
 
-func (b *Bag[_]) PrefixedString(prefix string) string {
+func (b *Bag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
+	sb.WriteString(fmt.Sprintf("Bag[%T]: (Size = %d)", *new(T), b.Len()))
 	for elt, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %d", prefix, elt, count))
 	}
