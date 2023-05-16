@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // preDelegateeRewardSize is the size of codec marshalling
@@ -22,7 +21,9 @@ import (
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
 const (
-	preDelegateeRewardSize   = wrappers.ShortLen + 3*wrappers.LongLen
+	preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
+
+	v0tag                    = "v0"
 	validatorMetadataCodecV0 = uint16(0)
 )
 
@@ -33,7 +34,7 @@ var (
 )
 
 func init() {
-	c := linearcodec.NewDefault()
+	c := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
 	validatorMetadataCodec = codec.NewManager(math.MaxInt32)
 
 	err := validatorMetadataCodec.RegisterCodec(validatorMetadataCodecV0, c)
@@ -43,16 +44,16 @@ func init() {
 }
 
 type preDelegateeRewardMetadata struct {
-	UpDuration      time.Duration `serialize:"true"`
-	LastUpdated     uint64        `serialize:"true"` // Unix time in seconds
-	PotentialReward uint64        `serialize:"true"`
+	UpDuration      time.Duration `v0:"true"`
+	LastUpdated     uint64        `v0:"true"` // Unix time in seconds
+	PotentialReward uint64        `v0:"true"`
 }
 
 type validatorMetadata struct {
-	UpDuration               time.Duration `serialize:"true"`
-	LastUpdated              uint64        `serialize:"true"` // Unix time in seconds
-	PotentialReward          uint64        `serialize:"true"`
-	PotentialDelegateeReward uint64        `serialize:"true"`
+	UpDuration               time.Duration `v0:"true"`
+	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
+	PotentialReward          uint64        `v0:"true"`
+	PotentialDelegateeReward uint64        `v0:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -259,7 +260,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := validatorMetadataCodec.Marshal(txs.Version, metadata)
+			metadataBytes, err := validatorMetadataCodec.Marshal(validatorMetadataCodecV0, metadata)
 			if err != nil {
 				return err
 			}
