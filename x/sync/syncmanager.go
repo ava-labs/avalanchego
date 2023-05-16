@@ -155,8 +155,8 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 	return nil
 }
 
-// sync awaits signal on [m.unprocessedWorkCond] which indicates that there
-// is work to do, or syncing completes.  If there is work, sync will dispatch a goroutine to do
+// sync awaits signal on [m.unprocessedWorkCond], which indicates that there
+// is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
 func (m *StateSyncManager) sync(ctx context.Context) {
 	defer func() {
