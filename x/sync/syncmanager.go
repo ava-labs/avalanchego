@@ -160,11 +160,9 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 // the work.
 func (m *StateSyncManager) sync(ctx context.Context) {
 	defer func() {
-		// Note we release [m.workLock] before calling Close()
-		// because Close() will acquire [m.workLock].
 		// Invariant: [m.workLock] is held when this goroutine begins.
+		m.close()
 		m.workLock.Unlock()
-		m.Close()
 	}()
 
 	// Keep doing work until we're closed, done or [ctx] is canceled.
@@ -203,12 +201,17 @@ func (m *StateSyncManager) sync(ctx context.Context) {
 	}
 }
 
-// Called when there is a fatal error or sync is complete.
+// Close will stop the syncing process
 func (m *StateSyncManager) Close() {
-	m.closeOnce.Do(func() {
-		m.workLock.Lock()
-		defer m.workLock.Unlock()
+	m.workLock.Lock()
+	defer m.workLock.Unlock()
+	m.close()
+}
 
+// close is called when there is a fatal error or sync is complete.
+// [workLock] must be held
+func (m *StateSyncManager) close() {
+	m.closeOnce.Do(func() {
 		// Don't process any more work items.
 		// Drop currently processing work items.
 		if m.cancelCtx != nil {
