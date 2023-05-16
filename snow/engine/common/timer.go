@@ -3,9 +3,7 @@
 
 package common
 
-import (
-	"time"
-)
+import "time"
 
 // Timer describes the standard interface for specifying a timeout
 type Timer interface {

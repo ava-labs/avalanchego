@@ -3,9 +3,7 @@
 
 package message
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 var _ Message = (*Tx)(nil)
 
