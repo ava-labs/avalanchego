@@ -81,10 +81,10 @@ const (
 	testNetworkID        = 10 // To be used in tests
 	defaultWeight uint64 = 10000
 
-	ApricotFork           activeFork = 0
-	BanffFork             activeFork = 1
-	CortinaFork           activeFork = 2
-	ContinuousStakingFork activeFork = 3
+	apricotFork           activeFork = 0
+	banffFork             activeFork = 1
+	cortinaFork           activeFork = 2
+	continuousStakingFork activeFork = 3
 )
 
 var (
@@ -330,20 +330,22 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	var (
+		apricotPhase3Time     = defaultValidateEndTime
+		apricotPhase5Time     = defaultValidateEndTime
 		banffTime             = mockable.MaxTime
 		cortinaTime           = mockable.MaxTime
 		continuousStakingTime = mockable.MaxTime
 	)
 
 	switch fork {
-	case ApricotFork:
+	case apricotFork:
 		// nothing todo
-	case BanffFork:
+	case banffFork:
 		banffTime = latestForkTime
-	case CortinaFork:
+	case cortinaFork:
 		banffTime = latestForkTime
 		cortinaTime = latestForkTime
-	case ContinuousStakingFork:
+	case continuousStakingFork:
 		banffTime = latestForkTime
 		cortinaTime = latestForkTime
 		continuousStakingTime = latestForkTime
@@ -366,8 +368,8 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		ApricotPhase3Time:      defaultValidateEndTime,
-		ApricotPhase5Time:      defaultValidateEndTime,
+		ApricotPhase3Time:      apricotPhase3Time,
+		ApricotPhase5Time:      apricotPhase5Time,
 		BanffTime:              banffTime,
 		CortinaTime:            cortinaTime,
 		ContinuousStakingTime:  continuousStakingTime,
@@ -535,7 +537,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -598,7 +600,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -645,7 +647,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -700,7 +702,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -741,7 +743,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -776,7 +778,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -820,7 +822,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -863,7 +865,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -958,7 +960,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1049,7 +1051,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1141,7 +1143,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1155,7 +1157,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1210,7 +1212,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1307,7 +1309,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM(ContinuousStakingFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1400,7 +1402,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -2055,7 +2057,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(ContinuousStakingFork)
+	vm, _, _ := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
@@ -2837,7 +2839,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {

@@ -63,10 +63,10 @@ const (
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 
-	ApricotFork           activeFork = 0
-	BanffFork             activeFork = 1
-	CortinaFork           activeFork = 2
-	ContinuousStakingFork activeFork = 3
+	apricotFork           activeFork = 0
+	banffFork             activeFork = 1
+	cortinaFork           activeFork = 2
+	continuousStakingFork activeFork = 3
 )
 
 var (
@@ -119,7 +119,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
-		clk:            defaultClock(fork != ApricotFork),
+		clk:            defaultClock(fork != apricotFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -311,23 +311,25 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
+		apricotPhase3Time     = defaultValidateEndTime
+		apricotPhase5Time     = defaultValidateEndTime
 		banffTime             = mockable.MaxTime
 		cortinaTime           = mockable.MaxTime
 		continuousStakingTime = mockable.MaxTime
 	)
 
 	switch fork {
-	case ApricotFork:
+	case apricotFork:
 		// nothing todo
-	case BanffFork:
-		banffTime = time.Time{}
-	case CortinaFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
-	case ContinuousStakingFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
-		continuousStakingTime = time.Time{}
+	case banffFork:
+		banffTime = defaultValidateEndTime
+	case cortinaFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+	case continuousStakingFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+		continuousStakingTime = defaultValidateEndTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -353,8 +355,8 @@ func defaultConfig(fork activeFork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     defaultValidateEndTime,
-		ApricotPhase5Time:     defaultValidateEndTime,
+		ApricotPhase3Time:     apricotPhase3Time,
+		ApricotPhase5Time:     apricotPhase5Time,
 		BanffTime:             banffTime,
 		CortinaTime:           cortinaTime,
 		ContinuousStakingTime: continuousStakingTime,
