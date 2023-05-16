@@ -85,7 +85,7 @@ function test_require_len_zero {
 }
 
 function test_require_equal_len {
-  if grep -R -o -P 'require\.Equal\(.*, len\(' .; then
+  if grep -R -o -P 'require\.Equal\((len\()|(.+? len\()' .; then
     echo ""
     echo "Use require.Len instead of require.Equal when testing for length."
     echo ""
