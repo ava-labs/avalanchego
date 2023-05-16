@@ -1059,6 +1059,8 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
+		// tx is guaranteed to be pre Continuous staking fork since these are genesis transactions.
+		// it's fine to use tx.StartTime
 		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
 		if err != nil {
 			return err
@@ -1096,8 +1098,8 @@ func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.loadMetadata(),
-		s.loadCurrentValidators(),
-		s.loadPendingValidators(),
+		s.loadCurrentStakers(),
+		s.loadPendingStakers(),
 		s.initValidatorSets(),
 	)
 	return errs.Err
@@ -1127,7 +1129,7 @@ func (s *state) loadMetadata() error {
 	return nil
 }
 
-func (s *state) loadCurrentValidators() error {
+func (s *state) loadCurrentStakers() error {
 	s.currentStakers = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
@@ -1158,7 +1160,14 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
+		startTime := time.Unix(metadata.StakerStartTime, 0)
+		if startTime == StakerZeroTime {
+			// pre Continuous staking fork, start time was not stored in metadata
+			// instead stakerTx.StartTime() was used
+			startTime = stakerTx.StartTime()
+		}
+
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1200,7 +1209,14 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
+		startTime := time.Unix(metadata.StakerStartTime, 0)
+		if startTime == StakerZeroTime {
+			// pre Continuous staking fork, start time was not stored in metadata
+			// instead stakerTx.StartTime() was used
+			startTime = stakerTx.StartTime()
+		}
+
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1230,8 +1246,8 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			potentialRewardBytes := delegatorIt.Value()
-			potentialReward, err := database.ParseUInt64(potentialRewardBytes)
+			metadata := &delegatorMetadata{}
+			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
 			}
@@ -1241,7 +1257,14 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), potentialReward)
+			startTime := time.Unix(metadata.StakerStartTime, 0)
+			if startTime == StakerZeroTime {
+				// pre Continuous staking fork, start time was not stored in metadata
+				// instead stakerTx.StartTime() was used
+				startTime = stakerTx.StartTime()
+			}
+
+			staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}
@@ -1267,7 +1290,7 @@ func (s *state) loadCurrentValidators() error {
 	return errs.Err
 }
 
-func (s *state) loadPendingValidators() error {
+func (s *state) loadPendingStakers() error {
 	s.pendingStakers = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
@@ -1638,9 +1661,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					LastUpdated:              uint64(staker.StartTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
+					StakerStartTime:          staker.StartTime.Unix(),
 				}
 
-				metadataBytes, err := validatorMetadataCodec.Marshal(validatorMetadataCodecV0, metadata)
+				// Let's start using V1 as soon as we deploy code. No need to
+				// wait till Continuous staking fork activation to do that.
+				metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -1765,7 +1791,17 @@ func writeCurrentDelegatorDiff(
 				return fmt.Errorf("failed to increase node weight diff: %w", err)
 			}
 
-			err = database.PutUInt64(currentDelegatorList, delegator.TxID[:], delegator.PotentialReward)
+			// Let's start using V1 as soon as we deploy code. No need to
+			// wait till Continuous staking fork activation to do that.
+			metadata := &delegatorMetadata{
+				PotentialReward: delegator.PotentialReward,
+				StakerStartTime: delegator.StartTime.Unix(),
+			}
+			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+			if err != nil {
+				return fmt.Errorf("failed marshalling delegators metadata: %w", err)
+			}
+			err = currentDelegatorList.Put(delegator.TxID[:], metadataBytes)
 			if err != nil {
 				return fmt.Errorf("failed to write current delegator to list: %w", err)
 			}

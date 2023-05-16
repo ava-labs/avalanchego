@@ -23,23 +23,30 @@ import (
 const (
 	preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
 
-	v0tag                    = "v0"
-	validatorMetadataCodecV0 = uint16(0)
+	v0tag                 = "v0"
+	stakerMetadataCodecV0 = uint16(0)
+	v1tag                 = "v1"
+	stakerMetadataCodecV1 = uint16(1)
 )
 
 var (
 	_ validatorState = (*metadata)(nil)
 
-	validatorMetadataCodec codec.Manager
+	stakersMetadataCodec codec.Manager
 )
 
 func init() {
-	c := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
-	validatorMetadataCodec = codec.NewManager(math.MaxInt32)
+	c0 := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
+	c1 := linearcodec.New([]string{v0tag, v1tag}, linearcodec.DefaultMaxSliceLength)
+	stakersMetadataCodec = codec.NewManager(math.MaxInt32)
 
-	err := validatorMetadataCodec.RegisterCodec(validatorMetadataCodecV0, c)
-	if err != nil {
-		panic(err)
+	errs := wrappers.Errs{}
+	errs.Add(
+		stakersMetadataCodec.RegisterCodec(stakerMetadataCodecV0, c0),
+		stakersMetadataCodec.RegisterCodec(stakerMetadataCodecV1, c1),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
 	}
 }
 
@@ -54,6 +61,7 @@ type validatorMetadata struct {
 	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
+	StakerStartTime          int64         `v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -80,7 +88,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		_, err := validatorMetadataCodec.Unmarshal(bytes, &tmp)
+		_, err := stakersMetadataCodec.Unmarshal(bytes, &tmp)
 		if err != nil {
 			return err
 		}
@@ -90,7 +98,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		_, err := validatorMetadataCodec.Unmarshal(bytes, metadata)
+		_, err := stakersMetadataCodec.Unmarshal(bytes, metadata)
 		if err != nil {
 			return err
 		}
@@ -260,7 +268,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := validatorMetadataCodec.Marshal(validatorMetadataCodecV0, metadata)
+			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV0, metadata)
 			if err != nil {
 				return err
 			}
