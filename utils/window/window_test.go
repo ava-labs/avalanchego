@@ -55,8 +55,7 @@ func TestAdd(t *testing.T) {
 
 			window.Add(test.newlyAdded)
 
-			expectedLen := len(test.window) + 1
-			require.Equal(t, expectedLen, window.Length())
+			require.Equal(t, len(test.window)+1, window.Length())
 			oldest, ok := window.Oldest()
 			require.Equal(t, test.expectedOldest, oldest)
 			require.True(t, ok)
