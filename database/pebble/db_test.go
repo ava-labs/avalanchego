@@ -18,10 +18,7 @@ func TestInterface(t *testing.T) {
 		folder := t.TempDir()
 		cfg := NewDefaultConfig()
 		db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
-		if err != nil {
-			t.Fatalf("pebble.New(%q, logging.NoLog{}) errored with %s", folder, err)
-		}
-
+		require.NoError(t, err)
 		defer db.Close()
 
 		test(t, db)
@@ -37,10 +34,7 @@ func FuzzInterface(f *testing.F) {
 		folder := f.TempDir()
 		cfg := NewDefaultConfig()
 		db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			require.NoError(f, err)
-		}
-
+		require.NoError(f, err)
 		defer db.Close()
 
 		test(f, db)
@@ -59,10 +53,7 @@ func BenchmarkInterface(b *testing.B) {
 			cfg := NewDefaultConfig()
 
 			db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
-			if err != nil {
-				b.Fatal(err)
-			}
-
+			require.NoError(b, err)
 			bench(b, db, "pebble", keys, values)
 
 			// The database may have been closed by the test, so we don't care if it

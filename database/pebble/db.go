@@ -1,4 +1,4 @@
-// Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pebble
@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,35 +31,33 @@ var (
 )
 
 type Database struct {
-	db *pebble.DB
-
+	db     *pebble.DB
 	closed utils.Atomic[bool]
-	// closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
 }
 
 type Config struct {
-	CacheSize                   int // B
-	BytesPerSync                int // B
-	WALBytesPerSync             int // B (0 disables)
+	CacheSize                   int // Byte
+	BytesPerSync                int // Byte
+	WALBytesPerSync             int // Byte (0 disables)
 	MemTableStopWritesThreshold int // num tables
-	MemTableSize                int // B
+	MemTableSize                int // Byte
 	MaxOpenFiles                int
 }
 
 func NewDefaultConfig() Config {
 	return Config{
-		CacheSize:                   1024 * 1024 * 1024,
-		BytesPerSync:                1024 * 1024,
-		WALBytesPerSync:             1024 * 1024,
+		CacheSize:                   units.GiB,
+		BytesPerSync:                units.MiB,
+		WALBytesPerSync:             units.MiB,
 		MemTableStopWritesThreshold: 8,
-		MemTableSize:                16 * 1024 * 1024,
-		MaxOpenFiles:                4_096,
+		MemTableSize:                16 * units.MiB,
+		MaxOpenFiles:                4 * units.KiB,
 	}
 }
 
-func New(file string, cfg Config, log logging.Logger, _ string, reg prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
 
 	opts := &pebble.Options{
@@ -95,31 +94,25 @@ func New(file string, cfg Config, log logging.Logger, _ string, reg prometheus.R
 	if err != nil {
 		return nil, err
 	}
-	// return &Database{db: db}, nil
 
-	wrappedDB := &Database{
+	return &Database{
 		db:      db,
 		closeCh: make(chan struct{}),
-	}
-
-	// TODO: add metrics support
-	return wrappedDB, nil
+	}, nil
 }
 
 func (db *Database) Close() error {
 	// close a db twice will trigger panic by pebble instead of error
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return herr
+	if db.closed.Get() {
+		return database.ErrClosed
 	}
 	db.closed.Set(true)
 
 	err := updateError(db.db.Close())
-	if err != nil {
-		if strings.Contains(err.Error(), "leaked iterator") {
-			// avalanche database support close db w/o error
-			// even if there is an iterator which is not released
-			return nil
-		}
+	if err != nil && strings.Contains(err.Error(), "leaked iterator") {
+		// avalanche database support close db w/o error
+		// even if there is an iterator which is not released
+		return nil
 	}
 	return err
 }
@@ -131,16 +124,17 @@ func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
 	return nil, nil
 }
 
-// Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return false, herr
+	if db.closed.Get() {
+		return false, database.ErrClosed
 	}
 
 	_, closer, err := db.db.Get(key)
 	if err == pebble.ErrNotFound {
 		return false, nil
-	} else if err != nil {
+	}
+
+	if err != nil {
 		return false, updateError(err)
 	}
 	return true, closer.Close()
@@ -148,8 +142,8 @@ func (db *Database) Has(key []byte) (bool, error) {
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return nil, herr
+	if db.closed.Get() {
+		return nil, database.ErrClosed
 	}
 
 	data, closer, err := db.db.Get(key)
@@ -163,22 +157,22 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
+	// Put causes panic if the db has already been closed
+	if db.closed.Get() {
+		return database.ErrClosed
+	}
+
 	// Use of [pebble.NoSync] here means we don't wait for the [Set] to be
 	// persisted to the WAL before returning. Basic benchmarking indicates that
 	// waiting for the WAL to sync reduces performance by 20%.
-
-	// Put causes panic if the db has already been closed
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return herr
-	}
 	return updateError(db.db.Set(key, value, pebble.NoSync))
 }
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
 	// Delete causes panic if the db has already been closed
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return herr
+	if db.closed.Get() {
+		return database.ErrClosed
 	}
 
 	return updateError(db.db.Delete(key, pebble.NoSync))
@@ -188,27 +182,26 @@ func (db *Database) Delete(key []byte) error {
 // pebble returns error but we like to return nil
 func (db *Database) Compact(start []byte, limit []byte) error {
 	// Compact causes panic if the db has already been closed
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
-		return herr
+	if db.closed.Get() {
+		return database.ErrClosed
 	}
 
 	err := updateError(db.db.Compact(start, limit, true))
-	if err != nil {
+	if err != nil && bytes.Equal(start, limit) {
 		// The default compare function of pebble is bytes.Compare.
 		// Use this default compare function since we don't setup
 		// the compare function when we create pebble db.
-		// It's imporssible to retrieve this default
+		// It's impossible to retrieve this default
 		// compare function from the pebble package since
 		// it's defined in internal.
 		// We use bytes.Equal instead of bytes.Compare
 		// because golangci_lint recommends
-		if bytes.Equal(start, limit) {
-			// Don't return error if it is caused
-			// by the same of start and limit
-			// Do nothing just ignore the error
-			// since there is no need to compact
-			err = nil
-		}
+
+		// Don't return error if it is caused
+		// by the same of start and limit
+		// Do nothing just ignore the error
+		// since there is no need to compact
+		err = nil
 	}
 	return err
 }
@@ -219,13 +212,18 @@ type batch struct {
 	db    *Database
 	size  int
 
-	// Support BATCH_REWRITE
+	// Support batch rewrite
 	applied atomic.Bool
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
 // the database when write is called
-func (db *Database) NewBatch() database.Batch { return &batch{db: db, batch: db.db.NewBatch()} }
+func (db *Database) NewBatch() database.Batch {
+	return &batch{
+		db:    db,
+		batch: db.db.NewBatch(),
+	}
+}
 
 // Put the value into the batch for later writing
 func (b *batch) Put(key, value []byte) error {
@@ -244,14 +242,15 @@ func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	if _, herr := b.db.HealthCheck(context.TODO()); herr != nil {
-		return herr
+	// write causes panic if the db has already been closed
+	if b.db.closed.Get() {
+		return database.ErrClosed
 	}
 
-	// Support BATCH_REWRITE
-	// the underline pebble db doesn't support batch rewrite but got panic instead
-	// we have to create a new batch which is a kind of duplicate of the given
-	// batch(arg b) and commit this new batch on behalf of the given batch
+	// Support batch rewrite
+	// The underlying pebble db doesn't support batch rewrites but panics instead
+	// We have to create a new batch which is a kind of duplicate of the given
+	// batch(arg b) and commit this new batch on behalf of the given batch.
 	if b.applied.Load() {
 		// the given batch b has already been committed
 		// Don't Commit it again, got panic otherwise
@@ -313,7 +312,7 @@ type iter struct {
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if db.closed.Get() {
 		return &iter{
 			db: db,
 		}
@@ -328,7 +327,7 @@ func (db *Database) NewIterator() database.Iterator {
 // NewIteratorWithStart creates a lexicographically ordered iterator over the
 // database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if db.closed.Get() {
 		return &iter{
 			db: db,
 		}
@@ -359,7 +358,7 @@ func bytesPrefix(prefix []byte) *pebble.IterOptions {
 // NewIteratorWithPrefix creates a lexicographically ordered iterator over the
 // database ignoring keys that do not start with the provided prefix
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if db.closed.Get() {
 		return &iter{
 			db: db,
 		}
@@ -378,7 +377,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 // Prefix should be some key contained within [start] or else the lower bound
 // of the iteration will be overwritten with [start].
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if db.closed.Get() {
 		return &iter{
 			db: db,
 		}
@@ -397,7 +396,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (it *iter) Next() bool {
 	// Short-circuit and set an error if the underlying database has been closed.
 	db := it.db
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if db.closed.Get() {
 		it.valid = false
 		it.err = database.ErrClosed
 		return false
@@ -436,8 +435,7 @@ func (it *iter) Value() []byte {
 }
 
 func (it *iter) Release() {
-	db := it.db
-	if _, herr := db.HealthCheck(context.TODO()); herr != nil {
+	if it.db.closed.Get() {
 		return
 	}
 
