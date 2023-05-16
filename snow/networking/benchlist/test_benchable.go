@@ -28,8 +28,7 @@ func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.NodeID) {
 	if b.BenchedF != nil {
 		b.BenchedF(chainID, validatorID)
 	} else if b.CantBenched && b.T != nil {
-		require := require.New(b.T)
-		require.FailNow("Unexpectedly called Benched")
+		require.FailNow(b.T, "Unexpectedly called Benched")
 	}
 }
 
@@ -37,7 +36,6 @@ func (b *TestBenchable) Unbenched(chainID ids.ID, validatorID ids.NodeID) {
 	if b.UnbenchedF != nil {
 		b.UnbenchedF(chainID, validatorID)
 	} else if b.CantUnbenched && b.T != nil {
-		require := require.New(b.T)
-		require.FailNow("Unexpectedly called Unbenched")
+		require.FailNow(b.T, "Unexpectedly called Unbenched")
 	}
 }

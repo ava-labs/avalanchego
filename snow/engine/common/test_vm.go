@@ -110,8 +110,7 @@ func (vm *TestVM) Initialize(
 		)
 	}
 	if vm.CantInitialize && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errInitialize.Error())
+		require.FailNow(vm.T, errInitialize.Error())
 	}
 	return errInitialize
 }
@@ -122,8 +121,7 @@ func (vm *TestVM) SetState(ctx context.Context, state snow.State) error {
 	}
 	if vm.CantSetState {
 		if vm.T != nil {
-			require := require.New(vm.T)
-			require.FailNow(errSetState.Error())
+			require.FailNow(vm.T, errSetState.Error())
 		}
 		return errSetState
 	}
@@ -136,8 +134,7 @@ func (vm *TestVM) Shutdown(ctx context.Context) error {
 	}
 	if vm.CantShutdown {
 		if vm.T != nil {
-			require := require.New(vm.T)
-			require.FailNow(errShutdown.Error())
+			require.FailNow(vm.T, errShutdown.Error())
 		}
 		return errShutdown
 	}
@@ -149,8 +146,7 @@ func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, 
 		return vm.CreateHandlersF(ctx)
 	}
 	if vm.CantCreateHandlers && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCreateHandlers.Error())
+		require.FailNow(vm.T, errCreateHandlers.Error())
 	}
 	return nil, nil
 }
@@ -160,8 +156,7 @@ func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]*HTTPHan
 		return vm.CreateStaticHandlersF(ctx)
 	}
 	if vm.CantCreateStaticHandlers && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCreateStaticHandlers.Error())
+		require.FailNow(vm.T, errCreateStaticHandlers.Error())
 	}
 	return nil, nil
 }
@@ -171,8 +166,7 @@ func (vm *TestVM) HealthCheck(ctx context.Context) (interface{}, error) {
 		return vm.HealthCheckF(ctx)
 	}
 	if vm.CantHealthCheck && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errHealthCheck.Error())
+		require.FailNow(vm.T, errHealthCheck.Error())
 	}
 	return nil, errHealthCheck
 }
@@ -185,8 +179,7 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errAppRequest.Error())
+		require.FailNow(vm.T, errAppRequest.Error())
 	}
 	return errAppRequest
 }
@@ -199,8 +192,7 @@ func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errAppRequestFailed.Error())
+		require.FailNow(vm.T, errAppRequestFailed.Error())
 	}
 	return errAppRequestFailed
 }
@@ -213,8 +205,7 @@ func (vm *TestVM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errAppResponse.Error())
+		require.FailNow(vm.T, errAppResponse.Error())
 	}
 	return errAppResponse
 }
@@ -227,8 +218,7 @@ func (vm *TestVM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) 
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errAppGossip.Error())
+		require.FailNow(vm.T, errAppGossip.Error())
 	}
 	return errAppGossip
 }
@@ -241,8 +231,7 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCrossChainAppRequest.Error())
+		require.FailNow(vm.T, errCrossChainAppRequest.Error())
 	}
 	return errCrossChainAppRequest
 }
@@ -255,8 +244,7 @@ func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCrossChainAppRequestFailed.Error())
+		require.FailNow(vm.T, errCrossChainAppRequestFailed.Error())
 	}
 	return errCrossChainAppRequestFailed
 }
@@ -269,8 +257,7 @@ func (vm *TestVM) CrossChainAppResponse(ctx context.Context, chainID ids.ID, req
 		return nil
 	}
 	if vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCrossChainAppResponse.Error())
+		require.FailNow(vm.T, errCrossChainAppResponse.Error())
 	}
 	return errCrossChainAppResponse
 }
@@ -280,8 +267,7 @@ func (vm *TestVM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *ver
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
 	if vm.CantConnected && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errConnected.Error())
+		require.FailNow(vm.T, errConnected.Error())
 	}
 	return nil
 }
@@ -291,8 +277,7 @@ func (vm *TestVM) Disconnected(ctx context.Context, id ids.NodeID) error {
 		return vm.DisconnectedF(ctx, id)
 	}
 	if vm.CantDisconnected && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errDisconnected.Error())
+		require.FailNow(vm.T, errDisconnected.Error())
 	}
 	return nil
 }
@@ -302,8 +287,7 @@ func (vm *TestVM) Version(ctx context.Context) (string, error) {
 		return vm.VersionF(ctx)
 	}
 	if vm.CantVersion && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errVersion.Error())
+		require.FailNow(vm.T, errVersion.Error())
 	}
 	return "", nil
 }

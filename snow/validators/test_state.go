@@ -41,8 +41,7 @@ func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return vm.GetMinimumHeightF(ctx)
 	}
 	if vm.CantGetMinimumHeight && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errMinimumHeight.Error())
+		require.FailNow(vm.T, errMinimumHeight.Error())
 	}
 	return 0, errMinimumHeight
 }
@@ -52,8 +51,7 @@ func (vm *TestState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return vm.GetCurrentHeightF(ctx)
 	}
 	if vm.CantGetCurrentHeight && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errCurrentHeight.Error())
+		require.FailNow(vm.T, errCurrentHeight.Error())
 	}
 	return 0, errCurrentHeight
 }
@@ -63,8 +61,7 @@ func (vm *TestState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, e
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
 	if vm.CantGetSubnetID && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errSubnetID.Error())
+		require.FailNow(vm.T, errSubnetID.Error())
 	}
 	return ids.Empty, errSubnetID
 }
@@ -78,8 +75,7 @@ func (vm *TestState) GetValidatorSet(
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.CantGetValidatorSet && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errGetValidatorSet.Error())
+		require.FailNow(vm.T, errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
 }

@@ -40,8 +40,7 @@ func (s *TestStorage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Verte
 		return s.GetVtxF(ctx, vtxID)
 	}
 	if s.CantGetVtx && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow(errGet.Error())
+		require.FailNow(s.T, errGet.Error())
 	}
 	return nil, errGet
 }
@@ -51,8 +50,7 @@ func (s *TestStorage) Edge(ctx context.Context) []ids.ID {
 		return s.EdgeF(ctx)
 	}
 	if s.CantEdge && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow(errEdge.Error())
+		require.FailNow(s.T, errEdge.Error())
 	}
 	return nil
 }
@@ -62,8 +60,7 @@ func (s *TestStorage) StopVertexAccepted(ctx context.Context) (bool, error) {
 		return s.StopVertexAcceptedF(ctx)
 	}
 	if s.CantStopVertexAccepted && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow(errStopVertexAccepted.Error())
+		require.FailNow(s.T, errStopVertexAccepted.Error())
 	}
 	return false, nil
 }
