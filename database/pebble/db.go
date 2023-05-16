@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -37,10 +36,6 @@ type Database struct {
 	// closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
-	// closeWg is used to wait for all goroutines created by New() to exit.
-	// This avoids racy behavior when Close() is called at the same time as
-	// Stats(). See: https://github.com/syndtr/goleveldb/issues/418
-	closeWg sync.WaitGroup
 }
 
 type Config struct {
@@ -63,7 +58,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-func New(file string, cfg Config, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, _ string, reg prometheus.Registerer) (database.Database, error) {
 	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
 
 	opts := &pebble.Options{
