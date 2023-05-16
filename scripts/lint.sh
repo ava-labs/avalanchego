@@ -108,7 +108,7 @@ function test_require_nil {
     return 1
   fi
 
-  if grep -R -zo -P 'require\.ErrorIs.+?nil\)\n' .; then
+  if grep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
     echo ""
     echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
     echo ""
