@@ -13,7 +13,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
-var _ pb.RuntimeServer = &Server{}
+var _ pb.RuntimeServer = (*Server)(nil)
 
 // Server is a VM runtime initializer controlled by RPC.
 type Server struct {
