@@ -21,6 +21,7 @@ var (
 	_ Diff = (*diff)(nil)
 
 	ErrMissingParentState     = errors.New("missing parent state")
+	ErrUpdatingPendingStaker  = errors.New("trying to update pending staker")
 	errIsNotTransformSubnetTx = errors.New("is not a transform subnet tx")
 )
 
@@ -520,23 +521,29 @@ func (d *diff) Apply(baseState State) error {
 				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator.staker)
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.updatedDelegators {
-				err := baseState.UpdateCurrentDelegator(delegator)
-				if err != nil {
-					return err
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutCurrentDelegator(delegator)
+				case updated:
+					err := baseState.UpdateCurrentDelegator(delegator)
+					if err != nil {
+						return err
+					}
+				case deleted:
+					baseState.DeleteCurrentDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
 				}
-			}
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeleteCurrentDelegator(delegator)
 			}
 		}
 	}
@@ -554,16 +561,28 @@ func (d *diff) Apply(baseState State) error {
 				baseState.PutPendingValidator(validatorDiff.validator.staker)
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator.staker)
+			case updated:
+				return ErrUpdatingPendingStaker
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeletePendingDelegator(delegator)
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutPendingDelegator(delegator)
+				case updated:
+					return ErrUpdatingPendingStaker
+				case deleted:
+					baseState.DeletePendingDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
+				}
 			}
 		}
 	}

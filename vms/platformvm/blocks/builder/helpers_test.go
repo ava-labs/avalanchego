@@ -232,8 +232,8 @@ func addSubnet(env *environment) {
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-
-	if err = testSubnet1.Unsigned.Visit(&executor); err != nil {
+	err = testSubnet1.Unsigned.Visit(&executor)
+	if err != nil {
 		panic(err)
 	}
 

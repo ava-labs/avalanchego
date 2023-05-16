@@ -944,15 +944,11 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 			return err
 		}
 
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
+		for _, delegator := range validator.delegators {
+			if err := vdrs.AddWeight(nodeID, delegator.Weight); err != nil {
 				return err
 			}
 		}
-		delegatorIterator.Release()
 	}
 	return nil
 }
@@ -1251,10 +1247,11 @@ func (s *state) loadCurrentValidators() error {
 			}
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1337,10 +1334,11 @@ func (s *state) loadPendingValidators() error {
 			}
 
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1673,6 +1671,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			case updated, unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -1754,27 +1756,31 @@ func writeCurrentDelegatorDiff(
 	weightDiff *ValidatorWeightDiff,
 	validatorDiff *diffValidator,
 ) error {
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			err := weightDiff.Add(false, delegator.Weight)
+			if err != nil {
+				return fmt.Errorf("failed to increase node weight diff: %w", err)
+			}
 
-		if err := weightDiff.Add(false, staker.Weight); err != nil {
-			return fmt.Errorf("failed to increase node weight diff: %w", err)
-		}
+			err = database.PutUInt64(currentDelegatorList, delegator.TxID[:], delegator.PotentialReward)
+			if err != nil {
+				return fmt.Errorf("failed to write current delegator to list: %w", err)
+			}
+		case deleted:
+			if err := weightDiff.Add(true, delegator.Weight); err != nil {
+				return fmt.Errorf("failed to decrease node weight diff: %w", err)
+			}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
-			return fmt.Errorf("failed to write current delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := weightDiff.Add(true, staker.Weight); err != nil {
-			return fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
-
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete current staker: %w", err)
+			if err := currentDelegatorList.Delete(delegator.TxID[:]); err != nil {
+				return fmt.Errorf("failed to delete current staker: %w", err)
+			}
+		case updated, unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
@@ -1821,21 +1827,27 @@ func writePendingDiff(
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
+	case updated, unmodified:
+		// nothing to do
+	default:
+		return ErrUnknownStakerStatus
 	}
 
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-
-		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
-			return fmt.Errorf("failed to write pending delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete pending delegator: %w", err)
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			if err := pendingDelegatorList.Put(delegator.TxID[:], nil); err != nil {
+				return fmt.Errorf("failed to write pending delegator to list: %w", err)
+			}
+		case deleted:
+			if err := pendingDelegatorList.Delete(delegator.TxID[:]); err != nil {
+				return fmt.Errorf("failed to delete pending delegator: %w", err)
+			}
+		case updated, unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
