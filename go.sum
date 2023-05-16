@@ -59,8 +59,6 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0 h1:TVi9JEdKNU/RevYZ9PyW4pULbEdS+KQDA9Ki2DUvuAs=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0/go.mod h1:SgKJvtqvgo/Bl/c8fxEHCLaSxEbzimYfBopcfrajxQk=
-github.com/ava-labs/coreth v0.12.1-rc.0 h1:Zv9mJqddI28BZ5eT0SRgRrzl0sdRCdA/Mm+qZrHAhOs=
-github.com/ava-labs/coreth v0.12.1-rc.0/go.mod h1:ZGhoIZTWbIaTmzEbprXu0hLtLdoE2PSTEFnCTYr0BRk=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7 h1:EdxD90j5sClfL5Ngpz2TlnbnkNYdFPDXa0jDOjam65c=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7/go.mod h1:XhiXSrh90sHUbkERzaxEftCmUz53eCijshDLZ4fByVM=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
@@ -454,6 +452,8 @@ github.com/supranational/blst v0.3.11-0.20220920110316-f72618070295/go.mod h1:jZ
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a h1:1ur3QoCqvE5fl+nylMaIr9PVV1w343YRDtsy+Rwu7XI=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
+github.com/taurusgroup/coreth v0.12.1-rc.0-taurus h1:UtRZOYLyI28wTZmSjP87QQi7+81X56QP9zwtYz2MlwY=
+github.com/taurusgroup/coreth v0.12.1-rc.0-taurus/go.mod h1:ZGhoIZTWbIaTmzEbprXu0hLtLdoE2PSTEFnCTYr0BRk=
 github.com/thepudds/fzgen v0.4.2 h1:HlEHl5hk2/cqEomf2uK5SA/FeJc12s/vIHmOG+FbACw=
 github.com/thepudds/fzgen v0.4.2/go.mod h1:kHCWdsv5tdnt32NIHYDdgq083m6bMtaY0M+ipiO9xWE=
 github.com/tklauser/go-sysconf v0.3.5 h1:uu3Xl4nkLzQfXNsWn15rPc/HQCJKObbt1dKJeWp3vU4=
