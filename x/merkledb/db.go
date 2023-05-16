@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	_ TrieView          = &Database{}
-	_ database.Database = &Database{}
+	_ TrieView          = (*Database)(nil)
+	_ database.Database = (*Database)(nil)
 
 	Codec, Version = newCodec()
 

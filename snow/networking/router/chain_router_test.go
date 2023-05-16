@@ -783,6 +783,8 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	}
 
 	{
+		engineType := p2p.EngineType(100)
+
 		requestID++
 		msg := message.InboundPushQuery(
 			ctx.ChainID,
@@ -790,16 +792,16 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			0,
 			nil,
 			nodeID,
-			100,
+			engineType,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.EqualValues(100, msg.EngineType)
+			require.Equal(engineType, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(0, chainRouter.timedRequests.Len())
+	require.Zero(chainRouter.timedRequests.Len())
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
@@ -1085,7 +1087,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(t, 0, chainRouter.timedRequests.Len())
+	require.Zero(t, chainRouter.timedRequests.Len())
 }
 
 func TestValidatorOnlyMessageDrops(t *testing.T) {
