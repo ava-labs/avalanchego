@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	ErrUpdatingDeletedStaker = errors.New("trying to update deleted staker")
-	ErrUpdatingUnknownStaker = errors.New("trying to update unknown staker")
-)
+var ErrUpdatingUnknownOrDeletedStaker = errors.New("trying to update unknown or deleted staker")
 
 type Stakers interface {
 	CurrentStakers
@@ -182,7 +179,7 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
 	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
-			ErrUpdatingDeletedStaker,
+			ErrUpdatingUnknownOrDeletedStaker,
 			staker.SubnetID,
 			staker.NodeID,
 		)
@@ -265,7 +262,7 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
 	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
-			ErrUpdatingUnknownStaker,
+			ErrUpdatingUnknownOrDeletedStaker,
 			staker.SubnetID,
 			staker.NodeID,
 		)
@@ -273,7 +270,7 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	prevDelegator, found := validator.delegators[staker.TxID]
 	if !found {
 		return fmt.Errorf("%w, subnetID %v, nodeID %v, txID %v",
-			ErrUpdatingUnknownStaker,
+			ErrUpdatingUnknownOrDeletedStaker,
 			staker.SubnetID,
 			staker.NodeID,
 			staker.TxID,
@@ -456,9 +453,11 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 	s.addedStakersOnly.ReplaceOrInsert(staker)
 }
 
-// UpdateValidator assumes that previous version of staker
-// has been pulled up into this diff or that it was just inserted
 func (s *diffStakers) UpdateValidator(staker *Staker) error {
+	// Note: for efficiency reasons, we won't check here whether the staker we're trying to
+	// update was previously added (and not deleted). Said staker may be in lower level diffs
+	// and we don't want to pull it up here (and spread staker copies across the whole diffs
+	// stack to ensure cache isolation). An error will surface when applying diff on base State.
 	validatorDiff := getOrCreateDiff(s.validatorDiffs, staker.SubnetID, staker.NodeID)
 	switch validatorDiff.validator.status {
 	case added:
@@ -479,7 +478,7 @@ func (s *diffStakers) UpdateValidator(staker *Staker) error {
 
 	case deleted:
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
-			ErrUpdatingDeletedStaker,
+			ErrUpdatingUnknownOrDeletedStaker,
 			staker.SubnetID,
 			staker.NodeID,
 		)
@@ -580,6 +579,8 @@ func (s *diffStakers) PutDelegator(staker *Staker) {
 }
 
 func (s *diffStakers) UpdateDelegator(staker *Staker) error {
+	// Note: for efficiency reasons, we won't check here whether
+	// the staker we're trying to update was previously added.
 	validatorDiff := getOrCreateDiff(s.validatorDiffs, staker.SubnetID, staker.NodeID)
 	prevStaker, found := validatorDiff.delegators[staker.TxID]
 	if !found {
@@ -608,7 +609,7 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 
 	case deleted:
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",
-			ErrUpdatingDeletedStaker,
+			ErrUpdatingUnknownOrDeletedStaker,
 			staker.SubnetID,
 			staker.NodeID,
 		)

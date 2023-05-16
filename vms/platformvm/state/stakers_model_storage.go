@@ -80,7 +80,7 @@ func (m *stakersStorageModel) UpdateCurrentValidator(staker *Staker) error {
 		nodeID:   staker.NodeID,
 	}
 	if _, found := m.currentValidators[key]; !found {
-		return ErrUpdatingDeletedStaker
+		return ErrUpdatingUnknownOrDeletedStaker
 	}
 
 	m.currentValidators[key] = staker
@@ -175,10 +175,10 @@ func (m *stakersStorageModel) UpdateCurrentDelegator(staker *Staker) error {
 
 	ls, found := m.currentDelegators[key]
 	if !found {
-		return ErrUpdatingDeletedStaker
+		return ErrUpdatingUnknownOrDeletedStaker
 	}
 	if _, found := ls[staker.TxID]; !found {
-		return ErrUpdatingDeletedStaker
+		return ErrUpdatingUnknownOrDeletedStaker
 	}
 	ls[staker.TxID] = staker
 	return nil

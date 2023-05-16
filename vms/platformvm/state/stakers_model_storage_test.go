@@ -42,7 +42,7 @@ var (
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
-	// // to reproduce a given scenario do something like this:
+	// to reproduce a given scenario do something like this:
 	// parameters := gopter.DefaultTestParametersWithSeed(1680853360138133268)
 	// properties := gopter.NewProperties(parameters)
 
