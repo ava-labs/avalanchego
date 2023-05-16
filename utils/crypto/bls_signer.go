@@ -1,8 +1,9 @@
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package crypto
 
-import (
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-)
+import "github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 var (
 	_ BLSSigner = (*BLSKeySigner)(nil)
