@@ -485,9 +485,10 @@ func (d *diff) Apply(baseState State) error {
 				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator.staker)
+			case unmodified:
+				// nothing to do
 			default:
-				// unmodified, nothing to do
-				// TODO: consider explicitly checking state is unmodified
+				return ErrUnknownStakerStatus
 			}
 
 			for _, ds := range validatorDiff.delegators {
@@ -502,9 +503,10 @@ func (d *diff) Apply(baseState State) error {
 					}
 				case deleted:
 					baseState.DeleteCurrentDelegator(delegator)
+				case unmodified:
+					// nothing to do
 				default:
-					// unmodified, nothing to do
-					// TODO: consider explicitly checking state is unmodified
+					return ErrUnknownStakerStatus
 				}
 			}
 		}
@@ -523,6 +525,12 @@ func (d *diff) Apply(baseState State) error {
 				baseState.PutPendingValidator(validatorDiff.validator.staker)
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator.staker)
+			case updated:
+				return ErrUpdatingPendingStaker
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
 			for _, ds := range validatorDiff.delegators {
@@ -534,9 +542,10 @@ func (d *diff) Apply(baseState State) error {
 					return ErrUpdatingPendingStaker
 				case deleted:
 					baseState.DeletePendingDelegator(delegator)
+				case unmodified:
+					// nothing to do
 				default:
-					// unmodified, nothing to do
-					// TODO: consider explicitly checking state is unmodified
+					return ErrUnknownStakerStatus
 				}
 			}
 		}

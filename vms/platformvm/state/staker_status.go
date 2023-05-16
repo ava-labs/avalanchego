@@ -3,6 +3,10 @@
 
 package state
 
+import "errors"
+
+var ErrUnknownStakerStatus = errors.New("unknown staker status")
+
 const (
 	unmodified diffStakerStatus = iota
 	added

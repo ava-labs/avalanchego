@@ -134,15 +134,15 @@ type baseStaker struct {
 
 	// delegators lists all non-deleted delegators by their TxID
 	// delegators has same content as sortedDelegators, but unlike sortedDelegators
-	// it allows querying delegators. Note that sortedDelegators identify stakers
+	// it allows querying delegators. Note that sortedDelegators identifies stakers
 	// via Staker.Less function, so an updated delegator with different NextTime than
 	// its previous version would be treated by sortedDelegators as a different staker.
 	// delegators identify stakers by their TxID, so it allows correctly querying stakers.
 	delegators map[ids.ID]*Staker
 
 	// sortedDelegators ordered for iterations. sortedDelegators has same content
-	// as delegators, but must not be used for stakers queries. We update and sortedDelegators
-	// as soon as stakers are inserted/updated/deleted instead of building it up upon interation.
+	// as delegators, but must not be used for stakers queries. We update sortedDelegators
+	// as soon as stakers are inserted/updated/deleted instead of building it up upon iterations.
 	sortedDelegators *btree.BTreeG[*Staker]
 }
 
@@ -245,11 +245,8 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	if validator.sortedDelegators == nil {
 		validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
-	if validator.delegators == nil {
-		validator.delegators = make(map[ids.ID]*Staker)
-	}
-	validator.sortedDelegators.ReplaceOrInsert(staker)
 	validator.delegators[staker.TxID] = staker
+	validator.sortedDelegators.ReplaceOrInsert(staker)
 
 	v.stakers.ReplaceOrInsert(staker)
 
@@ -257,11 +254,11 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	if validatorDiff.addedDelegators == nil {
 		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
-	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 		staker: staker,
 		status: added,
 	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 }
 
 func (v *baseStakers) UpdateDelegator(staker *Staker) error {
@@ -282,9 +279,9 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 			staker.TxID,
 		)
 	}
+	validator.delegators[staker.TxID] = staker
 	validator.sortedDelegators.Delete(prevDelegator)
 	validator.sortedDelegators.ReplaceOrInsert(staker)
-	validator.delegators[staker.TxID] = staker
 
 	v.stakers.Delete(prevDelegator)
 	v.stakers.ReplaceOrInsert(staker)
@@ -292,12 +289,12 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
 	if del, found := validatorDiff.delegators[staker.TxID]; found && del.status == added {
 		// updating a staker just added. Keep it as added
-		validatorDiff.addedDelegators.Delete(prevDelegator)
-		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 			staker: staker,
 			status: added,
 		}
+		validatorDiff.addedDelegators.Delete(prevDelegator)
+		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 	} else {
 		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 			staker: staker,
@@ -321,10 +318,10 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	if stored, found := validator.delegators[staker.TxID]; found {
 		delegatorToDelete = stored
 	}
+	delete(validator.delegators, delegatorToDelete.TxID)
 	if validator.sortedDelegators != nil {
 		validator.sortedDelegators.Delete(delegatorToDelete)
 	}
-	delete(validator.delegators, delegatorToDelete.TxID)
 	v.pruneValidator(delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
@@ -361,7 +358,9 @@ func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *
 		v.validators[subnetID] = subnetValidators
 	}
 
-	validator = &baseStaker{}
+	validator = &baseStaker{
+		delegators: make(map[ids.ID]*Staker),
+	}
 	subnetValidators[nodeID] = validator
 	return validator
 }
@@ -390,15 +389,20 @@ type diffStakers struct {
 	// moveover it supports stakers iteration over a specific subnetID/nodeID pair
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 
-	allStakers       map[ids.ID]stakerAndStatus
+	// allStakers contains all validators/delegators added/updated/deleted in the diff.
+	// allStakers enables iteration over all stakers, regardless their subnetID/nodeID
+	allStakers map[ids.ID]stakerAndStatus
+
+	// addedStakersOnly supports stakers iteration. It contains only stakers that were
+	// added in the diff, not updated or deleted ones (which can be found in allStakers)
 	addedStakersOnly *btree.BTreeG[*Staker]
 }
 
 func newDiffStakers() *diffStakers {
 	return &diffStakers{
 		validatorDiffs:   make(map[ids.ID]map[ids.NodeID]*diffValidator),
-		addedStakersOnly: btree.NewG(defaultTreeDegree, (*Staker).Less),
 		allStakers:       make(map[ids.ID]stakerAndStatus),
+		addedStakersOnly: btree.NewG(defaultTreeDegree, (*Staker).Less),
 	}
 }
 
@@ -409,9 +413,9 @@ type stakerAndStatus struct {
 
 type diffValidator struct {
 	// validatorStatus describes whether a validator has been added or removed.
-	// validator stakerAndStatus
 	validator stakerAndStatus
 
+	// delegators lists all
 	delegators      map[ids.ID]stakerAndStatus // by TxID
 	addedDelegators *btree.BTreeG[*Staker]
 }
@@ -461,12 +465,16 @@ func (s *diffStakers) UpdateValidator(staker *Staker) error {
 		// validator was added and is being immediately updated.
 		// We mark it as added
 		prevStaker := validatorDiff.validator.staker
-		s.addedStakersOnly.Delete(prevStaker)
-
 		validatorDiff.validator = stakerAndStatus{
 			staker: staker,
 			status: added,
 		}
+
+		s.allStakers[staker.TxID] = stakerAndStatus{
+			staker: staker,
+			status: added,
+		}
+		s.addedStakersOnly.Delete(prevStaker)
 		s.addedStakersOnly.ReplaceOrInsert(staker)
 
 	case deleted:
@@ -495,6 +503,7 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 	if validatorDiff.validator.status == added {
 		// This validator was added and immediately removed in this diff. We
 		// treat it as if it was never added.
+		delete(s.allStakers, staker.TxID)
 		s.addedStakersOnly.Delete(validatorDiff.validator.staker)
 		validatorDiff.validator = stakerAndStatus{
 			staker: nil,
@@ -557,11 +566,11 @@ func (s *diffStakers) PutDelegator(staker *Staker) {
 	if validatorDiff.addedDelegators == nil {
 		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
-	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 		staker: staker,
 		status: added,
 	}
+	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 
 	s.allStakers[staker.TxID] = stakerAndStatus{
 		staker: staker,
@@ -583,16 +592,19 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 	case added:
 		// delegator was added and is being immediately updated.
 		// We mark it as added
-		validatorDiff.addedDelegators.Delete(prevStaker.staker)
-		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
-
-		s.addedStakersOnly.Delete(prevStaker.staker)
-		s.addedStakersOnly.ReplaceOrInsert(staker)
-
 		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 			staker: staker,
 			status: added,
 		}
+		validatorDiff.addedDelegators.Delete(prevStaker.staker)
+		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
+
+		s.allStakers[staker.TxID] = stakerAndStatus{
+			staker: staker,
+			status: updated,
+		}
+		s.addedStakersOnly.Delete(prevStaker.staker)
+		s.addedStakersOnly.ReplaceOrInsert(staker)
 
 	case deleted:
 		return fmt.Errorf("%w, subnetID %v, nodeID %v",

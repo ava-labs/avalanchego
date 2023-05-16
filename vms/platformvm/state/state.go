@@ -1225,11 +1225,8 @@ func (s *state) loadCurrentValidators() error {
 			if validator.sortedDelegators == nil {
 				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			if validator.delegators == nil {
-				validator.delegators = make(map[ids.ID]*Staker)
-			}
-			validator.sortedDelegators.ReplaceOrInsert(staker)
 			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1315,11 +1312,8 @@ func (s *state) loadPendingValidators() error {
 			if validator.sortedDelegators == nil {
 				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			if validator.delegators == nil {
-				validator.delegators = make(map[ids.ID]*Staker)
-			}
-			validator.sortedDelegators.ReplaceOrInsert(staker)
 			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1652,6 +1646,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			case updated, unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -1754,8 +1752,10 @@ func writeCurrentDelegatorDiff(
 			if err := currentDelegatorList.Delete(delegator.TxID[:]); err != nil {
 				return fmt.Errorf("failed to delete current staker: %w", err)
 			}
+		case updated, unmodified:
+			// nothing to do
 		default:
-			// updated or unmodified, nothing to do
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
@@ -1802,6 +1802,10 @@ func writePendingDiff(
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
+	case updated, unmodified:
+		// nothing to do
+	default:
+		return ErrUnknownStakerStatus
 	}
 
 	for _, ds := range validatorDiff.delegators {
@@ -1815,8 +1819,10 @@ func writePendingDiff(
 			if err := pendingDelegatorList.Delete(delegator.TxID[:]); err != nil {
 				return fmt.Errorf("failed to delete pending delegator: %w", err)
 			}
+		case updated, unmodified:
+			// nothing to do
 		default:
-			// unmodified or updated, nothing to do
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil

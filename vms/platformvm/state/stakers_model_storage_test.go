@@ -30,61 +30,6 @@ var (
 	_ commands.Command = (*commitBottomStateCommand)(nil)
 )
 
-// func TestReproduceSimplifiedScenario(t *testing.T) {
-// 	require := require.New(t)
-// 	baseState, err := buildChainState(nil)
-// 	require.NoError(err)
-// 	sys := &sysUnderTest{
-// 		baseState:     baseState,
-// 		diffsMap:      map[ids.ID]Diff{},
-// 		sortedDiffIDs: []ids.ID{},
-// 	}
-
-// 	// 1. PutCurrentValidator
-// 	validator := &Staker{
-// 		SubnetID:  ids.GenerateTestID(),
-// 		NodeID:    ids.GenerateTestNodeID(),
-// 		TxID:      ids.GenerateTestID(),
-// 		Priority:  9,
-// 		StartTime: time.Unix(0, 0),
-// 		EndTime:   time.Unix(0, 0).Add(5466 * time.Hour),
-// 	}
-// 	topChainState := sys.getTopChainState()
-// 	topChainState.PutCurrentValidator(validator)
-
-// 	// 2. PutCurrentDelegator
-// 	delegator := &Staker{
-// 		SubnetID:  validator.SubnetID,
-// 		NodeID:    validator.NodeID,
-// 		TxID:      ids.GenerateTestID(),
-// 		Priority:  8,
-// 		StartTime: time.Unix(0, 0), // TODO: FIX
-// 		EndTime:   time.Unix(0, 0).Add(6657 * time.Hour),
-// 	}
-// 	require.NoError(addCurrentDelegatorInSystem(sys, delegator))
-
-// 	// 3. AddDiffAndUpdateCurrentDelegator
-// 	require.NoError(updateCurrentDelegatorInSystem(sys))
-
-// 	// 4. DeleteCurrentDelegator
-// 	_, err = deleteCurrentDelegator(sys)
-// 	require.NoError(err)
-
-// 	// 5. ApplyBottomDiffCommand
-// 	sys.flushBottomDiff()
-
-// 	// Check delegator is deleted
-// 	topDiff := sys.getTopChainState()
-// 	sysIt, err := topDiff.GetCurrentStakerIterator()
-// 	require.NoError(err)
-
-// 	for sysIt.Next() {
-// 		staker := sysIt.Value()
-// 		require.True(staker.TxID != delegator.TxID)
-// 	}
-// 	sysIt.Release()
-// }
-
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
 // system made of a stack of Diffs built on top of a State conforms to
 // our stakersStorageModel. It achieves this by:
