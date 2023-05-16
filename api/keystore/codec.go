@@ -11,7 +11,7 @@ import (
 
 const (
 	maxPackerSize  = 1 * units.GiB // max size, in bytes, of something being marshalled by Marshal()
-	maxSliceLength = 256 * 1024
+	maxSliceLength = linearcodec.DefaultMaxSliceLength
 
 	codecVersion = 0
 )
