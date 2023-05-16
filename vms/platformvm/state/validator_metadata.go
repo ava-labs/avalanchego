@@ -4,14 +4,16 @@
 package state
 
 import (
+	"math"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -19,9 +21,26 @@ import (
 // [preDelegateeRewardMetadata].
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
-const preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
+const (
+	preDelegateeRewardSize   = wrappers.ShortLen + 3*wrappers.LongLen
+	validatorMetadataCodecV0 = uint16(0)
+)
 
-var _ validatorState = (*metadata)(nil)
+var (
+	_ validatorState = (*metadata)(nil)
+
+	validatorMetadataCodec codec.Manager
+)
+
+func init() {
+	c := linearcodec.NewDefault()
+	validatorMetadataCodec = codec.NewManager(math.MaxInt32)
+
+	err := validatorMetadataCodec.RegisterCodec(validatorMetadataCodecV0, c)
+	if err != nil {
+		panic(err)
+	}
+}
 
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `serialize:"true"`
@@ -60,7 +79,8 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		if _, err := txs.Codec.Unmarshal(bytes, &tmp); err != nil {
+		_, err := validatorMetadataCodec.Unmarshal(bytes, &tmp)
+		if err != nil {
 			return err
 		}
 
@@ -69,7 +89,8 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		if _, err := txs.Codec.Unmarshal(bytes, metadata); err != nil {
+		_, err := validatorMetadataCodec.Unmarshal(bytes, metadata)
+		if err != nil {
 			return err
 		}
 	}
@@ -238,7 +259,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := genesis.Codec.Marshal(txs.Version, metadata)
+			metadataBytes, err := validatorMetadataCodec.Marshal(txs.Version, metadata)
 			if err != nil {
 				return err
 			}
