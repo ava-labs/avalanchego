@@ -85,7 +85,16 @@ function test_require_len_zero {
 }
 
 function test_require_equal_len {
-  if grep -R -o -P 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
+  # This should only flag if len(foo) is the *actual* val, not the expected val.
+  #
+  # These should *not* match:
+  # - require.Equal(len(foo), 2)
+  # - require.Equal(t, len(foo), 2)
+  #
+  # These should match:
+  # - require.Equal(2, len(foo))
+  # - require.Equal(t, 2, len(foo))
+  if grep -R -o -P --exclude-dir='scripts' 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
     echo ""
     echo "Use require.Len instead of require.Equal when testing for length."
     echo ""
