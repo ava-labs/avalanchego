@@ -38,8 +38,7 @@ func (e *EngineTest) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 		return e.GetBlockF(ctx, blkID)
 	}
 	if e.CantGetBlock && e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetBlock.Error())
+		require.FailNow(e.T, errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }

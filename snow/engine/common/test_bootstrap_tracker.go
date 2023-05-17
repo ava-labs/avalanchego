@@ -38,8 +38,7 @@ func (s *BootstrapTrackerTest) IsBootstrapped() bool {
 		return s.IsBootstrappedF()
 	}
 	if s.CantIsBootstrapped && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow("Unexpectedly called IsBootstrapped")
+		require.FailNow(s.T, "Unexpectedly called IsBootstrapped")
 	}
 	return false
 }
@@ -51,8 +50,7 @@ func (s *BootstrapTrackerTest) Bootstrapped(chainID ids.ID) {
 	if s.BootstrappedF != nil {
 		s.BootstrappedF(chainID)
 	} else if s.CantBootstrapped && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow("Unexpectedly called Bootstrapped")
+		require.FailNow(s.T, "Unexpectedly called Bootstrapped")
 	}
 }
 
@@ -60,8 +58,7 @@ func (s *BootstrapTrackerTest) OnBootstrapCompleted() chan struct{} {
 	if s.OnBootstrapCompletedF != nil {
 		return s.OnBootstrapCompletedF()
 	} else if s.CantOnBootstrapCompleted && s.T != nil {
-		require := require.New(s.T)
-		require.FailNow("Unexpectedly called OnBootstrapCompleted")
+		require.FailNow(s.T, "Unexpectedly called OnBootstrapCompleted")
 	}
 	return nil
 }
