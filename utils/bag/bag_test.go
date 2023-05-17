@@ -20,11 +20,11 @@ func TestBagAdd(t *testing.T) {
 	require.Zero(bag.Count(elt0))
 	require.Zero(bag.Count(elt1))
 	require.Zero(bag.Len())
-	require.Len(bag.List(), 0)
+	require.Empty(bag.List())
 	mode, freq := bag.Mode()
 	require.Equal(elt0, mode)
 	require.Zero(freq)
-	require.Len(bag.Threshold(), 0)
+	require.Empty(bag.Threshold())
 
 	bag.Add(elt0)
 
