@@ -55,8 +55,7 @@ func (vm *TestVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return vm.BuildBlockF(ctx)
 	}
 	if vm.CantBuildBlock && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errBuildBlock.Error())
+		require.FailNow(vm.T, errBuildBlock.Error())
 	}
 	return nil, errBuildBlock
 }
@@ -66,8 +65,7 @@ func (vm *TestVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, erro
 		return vm.ParseBlockF(ctx, b)
 	}
 	if vm.CantParseBlock && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errParseBlock.Error())
+		require.FailNow(vm.T, errParseBlock.Error())
 	}
 	return nil, errParseBlock
 }
@@ -77,8 +75,7 @@ func (vm *TestVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error
 		return vm.GetBlockF(ctx, id)
 	}
 	if vm.CantGetBlock && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errGetBlock.Error())
+		require.FailNow(vm.T, errGetBlock.Error())
 	}
 	return nil, errGetBlock
 }
@@ -88,8 +85,7 @@ func (vm *TestVM) SetPreference(ctx context.Context, id ids.ID) error {
 		return vm.SetPreferenceF(ctx, id)
 	}
 	if vm.CantSetPreference && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow("Unexpectedly called SetPreference")
+		require.FailNow(vm.T, "Unexpectedly called SetPreference")
 	}
 	return nil
 }
@@ -99,8 +95,7 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.LastAcceptedF(ctx)
 	}
 	if vm.CantLastAccepted && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errLastAccepted.Error())
+		require.FailNow(vm.T, errLastAccepted.Error())
 	}
 	return ids.ID{}, errLastAccepted
 }

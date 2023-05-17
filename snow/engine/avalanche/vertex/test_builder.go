@@ -35,8 +35,7 @@ func (b *TestBuilder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (ava
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
 	if b.CantBuildVtx && b.T != nil {
-		require := require.New(b.T)
-		require.FailNow(errBuild.Error())
+		require.FailNow(b.T, errBuild.Error())
 	}
 	return nil, errBuild
 }

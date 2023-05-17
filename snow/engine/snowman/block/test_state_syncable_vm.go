@@ -42,8 +42,7 @@ func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, erro
 		return vm.StateSyncEnabledF(ctx)
 	}
 	if vm.CantStateSyncEnabled && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errStateSyncEnabled.Error())
+		require.FailNow(vm.T, errStateSyncEnabled.Error())
 	}
 	return false, errStateSyncEnabled
 }
@@ -53,8 +52,7 @@ func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
 	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errStateSyncGetOngoingSummary.Error())
+		require.FailNow(vm.T, errStateSyncGetOngoingSummary.Error())
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -64,8 +62,7 @@ func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (StateSu
 		return vm.GetLastStateSummaryF(ctx)
 	}
 	if vm.CantGetLastStateSummary && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errGetLastStateSummary.Error())
+		require.FailNow(vm.T, errGetLastStateSummary.Error())
 	}
 	return nil, errGetLastStateSummary
 }
@@ -75,8 +72,7 @@ func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryByt
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
 	if vm.CantParseStateSummary && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errParseStateSummary.Error())
+		require.FailNow(vm.T, errParseStateSummary.Error())
 	}
 	return nil, errParseStateSummary
 }
@@ -86,8 +82,7 @@ func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeigh
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
-		require := require.New(vm.T)
-		require.FailNow(errGetStateSummary.Error())
+		require.FailNow(vm.T, errGetStateSummary.Error())
 	}
 	return nil, errGetStateSummary
 }
