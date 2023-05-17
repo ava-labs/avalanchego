@@ -412,19 +412,22 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 		return reward.Config{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	primaryNetworkCfg, err := parentState.GetRewardConfig(subnetID)
+	parentCfg, err := parentState.GetRewardConfig(subnetID)
 	if err != nil {
 		return reward.Config{}, err
 	}
 
 	if subnetID == constants.PrimaryNetworkID {
-		return primaryNetworkCfg, nil
+		return parentCfg, nil
 	}
 
-	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
-	if err != nil {
-		return reward.Config{}, err
+	transformSubnetIntf, exists := d.transformedSubnets[subnetID]
+	if !exists {
+		return parentCfg, nil
 	}
+
+	// this diff contains a tx transforming requested subnet into elastic one
+	// Duly update its config.
 	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 	if !ok {
 		return reward.Config{}, errIsNotTransformSubnetTx
@@ -433,7 +436,7 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 	return reward.Config{
 		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
 		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      primaryNetworkCfg.MintingPeriod,
+		MintingPeriod:      parentCfg.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}, nil
 }
