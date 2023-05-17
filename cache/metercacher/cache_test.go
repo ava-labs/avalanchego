@@ -14,8 +14,8 @@ import (
 
 func TestInterface(t *testing.T) {
 	for _, test := range cache.CacherTests {
-		cache := &cache.LRU[ids.ID, int]{Size: test.Size}
-		c, err := New[ids.ID, int]("", prometheus.NewRegistry(), cache)
+		baseCache := &cache.LRU[ids.ID, cache.TestSizedInt]{Size: test.Size}
+		c, err := New[ids.ID, cache.TestSizedInt]("", prometheus.NewRegistry(), baseCache)
 		if err != nil {
 			t.Fatal(err)
 		}
