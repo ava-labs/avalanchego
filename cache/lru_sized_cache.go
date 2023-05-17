@@ -10,91 +10,93 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 )
 
+var _ Cacher[struct{}, SizedElement] = (*sizedLRU[struct{}, SizedElement])(nil)
+
 type SizedElement interface {
 	Size() int
 }
 
-// var _ Cacher[struct{}, struct{}] = (*SizedLRU[struct{}, struct{}])(nil)
-
-// LRU is a key value store with bounded size. If the size is attempted to be
-// exceeded, then an element is removed from the cache before the insertion is
-// done, based on evicting the least recently used value.
-type SizedLRU[K comparable, V SizedElement] struct {
-	lock     sync.Mutex
-	elements linkedhashmap.LinkedHashmap[K, V]
-	// If set to < 0, will be set internally to 1.
-	MaxSize     int
+// sizedLRU is a key value store with bounded size. If the size is attempted to
+// be exceeded, then elements are removed from the cache until the bound is
+// honored, based on evicting the least recently used value.
+type sizedLRU[K comparable, V SizedElement] struct {
+	lock        sync.Mutex
+	elements    linkedhashmap.LinkedHashmap[K, V]
+	maxSize     int
 	currentSize int
 }
 
-func (c *SizedLRU[K, V]) Put(key K, value V) {
+func NewSizedLRU[K comparable, V SizedElement](maxSize int) Cacher[K, V] {
+	return &sizedLRU[K, V]{
+		elements: linkedhashmap.New[K, V](),
+		maxSize:  maxSize,
+	}
+}
+
+func (c *sizedLRU[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.put(key, value)
 }
 
-func (c *SizedLRU[K, V]) Get(key K) (V, bool) {
+func (c *sizedLRU[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.get(key)
 }
 
-func (c *SizedLRU[K, V]) Evict(key K) {
+func (c *sizedLRU[K, V]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *SizedLRU[K, V]) Flush() {
+func (c *sizedLRU[K, V]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *SizedLRU[K, V]) put(key K, value V) {
+func (c *sizedLRU[K, V]) put(key K, value V) {
+	if oldValue, ok := c.elements.Get(key); ok {
+		c.currentSize -= oldValue.Size()
+	}
+
 	c.elements.Put(key, value)
-	c.currentSize++
+	c.currentSize += value.Size()
+
 	c.resize()
 }
 
-func (c *SizedLRU[K, V]) get(key K) (V, bool) {
-	c.resize()
-
-	val, ok := c.elements.Get(key)
+func (c *sizedLRU[K, V]) get(key K) (V, bool) {
+	value, ok := c.elements.Get(key)
 	if !ok {
 		return utils.Zero[V](), false
 	}
-	c.elements.Put(key, val) // Mark [k] as MRU.
-	return val, true
+
+	c.elements.Put(key, value) // Mark [k] as MRU.
+	return value, true
 }
 
-func (c *SizedLRU[K, _]) evict(key K) {
-	c.elements.Delete(key)
-	c.currentSize--
-	c.resize()
+func (c *sizedLRU[K, _]) evict(key K) {
+	if value, ok := c.elements.Get(key); ok {
+		c.elements.Delete(key)
+		c.currentSize -= value.Size()
+	}
 }
 
-func (c *SizedLRU[K, V]) flush() {
+func (c *sizedLRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
 	c.currentSize = 0
 }
 
-// Initializes [c.elements] if it's nil.
-// Sets [c.size] to 1 if it's <= 0.
-// Removes oldest elements to make number of elements
-// in the cache == [c.size] if necessary.
-func (c *SizedLRU[K, V]) resize() {
-	if c.elements == nil {
-		c.elements = linkedhashmap.New[K, V]()
-	}
-	if c.MaxSize <= 0 {
-		c.MaxSize = 1
-	}
-	for c.currentSize > c.MaxSize {
+// Removes oldest elements until the size of elements in the cache <= [c.size].
+func (c *sizedLRU[K, V]) resize() {
+	for c.currentSize > c.maxSize {
 		oldestKey, value, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
 		c.currentSize -= value.Size()

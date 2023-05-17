@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -18,6 +19,8 @@ import (
 )
 
 var (
+	_ cache.SizedElement = (*Tx)(nil)
+
 	ErrNilSignedTx = errors.New("nil signed tx is not valid")
 
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
@@ -83,6 +86,10 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	unsignedBytes := signedBytes[:unsignedBytesLen]
 	tx.SetBytes(unsignedBytes, signedBytes)
 	return tx, nil
+}
+
+func (tx *Tx) Size() int {
+	return len(tx.bytes)
 }
 
 func (tx *Tx) Bytes() []byte {
