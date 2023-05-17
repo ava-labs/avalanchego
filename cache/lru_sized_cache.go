@@ -69,7 +69,12 @@ func (c *sizedLRU[K, V]) put(key K, value V) {
 	c.elements.Put(key, value)
 	c.currentSize += value.Size()
 
-	c.resize()
+	// Remove elements until the size of elements in the cache <= [c.maxSize].
+	for c.currentSize > c.maxSize {
+		oldestKey, value, _ := c.elements.Oldest()
+		c.elements.Delete(oldestKey)
+		c.currentSize -= value.Size()
+	}
 }
 
 func (c *sizedLRU[K, V]) get(key K) (V, bool) {
@@ -92,13 +97,4 @@ func (c *sizedLRU[K, _]) evict(key K) {
 func (c *sizedLRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
 	c.currentSize = 0
-}
-
-// Removes oldest elements until the size of elements in the cache <= [c.size].
-func (c *sizedLRU[K, V]) resize() {
-	for c.currentSize > c.maxSize {
-		oldestKey, value, _ := c.elements.Oldest()
-		c.elements.Delete(oldestKey)
-		c.currentSize -= value.Size()
-	}
 }
