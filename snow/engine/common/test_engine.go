@@ -189,8 +189,7 @@ func (e *EngineTest) Start(ctx context.Context, startReqID uint32) error {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errStart.Error())
+		require.FailNow(e.T, errStart.Error())
 	}
 	return errStart
 }
@@ -203,8 +202,7 @@ func (e *EngineTest) Context() *snow.ConsensusContext {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow("Unexpectedly called Context")
+		require.FailNow(e.T, "Unexpectedly called Context")
 	}
 	return nil
 }
@@ -217,8 +215,7 @@ func (e *EngineTest) Timeout(ctx context.Context) error {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errTimeout.Error())
+		require.FailNow(e.T, errTimeout.Error())
 	}
 	return errTimeout
 }
@@ -231,8 +228,7 @@ func (e *EngineTest) Gossip(ctx context.Context) error {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGossip.Error())
+		require.FailNow(e.T, errGossip.Error())
 	}
 	return errGossip
 }
@@ -246,8 +242,7 @@ func (e *EngineTest) Halt(ctx context.Context) {
 		return
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow("Unexpectedly called Halt")
+		require.FailNow(e.T, "Unexpectedly called Halt")
 	}
 }
 
@@ -259,8 +254,7 @@ func (e *EngineTest) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errShutdown.Error())
+		require.FailNow(e.T, errShutdown.Error())
 	}
 	return errShutdown
 }
@@ -273,8 +267,7 @@ func (e *EngineTest) Notify(ctx context.Context, msg Message) error {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errNotify.Error())
+		require.FailNow(e.T, errNotify.Error())
 	}
 	return errNotify
 }
@@ -287,8 +280,7 @@ func (e *EngineTest) GetStateSummaryFrontier(ctx context.Context, validatorID id
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetStateSummaryFrontier.Error())
+		require.FailNow(e.T, errGetStateSummaryFrontier.Error())
 	}
 	return errGetStateSummaryFrontier
 }
@@ -301,8 +293,7 @@ func (e *EngineTest) StateSummaryFrontier(ctx context.Context, validatorID ids.N
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errStateSummaryFrontier.Error())
+		require.FailNow(e.T, errStateSummaryFrontier.Error())
 	}
 	return errStateSummaryFrontier
 }
@@ -315,8 +306,7 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validato
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetStateSummaryFrontierFailed.Error())
+		require.FailNow(e.T, errGetStateSummaryFrontierFailed.Error())
 	}
 	return errGetStateSummaryFrontierFailed
 }
@@ -329,8 +319,7 @@ func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID id
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAcceptedStateSummary.Error())
+		require.FailNow(e.T, errGetAcceptedStateSummary.Error())
 	}
 	return errGetAcceptedStateSummary
 }
@@ -343,8 +332,7 @@ func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.N
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAcceptedStateSummary.Error())
+		require.FailNow(e.T, errAcceptedStateSummary.Error())
 	}
 	return errAcceptedStateSummary
 }
@@ -357,8 +345,7 @@ func (e *EngineTest) GetAcceptedStateSummaryFailed(ctx context.Context, validato
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAcceptedStateSummaryFailed.Error())
+		require.FailNow(e.T, errGetAcceptedStateSummaryFailed.Error())
 	}
 	return errGetAcceptedStateSummaryFailed
 }
@@ -371,8 +358,7 @@ func (e *EngineTest) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID,
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAcceptedFrontier.Error())
+		require.FailNow(e.T, errGetAcceptedFrontier.Error())
 	}
 	return errGetAcceptedFrontier
 }
@@ -385,8 +371,7 @@ func (e *EngineTest) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.N
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAcceptedFrontierFailed.Error())
+		require.FailNow(e.T, errGetAcceptedFrontierFailed.Error())
 	}
 	return errGetAcceptedFrontierFailed
 }
@@ -399,8 +384,7 @@ func (e *EngineTest) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAcceptedFrontier.Error())
+		require.FailNow(e.T, errAcceptedFrontier.Error())
 	}
 	return errAcceptedFrontier
 }
@@ -413,8 +397,7 @@ func (e *EngineTest) GetAccepted(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAccepted.Error())
+		require.FailNow(e.T, errGetAccepted.Error())
 	}
 	return errGetAccepted
 }
@@ -427,8 +410,7 @@ func (e *EngineTest) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, r
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAcceptedFailed.Error())
+		require.FailNow(e.T, errGetAcceptedFailed.Error())
 	}
 	return errGetAcceptedFailed
 }
@@ -441,8 +423,7 @@ func (e *EngineTest) Accepted(ctx context.Context, nodeID ids.NodeID, requestID 
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAccepted.Error())
+		require.FailNow(e.T, errAccepted.Error())
 	}
 	return errAccepted
 }
@@ -455,8 +436,7 @@ func (e *EngineTest) Get(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGet.Error())
+		require.FailNow(e.T, errGet.Error())
 	}
 	return errGet
 }
@@ -469,8 +449,7 @@ func (e *EngineTest) GetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAncestors.Error())
+		require.FailNow(e.T, errGetAncestors.Error())
 	}
 	return errGetAncestors
 }
@@ -483,8 +462,7 @@ func (e *EngineTest) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetFailed.Error())
+		require.FailNow(e.T, errGetFailed.Error())
 	}
 	return errGetFailed
 }
@@ -497,8 +475,7 @@ func (e *EngineTest) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errGetAncestorsFailed.Error())
+		require.FailNow(e.T, errGetAncestorsFailed.Error())
 	}
 	return errGetAncestorsFailed
 }
@@ -511,8 +488,7 @@ func (e *EngineTest) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errPut.Error())
+		require.FailNow(e.T, errPut.Error())
 	}
 	return errPut
 }
@@ -525,8 +501,7 @@ func (e *EngineTest) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAncestors.Error())
+		require.FailNow(e.T, errAncestors.Error())
 	}
 	return errAncestors
 }
@@ -539,8 +514,7 @@ func (e *EngineTest) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errPushQuery.Error())
+		require.FailNow(e.T, errPushQuery.Error())
 	}
 	return errPushQuery
 }
@@ -553,8 +527,7 @@ func (e *EngineTest) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errPullQuery.Error())
+		require.FailNow(e.T, errPullQuery.Error())
 	}
 	return errPullQuery
 }
@@ -567,8 +540,7 @@ func (e *EngineTest) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errQueryFailed.Error())
+		require.FailNow(e.T, errQueryFailed.Error())
 	}
 	return errQueryFailed
 }
@@ -581,8 +553,7 @@ func (e *EngineTest) CrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errCrossChainAppRequest.Error())
+		require.FailNow(e.T, errCrossChainAppRequest.Error())
 	}
 	return errCrossChainAppRequest
 }
@@ -595,8 +566,7 @@ func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errCrossChainAppRequestFailed.Error())
+		require.FailNow(e.T, errCrossChainAppRequestFailed.Error())
 	}
 	return errCrossChainAppRequestFailed
 }
@@ -609,8 +579,7 @@ func (e *EngineTest) CrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errCrossChainAppResponse.Error())
+		require.FailNow(e.T, errCrossChainAppResponse.Error())
 	}
 	return errCrossChainAppResponse
 }
@@ -623,8 +592,7 @@ func (e *EngineTest) AppRequest(ctx context.Context, nodeID ids.NodeID, requestI
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAppRequest.Error())
+		require.FailNow(e.T, errAppRequest.Error())
 	}
 	return errAppRequest
 }
@@ -637,8 +605,7 @@ func (e *EngineTest) AppResponse(ctx context.Context, nodeID ids.NodeID, request
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAppResponse.Error())
+		require.FailNow(e.T, errAppResponse.Error())
 	}
 	return errAppResponse
 }
@@ -651,8 +618,7 @@ func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, re
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAppRequestFailed.Error())
+		require.FailNow(e.T, errAppRequestFailed.Error())
 	}
 	return errAppRequestFailed
 }
@@ -665,8 +631,7 @@ func (e *EngineTest) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byt
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errAppGossip.Error())
+		require.FailNow(e.T, errAppGossip.Error())
 	}
 	return errAppGossip
 }
@@ -679,8 +644,7 @@ func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errChits.Error())
+		require.FailNow(e.T, errChits.Error())
 	}
 	return errChits
 }
@@ -693,8 +657,7 @@ func (e *EngineTest) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersi
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errConnected.Error())
+		require.FailNow(e.T, errConnected.Error())
 	}
 	return errConnected
 }
@@ -707,8 +670,7 @@ func (e *EngineTest) Disconnected(ctx context.Context, nodeID ids.NodeID) error 
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errDisconnected.Error())
+		require.FailNow(e.T, errDisconnected.Error())
 	}
 	return errDisconnected
 }
@@ -721,8 +683,7 @@ func (e *EngineTest) HealthCheck(ctx context.Context) (interface{}, error) {
 		return nil, nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow(errHealthCheck.Error())
+		require.FailNow(e.T, errHealthCheck.Error())
 	}
 	return nil, errHealthCheck
 }
@@ -735,8 +696,7 @@ func (e *EngineTest) GetVM() VM {
 		return nil
 	}
 	if e.T != nil {
-		require := require.New(e.T)
-		require.FailNow("Unexpectedly called GetVM")
+		require.FailNow(e.T, "Unexpectedly called GetVM")
 	}
 	return nil
 }

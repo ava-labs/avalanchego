@@ -39,8 +39,7 @@ func (b *BootstrapableTest) Clear() error {
 	if b.ClearF != nil {
 		return b.ClearF()
 	} else if b.CantClear && b.T != nil {
-		require := require.New(b.T)
-		require.FailNow(errClear.Error())
+		require.FailNow(b.T, errClear.Error())
 	}
 	return errClear
 }
@@ -49,8 +48,7 @@ func (b *BootstrapableTest) ForceAccepted(ctx context.Context, containerIDs []id
 	if b.ForceAcceptedF != nil {
 		return b.ForceAcceptedF(ctx, containerIDs)
 	} else if b.CantForceAccepted && b.T != nil {
-		require := require.New(b.T)
-		require.FailNow(errForceAccepted.Error())
+		require.FailNow(b.T, errForceAccepted.Error())
 	}
 	return errForceAccepted
 }
