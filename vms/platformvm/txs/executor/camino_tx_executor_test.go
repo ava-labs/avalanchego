@@ -1559,6 +1559,13 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	env.config.BanffTime = env.state.GetTimestamp()
 
 	t.Run("Happy path on abort", func(t *testing.T) {
+		// utxoids are polluted with cached ids, need to clean this non-exported field
+		for _, in := range ins {
+			in.UTXOID = avax.UTXOID{
+				TxID:        in.TxID,
+				OutputIndex: in.OutputIndex,
+			}
+		}
 		txExecutor, tx := execute(t, happyPathTest)
 		txExecutor.OnAbortState.Apply(env.state)
 		env.state.SetHeight(uint64(1))

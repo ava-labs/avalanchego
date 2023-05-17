@@ -201,7 +201,6 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 		Asset:  avax.Asset{ID: assetID},
 		Out:    out,
 	}
-	testUTXO.InputID()
 	return testUTXO
 }
 
@@ -256,11 +255,13 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 	}
 
 	// to be sure that utxoid.id is set in both entities
-	utxo.InputID()
 	return &avax.TransferableInput{
-		UTXOID: utxo.UTXOID,
-		Asset:  utxo.Asset,
-		In:     in,
+		UTXOID: avax.UTXOID{
+			TxID:        utxo.TxID,
+			OutputIndex: utxo.OutputIndex,
+		},
+		Asset: utxo.Asset,
+		In:    in,
 	}
 }
 

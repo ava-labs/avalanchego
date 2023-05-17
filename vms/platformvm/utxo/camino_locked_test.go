@@ -65,7 +65,7 @@ func TestUnlockUTXOs(t *testing.T) {
 			generateWant: func(utxos []*avax.UTXO) want {
 				return want{
 					ins: []*avax.TransferableInput{
-						generateTestInFromUTXO(utxos[0], nil),
+						generateTestInFromUTXO(utxos[0], []uint32{}),
 					},
 					outs: []*avax.TransferableOutput{
 						generateTestOut(ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
@@ -81,7 +81,7 @@ func TestUnlockUTXOs(t *testing.T) {
 			generateWant: func(utxos []*avax.UTXO) want {
 				return want{
 					ins: []*avax.TransferableInput{
-						generateTestInFromUTXO(utxos[0], nil),
+						generateTestInFromUTXO(utxos[0], []uint32{}),
 					},
 					outs: []*avax.TransferableOutput{
 						generateTestOut(ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),

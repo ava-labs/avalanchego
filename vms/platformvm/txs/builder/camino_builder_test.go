@@ -292,8 +292,11 @@ func TestNewClaimTx(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{{
-					UTXOID: feeUTXO.UTXOID,
-					Asset:  feeUTXO.Asset,
+					UTXOID: avax.UTXOID{
+						TxID:        feeUTXO.TxID,
+						OutputIndex: feeUTXO.OutputIndex,
+					},
+					Asset: feeUTXO.Asset,
 					In: &secp256k1fx.TransferInput{
 						Amt:   defaultTxFee,
 						Input: secp256k1fx.Input{SigIndices: []uint32{0}},

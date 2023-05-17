@@ -382,9 +382,12 @@ func (h *handler) Lock(
 			}
 
 			ins = append(ins, &avax.TransferableInput{
-				UTXOID: utxo.UTXOID,
-				Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
-				In:     in,
+				UTXOID: avax.UTXOID{
+					TxID:        utxo.TxID,
+					OutputIndex: utxo.OutputIndex,
+				},
+				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+				In:    in,
 			})
 			signers = append(signers, inSigners)
 			owners = append(owners, &innerOut.OutputOwners)
@@ -581,13 +584,16 @@ func (h *handler) unlockUTXOs(
 
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			UTXOID: avax.UTXOID{
+				TxID:        utxo.TxID,
+				OutputIndex: utxo.OutputIndex,
+			},
+			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 			In: &locked.In{
 				IDs: out.IDs,
 				TransferableIn: &secp256k1fx.TransferInput{
 					Amt:   out.Amount(),
-					Input: secp256k1fx.Input{},
+					Input: secp256k1fx.Input{SigIndices: []uint32{}},
 				},
 			},
 		})
@@ -700,8 +706,11 @@ func (h *handler) UnlockDeposit(
 
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
-			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			UTXOID: avax.UTXOID{
+				TxID:        utxo.TxID,
+				OutputIndex: utxo.OutputIndex,
+			},
+			Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 			In: &locked.In{
 				IDs:            out.IDs,
 				TransferableIn: in,
