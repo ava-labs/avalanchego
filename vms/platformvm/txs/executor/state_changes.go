@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -103,7 +102,6 @@ func (s *stateChanges) Len() int {
 // Instead it returns all the StateChanges caused by advancing the chain time to
 // the [newChainTime].
 func AdvanceTimeTo(
-	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
 ) (StateChanges, error) {
@@ -153,10 +151,11 @@ func AdvanceTimeTo(
 			}
 		}
 
-		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+		rewardsCfg, err := parentState.GetRewardConfig(stakerToAdd.SubnetID)
 		if err != nil {
 			return nil, err
 		}
+		rewards := reward.NewCalculator(rewardsCfg)
 
 		potentialReward := rewards.Calculate(
 			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
@@ -206,30 +205,4 @@ func AdvanceTimeTo(
 		changes.currentValidatorsToRemove = append(changes.currentValidatorsToRemove, stakerToRemove)
 	}
 	return changes, nil
-}
-
-func GetRewardsCalculator(
-	backend *Backend,
-	parentState state.Chain,
-	subnetID ids.ID,
-) (reward.Calculator, error) {
-	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
-	}
-
-	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
-	if err != nil {
-		return nil, err
-	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return nil, ErrIsNotTransformSubnetTx
-	}
-
-	return reward.NewCalculator(reward.Config{
-		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
-		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
-		SupplyCap:          transformSubnet.MaximumSupply,
-	}), nil
 }
