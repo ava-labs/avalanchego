@@ -44,7 +44,7 @@ if [[ -z $coreth_path ]] || [[ -z $evm_path ]]; then
 fi
 
 if [[ ! -d "$coreth_path" ]]; then
-  go get "github.com/ava-labs/coreth@$coreth_version"
+  go get "github.com/taurusgroup/coreth@$coreth_version"
 fi
 
 # Build Coreth

@@ -9,11 +9,11 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Direct
 avalanchego_path="$AVALANCHE_PATH/build/avalanchego"
 plugin_dir=${PLUGIN_DIR:-$HOME/.avalanchego/plugins}
 evm_path=${EVM_PATH:-$plugin_dir/evm}
-coreth_version=${CORETH_VERSION:-'v0.12.1-rc.0'}
+coreth_version=${CORETH_VERSION:-'v0.12.1-rc.0-taurus'}
 
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
-coreth_path=${CORETH_PATH:-"$GOPATH/pkg/mod/github.com/ava-labs/coreth@$coreth_version"}
+coreth_path=${CORETH_PATH:-"$GOPATH/pkg/mod/github.com/taurusgroup/coreth@$coreth_version"}
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
