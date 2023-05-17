@@ -6,8 +6,9 @@ package cache
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 const TestSizedIntSize = 8
