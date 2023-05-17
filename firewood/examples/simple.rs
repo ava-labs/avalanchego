@@ -2,10 +2,10 @@
 // See the file LICENSE.md for licensing terms.
 
 #[cfg(feature = "eth")]
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, WalConfig};
 
 #[cfg(feature = "eth")]
-fn print_states(db: &DB) {
+fn print_states(db: &Db) {
     println!("======");
     for account in ["ted", "alice"] {
         let addr = account.as_bytes();
@@ -37,9 +37,9 @@ fn main() {
 /// cargo run --example simple
 #[cfg(feature = "eth")]
 fn main() {
-    let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
+    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
     {
-        let db = DB::new("simple_db", &cfg.clone().truncate(true).build()).unwrap();
+        let db = Db::new("simple_db", &cfg.clone().truncate(true).build()).unwrap();
         db.new_writebatch()
             .set_balance(b"ted", 10.into())
             .unwrap()
@@ -54,7 +54,7 @@ fn main() {
             .commit();
     }
     {
-        let db = DB::new("simple_db", &cfg.clone().truncate(false).build()).unwrap();
+        let db = Db::new("simple_db", &cfg.clone().truncate(false).build()).unwrap();
         print_states(&db);
         db.new_writebatch()
             .set_state(b"alice", b"z", b"999".to_vec())
@@ -63,7 +63,7 @@ fn main() {
         print_states(&db);
     }
     {
-        let db = DB::new("simple_db", &cfg.truncate(false).build()).unwrap();
+        let db = Db::new("simple_db", &cfg.truncate(false).build()).unwrap();
         print_states(&db);
         let mut stdout = std::io::stdout();
         let mut acc = None;

@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, bail, Error, Result};
 use clap::Args;
-use firewood::db::{DBConfig, DBError, WALConfig, DB};
+use firewood::db::{Db, DbConfig, DbError, WalConfig};
 use log;
 use std::str;
 
@@ -26,11 +26,11 @@ pub struct Options {
 
 pub fn run(opts: &Options) -> Result<()> {
     log::debug!("get key value pair {:?}", opts);
-    let cfg = DBConfig::builder()
+    let cfg = DbConfig::builder()
         .truncate(false)
-        .wal(WALConfig::builder().max_revisions(10).build());
+        .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
+    let db = Db::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
 
     match db.kv_get(opts.key.as_bytes()) {
         Ok(val) => {
@@ -44,7 +44,7 @@ pub fn run(opts: &Options) -> Result<()> {
             }
             Ok(())
         }
-        Err(DBError::KeyNotFound) => bail!("key not found"),
+        Err(DbError::KeyNotFound) => bail!("key not found"),
         Err(e) => bail!(e),
     }
 }

@@ -2,15 +2,15 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::{
-    db::{DBConfig, Revision, WALConfig, DB},
+    db::{Db, DbConfig, Revision, WalConfig},
     proof::Proof,
 };
 
 /// cargo run --example rev
 fn main() {
-    let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
+    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
     {
-        let db = DB::new("rev_db", &cfg.clone().truncate(true).build())
+        let db = Db::new("rev_db", &cfg.clone().truncate(true).build())
             .expect("db initiation should succeed");
         let items = vec![("dof", "verb"), ("doe", "reindeer"), ("dog", "puppy")];
         for (k, v) in items.iter() {
@@ -77,7 +77,7 @@ fn main() {
     }
     {
         let db =
-            DB::new("rev_db", &cfg.truncate(false).build()).expect("db initiation should succeed");
+            Db::new("rev_db", &cfg.truncate(false).build()).expect("db initiation should succeed");
         {
             let revision = db.get_revision(0, None).expect("revision-0 should exist");
             let revision_root_hash = revision
@@ -88,7 +88,7 @@ fn main() {
             let current_root_hash = db
                 .kv_root_hash()
                 .expect("root-hash for current state should exist");
-            // The following is true as long as the current state is fresh after replaying from WALs.
+            // The following is true as long as the current state is fresh after replaying from Wals.
             assert_eq!(revision_root_hash, current_root_hash);
 
             let revision = db.get_revision(1, None).expect("revision-1 should exist");

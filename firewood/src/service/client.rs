@@ -12,10 +12,10 @@ use std::{path::Path, thread};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::api::Revision;
-use crate::db::DBRevConfig;
+use crate::db::DbRevConfig;
 use crate::{
     api,
-    db::{DBConfig, DBError},
+    db::{DbConfig, DbError},
     merkle,
 };
 use async_trait::async_trait;
@@ -44,7 +44,7 @@ impl Drop for Connection {
 
 impl Connection {
     #[allow(dead_code)]
-    fn new<P: AsRef<Path>>(path: P, cfg: DBConfig) -> Self {
+    fn new<P: AsRef<Path>>(path: P, cfg: DbConfig) -> Self {
         let (sender, receiver) = mpsc::channel(1_000)
             as (
                 tokio::sync::mpsc::Sender<Request>,
@@ -68,7 +68,7 @@ impl api::WriteBatch for BatchHandle {
         self,
         key: K,
         val: V,
-    ) -> Result<Self, DBError> {
+    ) -> Result<Self, DbError> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -81,14 +81,14 @@ impl api::WriteBatch for BatchHandle {
             .await;
         return match recv.await {
             Ok(_) => Ok(self),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
     async fn kv_remove<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
-    ) -> Result<(Self, Option<Vec<u8>>), DBError> {
+    ) -> Result<(Self, Option<Vec<u8>>), DbError> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -101,7 +101,7 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(v)) => Ok((self, v)),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
@@ -110,7 +110,7 @@ impl api::WriteBatch for BatchHandle {
         self,
         key: K,
         balance: primitive_types::U256,
-    ) -> Result<Self, DBError> {
+    ) -> Result<Self, DbError> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -124,12 +124,12 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(_)) => Ok(self),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
     #[cfg(feature = "eth")]
-    async fn set_code<K, V>(self, key: K, code: V) -> Result<Self, DBError>
+    async fn set_code<K, V>(self, key: K, code: V) -> Result<Self, DbError>
     where
         K: AsRef<[u8]> + Send + Sync,
         V: AsRef<[u8]> + Send + Sync,
@@ -147,7 +147,7 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(_)) => Ok(self),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
@@ -156,7 +156,7 @@ impl api::WriteBatch for BatchHandle {
         self,
         key: K,
         nonce: u64,
-    ) -> Result<Self, DBError> {
+    ) -> Result<Self, DbError> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -170,12 +170,12 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(_)) => Ok(self),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
     #[cfg(feature = "eth")]
-    async fn set_state<K, SK, S>(self, key: K, sub_key: SK, state: S) -> Result<Self, DBError>
+    async fn set_state<K, SK, S>(self, key: K, sub_key: SK, state: S) -> Result<Self, DbError>
     where
         K: AsRef<[u8]> + Send + Sync,
         SK: AsRef<[u8]> + Send + Sync,
@@ -195,11 +195,11 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(_)) => Ok(self),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
     #[cfg(feature = "eth")]
-    async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DBError> {
+    async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DbError> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -212,7 +212,7 @@ impl api::WriteBatch for BatchHandle {
         return match recv.await {
             Ok(Ok(_)) => Ok(self),
             Ok(Err(e)) => Err(e),
-            Err(_e) => Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 
@@ -221,7 +221,7 @@ impl api::WriteBatch for BatchHandle {
         self,
         _key: K,
         _acc: &mut Option<crate::account::Account>,
-    ) -> Result<Self, DBError> {
+    ) -> Result<Self, DbError> {
         todo!()
     }
 
@@ -249,7 +249,7 @@ impl api::WriteBatch for BatchHandle {
             .await;
         return match recv.await {
             Ok(_) => (),
-            Err(_e) => (), // Err(DBError::InvalidParams), // TODO: need a special error for comm failures
+            Err(_e) => (), // Err(DbError::InvalidParams), // TODO: need a special error for comm failures
         };
     }
 }
@@ -265,7 +265,7 @@ impl super::RevisionHandle {
 
 #[async_trait]
 impl Revision for super::RevisionHandle {
-    async fn kv_root_hash(&self) -> Result<merkle::Hash, DBError> {
+    async fn kv_root_hash(&self) -> Result<merkle::Hash, DbError> {
         let (send, recv) = oneshot::channel();
         let msg = Request::RevRequest(RevRequest::RootHash {
             handle: self.id,
@@ -275,7 +275,7 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("Actor task has been killed")
     }
 
-    async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DBError> {
+    async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DbError> {
         let (send, recv) = oneshot::channel();
         let _ = Request::RevRequest(RevRequest::Get {
             handle: self.id,
@@ -311,7 +311,7 @@ impl Revision for super::RevisionHandle {
     ) {
         todo!()
     }
-    async fn root_hash(&self) -> Result<merkle::Hash, DBError> {
+    async fn root_hash(&self) -> Result<merkle::Hash, DbError> {
         let (send, recv) = oneshot::channel();
         let msg = Request::RevRequest(RevRequest::RootHash {
             handle: self.id,
@@ -321,7 +321,7 @@ impl Revision for super::RevisionHandle {
         recv.await.expect("channel failed")
     }
 
-    async fn dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DBError> {
+    async fn dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DbError> {
         todo!()
     }
 
@@ -330,11 +330,11 @@ impl Revision for super::RevisionHandle {
         &self,
         _key: K,
         _writer: W,
-    ) -> Result<(), DBError> {
+    ) -> Result<(), DbError> {
         todo!()
     }
 
-    async fn kv_dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DBError> {
+    async fn kv_dump<W: std::io::Write + Send + Sync>(&self, _writer: W) -> Result<(), DbError> {
         unimplemented!();
     }
 
@@ -342,12 +342,12 @@ impl Revision for super::RevisionHandle {
     async fn get_balance<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
-    ) -> Result<primitive_types::U256, DBError> {
+    ) -> Result<primitive_types::U256, DbError> {
         todo!()
     }
 
     #[cfg(feature = "eth")]
-    async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, _key: K) -> Result<Vec<u8>, DBError> {
+    async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, _key: K) -> Result<Vec<u8>, DbError> {
         todo!()
     }
 
@@ -355,7 +355,7 @@ impl Revision for super::RevisionHandle {
     async fn get_nonce<K: AsRef<[u8]> + Send + Sync>(
         &self,
         _key: K,
-    ) -> Result<crate::api::Nonce, DBError> {
+    ) -> Result<crate::api::Nonce, DbError> {
         todo!()
     }
 
@@ -364,13 +364,13 @@ impl Revision for super::RevisionHandle {
         &self,
         _key: K,
         _sub_key: K,
-    ) -> Result<Vec<u8>, DBError> {
+    ) -> Result<Vec<u8>, DbError> {
         todo!()
     }
 }
 
 #[async_trait]
-impl crate::api::DB<BatchHandle, RevisionHandle> for Connection
+impl crate::api::Db<BatchHandle, RevisionHandle> for Connection
 where
     tokio::sync::mpsc::Sender<Request>: From<tokio::sync::mpsc::Sender<Request>>,
 {
@@ -391,7 +391,7 @@ where
         }
     }
 
-    async fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<RevisionHandle> {
+    async fn get_revision(&self, nback: usize, cfg: Option<DbRevConfig>) -> Option<RevisionHandle> {
         let (send, recv) = oneshot::channel();
         let msg = Request::NewRevision {
             nback,
@@ -414,7 +414,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{api::WriteBatch, api::DB, db::WALConfig};
+    use crate::{api::Db, api::WriteBatch, db::WalConfig};
     use std::path::PathBuf;
 
     use super::*;
@@ -457,9 +457,9 @@ mod test {
         );
     }
 
-    fn db_config() -> DBConfig {
-        DBConfig::builder()
-            .wal(WALConfig::builder().max_revisions(10).build())
+    fn db_config() -> DbConfig {
+        DbConfig::builder()
+            .wal(WalConfig::builder().max_revisions(10).build())
             .truncate(true)
             .build()
     }

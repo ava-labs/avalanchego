@@ -8,7 +8,7 @@ use std::default::Default;
 use std::mem::zeroed;
 
 #[repr(C)]
-pub enum IOCmd {
+pub enum IoCmd {
     PRead = 0,
     PWrite = 1,
     FSync = 2,
@@ -26,7 +26,7 @@ pub const IOCB_FLAG_IOPRIO: u32 = 1 << 1;
 // Taken from linux/include/linux/aio_abi.h
 // This is a kernel ABI, so there should be no need to worry about it changing.
 #[repr(C)]
-pub struct IOCb {
+pub struct IoCb {
     pub aio_data: u64, // ends up in io_event.data
     // NOTE: the order of aio_key and aio_rw_flags could be byte-order depedent
     pub aio_key: u32,
@@ -45,10 +45,10 @@ pub struct IOCb {
     pub aio_resfd: u32,
 }
 
-impl Default for IOCb {
-    fn default() -> IOCb {
-        IOCb {
-            aio_lio_opcode: IOCmd::Noop as u16,
+impl Default for IoCb {
+    fn default() -> IoCb {
+        IoCb {
+            aio_lio_opcode: IoCmd::Noop as u16,
             aio_fildes: (-1_i32) as u32,
             ..unsafe { zeroed() }
         }
@@ -57,45 +57,45 @@ impl Default for IOCb {
 
 #[derive(Clone)]
 #[repr(C)]
-pub struct IOEvent {
+pub struct IoEvent {
     pub data: u64,
     pub obj: u64,
     pub res: i64,
     pub res2: i64,
 }
 
-impl Default for IOEvent {
-    fn default() -> IOEvent {
+impl Default for IoEvent {
+    fn default() -> IoEvent {
         unsafe { zeroed() }
     }
 }
 
-pub enum IOContext {}
-pub type IOContextPtr = *mut IOContext;
+pub enum IoContext {}
+pub type IoContextPtr = *mut IoContext;
 
 #[repr(C)]
-pub struct IOVector {
+pub struct IoVector {
     pub iov_base: *mut u8,
     pub iov_len: size_t,
 }
 
 #[link(name = "aio", kind = "static")]
 extern "C" {
-    pub fn io_queue_init(maxevents: c_int, ctxp: *mut IOContextPtr) -> c_int;
-    pub fn io_queue_release(ctx: IOContextPtr) -> c_int;
-    pub fn io_queue_run(ctx: IOContextPtr) -> c_int;
-    pub fn io_setup(maxevents: c_int, ctxp: *mut IOContextPtr) -> c_int;
-    pub fn io_destroy(ctx: IOContextPtr) -> c_int;
-    pub fn io_submit(ctx: IOContextPtr, nr: c_long, ios: *mut *mut IOCb) -> c_int;
-    pub fn io_cancel(ctx: IOContextPtr, iocb: *mut IOCb, evt: *mut IOEvent) -> c_int;
+    pub fn io_queue_init(maxevents: c_int, ctxp: *mut IoContextPtr) -> c_int;
+    pub fn io_queue_release(ctx: IoContextPtr) -> c_int;
+    pub fn io_queue_run(ctx: IoContextPtr) -> c_int;
+    pub fn io_setup(maxevents: c_int, ctxp: *mut IoContextPtr) -> c_int;
+    pub fn io_destroy(ctx: IoContextPtr) -> c_int;
+    pub fn io_submit(ctx: IoContextPtr, nr: c_long, ios: *mut *mut IoCb) -> c_int;
+    pub fn io_cancel(ctx: IoContextPtr, iocb: *mut IoCb, evt: *mut IoEvent) -> c_int;
     pub fn io_getevents(
-        ctx_id: IOContextPtr,
+        ctx_id: IoContextPtr,
         min_nr: c_long,
         nr: c_long,
-        events: *mut IOEvent,
+        events: *mut IoEvent,
         timeout: *mut timespec,
     ) -> c_int;
-    pub fn io_set_eventfd(iocb: *mut IOCb, eventfd: c_int);
+    pub fn io_set_eventfd(iocb: *mut IoCb, eventfd: c_int);
 }
 
 #[cfg(test)]
@@ -105,7 +105,7 @@ mod test {
     #[test]
     fn test_sizes() {
         // Check against kernel ABI
-        assert!(size_of::<super::IOEvent>() == 32);
-        assert!(size_of::<super::IOCb>() == 64);
+        assert!(size_of::<super::IoEvent>() == 32);
+        assert!(size_of::<super::IoCb>() == 64);
     }
 }

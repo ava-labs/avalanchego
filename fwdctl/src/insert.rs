@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Error, Result};
 use clap::Args;
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, WalConfig};
 use log;
 
 #[derive(Debug, Args)]
@@ -29,11 +29,11 @@ pub struct Options {
 
 pub fn run(opts: &Options) -> Result<()> {
     log::debug!("inserting key value pair {:?}", opts);
-    let cfg = DBConfig::builder()
+    let cfg = DbConfig::builder()
         .truncate(false)
-        .wal(WALConfig::builder().max_revisions(10).build());
+        .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = match DB::new(opts.db.as_str(), &cfg.build()) {
+    let db = match Db::new(opts.db.as_str(), &cfg.build()) {
         Ok(db) => db,
         Err(_) => return Err(anyhow!("error opening database")),
     };

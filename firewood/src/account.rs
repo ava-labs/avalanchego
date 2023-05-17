@@ -67,9 +67,9 @@ impl Account {
     }
 }
 
-pub struct AccountRLP;
+pub struct AccountRlp;
 
-impl ValueTransformer for AccountRLP {
+impl ValueTransformer for AccountRlp {
     fn transform(raw: &[u8]) -> Vec<u8> {
         let acc = Account::deserialize(raw);
         let mut stream = rlp::RlpStream::new_list(4);

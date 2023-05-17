@@ -8,7 +8,7 @@ use crate::account::Account;
 #[cfg(feature = "eth")]
 use primitive_types::U256;
 
-use crate::db::{DBError, DBRevConfig};
+use crate::db::{DbError, DbRevConfig};
 use crate::merkle::Hash;
 #[cfg(feature = "proof")]
 use crate::{merkle::MerkleError, proof::Proof};
@@ -18,9 +18,9 @@ use async_trait::async_trait;
 pub type Nonce = u64;
 
 #[async_trait]
-pub trait DB<B: WriteBatch, R: Revision> {
+pub trait Db<B: WriteBatch, R: Revision> {
     async fn new_writebatch(&self) -> B;
-    async fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<R>;
+    async fn get_revision(&self, nback: usize, cfg: Option<DbRevConfig>) -> Option<R>;
 }
 
 #[async_trait]
@@ -32,13 +32,13 @@ where
         self,
         key: K,
         val: V,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Remove an item from the generic key-value storage. `val` will be set to the value that is
     /// removed from the storage if it exists.
     async fn kv_remove<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
-    ) -> Result<(Self, Option<Vec<u8>>), DBError>;
+    ) -> Result<(Self, Option<Vec<u8>>), DbError>;
 
     /// Set balance of the account
     #[cfg(feature = "eth")]
@@ -46,21 +46,21 @@ where
         self,
         key: K,
         balance: U256,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Set code of the account
     #[cfg(feature = "eth")]
     async fn set_code<K: AsRef<[u8]> + Send + Sync, V: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
         code: V,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Set nonce of the account.
     #[cfg(feature = "eth")]
     async fn set_nonce<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
         nonce: u64,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Set the state value indexed by `sub_key` in the account indexed by `key`.
     #[cfg(feature = "eth")]
     async fn set_state<
@@ -72,17 +72,17 @@ where
         key: K,
         sub_key: SK,
         val: V,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Create an account.
     #[cfg(feature = "eth")]
-    async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DBError>;
+    async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DbError>;
     /// Delete an account.
     #[cfg(feature = "eth")]
     async fn delete_account<K: AsRef<[u8]> + Send + Sync>(
         self,
         key: K,
         acc: &mut Option<Account>,
-    ) -> Result<Self, DBError>;
+    ) -> Result<Self, DbError>;
     /// Do not rehash merkle roots upon commit. This will leave the recalculation of the dirty root
     /// hashes to future invocation of `root_hash`, `kv_root_hash` or batch commits.
     async fn no_root_hash(self) -> Self;
@@ -97,12 +97,12 @@ pub trait Revision
 where
     Self: Sized,
 {
-    async fn kv_root_hash(&self) -> Result<Hash, DBError>;
-    async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DBError>;
+    async fn kv_root_hash(&self) -> Result<Hash, DbError>;
+    async fn kv_get<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DbError>;
 
-    async fn kv_dump<W: Write + Send + Sync>(&self, writer: W) -> Result<(), DBError>;
-    async fn root_hash(&self) -> Result<Hash, DBError>;
-    async fn dump<W: Write + Send + Sync>(&self, writer: W) -> Result<(), DBError>;
+    async fn kv_dump<W: Write + Send + Sync>(&self, writer: W) -> Result<(), DbError>;
+    async fn root_hash(&self) -> Result<Hash, DbError>;
+    async fn dump<W: Write + Send + Sync>(&self, writer: W) -> Result<(), DbError>;
 
     #[cfg(feature = "proof")]
     async fn prove<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Proof, MerkleError>;
@@ -116,21 +116,21 @@ where
         values: Vec<K>,
     );
     #[cfg(feature = "eth")]
-    async fn get_balance<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<U256, DBError>;
+    async fn get_balance<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<U256, DbError>;
     #[cfg(feature = "eth")]
-    async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DBError>;
+    async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DbError>;
     #[cfg(feature = "eth")]
-    async fn get_nonce<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Nonce, DBError>;
+    async fn get_nonce<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Nonce, DbError>;
     #[cfg(feature = "eth")]
     async fn get_state<K: AsRef<[u8]> + Send + Sync>(
         &self,
         key: K,
         sub_key: K,
-    ) -> Result<Vec<u8>, DBError>;
+    ) -> Result<Vec<u8>, DbError>;
     #[cfg(feature = "eth")]
     async fn dump_account<W: Write + Send + Sync, K: AsRef<[u8]> + Send + Sync>(
         &self,
         key: K,
         writer: W,
-    ) -> Result<(), DBError>;
+    ) -> Result<(), DbError>;
 }

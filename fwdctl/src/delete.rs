@@ -3,7 +3,7 @@
 
 use anyhow::{Error, Result};
 use clap::Args;
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, WalConfig};
 use log;
 
 #[derive(Debug, Args)]
@@ -25,11 +25,11 @@ pub struct Options {
 
 pub fn run(opts: &Options) -> Result<()> {
     log::debug!("deleting key {:?}", opts);
-    let cfg = DBConfig::builder()
+    let cfg = DbConfig::builder()
         .truncate(false)
-        .wal(WALConfig::builder().max_revisions(10).build());
+        .wal(WalConfig::builder().max_revisions(10).build());
 
-    let db = DB::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
+    let db = Db::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
     db.new_writebatch()
         .kv_remove(&opts.key)
         .map_err(Error::msg)?;

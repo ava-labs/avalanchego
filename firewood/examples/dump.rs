@@ -11,7 +11,7 @@ fn main() {
 #[cfg(feature = "eth")]
 use clap::{command, Arg, ArgMatches};
 #[cfg(feature = "eth")]
-use firewood::db::{DBConfig, DBError, WALConfig, DB};
+use firewood::db::{Db, DbConfig, DbError, WalConfig};
 
 /// cargo run --example dump benchmark_db/
 #[cfg(feature = "eth")]
@@ -25,9 +25,9 @@ fn main() {
         )
         .get_matches();
     let path = get_db_path(matches);
-    let db = DB::new(
+    let db = Db::new(
         path.unwrap().as_str(),
-        &DBConfig::builder().truncate(false).build(),
+        &DbConfig::builder().truncate(false).build(),
     )
     .unwrap();
     let mut stdout = std::io::stdout();
@@ -42,14 +42,14 @@ fn main() {
 /// Returns the provided INPUT db path if one is provided.
 /// Otherwise, instantiate a DB called simple_db and return the path.
 #[cfg(feature = "eth")]
-fn get_db_path(matches: ArgMatches) -> Result<String, DBError> {
+fn get_db_path(matches: ArgMatches) -> Result<String, DbError> {
     if let Some(m) = matches.get_one::<String>("INPUT") {
         return Ok(m.to_string());
     }
 
     // Build and provide a new db path
-    let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
-    let db = DB::new("simple_db", &cfg.truncate(true).build()).unwrap();
+    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+    let db = Db::new("simple_db", &cfg.truncate(true).build()).unwrap();
     db.new_writebatch()
         .set_balance(b"ted", 10.into())
         .unwrap()

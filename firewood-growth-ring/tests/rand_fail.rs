@@ -4,7 +4,7 @@ mod common;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-fn _multi_point_failure(sims: &[common::PaintingSim], state: &common::WALStoreEmulState, f: usize) {
+fn _multi_point_failure(sims: &[common::PaintingSim], state: &common::WalStoreEmulState, f: usize) {
     let sim = &sims[0];
     // save the current state and start from there
     let mut state = state.clone();
@@ -44,7 +44,7 @@ fn _multi_point_failure(sims: &[common::PaintingSim], state: &common::WALStoreEm
 }
 
 fn multi_point_failure(sims: &[common::PaintingSim]) {
-    _multi_point_failure(sims, &common::WALStoreEmulState::new(), 1);
+    _multi_point_failure(sims, &common::WalStoreEmulState::new(), 1);
 }
 
 #[test]

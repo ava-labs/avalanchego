@@ -82,7 +82,7 @@ impl Ash {
 pub struct AshRecord(pub HashMap<SpaceID, Ash>);
 
 impl growthring::wal::Record for AshRecord {
-    fn serialize(&self) -> growthring::wal::WALBytes {
+    fn serialize(&self) -> growthring::wal::WalBytes {
         let mut bytes = Vec::new();
         bytes.extend((self.0.len() as u64).to_le_bytes());
         for (space_id, w) in self.0.iter() {
@@ -101,7 +101,7 @@ impl growthring::wal::Record for AshRecord {
 
 impl AshRecord {
     #[allow(clippy::boxed_local)]
-    fn deserialize(raw: growthring::wal::WALBytes) -> Self {
+    fn deserialize(raw: growthring::wal::WalBytes) -> Self {
         let mut r = &raw[..];
         let len = u64::from_le_bytes(r[..8].try_into().unwrap());
         r = &r[8..];
@@ -853,8 +853,8 @@ impl Drop for FilePool {
 }
 
 #[derive(TypedBuilder, Clone, Debug)]
-pub struct WALConfig {
-    #[builder(default = 22)] // 4MB WAL logs
+pub struct WalConfig {
+    #[builder(default = 22)] // 4MB Wal logs
     pub file_nbit: u64,
     #[builder(default = 15)] // 32KB
     pub block_nbit: u64,

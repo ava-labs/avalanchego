@@ -1,4 +1,4 @@
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, WalConfig};
 use std::{collections::VecDeque, fs::remove_dir_all, path::Path};
 
 macro_rules! kv_dump {
@@ -12,7 +12,7 @@ macro_rules! kv_dump {
 #[test]
 fn test_revisions() {
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    let cfg = DBConfig::builder()
+    let cfg = DbConfig::builder()
         .meta_ncached_pages(1024)
         .meta_ncached_files(128)
         .payload_ncached_pages(1024)
@@ -20,7 +20,7 @@ fn test_revisions() {
         .payload_file_nbit(16)
         .payload_regn_nbit(16)
         .wal(
-            WALConfig::builder()
+            WalConfig::builder()
                 .file_nbit(15)
                 .block_nbit(8)
                 .max_revisions(10)
@@ -45,7 +45,7 @@ fn test_revisions() {
         key
     };
     for i in 0..10 {
-        let db = DB::new("test_revisions_db", &cfg.clone().truncate(true).build()).unwrap();
+        let db = Db::new("test_revisions_db", &cfg.clone().truncate(true).build()).unwrap();
         let mut dumped = VecDeque::new();
         for _ in 0..10 {
             {
@@ -73,7 +73,7 @@ fn test_revisions() {
             }
         }
         drop(db);
-        let db = DB::new("test_revisions_db", &cfg.clone().truncate(false).build()).unwrap();
+        let db = Db::new("test_revisions_db", &cfg.clone().truncate(false).build()).unwrap();
         for (j, _) in dumped.iter().enumerate().skip(1) {
             let rev = db.get_revision(j, None).unwrap();
             let a = &kv_dump!(rev);
@@ -89,7 +89,7 @@ fn test_revisions() {
 
 #[test]
 fn create_db_issue_proof() {
-    let cfg = DBConfig::builder()
+    let cfg = DbConfig::builder()
         .meta_ncached_pages(1024)
         .meta_ncached_files(128)
         .payload_ncached_pages(1024)
@@ -97,14 +97,14 @@ fn create_db_issue_proof() {
         .payload_file_nbit(16)
         .payload_regn_nbit(16)
         .wal(
-            WALConfig::builder()
+            WalConfig::builder()
                 .file_nbit(15)
                 .block_nbit(8)
                 .max_revisions(10)
                 .build(),
         );
 
-    let db = DB::new("test_db_proof", &cfg.truncate(true).build()).unwrap();
+    let db = Db::new("test_db_proof", &cfg.truncate(true).build()).unwrap();
 
     let mut wb = db.new_writebatch();
 

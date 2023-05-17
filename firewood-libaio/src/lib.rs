@@ -6,9 +6,9 @@
 //!
 //! ```rust
 //! use futures::{executor::LocalPool, future::FutureExt, task::LocalSpawnExt};
-//! use aiofut::AIOBuilder;
+//! use aiofut::AioBuilder;
 //! use std::os::unix::io::AsRawFd;
-//! let mut aiomgr = AIOBuilder::default().build().unwrap();
+//! let mut aiomgr = AioBuilder::default().build().unwrap();
 //! let file = std::fs::OpenOptions::new()
 //!     .read(true)
 //!     .write(true)
@@ -35,7 +35,7 @@
 //! ```
 
 mod abi;
-use abi::IOCb;
+use abi::IoCb;
 use libc::time_t;
 use parking_lot::Mutex;
 use std::collections::{hash_map, HashMap};
@@ -52,7 +52,7 @@ const LIBAIO_ENOMEM: libc::c_int = -libc::ENOMEM;
 const LIBAIO_ENOSYS: libc::c_int = -libc::ENOSYS;
 
 #[derive(Clone, Debug)]
-pub enum AIOError {
+pub enum AioError {
     MaxEventsTooLarge,
     LowKernelRes,
     NotSupported,
@@ -60,34 +60,34 @@ pub enum AIOError {
 }
 
 // NOTE: I assume it io_context_t is thread-safe, no?
-struct AIOContext(abi::IOContextPtr);
-unsafe impl Sync for AIOContext {}
-unsafe impl Send for AIOContext {}
+struct AioContext(abi::IoContextPtr);
+unsafe impl Sync for AioContext {}
+unsafe impl Send for AioContext {}
 
-impl std::ops::Deref for AIOContext {
-    type Target = abi::IOContextPtr;
-    fn deref(&self) -> &abi::IOContextPtr {
+impl std::ops::Deref for AioContext {
+    type Target = abi::IoContextPtr;
+    fn deref(&self) -> &abi::IoContextPtr {
         &self.0
     }
 }
 
-impl AIOContext {
-    fn new(maxevents: u32) -> Result<Self, AIOError> {
+impl AioContext {
+    fn new(maxevents: u32) -> Result<Self, AioError> {
         let mut ctx = std::ptr::null_mut();
         unsafe {
             match abi::io_setup(maxevents as libc::c_int, &mut ctx) {
                 0 => Ok(()),
-                LIBAIO_EAGAIN => Err(AIOError::MaxEventsTooLarge),
-                LIBAIO_ENOMEM => Err(AIOError::LowKernelRes),
-                LIBAIO_ENOSYS => Err(AIOError::NotSupported),
-                _ => Err(AIOError::OtherError),
+                LIBAIO_EAGAIN => Err(AioError::MaxEventsTooLarge),
+                LIBAIO_ENOMEM => Err(AioError::LowKernelRes),
+                LIBAIO_ENOSYS => Err(AioError::NotSupported),
+                _ => Err(AioError::OtherError),
             }
-            .map(|_| AIOContext(ctx))
+            .map(|_| AioContext(ctx))
         }
     }
 }
 
-impl Drop for AIOContext {
+impl Drop for AioContext {
     fn drop(&mut self) {
         unsafe {
             assert_eq!(abi::io_destroy(self.0), 0);
@@ -96,14 +96,14 @@ impl Drop for AIOContext {
 }
 
 /// Represent the necessary data for an AIO operation. Memory-safe when moved.
-pub struct AIO {
+pub struct Aio {
     // hold the buffer used by iocb
     data: Option<Box<[u8]>>,
-    iocb: AtomicPtr<abi::IOCb>,
+    iocb: AtomicPtr<abi::IoCb>,
     id: u64,
 }
 
-impl AIO {
+impl Aio {
     fn new(
         id: u64,
         fd: RawFd,
@@ -111,9 +111,9 @@ impl AIO {
         data: Box<[u8]>,
         priority: u16,
         flags: u32,
-        opcode: abi::IOCmd,
+        opcode: abi::IoCmd,
     ) -> Self {
-        let mut iocb = Box::<IOCb>::default();
+        let mut iocb = Box::<IoCb>::default();
         iocb.aio_fildes = fd as u32;
         iocb.aio_lio_opcode = opcode as u16;
         iocb.aio_reqprio = priority;
@@ -124,11 +124,11 @@ impl AIO {
         iocb.aio_data = id;
         let iocb = AtomicPtr::new(Box::into_raw(iocb));
         let data = Some(data);
-        AIO { iocb, id, data }
+        Aio { iocb, id, data }
     }
 }
 
-impl Drop for AIO {
+impl Drop for Aio {
     fn drop(&mut self) {
         unsafe {
             drop(Box::from_raw(self.iocb.load(Ordering::Acquire)));
@@ -138,23 +138,23 @@ impl Drop for AIO {
 
 /// The result of an AIO operation: the number of bytes written on success,
 /// or the errno on failure.
-pub type AIOResult = (Result<usize, i32>, Box<[u8]>);
+pub type AioResult = (Result<usize, i32>, Box<[u8]>);
 
 /// Represents a scheduled (future) asynchronous I/O operation, which gets executed (resolved)
 /// automatically.
-pub struct AIOFuture {
-    notifier: Arc<AIONotifier>,
+pub struct AioFuture {
+    notifier: Arc<AioNotifier>,
     aio_id: u64,
 }
 
-impl AIOFuture {
+impl AioFuture {
     pub fn get_id(&self) -> u64 {
         self.aio_id
     }
 }
 
-impl std::future::Future for AIOFuture {
-    type Output = AIOResult;
+impl std::future::Future for AioFuture {
+    type Output = AioResult;
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context) -> std::task::Poll<Self::Output> {
         if let Some(ret) = self.notifier.poll(self.aio_id, cx.waker()) {
             std::task::Poll::Ready(ret)
@@ -164,30 +164,30 @@ impl std::future::Future for AIOFuture {
     }
 }
 
-impl Drop for AIOFuture {
+impl Drop for AioFuture {
     fn drop(&mut self) {
         self.notifier.dropped(self.aio_id)
     }
 }
 
 #[allow(clippy::enum_variant_names)]
-enum AIOState {
-    FutureInit(AIO, bool),
-    FuturePending(AIO, std::task::Waker, bool),
-    FutureDone(AIOResult),
+enum AioState {
+    FutureInit(Aio, bool),
+    FuturePending(Aio, std::task::Waker, bool),
+    FutureDone(AioResult),
 }
 
 /// The state machine for finished AIO operations and wakes up the futures.
-pub struct AIONotifier {
-    waiting: Mutex<HashMap<u64, AIOState>>,
+pub struct AioNotifier {
+    waiting: Mutex<HashMap<u64, AioState>>,
     npending: AtomicUsize,
-    io_ctx: AIOContext,
+    io_ctx: AioContext,
     #[cfg(feature = "emulated-failure")]
     emul_fail: Option<EmulatedFailureShared>,
 }
 
-impl AIONotifier {
-    fn register_notify(&self, id: u64, state: AIOState) {
+impl AioNotifier {
+    fn register_notify(&self, id: u64, state: AioState) {
         let mut waiting = self.waiting.lock();
         assert!(waiting.insert(id, state).is_none());
     }
@@ -196,30 +196,30 @@ impl AIONotifier {
         let mut waiting = self.waiting.lock();
         if let hash_map::Entry::Occupied(mut e) = waiting.entry(id) {
             match e.get_mut() {
-                AIOState::FutureInit(_, dropped) => *dropped = true,
-                AIOState::FuturePending(_, _, dropped) => *dropped = true,
-                AIOState::FutureDone(_) => {
+                AioState::FutureInit(_, dropped) => *dropped = true,
+                AioState::FuturePending(_, _, dropped) => *dropped = true,
+                AioState::FutureDone(_) => {
                     e.remove();
                 }
             }
         }
     }
 
-    fn poll(&self, id: u64, waker: &std::task::Waker) -> Option<AIOResult> {
+    fn poll(&self, id: u64, waker: &std::task::Waker) -> Option<AioResult> {
         let mut waiting = self.waiting.lock();
         match waiting.entry(id) {
             hash_map::Entry::Occupied(e) => {
                 let v = e.remove();
                 match v {
-                    AIOState::FutureInit(aio, _) => {
-                        waiting.insert(id, AIOState::FuturePending(aio, waker.clone(), false));
+                    AioState::FutureInit(aio, _) => {
+                        waiting.insert(id, AioState::FuturePending(aio, waker.clone(), false));
                         None
                     }
-                    AIOState::FuturePending(aio, waker, dropped) => {
-                        waiting.insert(id, AIOState::FuturePending(aio, waker, dropped));
+                    AioState::FuturePending(aio, waker, dropped) => {
+                        waiting.insert(id, AioState::FuturePending(aio, waker, dropped));
                         None
                     }
-                    AIOState::FutureDone(res) => Some(res),
+                    AioState::FutureDone(res) => Some(res),
                 }
             }
             _ => unreachable!(),
@@ -231,12 +231,12 @@ impl AIONotifier {
         self.npending.fetch_sub(1, Ordering::Relaxed);
         match w.entry(id) {
             hash_map::Entry::Occupied(e) => match e.remove() {
-                AIOState::FutureInit(mut aio, dropped) => {
+                AioState::FutureInit(mut aio, dropped) => {
                     if !dropped {
                         let data = aio.data.take().unwrap();
                         w.insert(
                             id,
-                            AIOState::FutureDone(if res >= 0 {
+                            AioState::FutureDone(if res >= 0 {
                                 (Ok(res as usize), data)
                             } else {
                                 (Err(-res as i32), data)
@@ -244,12 +244,12 @@ impl AIONotifier {
                         );
                     }
                 }
-                AIOState::FuturePending(mut aio, waker, dropped) => {
+                AioState::FuturePending(mut aio, waker, dropped) => {
                     if !dropped {
                         let data = aio.data.take().unwrap();
                         w.insert(
                             id,
-                            AIOState::FutureDone(if res >= 0 {
+                            AioState::FutureDone(if res >= 0 {
                                 (Ok(res as usize), data)
                             } else {
                                 (Err(-res as i32), data)
@@ -258,8 +258,8 @@ impl AIONotifier {
                         waker.wake();
                     }
                 }
-                AIOState::FutureDone(ret) => {
-                    w.insert(id, AIOState::FutureDone(ret));
+                AioState::FutureDone(ret) => {
+                    w.insert(id, AioState::FutureDone(ret));
                 }
             },
             _ => unreachable!(),
@@ -267,7 +267,7 @@ impl AIONotifier {
     }
 }
 
-pub struct AIOBuilder {
+pub struct AioBuilder {
     max_events: u32,
     max_nwait: u16,
     max_nbatched: usize,
@@ -276,9 +276,9 @@ pub struct AIOBuilder {
     emul_fail: Option<EmulatedFailureShared>,
 }
 
-impl Default for AIOBuilder {
+impl Default for AioBuilder {
     fn default() -> Self {
-        AIOBuilder {
+        AioBuilder {
             max_events: 128,
             max_nwait: 128,
             max_nbatched: 128,
@@ -289,7 +289,7 @@ impl Default for AIOBuilder {
     }
 }
 
-impl AIOBuilder {
+impl AioBuilder {
     /// Maximum concurrent async IO operations.
     pub fn max_events(&mut self, v: u32) -> &mut Self {
         self.max_events = v;
@@ -322,18 +322,18 @@ impl AIOBuilder {
 
     /// Build an AIOManager object based on the configuration (and auto-start the background IO
     /// scheduling thread).
-    pub fn build(&mut self) -> Result<AIOManager, AIOError> {
+    pub fn build(&mut self) -> Result<AioManager, AioError> {
         let (scheduler_in, scheduler_out) = new_batch_scheduler(self.max_nbatched);
         let (exit_s, exit_r) = crossbeam_channel::bounded(0);
 
-        let notifier = Arc::new(AIONotifier {
-            io_ctx: AIOContext::new(self.max_events)?,
+        let notifier = Arc::new(AioNotifier {
+            io_ctx: AioContext::new(self.max_events)?,
             waiting: Mutex::new(HashMap::new()),
             npending: AtomicUsize::new(0),
             #[cfg(feature = "emulated-failure")]
             emul_fail: self.emul_fail.as_ref().map(|ef| ef.clone()),
         });
-        let mut aiomgr = AIOManager {
+        let mut aiomgr = AioManager {
             notifier,
             listener: None,
             scheduler_in,
@@ -351,21 +351,21 @@ pub trait EmulatedFailure: Send {
 pub type EmulatedFailureShared = Arc<Mutex<dyn EmulatedFailure>>;
 
 /// Manager all AIOs.
-pub struct AIOManager {
-    notifier: Arc<AIONotifier>,
-    scheduler_in: AIOBatchSchedulerIn,
+pub struct AioManager {
+    notifier: Arc<AioNotifier>,
+    scheduler_in: AioBatchSchedulerIn,
     listener: Option<std::thread::JoinHandle<()>>,
     exit_s: crossbeam_channel::Sender<()>,
 }
 
-impl AIOManager {
+impl AioManager {
     fn start(
         &mut self,
-        mut scheduler_out: AIOBatchSchedulerOut,
+        mut scheduler_out: AioBatchSchedulerOut,
         exit_r: crossbeam_channel::Receiver<()>,
         max_nwait: u16,
         timeout: Option<u32>,
-    ) -> Result<(), AIOError> {
+    ) -> Result<(), AioError> {
         let n = self.notifier.clone();
         self.listener = Some(std::thread::spawn(move || {
             let mut timespec = timeout.map(|sec: u32| libc::timespec {
@@ -398,7 +398,7 @@ impl AIOManager {
                     continue;
                 }
                 // then block on any finishing aios
-                let mut events = vec![abi::IOEvent::default(); max_nwait as usize];
+                let mut events = vec![abi::IoEvent::default(); max_nwait as usize];
                 let ret = unsafe {
                     abi::io_getevents(
                         *n.io_ctx,
@@ -438,19 +438,19 @@ impl AIOManager {
         Ok(())
     }
 
-    pub fn read(&self, fd: RawFd, offset: u64, length: usize, priority: Option<u16>) -> AIOFuture {
+    pub fn read(&self, fd: RawFd, offset: u64, length: usize, priority: Option<u16>) -> AioFuture {
         let priority = priority.unwrap_or(0);
         let mut data = Vec::new();
         data.resize(length, 0);
         let data = data.into_boxed_slice();
-        let aio = AIO::new(
+        let aio = Aio::new(
             self.scheduler_in.next_id(),
             fd,
             offset,
             data,
             priority,
             0,
-            abi::IOCmd::PRead,
+            abi::IoCmd::PRead,
         );
         self.scheduler_in.schedule(aio, &self.notifier)
     }
@@ -461,16 +461,16 @@ impl AIOManager {
         offset: u64,
         data: Box<[u8]>,
         priority: Option<u16>,
-    ) -> AIOFuture {
+    ) -> AioFuture {
         let priority = priority.unwrap_or(0);
-        let aio = AIO::new(
+        let aio = Aio::new(
             self.scheduler_in.next_id(),
             fd,
             offset,
             data,
             priority,
             0,
-            abi::IOCmd::PWrite,
+            abi::IoCmd::PWrite,
         );
         self.scheduler_in.schedule(aio, &self.notifier)
     }
@@ -480,9 +480,9 @@ impl AIOManager {
         let w = self.notifier.waiting.lock();
         w.get(&aio_id).map(|state| {
             match state {
-                AIOState::FutureInit(aio, _) => &**aio.data.as_ref().unwrap(),
-                AIOState::FuturePending(aio, _, _) => &**aio.data.as_ref().unwrap(),
-                AIOState::FutureDone(res) => &res.1,
+                AioState::FutureInit(aio, _) => &**aio.data.as_ref().unwrap(),
+                AioState::FuturePending(aio, _, _) => &**aio.data.as_ref().unwrap(),
+                AioState::FutureDone(res) => &res.1,
             }
             .to_vec()
         })
@@ -494,32 +494,32 @@ impl AIOManager {
     }
 }
 
-impl Drop for AIOManager {
+impl Drop for AioManager {
     fn drop(&mut self) {
         self.exit_s.send(()).unwrap();
         self.listener.take().unwrap().join().unwrap();
     }
 }
 
-pub struct AIOBatchSchedulerIn {
-    queue_in: crossbeam_channel::Sender<AtomicPtr<abi::IOCb>>,
+pub struct AioBatchSchedulerIn {
+    queue_in: crossbeam_channel::Sender<AtomicPtr<abi::IoCb>>,
     last_id: std::cell::Cell<u64>,
 }
 
-pub struct AIOBatchSchedulerOut {
-    queue_out: crossbeam_channel::Receiver<AtomicPtr<abi::IOCb>>,
+pub struct AioBatchSchedulerOut {
+    queue_out: crossbeam_channel::Receiver<AtomicPtr<abi::IoCb>>,
     max_nbatched: usize,
-    leftover: Vec<AtomicPtr<abi::IOCb>>,
+    leftover: Vec<AtomicPtr<abi::IoCb>>,
 }
 
-impl AIOBatchSchedulerIn {
-    fn schedule(&self, aio: AIO, notifier: &Arc<AIONotifier>) -> AIOFuture {
-        let fut = AIOFuture {
+impl AioBatchSchedulerIn {
+    fn schedule(&self, aio: Aio, notifier: &Arc<AioNotifier>) -> AioFuture {
+        let fut = AioFuture {
             notifier: notifier.clone(),
             aio_id: aio.id,
         };
         let iocb = aio.iocb.load(Ordering::Acquire);
-        notifier.register_notify(aio.id, AIOState::FutureInit(aio, false));
+        notifier.register_notify(aio.id, AioState::FutureInit(aio, false));
         self.queue_in.send(AtomicPtr::new(iocb)).unwrap();
         notifier.npending.fetch_add(1, Ordering::Relaxed);
         fut
@@ -532,14 +532,14 @@ impl AIOBatchSchedulerIn {
     }
 }
 
-impl AIOBatchSchedulerOut {
-    fn get_receiver(&self) -> &crossbeam_channel::Receiver<AtomicPtr<abi::IOCb>> {
+impl AioBatchSchedulerOut {
+    fn get_receiver(&self) -> &crossbeam_channel::Receiver<AtomicPtr<abi::IoCb>> {
         &self.queue_out
     }
     fn is_empty(&self) -> bool {
         self.leftover.len() == 0
     }
-    fn submit(&mut self, notifier: &AIONotifier) -> usize {
+    fn submit(&mut self, notifier: &AioNotifier) -> usize {
         let mut quota = self.max_nbatched;
         let mut pending = self
             .leftover
@@ -579,13 +579,13 @@ impl AIOBatchSchedulerOut {
 }
 
 /// Create the scheduler that submits AIOs in batches.
-fn new_batch_scheduler(max_nbatched: usize) -> (AIOBatchSchedulerIn, AIOBatchSchedulerOut) {
+fn new_batch_scheduler(max_nbatched: usize) -> (AioBatchSchedulerIn, AioBatchSchedulerOut) {
     let (queue_in, queue_out) = crossbeam_channel::unbounded();
-    let bin = AIOBatchSchedulerIn {
+    let bin = AioBatchSchedulerIn {
         queue_in,
         last_id: std::cell::Cell::new(0),
     };
-    let bout = AIOBatchSchedulerOut {
+    let bout = AioBatchSchedulerOut {
         queue_out,
         max_nbatched,
         leftover: Vec::new(),

@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use criterion::Criterion;
-use firewood::db::{DBConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, WalConfig};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -22,7 +22,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
+    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
     {
         use rand::{Rng, SeedableRng};
         let mut c = Criterion::default();
@@ -50,7 +50,7 @@ fn main() {
             &workload,
             |b, workload| {
                 b.iter(|| {
-                    let db = DB::new("benchmark_db", &cfg.clone().truncate(true).build()).unwrap();
+                    let db = Db::new("benchmark_db", &cfg.clone().truncate(true).build()).unwrap();
                     for batch in workload.iter() {
                         let mut wb = db.new_writebatch();
                         for (k, v) in batch {

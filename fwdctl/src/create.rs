@@ -3,7 +3,7 @@
 
 use anyhow::{Error, Result};
 use clap::{value_parser, Args};
-use firewood::db::{DBConfig, DBRevConfig, DiskBufferConfig, WALConfig, DB};
+use firewood::db::{Db, DbConfig, DbRevConfig, DiskBufferConfig, WalConfig};
 use log;
 
 #[derive(Args)]
@@ -218,15 +218,15 @@ pub struct Options {
         long,
         required = false,
         default_value_t = 100,
-        value_name = "WAL_MAX_REVISIONS",
+        value_name = "Wal_MAX_REVISIONS",
         help = "Number of revisions to keep from the past. This preserves a rolling window
     of the past N commits to the database."
     )]
     max_revisions: u32,
 }
 
-pub fn initialize_db_config(opts: &Options) -> DBConfig {
-    DBConfig {
+pub fn initialize_db_config(opts: &Options) -> DbConfig {
+    DbConfig {
         meta_ncached_pages: opts.meta_ncached_pages,
         meta_ncached_files: opts.meta_ncached_files,
         meta_file_nbit: opts.meta_file_nbit,
@@ -236,7 +236,7 @@ pub fn initialize_db_config(opts: &Options) -> DBConfig {
         payload_max_walk: opts.payload_max_walk,
         payload_regn_nbit: opts.payload_regn_nbit,
         truncate: opts.truncate,
-        rev: DBRevConfig {
+        rev: DbRevConfig {
             merkle_ncached_objs: opts.merkle_ncached_objs,
             blob_ncached_objs: opts.blob_ncached_objs,
         },
@@ -250,7 +250,7 @@ pub fn initialize_db_config(opts: &Options) -> DBConfig {
             wal_max_buffered: opts.wal_max_buffered,
             wal_max_batch: opts.wal_max_batch,
         },
-        wal: WALConfig {
+        wal: WalConfig {
             file_nbit: opts.file_nbit,
             block_nbit: opts.block_nbit,
             max_revisions: opts.max_revisions,
@@ -262,7 +262,7 @@ pub fn run(opts: &Options) -> Result<()> {
     let db_config = initialize_db_config(opts);
     log::debug!("database configuration parameters: \n{:?}\n", db_config);
 
-    DB::new::<&str>(opts.name.as_ref(), &db_config).map_err(Error::msg)?;
+    Db::new::<&str>(opts.name.as_ref(), &db_config).map_err(Error::msg)?;
     println!("created firewood database in {:?}", opts.name);
     Ok(())
 }

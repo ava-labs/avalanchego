@@ -1,12 +1,12 @@
 use futures::executor::block_on;
 use growthring::{
-    wal::{WALBytes, WALLoader, WALRingId, WALWriter},
-    walerror::WALError,
-    WALStoreAIO,
+    wal::{WalBytes, WalLoader, WalRingId, WalWriter},
+    walerror::WalError,
+    WalStoreAio,
 };
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
-fn test(records: Vec<String>, wal: &mut WALWriter<WALStoreAIO>) -> Vec<WALRingId> {
+fn test(records: Vec<String>, wal: &mut WalWriter<WalStoreAio>) -> Vec<WalRingId> {
     let mut res = Vec::new();
     for r in wal.grow(records).into_iter() {
         let ring_id = futures::executor::block_on(r).unwrap().1;
@@ -16,7 +16,7 @@ fn test(records: Vec<String>, wal: &mut WALWriter<WALStoreAIO>) -> Vec<WALRingId
     res
 }
 
-fn recover(payload: WALBytes, ringid: WALRingId) -> Result<(), WALError> {
+fn recover(payload: WalBytes, ringid: WalRingId) -> Result<(), WalError> {
     println!(
         "recover(payload={}, ringid={:?}",
         std::str::from_utf8(&payload).unwrap(),
@@ -28,10 +28,10 @@ fn recover(payload: WALBytes, ringid: WALRingId) -> Result<(), WALError> {
 fn main() {
     let wal_dir = "./wal_demo1";
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-    let mut loader = WALLoader::new();
+    let mut loader = WalLoader::new();
     loader.file_nbit(9).block_nbit(8);
 
-    let store = WALStoreAIO::new(wal_dir, true, None).unwrap();
+    let store = WalStoreAio::new(wal_dir, true, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -49,7 +49,7 @@ fn main() {
         );
     }
 
-    let store = WALStoreAIO::new(wal_dir, false, None).unwrap();
+    let store = WalStoreAio::new(wal_dir, false, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -63,7 +63,7 @@ fn main() {
         );
     }
 
-    let store = WALStoreAIO::new(wal_dir, false, None).unwrap();
+    let store = WalStoreAio::new(wal_dir, false, None).unwrap();
     let mut wal = block_on(loader.load(store, recover, 100)).unwrap();
     let mut history = std::collections::VecDeque::new();
     for _ in 0..3 {

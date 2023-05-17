@@ -19,12 +19,12 @@ use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceID, Storable,
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "eth")]
-use crate::account::{Account, AccountRLP, Blob, BlobStash};
+use crate::account::{Account, AccountRlp, Blob, BlobStash};
 use crate::file;
 use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
 use crate::proof::{Proof, ProofError};
 use crate::storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester};
-pub use crate::storage::{buffer::DiskBufferConfig, WALConfig};
+pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use crate::storage::{
     AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
     StoreRevShared, PAGE_SIZE_NBIT,
@@ -40,7 +40,7 @@ const MAGIC_STR: &[u8; 13] = b"firewood v0.1";
 
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum DBError {
+pub enum DbError {
     InvalidParams,
     Merkle(MerkleError),
     #[cfg(feature = "eth")]
@@ -52,42 +52,42 @@ pub enum DBError {
     IO(std::io::Error),
 }
 
-impl fmt::Display for DBError {
+impl fmt::Display for DbError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DBError::InvalidParams => write!(f, "invalid parameters provided"),
-            DBError::Merkle(e) => write!(f, "merkle error: {e:?}"),
+            DbError::InvalidParams => write!(f, "invalid parameters provided"),
+            DbError::Merkle(e) => write!(f, "merkle error: {e:?}"),
             #[cfg(feature = "eth")]
-            DBError::Blob(e) => write!(f, "storage error: {e:?}"),
-            DBError::System(e) => write!(f, "system error: {e:?}"),
-            DBError::KeyNotFound => write!(f, "not found"),
-            DBError::CreateError => write!(f, "database create error"),
-            DBError::IO(e) => write!(f, "I/O error: {e:?}"),
-            DBError::Shale(e) => write!(f, "shale error: {e:?}"),
+            DbError::Blob(e) => write!(f, "storage error: {e:?}"),
+            DbError::System(e) => write!(f, "system error: {e:?}"),
+            DbError::KeyNotFound => write!(f, "not found"),
+            DbError::CreateError => write!(f, "database create error"),
+            DbError::IO(e) => write!(f, "I/O error: {e:?}"),
+            DbError::Shale(e) => write!(f, "shale error: {e:?}"),
         }
     }
 }
 
-impl From<std::io::Error> for DBError {
+impl From<std::io::Error> for DbError {
     fn from(e: std::io::Error) -> Self {
-        DBError::IO(e)
+        DbError::IO(e)
     }
 }
 
-impl From<ShaleError> for DBError {
+impl From<ShaleError> for DbError {
     fn from(e: ShaleError) -> Self {
-        DBError::Shale(e)
+        DbError::Shale(e)
     }
 }
 
-impl Error for DBError {}
+impl Error for DbError {}
 
-/// DBParams contains the constants that are fixed upon the creation of the DB, this ensures the
+/// DbParams contains the constants that are fixed upon the creation of the DB, this ensures the
 /// correct parameters are used when the DB is opened later (the parameters here will override the
-/// parameters in [DBConfig] if the DB already exists).
+/// parameters in [DbConfig] if the DB already exists).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, AnyBitPattern)]
-struct DBParams {
+struct DbParams {
     magic: [u8; 16],
     meta_file_nbit: u64,
     payload_file_nbit: u64,
@@ -98,7 +98,7 @@ struct DBParams {
 
 /// Config for accessing a version of the DB.
 #[derive(TypedBuilder, Clone, Debug)]
-pub struct DBRevConfig {
+pub struct DbRevConfig {
     /// Maximum cached Trie objects.
     #[builder(default = 1 << 20)]
     pub merkle_ncached_objs: usize,
@@ -109,7 +109,7 @@ pub struct DBRevConfig {
 
 /// Database configuration.
 #[derive(TypedBuilder, Debug)]
-pub struct DBConfig {
+pub struct DbConfig {
     /// Maximum cached pages for the free list of the item stash.
     #[builder(default = 16384)] // 64M total size by default
     pub meta_ncached_pages: usize,
@@ -143,14 +143,14 @@ pub struct DBConfig {
     #[builder(default = false)]
     pub truncate: bool,
     /// Config for accessing a version of the DB.
-    #[builder(default = DBRevConfig::builder().build())]
-    pub rev: DBRevConfig,
+    #[builder(default = DbRevConfig::builder().build())]
+    pub rev: DbRevConfig,
     /// Config for the disk buffer.
     #[builder(default = DiskBufferConfig::builder().build())]
     pub buffer: DiskBufferConfig,
-    /// Config for WAL.
-    #[builder(default = WALConfig::builder().build())]
-    pub wal: WALConfig,
+    /// Config for Wal.
+    #[builder(default = WalConfig::builder().build())]
+    pub wal: WalConfig,
 }
 
 /// Necessary linear space instances bundled for a `CompactSpace`.
@@ -214,7 +214,7 @@ fn get_sub_universe_from_empty_delta(
 }
 
 /// DB-wide metadata, it keeps track of the roots of the top-level tries.
-struct DBHeader {
+struct DbHeader {
     /// The root node of the account model storage. (Where the values are [Account] objects, which
     /// may contain the root for the secondary trie.)
     acc_root: ObjPtr<Node>,
@@ -222,7 +222,7 @@ struct DBHeader {
     kv_root: ObjPtr<Node>,
 }
 
-impl DBHeader {
+impl DbHeader {
     pub const MSIZE: u64 = 16;
 
     pub fn new_empty() -> Self {
@@ -233,7 +233,7 @@ impl DBHeader {
     }
 }
 
-impl Storable for DBHeader {
+impl Storable for DbHeader {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
@@ -303,14 +303,14 @@ impl Universe<Rc<dyn MemStoreR>> {
 }
 
 /// Some readable version of the DB.
-pub struct DBRev {
-    header: shale::Obj<DBHeader>,
+pub struct DbRev {
+    header: shale::Obj<DbHeader>,
     merkle: Merkle,
     #[cfg(feature = "eth")]
     blob: BlobStash,
 }
 
-impl DBRev {
+impl DbRev {
     fn flush_dirty(&mut self) -> Option<()> {
         self.header.flush_dirty();
         self.merkle.flush_dirty()?;
@@ -320,19 +320,19 @@ impl DBRev {
     }
 
     #[cfg(feature = "eth")]
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DBHeader>, &mut Merkle, &mut BlobStash) {
+    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle, &mut BlobStash) {
         (&mut self.header, &mut self.merkle, &mut self.blob)
     }
     #[cfg(not(feature = "eth"))]
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DBHeader>, &mut Merkle) {
+    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle) {
         (&mut self.header, &mut self.merkle)
     }
 
     /// Get root hash of the generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<Hash, DBError> {
+    pub fn kv_root_hash(&self) -> Result<Hash, DbError> {
         self.merkle
             .root_hash::<IdTrans>(self.header.kv_root)
-            .map_err(DBError::Merkle)
+            .map_err(DbError::Merkle)
     }
 
     /// Get a value associated with a key.
@@ -345,10 +345,10 @@ impl DBRev {
     }
 
     /// Dump the Trie of the generic key-value storage.
-    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.merkle
             .dump(self.header.kv_root, w)
-            .map_err(DBError::Merkle)
+            .map_err(DbError::Merkle)
     }
 
     /// Provides a proof that a key is in the Trie.
@@ -372,23 +372,23 @@ impl DBRev {
     }
 
     /// Check if the account exists.
-    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DBError> {
+    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DbError> {
         Ok(match self.merkle.get(key, self.header.acc_root) {
             Ok(r) => r.is_some(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         })
     }
 }
 
 #[cfg(feature = "eth")]
-impl DBRev {
+impl DbRev {
     /// Get nonce of the account.
-    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DBError> {
+    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DbError> {
         Ok(self.get_account(key)?.nonce)
     }
 
     /// Get the state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DBError> {
+    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DbError> {
         let root = self.get_account(key)?.root;
         if root.is_null() {
             return Ok(Vec::new());
@@ -396,73 +396,73 @@ impl DBRev {
         Ok(match self.merkle.get(sub_key, root) {
             Ok(Some(v)) => v.to_vec(),
             Ok(None) => Vec::new(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         })
     }
 
     /// Get root hash of the world state of all accounts.
-    pub fn root_hash(&self) -> Result<Hash, DBError> {
+    pub fn root_hash(&self) -> Result<Hash, DbError> {
         self.merkle
-            .root_hash::<AccountRLP>(self.header.acc_root)
-            .map_err(DBError::Merkle)
+            .root_hash::<AccountRlp>(self.header.acc_root)
+            .map_err(DbError::Merkle)
     }
 
     /// Dump the Trie of the entire account model storage.
-    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.merkle
             .dump(self.header.acc_root, w)
-            .map_err(DBError::Merkle)
+            .map_err(DbError::Merkle)
     }
 
-    fn get_account<K: AsRef<[u8]>>(&self, key: K) -> Result<Account, DBError> {
+    fn get_account<K: AsRef<[u8]>>(&self, key: K) -> Result<Account, DbError> {
         Ok(match self.merkle.get(key, self.header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => Account::default(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         })
     }
 
     /// Dump the Trie of the state storage under an account.
-    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DbError> {
         let acc = match self.merkle.get(key, self.header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes),
             Ok(None) => Account::default(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         };
         writeln!(w, "{acc:?}").unwrap();
         if !acc.root.is_null() {
-            self.merkle.dump(acc.root, w).map_err(DBError::Merkle)?;
+            self.merkle.dump(acc.root, w).map_err(DbError::Merkle)?;
         }
         Ok(())
     }
 
     /// Get balance of the account.
-    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DBError> {
+    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DbError> {
         Ok(self.get_account(key)?.balance)
     }
 
     /// Get code of the account.
-    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
+    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
         let code = self.get_account(key)?.code;
         if code.is_null() {
             return Ok(Vec::new());
         }
-        let b = self.blob.get_blob(code).map_err(DBError::Blob)?;
+        let b = self.blob.get_blob(code).map_err(DbError::Blob)?;
         Ok(match &**b {
             Blob::Code(code) => code.clone(),
         })
     }
 }
 
-struct DBInner {
-    latest: DBRev,
+struct DbInner {
+    latest: DbRev,
     disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
     staging: Universe<Rc<StoreRevMut>>,
     cached: Universe<Rc<CachedSpace>>,
 }
 
-impl Drop for DBInner {
+impl Drop for DbInner {
     fn drop(&mut self) {
         self.disk_requester.shutdown();
         self.disk_thread.take().map(JoinHandle::join);
@@ -470,22 +470,22 @@ impl Drop for DBInner {
 }
 
 /// Firewood database handle.
-pub struct DB {
-    inner: Arc<RwLock<DBInner>>,
-    revisions: Arc<Mutex<DBRevInner>>,
+pub struct Db {
+    inner: Arc<RwLock<DbInner>>,
+    revisions: Arc<Mutex<DbRevInner>>,
     payload_regn_nbit: u64,
-    rev_cfg: DBRevConfig,
+    rev_cfg: DbRevConfig,
 }
 
-pub struct DBRevInner {
+pub struct DbRevInner {
     inner: VecDeque<Universe<StoreRevShared>>,
     max_revisions: usize,
     base: Universe<StoreRevShared>,
 }
 
-impl DB {
+impl Db {
     /// Open a database.
-    pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DBConfig) -> Result<Self, DBError> {
+    pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DbConfig) -> Result<Self, DbError> {
         // TODO: make sure all fds are released at the end
         if cfg.truncate {
             let _ = std::fs::remove_dir_all(db_path.as_ref());
@@ -504,17 +504,17 @@ impl DB {
         let fd0 = file0.get_fd();
 
         if reset {
-            // initialize DBParams
+            // initialize dbparams
             if cfg.payload_file_nbit < cfg.payload_regn_nbit
                 || cfg.payload_regn_nbit < PAGE_SIZE_NBIT
             {
-                return Err(DBError::InvalidParams);
+                return Err(DbError::InvalidParams);
             }
-            nix::unistd::ftruncate(fd0, 0).map_err(DBError::System)?;
-            nix::unistd::ftruncate(fd0, 1 << cfg.meta_file_nbit).map_err(DBError::System)?;
+            nix::unistd::ftruncate(fd0, 0).map_err(DbError::System)?;
+            nix::unistd::ftruncate(fd0, 1 << cfg.meta_file_nbit).map_err(DbError::System)?;
             let mut magic = [0; 16];
             magic[..MAGIC_STR.len()].copy_from_slice(MAGIC_STR);
-            let header = DBParams {
+            let header = DbParams {
                 magic,
                 meta_file_nbit: cfg.meta_file_nbit,
                 payload_file_nbit: cfg.payload_file_nbit,
@@ -523,15 +523,15 @@ impl DB {
                 wal_block_nbit: cfg.wal.block_nbit,
             };
             nix::sys::uio::pwrite(fd0, &shale::util::get_raw_bytes(&header), 0)
-                .map_err(DBError::System)?;
+                .map_err(DbError::System)?;
         }
 
-        // read DBParams
-        let mut header_bytes = [0; std::mem::size_of::<DBParams>()];
-        nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DBError::System)?;
+        // read DbParams
+        let mut header_bytes = [0; std::mem::size_of::<DbParams>()];
+        nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DbError::System)?;
         drop(file0);
         let mut offset = header_bytes.len() as u64;
-        let header: DBParams = cast_slice(&header_bytes)[0];
+        let header: DbParams = cast_slice(&header_bytes)[0];
 
         // setup disk buffer
         let cached = Universe {
@@ -589,7 +589,7 @@ impl DB {
             ),
         };
 
-        let wal = WALConfig::builder()
+        let wal = WalConfig::builder()
             .file_nbit(header.wal_file_nbit)
             .block_nbit(header.wal_block_nbit)
             .max_revisions(cfg.wal.max_revisions)
@@ -626,13 +626,13 @@ impl DB {
             ),
         };
 
-        // recover from WAL
+        // recover from Wal
         disk_requester.init_wal("wal", db_path);
 
         // set up the storage layout
 
-        let db_header: ObjPtr<DBHeader> = ObjPtr::new_from_addr(offset);
-        offset += DBHeader::MSIZE;
+        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
+        offset += DbHeader::MSIZE;
         let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
         offset += CompactSpaceHeader::MSIZE;
         assert!(offset <= SPACE_RESERVED);
@@ -650,7 +650,7 @@ impl DB {
             );
             initializer.write(
                 db_header.addr(),
-                &shale::to_dehydrated(&DBHeader::new_empty())?,
+                &shale::to_dehydrated(&DbHeader::new_empty())?,
             );
             let initializer = Rc::<StoreRevMut>::make_mut(&mut staging.blob.meta);
             initializer.write(
@@ -667,7 +667,7 @@ impl DB {
             let blob_meta_ref = staging.blob.meta.as_ref();
 
             (
-                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DbHeader::MSIZE).unwrap(),
                 StoredView::ptr_to_obj(
                     merkle_meta_ref,
                     merkle_payload_header,
@@ -715,10 +715,10 @@ impl DB {
                     })();
                 })
                 .unwrap();
-            err.map_err(DBError::Merkle)?
+            err.map_err(DbError::Merkle)?
         }
 
-        let mut latest = DBRev {
+        let mut latest = DbRev {
             header: db_header_ref,
             merkle: Merkle::new(Box::new(merkle_space)),
             #[cfg(feature = "eth")]
@@ -732,14 +732,14 @@ impl DB {
         };
 
         Ok(Self {
-            inner: Arc::new(RwLock::new(DBInner {
+            inner: Arc::new(RwLock::new(DbInner {
                 latest,
                 disk_thread,
                 disk_requester,
                 staging,
                 cached,
             })),
-            revisions: Arc::new(Mutex::new(DBRevInner {
+            revisions: Arc::new(Mutex::new(DbRevInner {
                 inner: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
                 base,
@@ -760,28 +760,28 @@ impl DB {
     }
 
     /// Dump the Trie of the latest generic key-value storage.
-    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.inner.read().latest.kv_dump(w)
     }
     /// Get root hash of the latest generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<Hash, DBError> {
+    pub fn kv_root_hash(&self) -> Result<Hash, DbError> {
         self.inner.read().latest.kv_root_hash()
     }
 
     /// Get a value in the kv store associated with a particular key.
-    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
+    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
         self.inner
             .read()
             .latest
             .kv_get(key)
-            .ok_or(DBError::KeyNotFound)
+            .ok_or(DbError::KeyNotFound)
     }
     /// Get a handle that grants the access to any committed state of the entire DB.
     ///
     /// The latest revision (nback) starts from 0, which is the current state.
     /// If nback equals is above the configured maximum number of revisions, this function returns None.
     /// Returns `None` if `nback` is greater than the configured maximum amount of revisions.
-    pub fn get_revision(&self, nback: usize, cfg: Option<DBRevConfig>) -> Option<Revision> {
+    pub fn get_revision(&self, nback: usize, cfg: Option<DbRevConfig>) -> Option<Revision> {
         let mut revisions = self.revisions.lock();
         let inner = self.inner.read();
 
@@ -814,11 +814,11 @@ impl DB {
         }
         // set up the storage layout
 
-        let mut offset = std::mem::size_of::<DBParams>() as u64;
-        // DBHeader starts after DBParams in merkle meta space
-        let db_header: ObjPtr<DBHeader> = ObjPtr::new_from_addr(offset);
-        offset += DBHeader::MSIZE;
-        // Merkle CompactHeader starts after DBHeader in merkle meta space
+        let mut offset = std::mem::size_of::<DbParams>() as u64;
+        // DbHeader starts after DbParams in merkle meta space
+        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
+        offset += DbHeader::MSIZE;
+        // Merkle CompactHeader starts after DbHeader in merkle meta space
         let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
         offset += CompactSpaceHeader::MSIZE;
         assert!(offset <= SPACE_RESERVED);
@@ -837,7 +837,7 @@ impl DB {
             let blob_meta_ref = &space.blob.meta;
 
             (
-                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DBHeader::MSIZE).unwrap(),
+                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DbHeader::MSIZE).unwrap(),
                 StoredView::ptr_to_obj(
                     merkle_meta_ref,
                     merkle_payload_header,
@@ -874,7 +874,7 @@ impl DB {
         )
         .unwrap();
         Some(Revision {
-            rev: DBRev {
+            rev: DbRev {
                 header: db_header_ref,
                 merkle: Merkle::new(Box::new(merkle_space)),
                 #[cfg(feature = "eth")]
@@ -884,56 +884,56 @@ impl DB {
     }
 }
 #[cfg(feature = "eth")]
-impl DB {
+impl Db {
     /// Dump the Trie of the latest entire account model storage.
-    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.inner.read().latest.dump(w)
     }
 
     /// Dump the Trie of the latest state storage under an account.
-    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DBError> {
+    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DbError> {
         self.inner.read().latest.dump_account(key, w)
     }
 
     /// Get root hash of the latest world state of all accounts.
-    pub fn root_hash(&self) -> Result<Hash, DBError> {
+    pub fn root_hash(&self) -> Result<Hash, DbError> {
         self.inner.read().latest.root_hash()
     }
 
     /// Get the latest balance of the account.
-    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DBError> {
+    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DbError> {
         self.inner.read().latest.get_balance(key)
     }
 
     /// Get the latest code of the account.
-    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DBError> {
+    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
         self.inner.read().latest.get_code(key)
     }
 
     /// Get the latest nonce of the account.
-    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DBError> {
+    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DbError> {
         self.inner.read().latest.get_nonce(key)
     }
 
     /// Get the latest state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DBError> {
+    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DbError> {
         self.inner.read().latest.get_state(key, sub_key)
     }
 
     /// Check if the account exists in the latest world state.
-    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DBError> {
+    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DbError> {
         self.inner.read().latest.exist(key)
     }
 }
 
 /// Lock protected handle to a readable version of the DB.
 pub struct Revision {
-    rev: DBRev,
+    rev: DbRev,
 }
 
 impl std::ops::Deref for Revision {
-    type Target = DBRev;
-    fn deref(&self) -> &DBRev {
+    type Target = DbRev;
+    fn deref(&self) -> &DbRev {
         &self.rev
     }
 }
@@ -942,15 +942,15 @@ impl std::ops::Deref for Revision {
 /// because when an error occurs, the write batch will be automatically aborted so that the DB
 /// remains clean.
 pub struct WriteBatch {
-    m: Arc<RwLock<DBInner>>,
-    r: Arc<Mutex<DBRevInner>>,
+    m: Arc<RwLock<DbInner>>,
+    r: Arc<Mutex<DbRevInner>>,
     root_hash_recalc: bool,
     committed: bool,
 }
 
 impl WriteBatch {
     /// Insert an item to the generic key-value storage.
-    pub fn kv_insert<K: AsRef<[u8]>>(self, key: K, val: Vec<u8>) -> Result<Self, DBError> {
+    pub fn kv_insert<K: AsRef<[u8]>>(self, key: K, val: Vec<u8>) -> Result<Self, DbError> {
         let mut rev = self.m.write();
         #[cfg(feature = "eth")]
         let (header, merkle, _) = rev.latest.borrow_split();
@@ -958,14 +958,14 @@ impl WriteBatch {
         let (header, merkle) = rev.latest.borrow_split();
         merkle
             .insert(key, val, header.kv_root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
         drop(rev);
         Ok(self)
     }
 
     /// Remove an item from the generic key-value storage. `val` will be set to the value that is
     /// removed from the storage if it exists.
-    pub fn kv_remove<K: AsRef<[u8]>>(self, key: K) -> Result<(Self, Option<Vec<u8>>), DBError> {
+    pub fn kv_remove<K: AsRef<[u8]>>(self, key: K) -> Result<(Self, Option<Vec<u8>>), DbError> {
         let mut rev = self.m.write();
         #[cfg(feature = "eth")]
         let (header, merkle, _) = rev.latest.borrow_split();
@@ -973,7 +973,7 @@ impl WriteBatch {
         let (header, merkle) = rev.latest.borrow_split();
         let old_value = merkle
             .remove(key, header.kv_root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
         drop(rev);
         Ok((self, old_value))
     }
@@ -1099,8 +1099,8 @@ impl WriteBatch {
     fn change_account(
         &mut self,
         key: &[u8],
-        modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DBError>,
-    ) -> Result<(), DBError> {
+        modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DbError>,
+    ) -> Result<(), DbError> {
         let mut rev = self.m.write();
         let (header, merkle, blob) = rev.latest.borrow_split();
         match merkle.get_mut(key, header.acc_root) {
@@ -1115,7 +1115,7 @@ impl WriteBatch {
                         }
                         *b = acc.serialize();
                     })
-                    .map_err(DBError::Merkle)?;
+                    .map_err(DbError::Merkle)?;
                 ret?;
             }
             Ok(None) => {
@@ -1123,15 +1123,15 @@ impl WriteBatch {
                 modify(&mut acc, blob)?;
                 merkle
                     .insert(key, acc.serialize(), header.acc_root)
-                    .map_err(DBError::Merkle)?;
+                    .map_err(DbError::Merkle)?;
             }
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         }
         Ok(())
     }
 
     /// Set balance of the account.
-    pub fn set_balance(mut self, key: &[u8], balance: U256) -> Result<Self, DBError> {
+    pub fn set_balance(mut self, key: &[u8], balance: U256) -> Result<Self, DbError> {
         self.change_account(key, |acc, _| {
             acc.balance = balance;
             Ok(())
@@ -1140,17 +1140,17 @@ impl WriteBatch {
     }
 
     /// Set code of the account.
-    pub fn set_code(mut self, key: &[u8], code: &[u8]) -> Result<Self, DBError> {
+    pub fn set_code(mut self, key: &[u8], code: &[u8]) -> Result<Self, DbError> {
         use sha3::Digest;
         self.change_account(key, |acc, blob_stash| {
             if !acc.code.is_null() {
-                blob_stash.free_blob(acc.code).map_err(DBError::Blob)?;
+                blob_stash.free_blob(acc.code).map_err(DbError::Blob)?;
             }
             acc.set_code(
                 Hash(sha3::Keccak256::digest(code).into()),
                 blob_stash
                     .new_blob(Blob::Code(code.to_vec()))
-                    .map_err(DBError::Blob)?
+                    .map_err(DbError::Blob)?
                     .as_ptr(),
             );
             Ok(())
@@ -1159,7 +1159,7 @@ impl WriteBatch {
     }
 
     /// Set nonce of the account.
-    pub fn set_nonce(mut self, key: &[u8], nonce: u64) -> Result<Self, DBError> {
+    pub fn set_nonce(mut self, key: &[u8], nonce: u64) -> Result<Self, DbError> {
         self.change_account(key, |acc, _| {
             acc.nonce = nonce;
             Ok(())
@@ -1168,38 +1168,38 @@ impl WriteBatch {
     }
 
     /// Set the state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn set_state(self, key: &[u8], sub_key: &[u8], val: Vec<u8>) -> Result<Self, DBError> {
+    pub fn set_state(self, key: &[u8], sub_key: &[u8], val: Vec<u8>) -> Result<Self, DbError> {
         let mut rev = self.m.write();
         let (header, merkle, _) = rev.latest.borrow_split();
         let mut acc = match merkle.get(key, header.acc_root) {
             Ok(Some(r)) => Account::deserialize(&r),
             Ok(None) => Account::default(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         };
         if acc.root.is_null() {
-            Merkle::init_root(&mut acc.root, merkle.get_store()).map_err(DBError::Merkle)?;
+            Merkle::init_root(&mut acc.root, merkle.get_store()).map_err(DbError::Merkle)?;
         }
         merkle
             .insert(sub_key, val, acc.root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
         acc.root_hash = merkle
             .root_hash::<IdTrans>(acc.root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
         merkle
             .insert(key, acc.serialize(), header.acc_root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
         drop(rev);
         Ok(self)
     }
 
     /// Create an account.
-    pub fn create_account(self, key: &[u8]) -> Result<Self, DBError> {
+    pub fn create_account(self, key: &[u8]) -> Result<Self, DbError> {
         let mut rev = self.m.write();
         let (header, merkle, _) = rev.latest.borrow_split();
         let old_balance = match merkle.get_mut(key, header.acc_root) {
             Ok(Some(bytes)) => Account::deserialize(&bytes.get()).balance,
             Ok(None) => U256::zero(),
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         };
         let acc = Account {
             balance: old_balance,
@@ -1207,14 +1207,14 @@ impl WriteBatch {
         };
         merkle
             .insert(key, acc.serialize(), header.acc_root)
-            .map_err(DBError::Merkle)?;
+            .map_err(DbError::Merkle)?;
 
         drop(rev);
         Ok(self)
     }
 
     /// Delete an account.
-    pub fn delete_account(self, key: &[u8], acc: &mut Option<Account>) -> Result<Self, DBError> {
+    pub fn delete_account(self, key: &[u8], acc: &mut Option<Account>) -> Result<Self, DbError> {
         let mut rev = self.m.write();
         let (header, merkle, blob_stash) = rev.latest.borrow_split();
         let mut a = match merkle.remove(key, header.acc_root) {
@@ -1224,14 +1224,14 @@ impl WriteBatch {
                 drop(rev);
                 return Ok(self);
             }
-            Err(e) => return Err(DBError::Merkle(e)),
+            Err(e) => return Err(DbError::Merkle(e)),
         };
         if !a.root.is_null() {
-            merkle.remove_tree(a.root).map_err(DBError::Merkle)?;
+            merkle.remove_tree(a.root).map_err(DbError::Merkle)?;
             a.root = ObjPtr::null();
         }
         if !a.code.is_null() {
-            blob_stash.free_blob(a.code).map_err(DBError::Blob)?;
+            blob_stash.free_blob(a.code).map_err(DbError::Blob)?;
             a.code = ObjPtr::null();
         }
         *acc = Some(a);

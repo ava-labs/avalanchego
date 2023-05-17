@@ -6,15 +6,15 @@ use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
 
 use super::{
-    Ash, AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WALConfig,
+    Ash, AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WalConfig,
     PAGE_SIZE_NBIT,
 };
 
-use aiofut::{AIOBuilder, AIOError, AIOManager};
+use aiofut::{AioBuilder, AioError, AioManager};
 use growthring::{
-    wal::{RecoverPolicy, WALLoader, WALWriter},
-    walerror::WALError,
-    WALStoreAIO,
+    wal::{RecoverPolicy, WalLoader, WalWriter},
+    walerror::WalError,
+    WalStoreAio,
 };
 use shale::SpaceID;
 use tokio::sync::oneshot::error::RecvError;
@@ -23,8 +23,8 @@ use typed_builder::TypedBuilder;
 
 #[derive(Debug)]
 pub enum BufferCmd {
-    /// Initialize the WAL.
-    InitWAL(PathBuf, String),
+    /// Initialize the Wal.
+    InitWal(PathBuf, String),
     /// Process a write batch against the underlying store.
     WriteBatch(Vec<BufferWrite>, AshRecord),
     /// Get a page from the disk buffer.
@@ -54,13 +54,13 @@ pub struct DiskBufferConfig {
     /// Maximum number of async I/O requests per submission.
     #[builder(default = 128)]
     pub max_aio_submit: usize,
-    /// Maximum number of concurrent async I/O requests in WAL.
+    /// Maximum number of concurrent async I/O requests in Wal.
     #[builder(default = 256)]
     pub wal_max_aio_requests: usize,
-    /// Maximum buffered WAL records.
+    /// Maximum buffered Wal records.
     #[builder(default = 1024)]
     pub wal_max_buffered: usize,
-    /// Maximum batched WAL records per write.
+    /// Maximum batched Wal records per write.
     #[builder(default = 4096)]
     pub wal_max_batch: usize,
 }
@@ -88,13 +88,13 @@ pub struct DiskBuffer {
     fc_notifier: Option<oneshot::Sender<()>>,
     fc_blocker: Option<oneshot::Receiver<()>>,
     file_pools: [Option<Arc<FilePool>>; 255],
-    aiomgr: AIOManager,
+    aiomgr: AioManager,
     local_pool: Rc<tokio::task::LocalSet>,
     task_id: u64,
     tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    wal: Option<Rc<Mutex<WALWriter<WALStoreAIO>>>>,
+    wal: Option<Rc<Mutex<WalWriter<WalStoreAio>>>>,
     cfg: DiskBufferConfig,
-    wal_cfg: WALConfig,
+    wal_cfg: WalConfig,
 }
 
 impl DiskBuffer {
@@ -102,14 +102,14 @@ impl DiskBuffer {
     pub fn new(
         inbound: mpsc::Receiver<BufferCmd>,
         cfg: &DiskBufferConfig,
-        wal: &WALConfig,
-    ) -> Result<Self, AIOError> {
-        let aiomgr = AIOBuilder::default()
+        wal: &WalConfig,
+    ) -> Result<Self, AioError> {
+        let aiomgr = AioBuilder::default()
             .max_events(cfg.max_aio_requests)
             .max_nwait(cfg.max_aio_response)
             .max_nbatched(cfg.max_aio_submit)
             .build()
-            .map_err(|_| AIOError::OtherError)?;
+            .map_err(|_| AioError::OtherError)?;
 
         Ok(Self {
             pending: HashMap::new(),
@@ -182,14 +182,14 @@ impl DiskBuffer {
         }
     }
 
-    /// Initialize the WAL subsystem if it does not exists and attempts to replay the WAL if exists.
-    async fn init_wal(&mut self, rootpath: PathBuf, waldir: String) -> Result<(), WALError> {
+    /// Initialize the Wal subsystem if it does not exists and attempts to replay the Wal if exists.
+    async fn init_wal(&mut self, rootpath: PathBuf, waldir: String) -> Result<(), WalError> {
         let final_path = rootpath.clone().join(waldir.clone());
-        let mut aiobuilder = AIOBuilder::default();
+        let mut aiobuilder = AioBuilder::default();
         aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
         let aiomgr = aiobuilder.build()?;
-        let store = WALStoreAIO::new(final_path.clone(), false, Some(aiomgr))?;
-        let mut loader = WALLoader::new();
+        let store = WalStoreAio::new(final_path.clone(), false, Some(aiomgr))?;
+        let mut loader = WalLoader::new();
         loader
             .file_nbit(self.wal_cfg.file_nbit)
             .block_nbit(self.wal_cfg.block_nbit)
@@ -214,7 +214,7 @@ impl DiskBuffer {
                                 file_pool
                                     .get_file(fid)
                                     .map_err(|e| {
-                                        WALError::Other(format!(
+                                        WalError::Other(format!(
                                             "file pool error: {:?} - final path {:?}",
                                             e, final_path
                                         ))
@@ -224,7 +224,7 @@ impl DiskBuffer {
                                 (offset & file_mask) as nix::libc::off_t,
                             )
                             .map_err(|e| {
-                                WALError::Other(format!(
+                                WalError::Other(format!(
                                     "wal loader error: {:?} - final path {:?}",
                                     e, final_path
                                 ))
@@ -259,12 +259,12 @@ impl DiskBuffer {
                     break;
                 }
             }
-            // first write to WAL
+            // first write to Wal
             let ring_ids: Vec<_> =
                 futures::future::join_all(self.wal.as_ref().unwrap().lock().await.grow(records))
                     .await
                     .into_iter()
-                    .map(|ring| ring.map_err(|_| "WAL Error while writing").unwrap().1)
+                    .map(|ring| ring.map_err(|_| "Wal Error while writing").unwrap().1)
                     .collect();
             let sem = Rc::new(tokio::sync::Semaphore::new(0));
             let mut npermit = 0;
@@ -303,7 +303,7 @@ impl DiskBuffer {
                     .await
                     .peel(ring_ids, max_revisions)
                     .await
-                    .map_err(|_| "WAL errore while pruning")
+                    .map_err(|_| "Wal errore while pruning")
                     .unwrap();
             });
             if self.pending.len() >= self.cfg.max_pending {
@@ -321,12 +321,12 @@ impl DiskBuffer {
     ) -> bool {
         match req {
             BufferCmd::Shutdown => return false,
-            BufferCmd::InitWAL(root_path, waldir) => {
+            BufferCmd::InitWal(root_path, waldir) => {
                 self.init_wal(root_path.clone(), waldir.clone())
                     .await
                     .unwrap_or_else(|e| {
                         panic!(
-                            "Initialize WAL in dir {:?} failed creating {:?}: {e:?}",
+                            "Initialize Wal in dir {:?} failed creating {:?}: {e:?}",
                             root_path, waldir
                         )
                     });
@@ -338,7 +338,7 @@ impl DiskBuffer {
                 wal_in.send((writes, wal_writes)).await.unwrap();
             }
             BufferCmd::CollectAsh(nrecords, tx) => {
-                // wait to ensure writes are paused for WAL
+                // wait to ensure writes are paused for Wal
                 let ash = self
                     .wal
                     .as_ref()
@@ -465,15 +465,15 @@ impl DiskBufferRequester {
         self.sender.blocking_send(BufferCmd::Shutdown).ok().unwrap()
     }
 
-    /// Initialize the WAL.
+    /// Initialize the Wal.
     pub fn init_wal(&self, waldir: &str, rootpath: PathBuf) {
         self.sender
-            .blocking_send(BufferCmd::InitWAL(rootpath, waldir.to_string()))
+            .blocking_send(BufferCmd::InitWal(rootpath, waldir.to_string()))
             .map_err(StoreError::Send)
             .ok();
     }
 
-    /// Collect the last N records from the WAL.
+    /// Collect the last N records from the Wal.
     pub fn collect_ash(&self, nrecords: usize) -> Result<Vec<AshRecord>, StoreError<RecvError>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.sender
@@ -515,7 +515,7 @@ mod tests {
         ];
 
         let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
-        let wal_cfg = WALConfig::builder().build();
+        let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
         // TODO: Run the test in a separate standalone directory for concurrency reasons
@@ -582,7 +582,7 @@ mod tests {
         });
         // wait for the write to complete.
         write_thread_handle.join().unwrap();
-        // This is not ACID compliant, write should not return before WAL log
+        // This is not ACID compliant, write should not return before Wal log
         // is written to disk.
         assert!([
             &tmpdb.into_iter().collect::<String>(),
@@ -597,7 +597,7 @@ mod tests {
         assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
     }
 
-    fn init_buffer(buf_cfg: DiskBufferConfig, wal_cfg: WALConfig) -> DiskBufferRequester {
+    fn init_buffer(buf_cfg: DiskBufferConfig, wal_cfg: WalConfig) -> DiskBufferRequester {
         let (sender, inbound) = tokio::sync::mpsc::channel(buf_cfg.max_buffered);
         let disk_requester = DiskBufferRequester::new(sender);
         std::thread::spawn(move || {

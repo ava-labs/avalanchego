@@ -3,12 +3,10 @@
 
 use crate::api::DB;
 
-pub struct Sender {
-
-}
+pub struct Sender {}
 
 impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
-    fn kv_root_hash(&self) -> Result<crate::merkle::Hash, crate::db::DBError> {
+    fn kv_root_hash(&self) -> Result<crate::merkle::Hash, crate::db::DbError> {
         todo!()
     }
 
@@ -16,35 +14,35 @@ impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
         todo!()
     }
 
-    fn kv_dump<W: std::io::Write>(&self, writer: W) -> Result<(), crate::db::DBError> {
+    fn kv_dump<W: std::io::Write>(&self, writer: W) -> Result<(), crate::db::DbError> {
         todo!()
     }
 
-    fn root_hash(&self) -> Result<crate::merkle::Hash, crate::db::DBError> {
+    fn root_hash(&self) -> Result<crate::merkle::Hash, crate::db::DbError> {
         todo!()
     }
 
-    fn dump<W: std::io::Write>(&self, writer: W) -> Result<(), crate::db::DBError> {
-        todo!()
-    }
-
-    #[cfg(feature = "eth")]
-    fn get_account(&self, key: K) -> Result<crate::account::Account, crate::db::DBError> {
+    fn dump<W: std::io::Write>(&self, writer: W) -> Result<(), crate::db::DbError> {
         todo!()
     }
 
     #[cfg(feature = "eth")]
-    fn dump_account<W: std::io::Write>(&self, key: K, writer: W) -> Result<(), crate::db::DBError> {
+    fn get_account(&self, key: K) -> Result<crate::account::Account, crate::db::DbError> {
         todo!()
     }
 
     #[cfg(feature = "eth")]
-    fn get_balance(&self, key: K) -> Result<primitive_types::U256, crate::db::DBError> {
+    fn dump_account<W: std::io::Write>(&self, key: K, writer: W) -> Result<(), crate::db::DbError> {
         todo!()
     }
 
     #[cfg(feature = "eth")]
-    fn get_code(&self, key: K) -> Result<Vec<u8>, crate::db::DBError> {
+    fn get_balance(&self, key: K) -> Result<primitive_types::U256, crate::db::DbError> {
+        todo!()
+    }
+
+    #[cfg(feature = "eth")]
+    fn get_code(&self, key: K) -> Result<Vec<u8>, crate::db::DbError> {
         todo!()
     }
 
@@ -66,16 +64,16 @@ impl<K: AsRef<[u8]>, V: AsRef<[u8]>> DB<K, V> for Sender {
     }
 
     #[cfg(feature = "eth")]
-    fn get_nonce(&self, key: K) -> Result<crate::api::Nonce, crate::db::DBError> {
+    fn get_nonce(&self, key: K) -> Result<crate::api::Nonce, crate::db::DbError> {
         todo!()
     }
 
     #[cfg(feature = "eth")]
-    fn get_state(&self, key: K, sub_key: K) -> Result<Vec<u8>, crate::db::DBError> {
+    fn get_state(&self, key: K, sub_key: K) -> Result<Vec<u8>, crate::db::DbError> {
         todo!()
     }
 
-    fn exist(&self, key: K) -> Result<bool, crate::db::DBError> {
+    fn exist(&self, key: K) -> Result<bool, crate::db::DbError> {
         todo!()
     }
 }

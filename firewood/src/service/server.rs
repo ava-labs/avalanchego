@@ -8,14 +8,14 @@ use std::{
 };
 use tokio::sync::mpsc::Receiver;
 
-use crate::db::{DBConfig, DBError, DB};
+use crate::db::{Db, DbConfig, DbError};
 
 use super::{BatchId, BatchRequest, Request, RevId};
 
 macro_rules! get_batch {
     ($active_batch: expr, $handle: ident, $lastid: ident, $respond_to: expr) => {{
         if $handle != $lastid.load(Ordering::Relaxed) - 1 || $active_batch.is_none() {
-            let _ = $respond_to.send(Err(DBError::InvalidParams));
+            let _ = $respond_to.send(Err(DbError::InvalidParams));
             continue;
         }
         $active_batch.take().unwrap()
@@ -26,7 +26,7 @@ macro_rules! get_rev {
     ($rev: ident, $handle: ident, $out: expr) => {
         match $rev.get(&$handle) {
             None => {
-                let _ = $out.send(Err(DBError::InvalidParams));
+                let _ = $out.send(Err(DbError::InvalidParams));
                 continue;
             }
             Some(x) => x,
@@ -37,8 +37,8 @@ macro_rules! get_rev {
 pub struct FirewoodService {}
 
 impl FirewoodService {
-    pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DBConfig) -> Self {
-        let db = DB::new(owned_path, &cfg).unwrap();
+    pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DbConfig) -> Self {
+        let db = Db::new(owned_path, &cfg).unwrap();
         let mut active_batch: Option<crate::db::WriteBatch> = None;
         let mut revs = HashMap::<RevId, crate::db::Revision>::new();
         let lastid = AtomicU32::new(0);
@@ -77,7 +77,7 @@ impl FirewoodService {
                     } => {
                         let rev = get_rev!(revs, handle, respond_to);
                         let msg = rev.kv_get(key);
-                        let _ = respond_to.send(msg.map_or(Err(DBError::KeyNotFound), Ok));
+                        let _ = respond_to.send(msg.map_or(Err(DbError::KeyNotFound), Ok));
                     }
                     #[cfg(feature = "proof")]
                     super::RevRequest::Prove {

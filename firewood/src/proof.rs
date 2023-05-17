@@ -4,7 +4,7 @@
 #[cfg(feature = "eth")]
 use crate::account::BlobError;
 
-use crate::db::DBError;
+use crate::db::DbError;
 use crate::merkle::*;
 use crate::merkle_util::*;
 
@@ -59,21 +59,21 @@ impl From<DataStoreError> for ProofError {
     }
 }
 
-impl From<DBError> for ProofError {
-    fn from(d: DBError) -> ProofError {
+impl From<DbError> for ProofError {
+    fn from(d: DbError) -> ProofError {
         match d {
-            DBError::InvalidParams => ProofError::InvalidProof,
-            DBError::Merkle(e) => ProofError::InvalidNode(e),
+            DbError::InvalidParams => ProofError::InvalidProof,
+            DbError::Merkle(e) => ProofError::InvalidNode(e),
             #[cfg(feature = "eth")]
-            DBError::Blob(e) => ProofError::BlobStoreError(e),
-            DBError::System(e) => ProofError::SystemError(e),
-            DBError::KeyNotFound => ProofError::InvalidEdgeKeys,
-            DBError::CreateError => ProofError::NoSuchNode,
+            DbError::Blob(e) => ProofError::BlobStoreError(e),
+            DbError::System(e) => ProofError::SystemError(e),
+            DbError::KeyNotFound => ProofError::InvalidEdgeKeys,
+            DbError::CreateError => ProofError::NoSuchNode,
             // TODO: fix better by adding a new error to ProofError
-            DBError::IO(e) => {
+            DbError::IO(e) => {
                 ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
             }
-            DBError::Shale(e) => ProofError::Shale(e),
+            DbError::Shale(e) => ProofError::Shale(e),
         }
     }
 }

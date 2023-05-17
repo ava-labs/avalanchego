@@ -13,11 +13,11 @@ use std::mem::MaybeUninit;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 
-pub use crate::walerror::WALError;
+pub use crate::walerror::WalError;
 
 const FILENAME_FMT: &str = r"[0-9a-f]+\.log";
 
-enum WALRingType {
+enum WalRingType {
     #[allow(dead_code)]
     Null = 0x0,
     Full,
@@ -27,7 +27,7 @@ enum WALRingType {
 }
 
 #[repr(packed)]
-struct WALRingBlob {
+struct WalRingBlob {
     counter: u32,
     crc32: u32,
     rsize: u32,
@@ -35,29 +35,29 @@ struct WALRingBlob {
     // payload follows
 }
 
-impl TryFrom<u8> for WALRingType {
+impl TryFrom<u8> for WalRingType {
     type Error = ();
     fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
-            x if x == WALRingType::Null as u8 => Ok(WALRingType::Null),
-            x if x == WALRingType::Full as u8 => Ok(WALRingType::Full),
-            x if x == WALRingType::First as u8 => Ok(WALRingType::First),
-            x if x == WALRingType::Middle as u8 => Ok(WALRingType::Middle),
-            x if x == WALRingType::Last as u8 => Ok(WALRingType::Last),
+            x if x == WalRingType::Null as u8 => Ok(WalRingType::Null),
+            x if x == WalRingType::Full as u8 => Ok(WalRingType::Full),
+            x if x == WalRingType::First as u8 => Ok(WalRingType::First),
+            x if x == WalRingType::Middle as u8 => Ok(WalRingType::Middle),
+            x if x == WalRingType::Last as u8 => Ok(WalRingType::Last),
             _ => Err(()),
         }
     }
 }
 
-type WALFileId = u64;
-pub type WALBytes = Box<[u8]>;
-pub type WALPos = u64;
+type WalFileId = u64;
+pub type WalBytes = Box<[u8]>;
+pub type WalPos = u64;
 
-fn get_fid(fname: &str) -> WALFileId {
-    scan_fmt!(fname, "{x}.log", [hex WALFileId]).unwrap()
+fn get_fid(fname: &str) -> WalFileId {
+    scan_fmt!(fname, "{x}.log", [hex WalFileId]).unwrap()
 }
 
-fn get_fname(fid: WALFileId) -> String {
+fn get_fname(fid: WalFileId) -> String {
     format!("{:08x}.log", fid)
 }
 
@@ -99,30 +99,30 @@ const HEADER_SIZE: usize = std::mem::size_of::<Header>();
 
 #[repr(C)]
 #[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
-pub struct WALRingId {
-    start: WALPos,
-    end: WALPos,
+pub struct WalRingId {
+    start: WalPos,
+    end: WalPos,
     counter: u32,
 }
 
-impl WALRingId {
+impl WalRingId {
     pub fn empty_id() -> Self {
-        WALRingId {
+        WalRingId {
             start: 0,
             end: 0,
             counter: 0,
         }
     }
-    pub fn get_start(&self) -> WALPos {
+    pub fn get_start(&self) -> WalPos {
         self.start
     }
-    pub fn get_end(&self) -> WALPos {
+    pub fn get_end(&self) -> WalPos {
         self.end
     }
 }
 
-impl Ord for WALRingId {
-    fn cmp(&self, other: &WALRingId) -> std::cmp::Ordering {
+impl Ord for WalRingId {
+    fn cmp(&self, other: &WalRingId) -> std::cmp::Ordering {
         other
             .start
             .cmp(&self.start)
@@ -130,90 +130,90 @@ impl Ord for WALRingId {
     }
 }
 
-impl PartialOrd for WALRingId {
-    fn partial_cmp(&self, other: &WALRingId) -> Option<std::cmp::Ordering> {
+impl PartialOrd for WalRingId {
+    fn partial_cmp(&self, other: &WalRingId) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 pub trait Record {
-    fn serialize(&self) -> WALBytes;
+    fn serialize(&self) -> WalBytes;
 }
 
-impl Record for WALBytes {
-    fn serialize(&self) -> WALBytes {
+impl Record for WalBytes {
+    fn serialize(&self) -> WalBytes {
         self[..].into()
     }
 }
 
 impl Record for String {
-    fn serialize(&self) -> WALBytes {
+    fn serialize(&self) -> WalBytes {
         self.as_bytes().into()
     }
 }
 
 impl Record for &str {
-    fn serialize(&self) -> WALBytes {
+    fn serialize(&self) -> WalBytes {
         self.as_bytes().into()
     }
 }
 
 /// the state for a WAL writer
-struct WALState {
-    /// the next position for a record, addressed in the entire WAL space
-    next: WALPos,
+struct WalState {
+    /// the next position for a record, addressed in the entire Wal space
+    next: WalPos,
     /// number of bits for a file
     file_nbit: u64,
-    next_complete: WALRingId,
+    next_complete: WalRingId,
     counter: u32,
-    io_complete: BinaryHeap<WALRingId>,
-    pending_removal: VecDeque<(WALFileId, u32)>,
+    io_complete: BinaryHeap<WalRingId>,
+    pending_removal: VecDeque<(WalFileId, u32)>,
 }
 
 #[async_trait(?Send)]
-pub trait WALFile {
+pub trait WalFile {
     /// Initialize the file space in [offset, offset + length) to zero.
-    async fn allocate(&self, offset: WALPos, length: usize) -> Result<(), WALError>;
+    async fn allocate(&self, offset: WalPos, length: usize) -> Result<(), WalError>;
     /// Write data with offset. We assume all previous `allocate`/`truncate` invocations are visible
     /// if ordered earlier (should be guaranteed by most OS).  Additionally, the write caused
     /// by each invocation of this function should be _atomic_ (the entire single write should be
     /// all or nothing).
-    async fn write(&self, offset: WALPos, data: WALBytes) -> Result<(), WALError>;
+    async fn write(&self, offset: WalPos, data: WalBytes) -> Result<(), WalError>;
     /// Read data with offset. Return `Ok(None)` when it reaches EOF.
-    async fn read(&self, offset: WALPos, length: usize) -> Result<Option<WALBytes>, WALError>;
+    async fn read(&self, offset: WalPos, length: usize) -> Result<Option<WalBytes>, WalError>;
     /// Truncate a file to a specified length.
     #[allow(clippy::result_unit_err)]
-    async fn truncate(&self, length: usize) -> Result<(), WALError>;
+    async fn truncate(&self, length: usize) -> Result<(), WalError>;
 }
 
 #[async_trait(?Send)]
-pub trait WALStore {
+pub trait WalStore {
     type FileNameIter: Iterator<Item = String>;
 
     /// Open a file given the filename, create the file if not exists when `touch` is `true`.
-    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WALFile>, WALError>;
+    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WalFile>, WalError>;
     /// Unlink a file given the filename.
-    async fn remove_file(&self, filename: String) -> Result<(), WALError>;
-    /// Enumerate all WAL filenames. It should include all WAL files that are previously opened
+    async fn remove_file(&self, filename: String) -> Result<(), WalError>;
+    /// Enumerate all Wal filenames. It should include all Wal files that are previously opened
     /// (created) but not removed. The list could be unordered.
     #[allow(clippy::result_unit_err)]
-    fn enumerate_files(&self) -> Result<Self::FileNameIter, WALError>;
+    fn enumerate_files(&self) -> Result<Self::FileNameIter, WalError>;
 }
 
-struct WALFileHandle<'a, F: WALStore> {
-    fid: WALFileId,
-    handle: &'a dyn WALFile,
-    pool: *const WALFilePool<F>,
+struct WalFileHandle<'a, F: WalStore> {
+    fid: WalFileId,
+    handle: &'a dyn WalFile,
+    pool: *const WalFilePool<F>,
 }
 
-impl<'a, F: WALStore> std::ops::Deref for WALFileHandle<'a, F> {
-    type Target = dyn WALFile + 'a;
+impl<'a, F: WalStore> std::ops::Deref for WalFileHandle<'a, F> {
+    type Target = dyn WalFile + 'a;
     fn deref(&self) -> &Self::Target {
         self.handle
     }
 }
 
-impl<'a, F: WALStore> Drop for WALFileHandle<'a, F> {
+impl<'a, F: WalStore> Drop for WalFileHandle<'a, F> {
     fn drop(&mut self) {
         unsafe {
             (*self.pool).release_file(self.fid);
@@ -223,33 +223,33 @@ impl<'a, F: WALStore> Drop for WALFileHandle<'a, F> {
 
 /// The middle layer that manages WAL file handles and invokes public trait functions to actually
 /// manipulate files and their contents.
-struct WALFilePool<F: WALStore> {
+struct WalFilePool<F: WalStore> {
     store: F,
-    header_file: Box<dyn WALFile>,
-    handle_cache: RefCell<lru::LruCache<WALFileId, Box<dyn WALFile>>>,
+    header_file: Box<dyn WalFile>,
+    handle_cache: RefCell<lru::LruCache<WalFileId, Box<dyn WalFile>>>,
     #[allow(clippy::type_complexity)]
-    handle_used: RefCell<HashMap<WALFileId, UnsafeCell<(Box<dyn WALFile>, usize)>>>,
+    handle_used: RefCell<HashMap<WalFileId, UnsafeCell<(Box<dyn WalFile>, usize)>>>,
     #[allow(clippy::type_complexity)]
-    last_write: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WALError>>>>>>,
+    last_write: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WalError>>>>>>,
     #[allow(clippy::type_complexity)]
-    last_peel: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WALError>>>>>>,
+    last_peel: UnsafeCell<MaybeUninit<Pin<Box<dyn Future<Output = Result<(), WalError>>>>>>,
     file_nbit: u64,
     file_size: u64,
     block_nbit: u64,
 }
 
-impl<F: WALStore> WALFilePool<F> {
+impl<F: WalStore> WalFilePool<F> {
     async fn new(
         store: F,
         file_nbit: u64,
         block_nbit: u64,
         cache_size: NonZeroUsize,
-    ) -> Result<Self, WALError> {
+    ) -> Result<Self, WalError> {
         let file_nbit = file_nbit;
         let block_nbit = block_nbit;
         let header_file = store.open_file("HEAD", true).await?;
         header_file.truncate(HEADER_SIZE).await?;
-        Ok(WALFilePool {
+        Ok(WalFilePool {
             store,
             header_file,
             handle_cache: RefCell::new(lru::LruCache::new(cache_size)),
@@ -262,14 +262,14 @@ impl<F: WALStore> WALFilePool<F> {
         })
     }
 
-    async fn read_header(&self) -> Result<Header, WALError> {
+    async fn read_header(&self) -> Result<Header, WalError> {
         let bytes = self.header_file.read(0, HEADER_SIZE).await?.unwrap();
         let bytes: [u8; HEADER_SIZE] = (&*bytes).try_into().unwrap();
         let header: Header = cast_slice(&bytes)[0];
         Ok(header)
     }
 
-    async fn write_header(&self, header: &Header) -> Result<(), WALError> {
+    async fn write_header(&self, header: &Header) -> Result<(), WalError> {
         let base = header as *const Header as usize as *const u8;
         let bytes = unsafe { std::slice::from_raw_parts(base, HEADER_SIZE) };
         self.header_file.write(0, bytes.into()).await?;
@@ -278,8 +278,8 @@ impl<F: WALStore> WALFilePool<F> {
 
     #[allow(clippy::await_holding_refcell_ref)]
     // TODO: Refactor to remove mutable reference from being awaited.
-    async fn get_file(&self, fid: u64, touch: bool) -> Result<WALFileHandle<F>, WALError> {
-        let pool = self as *const WALFilePool<F>;
+    async fn get_file(&self, fid: u64, touch: bool) -> Result<WalFileHandle<F>, WalError> {
+        let pool = self as *const WalFilePool<F>;
         if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
             let handle = match self.handle_used.borrow_mut().entry(fid) {
                 hash_map::Entry::Vacant(e) => unsafe {
@@ -287,7 +287,7 @@ impl<F: WALStore> WALFilePool<F> {
                 },
                 _ => unreachable!(),
             };
-            Ok(WALFileHandle { fid, handle, pool })
+            Ok(WalFileHandle { fid, handle, pool })
         } else {
             let v = unsafe {
                 &mut *match self.handle_used.borrow_mut().entry(fid) {
@@ -300,7 +300,7 @@ impl<F: WALStore> WALFilePool<F> {
                 .get()
             };
             v.1 += 1;
-            Ok(WALFileHandle {
+            Ok(WalFileHandle {
                 fid,
                 handle: &*v.0,
                 pool,
@@ -308,7 +308,7 @@ impl<F: WALStore> WALFilePool<F> {
         }
     }
 
-    fn release_file(&self, fid: WALFileId) {
+    fn release_file(&self, fid: WalFileId) {
         match self.handle_used.borrow_mut().entry(fid) {
             hash_map::Entry::Occupied(e) => {
                 let v = unsafe { &mut *e.get().get() };
@@ -326,8 +326,8 @@ impl<F: WALStore> WALFilePool<F> {
     #[allow(clippy::type_complexity)]
     fn write<'a>(
         &'a mut self,
-        writes: Vec<(WALPos, WALBytes)>,
-    ) -> Vec<Pin<Box<dyn Future<Output = Result<(), WALError>> + 'a>>> {
+        writes: Vec<(WalPos, WalBytes)>,
+    ) -> Vec<Pin<Box<dyn Future<Output = Result<(), WalError>> + 'a>>> {
         if writes.is_empty() {
             return Vec::new();
         }
@@ -352,7 +352,7 @@ impl<F: WALStore> WALFilePool<F> {
         let alloc = async move {
             last_write.await?;
             let mut last_h: Option<
-                Pin<Box<dyn Future<Output = Result<WALFileHandle<'a, F>, WALError>> + 'a>>,
+                Pin<Box<dyn Future<Output = Result<WalFileHandle<'a, F>, WalError>> + 'a>>,
             > = None;
             for ((next_fid, wl), h) in meta.into_iter().zip(files.into_iter()) {
                 if let Some(lh) = last_h.take() {
@@ -403,15 +403,15 @@ impl<F: WALStore> WALFilePool<F> {
     #[allow(clippy::type_complexity)]
     fn remove_files<'a>(
         &'a mut self,
-        state: &mut WALState,
+        state: &mut WalState,
         keep_nrecords: u32,
-    ) -> impl Future<Output = Result<(), WALError>> + 'a {
+    ) -> impl Future<Output = Result<(), WalError>> + 'a {
         let last_peel = unsafe {
             std::mem::replace(&mut *self.last_peel.get(), std::mem::MaybeUninit::uninit())
                 .assume_init()
         };
 
-        let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), WALError>>>>> = Vec::new();
+        let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), WalError>>>>> = Vec::new();
         while state.pending_removal.len() > 1 {
             let (fid, counter) = state.pending_removal.front().unwrap();
             if counter_lt(counter + keep_nrecords, state.counter) {
@@ -448,23 +448,23 @@ impl<F: WALStore> WALFilePool<F> {
     }
 }
 
-pub struct WALWriter<F: WALStore> {
-    state: WALState,
-    file_pool: WALFilePool<F>,
-    block_buffer: WALBytes,
+pub struct WalWriter<F: WalStore> {
+    state: WalState,
+    file_pool: WalFilePool<F>,
+    block_buffer: WalBytes,
     block_size: u32,
     msize: usize,
 }
 
-unsafe impl<F> Send for WALWriter<F> where F: WALStore + Send {}
+unsafe impl<F> Send for WalWriter<F> where F: WalStore + Send {}
 
-impl<F: WALStore> WALWriter<F> {
-    fn new(state: WALState, file_pool: WALFilePool<F>) -> Self {
+impl<F: WalStore> WalWriter<F> {
+    fn new(state: WalState, file_pool: WalFilePool<F>) -> Self {
         let mut b = Vec::new();
         let block_size = 1 << file_pool.block_nbit as u32;
-        let msize = std::mem::size_of::<WALRingBlob>();
+        let msize = std::mem::size_of::<WalRingBlob>();
         b.resize(block_size as usize, 0);
-        WALWriter {
+        WalWriter {
             state,
             file_pool,
             block_buffer: b.into_boxed_slice(),
@@ -473,16 +473,16 @@ impl<F: WALStore> WALWriter<F> {
         }
     }
 
-    /// Submit a sequence of records to WAL. It returns a vector of futures, each of which
-    /// corresponds to one record. When a future resolves to `WALRingId`, it is guaranteed the
+    /// Submit a sequence of records to Wal. It returns a vector of futures, each of which
+    /// corresponds to one record. When a future resolves to `WalRingId`, it is guaranteed the
     /// record is already logged. Then, after finalizing the changes encoded by that record to
-    /// the persistent storage, the caller can recycle the WAL files by invoking the given
-    /// `peel` with the given `WALRingId`s. Note: each serialized record should contain at least 1
+    /// the persistent storage, the caller can recycle the Wal files by invoking the given
+    /// `peel` with the given `WalRingId`s. Note: each serialized record should contain at least 1
     /// byte (empty record payload will result in assertion failure).
     pub fn grow<'a, R: Record + 'a>(
         &'a mut self,
         records: Vec<R>,
-    ) -> Vec<impl Future<Output = Result<(R, WALRingId), ()>> + 'a> {
+    ) -> Vec<impl Future<Output = Result<(R, WalRingId), ()>> + 'a> {
         let mut res = Vec::new();
         let mut writes = Vec::new();
         let msize = self.msize as u32;
@@ -506,7 +506,7 @@ impl<F: WALStore> WALWriter<F> {
                     let blob = unsafe {
                         &mut *self.block_buffer[bbuff_cur as usize..]
                             .as_mut_ptr()
-                            .cast::<WALRingBlob>()
+                            .cast::<WalRingBlob>()
                     };
                     bbuff_cur += msize;
                     if d >= rsize {
@@ -517,10 +517,10 @@ impl<F: WALStore> WALWriter<F> {
                         blob.rsize = rsize;
                         let (rs, rt) = if let Some(rs) = ring_start.take() {
                             self.state.counter += 1;
-                            (rs, WALRingType::Last)
+                            (rs, WalRingType::Last)
                         } else {
                             self.state.counter += 1;
-                            (rs0, WALRingType::Full)
+                            (rs0, WalRingType::Full)
                         };
                         blob.rtype = rt as u8;
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
@@ -529,7 +529,7 @@ impl<F: WALStore> WALWriter<F> {
                         rsize = 0;
                         let end = self.state.next + (bbuff_cur - bbuff_start) as u64;
                         res.push((
-                            WALRingId {
+                            WalRingId {
                                 start: rs,
                                 end,
                                 counter: blob.counter,
@@ -543,10 +543,10 @@ impl<F: WALStore> WALWriter<F> {
                         blob.crc32 = CRC32.checksum(payload);
                         blob.rsize = d;
                         blob.rtype = if ring_start.is_some() {
-                            WALRingType::Middle
+                            WalRingType::Middle
                         } else {
                             ring_start = Some(rs0);
-                            WALRingType::First
+                            WalRingType::First
                         } as u8;
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
                             .copy_from_slice(payload);
@@ -621,15 +621,15 @@ impl<F: WALStore> WALWriter<F> {
             .collect()
     }
 
-    /// Inform the `WALWriter` that some data writes are complete so that it could automatically
-    /// remove obsolete WAL files. The given list of `WALRingId` does not need to be ordered and
-    /// could be of arbitrary length. Use `0` for `keep_nrecords` if all obsolete WAL files
+    /// Inform the `WalWriter` that some data writes are complete so that it could automatically
+    /// remove obsolete Wal files. The given list of `WalRingId` does not need to be ordered and
+    /// could be of arbitrary length. Use `0` for `keep_nrecords` if all obsolete Wal files
     /// need to removed (the obsolete files do not affect the speed of recovery or correctness).
-    pub async fn peel<T: AsRef<[WALRingId]>>(
+    pub async fn peel<T: AsRef<[WalRingId]>>(
         &mut self,
         records: T,
         keep_nrecords: u32,
-    ) -> Result<(), WALError> {
+    ) -> Result<(), WalError> {
         let msize = self.msize as u64;
         let block_size = self.block_size as u64;
         let state = &mut self.state;
@@ -672,12 +672,12 @@ impl<F: WALStore> WALWriter<F> {
         &'a self,
         nrecords: usize,
         recover_policy: &RecoverPolicy,
-    ) -> Result<Vec<WALBytes>, WALError> {
+    ) -> Result<Vec<WalBytes>, WalError> {
         let filename_fmt = regex::Regex::new(FILENAME_FMT).unwrap();
         let file_pool = &self.file_pool;
         let file_nbit = file_pool.file_nbit;
         let block_size = 1 << file_pool.block_nbit;
-        let msize = std::mem::size_of::<WALRingBlob>();
+        let msize = std::mem::size_of::<WalRingBlob>();
 
         let logfiles = sort_fids(
             file_nbit,
@@ -693,7 +693,7 @@ impl<F: WALStore> WALWriter<F> {
         let mut records = Vec::new();
         'outer: for (_, fid) in logfiles.into_iter().rev() {
             let f = file_pool.get_file(fid, false).await?;
-            let ring_stream = WALLoader::read_rings(&f, true, file_pool.block_nbit, recover_policy);
+            let ring_stream = WalLoader::read_rings(&f, true, file_pool.block_nbit, recover_policy);
             let mut off = fid << file_nbit;
             let mut rings = Vec::new();
             futures::pin_mut!(ring_stream);
@@ -701,21 +701,21 @@ impl<F: WALStore> WALWriter<F> {
                 rings.push(ring);
             }
             for ring in rings.into_iter().rev() {
-                let ring = ring.map_err(|_| WALError::Other("error mapping ring".to_string()))?;
+                let ring = ring.map_err(|_| WalError::Other("error mapping ring".to_string()))?;
                 let (header, payload) = ring;
                 let payload = payload.unwrap();
                 match header.rtype.try_into() {
-                    Ok(WALRingType::Full) => {
+                    Ok(WalRingType::Full) => {
                         assert!(chunks.is_none());
-                        if !WALLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
-                            return Err(WALError::InvalidChecksum);
+                        if !WalLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
+                            return Err(WalError::InvalidChecksum);
                         }
                         off += header.rsize as u64;
                         records.push(payload);
                     }
-                    Ok(WALRingType::First) => {
-                        if !WALLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
-                            return Err(WALError::InvalidChecksum);
+                    Ok(WalRingType::First) => {
+                        if !WalLoader::verify_checksum_(&payload, header.crc32, recover_policy)? {
+                            return Err(WalError::InvalidChecksum);
                         }
                         if let Some(mut chunks) = chunks.take() {
                             chunks.push(payload);
@@ -730,7 +730,7 @@ impl<F: WALStore> WALWriter<F> {
                         }
                         off += header.rsize as u64;
                     }
-                    Ok(WALRingType::Middle) => {
+                    Ok(WalRingType::Middle) => {
                         if let Some(chunks) = &mut chunks {
                             chunks.push(payload);
                         } else {
@@ -738,15 +738,15 @@ impl<F: WALStore> WALWriter<F> {
                         }
                         off += header.rsize as u64;
                     }
-                    Ok(WALRingType::Last) => {
+                    Ok(WalRingType::Last) => {
                         assert!(chunks.is_none());
                         chunks = Some(vec![payload]);
                         off += header.rsize as u64;
                     }
-                    Ok(WALRingType::Null) => break,
+                    Ok(WalRingType::Null) => break,
                     Err(_) => match recover_policy {
                         RecoverPolicy::Strict => {
-                            return Err(WALError::Other(
+                            return Err(WalError::Other(
                                 "invalid ring type - strict recovery requested".to_string(),
                             ))
                         }
@@ -774,16 +774,16 @@ pub enum RecoverPolicy {
     BestEffort,
 }
 
-pub struct WALLoader {
+pub struct WalLoader {
     file_nbit: u64,
     block_nbit: u64,
     cache_size: NonZeroUsize,
     recover_policy: RecoverPolicy,
 }
 
-impl Default for WALLoader {
+impl Default for WalLoader {
     fn default() -> Self {
-        WALLoader {
+        WalLoader {
             file_nbit: 22,  // 4MB
             block_nbit: 15, // 32KB,
             cache_size: NonZeroUsize::new(16).unwrap(),
@@ -792,7 +792,7 @@ impl Default for WALLoader {
     }
 }
 
-impl WALLoader {
+impl WalLoader {
     pub fn new() -> Self {
         Default::default()
     }
@@ -817,36 +817,36 @@ impl WALLoader {
         self
     }
 
-    fn verify_checksum_(data: &[u8], checksum: u32, p: &RecoverPolicy) -> Result<bool, WALError> {
+    fn verify_checksum_(data: &[u8], checksum: u32, p: &RecoverPolicy) -> Result<bool, WalError> {
         if checksum == CRC32.checksum(data) {
             Ok(true)
         } else {
             match p {
-                RecoverPolicy::Strict => Err(WALError::Other("invalid checksum".to_string())),
+                RecoverPolicy::Strict => Err(WalError::Other("invalid checksum".to_string())),
                 RecoverPolicy::BestEffort => Ok(false),
             }
         }
     }
 
-    fn verify_checksum(&self, data: &[u8], checksum: u32) -> Result<bool, WALError> {
+    fn verify_checksum(&self, data: &[u8], checksum: u32) -> Result<bool, WalError> {
         Self::verify_checksum_(data, checksum, &self.recover_policy)
     }
 
     #[allow(clippy::await_holding_refcell_ref)]
     // TODO: Refactor to a more safe solution.
-    fn read_rings<'a, F: WALStore + 'a>(
-        file: &'a WALFileHandle<'a, F>,
+    fn read_rings<'a, F: WalStore + 'a>(
+        file: &'a WalFileHandle<'a, F>,
         read_payload: bool,
         block_nbit: u64,
         recover_policy: &'a RecoverPolicy,
-    ) -> impl futures::Stream<Item = Result<(WALRingBlob, Option<WALBytes>), bool>> + 'a {
+    ) -> impl futures::Stream<Item = Result<(WalRingBlob, Option<WalBytes>), bool>> + 'a {
         let block_size = 1 << block_nbit;
-        let msize = std::mem::size_of::<WALRingBlob>();
+        let msize = std::mem::size_of::<WalRingBlob>();
 
-        struct Vars<'a, F: WALStore> {
+        struct Vars<'a, F: WalStore> {
             done: bool,
             off: u64,
-            file: &'a WALFileHandle<'a, F>,
+            file: &'a WalFileHandle<'a, F>,
         }
 
         let vars = std::rc::Rc::new(std::cell::RefCell::new(Vars {
@@ -905,8 +905,8 @@ impl WALLoader {
                     None => _yield!(),
                 };
                 v.off += msize as u64;
-                let header = unsafe { &*header_raw.as_ptr().cast::<WALRingBlob>() };
-                let header = WALRingBlob {
+                let header = unsafe { &*header_raw.as_ptr().cast::<WalRingBlob>() };
+                let header = WalRingBlob {
                     counter: header.counter,
                     crc32: header.crc32,
                     rsize: header.rsize,
@@ -914,21 +914,21 @@ impl WALLoader {
                 };
                 let payload;
                 match header.rtype.try_into() {
-                    Ok(WALRingType::Full)
-                    | Ok(WALRingType::First)
-                    | Ok(WALRingType::Middle)
-                    | Ok(WALRingType::Last) => {
+                    Ok(WalRingType::Full)
+                    | Ok(WalRingType::First)
+                    | Ok(WalRingType::Middle)
+                    | Ok(WalRingType::Last) => {
                         payload = if read_payload {
                             Some(check!(check!(
                                 v.file.read(v.off, header.rsize as usize).await
                             )
-                            .ok_or(WALError::Other)))
+                            .ok_or(WalError::Other)))
                         } else {
                             None
                         };
                         v.off += header.rsize as u64;
                     }
-                    Ok(WALRingType::Null) => _yield!(),
+                    Ok(WalRingType::Null) => _yield!(),
                     Err(_) => match recover_policy {
                         RecoverPolicy::Strict => die!(),
                         RecoverPolicy::BestEffort => {
@@ -943,21 +943,21 @@ impl WALLoader {
     }
 
     #[allow(clippy::await_holding_refcell_ref)]
-    fn read_records<'a, F: WALStore + 'a>(
+    fn read_records<'a, F: WalStore + 'a>(
         &'a self,
-        file: &'a WALFileHandle<'a, F>,
-        chunks: &'a mut Option<(Vec<WALBytes>, WALPos)>,
-    ) -> impl futures::Stream<Item = Result<(WALBytes, WALRingId, u32), bool>> + 'a {
+        file: &'a WalFileHandle<'a, F>,
+        chunks: &'a mut Option<(Vec<WalBytes>, WalPos)>,
+    ) -> impl futures::Stream<Item = Result<(WalBytes, WalRingId, u32), bool>> + 'a {
         let fid = file.fid;
         let file_nbit = self.file_nbit;
         let block_size = 1 << self.block_nbit;
-        let msize = std::mem::size_of::<WALRingBlob>();
+        let msize = std::mem::size_of::<WalRingBlob>();
 
-        struct Vars<'a, F: WALStore> {
+        struct Vars<'a, F: WalStore> {
             done: bool,
-            chunks: &'a mut Option<(Vec<WALBytes>, WALPos)>,
+            chunks: &'a mut Option<(Vec<WalBytes>, WalPos)>,
             off: u64,
-            file: &'a WALFileHandle<'a, F>,
+            file: &'a WalFileHandle<'a, F>,
         }
 
         let vars = std::rc::Rc::new(std::cell::RefCell::new(Vars {
@@ -1019,13 +1019,13 @@ impl WALLoader {
                     };
                     let ringid_start = (fid << file_nbit) + v.off;
                     v.off += msize as u64;
-                    let header = unsafe { &*header_raw.as_ptr().cast::<WALRingBlob>() };
+                    let header = unsafe { &*header_raw.as_ptr().cast::<WalRingBlob>() };
                     let rsize = header.rsize;
                     match header.rtype.try_into() {
-                        Ok(WALRingType::Full) => {
+                        Ok(WalRingType::Full) => {
                             assert!(v.chunks.is_none());
                             let payload = check!(check!(v.file.read(v.off, rsize as usize).await)
-                                .ok_or(WALError::Other));
+                                .ok_or(WalError::Other));
                             // TODO: improve the behavior when CRC32 fails
                             if !check!(self.verify_checksum(&payload, header.crc32)) {
                                 die!()
@@ -1033,7 +1033,7 @@ impl WALLoader {
                             v.off += rsize as u64;
                             _yield!((
                                 payload,
-                                WALRingId {
+                                WalRingId {
                                     start: ringid_start,
                                     end: (fid << file_nbit) + v.off,
                                     counter: header.counter
@@ -1041,23 +1041,23 @@ impl WALLoader {
                                 header.counter
                             ))
                         }
-                        Ok(WALRingType::First) => {
+                        Ok(WalRingType::First) => {
                             assert!(v.chunks.is_none());
                             let chunk = check!(check!(v.file.read(v.off, rsize as usize).await)
-                                .ok_or(WALError::Other));
+                                .ok_or(WalError::Other));
                             if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                 die!()
                             }
                             *v.chunks = Some((vec![chunk], ringid_start));
                             v.off += rsize as u64;
                         }
-                        Ok(WALRingType::Middle) => {
+                        Ok(WalRingType::Middle) => {
                             let Vars {
                                 chunks, off, file, ..
                             } = &mut *v;
                             if let Some((chunks, _)) = chunks {
                                 let chunk = check!(check!(file.read(*off, rsize as usize).await)
-                                    .ok_or(WALError::Other));
+                                    .ok_or(WalError::Other));
                                 if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                     die!()
                                 }
@@ -1065,13 +1065,13 @@ impl WALLoader {
                             } // otherwise ignore the leftover
                             *off += rsize as u64;
                         }
-                        Ok(WALRingType::Last) => {
+                        Ok(WalRingType::Last) => {
                             let v_off = v.off;
                             v.off += rsize as u64;
                             if let Some((mut chunks, ringid_start)) = v.chunks.take() {
                                 let chunk =
                                     check!(check!(v.file.read(v_off, rsize as usize).await)
-                                        .ok_or(WALError::Other));
+                                        .ok_or(WalError::Other));
                                 if !check!(self.verify_checksum(&chunk, header.crc32)) {
                                     die!()
                                 }
@@ -1085,7 +1085,7 @@ impl WALLoader {
                                 }
                                 _yield!((
                                     payload.into_boxed_slice(),
-                                    WALRingId {
+                                    WalRingId {
                                         start: ringid_start,
                                         end: (fid << file_nbit) + v.off,
                                         counter: header.counter,
@@ -1094,7 +1094,7 @@ impl WALLoader {
                                 ))
                             }
                         }
-                        Ok(WALRingType::Null) => _yield!(),
+                        Ok(WalRingType::Null) => _yield!(),
                         Err(_) => match self.recover_policy {
                             RecoverPolicy::Strict => die!(),
                             RecoverPolicy::BestEffort => {
@@ -1109,19 +1109,19 @@ impl WALLoader {
         })
     }
 
-    /// Recover by reading the WAL files.
-    pub async fn load<S: WALStore, F: FnMut(WALBytes, WALRingId) -> Result<(), WALError>>(
+    /// Recover by reading the Wal files.
+    pub async fn load<S: WalStore, F: FnMut(WalBytes, WalRingId) -> Result<(), WalError>>(
         &self,
         store: S,
         mut recover_func: F,
         keep_nrecords: u32,
-    ) -> Result<WALWriter<S>, WALError> {
-        let msize = std::mem::size_of::<WALRingBlob>();
+    ) -> Result<WalWriter<S>, WalError> {
+        let msize = std::mem::size_of::<WalRingBlob>();
         assert!(self.file_nbit > self.block_nbit);
         assert!(msize < 1 << self.block_nbit);
         let filename_fmt = regex::Regex::new(FILENAME_FMT).unwrap();
         let mut file_pool =
-            WALFilePool::new(store, self.file_nbit, self.block_nbit, self.cache_size).await?;
+            WalFilePool::new(store, self.file_nbit, self.block_nbit, self.cache_size).await?;
         let logfiles = sort_fids(
             self.file_nbit,
             file_pool
@@ -1136,7 +1136,7 @@ impl WALLoader {
 
         let mut chunks = None;
         let mut pre_skip = true;
-        let mut scanned: Vec<(String, WALFileHandle<S>)> = Vec::new();
+        let mut scanned: Vec<(String, WalFileHandle<S>)> = Vec::new();
         let mut counter = 0;
 
         // TODO: check for missing logfiles
@@ -1157,7 +1157,7 @@ impl WALLoader {
                     let (bytes, ring_id, _) = match res {
                         Err(e) => {
                             if e {
-                                return Err(WALError::Other(
+                                return Err(WalError::Other(
                                     "error loading from storage".to_string(),
                                 ));
                             } else {
@@ -1178,8 +1178,8 @@ impl WALLoader {
                 .await;
             for e in records.into_iter().rev() {
                 let (rec, _) =
-                    e.map_err(|_| WALError::Other("error decoding WALRingBlob".to_string()))?;
-                if rec.rtype == WALRingType::Full as u8 || rec.rtype == WALRingType::Last as u8 {
+                    e.map_err(|_| WalError::Other("error decoding WalRingBlob".to_string()))?;
+                if rec.rtype == WalRingType::Full as u8 || rec.rtype == WalRingType::Last as u8 {
                     counter = rec.counter + 1;
                     break 'outer;
                 }
@@ -1202,7 +1202,7 @@ impl WALLoader {
             futures::pin_mut!(stream);
             while let Some(r) = stream.next().await {
                 last =
-                    Some(r.map_err(|_| WALError::Other("error decoding WALRingBlob".to_string()))?);
+                    Some(r.map_err(|_| WalError::Other("error decoding WalRingBlob".to_string()))?);
             }
             if let Some((last_rec, _)) = last {
                 if !counter_lt(last_rec.counter + keep_nrecords, counter) {
@@ -1221,13 +1221,13 @@ impl WALLoader {
         file_pool.reset();
 
         let next = recover_fid << self.file_nbit;
-        let next_complete = WALRingId {
+        let next_complete = WalRingId {
             start: 0,
             end: next,
             counter,
         };
-        Ok(WALWriter::new(
-            WALState {
+        Ok(WalWriter::new(
+            WalState {
                 counter,
                 next_complete,
                 next,

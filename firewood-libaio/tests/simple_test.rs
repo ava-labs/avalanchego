@@ -1,4 +1,4 @@
-use aiofut::AIOBuilder;
+use aiofut::AioBuilder;
 use futures::executor::LocalPool;
 use futures::future::FutureExt;
 use futures::task::LocalSpawnExt;
@@ -6,7 +6,7 @@ use std::os::unix::io::AsRawFd;
 
 #[test]
 fn simple1() {
-    let aiomgr = AIOBuilder::default().max_events(100).build().unwrap();
+    let aiomgr = AioBuilder::default().max_events(100).build().unwrap();
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -32,7 +32,7 @@ fn simple1() {
 
 #[test]
 fn simple2() {
-    let aiomgr = AIOBuilder::default().build().unwrap();
+    let aiomgr = AioBuilder::default().build().unwrap();
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
