@@ -6,6 +6,7 @@ package txs
 import (
 	"errors"
 	"fmt"
+	"math/bits"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -89,7 +90,10 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 }
 
 func (tx *Tx) Size() int {
-	return len(tx.bytes)
+	if tx == nil {
+		return bits.UintSize
+	}
+	return len(tx.bytes) + bits.UintSize
 }
 
 func (tx *Tx) Bytes() []byte {
