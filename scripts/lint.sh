@@ -84,7 +84,6 @@ function test_require_len_zero {
   fi
 }
 
-<<<<<<< HEAD
 function test_require_equal_len {
   # This should only flag if len(foo) is the *actual* val, not the expected val.
   #
@@ -103,8 +102,6 @@ function test_require_equal_len {
   fi
 }
 
-=======
->>>>>>> dev
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
   if grep -R -o -P '_ .+? = &.+?\{\}' .; then
