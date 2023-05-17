@@ -38,7 +38,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 
 	h.Pop()
 	require.Zero(h.Len())
-	require.Len(h.priorityHeap, 0)
+	require.Empty(h.priorityHeap)
 	require.Zero(h.sortedItems.Len())
 
 	item2 := &heapItem{
@@ -85,7 +85,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require.Equal(item2, gotItem)
 
 	require.Zero(h.Len())
-	require.Len(h.priorityHeap, 0)
+	require.Empty(h.priorityHeap)
 	require.Zero(h.sortedItems.Len())
 }
 
@@ -158,7 +158,7 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 	h.remove(heapItem1)
 
 	require.Zero(h.Len())
-	require.Len(h.priorityHeap, 0)
+	require.Empty(h.priorityHeap)
 	require.Zero(h.sortedItems.Len())
 
 	item2 := &syncWorkItem{
@@ -184,7 +184,7 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 	require.Equal(item1, heapItem1.workItem)
 	h.remove(heapItem1)
 	require.Zero(h.Len())
-	require.Len(h.priorityHeap, 0)
+	require.Empty(h.priorityHeap)
 	require.Zero(h.sortedItems.Len())
 }
 

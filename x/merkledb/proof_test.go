@@ -122,7 +122,7 @@ func Test_Proof_Marshal_Errors(t *testing.T) {
 }
 
 func verifyPath(t *testing.T, path1, path2 []ProofNode) {
-	require.Equal(t, len(path1), len(path2))
+	require.Len(t, path2, len(path1))
 	for i := range path1 {
 		require.True(t, bytes.Equal(path1[i].KeyPath.Value, path2[i].KeyPath.Value))
 		require.Equal(t, path1[i].KeyPath.hasOddLength(), path2[i].KeyPath.hasOddLength())
