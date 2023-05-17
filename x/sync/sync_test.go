@@ -984,7 +984,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			Log:                   logging.NoLog{},
 		})
 		require.NoError(err)
-		require.NotNil(t, syncer)
+		require.NotNil(syncer)
 
 		require.NoError(syncer.StartSyncing(context.Background()))
 
