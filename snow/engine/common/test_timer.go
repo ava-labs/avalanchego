@@ -30,7 +30,6 @@ func (t *TimerTest) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
 		t.RegisterTimeoutF(delay)
 	} else if t.CantRegisterTimout && t.T != nil {
-		require := require.New(t.T)
-		require.FailNow("Unexpectedly called RegisterTimeout")
+		require.FailNow(t.T, "Unexpectedly called RegisterTimeout")
 	}
 }
