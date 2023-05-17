@@ -22,6 +22,12 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const (
+	// pebbleByteOverHead is the number of bytes of constant overhead that
+	// should be added to a batch size per operation.
+	pebbleByteOverHead = 8
+)
+
 var (
 	_ database.Database = (*Database)(nil)
 	_ database.Batch    = (*batch)(nil)
@@ -58,8 +64,8 @@ func NewDefaultConfig() Config {
 }
 
 func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
-	// These default settings are based on https://github.com/ethereum/go-ethereum/blob/master/ethdb/pebble/pebble.go
-
+	// Original default settings are based on
+	// https://github.com/ethereum/go-ethereum/blob/release/1.11/ethdb/pebble/pebble.go
 	opts := &pebble.Options{
 		Cache:        pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync: cfg.BytesPerSync,
@@ -74,12 +80,13 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		Levels:                      make([]pebble.LevelOptions, 7),
 		// TODO: add support for adding a custom logger
 	}
+
 	// Default configuration sourced from:
-	// https://github.com/cockroachdb/pebble/blob/master/cmd/pebble/db.go#L76-L86
+	// https://github.com/cockroachdb/pebble/blob/crl-release-23.1/cmd/pebble/db.go
 	for i := 0; i < len(opts.Levels); i++ {
 		l := &opts.Levels[i]
-		l.BlockSize = 64 * 1024
-		l.IndexBlockSize = 256 * 1024
+		l.BlockSize = 64 * units.KiB
+		l.IndexBlockSize = 256 * units.KiB
 		l.FilterPolicy = bloom.FilterPolicy(10)
 		l.FilterType = pebble.TableFilter
 		if i > 0 {
@@ -142,7 +149,6 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return true, closer.Close()
 }
 
-// Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if db.closed.Get() {
 		return nil, database.ErrClosed
@@ -156,7 +162,6 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return ret, closer.Close()
 }
 
-// Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
 	// Put causes panic if the db has already been closed
 	if db.closed.Get() {
@@ -169,7 +174,6 @@ func (db *Database) Put(key []byte, value []byte) error {
 	return updateError(db.db.Set(key, value, pebble.NoSync))
 }
 
-// Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
 	// Delete causes panic if the db has already been closed
 	if db.closed.Get() {
@@ -217,8 +221,6 @@ type batch struct {
 	applied atomic.Bool
 }
 
-// NewBatch creates a write/delete-only buffer that is atomically committed to
-// the database when write is called
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
 		db:    db,
@@ -227,20 +229,17 @@ func (db *Database) NewBatch() database.Batch {
 }
 
 func (b *batch) Put(key, value []byte) error {
-	b.size += len(key) + len(value) + 8 // TODO: find byte overhead
+	b.size += len(key) + len(value) + pebbleByteOverHead
 	return b.batch.Set(key, value, pebble.NoSync)
 }
 
-// Delete the key during writing
 func (b *batch) Delete(key []byte) error {
-	b.size += len(key) + 8 // TODO: find byte overhead
+	b.size += len(key) + pebbleByteOverHead
 	return b.batch.Delete(key, pebble.NoSync)
 }
 
-// Size retrieves the amount of data queued up for writing.
 func (b *batch) Size() int { return b.size }
 
-// Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
 	// write causes panic if the db has already been closed
 	if b.db.closed.Get() {
@@ -272,13 +271,11 @@ func (b *batch) Write() error {
 	return updateError(b.batch.Commit(pebble.NoSync))
 }
 
-// Reset resets the batch for reuse.
 func (b *batch) Reset() {
 	b.batch.Reset()
 	b.size = 0
 }
 
-// Replay the batch contents.
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	reader := b.batch.Reader()
 	for {
@@ -301,7 +298,6 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	}
 }
 
-// Inner returns itself
 func (b *batch) Inner() database.Batch { return b }
 
 type iter struct {
@@ -313,7 +309,6 @@ type iter struct {
 	err   error
 }
 
-// NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
 	// Don't call NewIter of pebble after the db closed. It panics otherwise.
 	if db.closed.Get() {
@@ -328,8 +323,6 @@ func (db *Database) NewIterator() database.Iterator {
 	}
 }
 
-// NewIteratorWithStart creates a lexicographically ordered iterator over the
-// database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	if db.closed.Get() {
 		return &iter{
@@ -359,8 +352,6 @@ func bytesPrefix(prefix []byte) *pebble.IterOptions {
 	return &pebble.IterOptions{LowerBound: prefix, UpperBound: limit}
 }
 
-// NewIteratorWithPrefix creates a lexicographically ordered iterator over the
-// database ignoring keys that do not start with the provided prefix
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	if db.closed.Get() {
 		return &iter{
