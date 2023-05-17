@@ -21,7 +21,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero"}
+TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len"}
 
 function test_golangci_lint {
   go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
@@ -79,6 +79,24 @@ function test_require_len_zero {
   if grep -R -o -P 'require\.Len\((t, )?.+, 0(,|\))' .; then
     echo ""
     echo "Use require.Empty instead of require.Len when testing for 0 length."
+    echo ""
+    return 1
+  fi
+}
+
+function test_require_equal_len {
+  # This should only flag if len(foo) is the *actual* val, not the expected val.
+  #
+  # These should *not* match:
+  # - require.Equal(len(foo), 2)
+  # - require.Equal(t, len(foo), 2)
+  #
+  # These should match:
+  # - require.Equal(2, len(foo))
+  # - require.Equal(t, 2, len(foo))
+  if grep -R -o -P --exclude-dir='scripts' 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
+    echo ""
+    echo "Use require.Len instead of require.Equal when testing for length."
     echo ""
     return 1
   fi

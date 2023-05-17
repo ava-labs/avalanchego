@@ -26,7 +26,6 @@ func TestSet(t *testing.T) {
 	s.Add(id1)
 	require.True(s.Contains(id1))
 	require.Len(s.List(), 1)
-	require.Equal(len(s.List()), 1)
 	require.Equal(id1, s.List()[0])
 
 	s.Clear()

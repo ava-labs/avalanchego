@@ -692,7 +692,7 @@ func Test_Change_List(t *testing.T) {
 
 	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 8)
 	require.NoError(err)
-	require.Equal(8, len(changes.values))
+	require.Len(changes.values, 8)
 }
 
 func TestHistoryRecord(t *testing.T) {
