@@ -67,9 +67,9 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	timestamp := r.backend.getTimestamp(r.backend.LastAccepted())
+	chainTime := r.backend.getTimestamp(r.backend.LastAccepted())
 	for _, tx := range b.Txs() {
-		if err := r.Mempool.Add(tx, timestamp); err != nil {
+		if err := r.Mempool.Add(tx, chainTime); err != nil {
 			r.ctx.Log.Debug(
 				"failed to reissue tx",
 				zap.Stringer("txID", tx.ID()),
