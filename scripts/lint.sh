@@ -21,7 +21,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len"}
+TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil"}
 
 function test_golangci_lint {
   go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
@@ -97,6 +97,29 @@ function test_require_equal_len {
   if grep -R -o -P --exclude-dir='scripts' 'require\.Equal\((t, )?.*, len\([^,]*$' .; then
     echo ""
     echo "Use require.Len instead of require.Equal when testing for length."
+    echo ""
+    return 1
+  fi
+}
+
+function test_require_nil {
+  if grep -R -o -P 'require\..+?!= nil' .; then
+    echo ""
+    echo "Use require.NotNil when testing for nil inequality."
+    echo ""
+    return 1
+  fi
+
+  if grep -R -o -P 'require\..+?== nil' .; then
+    echo ""
+    echo "Use require.Nil when testing for nil equality."
+    echo ""
+    return 1
+  fi
+
+  if grep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
+    echo ""
+    echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
     echo ""
     return 1
   fi
