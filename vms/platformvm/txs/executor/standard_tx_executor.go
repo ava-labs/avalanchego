@@ -501,14 +501,17 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
+// addStakerFromStakerTx creates the staker to be added to state.
+// Post Continuous Staking fork activation it has also a side-effect:
+// it updates current supply in state
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
 	chainTime time.Time,
 ) (*state.Staker, error) {
-	// Pre Continuous Staking fork, stakers are added as pending first, them promoted
-	// to current when chainTime reach their start time.
+	// Pre Continuous Staking fork, stakers are added as pending first, then promoted
+	// to current when chainTime reaches their start time.
 	// Post Continuous Staking fork, stakers are immediately marked as current.
-	// their start time is current chain time.
+	// Their start time is current chain time.
 
 	txID := e.Tx.ID()
 	if !e.Config.IsContinuousStakingActivated(chainTime) {
@@ -520,12 +523,13 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		stakeDuration   = stakerTx.Duration()
 	)
 	if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
-		currentSupply, err := e.State.GetCurrentSupply(stakerTx.SubnetID())
+		subnetID := stakerTx.SubnetID()
+		currentSupply, err := e.State.GetCurrentSupply(subnetID)
 		if err != nil {
 			return nil, err
 		}
 
-		rewardCfg, err := e.State.GetRewardConfig(stakerTx.SubnetID())
+		rewardCfg, err := e.State.GetRewardConfig(subnetID)
 		if err != nil {
 			return nil, err
 		}
@@ -538,7 +542,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		)
 
 		updatedSupply := currentSupply + potentialReward
-		e.State.SetCurrentSupply(stakerTx.SubnetID(), updatedSupply)
+		e.State.SetCurrentSupply(subnetID, updatedSupply)
 	}
 	return state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
 }

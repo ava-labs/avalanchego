@@ -1059,8 +1059,8 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
-		// tx is guaranteed to be pre Continuous staking fork since these are genesis transactions.
-		// it's fine to use tx.StartTime
+		// tx is a genesis transactions, hence it's guaranteed to be
+		// pre Continuous staking fork. It's fine to use tx.StartTime
 		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
 		if err != nil {
 			return err
