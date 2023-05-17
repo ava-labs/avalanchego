@@ -158,7 +158,6 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
