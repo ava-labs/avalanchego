@@ -34,8 +34,8 @@ func newCounterMetric(namespace, name string, reg prometheus.Registerer, errs *w
 
 type metrics struct {
 	get,
-	put metric.Averager
-
+	put,
+	portionFilled metric.Averager
 	hit,
 	miss prometheus.Counter
 }
@@ -47,6 +47,7 @@ func (m *metrics) Initialize(
 	errs := wrappers.Errs{}
 	m.get = newAveragerMetric(namespace, "get", reg, &errs)
 	m.put = newAveragerMetric(namespace, "put", reg, &errs)
+	m.portionFilled = newAveragerMetric(namespace, "portion_filled", reg, &errs)
 	m.hit = newCounterMetric(namespace, "hit", reg, &errs)
 	m.miss = newCounterMetric(namespace, "miss", reg, &errs)
 	return errs.Err
