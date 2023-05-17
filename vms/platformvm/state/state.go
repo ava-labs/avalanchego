@@ -1529,7 +1529,10 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, &stBlk)
+		// Note: Evict is used rather than Put here because stBlk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1844,7 +1847,10 @@ func (s *state) writeTXs() error {
 		}
 
 		delete(s.addedTxs, txID)
-		s.txCache.Put(txID, txStatus)
+		// Note: Evict is used rather than Put here because stx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.txCache.Evict(txID)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
@@ -1907,7 +1913,10 @@ func (s *state) writeTransformedSubnets() error {
 		txID := tx.ID()
 
 		delete(s.transformedSubnets, subnetID)
-		s.transformedSubnetCache.Put(subnetID, tx)
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.transformedSubnetCache.Evict(subnetID)
 		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}
