@@ -1160,11 +1160,15 @@ func (s *state) loadCurrentStakers() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		startTime := stakerTx.StartTime()
-		if metadata.StakerStartTime != 0 {
-			// post Continuous staking fork, start time is stored in metadata
-			// and must be used instead stakerTx.StartTime().
-			startTime = time.Unix(metadata.StakerStartTime, 0)
+		startTime := time.Unix(metadata.StakerStartTime, 0)
+		if metadata.StakerStartTime == 0 {
+			// pre Continuous staking fork, start time is not stored in metadata.
+			// we must use  stakerTx.StartTime().
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", tx.Unsigned)
+			}
+			startTime = stakerTx.StartTime()
 		}
 
 		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
@@ -1199,17 +1203,21 @@ func (s *state) loadCurrentStakers() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
+		defaultStartTime := time.Time{}
+		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+			defaultStartTime = preStaker.StartTime()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
-			LastUpdated: uint64(stakerTx.StartTime().Unix()),
+			LastUpdated: uint64(defaultStartTime.Unix()),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
 
-		startTime := stakerTx.StartTime()
+		startTime := defaultStartTime
 		if metadata.StakerStartTime != 0 {
 			// post Continuous staking fork, start time is stored in metadata
 			// and must be used instead stakerTx.StartTime().
@@ -1257,7 +1265,11 @@ func (s *state) loadCurrentStakers() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			startTime := stakerTx.StartTime()
+			defaultStartTime := time.Time{}
+			if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+				defaultStartTime = preStaker.StartTime()
+			}
+			startTime := defaultStartTime
 			if metadata.StakerStartTime != 0 {
 				// post Continuous staking fork, start time is stored in metadata
 				// and must be used instead stakerTx.StartTime().
@@ -1311,7 +1323,7 @@ func (s *state) loadPendingStakers() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1346,7 +1358,7 @@ func (s *state) loadPendingStakers() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}

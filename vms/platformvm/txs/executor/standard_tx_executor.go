@@ -515,7 +515,11 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 
 	txID := e.Tx.ID()
 	if !e.Config.IsContinuousStakingActivated(chainTime) {
-		return state.NewPendingStaker(txID, stakerTx)
+		preContinuousStakingStakerTx, ok := stakerTx.(txs.PreContinuousStakingStaker)
+		if !ok {
+			return nil, fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", stakerTx)
+		}
+		return state.NewPendingStaker(txID, preContinuousStakingStakerTx)
 	}
 
 	var (

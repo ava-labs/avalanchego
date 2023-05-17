@@ -102,19 +102,19 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	nodeID := ids.NodeID(rewardAddress)
 
 	newValidatorID := ids.GenerateTestNodeID()
-	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
-	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
+	newValidatorStartTime := defaultValidateStartTime.Add(5 * time.Second)
+	newValidatorEndTime := defaultValidateEndTime.Add(-5 * time.Second)
 
 	// [addMinStakeValidator] adds a new validator to the primary network's
 	// pending validator set with the minimum staking amount
 	addMinStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
-			target.config.MinValidatorStake, // stake amount
-			newValidatorStartTime,           // start time
-			newValidatorEndTime,             // end time
-			newValidatorID,                  // node ID
-			rewardAddress,                   // Reward Address
-			reward.PercentDenominator,       // Shares
+			target.config.MinValidatorStake,      // stake amount
+			uint64(newValidatorStartTime.Unix()), // start time
+			uint64(newValidatorEndTime.Unix()),   // end time
+			newValidatorID,                       // node ID
+			rewardAddress,                        // Reward Address
+			reward.PercentDenominator,            // Shares
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
@@ -124,7 +124,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
-			addValTx.StartTime(),
+			newValidatorStartTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -140,12 +140,12 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	// pending validator set with the maximum staking amount
 	addMaxStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
-			target.config.MaxValidatorStake, // stake amount
-			newValidatorStartTime,           // start time
-			newValidatorEndTime,             // end time
-			newValidatorID,                  // node ID
-			rewardAddress,                   // Reward Address
-			reward.PercentDenominator,       // Shared
+			target.config.MaxValidatorStake,      // stake amount
+			uint64(newValidatorStartTime.Unix()), // start time
+			uint64(newValidatorEndTime.Unix()),   // end time
+			newValidatorID,                       // node ID
+			rewardAddress,                        // Reward Address
+			reward.PercentDenominator,            // Shared
 			[]*secp256k1.PrivateKey{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
@@ -155,7 +155,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
-			addValTx.StartTime(),
+			newValidatorStartTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -173,8 +173,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	type test struct {
 		description          string
 		stakeAmount          uint64
-		startTime            uint64
-		endTime              uint64
+		startTime            time.Time
+		endTime              time.Time
 		nodeID               ids.NodeID
 		rewardAddress        ids.ShortID
 		feeKeys              []*secp256k1.PrivateKey
@@ -188,8 +188,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		{
 			description:          "validator stops validating earlier than delegator",
 			stakeAmount:          dummyH.config.MinDelegatorStake,
-			startTime:            uint64(defaultValidateStartTime.Unix()) + 1,
-			endTime:              uint64(defaultValidateEndTime.Unix()) + 1,
+			startTime:            defaultValidateStartTime.Add(time.Second),
+			endTime:              defaultValidateEndTime.Add(time.Second),
 			nodeID:               nodeID,
 			rewardAddress:        rewardAddress,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -201,8 +201,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		{
 			description:          fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
 			stakeAmount:          dummyH.config.MinDelegatorStake,
-			startTime:            uint64(currentTimestamp.Add(MaxFutureStartTime + time.Second).Unix()),
-			endTime:              uint64(currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second).Unix()),
+			startTime:            currentTimestamp.Add(MaxFutureStartTime + time.Second),
+			endTime:              currentTimestamp.Add(MaxFutureStartTime + defaultMinStakingDuration + time.Second),
 			nodeID:               nodeID,
 			rewardAddress:        rewardAddress,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -214,8 +214,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		{
 			description:          "validator not in the current or pending validator sets",
 			stakeAmount:          dummyH.config.MinDelegatorStake,
-			startTime:            uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
-			endTime:              uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
+			startTime:            defaultValidateStartTime.Add(5 * time.Second),
+			endTime:              defaultValidateEndTime.Add(-5 * time.Second),
 			nodeID:               newValidatorID,
 			rewardAddress:        rewardAddress,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -227,7 +227,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		{
 			description:          "delegator starts before validator",
 			stakeAmount:          dummyH.config.MinDelegatorStake,
-			startTime:            newValidatorStartTime - 1, // start validating subnet before primary network
+			startTime:            newValidatorStartTime.Add(-1 * time.Second), // start validating subnet before primary network
 			endTime:              newValidatorEndTime,
 			nodeID:               newValidatorID,
 			rewardAddress:        rewardAddress,
@@ -241,7 +241,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			description:          "delegator stops before validator",
 			stakeAmount:          dummyH.config.MinDelegatorStake,
 			startTime:            newValidatorStartTime,
-			endTime:              newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
+			endTime:              newValidatorEndTime.Add(time.Second), // stop validating subnet after stopping validating primary network
 			nodeID:               newValidatorID,
 			rewardAddress:        rewardAddress,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -266,8 +266,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		{
 			description:          "starts delegating at current timestamp",
 			stakeAmount:          dummyH.config.MinDelegatorStake,           // weight
-			startTime:            uint64(currentTimestamp.Unix()),           // start time
-			endTime:              uint64(defaultValidateEndTime.Unix()),     // end time
+			startTime:            currentTimestamp,                          // start time
+			endTime:              defaultValidateEndTime,                    // end time
 			nodeID:               nodeID,                                    // node ID
 			rewardAddress:        rewardAddress,                             // Reward Address
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
@@ -278,12 +278,12 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		},
 		{
 			description:   "tx fee paying key has no funds",
-			stakeAmount:   dummyH.config.MinDelegatorStake,             // weight
-			startTime:     uint64(defaultValidateStartTime.Unix()) + 1, // start time
-			endTime:       uint64(defaultValidateEndTime.Unix()),       // end time
-			nodeID:        nodeID,                                      // node ID
-			rewardAddress: rewardAddress,                               // Reward Address
-			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]},   // tx fee payer
+			stakeAmount:   dummyH.config.MinDelegatorStake,           // weight
+			startTime:     defaultValidateStartTime.Add(time.Second), // start time
+			endTime:       defaultValidateEndTime,                    // end time
+			nodeID:        nodeID,                                    // node ID
+			rewardAddress: rewardAddress,                             // Reward Address
+			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[1]}, // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
@@ -341,8 +341,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
 				tt.stakeAmount,
-				tt.startTime,
-				tt.endTime,
+				uint64(tt.startTime.Unix()),
+				uint64(tt.endTime.Unix()),
 				tt.nodeID,
 				tt.rewardAddress,
 				tt.feeKeys,
@@ -496,7 +496,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
 		addValTx,
-		addValTx.StartTime(),
+		dsStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -636,7 +636,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		addSubnetValTx,
-		addSubnetValTx.StartTime(),
+		defaultValidateStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -794,7 +794,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			addSubnetValTx,
-			addSubnetValTx.StartTime(),
+			defaultValidateStartTime,
 			0,
 		)
 		require.NoError(err)
@@ -899,7 +899,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValTx,
-			addValTx.StartTime(),
+			startTime,
 			0,
 		)
 		require.NoError(err)

@@ -253,7 +253,7 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasStakerTx() {
 		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
+		startTime := tx.Unsigned.(txs.PreContinuousStakingStaker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.
