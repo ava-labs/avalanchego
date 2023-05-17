@@ -58,6 +58,8 @@ func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.Ran
 }
 
 func Test_Creation(t *testing.T) {
+	require := require.New(t)
+
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
@@ -67,7 +69,7 @@ func Test_Creation(t *testing.T) {
 			NodeCacheSize: 1000,
 		},
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	syncer, err := NewStateSyncManager(StateSyncConfig{
 		SyncDB:                db,
@@ -76,12 +78,13 @@ func Test_Creation(t *testing.T) {
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	})
-	require.NotNil(t, syncer)
-	require.NoError(t, err)
+	require.NoError(err)
+	require.NotNil(syncer)
 }
 
 func Test_Completion(t *testing.T) {
 	for i := 0; i < 10; i++ {
+		require := require.New(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		emptyDB, err := merkledb.New(
@@ -93,9 +96,9 @@ func Test_Completion(t *testing.T) {
 				NodeCacheSize: 1000,
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 		emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
-		require.NoError(t, err)
+		require.NoError(err)
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
@@ -105,7 +108,7 @@ func Test_Completion(t *testing.T) {
 				NodeCacheSize: 1000,
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
 			SyncDB:                db,
 			Client:                &mockClient{db: emptyDB},
@@ -113,68 +116,70 @@ func Test_Completion(t *testing.T) {
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
 		})
-		require.NoError(t, err)
-		require.NotNil(t, syncer)
-		require.NoError(t, syncer.StartSyncing(context.Background()))
-		require.NoError(t, syncer.Wait(context.Background()))
+		require.NoError(err)
+		require.NotNil(syncer)
+		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Wait(context.Background()))
 		syncer.workLock.Lock()
-		require.Zero(t, syncer.unprocessedWork.Len())
-		require.Equal(t, 1, syncer.processedWork.Len())
+		require.Zero(syncer.unprocessedWork.Len())
+		require.Equal(1, syncer.processedWork.Len())
 		syncer.workLock.Unlock()
 	}
 }
 
 func Test_Midpoint(t *testing.T) {
+	require := require.New(t)
+
 	mid := midPoint([]byte{1, 255}, []byte{2, 1})
-	require.Equal(t, []byte{2, 0}, mid)
+	require.Equal([]byte{2, 0}, mid)
 
 	mid = midPoint(nil, []byte{255, 255, 0})
-	require.Equal(t, []byte{127, 255, 128}, mid)
+	require.Equal([]byte{127, 255, 128}, mid)
 
 	mid = midPoint([]byte{255, 255, 255}, []byte{255, 255})
-	require.Equal(t, []byte{255, 255, 127, 128}, mid)
+	require.Equal([]byte{255, 255, 127, 128}, mid)
 
 	mid = midPoint(nil, []byte{255})
-	require.Equal(t, []byte{127, 127}, mid)
+	require.Equal([]byte{127, 127}, mid)
 
 	mid = midPoint([]byte{1, 255}, []byte{255, 1})
-	require.Equal(t, []byte{128, 128}, mid)
+	require.Equal([]byte{128, 128}, mid)
 
 	mid = midPoint([]byte{140, 255}, []byte{141, 0})
-	require.Equal(t, []byte{140, 255, 127}, mid)
+	require.Equal([]byte{140, 255, 127}, mid)
 
 	mid = midPoint([]byte{126, 255}, []byte{127})
-	require.Equal(t, []byte{126, 255, 127}, mid)
+	require.Equal([]byte{126, 255, 127}, mid)
 
 	mid = midPoint(nil, nil)
-	require.Equal(t, []byte{127}, mid)
+	require.Equal([]byte{127}, mid)
 
 	low := midPoint(nil, mid)
-	require.Equal(t, []byte{63, 127}, low)
+	require.Equal([]byte{63, 127}, low)
 
 	high := midPoint(mid, nil)
-	require.Equal(t, []byte{191}, high)
+	require.Equal([]byte{191}, high)
 
 	mid = midPoint([]byte{255, 255}, nil)
-	require.Equal(t, []byte{255, 255, 127, 127}, mid)
+	require.Equal([]byte{255, 255, 127, 127}, mid)
 
 	mid = midPoint([]byte{255}, nil)
-	require.Equal(t, []byte{255, 127, 127}, mid)
+	require.Equal([]byte{255, 127, 127}, mid)
 
 	for i := 0; i < 5000; i++ {
 		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
 
 		start := make([]byte, r.Intn(99)+1)
 		_, err := r.Read(start)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		end := make([]byte, r.Intn(99)+1)
 		_, err = r.Read(end)
-		require.NoError(t, err)
+		require.NoError(err)
 
 		for bytes.Equal(start, end) {
 			_, err = r.Read(end)
-			require.NoError(t, err)
+			require.NoError(err)
 		}
 
 		if bytes.Compare(start, end) == 1 {
@@ -182,8 +187,8 @@ func Test_Midpoint(t *testing.T) {
 		}
 
 		mid = midPoint(start, end)
-		require.Equal(t, -1, bytes.Compare(start, mid))
-		require.Equal(t, -1, bytes.Compare(mid, end))
+		require.Equal(-1, bytes.Compare(start, mid))
+		require.Equal(-1, bytes.Compare(mid, end))
 	}
 }
 
