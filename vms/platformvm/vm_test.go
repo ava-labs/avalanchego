@@ -544,7 +544,7 @@ func TestGenesis(t *testing.T) {
 	require.True(ok)
 
 	currentValidators := vdrSet.List()
-	require.Equal(len(currentValidators), len(genesisState.Validators))
+	require.Len(genesisState.Validators, len(currentValidators))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())

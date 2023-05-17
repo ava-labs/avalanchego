@@ -600,7 +600,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	err := service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range genesis.Validators {
 		found := false
@@ -650,7 +650,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	err = service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	// Make sure the delegator is there
 	found := false
@@ -676,7 +676,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(vdr.NodeID, innerVdr.NodeID)
 
 		require.NotNil(innerVdr.Delegators)
-		require.Equal(1, len(*innerVdr.Delegators))
+		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
@@ -696,14 +696,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Call getValidators
 	response = GetCurrentValidatorsReply{}
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
-	for i := 0; i < len(response.Validators); i++ {
-		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+	for _, vdr := range response.Validators {
+		castVdr := vdr.(pchainapi.PermissionlessValidator)
+		if castVdr.NodeID != validatorNodeID {
 			continue
 		}
-		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
+		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))
 	}
 }
 
