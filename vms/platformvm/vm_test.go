@@ -549,7 +549,7 @@ func TestGenesis(t *testing.T) {
 	require.True(ok)
 
 	currentValidators := vdrSet.List()
-	require.Equal(len(currentValidators), len(genesisState.Validators))
+	require.Len(genesisState.Validators, len(currentValidators))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
@@ -2776,7 +2776,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			if tt.expectedErr != nil {
 				return
 			}
-			require.Equal(len(tt.expectedVdrSet), len(gotVdrSet))
+			require.Len(gotVdrSet, len(tt.expectedVdrSet))
 			for nodeID, vdr := range tt.expectedVdrSet {
 				otherVdr, ok := gotVdrSet[nodeID]
 				require.True(ok)
