@@ -24,13 +24,13 @@ func TestLRUEviction(t *testing.T) {
 
 func TestLRUResize(t *testing.T) {
 	require := require.New(t)
-	cache := LRU[ids.ID, int]{Size: 2}
+	cache := LRU[ids.ID, TestSizedInt]{Size: 2}
 
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}
 
-	expectedVal1 := 1
-	expectedVal2 := 2
+	expectedVal1 := TestSizedInt{i: 1}
+	expectedVal2 := TestSizedInt{i: 2}
 	cache.Put(id1, expectedVal1)
 	cache.Put(id2, expectedVal2)
 
