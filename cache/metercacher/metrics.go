@@ -50,9 +50,11 @@ func (m *metrics) Initialize(
 	m.portionFilled = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "portion_filled_fraction",
+			Name:      "portion_filled",
 			Help:      "fraction of cache filled",
-		})
+		},
+	)
+	errs.Add(reg.Register(m.portionFilled))
 	m.hit = newCounterMetric(namespace, "hit", reg, &errs)
 	m.miss = newCounterMetric(namespace, "miss", reg, &errs)
 	return errs.Err
