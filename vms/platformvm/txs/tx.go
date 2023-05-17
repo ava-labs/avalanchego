@@ -6,7 +6,6 @@ package txs
 import (
 	"errors"
 	"fmt"
-	"math/bits"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -91,9 +91,9 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 
 func (tx *Tx) Size() int {
 	if tx == nil {
-		return bits.UintSize
+		return wrappers.LongLen
 	}
-	return len(tx.bytes) + bits.UintSize
+	return len(tx.bytes) + wrappers.LongLen
 }
 
 func (tx *Tx) Bytes() []byte {

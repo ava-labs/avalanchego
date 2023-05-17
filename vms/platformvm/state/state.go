@@ -6,7 +6,6 @@ package state
 import (
 	"errors"
 	"fmt"
-	"math/bits"
 	"time"
 
 	"github.com/google/btree"
@@ -161,9 +160,9 @@ type stateBlk struct {
 
 func (b *stateBlk) Size() int {
 	if b == nil {
-		return bits.UintSize
+		return wrappers.LongLen
 	}
-	return len(b.Bytes) + wrappers.IntLen + bits.UintSize
+	return len(b.Bytes) + wrappers.IntLen + wrappers.LongLen
 }
 
 /*
@@ -350,9 +349,9 @@ type txAndStatus struct {
 
 func (t *txAndStatus) Size() int {
 	if t == nil {
-		return bits.UintSize
+		return wrappers.LongLen
 	}
-	return t.tx.Size() + wrappers.IntLen + bits.UintSize
+	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
 }
 
 func New(
