@@ -72,7 +72,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 		require.NoError(err)
 		require.Equal(i+1, cache.fifo.Len())
 	}
-	require.Len(evicted, 0)
+	require.Empty(evicted)
 
 	// Cache has [0,1,2]
 

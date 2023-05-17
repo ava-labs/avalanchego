@@ -60,7 +60,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok := u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -70,7 +70,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -80,7 +80,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -90,7 +90,7 @@ func TestQueue(t *testing.T) {
 	require.Equal(1, u.Len())
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 	require.Equal(msg1, gotMsg1)
 
@@ -126,7 +126,7 @@ func TestQueue(t *testing.T) {
 	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.Equal(msg1, gotMsg1)
-	require.Len(u.nodeToUnprocessedMsgs, 0)
+	require.Empty(u.nodeToUnprocessedMsgs)
 	require.Zero(u.Len())
 
 	// u is now empty
