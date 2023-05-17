@@ -61,20 +61,33 @@ func (c *sizedLRU[K, V]) Flush() {
 	c.flush()
 }
 
+func (c *sizedLRU[_, _]) PortionFilled() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.portionFilled()
+}
+
 func (c *sizedLRU[K, V]) put(key K, value V) {
+	valueSize := value.Size()
+	if valueSize > c.maxSize {
+		c.flush()
+		return
+	}
+
 	if oldValue, ok := c.elements.Get(key); ok {
 		c.currentSize -= oldValue.Size()
 	}
 
-	c.elements.Put(key, value)
-	c.currentSize += value.Size()
-
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
-	for c.currentSize > c.maxSize {
+	for c.currentSize > c.maxSize-valueSize {
 		oldestKey, value, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
 		c.currentSize -= value.Size()
 	}
+
+	c.elements.Put(key, value)
+	c.currentSize += valueSize
 }
 
 func (c *sizedLRU[K, V]) get(key K) (V, bool) {
@@ -97,4 +110,8 @@ func (c *sizedLRU[K, _]) evict(key K) {
 func (c *sizedLRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
 	c.currentSize = 0
+}
+
+func (c *sizedLRU[_, _]) portionFilled() float64 {
+	return float64(c.currentSize) / float64(c.maxSize)
 }
