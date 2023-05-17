@@ -6,6 +6,7 @@ package pebble
 import (
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -59,6 +60,32 @@ func BenchmarkInterface(b *testing.B) {
 			// The database may have been closed by the test, so we don't care if it
 			// errors here.
 			_ = db.Close()
+		}
+	}
+}
+
+func Test_bytesPrefix(t *testing.T) {
+	require := require.New(t)
+
+	prefs := [][]byte{
+		{},
+		{1},
+		{1},
+		{1, 2, 3},
+		{1, 2, 3, 4, 5},
+		{1, 2, 3, 4, 5, 8, 19, 29},
+	}
+
+	itopts := make([]*pebble.IterOptions, 0)
+	for _, pref := range prefs {
+		itopts = append(itopts, bytesPrefix(pref))
+	}
+
+	for idx, itopt := range itopts {
+		if the_len := len(itopt.LowerBound); the_len > 0 {
+			require.Equal(prefs[idx], itopt.LowerBound)
+			itopt.LowerBound[the_len-1] += 1
+			require.Equal(itopt.LowerBound, itopt.UpperBound)
 		}
 	}
 }
