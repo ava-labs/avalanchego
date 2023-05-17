@@ -324,7 +324,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs, "should have returned 0 utxoIDs")
+	require.Empty(t, balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -367,7 +367,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs, "should have returned 0 utxoIDs")
+	require.Empty(t, balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
@@ -412,7 +412,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs, "should have returned 0 utxoIDs")
+	require.Empty(t, balanceReply.UTXOIDs)
 }
 
 func TestServiceGetTxs(t *testing.T) {
