@@ -50,12 +50,12 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	return value, has
 }
 
-func (c *Cache[K, V]) Evict(key K) {
+func (c *Cache[K, _]) Evict(key K) {
 	c.Cacher.Evict(key)
 	c.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
-func (c *Cache[K, V]) Flush() {
+func (c *Cache[_, _]) Flush() {
 	c.Cacher.Flush()
 	c.portionFilled.Set(c.Cacher.PortionFilled())
 }
