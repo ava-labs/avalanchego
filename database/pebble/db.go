@@ -112,6 +112,8 @@ func (db *Database) Close() error {
 	if err != nil && strings.Contains(err.Error(), "leaked iterator") {
 		// avalanche database support close db w/o error
 		// even if there is an iterator which is not released
+		// TODO: This is a fragile way to detect "leaked iterator". Try to
+		// find a better way to do it.
 		return nil
 	}
 	return err
@@ -150,8 +152,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, updateError(err)
 	}
-	ret := make([]byte, len(data))
-	copy(ret, data)
+	ret := slices.Clone(data)
 	return ret, closer.Close()
 }
 
@@ -225,7 +226,6 @@ func (db *Database) NewBatch() database.Batch {
 	}
 }
 
-// Put the value into the batch for later writing
 func (b *batch) Put(key, value []byte) error {
 	b.size += len(key) + len(value) + 8 // TODO: find byte overhead
 	return b.batch.Set(key, value, pebble.NoSync)
@@ -255,7 +255,10 @@ func (b *batch) Write() error {
 		// the given batch b has already been committed
 		// Don't Commit it again, got panic otherwise
 		// Create a new batch to do Commit
-		newbatch := &batch{db: b.db, batch: b.db.db.NewBatch()}
+		newbatch := &batch{
+			db:    b.db,
+			batch: b.db.db.NewBatch(),
+		}
 
 		// duplicate b.batch to newbatch.batch
 		if err := newbatch.batch.Apply(b.batch, nil); err != nil {
@@ -312,6 +315,7 @@ type iter struct {
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
+	// Don't call NewIter of pebble after the db closed. It panics otherwise.
 	if db.closed.Get() {
 		return &iter{
 			db: db,
