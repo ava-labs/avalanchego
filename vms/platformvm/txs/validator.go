@@ -62,7 +62,9 @@ func (v *Validator) Verify() error {
 
 // BoundedBy returns true iff the period that [validator] validates is a
 // (non-strict) subset of the time that [other] validates.
-// Namely, startTime <= v.StartTime() <= v.EndTime() <= endTime
-func (v *Validator) BoundedBy(startTime, endTime time.Time) bool {
-	return !v.StartTime().Before(startTime) && !v.EndTime().After(endTime)
+// Namely, lowerBound <= validatorEffectiveStart <= validatorEffectiveEnd <= upperBound
+// where validatorEffectiveEnd = validatorEffectiveStart.Add(v.Duration())
+func (v *Validator) BoundedBy(validatorEffectiveStart, lowerBound, upperBound time.Time) bool {
+	validatorEffectiveEnd := validatorEffectiveStart.Add(v.Duration())
+	return !validatorEffectiveStart.Before(lowerBound) && !validatorEffectiveEnd.After(upperBound)
 }

@@ -34,7 +34,6 @@ var (
 	ErrOverDelegated                   = errors.New("validator would be over delegated")
 	ErrIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
 	ErrTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
-	ErrStartTimeMustBeZero             = errors.New("staker start time must be zero")
 	ErrAlreadyValidator                = errors.New("already a validator")
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
@@ -90,6 +89,25 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		startTime                     = tx.StartTime()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
+		if !currentTimestamp.Before(startTime) {
+			return nil, fmt.Errorf(
+				"%w: %s >= %s",
+				ErrTimestampNotBeforeStartTime,
+				currentTimestamp,
+				startTime,
+			)
+		}
+	}
+
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
@@ -120,37 +138,13 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
-			return nil, fmt.Errorf(
-				"%w: %s",
-				ErrStartTimeMustBeZero,
-				startTime,
-			)
+	if !isContinuousStakingForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return nil, ErrFutureStakeTime
 		}
-	} else {
-		// Ensure the proposed validator starts after the current time
-		if !currentTimestamp.Before(startTime) {
-			return nil, fmt.Errorf(
-				"%w: %s >= %s",
-				ErrTimestampNotBeforeStartTime,
-				currentTimestamp,
-				startTime,
-			)
-		}
-	}
-
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
-	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
-	// (start time is zero). I didn't bother guarding the check (which must be the
-	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
 	}
 
 	return outs, nil
@@ -184,18 +178,15 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
-			return fmt.Errorf(
-				"%w: %s",
-				ErrStartTimeMustBeZero,
-				startTime,
-			)
-		}
-	} else {
-		// Ensure the proposed validator starts after the current timestamp
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		startTime                     = tx.StartTime()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(startTime) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
@@ -239,14 +230,17 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		primaryNetworkValDuration := primaryNetworkValidator.EndTime.Sub(primaryNetworkValidator.StartTime)
-		if tx.Validator.Duration() > primaryNetworkValDuration {
-			return ErrValidatorSubset
-		}
-	} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
-		// Ensure that the period this validator validates the specified subnet
-		// is a subset of the time they validate the primary network.
+	// Ensure that the period this validator validates the specified subnet
+	// is a subset of the time they validate the primary network.
+	validatorEffectiveStart := currentTimestamp
+	if !isContinuousStakingForkActive {
+		validatorEffectiveStart = tx.Validator.StartTime()
+	}
+	if !tx.Validator.BoundedBy(
+		validatorEffectiveStart,
+		primaryNetworkValidator.StartTime,
+		primaryNetworkValidator.EndTime,
+	) {
 		return ErrValidatorSubset
 	}
 
@@ -269,15 +263,13 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
-	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
-	// (start time is zero). I didn't bother guarding the check (which must be the
-	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isContinuousStakingForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil
@@ -390,18 +382,15 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
-			return nil, fmt.Errorf(
-				"%w: %s",
-				ErrStartTimeMustBeZero,
-				startTime,
-			)
-		}
-	} else {
-		// Ensure the proposed validator starts after the current timestamp
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		startTime                     = tx.StartTime()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(startTime) {
 			return nil, fmt.Errorf(
 				"%w: %s >= %s",
@@ -432,7 +421,7 @@ func verifyAddDelegatorTx(
 
 	txID := sTx.ID()
 	var newStaker *state.Staker
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+	if isContinuousStakingForkActive {
 		// potential reward does not matter
 		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
 	} else {
@@ -464,15 +453,13 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
-	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
-	// (start time is zero). I didn't bother guarding the check (which must be the
-	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, ErrFutureStakeTime
+	if !isContinuousStakingForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return nil, ErrFutureStakeTime
+		}
 	}
 
 	return outs, nil
@@ -495,18 +482,15 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
-			return fmt.Errorf(
-				"%w: %s",
-				ErrStartTimeMustBeZero,
-				startTime,
-			)
-		}
-	} else {
-		// Ensure the proposed validator starts after the current time
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		startTime                     = tx.StartTime()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(startTime) {
 			return fmt.Errorf(
 				"%w: %s >= %s",
@@ -584,13 +568,17 @@ func verifyAddPermissionlessValidatorTx(
 			)
 		}
 
-		if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-			if tx.Validator.Duration() > primaryNetworkValidator.Duration() {
-				return ErrValidatorSubset
-			}
-		} else if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
-			// Ensure that the period this validator validates the specified subnet
-			// is a subset of the time they validate the primary network.
+		// Ensure that the period this validator validates the specified subnet
+		// is a subset of the time they validate the primary network.
+		validatorEffectiveStart := currentTimestamp
+		if !isContinuousStakingForkActive {
+			validatorEffectiveStart = tx.Validator.StartTime()
+		}
+		if !tx.Validator.BoundedBy(
+			validatorEffectiveStart,
+			primaryNetworkValidator.StartTime,
+			primaryNetworkValidator.EndTime,
+		) {
 			return ErrValidatorSubset
 		}
 
@@ -617,15 +605,13 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
-	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
-	// (start time is zero). I didn't bother guarding the check (which must be the
-	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isContinuousStakingForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil
@@ -692,18 +678,15 @@ func verifyAddPermissionlessDelegatorTx(
 		return nil
 	}
 
-	currentTimestamp := chainState.GetTimestamp()
-	startTime := tx.StartTime()
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		if startTime != state.StakerZeroTime {
-			return fmt.Errorf(
-				"%w: %s",
-				ErrStartTimeMustBeZero,
-				startTime,
-			)
-		}
-	} else {
-		// Ensure the proposed validator starts after the current timestamp
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking duration matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		startTime                     = tx.StartTime()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(startTime) {
 			return fmt.Errorf(
 				"chain timestamp (%s) not before validator's start time (%s)",
@@ -764,7 +747,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	txID := sTx.ID()
 	var newStaker *state.Staker
-	if backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+	if isContinuousStakingForkActive {
 		// potential reward does not matter
 		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
 	} else {
@@ -817,15 +800,13 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	// Strickly speaking this check is needed for Pre Continuous Staking fork txs.
-	// However Post Continuous Staking fork txs are guaranteed to satisfy the test
-	// (start time is zero). I didn't bother guarding the check (which must be the
-	// last one made).
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return ErrFutureStakeTime
+	if !isContinuousStakingForkActive {
+		// Make sure the tx doesn't start too far in the future. This is done last
+		// to allow the verifier visitor to explicitly check for this error.
+		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+		if startTime.After(maxStartTime) {
+			return ErrFutureStakeTime
+		}
 	}
 
 	return nil

@@ -1160,11 +1160,11 @@ func (s *state) loadCurrentStakers() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		startTime := time.Unix(metadata.StakerStartTime, 0)
-		if startTime == StakerZeroTime {
-			// pre Continuous staking fork, start time was not stored in metadata
-			// instead stakerTx.StartTime() was used
-			startTime = stakerTx.StartTime()
+		startTime := stakerTx.StartTime()
+		if metadata.StakerStartTime != 0 {
+			// post Continuous staking fork, start time is stored in metadata
+			// and must be used instead stakerTx.StartTime().
+			startTime = time.Unix(metadata.StakerStartTime, 0)
 		}
 
 		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
@@ -1209,11 +1209,11 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 
-		startTime := time.Unix(metadata.StakerStartTime, 0)
-		if startTime == StakerZeroTime {
-			// pre Continuous staking fork, start time was not stored in metadata
-			// instead stakerTx.StartTime() was used
-			startTime = stakerTx.StartTime()
+		startTime := stakerTx.StartTime()
+		if metadata.StakerStartTime != 0 {
+			// post Continuous staking fork, start time is stored in metadata
+			// and must be used instead stakerTx.StartTime().
+			startTime = time.Unix(metadata.StakerStartTime, 0)
 		}
 
 		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
@@ -1257,11 +1257,11 @@ func (s *state) loadCurrentStakers() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			startTime := time.Unix(metadata.StakerStartTime, 0)
-			if startTime == StakerZeroTime {
-				// pre Continuous staking fork, start time was not stored in metadata
-				// instead stakerTx.StartTime() was used
-				startTime = stakerTx.StartTime()
+			startTime := stakerTx.StartTime()
+			if metadata.StakerStartTime != 0 {
+				// post Continuous staking fork, start time is stored in metadata
+				// and must be used instead stakerTx.StartTime().
+				startTime = time.Unix(metadata.StakerStartTime, 0)
 			}
 
 			staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
