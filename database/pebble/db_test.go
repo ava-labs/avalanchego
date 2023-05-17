@@ -82,9 +82,9 @@ func Test_bytesPrefix(t *testing.T) {
 	}
 
 	for idx, itopt := range itopts {
-		if the_len := len(itopt.LowerBound); the_len > 0 {
+		if lbLen := len(itopt.LowerBound); lbLen > 0 {
 			require.Equal(prefs[idx], itopt.LowerBound)
-			itopt.LowerBound[the_len-1] += 1
+			itopt.LowerBound[lbLen-1] += 1
 			require.Equal(itopt.LowerBound, itopt.UpperBound)
 		}
 	}
