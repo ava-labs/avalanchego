@@ -66,15 +66,17 @@ func (c *sizedLRU[K, V]) put(key K, value V) {
 		c.currentSize -= oldValue.Size()
 	}
 
-	c.elements.Put(key, value)
-	c.currentSize += value.Size()
-
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
-	for c.currentSize > c.maxSize {
+	valueSize := value.Size()
+	for c.currentSize+valueSize > c.maxSize {
 		oldestKey, value, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
 		c.currentSize -= value.Size()
 	}
+
+	c.elements.Put(key, value)
+	c.currentSize += valueSize
+
 }
 
 func (c *sizedLRU[K, V]) get(key K) (V, bool) {
