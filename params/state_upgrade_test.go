@@ -72,7 +72,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 	}
 }
 
-func TestCheckCompatibleStateUpgradeConfigs(t *testing.T) {
+func TestCheckCompatibleStateUpgrades(t *testing.T) {
 	chainConfig := *TestChainConfig
 	stateUpgrade := map[common.Address]StateUpgradeAccount{
 		{1}: {BalanceChange: (*math.HexOrDecimal256)(common.Big1)},
