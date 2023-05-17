@@ -608,6 +608,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	}()
 
 	var (
+		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime       = startTime.Add(defaultMinStakingDuration)
 		nodeID        = ids.GenerateTestNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
@@ -615,8 +617,8 @@ func TestAddValidatorCommit(t *testing.T) {
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		0,
-		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
 		rewardAddress,
 		reward.PercentDenominator,
@@ -709,15 +711,20 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.GenerateTestNodeID()
+	var (
+		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime       = startTime.Add(defaultMinStakingDuration)
+		nodeID        = ids.GenerateTestNodeID()
+		rewardAddress = ids.GenerateTestShortID()
+	)
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.MinValidatorStake,
-		0,
-		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
-		ids.GenerateTestShortID(), // rewardAddress
+		rewardAddress,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0]},
 		ids.ShortEmpty, // change addr
@@ -785,15 +792,19 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	var (
+		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime   = startTime.Add(defaultMinStakingDuration)
+		nodeID    = ids.NodeID(keys[0].PublicKey().Address())
+	)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		0,
-		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -829,15 +840,19 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	nodeID := ids.NodeID(keys[0].PublicKey().Address())
+	var (
+		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime   = startTime.Add(defaultMinStakingDuration)
+		nodeID    = ids.NodeID(keys[0].PublicKey().Address())
+	)
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		0,
-		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
 		testSubnet1.ID(),
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
@@ -1207,9 +1222,8 @@ func TestCreateChain(t *testing.T) {
 
 // test where we:
 // 1) Create a subnet
-// 2) Add a validator to the subnet's pending validator set
-// 3) Advance timestamp to validator's start time (moving the validator from pending to current)
-// 4) Advance timestamp to validator's end time (removing validator from current)
+// 2) Add a validator to the subnet's current validator set
+// 3) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(continuousStakingFork)
@@ -1259,11 +1273,13 @@ func TestCreateSubnet(t *testing.T) {
 	require.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultWeight,
-		0,
-		uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
 		nodeID,
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1292,7 +1308,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
-	endTime := vm.clock.Time().Add(defaultMinStakingDuration)
+	endTime = vm.clock.Time().Add(defaultMinStakingDuration)
 	vm.clock.Set(endTime)
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
