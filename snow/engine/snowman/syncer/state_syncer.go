@@ -304,6 +304,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		)
 
 		// if we do not restart state sync, move on to bootstrapping.
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
@@ -322,22 +323,22 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	switch syncMode {
 	case block.StateSyncSkipped:
 		// VM did not accept the summary, move on to bootstrapping.
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	case block.StateSyncStatic:
 		// Summary was accepted and VM is state syncing.
 		// Engine will wait for notification of state sync done.
-		ss.Ctx.StateSyncing.Set(true)
 		return nil
 	case block.StateSyncDynamic:
 		// Summary was accepted and VM is state syncing.
 		// Engine will continue into bootstrapping and the VM will sync in the
 		// background.
-		ss.Ctx.StateSyncing.Set(true)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	default:
 		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",
 			zap.Stringer("syncMode", syncMode),
 		)
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 }
@@ -387,11 +388,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
-
-	ss.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.StateSyncing,
-	})
+	ss.Ctx.Start(snow.StateSyncing, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}
@@ -475,6 +472,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
+		ss.Config.Ctx.Done(snow.StateSyncing)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
@@ -537,7 +535,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		return nil
 	}
 
-	ss.Ctx.StateSyncing.Set(false)
+	ss.Config.Ctx.Done(snow.StateSyncing)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
@@ -576,10 +574,6 @@ func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 }
 
 func (*stateSyncer) Halt(context.Context) {}
-
-func (*stateSyncer) Timeout(context.Context) error {
-	return nil
-}
 
 func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)

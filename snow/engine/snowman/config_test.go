@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"testing"
+
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -11,8 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func DefaultConfigs() Config {
-	commonCfg := common.DefaultConfigTest()
+func DefaultConfigs(t *testing.T) Config {
+	commonCfg := common.DefaultConfigTest(t)
 	return Config{
 		Ctx:        commonCfg.Ctx,
 		Sender:     commonCfg.Sender,

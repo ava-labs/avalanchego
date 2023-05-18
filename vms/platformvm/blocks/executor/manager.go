@@ -51,7 +51,7 @@ func NewManager(
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
-			bootstrapped:     txExecutorBackend.Bootstrapped,
+			vmState:          txExecutorBackend.VMState,
 		},
 		rejector: &rejector{backend: backend},
 	}

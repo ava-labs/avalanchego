@@ -228,11 +228,11 @@ func (b *stateBlk) Size() int {
 type state struct {
 	validatorState
 
-	cfg          *config.Config
-	ctx          *snow.Context
-	metrics      metrics.Metrics
-	rewards      reward.Calculator
-	bootstrapped *utils.Atomic[bool]
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
+	vmState *utils.Atomic[snow.State]
 
 	baseDB *versiondb.Database
 
@@ -362,7 +362,7 @@ func New(
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
+	vmState *utils.Atomic[snow.State],
 ) (State, error) {
 	s, err := new(
 		db,
@@ -371,7 +371,7 @@ func New(
 		ctx,
 		metricsReg,
 		rewards,
-		bootstrapped,
+		vmState,
 	)
 	if err != nil {
 		return nil, err
@@ -394,7 +394,7 @@ func new(
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
-	bootstrapped *utils.Atomic[bool],
+	vmState *utils.Atomic[snow.State],
 ) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
@@ -507,12 +507,12 @@ func new(
 	return &state{
 		validatorState: newValidatorState(),
 
-		cfg:          cfg,
-		ctx:          ctx,
-		metrics:      metrics,
-		rewards:      rewards,
-		bootstrapped: bootstrapped,
-		baseDB:       baseDB,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+		vmState: vmState,
+		baseDB:  baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1358,7 +1358,7 @@ func (s *state) initValidatorSets() error {
 		return err
 	}
 
-	vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, constants.PrimaryNetworkID, s.ctx.NodeID)
+	vl := newValidatorsLogger(s.ctx.Log, s.vmState, constants.PrimaryNetworkID, s.ctx.NodeID)
 	primaryValidators.RegisterCallbackListener(vl)
 
 	s.metrics.SetLocalStake(primaryValidators.GetWeight(s.ctx.NodeID))
@@ -1375,7 +1375,7 @@ func (s *state) initValidatorSets() error {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
 
-		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
+		vl := newValidatorsLogger(s.ctx.Log, s.vmState, subnetID, s.ctx.NodeID)
 		subnetValidators.RegisterCallbackListener(vl)
 	}
 	return nil

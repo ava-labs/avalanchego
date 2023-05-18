@@ -343,7 +343,11 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		tb.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		tb.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -661,13 +665,15 @@ func TestIssueNFT(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -814,13 +820,15 @@ func TestIssueProperty(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1528,8 +1536,11 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1697,8 +1708,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1800,7 +1814,11 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1934,8 +1952,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
 		t.Fatal(err)
 	}
 

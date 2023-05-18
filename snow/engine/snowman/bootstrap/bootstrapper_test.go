@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -35,7 +36,10 @@ import (
 var errUnknownBlock = errors.New("unknown block")
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 
 	peers := validators.NewSet()
 
@@ -47,17 +51,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	sender.Default(true)
 	vm.Default(true)
-
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
 
 	sender.CantSendGetAcceptedFrontier = false
 
@@ -81,8 +74,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		Alpha:                          peers.Weight()/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
@@ -124,14 +115,12 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	peers.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            snow.DefaultConsensusContextTest(t),
 		Beacons:                        peers,
 		SampleK:                        sampleK,
 		Alpha:                          alpha,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		BootstrapTracker:               &common.BootstrapTrackerTest{},
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
@@ -168,10 +157,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// create bootstrapper
 	dummyCallback := func(context.Context, uint32) error {
-		cfg.Ctx.State.Set(snow.EngineState{
-			Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-			State: snow.NormalOp,
-		})
+		cfg.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 		return nil
 	}
 	bs, err := New(cfg, dummyCallback)
@@ -248,10 +234,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -292,7 +275,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk1.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -354,10 +337,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -444,7 +424,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -517,10 +497,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -609,7 +586,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -683,10 +660,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -794,7 +768,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -871,10 +845,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -956,7 +927,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1016,10 +987,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1092,7 +1060,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1230,10 +1198,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	bsIntf, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1297,7 +1262,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Ctx.State.Get().State == snow.NormalOp {
+	if config.Ctx.IsChainBootstrapped() {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
@@ -1306,7 +1271,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Accepted:
 		t.Fatalf("Block should be accepted")
@@ -1372,10 +1337,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	bsIntf, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1413,7 +1375,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	switch {
-	case config.Ctx.State.Get().State != snow.NormalOp:
+	case !config.Ctx.IsChainBootstrapped():
 		t.Fatalf("Bootstrapping should have finished")
 	case blk0.Status() != choices.Processing:
 		t.Fatalf("Block should be processing")
@@ -1461,10 +1423,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	bsIntf, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)
@@ -1506,7 +1465,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 func TestBootstrapNoParseOnNew(t *testing.T) {
 	require := require.New(t)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	peers := validators.NewSet()
 
 	sender := &common.SenderTest{}
@@ -1517,17 +1476,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 
 	sender.Default(true)
 	vm.Default(true)
-
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
 
 	sender.CantSendGetAcceptedFrontier = false
 
@@ -1546,8 +1494,6 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		Alpha:                          peers.Weight()/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
@@ -1611,10 +1557,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	_, err = New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 			return nil
 		},
 	)

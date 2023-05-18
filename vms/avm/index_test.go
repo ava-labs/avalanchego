@@ -540,9 +540,14 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 		t.Fatal(err)
 	}
 
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
+
+	if err := vm.SetState(context.Background(), snow.SubnetSynced); err != nil {
+		t.Fatal(err)
+	}
+
 	return vm
 }
 

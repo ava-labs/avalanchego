@@ -3,17 +3,14 @@
 
 package snow
 
-import (
-	"errors"
-
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-)
+import "errors"
 
 const (
 	Initializing State = iota
 	StateSyncing
 	Bootstrapping
-	NormalOp
+	ExtendingFrontier
+	SubnetSynced
 )
 
 var ErrUnknownState = errors.New("unknown state")
@@ -28,14 +25,11 @@ func (st State) String() string {
 		return "State syncing state"
 	case Bootstrapping:
 		return "Bootstrapping state"
-	case NormalOp:
-		return "Normal operations state"
+	case ExtendingFrontier:
+		return "Extending frontier state"
+	case SubnetSynced:
+		return "Subnet synced state"
 	default:
 		return "Unknown state"
 	}
-}
-
-type EngineState struct {
-	Type  p2p.EngineType
-	State State
 }

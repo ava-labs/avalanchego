@@ -374,7 +374,13 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
+	if err != nil {
+		panic(err)
+	}
+
+	// immediately promoting vm to fully synced to allow insertion of testSubnet
+	err = vm.SetState(context.Background(), snow.SubnetSynced)
 	if err != nil {
 		panic(err)
 	}
@@ -465,7 +471,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	)
 	require.NoError(err)
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	// Create a subnet and store it in testSubnet1
@@ -1435,7 +1441,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	err = blk.Accept(context.Background())
 	require.NoError(err)
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
@@ -1620,7 +1626,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	ctx.SharedMemory = msm
 
-	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx := snow.DefaultConsensusContextTest(t)
 	consensusCtx.Context = ctx
 	ctx.Lock.Lock()
 
@@ -1730,6 +1736,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AppGossipValidatorSize:    1,
 		AppGossipNonValidatorSize: 1,
 	}
+
+	sb := subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig})
+	sb.AddChain(consensusCtx.ChainID)
+	consensusCtx.SubnetStateTracker = sb
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
@@ -1737,7 +1747,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		chainRouter,
 		timeoutManager,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(consensusCtx.NodeID, subnets.Config{GossipConfig: gossipConfig}),
+		sb,
 	)
 	require.NoError(err)
 
@@ -1754,17 +1764,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
 	peers := tracker.NewPeers()
 	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
 	beacons.RegisterCallbackListener(startup)
@@ -1778,7 +1777,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		StartupTracker:                 startup,
 		Alpha:                          (beacons.Weight() + 1) / 2,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
@@ -1803,6 +1801,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	)
 	require.NoError(err)
 
+	sb2 := subnets.New(bootstrapConfig.Ctx.NodeID, subnets.Config{})
+	sb2.AddChain(bootstrapConfig.Ctx.ChainID)
+	bootstrapConfig.Ctx.SubnetStateTracker = sb2
 	h, err := handler.New(
 		bootstrapConfig.Ctx,
 		beacons,
@@ -1811,7 +1812,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		2,
 		cpuTracker,
 		vm,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb2,
 	)
 	require.NoError(err)
 
@@ -1854,11 +1855,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-
-	consensusCtx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp,
-	})
+	consensusCtx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(context.Background(), h)
@@ -2116,7 +2113,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(firstVM.SetState(context.Background(), snow.ExtendingFrontier))
 
 	// Fast forward clock to time for genesis validators to leave
 	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
@@ -2161,7 +2158,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 
 	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(secondVM.SetState(context.Background(), snow.ExtendingFrontier))
 
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
@@ -2297,7 +2294,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
@@ -2395,7 +2392,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
 
 	require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(t, vm.SetState(context.Background(), snow.ExtendingFrontier))
 
 	var (
 		oldVdrs       = vm.Validators

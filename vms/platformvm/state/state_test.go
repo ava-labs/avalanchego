@@ -510,7 +510,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		}),
-		&utils.Atomic[bool]{},
+		&utils.Atomic[snow.State]{},
 	)
 	require.NoError(err)
 	require.NotNil(state)

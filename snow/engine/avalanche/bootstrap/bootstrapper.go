@@ -273,10 +273,6 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (*bootstrapper) Timeout(context.Context) error {
-	return nil
-}
-
 func (*bootstrapper) Gossip(context.Context) error {
 	return nil
 }
@@ -292,14 +288,9 @@ func (*bootstrapper) Notify(context.Context, common.Message) error {
 
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
-
-	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-		State: snow.Bootstrapping,
-	})
+	b.Ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}
 
 	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
@@ -567,7 +558,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.IsBootstrapped() || len(pendingJobs) > 0 {
+	if b.Ctx.IsChainBootstrapped() || len(pendingJobs) > 0 {
 		return nil
 	}
 
@@ -624,5 +615,6 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	b.processedCache.Flush()
+	b.Config.Ctx.Done(snow.Bootstrapping)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

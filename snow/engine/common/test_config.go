@@ -4,24 +4,16 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
+	"testing"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // DefaultConfigTest returns a test configuration
-func DefaultConfigTest() Config {
-	isBootstrapped := false
-	bootstrapTracker := &BootstrapTrackerTest{
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
+func DefaultConfigTest(t *testing.T) Config {
+	ctx := snow.DefaultConsensusContextTest(t)
 	beacons := validators.NewSet()
 
 	connectedPeers := tracker.NewPeers()
@@ -29,13 +21,11 @@ func DefaultConfigTest() Config {
 	beacons.RegisterCallbackListener(startupTracker)
 
 	return Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            ctx,
 		Beacons:                        beacons,
 		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &SharedConfig{},

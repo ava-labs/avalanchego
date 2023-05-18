@@ -27,7 +27,7 @@ func (e *Engine) Get(state snow.State) (common.Engine, bool) {
 		return e.StateSyncer, e.StateSyncer != nil
 	case snow.Bootstrapping:
 		return e.Bootstrapper, e.Bootstrapper != nil
-	case snow.NormalOp:
+	case snow.ExtendingFrontier, snow.SubnetSynced:
 		return e.Consensus, e.Consensus != nil
 	default:
 		return nil, false

@@ -13,7 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -71,6 +73,8 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		},
 	}
 
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.SubnetSynced)
 	backend := &Backend{
 		Ctx:    ctx,
 		Config: &feeConfig,
@@ -83,7 +87,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		TypeToFxIndex: typeToFxIndex,
 		Codec:         codec,
 		FeeAssetID:    ids.GenerateTestID(),
-		Bootstrapped:  true,
+		VMState:       vmState,
 	}
 	require.NoError(t, secpFx.Bootstrapped())
 
@@ -449,6 +453,8 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		DestinationChain: ctx.CChainID,
 	}
 
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.SubnetSynced)
 	backend := &Backend{
 		Ctx:    ctx,
 		Config: &feeConfig,
@@ -461,7 +467,7 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		TypeToFxIndex: typeToFxIndex,
 		Codec:         codec,
 		FeeAssetID:    ids.GenerateTestID(),
-		Bootstrapped:  true,
+		VMState:       vmState,
 	}
 	require.NoError(t, secpFx.Bootstrapped())
 
@@ -829,6 +835,8 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		DestinationChain: ctx.CChainID,
 	}
 
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.SubnetSynced)
 	backend := &Backend{
 		Ctx:    ctx,
 		Config: &feeConfig,
@@ -841,7 +849,7 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		TypeToFxIndex: typeToFxIndex,
 		Codec:         codec,
 		FeeAssetID:    ids.GenerateTestID(),
-		Bootstrapped:  true,
+		VMState:       vmState,
 	}
 	require.NoError(secpFx.Bootstrapped())
 

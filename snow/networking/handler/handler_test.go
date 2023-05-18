@@ -34,9 +34,7 @@ var errFatal = errors.New("error should cause handler to close")
 
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
-
-	ctx := snow.DefaultConsensusContextTest()
-
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
 	err := vdrs.Add(vdr0, nil, ids.Empty, 1)
@@ -49,6 +47,10 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -57,7 +59,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -87,10 +89,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 			Bootstrapper: bootstrapper,
 		},
 	})
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	pastTime := time.Now()
 	handler.clock.Set(pastTime)
@@ -131,8 +130,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 func TestHandlerClosesOnError(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
-
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -144,6 +142,10 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -152,7 +154,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -193,10 +195,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping,
-	})
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -223,7 +222,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -235,6 +234,10 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handlerIntf, err := New(
 		ctx,
 		vdrs,
@@ -243,7 +246,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -271,10 +274,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 			Bootstrapper: bootstrapper,
 		},
 	})
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -302,7 +302,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
 	calledNotify := make(chan struct{}, 1)
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
@@ -315,6 +315,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -323,7 +327,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -353,11 +357,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp, // assumed bootstrap is done
-	})
+	ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -374,7 +374,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 }
 
 func TestHandlerSubnetConnector(t *testing.T) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
@@ -393,6 +393,10 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	require.NoError(t, err)
+
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	handler, err := New(
 		ctx,
 		vdrs,
@@ -401,7 +405,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		connector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb,
 	)
 	require.NoError(t, err)
 
@@ -427,10 +431,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp, // assumed bootstrap is done
-	})
+	ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is done
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -551,7 +552,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			messageReceived := make(chan struct{})
-			ctx := snow.DefaultConsensusContextTest()
+			ctx := snow.DefaultConsensusContextTest(t)
 			vdrs := validators.NewSet()
 			err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 			require.NoError(t, err)
@@ -563,6 +564,10 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				time.Second,
 			)
 			require.NoError(t, err)
+
+			sb := subnets.New(ctx.NodeID, subnets.Config{})
+			sb.AddChain(ctx.ChainID)
+			ctx.SubnetStateTracker = sb
 			handler, err := New(
 				ctx,
 				vdrs,
@@ -571,7 +576,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				testThreadPoolSize,
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
-				subnets.New(ids.EmptyNodeID, subnets.Config{}),
+				sb,
 			)
 			require.NoError(t, err)
 
@@ -597,10 +602,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 
 			test.setup(handler, bootstrapper, engine)
 
-			ctx.State.Set(snow.EngineState{
-				Type:  test.currentEngineType,
-				State: snow.NormalOp, // assumed bootstrap is done
-			})
+			ctx.Start(snow.ExtendingFrontier, test.currentEngineType) // assumed bootstrap is done
 
 			bootstrapper.StartF = func(context.Context, uint32) error {
 				return nil

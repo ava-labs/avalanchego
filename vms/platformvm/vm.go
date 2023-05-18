@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -92,8 +93,8 @@ type VM struct {
 	fx            fx.Fx
 	codecRegistry codec.Registry
 
-	// Bootstrapped remembers if this chain has finished bootstrapping or not
-	bootstrapped utils.Atomic[bool]
+	// vmState tracks vm status as set by the consensus engine
+	vmState utils.Atomic[snow.State]
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -161,7 +162,7 @@ func (vm *VM) Initialize(
 		vm.ctx,
 		vm.metrics,
 		rewards,
-		&vm.bootstrapped,
+		&vm.vmState,
 	)
 	if err != nil {
 		return err
@@ -170,7 +171,7 @@ func (vm *VM) Initialize(
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
-	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
+	vm.UptimeLockedCalculator.SetCalculator(&vm.vmState, &chainCtx.Lock, vm.uptimeManager)
 
 	vm.txBuilder = txbuilder.New(
 		vm.ctx,
@@ -183,14 +184,14 @@ func (vm *VM) Initialize(
 	)
 
 	txExecutorBackend := &txexecutor.Backend{
-		Config:       &vm.Config,
-		Ctx:          vm.ctx,
-		Clk:          &vm.clock,
-		Fx:           vm.fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      vm.uptimeManager,
-		Rewards:      rewards,
-		Bootstrapped: &vm.bootstrapped,
+		Config:      &vm.Config,
+		Ctx:         vm.ctx,
+		Clk:         &vm.clock,
+		Fx:          vm.fx,
+		FlowChecker: utxoHandler,
+		Uptimes:     vm.uptimeManager,
+		Rewards:     rewards,
+		VMState:     &vm.vmState,
 	}
 
 	// Note: There is a circular dependency between the mempool and block
@@ -275,16 +276,16 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 
 // onBootstrapStarted marks this VM as bootstrapping
 func (vm *VM) onBootstrapStarted() error {
-	vm.bootstrapped.Set(false)
+	vm.vmState.Set(snow.Bootstrapping)
 	return vm.fx.Bootstrapping()
 }
 
-// onNormalOperationsStarted marks this VM as bootstrapped
-func (vm *VM) onNormalOperationsStarted() error {
-	if vm.bootstrapped.Get() {
+// onExtendingFrontierStarted marks this VM as bootstrapped
+func (vm *VM) onExtendingFrontierStarted() error {
+	if status.DoneBootstraping(vm.vmState.Get()) {
 		return nil
 	}
-	vm.bootstrapped.Set(true)
+	vm.vmState.Set(snow.ExtendingFrontier)
 
 	if err := vm.fx.Bootstrapped(); err != nil {
 		return err
@@ -312,6 +313,16 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
+	return nil
+}
+
+func (vm *VM) onFullySynced() error {
+	if status.FullySynced(vm.vmState.Get()) {
+		return nil
+	}
+
+	vm.vmState.Set(snow.SubnetSynced)
+
 	// Start the block builder
 	vm.Builder.ResetBlockTimer()
 	return nil
@@ -321,8 +332,10 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
-	case snow.NormalOp:
-		return vm.onNormalOperationsStarted()
+	case snow.ExtendingFrontier:
+		return vm.onExtendingFrontierStarted()
+	case snow.SubnetSynced:
+		return vm.onFullySynced()
 	default:
 		return snow.ErrUnknownState
 	}
@@ -336,7 +349,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 	vm.Builder.Shutdown()
 
-	if vm.bootstrapped.Get() {
+	if status.DoneBootstraping(vm.vmState.Get()) {
 		primaryVdrIDs, exists := vm.getValidatorIDs(constants.PrimaryNetworkID)
 		if !exists {
 			return errMissingValidatorSet

@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -48,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/blocks/builder"
@@ -101,8 +103,8 @@ type VM struct {
 	// State management
 	state states.State
 
-	// Set to true once this VM is marked as `Bootstrapped` by the engine
-	bootstrapped bool
+	// vmState tracks vm status as set by the consensus engine
+	vmState utils.Atomic[snow.State]
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
@@ -286,7 +288,7 @@ func (vm *VM) Initialize(
 		TypeToFxIndex: vm.typeToFxIndex,
 		Codec:         vm.parser.Codec(),
 		FeeAssetID:    vm.feeAssetID,
-		Bootstrapped:  false,
+		VMState:       &vm.vmState,
 	}
 	vm.dagState = &dagState{
 		Chain: vm.state,
@@ -298,7 +300,7 @@ func (vm *VM) Initialize(
 
 // onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
 func (vm *VM) onBootstrapStarted() error {
-	vm.txBackend.Bootstrapped = false
+	vm.vmState.Set(snow.Bootstrapping)
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -307,8 +309,8 @@ func (vm *VM) onBootstrapStarted() error {
 	return nil
 }
 
-func (vm *VM) onNormalOperationsStarted() error {
-	vm.txBackend.Bootstrapped = true
+func (vm *VM) onExtendingFrontierStarted() error {
+	vm.vmState.Set(snow.ExtendingFrontier)
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -328,7 +330,15 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	vm.bootstrapped = true
+	return nil
+}
+
+func (vm *VM) onFullySynced() error {
+	if status.FullySynced(vm.vmState.Get()) {
+		return nil
+	}
+
+	vm.vmState.Set(snow.SubnetSynced)
 	return nil
 }
 
@@ -336,8 +346,10 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
-	case snow.NormalOp:
-		return vm.onNormalOperationsStarted()
+	case snow.ExtendingFrontier:
+		return vm.onExtendingFrontierStarted()
+	case snow.SubnetSynced:
+		return vm.onFullySynced()
 	default:
 		return snow.ErrUnknownState
 	}
@@ -518,7 +530,7 @@ func (vm *VM) GetTx(_ context.Context, txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
-	if !vm.bootstrapped {
+	if !status.FullySynced(vm.vmState.Get()) {
 		return ids.ID{}, errBootstrapping
 	}
 

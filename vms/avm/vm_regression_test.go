@@ -59,7 +59,8 @@ func TestVerifyFxUsage(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{

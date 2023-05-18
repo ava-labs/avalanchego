@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -65,6 +66,10 @@ type Registerer interface {
 type ConsensusContext struct {
 	*Context
 
+	// SubnetStateTracker tracks state of each VM associated with
+	// Context.SubnetID
+	SubnetStateTracker
+
 	// Registers all common and snowman consensus metrics. Unlike the avalanche
 	// consensus engine metrics, we do not prefix the name with the engine name,
 	// as snowman is used for all chains by default.
@@ -87,42 +92,24 @@ type ConsensusContext struct {
 	// accepted.
 	VertexAcceptor Acceptor
 
-	// State indicates the current state of this consensus instance.
-	State utils.Atomic[EngineState]
-
 	// True iff this chain is executing transactions as part of bootstrapping.
 	Executing utils.Atomic[bool]
-
-	// True iff this chain is currently state-syncing
-	StateSyncing utils.Atomic[bool]
 }
 
-func DefaultContextTest() *Context {
-	sk, err := bls.NewSecretKey()
-	if err != nil {
-		panic(err)
-	}
-	pk := bls.PublicFromSecretKey(sk)
-	return &Context{
-		NetworkID:    0,
-		SubnetID:     ids.Empty,
-		ChainID:      ids.Empty,
-		NodeID:       ids.EmptyNodeID,
-		PublicKey:    pk,
-		Log:          logging.NoLog{},
-		BCLookup:     ids.NewAliaser(),
-		Metrics:      metrics.NewOptionalGatherer(),
-		ChainDataDir: "",
-	}
+// Helpers section
+func (cc *ConsensusContext) Start(state State, currentEngineType p2p.EngineType) {
+	cc.SubnetStateTracker.StartState(cc.ChainID, state, currentEngineType)
 }
 
-func DefaultConsensusContextTest() *ConsensusContext {
-	return &ConsensusContext{
-		Context:             DefaultContextTest(),
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-		BlockAcceptor:       noOpAcceptor{},
-		TxAcceptor:          noOpAcceptor{},
-		VertexAcceptor:      noOpAcceptor{},
-	}
+func (cc *ConsensusContext) Done(state State) {
+	cc.SubnetStateTracker.StopState(cc.ChainID, state)
+}
+
+func (cc *ConsensusContext) IsChainBootstrapped() bool {
+	return cc.SubnetStateTracker.IsChainBootstrapped(cc.ChainID)
+}
+
+// TODO: consider dropping GetChainState
+func (cc *ConsensusContext) GetChainState() (State, p2p.EngineType) {
+	return cc.SubnetStateTracker.GetState(cc.ChainID)
 }

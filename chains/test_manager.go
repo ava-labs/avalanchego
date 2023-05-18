@@ -52,7 +52,7 @@ func (testManager) SubnetID(ids.ID) (ids.ID, error) {
 	return ids.ID{}, nil
 }
 
-func (testManager) IsBootstrapped(ids.ID) bool {
+func (testManager) IsSynced(ids.ID) bool {
 	return false
 }
 

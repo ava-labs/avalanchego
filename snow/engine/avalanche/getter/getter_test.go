@@ -33,25 +33,13 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
+	ctx := snow.DefaultConsensusContextTest(t)
 	commonConfig := common.Config{
-		Ctx:                            snow.DefaultConsensusContextTest(),
+		Ctx:                            ctx,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

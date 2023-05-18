@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 var (
@@ -34,9 +35,10 @@ var (
 )
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
-	require := require.New(t)
-
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
+	sb := subnets.New(ctx.NodeID, subnets.Config{})
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 
 	peers := validators.NewSet()
 	db := memdb.New()
@@ -45,17 +47,6 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	vm := &vertex.TestVM{}
 	vm.T = t
 
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
-
 	sender.Default(true)
 	manager.Default(true)
 	vm.Default(true)
@@ -63,13 +54,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	vtxBlocker, err := queue.NewWithMissing(prefixdb.New([]byte("vtx"), db), "vtx", ctx.AvalancheRegisterer)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	txBlocker, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", ctx.AvalancheRegisterer)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	peerTracker := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(peerTracker, peers.Weight()/2+1)
@@ -82,15 +73,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		Alpha:                          peers.Weight()/2 + 1,
 		StartupTracker:                 startupTracker,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
 	avaGetHandler, err := getter.New(manager, commonConfig)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	return Config{
 		Config:        commonConfig,
@@ -145,10 +134,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -202,7 +188,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	require.NoError(bs.ForceAccepted(context.Background(), acceptedIDs))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Accepted, vtx2.Status())
@@ -254,10 +240,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -342,7 +325,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2})) // send expected vertex and vertex that should not be accepted
 	require.Equal(oldReqID, *requestID)                                                                     // shouldn't have sent a new request
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Processing, vtx2.Status())
@@ -421,10 +404,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -496,7 +476,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, tx0.Status())
 	require.Equal(choices.Accepted, tx1.Status())
 	require.Equal(choices.Accepted, vtx0.Status())
@@ -547,10 +527,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -602,7 +579,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.Equal(vtxID1, requested)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
-	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
+	require.False(bs.Context().IsChainBootstrapped())
 	require.Equal(vtxID0, requested)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {
@@ -620,7 +597,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})) // Provide vtx0; can finish now
-	require.Equal(snow.NormalOp, bs.Context().State.Get().State)
+	require.True(bs.Context().IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Accepted, vtx2.Status())
@@ -658,10 +635,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -736,7 +710,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	reqID = requestIDs[vtxID0]
 	require.NoError(bs.GetAncestorsFailed(context.Background(), peerID, reqID))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 }
@@ -785,10 +759,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	bs, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -867,7 +838,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 
 	reqID := requestIDs[vtxID2]
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Accepted, vtx2.Status())
@@ -949,10 +920,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	bsIntf, err := New(
 		config,
 		func(context.Context, uint32) error {
-			config.Ctx.State.Set(snow.EngineState{
-				Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-				State: snow.NormalOp,
-			})
+			config.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 			return nil
 		},
 	)
@@ -1079,7 +1047,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	vtx1ReqID := requestIDs[vtxID1]
 	require.NoError(bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}))
-	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+	require.True(config.Ctx.IsChainBootstrapped())
 	require.Equal(choices.Accepted, vtx0.Status())
 	require.Equal(choices.Accepted, vtx1.Status())
 	require.Equal(choices.Accepted, vtx2.Status())

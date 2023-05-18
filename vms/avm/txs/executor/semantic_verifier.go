@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -64,7 +65,8 @@ func (v *SemanticVerifier) OperationTx(tx *txs.OperationTx) error {
 		return err
 	}
 
-	if !v.Bootstrapped || v.Tx.ID().String() == "MkvpJS13eCnEYeYi9B5zuWrU9goG9RBj7nr83U7BjrFV22a12" {
+	if !status.DoneBootstraping(v.VMState.Get()) ||
+		v.Tx.ID().String() == "MkvpJS13eCnEYeYi9B5zuWrU9goG9RBj7nr83U7BjrFV22a12" {
 		return nil
 	}
 
@@ -85,7 +87,7 @@ func (v *SemanticVerifier) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 
-	if !v.Bootstrapped {
+	if !status.DoneBootstraping(v.VMState.Get()) {
 		return nil
 	}
 
@@ -126,7 +128,7 @@ func (v *SemanticVerifier) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 
-	if v.Bootstrapped {
+	if status.FullySynced(v.VMState.Get()) {
 		if err := verify.SameSubnet(context.TODO(), v.Ctx, tx.DestinationChain); err != nil {
 			return err
 		}

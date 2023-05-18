@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -126,8 +128,12 @@ func TestManagerVerifyTx(t *testing.T) {
 				return &txs.Tx{}
 			},
 			managerF: func(ctrl *gomock.Controller) *manager {
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.Bootstrapping)
 				return &manager{
-					backend: &executor.Backend{},
+					backend: &executor.Backend{
+						VMState: vmState,
+					},
 				}
 			},
 			expectedErr: ErrChainNotSynced,
@@ -142,9 +148,11 @@ func TestManagerVerifyTx(t *testing.T) {
 				}
 			},
 			managerF: func(*gomock.Controller) *manager {
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &manager{
 					backend: &executor.Backend{
-						Bootstrapped: true,
+						VMState: vmState,
 					},
 				}
 			},
@@ -170,9 +178,11 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &manager{
 					backend: &executor.Backend{
-						Bootstrapped: true,
+						VMState: vmState,
 					},
 					state:        state,
 					lastAccepted: preferred,
@@ -203,9 +213,11 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &manager{
 					backend: &executor.Backend{
-						Bootstrapped: true,
+						VMState: vmState,
 					},
 					state:        state,
 					lastAccepted: preferred,
@@ -243,9 +255,11 @@ func TestManagerVerifyTx(t *testing.T) {
 				diffState.EXPECT().GetLastAccepted().Return(preferredID)
 				diffState.EXPECT().GetTimestamp().Return(time.Time{})
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &manager{
 					backend: &executor.Backend{
-						Bootstrapped: true,
+						VMState: vmState,
 					},
 					blkIDToState: map[ids.ID]*blockState{
 						preferredID: {
@@ -282,9 +296,11 @@ func TestManagerVerifyTx(t *testing.T) {
 				state.EXPECT().GetLastAccepted().Return(preferred)
 				state.EXPECT().GetTimestamp().Return(time.Time{})
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &manager{
 					backend: &executor.Backend{
-						Bootstrapped: true,
+						VMState: vmState,
 					},
 					state:        state,
 					lastAccepted: preferred,

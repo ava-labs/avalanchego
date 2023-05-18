@@ -123,8 +123,8 @@ type Manager interface {
 	// Given an alias, return the ID of the VM associated with that alias
 	LookupVM(string) (ids.ID, error)
 
-	// Returns true iff the chain with the given ID exists and is finished bootstrapping
-	IsBootstrapped(ids.ID) bool
+	// Returns true iff the chain with the given ID exists and is synced
+	IsSynced(ids.ID) bool
 
 	// Starts the chain creator with the initial platform chain parameters, must
 	// be called once.
@@ -483,6 +483,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		BlockAcceptor:       m.BlockAcceptorGroup,
 		TxAcceptor:          m.TxAcceptorGroup,
 		VertexAcceptor:      m.VertexAcceptorGroup,
+		SubnetStateTracker:  sb,
 		Registerer:          consensusMetrics,
 		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
@@ -598,10 +599,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-		State: snow.Initializing,
-	})
+	ctx.Start(snow.Initializing, p2p.EngineType_ENGINE_TYPE_AVALANCHE)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
@@ -838,8 +836,6 @@ func (m *manager) createAvalancheChain(
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		StartupTracker:                 startupTracker,
 		Sender:                         snowmanMessageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -903,8 +899,6 @@ func (m *manager) createAvalancheChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         avalancheMessageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -989,10 +983,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Initializing,
-	})
+	ctx.Start(snow.Initializing, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager("db", ctx.Registerer)
 	if err != nil {
@@ -1172,8 +1163,6 @@ func (m *manager) createSnowmanChain(
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		Sender:                         messageSender,
-		BootstrapTracker:               sb,
-		Timer:                          h,
 		RetryBootstrap:                 m.RetryBootstrap,
 		RetryBootstrapWarnFrequency:    m.RetryBootstrapWarnFrequency,
 		MaxTimeGetAncestors:            m.BootstrapMaxTimeGetAncestors,
@@ -1273,7 +1262,7 @@ func (m *manager) createSnowmanChain(
 	}, nil
 }
 
-func (m *manager) IsBootstrapped(id ids.ID) bool {
+func (m *manager) IsSynced(id ids.ID) bool {
 	m.chainsLock.Lock()
 	chain, exists := m.chains[id]
 	m.chainsLock.Unlock()
@@ -1281,7 +1270,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 		return false
 	}
 
-	return chain.Context().State.Get().State == snow.NormalOp
+	return chain.Context().IsSynced()
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
@@ -1290,7 +1279,7 @@ func (m *manager) subnetsNotBootstrapped() []ids.ID {
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
-		if !subnet.IsBootstrapped() {
+		if !subnet.IsSynced() {
 			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
 		}
 	}

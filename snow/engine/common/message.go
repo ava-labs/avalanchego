@@ -19,6 +19,9 @@ const (
 	// StateSyncDone notifies the state syncer engine that the VM has finishing
 	// syncing the requested state summary.
 	StateSyncDone
+
+	// SubnetSynced notifies VMs that all other VMs in the same subnet have synced
+	SubnetSynced
 )
 
 func (msg Message) String() string {
@@ -27,6 +30,8 @@ func (msg Message) String() string {
 		return "Pending Transactions"
 	case StateSyncDone:
 		return "State Sync Done"
+	case SubnetSynced:
+		return "Subnet Synced"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}

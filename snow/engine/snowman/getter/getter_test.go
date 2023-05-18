@@ -34,7 +34,7 @@ func testSetup(
 	t *testing.T,
 	ctrl *gomock.Controller,
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	peers := validators.NewSet()
 	sender := &common.SenderTest{}
@@ -44,19 +44,7 @@ func testSetup(
 	}
 
 	sender.T = t
-
 	sender.Default(true)
-
-	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
-		T: t,
-		IsBootstrappedF: func() bool {
-			return isBootstrapped
-		},
-		BootstrappedF: func(ids.ID) {
-			isBootstrapped = true
-		},
-	}
 
 	sender.CantSendGetAcceptedFrontier = false
 
@@ -71,8 +59,6 @@ func testSetup(
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
 		SharedCfg:                      &common.SharedConfig{},

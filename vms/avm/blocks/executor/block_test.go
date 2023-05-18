@@ -872,6 +872,8 @@ func TestBlockReject(t *testing.T) {
 				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
 				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -879,7 +881,7 @@ func TestBlockReject(t *testing.T) {
 						mempool:   mempool,
 						metrics:   metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
-							Bootstrapped: true,
+							VMState: vmState,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},
@@ -931,6 +933,8 @@ func TestBlockReject(t *testing.T) {
 				mockPreferredState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).AnyTimes()
 				mockPreferredState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
+				vmState := &utils.Atomic[snow.State]{}
+				vmState.Set(snow.SubnetSynced)
 				return &Block{
 					Block: mockBlock,
 					manager: &manager{
@@ -938,7 +942,7 @@ func TestBlockReject(t *testing.T) {
 						mempool:   mempool,
 						metrics:   metrics.NewMockMetrics(ctrl),
 						backend: &executor.Backend{
-							Bootstrapped: true,
+							VMState: vmState,
 							Ctx: &snow.Context{
 								Log: logging.NoLog{},
 							},

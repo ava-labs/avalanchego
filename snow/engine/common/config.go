@@ -17,13 +17,11 @@ type Config struct {
 	Ctx     *snow.ConsensusContext
 	Beacons validators.Set
 
-	SampleK          int
-	Alpha            uint64
-	StartupTracker   tracker.Startup
-	Sender           Sender
-	Bootstrapable    Bootstrapable
-	BootstrapTracker BootstrapTracker
-	Timer            Timer
+	SampleK        int
+	Alpha          uint64
+	StartupTracker tracker.Startup
+	Sender         Sender
+	Bootstrapable  Bootstrapable
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
@@ -47,11 +45,6 @@ type Config struct {
 
 func (c *Config) Context() *snow.ConsensusContext {
 	return c.Ctx
-}
-
-// IsBootstrapped returns true iff this chain is done bootstrapping
-func (c *Config) IsBootstrapped() bool {
-	return c.Ctx.State.Get().State == snow.NormalOp
 }
 
 // Shared among common.bootstrapper and snowman/avalanche bootstrapper

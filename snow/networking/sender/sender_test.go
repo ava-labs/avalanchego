@@ -96,10 +96,13 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
+	sb := subnets.New(ctx.NodeID, defaultSubnetConfig)
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	sender, err := New(
 		ctx,
 		mc,
@@ -107,11 +110,11 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		sb,
 	)
 	require.NoError(err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -119,6 +122,10 @@ func TestTimeout(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(err)
+
+	sb2 := subnets.New(ctx2.NodeID, subnets.Config{})
+	sb2.AddChain(ctx2.ChainID)
+	ctx2.SubnetStateTracker = sb2
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -127,7 +134,7 @@ func TestTimeout(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb2,
 	)
 	require.NoError(err)
 
@@ -159,10 +166,7 @@ func TestTimeout(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -369,11 +373,14 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
+	sb := subnets.New(ctx.NodeID, defaultSubnetConfig)
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	sender, err := New(
 		ctx,
 		mc,
@@ -381,11 +388,11 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		sb,
 	)
 	require.NoError(t, err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -393,6 +400,10 @@ func TestReliableMessages(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb2 := subnets.New(ctx2.NodeID, subnets.Config{})
+	sb2.AddChain(ctx2.ChainID)
+	ctx2.SubnetStateTracker = sb2
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -401,7 +412,7 @@ func TestReliableMessages(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb2,
 	)
 	require.NoError(t, err)
 
@@ -443,10 +454,7 @@ func TestReliableMessages(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -518,11 +526,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest(t)
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
+	sb := subnets.New(ctx.NodeID, defaultSubnetConfig)
+	sb.AddChain(ctx.ChainID)
+	ctx.SubnetStateTracker = sb
 	sender, err := New(
 		ctx,
 		mc,
@@ -530,11 +541,11 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		subnets.New(ctx.NodeID, defaultSubnetConfig),
+		sb,
 	)
 	require.NoError(t, err)
 
-	ctx2 := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest(t)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -542,6 +553,10 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
+
+	sb2 := subnets.New(ctx2.NodeID, subnets.Config{})
+	sb2.AddChain(ctx2.ChainID)
+	ctx2.SubnetStateTracker = sb2
 	h, err := handler.New(
 		ctx2,
 		vdrs,
@@ -550,7 +565,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		sb2,
 	)
 	require.NoError(t, err)
 
@@ -591,10 +606,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	ctx2.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping, // assumed bootstrap is ongoing
-	})
+	ctx2.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -856,6 +868,9 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			nodeIDsCopy.Union(nodeIDs)
 			snowCtx.Registerer = prometheus.NewRegistry()
 
+			sb := subnets.New(snowCtx.NodeID, defaultSubnetConfig)
+			sb.AddChain(snowCtx.ChainID)
+			snowCtx.SubnetStateTracker = sb
 			sender, err := New(
 				snowCtx,
 				msgCreator,
@@ -863,7 +878,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				sb,
 			)
 			require.NoError(err)
 
@@ -1081,6 +1096,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			snowCtx.Registerer = prometheus.NewRegistry()
 			snowCtx.AvalancheRegisterer = prometheus.NewRegistry()
 
+			sb := subnets.New(snowCtx.NodeID, defaultSubnetConfig)
+			sb.AddChain(snowCtx.ChainID)
+			snowCtx.SubnetStateTracker = sb
 			sender, err := New(
 				snowCtx,
 				msgCreator,
@@ -1088,7 +1106,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				sb,
 			)
 			require.NoError(err)
 
@@ -1249,6 +1267,9 @@ func TestSender_Single_Request(t *testing.T) {
 			)
 			snowCtx.Registerer = prometheus.NewRegistry()
 
+			sb := subnets.New(snowCtx.NodeID, defaultSubnetConfig)
+			sb.AddChain(snowCtx.ChainID)
+			snowCtx.SubnetStateTracker = sb
 			sender, err := New(
 				snowCtx,
 				msgCreator,
@@ -1256,7 +1277,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, defaultSubnetConfig),
+				sb,
 			)
 			require.NoError(err)
 

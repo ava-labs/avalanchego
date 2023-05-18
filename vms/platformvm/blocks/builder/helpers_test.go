@@ -92,28 +92,31 @@ type environment struct {
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
-	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	msm            *mutableSharedMemory
-	fx             fx.Fx
-	state          state.State
-	atomicUTXOs    avax.AtomicUTXOManager
-	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      txbuilder.Builder
-	backend        txexecutor.Backend
+	vmState      *utils.Atomic[snow.State]
+	config       *config.Config
+	clk          *mockable.Clock
+	baseDB       *versiondb.Database
+	ctx          *snow.Context
+	msm          *mutableSharedMemory
+	fx           fx.Fx
+	state        state.State
+	atomicUTXOs  avax.AtomicUTXOManager
+	uptimes      uptime.Manager
+	utxosHandler utxo.Handler
+	txBuilder    txbuilder.Builder
+	backend      txexecutor.Backend
 }
 
 func newEnvironment(t *testing.T) *environment {
+	vmState := &utils.Atomic[snow.State]{}
+	vmState.Set(snow.Bootstrapping)
+
 	res := &environment{
-		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
-		clk:            defaultClock(),
+		vmState: vmState,
+		config:  defaultConfig(),
+		clk:     defaultClock(),
 	}
-	res.isBootstrapped.Set(true)
+	res.vmState.Set(snow.SubnetSynced)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
@@ -122,10 +125,10 @@ func newEnvironment(t *testing.T) *environment {
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
 
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
+	res.fx = defaultFx(res.clk, res.ctx.Log, true /*bootstrapped*/)
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(res.config, res.ctx, res.vmState, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -143,14 +146,14 @@ func newEnvironment(t *testing.T) *environment {
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
-		Config:       res.config,
-		Ctx:          res.ctx,
-		Clk:          res.clk,
-		Bootstrapped: res.isBootstrapped,
-		Fx:           res.fx,
-		FlowChecker:  res.utxosHandler,
-		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
+		Config:      res.config,
+		Ctx:         res.ctx,
+		Clk:         res.clk,
+		VMState:     res.vmState,
+		Fx:          res.fx,
+		FlowChecker: res.utxosHandler,
+		Uptimes:     res.uptimes,
+		Rewards:     rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -238,6 +241,7 @@ func addSubnet(env *environment) {
 func defaultState(
 	cfg *config.Config,
 	ctx *snow.Context,
+	vmState *utils.Atomic[snow.State],
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
@@ -250,7 +254,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
-		&utils.Atomic[bool]{},
+		vmState,
 	)
 	if err != nil {
 		panic(err)
@@ -437,7 +441,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.Get() {
+	if env.vmState.Get() == snow.SubnetSynced {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errMissingPrimaryValidators

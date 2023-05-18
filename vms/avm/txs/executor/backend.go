@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
@@ -21,6 +22,6 @@ type Backend struct {
 	Codec         codec.Manager
 	// Note: FeeAssetID may be different than ctx.AVAXAssetID if this AVM is
 	// running in a subnet.
-	FeeAssetID   ids.ID
-	Bootstrapped bool
+	FeeAssetID ids.ID
+	VMState    *utils.Atomic[snow.State]
 }

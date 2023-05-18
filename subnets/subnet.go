@@ -4,10 +4,12 @@
 package subnets
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -22,7 +24,7 @@ type Allower interface {
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
 type Subnet interface {
-	common.BootstrapTracker
+	snow.SubnetStateTracker
 
 	// AddChain adds a chain to this Subnet
 	AddChain(chainID ids.ID) bool
@@ -34,58 +36,185 @@ type Subnet interface {
 }
 
 type subnet struct {
-	lock             sync.RWMutex
-	bootstrapping    set.Set[ids.ID]
-	bootstrapped     set.Set[ids.ID]
-	once             sync.Once
-	bootstrappedSema chan struct{}
-	config           Config
-	myNodeID         ids.NodeID
+	lock sync.RWMutex
+
+	engineTypes map[ids.ID]p2p.EngineType
+
+	// currentState maps chainID to chain's latest started state
+	currentState map[ids.ID]snow.State
+
+	// started maps a vm state to the set of VMs that has started that state
+	started map[snow.State]set.Set[ids.ID]
+
+	// done maps a vm state to the set of VMs that has done with that state
+	done map[snow.State]set.Set[ids.ID]
+
+	onces      map[ids.ID]*sync.Once
+	semaphores map[ids.ID]chan struct{}
+	config     Config
+	myNodeID   ids.NodeID
 }
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
-		bootstrappedSema: make(chan struct{}),
-		config:           config,
-		myNodeID:         myNodeID,
+		engineTypes:  make(map[ids.ID]p2p.EngineType),
+		currentState: make(map[ids.ID]snow.State),
+		started:      make(map[snow.State]set.Set[ids.ID]),
+		done:         make(map[snow.State]set.Set[ids.ID]),
+		onces:        make(map[ids.ID]*sync.Once),
+		semaphores:   make(map[ids.ID]chan struct{}),
+		config:       config,
+		myNodeID:     myNodeID,
 	}
 }
 
-func (s *subnet) IsBootstrapped() bool {
+func (s *subnet) IsSynced() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.bootstrapping.Len() == 0
+	return s.isSynced()
 }
 
-func (s *subnet) Bootstrapped(chainID ids.ID) {
+// isSynced assumes s.lock is held
+func (s *subnet) isSynced() bool {
+	bootstrapped, anyChainDoneBootstrap := s.done[snow.Bootstrapping]
+	if !anyChainDoneBootstrap {
+		// Note: a subnet with no registered chains is marked as not synced.
+		// This choice avoid the subnet flipping between synced and not synced
+		// in case chains are added at a later time.
+		return false
+	}
+
+	stateSyncedStarted, anyChainStartedStateSync := s.started[snow.StateSyncing]
+	stateSyncedDone, anyChainDoneStateSync := s.done[snow.StateSyncing]
+
+	if anyChainStartedStateSync && !anyChainDoneStateSync {
+		// some chains have started state sync but none have finished it.
+		// Can't be fully synced
+		return false
+	}
+
+	synced := true
+	for chain := range s.currentState {
+		// full sync requires bootstrapping done
+		if !bootstrapped.Contains(chain) {
+			synced = false
+			break
+		}
+
+		// full sync requires state sync done, if ever started
+		if stateSyncedStarted.Contains(chain) &&
+			(stateSyncedDone != nil && !stateSyncedDone.Contains(chain)) {
+			synced = false
+			break
+		}
+	}
+	return synced
+}
+
+func (s *subnet) IsChainBootstrapped(chainID ids.ID) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	// chain must have completed bootstrap
+	doneBootstrap := s.done[snow.Bootstrapping]
+	if !doneBootstrap.Contains(chainID) {
+		return false
+	}
+
+	// chain must have complete state sync only if it ever started
+	startedStateSync := s.started[snow.StateSyncing]
+	if !startedStateSync.Contains(chainID) {
+		// bootstrap done, state sync never started
+		return true
+	}
+
+	// state sync started, must have finished
+	stoppedStateSync := s.done[snow.StateSyncing]
+	return stoppedStateSync.Contains(chainID)
+}
+
+func (s *subnet) GetState(chainID ids.ID) (snow.State, p2p.EngineType) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.currentState[chainID], s.engineTypes[chainID]
+}
+
+func (s *subnet) StartState(chainID ids.ID, state snow.State, currentEngineType p2p.EngineType) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.bootstrapping.Remove(chainID)
-	s.bootstrapped.Add(chainID)
-	if s.bootstrapping.Len() > 0 {
+	s.engineTypes[chainID] = currentEngineType
+	s.currentState[chainID] = state
+	started, anyChainStarted := s.started[state]
+	if !anyChainStarted {
+		s.started[state] = set.NewSet[ids.ID](3)
+		started = s.started[state]
+	}
+	started.Add(chainID)
+
+	// if we are restarting a given state, make sure it is not marked as stopped
+	if stopped, anyChainStopped := s.done[state]; anyChainStopped {
+		stopped.Remove(chainID)
+	}
+
+	if !s.isSynced() {
 		return
 	}
 
-	s.once.Do(func() {
-		close(s.bootstrappedSema)
-	})
+	for chainID, ch := range s.semaphores {
+		once := s.onces[chainID]
+		once.Do(func() {
+			close(ch)
+		})
+	}
 }
 
-func (s *subnet) OnBootstrapCompleted() chan struct{} {
-	return s.bootstrappedSema
+func (s *subnet) StopState(chainID ids.ID, state snow.State) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	stopped, anyChainDoneBootstrap := s.done[state]
+	if !anyChainDoneBootstrap {
+		s.done[state] = set.NewSet[ids.ID](3)
+		stopped = s.done[state]
+	}
+	stopped.Add(chainID)
+
+	if !s.isSynced() {
+		return
+	}
+	for chainID, ch := range s.semaphores {
+		once := s.onces[chainID]
+		once.Do(func() {
+			close(ch)
+		})
+	}
+}
+
+func (s *subnet) OnSyncCompleted(chainID ids.ID) (chan struct{}, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	if _, found := s.semaphores[chainID]; !found {
+		return nil, fmt.Errorf("unknown chain %s", chainID)
+	}
+
+	return s.semaphores[chainID], nil
 }
 
 func (s *subnet) AddChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.bootstrapping.Contains(chainID) || s.bootstrapped.Contains(chainID) {
+	if _, alreadyAdded := s.currentState[chainID]; alreadyAdded {
 		return false
 	}
 
-	s.bootstrapping.Add(chainID)
+	s.currentState[chainID] = snow.Initializing
+	s.onces[chainID] = &sync.Once{}
+	s.semaphores[chainID] = make(chan struct{})
 	return true
 }
 

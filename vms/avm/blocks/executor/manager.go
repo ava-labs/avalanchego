@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -143,7 +144,7 @@ func (m *manager) NewBlock(blk blocks.Block) snowman.Block {
 }
 
 func (m *manager) VerifyTx(tx *txs.Tx) error {
-	if !m.backend.Bootstrapped {
+	if !status.DoneBootstraping(m.backend.VMState.Get()) {
 		return ErrChainNotSynced
 	}
 

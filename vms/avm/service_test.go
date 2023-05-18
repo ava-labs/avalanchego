@@ -811,7 +811,8 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	txID, err := vm.IssueTx(createAssetTx.Bytes())
@@ -890,7 +891,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
@@ -982,7 +984,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
@@ -1076,7 +1079,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
@@ -1170,7 +1174,8 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
@@ -1265,7 +1270,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
@@ -1358,7 +1364,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(context.Background(), snow.ExtendingFrontier))
+	require.NoError(vm.SetState(context.Background(), snow.SubnetSynced))
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)

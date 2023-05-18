@@ -199,7 +199,7 @@ func initTestProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := proVM.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -999,7 +999,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := proVM.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1314,7 +1314,7 @@ func TestInnerVMRollback(t *testing.T) {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := proVM.SetState(context.Background(), snow.ExtendingFrontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2022,7 +2022,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
+	err = proVM.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)
@@ -2237,7 +2237,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
+	err = proVM.SetState(context.Background(), snow.ExtendingFrontier)
 	require.NoError(err)
 
 	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)

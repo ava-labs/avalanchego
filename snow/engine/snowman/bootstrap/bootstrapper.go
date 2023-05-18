@@ -5,7 +5,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -25,14 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// Parameters for delaying bootstrapping to avoid potential CPU burns
-const bootstrappingDelay = 10 * time.Second
-
-var (
-	_ common.BootstrapableEngine = (*bootstrapper)(nil)
-
-	errUnexpectedTimeout = errors.New("unexpected timeout fired")
-)
+var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 // Invariant: The VM is not guaranteed to be initialized until Start has been
 // called, so it must be guaranteed the VM is not used until after Start.
@@ -66,8 +58,6 @@ type bootstrapper struct {
 	executedStateTransitions int
 
 	parser *parser
-
-	awaitingTimeout bool
 
 	// fetchFrom is the set of nodes that we can fetch the next container from.
 	// When a container is fetched, the nodeID is removed from [fetchFrom] to
@@ -113,14 +103,9 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
-
-	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.Bootstrapping,
-	})
+	b.Ctx.Start(snow.Bootstrapping, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
-			err)
+		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
 	}
 
 	b.parser = &parser{
@@ -276,19 +261,6 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return nil
 }
 
-func (b *bootstrapper) Timeout(ctx context.Context) error {
-	if !b.awaitingTimeout {
-		return errUnexpectedTimeout
-	}
-	b.awaitingTimeout = false
-
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.Restart(ctx, true)
-	}
-	b.fetchETA.Set(0)
-	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
-}
-
 func (*bootstrapper) Gossip(context.Context) error {
 	return nil
 }
@@ -306,7 +278,7 @@ func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
 		return nil
 	}
 
-	b.Ctx.StateSyncing.Set(false)
+	b.Ctx.Done(snow.StateSyncing)
 	return nil
 }
 
@@ -546,7 +518,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
-	if b.IsBootstrapped() || b.awaitingTimeout {
+	if b.Ctx.IsChainBootstrapped() {
 		return nil
 	}
 
@@ -588,24 +560,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 			b.Bootstrapped()
 		})
 	}
-
-	// Notify the subnet that this chain is synced
-	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
-
-	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing.
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		if !b.Config.SharedCfg.Restarted {
-			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
-		} else {
-			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
-		}
-		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
-		// on the latest tip.
-		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
-		b.awaitingTimeout = true
-		return nil
-	}
 	b.fetchETA.Set(0)
+	b.Config.Ctx.Done(snow.Bootstrapping)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

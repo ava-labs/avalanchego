@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -81,6 +82,10 @@ type Transitive struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// subnetSyncedOnce ensures this engine notifies
+	// VM that subnet is synced only once
+	subnetSyncedOnce sync.Once
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
@@ -314,10 +319,6 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 	return t.buildBlocks(ctx)
 }
 
-func (*Transitive) Timeout(context.Context) error {
-	return nil
-}
-
 func (t *Transitive) Gossip(ctx context.Context) error {
 	blkID, err := t.VM.LastAccepted(ctx)
 	if err != nil {
@@ -353,9 +354,23 @@ func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 		// the pending txs message means we should attempt to build a block.
 		t.pendingBuildBlocks++
 		return t.buildBlocks(ctx)
+
 	case common.StateSyncDone:
-		t.Ctx.StateSyncing.Set(false)
+		t.Ctx.Done(snow.StateSyncing)
 		return nil
+
+	case common.SubnetSynced:
+		var err error
+		t.subnetSyncedOnce.Do(func() {
+			err = t.VM.SetState(ctx, snow.SubnetSynced)
+		})
+		if err == nil {
+			t.Ctx.Log.Info("Subnet fully synced",
+				zap.Stringer("SubnetID", t.Ctx.SubnetID),
+			)
+		}
+		return err
+
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
@@ -418,15 +433,8 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	)
 	t.metrics.bootstrapFinished.Set(1)
 
-	t.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp,
-	})
-	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
-			err)
-	}
-	return nil
+	t.Ctx.Start(snow.ExtendingFrontier, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	return t.VM.SetState(ctx, snow.ExtendingFrontier)
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -462,10 +470,10 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
-	if t.Ctx.StateSyncing.Get() {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
-	} else {
+	if t.Ctx.IsSynced() {
 		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})
+	} else {
+		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
 	}
 }
 
