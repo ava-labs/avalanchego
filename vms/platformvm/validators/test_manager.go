@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -30,7 +30,4 @@ func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.Nod
 	return nil, nil
 }
 
-func (testManager) GetValidatorIDs(ids.ID) ([]ids.NodeID, bool) {
-	return nil, false
-}
 func (testManager) OnAcceptedBlockID(ids.ID) {}

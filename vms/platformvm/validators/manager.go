@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -32,25 +32,16 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator    = errors.New("missing validator")
-	ErrMissingValidatorSet = errors.New("missing validator set")
+	ErrMissingValidator = errors.New("missing validator")
 )
 
-// QueryManager encapsulates the logic that allows the P-chain to provide
-// information about validators active at different heights.
-type QueryManager interface {
+// Manager adds the ability to introduce newly acceted blocks IDs to the State
+// interface.
+type Manager interface {
 	validators.State
 
-	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
-}
-
-// Manager interface adds to QueryManager the ability to blocks IDs
-// to serve GetMinimumHeight
-type Manager interface {
-	QueryManager
-
 	// OnAcceptedBlockID registers the ID of the latest accepted block.
-	// It is used to update [recentlyAccepted] sliding window.
+	// It is used to update the [recentlyAccepted] sliding window.
 	OnAcceptedBlockID(blkID ids.ID)
 }
 
@@ -131,7 +122,6 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-// GetCurrentHeight returns the height of the last accepted block
 func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
@@ -141,8 +131,6 @@ func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-// GetValidatorSet returns the validator set at the specified height for the
-// provided subnetID.
 func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache, exists := m.caches[subnetID]
 	if !exists {
@@ -273,7 +261,6 @@ func (m *manager) applyValidatorDiffs(
 	return nil
 }
 
-// GetSubnetID returns subnetID of the specified chainID
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
@@ -292,21 +279,6 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
 	}
 	return chain.SubnetID, nil
-}
-
-func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
-	validatorSet, exist := m.cfg.Validators.Get(subnetID)
-	if !exist {
-		return nil, false
-	}
-	validators := validatorSet.List()
-
-	validatorIDs := make([]ids.NodeID, len(validators))
-	for i, vdr := range validators {
-		validatorIDs[i] = vdr.NodeID
-	}
-
-	return validatorIDs, true
 }
 
 func (m *manager) OnAcceptedBlockID(blkID ids.ID) {

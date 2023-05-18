@@ -60,7 +60,6 @@ const (
 	pending stakerStatus = iota
 	current
 
-	testNetworkID = 10 // To be used in tests
 	defaultWeight = 10000
 )
 
