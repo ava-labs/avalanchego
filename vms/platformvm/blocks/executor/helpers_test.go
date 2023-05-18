@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -54,6 +53,7 @@ import (
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 type activeFork uint8
@@ -200,13 +200,6 @@ func newEnvironment(
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
 	res.sender = &common.SenderTest{T: t}
 
 	metrics := metrics.Noop
@@ -223,7 +216,7 @@ func newEnvironment(
 			metrics,
 			res.state,
 			res.backend,
-			window,
+			pvalidators.TestManager,
 		)
 		addSubnet(res)
 	} else {
@@ -232,7 +225,7 @@ func newEnvironment(
 			metrics,
 			res.mockedState,
 			res.backend,
-			window,
+			pvalidators.TestManager,
 		)
 		// we do not add any subnet to state, since we can mock
 		// whatever we need
@@ -404,9 +397,9 @@ func defaultClock(postFork bool) *mockable.Clock {
 		// 1 second after latest fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(now)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {

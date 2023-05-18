@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -53,6 +52,7 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 type activeFork uint8
@@ -160,13 +160,6 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
 	res.sender = &common.SenderTest{T: t}
 
 	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
@@ -183,7 +176,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 		metrics,
 		res.state,
 		&res.backend,
-		window,
+		pvalidators.TestManager,
 	)
 
 	res.Builder = New(
@@ -367,9 +360,9 @@ func defaultClock(postFork bool) *mockable.Clock {
 		// 1 second after latest fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(now)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {
