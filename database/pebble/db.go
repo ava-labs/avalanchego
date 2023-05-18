@@ -190,7 +190,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		return database.ErrClosed
 	}
 
-	if bytes.Equal(start, limit) && !bytes.Equal(start, nil) {
+	if bytes.Equal(start, limit) && limit != nil {
 		// The default compare function of pebble is bytes.Compare.
 		// Use this default compare function since we don't setup
 		// the compare function when we create pebble db.
@@ -206,20 +206,18 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		// and not nil since there is no need to compact and avalanche db
 		// expects a nil return.
 		return nil
+	} else if limit != nil {
+		return updateError(db.db.Compact(start, limit, true))
 	}
 
-	if limit == nil {
-		// A nil limit is treated as a key after all keys in avalanche DB.
-		// But pebble treats a nil, no matter start or limit, as a key before
-		// all keys in the DB
-		it := db.db.NewIter(&pebble.IterOptions{})
-		if it.Last() {
-			if lastkey := it.Key(); lastkey != nil {
-				return updateError(db.db.Compact(start, lastkey, true))
-			}
+	// A nil limit is treated as a key after all keys in avalanche DB.
+	// But pebble treats a nil, no matter start or limit, as a key before
+	// all keys in the DB
+	it := db.db.NewIter(&pebble.IterOptions{})
+	if it.Last() {
+		if lastkey := it.Key(); lastkey != nil {
+			return updateError(db.db.Compact(start, lastkey, true))
 		}
-	} else {
-		return updateError(db.db.Compact(start, limit, true))
 	}
 
 	return database.ErrNotFoundLastKey
