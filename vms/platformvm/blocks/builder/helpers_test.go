@@ -55,10 +55,7 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
-)
+const defaultWeight = 10000
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
