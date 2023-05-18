@@ -15,7 +15,7 @@ func TestSizedLRU(t *testing.T) {
 	TestBasic(t, cache)
 }
 
-func TestSizedtLRUEviction(t *testing.T) {
+func TestSizedLRUEviction(t *testing.T) {
 	cache := NewSizedLRU[ids.ID, TestSizedInt](2 * TestSizedIntSize)
 
 	TestEviction(t, cache)
