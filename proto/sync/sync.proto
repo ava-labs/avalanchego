@@ -45,6 +45,12 @@ message KeyChange {
   optional bytes value = 2;
 }
 
+/* SerializedPath is the serialized representation of a path */
+message SerializedPath {
+  int nibble_length = 1;
+  bytes value = 2;
+}
+
 /* ProofNode is a node in a merkle proof */
 message ProofNode {
   bytes key = 1;
