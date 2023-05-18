@@ -319,10 +319,6 @@ func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, request
 	return t.buildBlocks(ctx)
 }
 
-func (*Transitive) Timeout(context.Context) error {
-	return nil
-}
-
 func (t *Transitive) Gossip(ctx context.Context) error {
 	blkID, err := t.VM.LastAccepted(ctx)
 	if err != nil {

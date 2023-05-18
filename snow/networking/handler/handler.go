@@ -902,9 +902,6 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	case *message.GossipRequest:
 		return engine.Gossip(context.TODO())
 
-	case *message.Timeout:
-		return engine.Timeout(context.TODO())
-
 	default:
 		return fmt.Errorf(
 			"attempt to submit unhandled chan msg %s",

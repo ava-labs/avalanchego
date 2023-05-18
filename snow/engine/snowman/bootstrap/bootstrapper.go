@@ -5,7 +5,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -25,11 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var (
-	_ common.BootstrapableEngine = (*bootstrapper)(nil)
-
-	errUnexpectedTimeout = errors.New("unexpected timeout fired")
-)
+var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 // Invariant: The VM is not guaranteed to be initialized until Start has been
 // called, so it must be guaranteed the VM is not used until after Start.
@@ -264,10 +259,6 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 
 	b.markUnavailable(nodeID)
 	return nil
-}
-
-func (*bootstrapper) Timeout(_ context.Context) error {
-	return errUnexpectedTimeout
 }
 
 func (*bootstrapper) Gossip(context.Context) error {

@@ -273,10 +273,6 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (*bootstrapper) Timeout(context.Context) error {
-	return nil
-}
-
 func (*bootstrapper) Gossip(context.Context) error {
 	return nil
 }

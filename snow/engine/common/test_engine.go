@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	errTimeout                       = errors.New("unexpectedly called Timeout")
 	errGossip                        = errors.New("unexpectedly called Gossip")
 	errNotify                        = errors.New("unexpectedly called Notify")
 	errGetStateSummaryFrontier       = errors.New("unexpectedly called GetStateSummaryFrontier")
@@ -52,7 +51,6 @@ type EngineTest struct {
 	CantStart,
 
 	CantIsBootstrapped,
-	CantTimeout,
 	CantGossip,
 	CantHalt,
 	CantShutdown,
@@ -109,7 +107,7 @@ type EngineTest struct {
 	IsBootstrappedF                            func() bool
 	ContextF                                   func() *snow.ConsensusContext
 	HaltF                                      func(context.Context)
-	TimeoutF, GossipF, ShutdownF               func(context.Context) error
+	GossipF, ShutdownF                         func(context.Context) error
 	NotifyF                                    func(context.Context, Message) error
 	GetF, GetAncestorsF, PullQueryF            func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
@@ -138,7 +136,6 @@ type EngineTest struct {
 func (e *EngineTest) Default(cant bool) {
 	e.CantStart = cant
 	e.CantIsBootstrapped = cant
-	e.CantTimeout = cant
 	e.CantGossip = cant
 	e.CantHalt = cant
 	e.CantShutdown = cant
@@ -203,19 +200,6 @@ func (e *EngineTest) Context() *snow.ConsensusContext {
 		e.T.Fatalf("Unexpectedly called Context")
 	}
 	return nil
-}
-
-func (e *EngineTest) Timeout(ctx context.Context) error {
-	if e.TimeoutF != nil {
-		return e.TimeoutF(ctx)
-	}
-	if !e.CantTimeout {
-		return nil
-	}
-	if e.T != nil {
-		e.T.Fatal(errTimeout)
-	}
-	return errTimeout
 }
 
 func (e *EngineTest) Gossip(ctx context.Context) error {
