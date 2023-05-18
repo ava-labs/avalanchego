@@ -248,13 +248,12 @@ func TestNewPendingStaker(t *testing.T) {
 	duration := endTime.Sub(startTime)
 	pendingPriority := txs.SubnetPermissionedValidatorPendingPriority
 
-	stakerTx := txs.NewMockStaker(ctrl)
+	stakerTx := txs.NewMockPreContinuousStakingStaker(ctrl)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
 	stakerTx.EXPECT().Weight().Return(weight)
 	stakerTx.EXPECT().StartTime().Return(startTime)
-	stakerTx.EXPECT().StakingPeriod().Return(duration)
 	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().PendingPriority().Return(pendingPriority)
 

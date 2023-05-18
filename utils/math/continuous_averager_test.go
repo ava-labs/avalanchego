@@ -45,7 +45,7 @@ func TestUninitializedAverager(t *testing.T) {
 	firstObservation := float64(10)
 
 	a := NewUninitializedAverager(halfLife)
-	require.Equal(t, 0.0, a.Read())
+	require.Zero(t, a.Read())
 
 	a.Observe(firstObservation, currentTime)
 	require.Equal(t, firstObservation, a.Read())

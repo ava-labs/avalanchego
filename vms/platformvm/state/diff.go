@@ -21,6 +21,7 @@ var (
 	_ Diff = (*diff)(nil)
 
 	ErrMissingParentState     = errors.New("missing parent state")
+	ErrUpdatingPendingStaker  = errors.New("trying to update pending staker")
 	errIsNotTransformSubnetTx = errors.New("is not a transform subnet tx")
 )
 
@@ -423,19 +424,22 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 		return reward.Config{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	primaryNetworkCfg, err := parentState.GetRewardConfig(subnetID)
+	parentCfg, err := parentState.GetRewardConfig(subnetID)
 	if err != nil {
 		return reward.Config{}, err
 	}
 
 	if subnetID == constants.PrimaryNetworkID {
-		return primaryNetworkCfg, nil
+		return parentCfg, nil
 	}
 
-	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
-	if err != nil {
-		return reward.Config{}, err
+	transformSubnetIntf, exists := d.transformedSubnets[subnetID]
+	if !exists {
+		return parentCfg, nil
 	}
+
+	// this diff contains a tx transforming requested subnet into elastic one
+	// Duly update its config.
 	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 	if !ok {
 		return reward.Config{}, errIsNotTransformSubnetTx
@@ -444,7 +448,7 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 	return reward.Config{
 		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
 		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      primaryNetworkCfg.MintingPeriod,
+		MintingPeriod:      parentCfg.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}, nil
 }
@@ -520,23 +524,29 @@ func (d *diff) Apply(baseState State) error {
 				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator.staker)
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.updatedDelegators {
-				err := baseState.UpdateCurrentDelegator(delegator)
-				if err != nil {
-					return err
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutCurrentDelegator(delegator)
+				case updated:
+					err := baseState.UpdateCurrentDelegator(delegator)
+					if err != nil {
+						return err
+					}
+				case deleted:
+					baseState.DeleteCurrentDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
 				}
-			}
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeleteCurrentDelegator(delegator)
 			}
 		}
 	}
@@ -554,16 +564,28 @@ func (d *diff) Apply(baseState State) error {
 				baseState.PutPendingValidator(validatorDiff.validator.staker)
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator.staker)
+			case updated:
+				return ErrUpdatingPendingStaker
+			case unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-			for addedDelegatorIterator.Next() {
-				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
-			}
-			addedDelegatorIterator.Release()
-
-			for _, delegator := range validatorDiff.deletedDelegators {
-				baseState.DeletePendingDelegator(delegator)
+			for _, ds := range validatorDiff.delegators {
+				delegator := ds.staker
+				switch ds.status {
+				case added:
+					baseState.PutPendingDelegator(delegator)
+				case updated:
+					return ErrUpdatingPendingStaker
+				case deleted:
+					baseState.DeletePendingDelegator(delegator)
+				case unmodified:
+					// nothing to do
+				default:
+					return ErrUnknownStakerStatus
+				}
 			}
 		}
 	}

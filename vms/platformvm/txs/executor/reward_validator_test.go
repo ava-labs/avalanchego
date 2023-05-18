@@ -25,7 +25,7 @@ import (
 
 func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(ContinuousStakingFork)
+	env := newEnvironment(continuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -125,7 +125,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
 	require.NoError(err)
 
-	// check that post ContinuousStakingFork, staker is shifted ahead by its staking period
+	// check that post continuousStakingFork, staker is shifted ahead by its staking period
 	var shiftedStaker *state.Staker
 	for onCommitStakerIterator.Next() {
 		nextStaker := onCommitStakerIterator.Value()
@@ -166,7 +166,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(ContinuousStakingFork)
+	env := newEnvironment(continuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -260,7 +260,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
 	require.NoError(err)
 
-	// check that post ContinuousStakingFork, staker is shifted ahead by its staking period
+	// check that post continuousStakingFork, staker is shifted ahead by its staking period
 	var shiftedStaker *state.Staker
 	for onAbortStakerIterator.Next() {
 		nextStaker := onAbortStakerIterator.Value()
@@ -302,7 +302,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(ContinuousStakingFork)
+	env := newEnvironment(continuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -542,7 +542,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(CortinaFork)
+	env := newEnvironment(cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -640,6 +640,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -650,7 +651,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(CortinaFork)
+	env := newEnvironment(cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -742,6 +743,7 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(txExecutor.OnAbortState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -752,7 +754,136 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(CortinaFork)
+	env := newEnvironment(banffFork)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+	dummyHeight := uint64(1)
+
+	vdrRewardAddress := ids.GenerateTestShortID()
+	delRewardAddress := ids.GenerateTestShortID()
+
+	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
+	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrNodeID := ids.GenerateTestNodeID()
+
+	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake, // stakeAmt
+		vdrStartTime,
+		vdrEndTime,
+		vdrNodeID,        // node ID
+		vdrRewardAddress, // reward address
+		reward.PercentDenominator/4,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty,
+	)
+	require.NoError(err)
+
+	delStartTime := vdrStartTime
+	delEndTime := vdrEndTime
+
+	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.config.MinDelegatorStake,
+		delStartTime,
+		delEndTime,
+		vdrNodeID,
+		delRewardAddress,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		ids.ShortEmpty, // Change address
+	)
+	require.NoError(err)
+
+	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
+	vdrStaker, err := state.NewCurrentStaker(
+		vdrTx.ID(),
+		addValTx,
+		addValTx.StartTime(),
+		0,
+	)
+	require.NoError(err)
+
+	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
+	delStaker, err := state.NewCurrentStaker(
+		delTx.ID(),
+		addDelTx,
+		addDelTx.StartTime(),
+		1000000,
+	)
+	require.NoError(err)
+
+	env.state.PutCurrentValidator(vdrStaker)
+	env.state.AddTx(vdrTx, status.Committed)
+	env.state.PutCurrentDelegator(delStaker)
+	env.state.AddTx(delTx, status.Committed)
+	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
+	env.state.SetHeight(dummyHeight)
+	require.NoError(env.state.Commit())
+
+	// test validator stake
+	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	require.True(ok)
+
+	stake := vdrSet.GetWeight(vdrNodeID)
+	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
+
+	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
+	}
+	err = tx.Unsigned.Visit(&txExecutor)
+	require.NoError(err)
+
+	vdrDestSet := set.Set[ids.ShortID]{}
+	vdrDestSet.Add(vdrRewardAddress)
+	delDestSet := set.Set[ids.ShortID]{}
+	delDestSet.Add(delRewardAddress)
+
+	expectedReward := uint64(1000000)
+
+	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
+	require.NoError(err)
+	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
+	require.NoError(err)
+
+	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+
+	env.state.SetHeight(dummyHeight)
+	require.NoError(env.state.Commit())
+
+	// Since the tx was committed, the delegator and the delegatee should be rewarded.
+	// The delegator reward should be higher since the delegatee's share is 25%.
+	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
+	require.NoError(err)
+	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+	require.NoError(err)
+	require.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
+
+	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
+	require.NoError(err)
+	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+	require.NoError(err)
+	require.NotZero(delReward, "expected delegator balance to increase because of reward")
+
+	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
+	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
+
+	require.Equal(env.config.MinValidatorStake, vdrSet.GetWeight(vdrNodeID))
+}
+
+func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(continuousStakingFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -796,7 +927,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
 		addValTx,
-		addValTx.StartTime(),
+		time.Unix(int64(vdrStartTime), 0),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -806,7 +937,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		time.Unix(int64(delStartTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -977,7 +1108,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(CortinaFork)
+	env := newEnvironment(cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1031,7 +1162,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		time.Unix(int64(delStartTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -1141,7 +1272,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 
 func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(CortinaFork)
+	env := newEnvironment(cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1239,6 +1370,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(txExecutor.OnAbortState.Apply(env.state))
+
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -1262,7 +1394,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(BanffFork)
+	env := newEnvironment(banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

@@ -44,7 +44,7 @@ func TestSet(t *testing.T) {
 	ipsArg := s.IPsArg()
 	require.Equal("", ipsArg)
 	len := s.Len()
-	require.Equal(0, len)
+	require.Zero(len)
 
 	err := s.Add(b0)
 	require.NoError(err)

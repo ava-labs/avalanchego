@@ -35,7 +35,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, ApricotFork)
+	env := newEnvironment(t, ctrl, apricotFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -153,14 +153,15 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, BanffFork)
+	env := newEnvironment(t, ctrl, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	env.clk.Set(defaultGenesisTime)
+	now := env.config.CortinaTime
+	env.clk.Set(now)
 
 	// create parentBlock. It's a standard one for simplicity
-	parentTime := defaultGenesisTime
+	parentTime := now
 	parentHeight := uint64(2022)
 
 	banffParentBlk, err := blocks.NewApricotStandardBlock(
@@ -568,7 +569,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, CortinaFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -720,7 +721,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, CortinaFork)
+	env := newEnvironment(t, nil, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -861,7 +862,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, CortinaFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -966,7 +967,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, CortinaFork)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1150,7 +1151,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, CortinaFork)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

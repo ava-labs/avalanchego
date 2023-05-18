@@ -62,15 +62,14 @@ const (
 	pending stakerStatus = iota
 	current
 
-	testNetworkID                 = 10 // To be used in tests
 	defaultWeight                 = 10000
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 
-	ApricotFork           activeFork = 0
-	BanffFork             activeFork = 1
-	CortinaFork           activeFork = 2
-	ContinuousStakingFork activeFork = 3
+	apricotFork           activeFork = 0
+	banffFork             activeFork = 1
+	cortinaFork           activeFork = 2
+	continuousStakingFork activeFork = 3
 )
 
 var (
@@ -146,7 +145,7 @@ func newEnvironment(
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
-		clk:            defaultClock(fork != ApricotFork),
+		clk:            defaultClock(fork != apricotFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -198,7 +197,6 @@ func newEnvironment(
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -272,8 +270,8 @@ func addSubnet(env *environment) {
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-
-	if err = testSubnet1.Unsigned.Visit(&executor); err != nil {
+	err = testSubnet1.Unsigned.Visit(&executor)
+	if err != nil {
 		panic(err)
 	}
 
@@ -348,23 +346,25 @@ func defaultCtx(db database.Database) *snow.Context {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
+		apricotPhase3Time     = defaultValidateEndTime
+		apricotPhase5Time     = defaultValidateEndTime
 		banffTime             = mockable.MaxTime
 		cortinaTime           = mockable.MaxTime
 		continuousStakingTime = mockable.MaxTime
 	)
 
 	switch fork {
-	case ApricotFork:
+	case apricotFork:
 		// nothing todo
-	case BanffFork:
-		banffTime = time.Time{}
-	case CortinaFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
-	case ContinuousStakingFork:
-		banffTime = time.Time{}
-		cortinaTime = time.Time{}
-		continuousStakingTime = time.Time{}
+	case banffFork:
+		banffTime = defaultValidateEndTime
+	case cortinaFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+	case continuousStakingFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+		continuousStakingTime = defaultValidateEndTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -390,8 +390,8 @@ func defaultConfig(fork activeFork) *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     defaultValidateEndTime,
-		ApricotPhase5Time:     defaultValidateEndTime,
+		ApricotPhase3Time:     apricotPhase3Time,
+		ApricotPhase5Time:     apricotPhase5Time,
 		BanffTime:             banffTime,
 		CortinaTime:           cortinaTime,
 		ContinuousStakingTime: continuousStakingTime,
@@ -447,10 +447,9 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 
 func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -463,7 +462,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -486,7 +485,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   ctx.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,

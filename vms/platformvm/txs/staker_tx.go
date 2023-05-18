@@ -48,16 +48,24 @@ type PermissionlessStaker interface {
 	Stake() []*avax.TransferableOutput
 }
 
-type Staker interface {
+type commonStaker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
 	// PublicKey returns the BLS public key registered by this transaction. If
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)
-	StartTime() time.Time
-	EndTime() time.Time
-	StakingPeriod() time.Duration
 	Weight() uint64
 	PendingPriority() Priority
 	CurrentPriority() Priority
+}
+
+type Staker interface {
+	commonStaker
+	StakingPeriod() time.Duration
+}
+
+type PreContinuousStakingStaker interface {
+	commonStaker
+	StartTime() time.Time
+	EndTime() time.Time
 }

@@ -36,7 +36,7 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, ApricotFork)
+	env := newEnvironment(t, apricotFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -67,7 +67,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
@@ -84,7 +84,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, ApricotFork)
+	env := newEnvironment(t, apricotFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -111,7 +111,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, ApricotFork)
+	env := newEnvironment(t, apricotFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -129,7 +129,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)

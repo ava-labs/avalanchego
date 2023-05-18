@@ -199,7 +199,7 @@ func maskedIteratorTestGenerator() []gopter.Gen {
 	parentStakersCount := 10
 
 	return []gopter.Gen{
-		gen.SliceOfN(parentStakersCount, StakerGenerator(AnyPriority, nil, nil, math.MaxUint64)),
+		gen.SliceOfN(parentStakersCount, stakerGenerator(anyPriority, nil, nil, math.MaxUint64)),
 		indexPermutationGenerator(parentStakersCount),
 		gen.SliceOfN(2, gen.IntRange(0, parentStakersCount)).SuchThat(func(v interface{}) bool {
 			nums := v.([]int)

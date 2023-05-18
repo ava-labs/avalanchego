@@ -67,7 +67,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(ContinuousStakingFork)
+	vm, _, mutableSharedMemory := defaultVM(continuousStakingFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -372,7 +372,9 @@ func TestGetTx(t *testing.T) {
 					require.Equal(tx.Bytes(), responseTxBytes)
 
 				case formatting.JSON:
-					require.Equal(tx, response.Tx)
+					require.IsType((*txs.Tx)(nil), response.Tx)
+					responseTx := response.Tx.(*txs.Tx)
+					require.Equal(tx.ID(), responseTx.ID())
 				}
 
 				err = service.vm.Shutdown(context.Background())
@@ -490,11 +492,12 @@ func TestGetStake(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := ids.NodeID(keys[0].PublicKey().Address())
-	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	delegatorStartTime := defaultGenesisTime
+	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		uint64(defaultGenesisTime.Unix()),
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		delegatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -506,7 +509,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -593,7 +596,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis() // the genesis used to init service.vm
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
@@ -601,7 +604,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	err := service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range genesis.Validators {
 		found := false
@@ -621,13 +624,13 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := ids.NodeID(keys[1].PublicKey().Address())
-	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
-	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
+	delegatorStartTime := defaultValidateStartTime
+	delegatorEndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
-		delegatorStartTime,
-		delegatorEndTime,
+		uint64(delegatorStartTime.Unix()),
+		uint64(delegatorEndTime.Unix()),
 		validatorNodeID,
 		ids.GenerateTestShortID(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -639,7 +642,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		addDelTx.StartTime(),
+		delegatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -653,7 +656,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	err = service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	// Make sure the delegator is there
 	found := false
@@ -679,11 +682,11 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(vdr.NodeID, innerVdr.NodeID)
 
 		require.NotNil(innerVdr.Delegators)
-		require.Equal(1, len(*innerVdr.Delegators))
+		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
-		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
-		require.Equal(uint64(delegator.EndTime), delegatorEndTime)
+		require.Equal(int64(delegator.StartTime), delegatorStartTime.Unix())
+		require.Equal(int64(delegator.EndTime), delegatorEndTime.Unix())
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
@@ -699,14 +702,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Call getValidators
 	response = GetCurrentValidatorsReply{}
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
-	for i := 0; i < len(response.Validators); i++ {
-		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+	for _, vdr := range response.Validators {
+		castVdr := vdr.(pchainapi.PermissionlessValidator)
+		if castVdr.NodeID != validatorNodeID {
 			continue
 		}
-		require.Equal(uint64(100000), uint64(*vdr.AccruedDelegateeReward))
+		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))
 	}
 }
 
@@ -792,7 +795,9 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.Equal(statelessBlock, response.Block)
+				require.IsType((*blocks.BanffStandardBlock)(nil), response.Block)
+				responseBlock := response.Block.(*blocks.BanffStandardBlock)
+				require.Equal(statelessBlock.ID(), responseBlock.ID())
 
 				_, err = stdjson.Marshal(response)
 				require.NoError(err)

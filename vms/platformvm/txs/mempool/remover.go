@@ -3,9 +3,7 @@
 
 package mempool
 
-import (
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-)
+import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 var _ txs.Visitor = (*remover)(nil)
 
@@ -14,8 +12,6 @@ type remover struct {
 	tx *txs.Tx
 }
 
-// TODO ABENEGIA: for staker txs, should I bother removing one way of the other
-// depending on fork?
 func (r *remover) AddValidatorTx(*txs.AddValidatorTx) error {
 	r.m.removeStakerTx(r.tx)
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})

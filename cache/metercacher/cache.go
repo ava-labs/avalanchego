@@ -33,6 +33,7 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	c.Cacher.Put(key, value)
 	end := c.clock.Time()
 	c.put.Observe(float64(end.Sub(start)))
+	c.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
@@ -47,4 +48,14 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	}
 
 	return value, has
+}
+
+func (c *Cache[K, _]) Evict(key K) {
+	c.Cacher.Evict(key)
+	c.portionFilled.Set(c.Cacher.PortionFilled())
+}
+
+func (c *Cache[_, _]) Flush() {
+	c.Cacher.Flush()
+	c.portionFilled.Set(c.Cacher.PortionFilled())
 }

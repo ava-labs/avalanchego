@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package models
+package state
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,16 +25,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	_ state.Versions = (*versionsHolder)(nil)
+	_ Versions = (*versionsHolder)(nil)
 
-	xChainID    = ids.Empty.Prefix(0)
-	cChainID    = ids.Empty.Prefix(1)
-	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
+	testNetworkID = uint32(10) // To be used in tests
+	xChainID      = ids.Empty.Prefix(0)
+	cChainID      = ids.Empty.Prefix(1)
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -42,25 +43,27 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
 
-	testNetworkID = 10 // To be used in tests
+	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
+	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
 )
 
 type versionsHolder struct {
-	baseState state.State
+	baseState State
 }
 
-func (h *versionsHolder) GetState(blkID ids.ID) (state.Chain, bool) {
+func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildChainState() (state.State, error) {
+func buildChainState(trackedSubnets []ids.ID) (State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
 	cfg := defaultConfig()
+	cfg.TrackedSubnets.Add(trackedSubnets...)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = 10
+	ctx.NetworkID = testNetworkID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
@@ -71,7 +74,7 @@ func buildChainState() (state.State, error) {
 	}
 
 	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	return state.New(
+	return New(
 		baseDB,
 		genesisBytes,
 		prometheus.NewRegistry(),
@@ -107,21 +110,18 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time:     defaultValidateEndTime,
 		ApricotPhase5Time:     defaultValidateEndTime,
-		BanffTime:             time.Time{}, // neglecting fork ordering this for package tests
-		CortinaTime:           time.Time{},
-		ContinuousStakingTime: time.Time{},
+		BanffTime:             defaultValidateEndTime,
+		CortinaTime:           defaultValidateEndTime,
+		ContinuousStakingTime: defaultValidateEndTime,
 	}
 }
 
 func buildGenesisTest(ctx *snow.Context) ([]byte, error) {
-	// no UTXOs, not nor validators in this genesis
-	genesisUTXOs := make([]api.UTXO, 0)
-	genesisValidators := make([]api.PermissionlessValidator, 0)
 	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(testNetworkID),
 		AvaxAssetID:   ctx.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
+		UTXOs:         nil, // no UTXOs in this genesis. Not relevant to package tests.
+		Validators:    nil, // no validators in this genesis. Tests will handle them.
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),

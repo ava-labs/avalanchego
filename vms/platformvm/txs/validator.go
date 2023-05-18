@@ -45,12 +45,13 @@ func (v *Validator) EndTime() time.Time {
 	return time.Unix(int64(v.End), 0)
 }
 
-// StakingPeriod is the amount of time that this validator will be in the validator set
+// Duration is the amount of time that this validator will be in the validator set
 func (v *Validator) StakingPeriod() time.Duration {
-	if v.Start == 0 {
-		return time.Duration(v.End) * time.Second
-	}
-	return v.EndTime().Sub(v.StartTime())
+	var (
+		endTime   = time.Unix(int64(v.End), 0)
+		startTime = time.Unix(int64(v.Start), 0)
+	)
+	return endTime.Sub(startTime)
 }
 
 // Weight is this validator's weight when sampling
@@ -73,7 +74,9 @@ func (v *Validator) Verify() error {
 
 // BoundedBy returns true iff the period that [validator] validates is a
 // (non-strict) subset of the time that [other] validates.
-// Namely, startTime <= v.StartTime() <= v.EndTime() <= endTime
-func (v *Validator) BoundedBy(startTime, endTime time.Time) bool {
-	return !v.StartTime().Before(startTime) && !v.EndTime().After(endTime)
+// Namely, lowerBound <= validatorEffectiveStart <= validatorEffectiveEnd <= upperBound
+// where validatorEffectiveEnd = validatorEffectiveStart.Add(v.Duration())
+func (v *Validator) BoundedBy(validatorEffectiveStart, lowerBound, upperBound time.Time) bool {
+	validatorEffectiveEnd := validatorEffectiveStart.Add(v.StakingPeriod())
+	return !validatorEffectiveStart.Before(lowerBound) && !validatorEffectiveEnd.After(upperBound)
 }

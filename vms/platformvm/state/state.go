@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -40,16 +41,20 @@ import (
 )
 
 const (
+	blockCacheSize               = 64 * units.MiB
+	txCacheSize                  = 128 * units.MiB
+	transformedSubnetTxCacheSize = 4 * units.MiB
+
 	validatorDiffsCacheSize = 2048
-	blockCacheSize          = 2048
-	txCacheSize             = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
 )
 
 var (
-	_ State = (*state)(nil)
+	_ State              = (*state)(nil)
+	_ cache.SizedElement = (*stateBlk)(nil)
+	_ cache.SizedElement = (*txAndStatus)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
 	errMissingValidatorSet          = errors.New("missing validator set")
@@ -153,6 +158,13 @@ type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
+}
+
+func (b *stateBlk) Size() int {
+	if b == nil {
+		return wrappers.LongLen
+	}
+	return len(b.Bytes) + wrappers.IntLen + wrappers.LongLen
 }
 
 /*
@@ -337,6 +349,13 @@ type txAndStatus struct {
 	status status.Status
 }
 
+func (t *txAndStatus) Size() int {
+	if t == nil {
+		return wrappers.LongLen
+	}
+	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
+}
+
 func New(
 	db database.Database,
 	genesisBytes []byte,
@@ -379,10 +398,10 @@ func new(
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
-	blockCache, err := metercacher.New[ids.ID, *stateBlk](
+	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
+		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -424,10 +443,10 @@ func new(
 		return nil, err
 	}
 
-	txCache, err := metercacher.New[ids.ID, *txAndStatus](
+	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txAndStatus]{Size: txCacheSize},
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -451,10 +470,10 @@ func new(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
-	transformedSubnetCache, err := metercacher.New[ids.ID, *txs.Tx](
+	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txs.Tx]{Size: chainCacheSize},
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -944,15 +963,11 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 			return err
 		}
 
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
+		for _, delegator := range validator.delegators {
+			if err := vdrs.AddWeight(nodeID, delegator.Weight); err != nil {
 				return err
 			}
 		}
-		delegatorIterator.Release()
 	}
 	return nil
 }
@@ -1063,6 +1078,8 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
+		// tx is a genesis transactions, hence it's guaranteed to be
+		// pre Continuous staking fork. It's fine to use tx.StartTime
 		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
 		if err != nil {
 			return err
@@ -1100,8 +1117,8 @@ func (s *state) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.loadMetadata(),
-		s.loadCurrentValidators(),
-		s.loadPendingValidators(),
+		s.loadCurrentStakers(),
+		s.loadPendingStakers(),
 		s.initValidatorSets(),
 	)
 	return errs.Err
@@ -1131,7 +1148,7 @@ func (s *state) loadMetadata() error {
 	return nil
 }
 
-func (s *state) loadCurrentValidators() error {
+func (s *state) loadCurrentStakers() error {
 	s.currentStakers = newBaseStakers()
 
 	validatorIt := s.currentValidatorList.NewIterator()
@@ -1162,7 +1179,18 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
+		startTime := time.Unix(metadata.StakerStartTime, 0)
+		if metadata.StakerStartTime == 0 {
+			// pre Continuous staking fork, start time is not stored in metadata.
+			// we must use  stakerTx.StartTime().
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", tx.Unsigned)
+			}
+			startTime = stakerTx.StartTime()
+		}
+
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1194,17 +1222,28 @@ func (s *state) loadCurrentValidators() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
+		defaultStartTime := time.Time{}
+		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+			defaultStartTime = preStaker.StartTime()
+		}
 		metadata := &validatorMetadata{
 			txID: txID,
 			// use the start time as the fallback value
 			// in case it's not stored in the database
-			LastUpdated: uint64(stakerTx.StartTime().Unix()),
+			LastUpdated: uint64(defaultStartTime.Unix()),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), metadata.PotentialReward)
+		startTime := defaultStartTime
+		if metadata.StakerStartTime != 0 {
+			// post Continuous staking fork, start time is stored in metadata
+			// and must be used instead stakerTx.StartTime().
+			startTime = time.Unix(metadata.StakerStartTime, 0)
+		}
+
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1234,8 +1273,8 @@ func (s *state) loadCurrentValidators() error {
 				return err
 			}
 
-			potentialRewardBytes := delegatorIt.Value()
-			potentialReward, err := database.ParseUInt64(potentialRewardBytes)
+			metadata := &delegatorMetadata{}
+			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
 				return err
 			}
@@ -1245,16 +1284,28 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, stakerTx.StartTime(), potentialReward)
+			defaultStartTime := time.Time{}
+			if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
+				defaultStartTime = preStaker.StartTime()
+			}
+			startTime := defaultStartTime
+			if metadata.StakerStartTime != 0 {
+				// post Continuous staking fork, start time is stored in metadata
+				// and must be used instead stakerTx.StartTime().
+				startTime = time.Unix(metadata.StakerStartTime, 0)
+			}
+
+			staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.currentStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1270,7 +1321,7 @@ func (s *state) loadCurrentValidators() error {
 	return errs.Err
 }
 
-func (s *state) loadPendingValidators() error {
+func (s *state) loadPendingStakers() error {
 	s.pendingStakers = newBaseStakers()
 
 	validatorIt := s.pendingValidatorList.NewIterator()
@@ -1291,7 +1342,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1326,7 +1377,7 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.PreContinuousStakingStaker)
 			if !ok {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
@@ -1337,10 +1388,11 @@ func (s *state) loadPendingValidators() error {
 			}
 
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			if validator.delegators == nil {
-				validator.delegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+			if validator.sortedDelegators == nil {
+				validator.sortedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 			}
-			validator.delegators.ReplaceOrInsert(staker)
+			validator.delegators[staker.TxID] = staker
+			validator.sortedDelegators.ReplaceOrInsert(staker)
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
@@ -1543,7 +1595,10 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, &stBlk)
+		// Note: Evict is used rather than Put here because stBlk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1640,9 +1695,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					LastUpdated:              uint64(staker.StartTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
+					StakerStartTime:          staker.StartTime.Unix(),
 				}
 
-				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
+				// Let's start using V1 as soon as we deploy code. No need to
+				// wait till Continuous staking fork activation to do that.
+				metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -1673,6 +1731,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
+			case updated, unmodified:
+				// nothing to do
+			default:
+				return ErrUnknownStakerStatus
 			}
 
 			err := writeCurrentDelegatorDiff(
@@ -1754,27 +1816,41 @@ func writeCurrentDelegatorDiff(
 	weightDiff *ValidatorWeightDiff,
 	validatorDiff *diffValidator,
 ) error {
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			err := weightDiff.Add(false, delegator.Weight)
+			if err != nil {
+				return fmt.Errorf("failed to increase node weight diff: %w", err)
+			}
 
-		if err := weightDiff.Add(false, staker.Weight); err != nil {
-			return fmt.Errorf("failed to increase node weight diff: %w", err)
-		}
+			// Let's start using V1 as soon as we deploy code. No need to
+			// wait till Continuous staking fork activation to do that.
+			metadata := &delegatorMetadata{
+				PotentialReward: delegator.PotentialReward,
+				StakerStartTime: delegator.StartTime.Unix(),
+			}
+			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+			if err != nil {
+				return fmt.Errorf("failed marshalling delegators metadata: %w", err)
+			}
+			err = currentDelegatorList.Put(delegator.TxID[:], metadataBytes)
+			if err != nil {
+				return fmt.Errorf("failed to write current delegator to list: %w", err)
+			}
+		case deleted:
+			if err := weightDiff.Add(true, delegator.Weight); err != nil {
+				return fmt.Errorf("failed to decrease node weight diff: %w", err)
+			}
 
-		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
-			return fmt.Errorf("failed to write current delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := weightDiff.Add(true, staker.Weight); err != nil {
-			return fmt.Errorf("failed to decrease node weight diff: %w", err)
-		}
-
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete current staker: %w", err)
+			if err := currentDelegatorList.Delete(delegator.TxID[:]); err != nil {
+				return fmt.Errorf("failed to delete current staker: %w", err)
+			}
+		case updated, unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
@@ -1821,21 +1897,27 @@ func writePendingDiff(
 		if err != nil {
 			return fmt.Errorf("failed to delete pending validator: %w", err)
 		}
+	case updated, unmodified:
+		// nothing to do
+	default:
+		return ErrUnknownStakerStatus
 	}
 
-	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-	defer addedDelegatorIterator.Release()
-	for addedDelegatorIterator.Next() {
-		staker := addedDelegatorIterator.Value()
-
-		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
-			return fmt.Errorf("failed to write pending delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete pending delegator: %w", err)
+	for _, ds := range validatorDiff.delegators {
+		delegator := ds.staker
+		switch ds.status {
+		case added:
+			if err := pendingDelegatorList.Put(delegator.TxID[:], nil); err != nil {
+				return fmt.Errorf("failed to write pending delegator to list: %w", err)
+			}
+		case deleted:
+			if err := pendingDelegatorList.Delete(delegator.TxID[:]); err != nil {
+				return fmt.Errorf("failed to delete pending delegator: %w", err)
+			}
+		case updated, unmodified:
+			// nothing to do
+		default:
+			return ErrUnknownStakerStatus
 		}
 	}
 	return nil
@@ -1858,7 +1940,10 @@ func (s *state) writeTXs() error {
 		}
 
 		delete(s.addedTxs, txID)
-		s.txCache.Put(txID, txStatus)
+		// Note: Evict is used rather than Put here because stx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.txCache.Evict(txID)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
@@ -1921,7 +2006,10 @@ func (s *state) writeTransformedSubnets() error {
 		txID := tx.ID()
 
 		delete(s.transformedSubnets, subnetID)
-		s.transformedSubnetCache.Put(subnetID, tx)
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.transformedSubnetCache.Evict(subnetID)
 		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}

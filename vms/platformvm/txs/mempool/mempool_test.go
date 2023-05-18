@@ -80,7 +80,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
-		require.True(retrieved != nil)
+		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
 
 		// we can peek it
@@ -137,13 +137,13 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
-		require.True(retrieved != nil)
+		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
 
 		{
 			// we can peek it
 			peeked := mpool.PeekStakerTx()
-			require.True(peeked != nil)
+			require.NotNil(peeked)
 			require.Equal(tx, peeked)
 		}
 

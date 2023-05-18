@@ -41,7 +41,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -201,7 +201,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(CortinaFork)
+			vm, _, _ := defaultVM(cortinaFork)
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -471,7 +471,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(CortinaFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -693,7 +693,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(CortinaFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1020,7 +1020,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1167,7 +1167,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1254,7 +1254,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1376,7 +1376,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(CortinaFork)
+	vm, _, _ := defaultVM(cortinaFork)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
