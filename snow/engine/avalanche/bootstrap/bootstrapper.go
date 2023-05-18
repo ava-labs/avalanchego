@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -33,7 +34,6 @@ const (
 var _ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 func New(
-	ctx context.Context,
 	config Config,
 	onFinished func(ctx context.Context, lastReqID uint32) error,
 ) (common.BootstrapableEngine, error) {
@@ -57,29 +57,13 @@ func New(
 		return nil, err
 	}
 
-	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAcceptedVts,
-		numDropped:  b.numDroppedVts,
-		manager:     b.Manager,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := b.TxBlocked.SetParser(&txParser{
-		log:         config.Ctx.Log,
-		numAccepted: b.numAcceptedTxs,
-		numDropped:  b.numDroppedTxs,
-		vm:          b.VM,
-	}); err != nil {
-		return nil, err
-	}
-
 	config.Config.Bootstrapable = b
 	b.Bootstrapper = common.NewCommonBootstrapper(config.Config)
 	return b, nil
 }
 
+// Note: To align with the Snowman invariant, it should be guaranteed the VM is
+// not used until after the bootstrapper has been Started.
 type bootstrapper struct {
 	Config
 
@@ -151,19 +135,22 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			)
 			return nil
 		}
-		b.Ctx.Log.Debug("failed to parse requested vertex",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("vtxID", requestedVtxID),
-			zap.Error(err),
-		)
-		b.Ctx.Log.Verbo("failed to parse requested vertex",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("vtxID", requestedVtxID),
-			zap.Binary("vtxBytes", vtxs[0]),
-			zap.Error(err),
-		)
+		if b.Ctx.Log.Enabled(logging.Verbo) {
+			b.Ctx.Log.Verbo("failed to parse requested vertex",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Stringer("vtxID", requestedVtxID),
+				zap.Binary("vtxBytes", vtxs[0]),
+				zap.Error(err),
+			)
+		} else {
+			b.Ctx.Log.Debug("failed to parse requested vertex",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Stringer("vtxID", requestedVtxID),
+				zap.Error(err),
+			)
+		}
 		return b.fetch(ctx, requestedVtxID)
 	}
 
@@ -313,6 +300,24 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
+	}
+
+	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
+		log:         b.Ctx.Log,
+		numAccepted: b.numAcceptedVts,
+		numDropped:  b.numDroppedVts,
+		manager:     b.Manager,
+	}); err != nil {
+		return err
+	}
+
+	if err := b.TxBlocked.SetParser(&txParser{
+		log:         b.Ctx.Log,
+		numAccepted: b.numAcceptedTxs,
+		numDropped:  b.numDroppedTxs,
+		vm:          b.VM,
+	}); err != nil {
+		return err
 	}
 
 	b.Config.SharedCfg.RequestID = startReqID

@@ -3,9 +3,7 @@
 
 package sampler
 
-import (
-	"golang.org/x/exp/maps"
-)
+import "golang.org/x/exp/maps"
 
 type defaultMap map[uint64]uint64
 
