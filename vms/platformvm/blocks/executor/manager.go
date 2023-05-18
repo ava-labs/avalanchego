@@ -31,7 +31,7 @@ func NewManager(
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
-	validatorsSet validators.Manager,
+	validatorManager validators.Manager,
 ) Manager {
 	backend := &backend{
 		Mempool:      mempool,
@@ -50,7 +50,7 @@ func NewManager(
 		acceptor: &acceptor{
 			backend:      backend,
 			metrics:      metrics,
-			validators:   validatorsSet,
+			validators:   validatorManager,
 			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{backend: backend},
