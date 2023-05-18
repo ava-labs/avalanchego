@@ -793,6 +793,11 @@ func (p *peer) handleNewPing(msg *p2p.Ping) {
 			return
 		}
 
+		// Only record uptimes for subnets that we also track
+		if !p.MySubnets.Contains(subnetID) {
+			continue
+		}
+
 		uptime := subnetUptime.GetUptime()
 		if uptime > 100 {
 			p.Log.Debug("dropping ping message with invalid uptime",
@@ -876,6 +881,11 @@ func (p *peer) handlePong(msg *p2p.Pong) {
 			return
 		}
 
+		// Only record uptimes for subnets that we also track
+		if !p.MySubnets.Contains(subnetID) {
+			continue
+		}
+
 		uptime := subnetUptime.Uptime
 		if uptime > 100 {
 			p.Log.Debug("dropping pong message with invalid uptime",
@@ -892,11 +902,9 @@ func (p *peer) handlePong(msg *p2p.Pong) {
 
 // Record that the given peer perceives our uptime for the given [subnetID]
 // to be [uptime].
+// Assumes [uptime] is in the range [0, 100] and [subnetID] is a valid ID
+// of a subnet this peer tracks (MySubnets).
 func (p *peer) observeUptime(subnetID ids.ID, uptime uint32) {
-	// Only record uptimes for subnets that we also track
-	if subnetID != constants.PrimaryNetworkID && !p.MySubnets.Contains(subnetID) {
-		return
-	}
 	p.observedUptimesLock.Lock()
 	p.observedUptimes[subnetID] = uptime // [0, 100] percentage
 	p.observedUptimesLock.Unlock()
