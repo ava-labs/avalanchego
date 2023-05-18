@@ -17,8 +17,8 @@ func TestStatusValid(t *testing.T) {
 	require.NoError(Rejected.Valid())
 	require.NoError(Processing.Valid())
 	require.NoError(Unknown.Valid())
-
-	require.Error(Status(math.MaxInt32).Valid())
+	err := Status(math.MaxInt32).Valid()
+	require.ErrorIs(err, errUnknownStatus)
 }
 
 func TestStatusDecided(t *testing.T) {
@@ -28,7 +28,6 @@ func TestStatusDecided(t *testing.T) {
 	require.True(Rejected.Decided())
 	require.False(Processing.Decided())
 	require.False(Unknown.Decided())
-
 	require.False(Status(math.MaxInt32).Decided())
 }
 
@@ -39,7 +38,6 @@ func TestStatusFetched(t *testing.T) {
 	require.True(Rejected.Fetched())
 	require.True(Processing.Fetched())
 	require.False(Unknown.Fetched())
-
 	require.False(Status(math.MaxInt32).Fetched())
 }
 
@@ -50,6 +48,5 @@ func TestStatusString(t *testing.T) {
 	require.Equal("Rejected", Rejected.String())
 	require.Equal("Processing", Processing.String())
 	require.Equal("Unknown", Unknown.String())
-
 	require.Equal("Invalid status", Status(math.MaxInt32).String())
 }

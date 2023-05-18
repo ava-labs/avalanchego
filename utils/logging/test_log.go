@@ -38,6 +38,10 @@ func (NoLog) Verbo(string, ...zap.Field) {}
 
 func (NoLog) SetLevel(Level) {}
 
+func (NoLog) Enabled(Level) bool {
+	return false
+}
+
 func (NoLog) StopOnPanic() {}
 
 func (NoLog) RecoverAndPanic(f func()) {

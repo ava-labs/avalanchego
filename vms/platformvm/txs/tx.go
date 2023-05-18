@@ -7,17 +7,21 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
+	_ cache.SizedElement = (*Tx)(nil)
+
 	ErrNilSignedTx = errors.New("nil signed tx is not valid")
 
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
@@ -31,7 +35,7 @@ type Tx struct {
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 
-	id    ids.ID
+	TxID  ids.ID `json:"id"`
 	bytes []byte
 }
 
@@ -63,7 +67,7 @@ func (tx *Tx) Initialize(c codec.Manager) error {
 func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 	tx.Unsigned.SetBytes(unsignedBytes)
 	tx.bytes = signedBytes
-	tx.id = hashing.ComputeHash256Array(signedBytes)
+	tx.TxID = hashing.ComputeHash256Array(signedBytes)
 }
 
 // Parse signed tx starting from its byte representation.
@@ -85,12 +89,19 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	return tx, nil
 }
 
+func (tx *Tx) Size() int {
+	if tx == nil {
+		return wrappers.LongLen
+	}
+	return len(tx.bytes) + wrappers.LongLen
+}
+
 func (tx *Tx) Bytes() []byte {
 	return tx.bytes
 }
 
 func (tx *Tx) ID() ids.ID {
-	return tx.id
+	return tx.TxID
 }
 
 // UTXOs returns the UTXOs transaction is producing.
@@ -100,7 +111,7 @@ func (tx *Tx) UTXOs() []*avax.UTXO {
 	for i, out := range outs {
 		utxos[i] = &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID:        tx.id,
+				TxID:        tx.TxID,
 				OutputIndex: uint32(i),
 			},
 			Asset: avax.Asset{ID: out.AssetID()},
@@ -114,7 +125,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilSignedTx
-	case tx.id == ids.Empty:
+	case tx.TxID == ids.Empty:
 		return errSignedTxNotInitialized
 	default:
 		return tx.Unsigned.SyntacticVerify(ctx)

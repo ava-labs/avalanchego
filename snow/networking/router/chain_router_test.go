@@ -36,7 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-const engineType = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+const (
+	engineType         = p2p.EngineType_ENGINE_TYPE_AVALANCHE
+	testThreadPoolSize = 2
+)
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
@@ -89,6 +92,7 @@ func TestShutdown(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -224,6 +228,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -380,6 +385,7 @@ func TestRouterTimeout(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -777,6 +783,8 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	}
 
 	{
+		engineType := p2p.EngineType(100)
+
 		requestID++
 		msg := message.InboundPushQuery(
 			ctx.ChainID,
@@ -784,16 +792,16 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			0,
 			nil,
 			nodeID,
-			100,
+			engineType,
 		)
 
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
-			require.EqualValues(100, msg.EngineType)
+			require.Equal(engineType, msg.EngineType)
 		})
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(0, chainRouter.timedRequests.Len())
+	require.Zero(chainRouter.timedRequests.Len())
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
@@ -848,6 +856,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
@@ -1078,7 +1087,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
 
-	require.Equal(t, 0, chainRouter.timedRequests.Len())
+	require.Zero(t, chainRouter.timedRequests.Len())
 }
 
 func TestValidatorOnlyMessageDrops(t *testing.T) {
@@ -1138,6 +1147,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
@@ -1287,6 +1297,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(requester.NodeID, subnets.Config{}),
@@ -1304,6 +1315,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(responder.NodeID, subnets.Config{}),
@@ -1552,6 +1564,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		vdrs,
 		nil,
 		time.Second,
+		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,

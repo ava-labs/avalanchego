@@ -5,12 +5,15 @@ package sampler
 
 import (
 	"fmt"
-	"math"
 	"testing"
+
+	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -84,8 +87,8 @@ func WeightedWithoutReplacementInitializeOverflowTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1, math.MaxUint64})
-	require.Error(t, err, "should have reported an overflow error")
+	err := s.Initialize([]uint64{1, stdmath.MaxUint64})
+	require.ErrorIs(t, err, math.ErrOverflow)
 }
 
 func WeightedWithoutReplacementOutOfRangeTest(
@@ -96,7 +99,7 @@ func WeightedWithoutReplacementOutOfRangeTest(
 	require.NoError(t, err)
 
 	_, err = s.Sample(2)
-	require.Error(t, err, "should have reported an out of range error")
+	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func WeightedWithoutReplacementEmptyWithoutWeightTest(
@@ -108,7 +111,7 @@ func WeightedWithoutReplacementEmptyWithoutWeightTest(
 
 	indices, err := s.Sample(0)
 	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.Empty(t, indices, "shouldn't have selected any elements")
 }
 
 func WeightedWithoutReplacementEmptyTest(
@@ -120,7 +123,7 @@ func WeightedWithoutReplacementEmptyTest(
 
 	indices, err := s.Sample(0)
 	require.NoError(t, err)
-	require.Len(t, indices, 0, "shouldn't have selected any elements")
+	require.Empty(t, indices, "shouldn't have selected any elements")
 }
 
 func WeightedWithoutReplacementSingletonTest(

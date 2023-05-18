@@ -24,7 +24,7 @@ type Network struct {
 
 func (n *Network) shuffleColors() {
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(n.colors)))
+	s.Initialize(uint64(len(n.colors)))
 	indices, _ := s.Sample(len(n.colors))
 	colors := []*TestBlock(nil)
 	for _, index := range indices {
@@ -105,7 +105,7 @@ func (n *Network) Round() error {
 	running := n.running[runningInd]
 
 	s := sampler.NewUniform()
-	_ = s.Initialize(uint64(len(n.nodes)))
+	s.Initialize(uint64(len(n.nodes)))
 	indices, _ := s.Sample(n.params.K)
 	sampledColors := bag.Bag[ids.ID]{}
 	for _, index := range indices {
