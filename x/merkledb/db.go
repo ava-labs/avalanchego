@@ -516,24 +516,23 @@ func (db *Database) GetChangeProof(
 	})
 
 	// TODO: sync.pool these buffers
-	result.KeyValues = make([]KeyValue, 0, len(changedKeys))
-	result.DeletedKeys = make([][]byte, 0, len(changedKeys))
+	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
 	for _, key := range changedKeys {
 		change := changes.values[key]
 		serializedKey := key.Serialize().Value
 
-		if change.after.IsNothing() {
-			result.DeletedKeys = append(result.DeletedKeys, serializedKey)
-		} else {
-			result.KeyValues = append(result.KeyValues, KeyValue{
-				Key: serializedKey,
-				// create a copy so edits of the []byte don't affect the db
-				Value: slices.Clone(change.after.value),
-			})
-		}
+		result.KeyChanges = append(result.KeyChanges, KeyChange{
+			Key: serializedKey,
+			// create a copy so edits of the []byte don't affect the db
+			Value: Clone(change.after),
+		})
 	}
-	largestKey := result.getLargestKey(end)
+
+	largestKey := end
+	if len(result.KeyChanges) > 0 {
+		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
@@ -1121,20 +1120,18 @@ func (db *Database) prepareBatchView(ops []database.BatchOp) (*trieView, error) 
 // inserted and the key/value pairs in [proof.DeletedKeys] removed.
 // Assumes [db.commitLock] is locked.
 func (db *Database) prepareChangeProofView(proof *ChangeProof) (*trieView, error) {
-	view, err := db.newUntrackedView(len(proof.KeyValues))
+	view, err := db.newUntrackedView(len(proof.KeyChanges))
 	if err != nil {
 		return nil, err
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
 
-	for _, kv := range proof.KeyValues {
-		if err := view.insert(kv.Key, kv.Value); err != nil {
-			return nil, err
-		}
-	}
-
-	for _, keyToDelete := range proof.DeletedKeys {
-		if err := view.remove(keyToDelete); err != nil {
+	for _, kv := range proof.KeyChanges {
+		if kv.Value.IsNothing() {
+			if err := view.remove(kv.Key); err != nil {
+				return nil, err
+			}
+		} else if err := view.insert(kv.Key, kv.Value.value); err != nil {
 			return nil, err
 		}
 	}
