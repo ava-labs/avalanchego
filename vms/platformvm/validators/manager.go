@@ -32,22 +32,13 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator    = errors.New("missing validator")
-	ErrMissingValidatorSet = errors.New("missing validator set")
+	ErrMissingValidator = errors.New("missing validator")
 )
 
-// QueryManager encapsulates the logic that allows the P-chain to provide
-// information about validators active at different heights.
-type QueryManager interface {
-	validators.State
-
-	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool)
-}
-
-// Manager interface adds to QueryManager the ability to blocks IDs
-// to serve GetMinimumHeight
+// Manager adds the ability to introduce newly acceted blocks IDs to the State
+// interface.
 type Manager interface {
-	QueryManager
+	validators.State
 
 	// OnAcceptedBlockID registers the ID of the latest accepted block.
 	// It is used to update the [recentlyAccepted] sliding window.
@@ -131,7 +122,6 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-// GetCurrentHeight returns the height of the last accepted block
 func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
@@ -289,21 +279,6 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
 	}
 	return chain.SubnetID, nil
-}
-
-func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, bool) {
-	validatorSet, exist := m.cfg.Validators.Get(subnetID)
-	if !exist {
-		return nil, false
-	}
-	validators := validatorSet.List()
-
-	validatorIDs := make([]ids.NodeID, len(validators))
-	for i, vdr := range validators {
-		validatorIDs[i] = vdr.NodeID
-	}
-
-	return validatorIDs, true
 }
 
 func (m *manager) OnAcceptedBlockID(blkID ids.ID) {

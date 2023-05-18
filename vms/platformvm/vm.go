@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gorilla/rpc/v2"
@@ -57,12 +58,14 @@ var (
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
+
+	errMissingValidatorSet = errors.New("missing validator set")
 )
 
 type VM struct {
 	config.Config
 	blockbuilder.Builder
-	pvalidators.QueryManager
+	validators.State
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
@@ -140,7 +143,7 @@ func (vm *VM) Initialize(
 	}
 
 	validatorManager := pvalidators.NewManager(vm.Config, vm.state, vm.metrics, &vm.clock)
-	vm.QueryManager = validatorManager
+	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
@@ -264,18 +267,18 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	primaryVdrIDs, exists := vm.GetValidatorIDs(constants.PrimaryNetworkID)
-	if !exists {
-		return pvalidators.ErrMissingValidatorSet
+	primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+	if err != nil {
+		return err
 	}
 	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
 	for subnetID := range vm.TrackedSubnets {
-		vdrIDs, exists := vm.GetValidatorIDs(subnetID)
-		if !exists {
-			return pvalidators.ErrMissingValidatorSet
+		vdrIDs, err := validators.NodeIDs(vm.Validators, subnetID)
+		if err != nil {
+			return err
 		}
 		if err := vm.uptimeManager.StartTracking(vdrIDs, subnetID); err != nil {
 			return err
@@ -311,18 +314,18 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.Get() {
-		primaryVdrIDs, exists := vm.GetValidatorIDs(constants.PrimaryNetworkID)
-		if !exists {
-			return pvalidators.ErrMissingValidatorSet
+		primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+		if err != nil {
+			return err
 		}
 		if err := vm.uptimeManager.StopTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range vm.TrackedSubnets {
-			vdrIDs, exists := vm.GetValidatorIDs(subnetID)
-			if !exists {
-				return pvalidators.ErrMissingValidatorSet
+			vdrIDs, err := validators.NodeIDs(vm.Validators, subnetID)
+			if err != nil {
+				return err
 			}
 			if err := vm.uptimeManager.StopTracking(vdrIDs, subnetID); err != nil {
 				return err
@@ -451,7 +454,7 @@ func (vm *VM) Logger() logging.Logger {
 func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 	vdrSet, exists := vm.Validators.Get(subnetID)
 	if !exists {
-		return 0, pvalidators.ErrMissingValidatorSet
+		return 0, errMissingValidatorSet
 	}
 
 	vdrSetWeight := vdrSet.Weight()
