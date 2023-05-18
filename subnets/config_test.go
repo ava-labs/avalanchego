@@ -9,43 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var validParameters = avalanche.Parameters{
-	Parents:   2,
-	BatchSize: 1,
-	Parameters: snowball.Parameters{
-		K:                     1,
-		Alpha:                 1,
-		BetaVirtuous:          1,
-		BetaRogue:             1,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	},
+var validParameters = snowball.Parameters{
+	K:                     1,
+	Alpha:                 1,
+	BetaVirtuous:          1,
+	BetaRogue:             1,
+	ConcurrentRepolls:     1,
+	OptimalProcessing:     1,
+	MaxOutstandingItems:   1,
+	MaxItemProcessingTime: 1,
 }
 
 func TestValid(t *testing.T) {
 	tests := []struct {
-		name string
-		s    Config
-		err  string
+		name        string
+		s           Config
+		expectedErr error
 	}{
 		{
 			name: "invalid consensus parameters",
 			s: Config{
-				ConsensusParameters: avalanche.Parameters{
-					Parameters: snowball.Parameters{
-						K:     2,
-						Alpha: 1,
-					},
+				ConsensusParameters: snowball.Parameters{
+					K:     2,
+					Alpha: 1,
 				},
 			},
-			err: "consensus parameters are invalid",
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 		{
 			name: "invalid allowed node IDs",
@@ -54,7 +47,7 @@ func TestValid(t *testing.T) {
 				ValidatorOnly:       false,
 				ConsensusParameters: validParameters,
 			},
-			err: errAllowedNodesWhenNotValidatorOnly.Error(),
+			expectedErr: errAllowedNodesWhenNotValidatorOnly,
 		},
 		{
 			name: "valid",
@@ -62,16 +55,13 @@ func TestValid(t *testing.T) {
 				ConsensusParameters: validParameters,
 				ValidatorOnly:       false,
 			},
+			expectedErr: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.s.Valid()
-			if tt.err != "" {
-				require.ErrorContains(t, err, tt.err)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

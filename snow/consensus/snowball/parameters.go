@@ -4,6 +4,7 @@
 package snowball
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -25,6 +26,8 @@ const (
 		` \______  /\_______  /\____|__  /____|` + "\n" +
 		`        \/         \/         \/` + "\n"
 )
+
+var ErrParametersInvalid = errors.New("parameters invalid")
 
 // Parameters required for snowball consensus
 type Parameters struct {
@@ -57,29 +60,29 @@ type Parameters struct {
 func (p Parameters) Verify() error {
 	switch {
 	case p.Alpha <= p.K/2:
-		return fmt.Errorf("k = %d, alpha = %d: fails the condition that: k/2 < alpha", p.K, p.Alpha)
+		return fmt.Errorf("%w: k = %d, alpha = %d: fails the condition that: k/2 < alpha", ErrParametersInvalid, p.K, p.Alpha)
 	case p.K < p.Alpha:
-		return fmt.Errorf("k = %d, alpha = %d: fails the condition that: alpha <= k", p.K, p.Alpha)
+		return fmt.Errorf("%w: k = %d, alpha = %d: fails the condition that: alpha <= k", ErrParametersInvalid, p.K, p.Alpha)
 	case p.BetaVirtuous <= 0:
-		return fmt.Errorf("betaVirtuous = %d: fails the condition that: 0 < betaVirtuous", p.BetaVirtuous)
+		return fmt.Errorf("%w: betaVirtuous = %d: fails the condition that: 0 < betaVirtuous", ErrParametersInvalid, p.BetaVirtuous)
 	case p.BetaRogue == 3 && p.BetaVirtuous == 28:
-		return fmt.Errorf("betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue\n%s", p.BetaVirtuous, p.BetaRogue, errMsg)
+		return fmt.Errorf("%w: betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue\n%s", ErrParametersInvalid, p.BetaVirtuous, p.BetaRogue, errMsg)
 	case p.BetaRogue < p.BetaVirtuous:
-		return fmt.Errorf("betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue", p.BetaVirtuous, p.BetaRogue)
+		return fmt.Errorf("%w: betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue", ErrParametersInvalid, p.BetaVirtuous, p.BetaRogue)
 	case p.ConcurrentRepolls <= 0:
-		return fmt.Errorf("concurrentRepolls = %d: fails the condition that: 0 < concurrentRepolls", p.ConcurrentRepolls)
+		return fmt.Errorf("%w: concurrentRepolls = %d: fails the condition that: 0 < concurrentRepolls", ErrParametersInvalid, p.ConcurrentRepolls)
 	case p.ConcurrentRepolls > p.BetaRogue:
-		return fmt.Errorf("concurrentRepolls = %d, betaRogue = %d: fails the condition that: concurrentRepolls <= betaRogue", p.ConcurrentRepolls, p.BetaRogue)
+		return fmt.Errorf("%w: concurrentRepolls = %d, betaRogue = %d: fails the condition that: concurrentRepolls <= betaRogue", ErrParametersInvalid, p.ConcurrentRepolls, p.BetaRogue)
 	case p.OptimalProcessing <= 0:
-		return fmt.Errorf("optimalProcessing = %d: fails the condition that: 0 < optimalProcessing", p.OptimalProcessing)
+		return fmt.Errorf("%w: optimalProcessing = %d: fails the condition that: 0 < optimalProcessing", ErrParametersInvalid, p.OptimalProcessing)
 	case p.MaxOutstandingItems <= 0:
-		return fmt.Errorf("maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", p.MaxOutstandingItems)
+		return fmt.Errorf("%w: maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", ErrParametersInvalid, p.MaxOutstandingItems)
 	case p.MaxItemProcessingTime <= 0:
-		return fmt.Errorf("maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", p.MaxItemProcessingTime)
+		return fmt.Errorf("%w: maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", ErrParametersInvalid, p.MaxItemProcessingTime)
 	case p.MixedQueryNumPushVdr > p.K:
-		return fmt.Errorf("mixedQueryNumPushVdr (%d) > K (%d)", p.MixedQueryNumPushVdr, p.K)
+		return fmt.Errorf("%w: mixedQueryNumPushVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushVdr, p.K)
 	case p.MixedQueryNumPushNonVdr > p.K:
-		return fmt.Errorf("mixedQueryNumPushNonVdr (%d) > K (%d)", p.MixedQueryNumPushNonVdr, p.K)
+		return fmt.Errorf("%w: mixedQueryNumPushNonVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushNonVdr, p.K)
 	default:
 		return nil
 	}
