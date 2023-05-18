@@ -130,7 +130,7 @@ impl Proof {
         root_hash: [u8; 32],
     ) -> Result<Option<Vec<u8>>, ProofError> {
         let mut chunks = Vec::new();
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         let mut cur_key: &[u8] = &chunks;
         let mut cur_hash = root_hash;
@@ -171,8 +171,14 @@ impl Proof {
         let size = rlp.item_count().unwrap();
         match size {
             EXT_NODE_SIZE => {
-                let cur_key_path: Vec<_> =
-                    to_nibbles(&rlp.at(0).unwrap().as_val::<Vec<u8>>().unwrap()).collect();
+                let cur_key_path: Vec<_> = rlp
+                    .at(0)
+                    .unwrap()
+                    .as_val::<Vec<u8>>()
+                    .unwrap()
+                    .into_iter()
+                    .flat_map(to_nibble_array)
+                    .collect();
                 let (cur_key_path, term) = PartialPath::decode(cur_key_path);
                 let cur_key = cur_key_path.into_inner();
 
@@ -377,7 +383,7 @@ impl Proof {
         let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
 
         let mut chunks = Vec::new();
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         let mut cur_key: &[u8] = &chunks;
         let mut cur_hash = root_hash;
@@ -570,8 +576,15 @@ impl Proof {
         let size = rlp.item_count().unwrap();
         match size {
             EXT_NODE_SIZE => {
-                let cur_key_path: Vec<_> =
-                    to_nibbles(&rlp.at(0).unwrap().as_val::<Vec<u8>>().unwrap()).collect();
+                let cur_key_path: Vec<_> = rlp
+                    .at(0)
+                    .unwrap()
+                    .as_val::<Vec<u8>>()
+                    .unwrap()
+                    .into_iter()
+                    .flat_map(to_nibble_array)
+                    .collect();
+
                 let (cur_key_path, term) = PartialPath::decode(cur_key_path);
                 let cur_key = cur_key_path.into_inner();
 
@@ -695,10 +708,10 @@ fn unset_internal<K: AsRef<[u8]>>(
 ) -> Result<bool, ProofError> {
     // Add the sentinel root
     let mut left_chunks = vec![0];
-    left_chunks.extend(to_nibbles(left.as_ref()));
+    left_chunks.extend(left.as_ref().iter().copied().flat_map(to_nibble_array));
     // Add the sentinel root
     let mut right_chunks = vec![0];
-    right_chunks.extend(to_nibbles(right.as_ref()));
+    right_chunks.extend(right.as_ref().iter().copied().flat_map(to_nibble_array));
     let root = merkle_setup.get_root();
     let merkle = merkle_setup.get_merkle_mut();
     let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;

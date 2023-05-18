@@ -599,15 +599,18 @@ impl Storable for Node {
                 let path_len = buff[0] as u64;
                 cur.read_exact(&mut buff)?;
                 let ptr = u64::from_le_bytes(buff);
-                let nibbles: Vec<_> = to_nibbles(
-                    &mem.get_view(addr + META_SIZE + ext_header_size, path_len)
-                        .ok_or(ShaleError::InvalidCacheView {
-                            offset: addr + META_SIZE + ext_header_size,
-                            size: path_len,
-                        })?
-                        .as_deref(),
-                )
-                .collect();
+
+                let nibbles: Vec<u8> = mem
+                    .get_view(addr + META_SIZE + ext_header_size, path_len)
+                    .ok_or(ShaleError::InvalidCacheView {
+                        offset: addr + META_SIZE + ext_header_size,
+                        size: path_len,
+                    })?
+                    .as_deref()
+                    .into_iter()
+                    .flat_map(to_nibble_array)
+                    .collect();
+
                 let (path, _) = PartialPath::decode(nibbles);
 
                 let mut buff = [0_u8; 1];
@@ -659,8 +662,14 @@ impl Storable for Node {
                         offset: addr + META_SIZE + leaf_header_size,
                         size: path_len + data_len,
                     })?;
-                let nibbles: Vec<_> =
-                    to_nibbles(&remainder.as_deref()[..path_len as usize]).collect();
+
+                let nibbles: Vec<_> = remainder
+                    .as_deref()
+                    .into_iter()
+                    .take(path_len as usize)
+                    .flat_map(to_nibble_array)
+                    .collect();
+
                 let (path, _) = PartialPath::decode(nibbles);
                 let value = Data(remainder.as_deref()[path_len as usize..].to_vec());
                 Ok(Self::new_from_hash(
@@ -1108,7 +1117,7 @@ impl Merkle {
         // TODO: Explain why this always starts with a 0 chunk
         // I think this may have to do with avoiding moving the root
         let mut chunked_key = vec![0];
-        chunked_key.extend(to_nibbles(key.as_ref()));
+        chunked_key.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         let mut next_node = Some(self.get_node(root)?);
         let mut nskip = 0;
@@ -1573,7 +1582,7 @@ impl Merkle {
         root: ObjPtr<Node>,
     ) -> Result<Option<Vec<u8>>, MerkleError> {
         let mut chunks = vec![0];
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         if root.is_null() {
             return Ok(None);
@@ -1697,7 +1706,7 @@ impl Merkle {
         root: ObjPtr<Node>,
     ) -> Result<Option<RefMut>, MerkleError> {
         let mut chunks = vec![0];
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
         let mut parents = Vec::new();
 
         if root.is_null() {
@@ -1772,7 +1781,7 @@ impl Merkle {
         T: ValueTransformer,
     {
         let mut chunks = Vec::new();
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         let mut proofs: HashMap<[u8; HASH_SIZE], Vec<u8>> = HashMap::new();
         if root.is_null() {
@@ -1852,7 +1861,7 @@ impl Merkle {
         root: ObjPtr<Node>,
     ) -> Result<Option<Ref>, MerkleError> {
         let mut chunks = vec![0];
-        chunks.extend(to_nibbles(key.as_ref()));
+        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
         if root.is_null() {
             return Ok(None);
@@ -1987,10 +1996,9 @@ impl ValueTransformer for IdTrans {
     }
 }
 
-// given a set of bytes, return a new iterator that returns a set of
 // nibbles, high bits first, then low bits
-pub fn to_nibbles(bytes: &[u8]) -> impl Iterator<Item = u8> + '_ {
-    bytes.iter().flat_map(|b| [b >> 4, b & 0xf])
+pub fn to_nibble_array(x: u8) -> [u8; 2] {
+    [x >> 4, x & 0b_0000_1111]
 }
 
 // given a set of nibbles, take each pair and convert this back into bytes
@@ -2028,7 +2036,7 @@ mod test {
             (vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6]),
             (vec![0xc0, 0xff], vec![0xc, 0x0, 0xf, 0xf]),
         ] {
-            let n: Vec<_> = to_nibbles(&bytes).collect();
+            let n: Vec<_> = bytes.into_iter().flat_map(to_nibble_array).collect();
             assert_eq!(n, nibbles);
         }
     }
