@@ -88,8 +88,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		_, err := stakersMetadataCodec.Unmarshal(bytes, &tmp)
-		if err != nil {
+		if _, err := stakersMetadataCodec.Unmarshal(bytes, &tmp); err != nil {
 			return err
 		}
 
@@ -98,8 +97,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		_, err := stakersMetadataCodec.Unmarshal(bytes, metadata)
-		if err != nil {
+		if _, err := stakersMetadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
 	}
