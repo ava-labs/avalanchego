@@ -196,6 +196,15 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 				zap.String("resource", "system memory"),
 				zap.Error(getMemoryErr),
 			)
+			machineMemory = &mem.VirtualMemoryStat{}
+		}
+		machineSwap, getSwapErr := mem.SwapMemory()
+		if getSwapErr != nil {
+			m.log.Debug("failed to lookup resource",
+				zap.String("resource", "system swap"),
+				zap.Error(getSwapErr),
+			)
+			machineSwap = &mem.SwapMemoryStat{}
 		}
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
 		if getBytesErr != nil {
@@ -212,7 +221,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		m.writeUsage = oldDiskWeight*m.writeUsage + currentScaledWriteUsage
 
 		if getMemoryErr == nil {
-			m.availableMemoryBytes = machineMemory.Available
+			m.availableMemoryBytes = machineMemory.Available + machineSwap.Free
 		}
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
