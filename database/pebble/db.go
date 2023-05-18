@@ -183,16 +183,14 @@ func (db *Database) Delete(key []byte) error {
 	return updateError(db.db.Delete(key, pebble.NoSync))
 }
 
-// If start and limit are the same based on the compare function in pebble
-// pebble returns error but we like to return nil
 func (db *Database) Compact(start []byte, limit []byte) error {
-	// Compact causes panic if the db has already been closed
+	// Pebble Compact causes panic if the db has already been closed.
+	// Avalanche database just return error instead.
 	if db.closed.Get() {
 		return database.ErrClosed
 	}
 
-	err := updateError(db.db.Compact(start, limit, true))
-	if err != nil && bytes.Equal(start, limit) {
+	if bytes.Equal(start, limit) && !bytes.Equal(start, nil) {
 		// The default compare function of pebble is bytes.Compare.
 		// Use this default compare function since we don't setup
 		// the compare function when we create pebble db.
@@ -202,13 +200,29 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		// We use bytes.Equal instead of bytes.Compare
 		// because golangci_lint recommends
 
-		// Don't return error if it is caused
-		// by the same of start and limit
-		// Do nothing just ignore the error
-		// since there is no need to compact
-		err = nil
+		// pebble return error if start and limit are the same,
+		// even if both are nil.
+		// Do nothing just ignore the error if start and limt are the same
+		// and not nil since there is no need to compact and avalanche db
+		// expects a nil return.
+		return nil
 	}
-	return err
+
+	if limit == nil {
+		// A nil limit is treated as a key after all keys in avalanche DB.
+		// But pebble treats a nil, no matter start or limit, as a key before
+		// all keys in the DB
+		it := db.db.NewIter(&pebble.IterOptions{})
+		if it.Last() {
+			if lastkey := it.Key(); lastkey != nil {
+				return updateError(db.db.Compact(start, lastkey, true))
+			}
+		}
+	} else {
+		return updateError(db.db.Compact(start, limit, true))
+	}
+
+	return database.ErrNotFoundLastKey
 }
 
 // batch is a wrapper around a pebbleDB batch to contain sizes.
