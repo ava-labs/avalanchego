@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -96,7 +97,7 @@ func (b *UniqueBag[T]) Bag(threshold int) Bag[T] {
 func (b *UniqueBag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("UniqueBag[%T]: (Size = %d)", *new(T), len(*b)))
+	sb.WriteString(fmt.Sprintf("UniqueBag[%T]: (Size = %d)", utils.Zero[T](), len(*b)))
 	for key, set := range *b {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %s", prefix, key, set))
 	}

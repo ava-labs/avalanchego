@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -157,7 +158,7 @@ func (b *Bag[T]) Remove(elt T) {
 func (b *Bag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("Bag[%T]: (Size = %d)", *new(T), b.Len()))
+	sb.WriteString(fmt.Sprintf("Bag[%T]: (Size = %d)", utils.Zero[T](), b.Len()))
 	for elt, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %d", prefix, elt, count))
 	}
