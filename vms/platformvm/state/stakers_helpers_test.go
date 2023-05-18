@@ -31,10 +31,9 @@ import (
 var (
 	_ Versions = (*versionsHolder)(nil)
 
-	testNetworkID = uint32(10) // To be used in tests
-	xChainID      = ids.Empty.Prefix(0)
-	cChainID      = ids.Empty.Prefix(1)
-	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
+	xChainID    = ids.Empty.Prefix(0)
+	cChainID    = ids.Empty.Prefix(1)
+	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -61,7 +60,7 @@ func buildChainState() (State, error) {
 	cfg := defaultConfig()
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = testNetworkID
+	ctx.NetworkID = constants.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
@@ -115,7 +114,7 @@ func defaultConfig() *config.Config {
 
 func buildGenesisTest(ctx *snow.Context) ([]byte, error) {
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   ctx.AVAXAssetID,
 		UTXOs:         nil, // no UTXOs in this genesis. Not relevant to package tests.
 		Validators:    nil, // no validators in this genesis. Tests will handle them.
