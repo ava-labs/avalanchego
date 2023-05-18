@@ -878,19 +878,22 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 		s.subnet,
 	)
 	if sentTo.Len() == 0 {
-		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", message.PutOp),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Uint32("requestID", requestID),
-		)
-		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", message.PutOp),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Uint32("requestID", requestID),
-			zap.Binary("container", container),
-		)
+		if s.ctx.Log.Enabled(logging.Verbo) {
+			s.ctx.Log.Verbo("failed to send message",
+				zap.Stringer("messageOp", message.PutOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+				zap.Binary("container", container),
+			)
+		} else {
+			s.ctx.Log.Debug("failed to send message",
+				zap.Stringer("messageOp", message.PutOp),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("chainID", s.ctx.ChainID),
+				zap.Uint32("requestID", requestID),
+			)
+		}
 	}
 }
 
