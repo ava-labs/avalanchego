@@ -707,7 +707,13 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(msg *p2p.Ping) {
-	if len(msg.GetSubnetUptimes()) > 0 {
+	// if GetUptime is not 0 then this is a guaranteed new ping message
+	// It can be 0 in both cases: 1) old ping message
+	// 2) new ping message and we're not a validator (or an actual 0 uptime)
+	// In both cases we should handle it as an old ping message since
+	// it is backwards compatible
+	// TODO: remove this in the future
+	if msg.GetUptime() != 0 {
 		p.handleNewPing(msg)
 	} else {
 		p.handleOldPing(msg)
@@ -716,8 +722,6 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 
 func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 	idList := p.trackedSubnets.List()
-	idList = append(idList, constants.PrimaryNetworkID)
-
 	subnetUptimes := make([]*p2p.SubnetUptime, 0, len(idList))
 
 	for _, subnetID := range idList {
@@ -728,12 +732,7 @@ func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 				zap.Stringer("subnetID", subnetID),
 				zap.Error(err),
 			)
-			// Make sure we always include the primary network ID
-			// in the ping message.
-			if subnetID != constants.PrimaryNetworkID {
-				continue
-			}
-			subnetUptime = 0
+			continue
 		}
 
 		copyID := subnetID
@@ -743,7 +742,21 @@ func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 		})
 	}
 
-	msg, err := p.MessageCreator.Ping(subnetUptimes)
+	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
+		p.id,
+		constants.PrimaryNetworkID,
+	)
+	if err != nil {
+		p.Log.Debug("failed to get peer primary uptime percentage",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+			zap.Error(err),
+		)
+		primaryUptime = 0
+	}
+	primaryUptimePercent := uint32(primaryUptime * 100)
+
+	msg, err := p.MessageCreator.Ping(primaryUptimePercent, subnetUptimes)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PingOp),
@@ -757,6 +770,18 @@ func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 }
 
 func (p *peer) handleNewPing(msg *p2p.Ping) {
+	// handle primary network uptime
+	primaryUptime := msg.GetUptime()
+	if primaryUptime > 100 {
+		p.Log.Debug("dropping pong message with invalid uptime",
+			zap.Stringer("nodeID", p.id),
+			zap.Uint32("uptime", msg.Uptime),
+		)
+		p.StartClose()
+		return
+	}
+	p.observeUptime(constants.PrimaryNetworkID, primaryUptime)
+
 	for _, subnetUptime := range msg.GetSubnetUptimes() {
 		subnetID, err := ids.ToID(subnetUptime.GetSubnetId())
 		if err != nil {
@@ -868,6 +893,10 @@ func (p *peer) handlePong(msg *p2p.Pong) {
 // Record that the given peer perceives our uptime for the given [subnetID]
 // to be [uptime].
 func (p *peer) observeUptime(subnetID ids.ID, uptime uint32) {
+	// Only record uptimes for subnets that we also track
+	if subnetID != constants.PrimaryNetworkID && !p.MySubnets.Contains(subnetID) {
+		return
+	}
 	p.observedUptimesLock.Lock()
 	p.observedUptimes[subnetID] = uptime // [0, 100] percentage
 	p.observedUptimesLock.Unlock()

@@ -37,7 +37,9 @@ type OutboundMsgBuilder interface {
 		peerAcks []*p2p.PeerAck,
 	) (OutboundMessage, error)
 
-	Ping(subnetUptimes []*p2p.SubnetUptime,
+	Ping(
+		primaryUptime uint32,
+		subnetUptimes []*p2p.SubnetUptime,
 	) (OutboundMessage, error)
 
 	// Deprecated: Use Ping instead.
@@ -185,12 +187,14 @@ func newOutboundBuilder(compressionType compression.Type, builder *msgBuilder) O
 }
 
 func (b *outMsgBuilder) Ping(
+	primaryUptime uint32,
 	subnetUptimes []*p2p.SubnetUptime,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Ping{
 				Ping: &p2p.Ping{
+					Uptime:        primaryUptime,
 					SubnetUptimes: subnetUptimes,
 				},
 			},
