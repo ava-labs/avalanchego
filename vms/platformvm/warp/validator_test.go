@@ -91,9 +91,8 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			},
 			expectedVdrs: []*Validator{
 				{
-					PublicKey:      testVdrs[0].vdr.PublicKey,
-					PublicKeyBytes: testVdrs[0].vdr.PublicKeyBytes,
-					Weight:         testVdrs[0].vdr.Weight * 2,
+					PublicKey: testVdrs[0].vdr.PublicKey,
+					Weight:    testVdrs[0].vdr.Weight * 2,
 					NodeIDs: []ids.NodeID{
 						testVdrs[0].nodeID,
 						testVdrs[2].nodeID,
@@ -150,10 +149,14 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Len(vdrs, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
-				expectedPKBytes := bls.PublicKeyToBytes(expectedVdr.PublicKey)
-				gotPKBytes := bls.PublicKeyToBytes(gotVdr.PublicKey)
+				expectedPK, err := expectedVdr.PublicKey.Key()
+				require.NoError(err)
+				expectedPKBytes := bls.PublicKeyToBytes(expectedPK)
+				gotPK, err := gotVdr.PublicKey.Key()
+				require.NoError(err)
+				gotPKBytes := bls.PublicKeyToBytes(gotPK)
 				require.Equal(expectedPKBytes, gotPKBytes)
-				require.Equal(expectedVdr.PublicKeyBytes, gotVdr.PublicKeyBytes)
+				require.Equal(expectedVdr.PublicKey.Bytes(), gotVdr.PublicKey.Bytes())
 				require.Equal(expectedVdr.Weight, gotVdr.Weight)
 				require.ElementsMatch(expectedVdr.NodeIDs, gotVdr.NodeIDs)
 			}
@@ -166,18 +169,16 @@ func TestFilterValidators(t *testing.T) {
 	require.NoError(t, err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
-		PublicKey:      pk0,
-		PublicKeyBytes: pk0.Serialize(),
-		Weight:         1,
+		PublicKey: validators.NewPublicKey(pk0),
+		Weight:    1,
 	}
 
 	sk1, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
-		PublicKey:      pk1,
-		PublicKeyBytes: pk1.Serialize(),
-		Weight:         2,
+		PublicKey: validators.NewPublicKey(pk1),
+		Weight:    2,
 	}
 
 	type test struct {
@@ -317,8 +318,10 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 		require.NoError(b, err)
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: blsPublicKey,
+			NodeID: nodeID,
+			// assumes that the grpc client caches public keys to avoid the
+			// re-serialization overhead
+			PublicKey: validators.NewPublicKeyFromBytes(blsPublicKey.Serialize()),
 			Weight:    20,
 		})
 	}

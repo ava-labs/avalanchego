@@ -526,7 +526,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 		}
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
-			PublicKey: primaryVdr.PublicKey,
+			PublicKey: validators.NewPublicKey(primaryVdr.PublicKey),
 			Weight:    vdr.Weight,
 		}
 	}
@@ -584,7 +584,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 			if vdr, ok := vdrSet[nodeID]; ok {
 				// The validator's public key was removed at this block, so it
 				// was in the validator set before.
-				vdr.PublicKey = pk
+				vdr.PublicKey = validators.NewPublicKey(pk)
 			}
 		}
 	}

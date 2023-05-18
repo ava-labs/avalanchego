@@ -27,14 +27,13 @@ var (
 )
 
 type Validator struct {
-	PublicKey      *bls.PublicKey
-	PublicKeyBytes []byte
-	Weight         uint64
-	NodeIDs        []ids.NodeID
+	PublicKey *validators.PublicKey
+	Weight    uint64
+	NodeIDs   []ids.NodeID
 }
 
 func (v *Validator) Less(o *Validator) bool {
-	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes) < 0
+	return bytes.Compare(v.PublicKey.Bytes(), o.PublicKey.Bytes()) < 0
 }
 
 // GetCanonicalValidatorSet returns the validator set of [subnetID] at
@@ -66,12 +65,11 @@ func GetCanonicalValidatorSet(
 			continue
 		}
 
-		pkBytes := vdr.PublicKey.Serialize()
+		pkBytes := vdr.PublicKey.Bytes()
 		uniqueVdr, ok := vdrs[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Validator{
-				PublicKey:      vdr.PublicKey,
-				PublicKeyBytes: pkBytes,
+				PublicKey: vdr.PublicKey,
 			}
 			vdrs[string(pkBytes)] = uniqueVdr
 		}
@@ -136,7 +134,11 @@ func SumWeight(vdrs []*Validator) (uint64, error) {
 func AggregatePublicKeys(vdrs []*Validator) (*bls.PublicKey, error) {
 	pks := make([]*bls.PublicKey, len(vdrs))
 	for i, vdr := range vdrs {
-		pks[i] = vdr.PublicKey
+		pk, err := vdr.PublicKey.Key()
+		if err != nil {
+			return nil, err
+		}
+		pks[i] = pk
 	}
 	return bls.AggregatePublicKeys(pks)
 }
