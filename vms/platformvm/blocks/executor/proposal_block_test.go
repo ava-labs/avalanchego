@@ -565,7 +565,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, continuousStakingFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -713,7 +713,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -854,7 +854,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, continuousStakingFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
