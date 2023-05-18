@@ -349,9 +349,9 @@ func defaultClock(postFork bool) *mockable.Clock {
 		// 1 second after latest fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(now)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {
