@@ -3001,11 +3001,11 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
-	// Now we are expecting a Chits message, and we receive it for [blk3] instead of [blk1].
+	// Now we are expecting a Chits message and we receive it for [blk3].
 	// This will cause the node to again request [blk3].
 	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk3.ID()}, nil))
 
-	// Drop the re-request for [blk3] to cause the poll to termindate. The votes
+	// Drop the re-request for [blk3] to cause the poll to terminate. The votes
 	// should be bubbled through [blk3] despite the fact that it hasn't been
 	// issued.
 	require.NoError(te.GetFailed(context.Background(), *reqVdr, *sendReqID))
