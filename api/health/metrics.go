@@ -3,9 +3,7 @@
 
 package health
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-)
+import "github.com/prometheus/client_golang/prometheus"
 
 type metrics struct {
 	// failingChecks keeps track of the number of check failing

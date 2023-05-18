@@ -67,6 +67,8 @@ linters-settings:
     forbid:
       - 'require\.Error$(# ErrorIs should be used instead)?'
       - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
+      - 'require\.EqualValues$(# Equal should be used instead)?'
+      - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
     exclude_godoc_examples: false
   # https://golangci-lint.run/usage/linters#gosec
   gosec:

@@ -241,7 +241,7 @@ type manager struct {
 	unblockChainCreatorCh  chan struct{}
 	chainCreatorShutdownCh chan struct{}
 
-	subnetsLock sync.Mutex
+	subnetsLock sync.RWMutex
 	// Key: Subnet's ID
 	// Value: Subnet description
 	subnets map[ids.ID]subnets.Subnet
@@ -322,9 +322,9 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	m.subnetsLock.Lock()
+	m.subnetsLock.RLock()
 	sb := m.subnets[chainParams.SubnetID]
-	m.subnetsLock.Unlock()
+	m.subnetsLock.RUnlock()
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -629,10 +629,6 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
-
 	// Passes messages from the avalanche engines to the network
 	avalancheMessageSender, err := sender.New(
 		ctx,
@@ -728,6 +724,10 @@ func (m *manager) createAvalancheChain(
 	}
 
 	ctx.Context.Metrics = avalancheRegisterer
+
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// The only difference between using avalancheMessageSender and
 	// snowmanMessageSender here is where the metrics will be placed. Because we
@@ -885,7 +885,6 @@ func (m *manager) createAvalancheChain(
 		VM:            vmWrappingProposerVM,
 	}
 	snowmanBootstrapper, err := smbootstrap.New(
-		context.TODO(),
 		bootstrapCfg,
 		snowmanEngine.Start,
 	)
@@ -939,7 +938,6 @@ func (m *manager) createAvalancheChain(
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
-		context.TODO(),
 		avalancheBootstrapperConfig,
 		snowmanBootstrapper.Start,
 	)
@@ -1010,10 +1008,6 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, err
 	}
-
-	// The channel through which a VM may send messages to the consensus engine
-	// VM uses this channel to notify engine that a block is ready to be made
-	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Passes messages from the consensus engine to the network
 	messageSender, err := sender.New(
@@ -1128,6 +1122,10 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
+
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1223,7 +1221,6 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:  bootstrapFunc,
 	}
 	bootstrapper, err := smbootstrap.New(
-		context.TODO(),
 		bootstrapCfg,
 		engine.Start,
 	)
@@ -1288,8 +1285,8 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 }
 
 func (m *manager) subnetsNotBootstrapped() []ids.ID {
-	m.subnetsLock.Lock()
-	defer m.subnetsLock.Unlock()
+	m.subnetsLock.RLock()
+	defer m.subnetsLock.RUnlock()
 
 	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
 	for subnetID, subnet := range m.subnets {
@@ -1326,8 +1323,8 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 		return errNoPlatformSubnetConfig
 	}
 
-	m.subnetsLock.Lock()
 	sb := subnets.New(m.NodeID, sbConfig)
+	m.subnetsLock.Lock()
 	m.subnets[platformParams.SubnetID] = sb
 	sb.AddChain(platformParams.ID)
 	m.subnetsLock.Unlock()
