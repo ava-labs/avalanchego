@@ -3,9 +3,7 @@
 
 package common
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // TODO: Consider renaming Message to, say, VMMessage
 
@@ -21,9 +19,6 @@ const (
 	// StateSyncDone notifies the state syncer engine that the VM has finishing
 	// syncing the requested state summary.
 	StateSyncDone
-
-	// StopVertex notifies a consensus that it has a pending stop vertex
-	StopVertex
 )
 
 func (msg Message) String() string {
@@ -32,8 +27,6 @@ func (msg Message) String() string {
 		return "Pending Transactions"
 	case StateSyncDone:
 		return "State Sync Done"
-	case StopVertex:
-		return "Pending Stop Vertex"
 	default:
 		return fmt.Sprintf("Unknown Message: %d", msg)
 	}

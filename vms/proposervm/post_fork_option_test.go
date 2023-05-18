@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,6 +37,8 @@ func (tob TestOptionsBlock) Options(context.Context) ([2]snowman.Block, error) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -116,17 +120,13 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	}
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
-	if _, ok := opts[0].(*postForkOption); !ok {
-		t.Fatal("unexpected option type")
-	}
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them
 	if err := opts[0].Verify(context.Background()); err != nil {
@@ -159,9 +159,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not build on top of option")
 	}
-	if _, ok := proChild.(*postForkBlock); !ok {
-		t.Fatal("unexpected block type")
-	}
+	require.IsType(&postForkBlock{}, proChild)
 	if err := proChild.Verify(context.Background()); err != nil {
 		t.Fatal("block built on option does not verify")
 	}
@@ -169,6 +167,8 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 // ProposerBlock.Accept tests section
 func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
+	require := require.New(t)
+
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -253,17 +253,13 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	}
 
 	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
-	if _, ok := opts[0].(*postForkOption); !ok {
-		t.Fatal("unexpected option type")
-	}
+	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
 	if err := opts[0].Verify(context.Background()); err != nil {
@@ -287,7 +283,8 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 }
 
 func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
-	// setup
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -379,10 +376,8 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	}
 
 	// accept one of the options
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkOracleBlk := parentBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
@@ -407,7 +402,8 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 
 // ProposerBlock.Reject tests section
 func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
-	// setup
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
@@ -485,10 +481,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	if err := builtBlk.Reject(context.Background()); err != nil {
 		t.Fatal("could not reject block")
 	}
-	proBlk, ok := builtBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("built block has not expected type")
-	}
+	require.IsType(&postForkBlock{}, builtBlk)
+	proBlk := builtBlk.(*postForkBlock)
 
 	if proBlk.Status() != choices.Rejected {
 		t.Fatal("block rejection did not set state properly")
@@ -499,10 +493,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	}
 
 	// reject an option
-	postForkOracleBlk, ok := builtBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, builtBlk)
+	postForkOracleBlk := builtBlk.(*postForkBlock)
 	opts, err := postForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
@@ -511,10 +503,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	if err := opts[0].Reject(context.Background()); err != nil {
 		t.Fatal("could not accept option")
 	}
-	proOpt, ok := opts[0].(*postForkOption)
-	if !ok {
-		t.Fatal("built block has not expected type")
-	}
+	require.IsType(&postForkOption{}, opts[0])
+	proOpt := opts[0].(*postForkOption)
 
 	if proOpt.Status() != choices.Rejected {
 		t.Fatal("block rejection did not set state properly")
@@ -526,6 +516,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
+	require := require.New(t)
+
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -587,10 +579,8 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	postForkBlk, ok := parentBlk.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, parentBlk)
+	postForkBlk := parentBlk.(*postForkBlock)
 	_, err = postForkBlk.Options(context.Background())
 	if err != snowman.ErrNotOracle {
 		t.Fatal("should have reported that the block isn't an oracle block")

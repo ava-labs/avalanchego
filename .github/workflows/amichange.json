@@ -12,7 +12,7 @@
             "AccessRoleArn": "",
             "UserName": "ubuntu",
             "OperatingSystemName": "UBUNTU",
-            "OperatingSystemVersion": "Ubuntu 20.04"
+            "OperatingSystemVersion": "Ubuntu 22.04"
           },
           "UsageInstructions": "Connect via SSH and you can make local calls to port 9650",
           "RecommendedInstanceType": "c5.2xlarge",
