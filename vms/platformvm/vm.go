@@ -139,8 +139,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	queryManager := pvalidators.NewManager(vm.Config, vm.state, vm.metrics, &vm.clock)
-	vm.QueryManager = queryManager
+	validatorManager := pvalidators.NewManager(vm.Config, vm.state, vm.metrics, &vm.clock)
+	vm.QueryManager = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state)
@@ -179,7 +179,7 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
-		queryManager,
+		validatorManager,
 	)
 	vm.Builder = blockbuilder.New(
 		mempool,
