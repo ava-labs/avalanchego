@@ -141,8 +141,6 @@ func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-// GetValidatorSet returns the validator set at the specified height for the
-// provided subnetID.
 func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache, exists := m.caches[subnetID]
 	if !exists {
@@ -273,7 +271,6 @@ func (m *manager) applyValidatorDiffs(
 	return nil
 }
 
-// GetSubnetID returns subnetID of the specified chainID
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
