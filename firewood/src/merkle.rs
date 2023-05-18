@@ -211,28 +211,27 @@ impl BranchNode {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
                     if c_ref.get_eth_rlp_long::<T>(store) {
-                        let s = stream.append(&&(*c_ref.get_root_hash::<T>(store))[..]);
+                        stream.append(&&(*c_ref.get_root_hash::<T>(store))[..]);
                         if c_ref.lazy_dirty.get() {
                             c_ref.write(|_| {}).unwrap();
                             c_ref.lazy_dirty.set(false)
                         }
-                        s
                     } else {
                         let c_rlp = &c_ref.get_eth_rlp::<T>(store);
-                        stream.append_raw(c_rlp, 1)
+                        stream.append_raw(c_rlp, 1);
                     }
                 }
                 None => {
                     // Check if there is already a calculated rlp for the child, which
                     // can happen when manually constructing a trie from proof.
                     if self.chd_eth_rlp[i].is_none() {
-                        stream.append_empty_data()
+                        stream.append_empty_data();
                     } else {
                         let v = self.chd_eth_rlp[i].clone().unwrap();
                         if v.len() == HASH_SIZE {
-                            stream.append(&v)
+                            stream.append(&v);
                         } else {
-                            stream.append_raw(&v, 1)
+                            stream.append_raw(&v, 1);
                         }
                     }
                 }
