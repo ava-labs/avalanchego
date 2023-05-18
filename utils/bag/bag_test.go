@@ -17,19 +17,19 @@ func TestBagAdd(t *testing.T) {
 
 	bag := Bag[int]{}
 
-	require.Equal(0, bag.Count(elt0))
-	require.Equal(0, bag.Count(elt1))
-	require.Equal(0, bag.Len())
-	require.Len(bag.List(), 0)
+	require.Zero(bag.Count(elt0))
+	require.Zero(bag.Count(elt1))
+	require.Zero(bag.Len())
+	require.Empty(bag.List())
 	mode, freq := bag.Mode()
 	require.Equal(elt0, mode)
-	require.Equal(0, freq)
-	require.Len(bag.Threshold(), 0)
+	require.Zero(freq)
+	require.Empty(bag.Threshold())
 
 	bag.Add(elt0)
 
 	require.Equal(1, bag.Count(elt0))
-	require.Equal(0, bag.Count(elt1))
+	require.Zero(bag.Count(elt1))
 	require.Equal(1, bag.Len())
 	require.Len(bag.List(), 1)
 	mode, freq = bag.Mode()
@@ -40,7 +40,7 @@ func TestBagAdd(t *testing.T) {
 	bag.Add(elt0)
 
 	require.Equal(2, bag.Count(elt0))
-	require.Equal(0, bag.Count(elt1))
+	require.Zero(bag.Count(elt1))
 	require.Equal(2, bag.Len())
 	require.Len(bag.List(), 1)
 	mode, freq = bag.Mode()
@@ -113,7 +113,7 @@ func TestBagFilter(t *testing.T) {
 	even := bag.Filter(filterFunc)
 
 	require.Equal(1, even.Count(elt0))
-	require.Equal(0, even.Count(elt1))
+	require.Zero(even.Count(elt1))
 	require.Equal(5, even.Count(elt2))
 }
 
@@ -138,11 +138,11 @@ func TestBagSplit(t *testing.T) {
 	odds := bags[1]
 
 	require.Equal(1, evens.Count(elt0))
-	require.Equal(0, evens.Count(elt1))
+	require.Zero(evens.Count(elt1))
 	require.Equal(5, evens.Count(elt2))
-	require.Equal(0, odds.Count(elt0))
+	require.Zero(odds.Count(elt0))
 	require.Equal(3, odds.Count(elt1))
-	require.Equal(0, odds.Count(elt2))
+	require.Zero(odds.Count(elt2))
 }
 
 func TestBagString(t *testing.T) {
@@ -168,7 +168,7 @@ func TestBagRemove(t *testing.T) {
 	bag := Bag[int]{}
 
 	bag.Remove(elt0)
-	require.Equal(0, bag.Len())
+	require.Zero(bag.Len())
 
 	bag.AddCount(elt0, 3)
 	bag.AddCount(elt1, 2)
@@ -181,7 +181,7 @@ func TestBagRemove(t *testing.T) {
 
 	bag.Remove(elt0)
 
-	require.Equal(0, bag.Count(elt0))
+	require.Zero(bag.Count(elt0))
 	require.Equal(2, bag.Count(elt1))
 	require.Equal(1, bag.Count(elt2))
 	require.Equal(3, bag.Len())
@@ -191,8 +191,8 @@ func TestBagRemove(t *testing.T) {
 	require.Equal(2, freq)
 
 	bag.Remove(elt1)
-	require.Equal(0, bag.Count(elt0))
-	require.Equal(0, bag.Count(elt1))
+	require.Zero(bag.Count(elt0))
+	require.Zero(bag.Count(elt1))
 	require.Equal(1, bag.Count(elt2))
 	require.Equal(1, bag.Len())
 	require.Len(bag.counts, 1)

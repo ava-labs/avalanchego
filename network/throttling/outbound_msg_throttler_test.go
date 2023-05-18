@@ -57,7 +57,7 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	require.True(acquired)
 	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
 	require.Equal(uint64(1), throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
@@ -65,8 +65,8 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	throttlerIntf.Release(msg, vdr1ID)
 	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize+1)
@@ -142,13 +142,13 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	throttlerIntf.Release(msg, vdr2ID)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr2ID])
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Zero(throttler.remainingAtLargeBytes)
 
 	// Release all of vdr1's messages
 	msg = testMsgWithSize(ctrl, config.VdrAllocSize/2-1)
 	throttlerIntf.Release(msg, vdr1ID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	require.Equal(config.AtLargeAllocSize/2-1, throttler.remainingAtLargeBytes)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
@@ -156,10 +156,10 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	// Release nonVdr's messages
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
 	throttlerIntf.Release(msg, nonVdrID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[nonVdrID])
 }
 
