@@ -73,10 +73,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-const (
-	testNetworkID        = 10 // To be used in tests
-	defaultWeight uint64 = 10000
-)
+const defaultWeight uint64 = 10000
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -138,7 +135,7 @@ func defaultContext(t *testing.T) *snow.Context {
 	require := require.New(t)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = testNetworkID
+	ctx.NetworkID = constants.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
@@ -176,10 +173,9 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(keys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
@@ -190,7 +186,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
@@ -212,7 +208,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -244,10 +240,9 @@ func BuildGenesisTest(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 	genesisUTXOs := make([]api.UTXO, len(keys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 
 		genesisUTXOs[i] = api.UTXO{
@@ -259,7 +254,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		require.NoError(err)
 
 		genesisValidators[i] = api.PermissionlessValidator{
@@ -281,7 +276,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -511,8 +506,7 @@ func TestGenesis(t *testing.T) {
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
 			id := keys[0].PublicKey().Address()
-			hrp := constants.NetworkIDToHRP[testNetworkID]
-			addr, err := address.FormatBech32(hrp, id.Bytes())
+			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
 			require.Equal(utxo.Address, addr)
