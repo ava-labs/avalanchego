@@ -42,7 +42,7 @@ import (
 
 const (
 	blockCacheSize               = 64 * units.MiB
-	txCacheSize                  = 1 * units.GiB
+	txCacheSize                  = 128 * units.MiB
 	transformedSubnetTxCacheSize = 4 * units.MiB
 
 	validatorDiffsCacheSize = 2048
