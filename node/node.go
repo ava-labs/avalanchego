@@ -261,9 +261,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.SybilProtectionEnabled {
-		// Sybil protection is disabled so we don't have a txID that added us as a
-		// validator. Because each validator needs a txID associated with it, we
-		// hack one together by just padding our nodeID with zeroes.
+		// Sybil protection is disabled so we don't have a txID that added us as
+		// a validator. Because each validator needs a txID associated with it,
+		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
@@ -764,9 +764,9 @@ func (n *Node) initVMs() error {
 
 	vdrs := n.vdrs
 
-	// If sybil protection is disabled, ignore updates to Subnets' validator sets
-	// Instead of updating node's validator manager, platform chain makes changes
-	// to its own local validator manager (which isn't used for sampling)
+	// If sybil protection is disabled, we provide the P-chain its own local
+	// validator manager that will not be used by the rest of the node. This
+	// allows the node's validator sets to be determined by network connections.
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 		primaryVdrs := validators.NewSet()
