@@ -26,7 +26,7 @@ func TestNewLedgerKeychain(t *testing.T) {
 	// user request invalid number of addresses to derive
 	ledger := NewMockLedger(ctrl)
 	_, err := NewLedgerKeychain(ledger, 0)
-	require.Equal(err, ErrInvalidNumAddrsToDerive)
+	require.ErrorIs(err, ErrInvalidNumAddrsToDerive)
 
 	// ledger does not return expected number of derived addresses
 	ledger = NewMockLedger(ctrl)
@@ -38,7 +38,7 @@ func TestNewLedgerKeychain(t *testing.T) {
 	ledger = NewMockLedger(ctrl)
 	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr}, errTest).Times(1)
 	_, err = NewLedgerKeychain(ledger, 1)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path
 	ledger = NewMockLedger(ctrl)
@@ -160,7 +160,7 @@ func TestLedgerSigner_SignHash(t *testing.T) {
 	require.True(b)
 
 	_, err = s.SignHash(toSign)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path 1 addr
 	ledger = NewMockLedger(ctrl)
@@ -218,7 +218,7 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	// user request invalid number of indices
 	ledger := NewMockLedger(ctrl)
 	_, err := NewLedgerKeychainFromIndices(ledger, []uint32{})
-	require.Equal(err, ErrInvalidIndicesLength)
+	require.ErrorIs(err, ErrInvalidIndicesLength)
 
 	// ledger does not return expected number of derived addresses
 	ledger = NewMockLedger(ctrl)
@@ -230,7 +230,7 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	ledger = NewMockLedger(ctrl)
 	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr}, errTest).Times(1)
 	_, err = NewLedgerKeychainFromIndices(ledger, []uint32{0})
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path
 	ledger = NewMockLedger(ctrl)
@@ -382,7 +382,7 @@ func TestLedgerSignerFromIndices_SignHash(t *testing.T) {
 	require.True(b)
 
 	_, err = s.SignHash(toSign)
-	require.Equal(err, errTest)
+	require.ErrorIs(err, errTest)
 
 	// good path 1 addr
 	ledger = NewMockLedger(ctrl)

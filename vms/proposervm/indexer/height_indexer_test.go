@@ -177,7 +177,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	require.True(loadedForkHeight == forkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		require.Error(err, database.ErrNotFound)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 	for height := forkHeight; height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
