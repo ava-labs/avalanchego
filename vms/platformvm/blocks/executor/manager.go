@@ -6,12 +6,12 @@ package executor
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 var _ Manager = (*manager)(nil)
@@ -31,7 +31,7 @@ func NewManager(
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
-	recentlyAccepted window.Window[ids.ID],
+	validatorManager validators.Manager,
 ) Manager {
 	backend := &backend{
 		Mempool:      mempool,
@@ -48,10 +48,10 @@ func NewManager(
 			txExecutorBackend: txExecutorBackend,
 		},
 		acceptor: &acceptor{
-			backend:          backend,
-			metrics:          metrics,
-			recentlyAccepted: recentlyAccepted,
-			bootstrapped:     txExecutorBackend.Bootstrapped,
+			backend:      backend,
+			metrics:      metrics,
+			validators:   validatorManager,
+			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{backend: backend},
 	}
