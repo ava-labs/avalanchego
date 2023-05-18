@@ -42,8 +42,7 @@ func awaitHealthy(t *testing.T, r Reporter, healthy bool) {
 }
 
 func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
-	require := require.New(t)
-	require.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		_, ok := r.Liveness()
 		return ok == liveness
 	}, awaitTimeout, awaitFreq)
