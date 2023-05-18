@@ -351,7 +351,9 @@ func TestGetTx(t *testing.T) {
 					require.Equal(tx.Bytes(), responseTxBytes)
 
 				case formatting.JSON:
-					require.Equal(tx, response.Tx)
+					require.IsType((*txs.Tx)(nil), response.Tx)
+					responseTx := response.Tx.(*txs.Tx)
+					require.Equal(tx.ID(), responseTx.ID())
 				}
 
 				require.NoError(service.vm.Shutdown(context.Background()))
@@ -759,7 +761,9 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.Equal(statelessBlock, response.Block)
+				require.IsType((*blocks.BanffStandardBlock)(nil), response.Block)
+				responseBlock := response.Block.(*blocks.BanffStandardBlock)
+				require.Equal(statelessBlock.ID(), responseBlock.ID())
 
 				_, err = stdjson.Marshal(response)
 				require.NoError(err)
