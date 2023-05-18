@@ -301,7 +301,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -492,7 +492,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, continuousStakingFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -590,7 +590,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -688,7 +688,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, continuousStakingFork)
+			env := newEnvironment(t, nil, cortinaFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -751,7 +751,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

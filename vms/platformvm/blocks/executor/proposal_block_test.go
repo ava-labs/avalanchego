@@ -150,11 +150,11 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, continuousStakingFork)
+	env := newEnvironment(t, ctrl, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
-	now := env.config.ContinuousStakingTime
+	now := env.config.CortinaTime
 	env.clk.Set(now)
 
 	// create parentBlock. It's a standard one for simplicity
@@ -959,7 +959,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1143,7 +1143,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, continuousStakingFork)
+	env := newEnvironment(t, nil, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
