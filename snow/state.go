@@ -3,9 +3,7 @@
 
 package snow
 
-import (
-	"errors"
-)
+import "errors"
 
 const (
 	Initializing State = iota

@@ -385,7 +385,7 @@ func TestBuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
@@ -433,7 +433,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())

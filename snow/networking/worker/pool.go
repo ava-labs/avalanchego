@@ -3,9 +3,7 @@
 
 package worker
 
-import (
-	"sync"
-)
+import "sync"
 
 var _ Pool = (*pool)(nil)
 

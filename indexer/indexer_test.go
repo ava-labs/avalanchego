@@ -77,11 +77,11 @@ func TestNewIndexer(t *testing.T) {
 	require.True(idxr.indexingEnabled)
 	require.True(idxr.allowIncompleteIndex)
 	require.NotNil(idxr.blockIndices)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 	require.NotNil(idxr.txIndices)
-	require.Len(idxr.txIndices, 0)
+	require.Empty(idxr.txIndices)
 	require.NotNil(idxr.vtxIndices)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.vtxIndices)
 	require.NotNil(idxr.blockAcceptorGroup)
 	require.NotNil(idxr.txAcceptorGroup)
 	require.NotNil(idxr.vertexAcceptorGroup)
@@ -178,8 +178,8 @@ func TestIndexer(t *testing.T) {
 	require.Equal("index/chain1", server.bases[0])
 	require.Equal("/block", server.endpoints[0])
 	require.Len(idxr.blockIndices, 1)
-	require.Len(idxr.txIndices, 0)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.txIndices)
+	require.Empty(idxr.vtxIndices)
 
 	// Accept a container
 	blkID, blkBytes := ids.GenerateTestID(), utils.RandomBytes(32)
@@ -236,9 +236,9 @@ func TestIndexer(t *testing.T) {
 	idxr = idxrIntf.(*indexer)
 	now = time.Now()
 	idxr.clock.Set(now)
-	require.Len(idxr.blockIndices, 0)
-	require.Len(idxr.txIndices, 0)
-	require.Len(idxr.vtxIndices, 0)
+	require.Empty(idxr.blockIndices)
+	require.Empty(idxr.txIndices)
+	require.Empty(idxr.vtxIndices)
 	require.True(idxr.hasRunBefore)
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -445,7 +445,7 @@ func TestIncompleteIndex(t *testing.T) {
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.True(isIncomplete)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 
 	// Close and re-open the indexer, this time with indexing enabled
 	require.NoError(config.DB.(*versiondb.Database).Commit())
@@ -523,5 +523,5 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	// RegisterChain should return without adding an index for this chain
 	chainVM := mocks.NewMockChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
-	require.Len(idxr.blockIndices, 0)
+	require.Empty(idxr.blockIndices)
 }
