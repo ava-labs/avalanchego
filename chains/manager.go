@@ -167,7 +167,7 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	SybilProtectionEnabled bool            // True iff the network has staking enabled
+	SybilProtectionEnabled bool
 	StakingCert            tls.Certificate // needed to sign snowman++ blocks
 	StakingBLSKey          *bls.SecretKey
 	TracingEnabled         bool
@@ -525,7 +525,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	var ok bool
 	if m.SybilProtectionEnabled {
 		vdrs, ok = m.Validators.Get(chainParams.SubnetID)
-	} else { // Staking is disabled. Every peer validates every subnet.
+	} else { // Sybil protection is disabled. Every peer validates every subnet.
 		vdrs, ok = m.Validators.Get(constants.PrimaryNetworkID)
 	}
 	if !ok {

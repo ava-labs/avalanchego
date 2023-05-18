@@ -122,7 +122,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	if m.config.SybilProtectionEnabled {
 		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
 	} else {
-		// If staking is disabled, everyone validates every chain
+		// If sybil protection is disabled, everyone validates every chain
 		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
 	}
 	if !ok {

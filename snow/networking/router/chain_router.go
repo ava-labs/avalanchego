@@ -466,12 +466,12 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	// set, disconnect. we cannot put a subnet-only validator check here since
 	// Disconnected would not be handled properly.
 	//
-	// When staking is disabled, we only want this clause to happen once.
+	// When sybil protection is disabled, we only want this clause to happen once.
 	// Therefore, we only update the chains during the connection of the primary
 	// network, which is guaranteed to happen for every peer.
 	if cr.sybilProtectionEnabled || subnetID == constants.PrimaryNetworkID {
 		for _, chain := range cr.chainHandlers {
-			// If staking is disabled, send a Connected message to every chain
+			// If sybil protection is disabled, send a Connected message to every chain
 			// when connecting to the primary network
 			if subnetID == chain.Context().SubnetID || !cr.sybilProtectionEnabled {
 				chain.Push(
