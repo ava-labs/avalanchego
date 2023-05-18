@@ -147,7 +147,6 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{

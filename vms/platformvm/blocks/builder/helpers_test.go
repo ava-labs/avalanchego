@@ -150,7 +150,6 @@ func newEnvironment(t *testing.T) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()

@@ -114,6 +114,8 @@ type Chain interface {
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
+
+	GetRewardConfig(subnetID ids.ID) (reward.Config, error)
 }
 
 type State interface {
@@ -811,6 +813,29 @@ func (s *state) AddTx(tx *txs.Tx, status status.Status) {
 		tx:     tx,
 		status: status,
 	}
+}
+
+func (s *state) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
+	primaryNetworkCfg := s.cfg.RewardConfig
+	if subnetID == constants.PrimaryNetworkID {
+		return primaryNetworkCfg, nil
+	}
+
+	transformSubnetIntf, err := s.GetSubnetTransformation(subnetID)
+	if err != nil {
+		return reward.Config{}, err
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return reward.Config{}, errIsNotTransformSubnetTx
+	}
+
+	return reward.Config{
+		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+		MinConsumptionRate: transformSubnet.MinConsumptionRate,
+		MintingPeriod:      primaryNetworkCfg.MintingPeriod,
+		SupplyCap:          transformSubnet.MaximumSupply,
+	}, nil
 }
 
 func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {

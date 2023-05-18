@@ -185,7 +185,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
