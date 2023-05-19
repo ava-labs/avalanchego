@@ -90,8 +90,6 @@ message Pong {
   uint32 uptime = 1;
   // subnet_uptimes contains subnet uptime percentages.
   repeated SubnetUptime subnet_uptimes = 2;
-  // skip indicates receiver should skip reading fields.
-  bool skip = 3;
 }
 
 // The first outbound message that the local node sends to its remote peer

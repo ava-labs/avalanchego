@@ -45,7 +45,6 @@ type OutboundMsgBuilder interface {
 	Pong(
 		primaryUptime uint32,
 		subnetUptimes []*p2p.SubnetUptime,
-		skip bool,
 	) (OutboundMessage, error)
 
 	GetStateSummaryFrontier(
@@ -207,7 +206,6 @@ func (b *outMsgBuilder) Ping(
 func (b *outMsgBuilder) Pong(
 	primaryUptime uint32,
 	subnetUptimes []*p2p.SubnetUptime,
-	skip bool,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -215,7 +213,6 @@ func (b *outMsgBuilder) Pong(
 				Pong: &p2p.Pong{
 					Uptime:        primaryUptime,
 					SubnetUptimes: subnetUptimes,
-					Skip:          skip,
 				},
 			},
 		},
