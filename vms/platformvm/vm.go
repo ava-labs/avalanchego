@@ -214,7 +214,7 @@ func (vm *VM) initBlockchains() error {
 		return err
 	}
 
-	if vm.StakingEnabled {
+	if vm.SybilProtectionEnabled {
 		for subnetID := range vm.TrackedSubnets {
 			if err := vm.createSubnet(subnetID); err != nil {
 				return err
