@@ -673,7 +673,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePing(m)
 		msg.OnFinishedHandling()
 		return
-	// Deprecated: remove this in the future.
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
@@ -735,9 +734,9 @@ func (p *peer) createPingMessage() (message.OutboundMessage, error) {
 			continue
 		}
 
-		copyID := subnetID
+		subnetID := subnetID
 		subnetUptimes = append(subnetUptimes, &p2p.SubnetUptime{
-			SubnetId: copyID[:],
+			SubnetId: subnetID[:],
 			Uptime:   uint32(subnetUptime * 100),
 		})
 	}
@@ -810,6 +809,21 @@ func (p *peer) handleNewPing(msg *p2p.Ping) {
 		}
 		p.observeUptime(subnetID, uptime)
 	}
+
+	// send pong message
+	// We should still send a pong message even if we're not putting any
+	// uptimes in it, this is because we should keep the connection alive.
+	// We should tell the peer to skip reading fields to that they don't
+	// overwrite their uptimes with 0s.
+	pongMessage, err := p.MessageCreator.Pong(0, nil, true)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.PongOp),
+			zap.Error(err),
+		)
+		return
+	}
+	p.Send(p.onClosingCtx, pongMessage)
 }
 
 // Deprecated: remove this in the future.
@@ -847,7 +861,7 @@ func (p *peer) handleOldPing(*p2p.Ping) {
 	}
 
 	primaryUptimePercent := uint32(primaryUptime * 100)
-	msg, err := p.MessageCreator.Pong(primaryUptimePercent, subnetUptimes)
+	msg, err := p.MessageCreator.Pong(primaryUptimePercent, subnetUptimes, false)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
@@ -858,8 +872,11 @@ func (p *peer) handleOldPing(*p2p.Ping) {
 	p.Send(p.onClosingCtx, msg)
 }
 
-// Deprecated: This function is deprecated and will be removed in the future.
 func (p *peer) handlePong(msg *p2p.Pong) {
+	// This is pong message indicates that it does not have any uptimes
+	if msg.Skip {
+		return
+	}
 	if msg.Uptime > 100 {
 		p.Log.Debug("dropping pong message with invalid uptime",
 			zap.Stringer("nodeID", p.id),

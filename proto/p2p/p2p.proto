@@ -84,12 +84,14 @@ message SubnetUptime {
 // Contains the uptime percentage of the message receiver (remote peer)
 // from the sender's point of view, in response to "ping" message.
 // Uptimes are expected to be provided as integers ranging in [0, 100].
-// Deprecated: remove in the future.
 message Pong {
+  // Deprecated: remove all these fields in the future. but keep the message.
   // uptime is the primary network uptime percentage.
   uint32 uptime = 1;
   // subnet_uptimes contains subnet uptime percentages.
   repeated SubnetUptime subnet_uptimes = 2;
+  // skip indicates receiver should skip reading fields.
+  bool skip = 3;
 }
 
 // The first outbound message that the local node sends to its remote peer
