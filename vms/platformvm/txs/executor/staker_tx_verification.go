@@ -234,12 +234,15 @@ func verifyAddSubnetValidatorTx(
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
-	validatorEffectiveStart := currentTimestamp
+	stakerStart := currentTimestamp
+	stakerEnd := stakerStart.Add(tx.StakingPeriod())
 	if !isContinuousStakingForkActive {
-		validatorEffectiveStart = preContinuousStakingStartTime
+		stakerStart = preContinuousStakingStartTime
+		stakerEnd = tx.EndTime()
 	}
-	if !tx.Validator.BoundedBy(
-		validatorEffectiveStart,
+	if !txs.BoundedBy(
+		stakerStart,
+		stakerEnd,
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
@@ -581,12 +584,15 @@ func verifyAddPermissionlessValidatorTx(
 	if tx.Subnet != constants.PrimaryNetworkID {
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
-		validatorEffectiveStart := currentTimestamp
+		stakerStart := currentTimestamp
+		stakerEnd := stakerStart.Add(tx.StakingPeriod())
 		if !isContinuousStakingForkActive {
-			validatorEffectiveStart = preContinuousStakingStartTime
+			stakerStart = preContinuousStakingStartTime
+			stakerEnd = tx.EndTime()
 		}
-		if !tx.Validator.BoundedBy(
-			validatorEffectiveStart,
+		if !txs.BoundedBy(
+			stakerStart,
+			stakerEnd,
 			primaryNetworkValidator.StartTime,
 			primaryNetworkValidator.EndTime,
 		) {
