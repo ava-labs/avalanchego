@@ -126,6 +126,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			newValidatorEndTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -157,6 +158,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			newValidatorEndTime,
 			0,
 		)
 		require.NoError(t, err)
@@ -498,6 +500,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		dsStartTime,
+		dsEndTime,
 		0,
 	)
 	require.NoError(err)
@@ -638,6 +641,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		defaultValidateStartTime,
+		defaultValidateEndTime,
 		0,
 	)
 	require.NoError(err)
@@ -780,12 +784,13 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		startTime := defaultValidateStartTime.Add(time.Second)
+		endTime := startTime.Add(defaultMinStakingDuration).Add(time.Second)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,              // weight
 			uint64(startTime.Unix())+1, // start time
-			uint64(startTime.Add(defaultMinStakingDuration).Unix())+1, // end time
-			ids.NodeID(nodeID), // node ID
-			testSubnet1.ID(),   // subnet ID
+			uint64(endTime.Unix()),     // end time
+			ids.NodeID(nodeID),         // node ID
+			testSubnet1.ID(),           // subnet ID
 			[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
@@ -795,7 +800,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			addSubnetValTx,
-			defaultValidateStartTime,
+			startTime,
+			endTime,
 			0,
 		)
 		require.NoError(err)
@@ -884,10 +890,11 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	{
 		// Case: Validator in current validator set of primary network
 		startTime := defaultGenesisTime.Add(1 * time.Second)
+		endTime := startTime.Add(defaultMinStakingDuration)
 		tx, err := env.txBuilder.NewAddValidatorTx(
-			env.config.MinValidatorStake,                            // stake amount
-			uint64(startTime.Unix()),                                // start time
-			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
+			env.config.MinValidatorStake, // stake amount
+			uint64(startTime.Unix()),     // start time
+			uint64(endTime.Unix()),       // end time
 			nodeID,
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
@@ -901,6 +908,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			startTime,
+			endTime,
 			0,
 		)
 		require.NoError(err)

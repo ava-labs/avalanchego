@@ -548,14 +548,19 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 			updatedSupply := currentSupply + potentialReward
 			e.State.SetCurrentSupply(subnetID, updatedSupply)
 		}
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		staker, err = state.NewCurrentStaker(
+			txID,
+			stakerTx,
+			chainTime,
+			endTimeBound,
+			potentialReward,
+		)
 	}
 
 	if err != nil {
 		return err
 	}
 
-	state.MarkStakerForRemovalInPlaceBeforeTime(staker, endTimeBound)
 	switch priority := staker.Priority; {
 	case priority.IsCurrentValidator():
 		e.State.PutCurrentValidator(staker)

@@ -162,7 +162,7 @@ func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 	stakerTx.EXPECT().Weight().Return(weight)
 	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
 
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.NotNil(staker)
 	require.NoError(err)
 	require.Equal(txID, staker.TxID)
@@ -179,7 +179,7 @@ func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 
 	stakerTx.EXPECT().PublicKey().Return(nil, false, errCustom)
 
-	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	_, err = NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.ErrorIs(err, errCustom)
 }
 
@@ -210,7 +210,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	stakerTx.EXPECT().Weight().Return(weight)
 	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
 
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.NotNil(staker)
 	require.NoError(err)
 	require.Equal(txID, staker.TxID)
@@ -227,7 +227,7 @@ func TestNewCurrentStaker(t *testing.T) {
 
 	stakerTx.EXPECT().PublicKey().Return(nil, false, errCustom)
 
-	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	_, err = NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.ErrorIs(err, errCustom)
 }
 
@@ -358,7 +358,7 @@ func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
 
 	txID := ids.GenerateTestID()
 	potentialReward := uint64(54321)
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.NoError(err)
 
 	// stopTime should be at T+1 staking period
@@ -402,7 +402,7 @@ func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
 
 	txID := ids.GenerateTestID()
 	potentialReward := uint64(54321)
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
 	require.NoError(err)
 
 	// stopTime should be at end of staking period

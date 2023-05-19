@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -111,6 +110,7 @@ func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.Staker,
 	startTime time.Time,
+	endTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
@@ -127,7 +127,7 @@ func NewCurrentStaker(
 		Weight:          staker.Weight(),
 		StartTime:       startTime,
 		StakingPeriod:   stakingPeriod,
-		EndTime:         mockable.MaxTime,
+		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        startTime.Add(stakingPeriod),
 		Priority:        staker.CurrentPriority(),

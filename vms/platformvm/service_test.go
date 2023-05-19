@@ -510,6 +510,7 @@ func TestGetStake(t *testing.T) {
 		tx.ID(),
 		addDelTx,
 		delegatorStartTime,
+		delegatorEndTime,
 		0,
 	)
 	require.NoError(err)
@@ -643,6 +644,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		delegatorStartTime,
+		delegatorEndTime,
 		0,
 	)
 	require.NoError(err)

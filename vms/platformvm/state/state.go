@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -1080,7 +1081,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 
 		// tx is a genesis transactions, hence it's guaranteed to be
 		// pre Continuous staking fork. It's fine to use tx.StartTime
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), tx.EndTime(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1190,7 +1191,7 @@ func (s *state) loadCurrentStakers() error {
 			startTime = stakerTx.StartTime()
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, mockable.MaxTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1243,7 +1244,7 @@ func (s *state) loadCurrentStakers() error {
 			startTime = time.Unix(metadata.StakerStartTime, 0)
 		}
 
-		staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, startTime, mockable.MaxTime, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
@@ -1295,7 +1296,7 @@ func (s *state) loadCurrentStakers() error {
 				startTime = time.Unix(metadata.StakerStartTime, 0)
 			}
 
-			staker, err := NewCurrentStaker(txID, stakerTx, startTime, metadata.PotentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, startTime, mockable.MaxTime, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}

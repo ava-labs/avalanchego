@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -343,6 +344,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		currentChainTime,
+		mockable.MaxTime,
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -353,6 +355,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		currentChainTime,
+		mockable.MaxTime,
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -798,6 +801,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -807,6 +811,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
+		addDelTx.EndTime(),
 		1000000,
 	)
 	require.NoError(err)
@@ -928,6 +933,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		time.Unix(int64(vdrStartTime), 0),
+		time.Unix(int64(vdrEndTime), 0),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -938,6 +944,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		time.Unix(int64(delStartTime), 0),
+		time.Unix(int64(delEndTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -1153,6 +1160,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		vdrRewardAmt,
 	)
 	require.NoError(err)
@@ -1163,6 +1171,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 		delTx.ID(),
 		addDelTx,
 		time.Unix(int64(delStartTime), 0),
+		time.Unix(int64(delEndTime), 0),
 		delRewardAmt,
 	)
 	require.NoError(err)
@@ -1318,6 +1327,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1327,6 +1337,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
+		addDelTx.EndTime(),
 		1000000,
 	)
 	require.NoError(err)
@@ -1438,6 +1449,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrTx.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1447,6 +1459,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		addDelTx.StartTime(),
+		addDelTx.EndTime(),
 		1000000,
 	)
 	require.NoError(err)

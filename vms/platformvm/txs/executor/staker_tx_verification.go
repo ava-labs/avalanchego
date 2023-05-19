@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -429,7 +430,7 @@ func verifyAddDelegatorTx(
 	var newStaker *state.Staker
 	if isContinuousStakingForkActive {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, mockable.MaxTime, 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
@@ -766,7 +767,7 @@ func verifyAddPermissionlessDelegatorTx(
 	var newStaker *state.Staker
 	if isContinuousStakingForkActive {
 		// potential reward does not matter
-		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, 0)
+		newStaker, err = state.NewCurrentStaker(txID, tx, currentTimestamp, mockable.MaxTime, 0)
 	} else {
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
