@@ -714,6 +714,7 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
+			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		return
@@ -1073,8 +1074,8 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedPeers)
 	if err != nil {
 		p.Log.Error("failed to create message",
-			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListAckOp),
+			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
 		return
