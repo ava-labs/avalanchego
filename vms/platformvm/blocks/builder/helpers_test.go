@@ -65,6 +65,7 @@ const (
 	apricotFork activeFork = 0
 	banffFork   activeFork = 1
 	cortinaFork activeFork = 2
+	latestFork             = cortinaFork
 )
 
 var (
@@ -113,7 +114,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, fork activeFork) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unparam
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
