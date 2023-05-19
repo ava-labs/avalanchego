@@ -196,7 +196,6 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 				zap.String("resource", "system memory"),
 				zap.Error(getMemoryErr),
 			)
-			machineMemory = &mem.VirtualMemoryStat{}
 		}
 		machineSwap, getSwapErr := mem.SwapMemory()
 		if getSwapErr != nil {
@@ -221,6 +220,8 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		m.writeUsage = oldDiskWeight*m.writeUsage + currentScaledWriteUsage
 
 		if getMemoryErr == nil {
+			// Note: if [getSwapErr] is non-nil, we report the available swap as
+			// 0.
 			m.availableMemoryBytes = machineMemory.Available + machineSwap.Free
 		}
 		if getBytesErr == nil {
