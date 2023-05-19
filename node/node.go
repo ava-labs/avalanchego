@@ -1056,6 +1056,7 @@ func (n *Node) initHealthAPI() error {
 
 		var err error
 		if availableMemoryBytes < n.Config.RequiredAvailableMemory {
+			// TODO: log a FATAL and shutdown the node
 			n.Log.Error("critically low on memory",
 				zap.Uint64("usedMemory", usedMemoryBytes),
 				zap.Uint64("availableMemory", availableMemoryBytes),
