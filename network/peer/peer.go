@@ -650,8 +650,8 @@ func (p *peer) sendNetworkMessages() {
 				}
 			}
 
-			primaryUptimePercent, subnetUptimes := p.getUptimes()
-			pingMessage, err := p.MessageCreator.Ping(primaryUptimePercent, subnetUptimes)
+			primaryUptime, subnetUptimes := p.getUptimes()
+			pingMessage, err := p.MessageCreator.Ping(primaryUptime, subnetUptimes)
 			if err != nil {
 				p.Log.Error("failed to create message",
 					zap.Stringer("messageOp", message.PingOp),
@@ -709,8 +709,8 @@ func (p *peer) handle(msg message.InboundMessage) {
 func (p *peer) handlePing(msg *p2p.Ping) {
 	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
 
-	primaryUptimePercent, subnetUptimes := p.getUptimes()
-	pongMessage, err := p.MessageCreator.Pong(primaryUptimePercent, subnetUptimes)
+	primaryUptime, subnetUptimes := p.getUptimes()
+	pongMessage, err := p.MessageCreator.Pong(primaryUptime, subnetUptimes)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
@@ -764,25 +764,25 @@ func (p *peer) handlePong(msg *p2p.Pong) {
 	p.observeUptimes(msg.Uptime, msg.SubnetUptimes)
 }
 
-func (p *peer) observeUptimes(primaryNetworkUptime uint32, subnetUptimes []*p2p.SubnetUptime) {
+func (p *peer) observeUptimes(primaryUptime uint32, subnetUptimes []*p2p.SubnetUptime) {
 	// TODO: Remove once everyone sends uptimes in Ping messages.
 	//
-	// If primaryNetworkUptime is 0, the message may not include any uptimes.
-	// This may happen with old Ping messages or new Pong messages.
-	if primaryNetworkUptime == 0 {
+	// If primaryUptime is 0, the message may not include any uptimes. This may
+	// happen with old Ping messages or new Pong messages.
+	if primaryUptime == 0 {
 		return
 	}
 
-	if primaryNetworkUptime > 100 {
+	if primaryUptime > 100 {
 		p.Log.Debug("dropping message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-			zap.Uint32("uptime", primaryNetworkUptime),
+			zap.Uint32("uptime", primaryUptime),
 		)
 		p.StartClose()
 		return
 	}
-	p.observeUptime(constants.PrimaryNetworkID, primaryNetworkUptime)
+	p.observeUptime(constants.PrimaryNetworkID, primaryUptime)
 
 	for _, subnetUptime := range subnetUptimes {
 		subnetID, err := ids.ToID(subnetUptime.SubnetId)
