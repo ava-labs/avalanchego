@@ -54,9 +54,9 @@ type Staker struct {
 	// StakingPeriod does not change during a staker lifetime.
 	StakingPeriod time.Duration
 
-	// StartTime is the time this staker exits the current validators set.
-	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
-	// Post ContinuousStakingFork StartTime is set initially to mockable.MaxTime. An
+	// EndTime is the time this staker exits the current validators set.
+	// Pre ContinuousStakingFork, EndTime is set by the Add*Tx creating the staker.
+	// Post ContinuousStakingFork EndTime is set initially to mockable.MaxTime. An
 	// explicit StopStaking transaction with set it to a finite value.
 	// EndTime may change during a staker lifetime.
 	EndTime time.Time
@@ -72,7 +72,6 @@ type Staker struct {
 	// Post ContinuousStaking Fork, NextTime is the next time the staker will be
 	// evaluated for reward. Stakers are marked as current as soon as their creation
 	// tx is accepted. Also they will automatically restake until a StopStaking tx is issued.
-	// TODO ABENEGIA: consider renaming NextTime to NextRewardTime
 	NextTime time.Time
 
 	// Priority specifies how to break ties between stakers with the same
