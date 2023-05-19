@@ -254,16 +254,16 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
+	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
 	consensusRouter := n.Config.ConsensusRouter
-	if !n.Config.EnableStaking {
-		// Staking is disabled so we don't have a txID that added us as a
-		// validator. Because each validator needs a txID associated with it, we
-		// hack one together by just padding our nodeID with zeroes.
+	if !n.Config.SybilProtectionEnabled {
+		// Sybil protection is disabled so we don't have a txID that added us as
+		// a validator. Because each validator needs a txID associated with it,
+		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
@@ -271,7 +271,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
-			n.Config.DisabledStakingWeight,
+			n.Config.SybilProtectionDisabledWeight,
 		)
 		if err != nil {
 			return err
@@ -280,7 +280,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetVdrs,
-			weight: n.Config.DisabledStakingWeight,
+			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
@@ -695,7 +695,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		n.Config.EnableStaking,
+		n.Config.SybilProtectionEnabled,
 		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
@@ -707,7 +707,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		StakingEnabled:                          n.Config.EnableStaking,
+		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 		StakingCert:                             n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
@@ -764,10 +764,10 @@ func (n *Node) initVMs() error {
 
 	vdrs := n.vdrs
 
-	// If staking is disabled, ignore updates to Subnets' validator sets
-	// Instead of updating node's validator manager, platform chain makes changes
-	// to its own local validator manager (which isn't used for sampling)
-	if !n.Config.EnableStaking {
+	// If sybil protection is disabled, we provide the P-chain its own local
+	// validator manager that will not be used by the rest of the node. This
+	// allows the node's validator sets to be determined by network connections.
+	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 		primaryVdrs := validators.NewSet()
 		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -788,7 +788,7 @@ func (n *Node) initVMs() error {
 				Chains:                          n.chainManager,
 				Validators:                      vdrs,
 				UptimeLockedCalculator:          n.uptimeCalculator,
-				StakingEnabled:                  n.Config.EnableStaking,
+				SybilProtectionEnabled:          n.Config.SybilProtectionEnabled,
 				TrackedSubnets:                  n.Config.TrackedSubnets,
 				TxFee:                           n.Config.TxFee,
 				CreateAssetTxFee:                n.Config.CreateAssetTxFee,
