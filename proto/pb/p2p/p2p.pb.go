@@ -489,12 +489,10 @@ func (*Message_AppGossip) isMessage_Message() {}
 
 func (*Message_PeerListAck) isMessage_Message() {}
 
-// Message that the local node sends to its remote peers,
-// in order to periodically check its uptime.
+// Message that a node sends to its peers in order to periodically check
+// responsivness and report the local node's uptime measurements of the peer.
 //
-// Deprecated: remove this comment in the future.
-// On receiving "ping", the remote peer responds with the observed
-// uptime value of the message sender in "pong" message.
+// On receiving a "ping", the peer should respond with a "pong".
 type Ping struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -617,7 +615,7 @@ type Pong struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Deprecated: remove all these fields in the future. but keep the message.
+	// Deprecated: remove all these fields in the future, but keep the message.
 	// uptime is the primary network uptime percentage.
 	Uptime uint32 `protobuf:"varint,1,opt,name=uptime,proto3" json:"uptime,omitempty"`
 	// subnet_uptimes contains subnet uptime percentages.
