@@ -4,283 +4,199 @@
 package merkledb
 
 import (
-	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_View_Iteration(t *testing.T) {
-	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0}, []byte{0}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1}, []byte{1}))
+func Test_TrieView_Iterator(t *testing.T) {
+	require := require.New(t)
 
-	trie2, err := dbTrie.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie2.Insert(context.Background(), []byte{1}, []byte{2}))
-	require.NoError(t, trie2.Insert(context.Background(), []byte{2}, []byte{2}))
-	require.NoError(t, trie2.Insert(context.Background(), []byte{3}, []byte{3}))
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
 
-	trie3, err := trie2.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie3.Remove(context.Background(), []byte{3}))
-	require.NoError(t, trie3.Insert(context.Background(), []byte{4}, []byte{4}))
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
 
-	it := trie3.NewIterator()
-	values := make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Len(t, values, 4)
-	require.Equal(t, KeyValue{Key: []byte{0}, Value: []byte{0}}, values[0])
-	require.Equal(t, KeyValue{Key: []byte{1}, Value: []byte{2}}, values[1])
-	require.Equal(t, KeyValue{Key: []byte{2}, Value: []byte{2}}, values[2])
-	require.Equal(t, KeyValue{Key: []byte{4}, Value: []byte{4}}, values[3])
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+
+	iterator := db.NewIterator()
+	require.NotNil(iterator)
+
+	defer iterator.Release()
+
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.True(iterator.Next())
+	require.Equal(key2, iterator.Key())
+	require.Equal(value2, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
-func Test_View_Iteration2(t *testing.T) {
-	key0 := []byte{0}
-	value0 := []byte{0}
-	key1 := []byte{1}
-	value1 := []byte{1}
-	key2 := []byte{2}
-	value2 := []byte{2}
-	key3 := []byte{3}
-	value3 := []byte{3}
-	key4 := []byte{4}
-	value4 := []byte{4}
+// Test_TrieView_IteratorStart tests to make sure the iterator can be configured to
+// start midway through the database.
+func Test_TrieView_IteratorStart(t *testing.T) {
+	require := require.New(t)
+	db, err := getBasicDB()
+	require.NoError(err)
 
-	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
-	require.NoError(t, dbTrie.Insert(context.Background(), key0, value0))
-	require.NoError(t, dbTrie.Insert(context.Background(), key1, value1))
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
 
-	trie1, err := dbTrie.NewView()
-	require.NoError(t, err)
-	it := trie1.NewIterator()
-	values := make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Equal(t, len(values), 2)
-	require.Equal(t, KeyValue{Key: key0, Value: value0}, values[0])
-	require.Equal(t, KeyValue{Key: key1, Value: value1}, values[1])
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
 
-	// remove key0 from trie1, but key1 still exists in dbTrie
-	require.NoError(t, trie1.Remove(context.Background(), key0))
-	trie11, err := dbTrie.NewView()
-	require.NoError(t, err)
-	it = trie11.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Equal(t, len(values), 2)
-	require.Equal(t, KeyValue{Key: key0, Value: value0}, values[0])
-	require.Equal(t, KeyValue{Key: key1, Value: value1}, values[1])
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
-	// key0 doesn't exist in trie1
-	it = trie1.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Equal(t, len(values), 1)
-	require.Equal(t, KeyValue{Key: key1, Value: value1}, values[0])
+	iterator := db.NewIteratorWithStart(key2)
+	require.NotNil(iterator)
 
-	// key0, key1 still exist in dbTrie
-	trie2, err := dbTrie.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie2.Insert(context.Background(), key1, value2))
-	require.NoError(t, trie2.Insert(context.Background(), key2, value2))
-	require.NoError(t, trie2.Insert(context.Background(), key3, value3))
-	it = trie2.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Equal(t, len(values), 4)
-	require.Equal(t, KeyValue{Key: key0, Value: value0}, values[0])
-	require.Equal(t, KeyValue{Key: key1, Value: value2}, values[1])
-	require.Equal(t, KeyValue{Key: key2, Value: value2}, values[2])
-	require.Equal(t, KeyValue{Key: key3, Value: value3}, values[3])
+	defer iterator.Release()
 
-	// key0, key1, key2, key3 exist in trie2
-	trie3, err := trie2.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie3.Remove(context.Background(), key3))
-	require.NoError(t, trie3.Insert(context.Background(), key4, value4))
-	it = trie3.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Len(t, values, 4)
-	require.Equal(t, KeyValue{Key: []byte{0}, Value: []byte{0}}, values[0])
-	require.Equal(t, KeyValue{Key: []byte{1}, Value: []byte{2}}, values[1])
-	require.Equal(t, KeyValue{Key: []byte{2}, Value: []byte{2}}, values[2])
-	require.Equal(t, KeyValue{Key: []byte{4}, Value: []byte{4}}, values[3])
+	require.True(iterator.Next())
+	require.Equal(key2, iterator.Key())
+	require.Equal(value2, iterator.Value())
 
-	// Teh dbTrie contains {key0, value0}, {key1, value1}
-	// the dbTrie do not change while its views got changed
-	trie1, err = dbTrie.NewView()
-	require.NoError(t, err)
-	it = trie1.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Equal(t, len(values), 2)
-	require.Equal(t, KeyValue{Key: key0, Value: value0}, values[0])
-	require.Equal(t, KeyValue{Key: key1, Value: value1}, values[1])
-
-	// After commit trie3 to dbTrie, dbTrie will contains changes of trie3
-	trie3.commitToDB(context.Background())
-	trie1, err = dbTrie.NewView()
-	require.NoError(t, err)
-	it = trie1.NewIterator()
-	values = make([]KeyValue, 0, 4)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Len(t, values, 4)
-	require.Equal(t, KeyValue{Key: []byte{0}, Value: []byte{0}}, values[0])
-	require.Equal(t, KeyValue{Key: []byte{1}, Value: []byte{2}}, values[1])
-	require.Equal(t, KeyValue{Key: []byte{2}, Value: []byte{2}}, values[2])
-	require.Equal(t, KeyValue{Key: []byte{4}, Value: []byte{4}}, values[3])
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
-func Test_View_Iteration_Start_Prefix(t *testing.T) {
-	dbTrie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0}, []byte{0}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0, 1}, []byte{1}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 1}, []byte{1}))
+// Test_TrieView_IteratorPrefix tests to make sure the iterator can be configured to skip
+// keys missing the provided prefix.
+func Test_TrieView_IteratorPrefix(t *testing.T) {
+	require := require.New(t)
+	db, err := getBasicDB()
+	require.NoError(err)
 
-	trie2, err := dbTrie.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie2.Insert(context.Background(), []byte{0, 1}, []byte{2}))
-	require.NoError(t, trie2.Insert(context.Background(), []byte{0, 2}, []byte{2}))
-	require.NoError(t, trie2.Insert(context.Background(), []byte{0, 3}, []byte{3}))
-	require.NoError(t, trie2.Insert(context.Background(), []byte{1, 3}, []byte{3}))
+	key1 := []byte("hello")
+	value1 := []byte("world1")
 
-	trie3, err := trie2.NewView()
-	require.NoError(t, err)
-	require.NoError(t, trie3.Remove(context.Background(), []byte{1, 1}))
-	require.NoError(t, trie3.Remove(context.Background(), []byte{0, 3}))
-	require.NoError(t, trie3.Insert(context.Background(), []byte{0, 4}, []byte{4}))
-	require.NoError(t, trie3.Insert(context.Background(), []byte{1, 4}, []byte{4}))
-	it := trie3.NewIteratorWithStartAndPrefix([]byte{0, 2}, []byte{0})
-	values := make([]KeyValue, 0, 2)
-	for it.Next() {
-		values = append(values, KeyValue{
-			Key:   it.Key(),
-			Value: it.Value(),
-		})
-	}
-	require.Len(t, values, 2)
-	require.Equal(t, KeyValue{Key: []byte{0, 2}, Value: []byte{2}}, values[0])
-	require.Equal(t, KeyValue{Key: []byte{0, 4}, Value: []byte{4}}, values[1])
+	key2 := []byte("goodbye")
+	value2 := []byte("world2")
+
+	key3 := []byte("joy")
+	value3 := []byte("world3")
+
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
+
+	iterator := db.NewIteratorWithPrefix([]byte("h"))
+	require.NotNil(iterator)
+
+	defer iterator.Release()
+
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
 }
 
-func Test_View_Iteration_getValues(t *testing.T) {
-	dbTrie, err := getBasicDB()
+// Test_TrieView_IteratorStartPrefix tests to make sure that the iterator can start
+// midway through the database while skipping a prefix.
+func Test_TrieView_IteratorStartPrefix(t *testing.T) {
+	require := require.New(t)
+	db, err := getBasicDB()
+	require.NoError(err)
 
-	require.NoError(t, err)
-	require.NotNil(t, dbTrie)
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0}, []byte{0}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{0, 1}, []byte{1}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 0}, []byte{2}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{1, 1}, []byte{3}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 0}, []byte{4}))
-	require.NoError(t, dbTrie.Insert(context.Background(), []byte{2, 1}, []byte{5}))
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
 
-	trieView, verr := newTrieView(dbTrie, dbTrie, dbTrie.root.clone(), 10)
-	require.NoError(t, verr)
-	require.NotNil(t, trieView)
+	key2 := []byte("z")
+	value2 := []byte("world2")
 
-	// if maxLength is zero, get nothing
-	kv, kverr := trieView.getKeyValues([]byte{0, 1}, []byte{1, 1},
-		0, /*maxLength*/
-		set.Set[string]{},
-		false /*lock*/)
-	require.NotNil(t, kverr)
-	require.Equal(t, 0, len(kv))
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
 
-	// output all dbTrie 6 nodes
-	kv, kverr = trieView.getKeyValues(nil, nil,
-		10, /*maxLength*/
-		set.Set[string]{},
-		false /*lock*/)
-	require.Nil(t, kverr)
-	require.Equal(t, 6, len(kv))
-	require.Equal(t, KeyValue{Key: []byte{0}, Value: []byte{0}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[1])
-	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[2])
-	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[3])
-	require.Equal(t, KeyValue{Key: []byte{2, 0}, Value: []byte{4}}, kv[4])
-	require.Equal(t, KeyValue{Key: []byte{2, 1}, Value: []byte{5}}, kv[5])
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
 
-	// There are 3 outputs
-	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{1, 2}, /* same as  []byte{1, 1} */
-		10, /*maxLength*/
-		set.Set[string]{},
-		false /*lock*/)
-	require.Nil(t, kverr)
-	require.Equal(t, 3, len(kv))
-	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
-	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[2])
+	iterator := db.NewIteratorWithStartAndPrefix(key1, []byte("h"))
+	require.NotNil(iterator)
 
-	// There are 5 outputs
-	kv, kverr = trieView.getKeyValues([]byte{0, 1}, nil, /* same as []byte{2, 1} */
-		10, /*maxLength*/
-		set.Set[string]{},
-		false /*lock*/)
-	require.Nil(t, kverr)
-	require.Equal(t, 5, len(kv))
-	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
-	require.Equal(t, KeyValue{Key: []byte{1, 1}, Value: []byte{3}}, kv[2])
-	require.Equal(t, KeyValue{Key: []byte{2, 0}, Value: []byte{4}}, kv[3])
-	require.Equal(t, KeyValue{Key: []byte{2, 1}, Value: []byte{5}}, kv[4])
+	defer iterator.Release()
 
-	// there are 2 outputs
-	kv, kverr = trieView.getKeyValues([]byte{0, 1}, []byte{2, 1},
-		2, /*maxLength*/
-		set.Set[string]{},
-		false /*lock*/)
-	require.Nil(t, kverr)
-	require.Equal(t, 2, len(kv))
-	require.Equal(t, KeyValue{Key: []byte{0, 1}, Value: []byte{1}}, kv[0])
-	require.Equal(t, KeyValue{Key: []byte{1, 0}, Value: []byte{2}}, kv[1])
+	require.True(iterator.Next())
+	require.Equal(key1, iterator.Key())
+	require.Equal(value1, iterator.Value())
+
+	require.True(iterator.Next())
+	require.Equal(key3, iterator.Key())
+	require.Equal(value3, iterator.Value())
+
+	require.False(iterator.Next())
+	require.Nil(iterator.Key())
+	require.Nil(iterator.Value())
+	require.NoError(iterator.Error())
+}
+
+// Test_TrieView_IteratorMemorySafety tests to make sure that keys and values can
+// be modified from the returned iterator.
+func Test_TrieView_IteratorMemorySafety(t *testing.T) {
+	require := require.New(t)
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("z")
+	value2 := []byte("world2")
+
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
+
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
+
+	iterator := db.NewIterator()
+	require.NotNil(iterator)
+
+	defer iterator.Release()
+
+	var keys [][]byte
+	var values [][]byte
+	for iterator.Next() {
+		keys = append(keys, iterator.Key())
+		values = append(values, iterator.Value())
+	}
+
+	expectedKeys := [][]byte{
+		key1,
+		key3,
+		key2,
+	}
+	expectedValues := [][]byte{
+		value1,
+		value3,
+		value2,
+	}
+
+	for i, key := range keys {
+		value := values[i]
+		expectedKey := expectedKeys[i]
+		expectedValue := expectedValues[i]
+
+		require.Equal(expectedKey, key)
+		require.Equal(expectedValue, value)
+	}
 }

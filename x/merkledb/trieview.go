@@ -20,7 +20,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const defaultPreallocationSize = 100
@@ -418,27 +417,15 @@ func (t *trieView) GetRangeProof(
 		t.lock.RLock()
 	}
 
-	var (
-		result RangeProof
-		err    error
-	)
+	var result RangeProof
 
-	// TODO: Replace This With Iterator
-	result.KeyValues, err = t.getKeyValues(
-		start,
-		end,
-		maxLength,
-		set.Set[string]{},
-		false, /*lock*/
-	)
-	if err != nil {
-		return nil, err
+	result.KeyValues = make([]KeyValue, 0)
+	it := t.NewIteratorWithStart(start)
+	for it.Next() && len(result.KeyValues) < maxLength && (len(end) == 0 || bytes.Compare(it.Key(), end) <= 0) {
+		// clone the value to prevent editing of the values stored within the trie
+		result.KeyValues = append(result.KeyValues, KeyValue{Key: it.Key(), Value: slices.Clone(it.Value())})
 	}
-
-	// copy values, so edits won't affect the underlying arrays
-	for i, kv := range result.KeyValues {
-		result.KeyValues[i] = KeyValue{Key: kv.Key, Value: slices.Clone(kv.Value)}
-	}
+	it.Release()
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
 	// The end proof we provide should be for the last key-value pair in the proof, not for
@@ -483,52 +470,6 @@ func (t *trieView) GetRangeProof(
 		return nil, ErrInvalid
 	}
 	return &result, nil
-}
-
-// Returns up to [maxLength] key/values from keys in closed range [start, end].
-// Acts similarly to the merge step of a merge sort to combine state from the view
-// with state from the parent trie.
-// If [lock], grabs [t.lock]'s read lock.
-// Otherwise assumes [t.lock]'s read lock is held.
-// If [start] is nil, all keys are considered > [start].
-// If  [end] is nil, all keys are considered < [end].
-func (t *trieView) getKeyValues(
-	start []byte,
-	end []byte,
-	maxLength int,
-	keysToIgnore set.Set[string],
-	lock bool,
-) ([]KeyValue, error) {
-	if lock {
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-	}
-
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	}
-
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	kv := make([]KeyValue, 0)
-	it := t.NewIteratorWithStart(start)
-	for it.Next() {
-		if len(kv) >= maxLength {
-			// stop when hit the limit
-			break
-		}
-
-		if len(end) > 0 && bytes.Compare(it.Key(), end) > 0 {
-			// stop when meet the end point
-			break
-		}
-
-		kv = append(kv, KeyValue{Key: it.Key(), Value: it.Value()})
-	}
-
-	return kv, nil
 }
 
 // CommitToDB commits changes from this trie to the underlying DB.
