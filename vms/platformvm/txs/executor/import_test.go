@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(cortinaFork)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()

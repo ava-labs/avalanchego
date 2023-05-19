@@ -55,7 +55,17 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const defaultWeight = 10000
+type activeFork uint8
+
+const (
+	defaultWeight                 = 10000
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
+
+	apricotFork activeFork = 0
+	banffFork   activeFork = 1
+	cortinaFork activeFork = 2
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -103,11 +113,11 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T, fork activeFork) *environment {
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(),
-		clk:            defaultClock(),
+		config:         defaultConfig(fork),
+		clk:            defaultClock(fork != apricotFork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -290,7 +300,26 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+	)
+
+	switch fork {
+	case apricotFork:
+		// nothing todo
+	case banffFork:
+		banffTime = defaultValidateEndTime
+	case cortinaFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -312,16 +341,21 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
+		BanffTime:         banffTime,
+		CortinaTime:       cortinaTime,
 	}
 }
 
-func defaultClock() *mockable.Clock {
-	// set time after Banff fork (and before default nextStakerTime)
+func defaultClock(postFork bool) *mockable.Clock {
+	now := defaultGenesisTime
+	if postFork {
+		// 1 second after latest fork
+		now = defaultValidateEndTime.Add(-2 * time.Second)
+	}
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(now)
 	return clk
 }
 

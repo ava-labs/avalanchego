@@ -49,7 +49,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const defaultWeight = 5 * units.MilliAvax
+type activeFork uint8
+
+const (
+	testNetworkID = 10 // To be used in tests
+	defaultWeight = 5 * units.MilliAvax
+
+	apricotFork activeFork = 0
+	banffFork   activeFork = 1
+	cortinaFork activeFork = 2
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -109,12 +118,12 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(postBanff, postCortina bool) *environment {
+func newEnvironment(fork activeFork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
-	config := defaultConfig(postBanff, postCortina)
-	clk := defaultClock(postBanff || postCortina)
+	config := defaultConfig(fork)
+	clk := defaultClock(fork != apricotFork)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -123,7 +132,7 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -131,7 +140,7 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		&config,
+		config,
 		clk,
 		fx,
 		baseState,
@@ -140,7 +149,7 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
 		Clk:          clk,
 		Bootstrapped: &isBootstrapped,
@@ -152,7 +161,7 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 
 	env := &environment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
+		config:         config,
 		clk:            clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -280,20 +289,30 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig(postBanff, postCortina bool) config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
-	}
-	cortinaTime := mockable.MaxTime
-	if postCortina {
-		cortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
+func defaultConfig(fork activeFork) *config.Config {
+	var (
+		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		banffTime         = mockable.MaxTime
+		cortinaTime       = mockable.MaxTime
+	)
+
+	switch fork {
+	case apricotFork:
+		// nothing todo
+	case banffFork:
+		banffTime = defaultValidateEndTime
+	case cortinaFork:
+		banffTime = defaultValidateEndTime
+		cortinaTime = defaultValidateStartTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
 
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return config.Config{
+	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
@@ -311,8 +330,8 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
+		ApricotPhase3Time: apricotPhase3Time,
+		ApricotPhase5Time: apricotPhase5Time,
 		BanffTime:         banffTime,
 		CortinaTime:       cortinaTime,
 	}
@@ -321,7 +340,7 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 func defaultClock(postFork bool) *mockable.Clock {
 	now := defaultGenesisTime
 	if postFork {
-		// 1 second after Banff fork
+		// 1 second after latest fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}

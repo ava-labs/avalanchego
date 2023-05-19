@@ -99,6 +99,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -116,7 +119,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			name: "not bootstrapped",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
@@ -137,7 +143,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -160,7 +169,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -186,7 +198,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -212,7 +227,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -239,7 +257,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -269,7 +290,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -299,7 +323,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -331,7 +358,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -357,7 +387,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx:          snow.DefaultContextTest(),
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime: time.Time{}, // activate latest fork
+					},
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -403,6 +436,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
+						CortinaTime:           time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -449,6 +483,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
+						CortinaTime:           time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -499,6 +534,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						AddSubnetValidatorFee: 1,
+						CortinaTime:           time.Time{}, // activate latest fork,
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
