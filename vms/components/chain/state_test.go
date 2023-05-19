@@ -135,9 +135,9 @@ func cantBuildBlock(context.Context) (snowman.Block, error) {
 // checkProcessingBlock checks that [blk] is of the correct type and is
 // correctly uniquified when calling GetBlock and ParseBlock.
 func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
-	}
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
@@ -168,9 +168,9 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
 func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
-	}
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
@@ -385,7 +385,7 @@ func TestBuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
@@ -433,7 +433,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(t, chainState.verifiedBlocks)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())
@@ -521,6 +521,7 @@ func TestStateParent(t *testing.T) {
 }
 
 func TestGetBlockInternal(t *testing.T) {
+	require := require.New(t)
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -539,9 +540,7 @@ func TestGetBlockInternal(t *testing.T) {
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	if _, ok := genesisBlockInternal.(*TestBlock); !ok {
-		t.Fatalf("Expected LastAcceptedBlockInternal to return a block of type *snowman.TestBlock, but found %T", genesisBlockInternal)
-	}
+	require.IsType(&TestBlock{}, genesisBlockInternal)
 	if genesisBlockInternal.ID() != genesisBlock.ID() {
 		t.Fatalf("Expected LastAcceptedBlockInternal to be blk %s, but found %s", genesisBlock.ID(), genesisBlockInternal.ID())
 	}
@@ -551,9 +550,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := blk.(*TestBlock); !ok {
-		t.Fatalf("Expected retrieved block to return a block of type *snowman.TestBlock, but found %T", blk)
-	}
+	require.IsType(&TestBlock{}, blk)
 	if blk.ID() != genesisBlock.ID() {
 		t.Fatalf("Expected GetBlock to be blk %s, but found %s", genesisBlock.ID(), blk.ID())
 	}
@@ -682,6 +679,8 @@ func TestMeteredCache(t *testing.T) {
 
 // Test the bytesToIDCache
 func TestStateBytesToIDCache(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -708,27 +707,27 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	// Shouldn't have blk1 ID to start with
 	_, err := chainState.GetBlock(context.Background(), blk1.ID())
-	require.Error(t, err)
+	require.ErrorIs(err, database.ErrNotFound)
 	_, ok := chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.False(t, ok)
+	require.False(ok)
 
 	// Parse blk1 from bytes
 	_, err = chainState.ParseBlock(context.Background(), blk1.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// blk1 should be in cache now
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.True(t, ok)
+	require.True(ok)
 
 	// Parse another block
 	_, err = chainState.ParseBlock(context.Background(), blk2.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Should have bumped blk1 from cache
 	_, ok = chainState.bytesToIDCache.Get(string(blk2.Bytes()))
-	require.True(t, ok)
+	require.True(ok)
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	require.False(t, ok)
+	require.False(ok)
 }
 
 // TestSetLastAcceptedBlock ensures chainState's last accepted block
@@ -823,6 +822,8 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 }
 
 func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(5)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
@@ -849,19 +850,16 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	})
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.NoError(err)
+	require.Empty(chainState.verifiedBlocks)
 
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatalf("Built block failed verification due to %s", err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.NoError(builtBlk.Verify(context.Background()))
+	require.Len(chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
-	require.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
+	err = chainState.SetLastAcceptedBlock(resetBlk)
+	require.ErrorIs(err, errSetAcceptedWithProcessing)
 }
 
 func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {

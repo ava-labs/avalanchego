@@ -626,8 +626,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics := gatherCounterGauge(t, registerer)
-	require.EqualValues(0, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Zero(metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -635,8 +635,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics = gatherCounterGauge(t, registerer)
-	require.EqualValues(1, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Equal(float64(1), metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
@@ -1751,7 +1751,8 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	require.ErrorIs(sm.Add(context.Background(), block0), errDuplicateAdd)
+	err := sm.Add(context.Background(), block0)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
@@ -1789,7 +1790,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 	}
 
 	require.NoError(sm.Add(context.Background(), block0))
-	require.ErrorIs(sm.Add(context.Background(), block1), errDuplicateAdd)
+	err := sm.Add(context.Background(), block1)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {

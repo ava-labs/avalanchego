@@ -4,13 +4,16 @@
 package validators
 
 import (
-	"math"
 	"testing"
+
+	stdmath "math"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -42,11 +45,10 @@ func TestSetAddOverflow(t *testing.T) {
 	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, math.MaxUint64)
-	require.Error(err)
+	err = s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
+	require.ErrorIs(err, math.ErrOverflow)
 
-	weight := s.Weight()
-	require.EqualValues(1, weight)
+	require.Equal(uint64(1), s.Weight())
 }
 
 func TestSetAddWeightZeroWeight(t *testing.T) {
@@ -74,11 +76,10 @@ func TestSetAddWeightOverflow(t *testing.T) {
 	err = s.Add(nodeID, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.AddWeight(nodeID, math.MaxUint64-1)
-	require.Error(err)
+	err = s.AddWeight(nodeID, stdmath.MaxUint64-1)
+	require.ErrorIs(err, math.ErrOverflow)
 
-	weight := s.Weight()
-	require.EqualValues(2, weight)
+	require.Equal(uint64(2), s.Weight())
 }
 
 func TestSetGetWeight(t *testing.T) {
@@ -93,8 +94,7 @@ func TestSetGetWeight(t *testing.T) {
 	err := s.Add(nodeID, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	weight = s.GetWeight(nodeID)
-	require.EqualValues(1, weight)
+	require.Equal(uint64(1), s.GetWeight(nodeID))
 }
 
 func TestSetSubsetWeight(t *testing.T) {
@@ -166,10 +166,9 @@ func TestSetRemoveWeightUnderflow(t *testing.T) {
 	require.NoError(err)
 
 	err = s.RemoveWeight(nodeID, 2)
-	require.Error(err)
+	require.ErrorIs(err, math.ErrUnderflow)
 
-	weight := s.Weight()
-	require.EqualValues(2, weight)
+	require.Equal(uint64(2), s.Weight())
 }
 
 func TestSetGet(t *testing.T) {
@@ -192,7 +191,7 @@ func TestSetGet(t *testing.T) {
 	require.True(ok)
 	require.Equal(nodeID, vdr0.NodeID)
 	require.Equal(pk, vdr0.PublicKey)
-	require.EqualValues(1, vdr0.Weight)
+	require.Equal(uint64(1), vdr0.Weight)
 
 	err = s.AddWeight(nodeID, 1)
 	require.NoError(err)
@@ -201,10 +200,10 @@ func TestSetGet(t *testing.T) {
 	require.True(ok)
 	require.Equal(nodeID, vdr0.NodeID)
 	require.Equal(pk, vdr0.PublicKey)
-	require.EqualValues(1, vdr0.Weight)
+	require.Equal(uint64(1), vdr0.Weight)
 	require.Equal(nodeID, vdr1.NodeID)
 	require.Equal(pk, vdr1.PublicKey)
-	require.EqualValues(2, vdr1.Weight)
+	require.Equal(uint64(2), vdr1.Weight)
 }
 
 func TestSetContains(t *testing.T) {
@@ -286,7 +285,7 @@ func TestSetList(t *testing.T) {
 	node0 := list[0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
-	require.EqualValues(2, node0.Weight)
+	require.Equal(uint64(2), node0.Weight)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	err = s.Add(nodeID1, nil, ids.Empty, 1)
@@ -298,18 +297,18 @@ func TestSetList(t *testing.T) {
 	node0 = list[0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
-	require.EqualValues(2, node0.Weight)
+	require.Equal(uint64(2), node0.Weight)
 
 	node1 := list[1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
-	require.EqualValues(1, node1.Weight)
+	require.Equal(uint64(1), node1.Weight)
 
 	err = s.RemoveWeight(nodeID0, 1)
 	require.NoError(err)
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
-	require.EqualValues(2, node0.Weight)
+	require.Equal(uint64(2), node0.Weight)
 
 	list = s.List()
 	require.Len(list, 2)
@@ -317,12 +316,12 @@ func TestSetList(t *testing.T) {
 	node0 = list[0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
-	require.EqualValues(1, node0.Weight)
+	require.Equal(uint64(1), node0.Weight)
 
 	node1 = list[1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
-	require.EqualValues(1, node1.Weight)
+	require.Equal(uint64(1), node1.Weight)
 
 	err = s.RemoveWeight(nodeID0, 1)
 	require.NoError(err)
@@ -333,7 +332,7 @@ func TestSetList(t *testing.T) {
 	node0 = list[0]
 	require.Equal(nodeID1, node0.NodeID)
 	require.Nil(node0.PublicKey)
-	require.EqualValues(1, node0.Weight)
+	require.Equal(uint64(1), node0.Weight)
 
 	err = s.RemoveWeight(nodeID1, 1)
 	require.NoError(err)
@@ -384,10 +383,10 @@ func TestSetSample(t *testing.T) {
 	require.Equal([]ids.NodeID{nodeID0}, sampled)
 
 	_, err = s.Sample(2)
-	require.Error(err)
+	require.ErrorIs(err, sampler.ErrOutOfRange)
 
 	nodeID1 := ids.GenerateTestNodeID()
-	err = s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1)
+	err = s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1)
 	require.NoError(err)
 
 	sampled, err = s.Sample(1)
@@ -416,7 +415,7 @@ func TestSetString(t *testing.T) {
 	err := s.Add(nodeID0, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	err = s.Add(nodeID1, nil, ids.Empty, math.MaxInt64-1)
+	err = s.Add(nodeID1, nil, ids.Empty, stdmath.MaxInt64-1)
 	require.NoError(err)
 
 	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +

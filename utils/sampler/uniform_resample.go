@@ -3,9 +3,7 @@
 
 package sampler
 
-import (
-	"github.com/ava-labs/avalanchego/utils/set"
-)
+import "github.com/ava-labs/avalanchego/utils/set"
 
 // uniformResample allows for sampling over a uniform distribution without
 // replacement.
@@ -60,7 +58,7 @@ func (s *uniformResample) Reset() {
 func (s *uniformResample) Next() (uint64, error) {
 	i := uint64(len(s.drawn))
 	if i >= s.length {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 
 	for {
