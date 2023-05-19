@@ -8,13 +8,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
-	ErrWeightTooSmall       = errors.New("weight of this validator is too low")
-	ErrBadValidatorDuration = errors.New("validator duration too large")
-	errBadSubnetID          = errors.New("subnet ID can't be primary network ID")
+	ErrWeightTooSmall = errors.New("weight of this validator is too low")
+	errBadSubnetID    = errors.New("subnet ID can't be primary network ID")
 )
 
 // Validator is a validator.
@@ -39,9 +37,6 @@ func (v *Validator) StartTime() time.Time {
 
 // EndTime is the time that this validator will leave the validator set
 func (v *Validator) EndTime() time.Time {
-	if v.Start == 0 {
-		return mockable.MaxTime
-	}
 	return time.Unix(int64(v.End), 0)
 }
 
@@ -64,9 +59,6 @@ func (v *Validator) Verify() error {
 	switch {
 	case v.Wght == 0: // Ensure the validator has some weight
 		return ErrWeightTooSmall
-	case v.Start == 0 && v.StakingPeriod() > StakerMaxDuration:
-		// Ensure proper encoding when v.End is used to encode a duration
-		return ErrBadValidatorDuration
 	default:
 		return nil
 	}

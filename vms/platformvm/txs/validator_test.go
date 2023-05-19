@@ -21,8 +21,8 @@ func TestValidatorBoundedBy(t *testing.T) {
 	require := require.New(t)
 
 	// case 1: a starts, a finishes, b starts, b finishes
-	aStartTime := uint64(1)
-	aEndTIme := uint64(2)
+	aStartTime := uint64(0)
+	aEndTIme := uint64(1)
 	a := &Validator{
 		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  aStartTime,
@@ -30,8 +30,8 @@ func TestValidatorBoundedBy(t *testing.T) {
 		Wght:   defaultWeight,
 	}
 
-	bStartTime := uint64(3)
-	bEndTime := uint64(4)
+	bStartTime := uint64(2)
+	bEndTime := uint64(3)
 	b := &Validator{
 		NodeID: ids.NodeID(keys[0].PublicKey().Address()),
 		Start:  bStartTime,

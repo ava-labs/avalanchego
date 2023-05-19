@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,9 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
-
-// time.Duration underlying type is currently int64
-var StakerMaxDuration time.Duration = math.MaxInt64
 
 // ValidatorTx defines the interface for a validator transaction that supports
 // delegation.

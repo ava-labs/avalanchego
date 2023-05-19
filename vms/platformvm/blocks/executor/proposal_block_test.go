@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -29,6 +30,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+// time.Duration underlying type is currently int64
+const stakerMaxDuration time.Duration = math.MaxInt64
 
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
@@ -406,7 +410,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker0RewardAddress),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
-		stakingPeriod: txs.StakerMaxDuration,
+		stakingPeriod: stakerMaxDuration,
 	}
 
 	staker1RewardAddress := ids.GenerateTestShortID()

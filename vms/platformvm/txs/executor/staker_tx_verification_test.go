@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -25,6 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+// time.Duration underlying type is currently int64
+const stakerMaxDuration time.Duration = math.MaxInt64
 
 func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	type test struct {
@@ -514,7 +518,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				primaryNetworkVdr := &state.Staker{
 					StartTime:     time.Unix(0, 0),
-					StakingPeriod: txs.StakerMaxDuration,
+					StakingPeriod: stakerMaxDuration,
 					EndTime:       mockable.MaxTime,
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
