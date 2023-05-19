@@ -87,7 +87,6 @@ type Database struct {
 	// If a value is nil, the corresponding key isn't in the trie.
 	nodeCache             onEvictCache[path, *node]
 	intermediateNodeCache onEvictCache[path, *node]
-	notFoundNodeCache     onEvictCache[path, *node]
 	onEvictionErr         utils.Atomic[error]
 
 	// Stores change lists. Used to serve change proofs and construct
