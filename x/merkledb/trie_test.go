@@ -36,7 +36,6 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 
 		return closestNode.value.value, nil
 	}
-
 	if asDatabases, ok := t.(*Database); ok {
 		view, err := asDatabases.NewView()
 		if err != nil {
