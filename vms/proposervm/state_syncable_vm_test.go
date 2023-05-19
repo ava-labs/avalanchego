@@ -610,9 +610,10 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	// set height index to reindexing
 	proVM.hIndexer.MarkRepaired(false)
-	require.ErrorIs(proVM.VerifyHeightIndex(context.Background()), block.ErrIndexIncomplete)
+	err := proVM.VerifyHeightIndex(context.Background())
+	require.ErrorIs(err, block.ErrIndexIncomplete)
 
-	_, err := proVM.GetLastStateSummary(context.Background())
+	_, err = proVM.GetLastStateSummary(context.Background())
 	require.ErrorIs(err, block.ErrIndexIncomplete)
 
 	_, err = proVM.GetStateSummary(context.Background(), summaryHeight)

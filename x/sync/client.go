@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	_ Client = &client{}
+	_ Client = (*client)(nil)
 
 	errInvalidRangeProof = errors.New("failed to verify range proof")
 	errTooManyKeys       = errors.New("response contains more than requested keys")

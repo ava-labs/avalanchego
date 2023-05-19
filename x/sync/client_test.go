@@ -119,7 +119,7 @@ func TestGetRangeProof(t *testing.T) {
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	largeTrieKeyCount := 10_000
+	largeTrieKeyCount := 3 * defaultRequestKeyLimit
 	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
 	require.NoError(t, err)
 	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
@@ -232,7 +232,7 @@ func TestGetRangeProof(t *testing.T) {
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
 			},
-			expectedErr: merkledb.ErrInvalidProof,
+			expectedErr: merkledb.ErrProofNodeNotForKey,
 		},
 		"removed key from middle of response": {
 			db: largeTrieDB,

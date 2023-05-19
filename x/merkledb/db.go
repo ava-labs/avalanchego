@@ -38,12 +38,12 @@ const (
 )
 
 var (
-	_ TrieView          = &Database{}
-	_ database.Database = &Database{}
+	_ TrieView          = (*Database)(nil)
+	_ database.Database = (*Database)(nil)
 
 	Codec, Version = newCodec()
 
-	rootKey                 = []byte{}
+	rootKey                 []byte
 	nodePrefix              = []byte("node")
 	metadataPrefix          = []byte("metadata")
 	cleanShutdownKey        = []byte("cleanShutdown")
@@ -65,7 +65,7 @@ type Config struct {
 	Tracer trace.Tracer
 }
 
-// Can only be edited by committing changes from a trieView.
+// Database can only be edited by committing changes from a trieView.
 type Database struct {
 	// Must be held when reading/writing fields.
 	lock sync.RWMutex
@@ -225,7 +225,7 @@ func New(ctx context.Context, db database.Database, config Config) (*Database, e
 	return newDatabase(ctx, db, config, metrics)
 }
 
-// Commits the key/value pairs within the [proof] to the db.
+// CommitChangeProof commits the key/value pairs within the [proof] to the db.
 func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -241,7 +241,7 @@ func (db *Database) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	return view.commitToDB(ctx)
 }
 
-// Commits the key/value pairs within the [proof] to the db.
+// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 // [start] is the smallest key in the range this [proof] covers.
 func (db *Database) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
 	db.commitLock.Lock()
@@ -354,7 +354,7 @@ func (db *Database) getValueCopy(key path, lock bool) ([]byte, error) {
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // If [lock], [db.lock]'s read lock is acquired.
-// Otherwise assumes [db.lock] is already held.
+// Otherwise, assumes [db.lock] is already held.
 func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	if lock {
 		db.lock.RLock()
@@ -375,7 +375,7 @@ func (db *Database) getValue(key path, lock bool) ([]byte, error) {
 	return n.value.value, nil
 }
 
-// Returns the ID of the root node of the merkle trie.
+// GetMerkleRoot returns the ID of the root node of the merkle trie.
 func (db *Database) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetMerkleRoot")
 	defer span.End()
@@ -396,7 +396,7 @@ func (db *Database) getMerkleRoot() ids.ID {
 	return db.root.id
 }
 
-// Returns a proof of the existence/non-existence of [key] in this trie.
+// GetProof returns a proof of the existence/non-existence of [key] in this trie.
 func (db *Database) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -419,7 +419,7 @@ func (db *Database) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-// Returns a proof for the key/value pairs in this trie within the range
+// GetRangeProof returns a proof for the key/value pairs in this trie within the range
 // [start, end].
 func (db *Database) GetRangeProof(
 	ctx context.Context,
@@ -433,7 +433,7 @@ func (db *Database) GetRangeProof(
 	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
 }
 
-// Returns a proof for the key/value pairs in this trie within the range
+// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 // [start, end] when the root of the trie was [rootID].
 func (db *Database) GetRangeProofAtRoot(
 	ctx context.Context,
@@ -470,7 +470,7 @@ func (db *Database) getRangeProofAtRoot(
 	return historicalView.GetRangeProof(ctx, start, end, maxLength)
 }
 
-// Returns a proof for a subset of the key/value changes in key range
+// GetChangeProof returns a proof for a subset of the key/value changes in key range
 // [start, end] that occurred between [startRootID] and [endRootID].
 // Returns at most [maxLength] key/value pairs.
 func (db *Database) GetChangeProof(
@@ -577,7 +577,7 @@ func (db *Database) GetChangeProof(
 	return result, nil
 }
 
-// Returns a new view on top of this trie.
+// NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.lock] isn't held.
 func (db *Database) NewView() (TrieView, error) {
@@ -591,7 +591,7 @@ func (db *Database) newUntrackedView(estimatedSize int) (*trieView, error) {
 	return newTrieView(db, db, db.root.clone(), estimatedSize)
 }
 
-// Returns a new view preallocated to hold at least [estimatedSize] value changes at a time.
+// NewPreallocatedView returns a new view with memory allocated to hold at least [estimatedSize] value changes at a time.
 // If more changes are made, additional memory will be allocated.
 // The returned view is added to [db.childViews].
 // Assumes [db.lock] isn't held.
@@ -721,7 +721,7 @@ func (db *Database) onEviction(node *node) error {
 	return nil
 }
 
-// Inserts the key/value pair into the db.
+// Put upserts the key/value pair into the db.
 func (db *Database) Put(k, v []byte) error {
 	return db.Insert(context.Background(), k, v)
 }
