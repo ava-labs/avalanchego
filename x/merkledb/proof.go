@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"google.golang.org/protobuf/proto"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -57,6 +58,7 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	}
 
 	for childIndex, childID := range node.Children {
+		childID := childID
 		pbNode.Children[uint32(childIndex)] = childID[:]
 	}
 
@@ -65,6 +67,26 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	}
 
 	return pbNode
+}
+
+func (node *ProofNode) FromProto(pbNode *syncpb.ProofNode) error {
+	node.KeyPath.NibbleLength = int(pbNode.Key.NibbleLength)
+	node.KeyPath.Value = pbNode.Key.Value
+
+	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
+	for childIndex, childIDBytes := range pbNode.Children {
+		childID, err := ids.ToID(childIDBytes)
+		if err != nil {
+			return err
+		}
+		node.Children[byte(childIndex)] = childID
+	}
+
+	if pbNode.ValueOrHash != nil {
+		node.ValueOrHash = Some(pbNode.ValueOrHash)
+	}
+
+	return nil
 }
 
 // An inclusion/exclustion proof of a key.
@@ -295,6 +317,40 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
 		End:       endProof,
 		KeyValues: keyValues,
 	}
+}
+
+// Unmarshals [proofBytes], which is the byte representation of a
+// syncpb.RangeProofResponse, into [proof].
+func (proof *RangeProof) UnmarshalProto(proofBytes []byte) error {
+	var pbProof syncpb.RangeProofResponse
+
+	if err := proto.Unmarshal(proofBytes, &pbProof); err != nil {
+		return err
+	}
+
+	proof.StartProof = make([]ProofNode, len(pbProof.Start))
+	for i, node := range pbProof.Start {
+		if err := proof.StartProof[i].FromProto(node); err != nil {
+			return err
+		}
+	}
+
+	proof.EndProof = make([]ProofNode, len(pbProof.End))
+	for i, node := range pbProof.End {
+		if err := proof.EndProof[i].FromProto(node); err != nil {
+			return err
+		}
+	}
+
+	proof.KeyValues = make([]KeyValue, len(pbProof.KeyValues))
+	for i, kv := range pbProof.KeyValues {
+		proof.KeyValues[i] = KeyValue{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	return nil
 }
 
 // Verify that all non-intermediate nodes in [proof] which have keys

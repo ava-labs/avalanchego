@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -1533,20 +1534,48 @@ func TestVerifyProofPath(t *testing.T) {
 	}
 }
 
-// TODO
-// func TestProofNodeToProto(t *testing.T) {
-// 	type test struct {
-// 		name string
-// 		node ProofNode
-// 	}
+func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337))
 
-// 	tests := []test{}
+	for i := 0; i < 1_000; i++ {
+		// Make a random proof node.
+		keyLen := rand.Intn(32)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+		serializedKey := newPath(key).Serialize()
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			pbNode := tt.node.ToProto()
+		var value Maybe[[]byte]
+		hasValue := rand.Intn(2) == 1
+		if hasValue {
+			valueBytes := make([]byte, rand.Intn(32))
+			_, _ = rand.Read(valueBytes)
+			value = Some(valueBytes)
+		}
 
-// 			require.Equal(t, tt.node, ProofNodeFromProto(proto))
-// 		})
-// 	}
-// }
+		children := map[byte]ids.ID{}
+		numChildren := rand.Intn(NodeBranchFactor + 1)
+		for i := 0; i < numChildren; i++ {
+			childID := ids.Empty.Prefix(uint64(i))
+			children[byte(i)] = childID
+		}
+
+		node := ProofNode{
+			KeyPath:     serializedKey,
+			ValueOrHash: value,
+			Children:    children,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		protoNode := node.ToProto()
+		var unmarshaledNode ProofNode
+		err := unmarshaledNode.FromProto(protoNode)
+		require.NoError(err)
+		require.Equal(node, unmarshaledNode)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledNode := unmarshaledNode.ToProto()
+		require.Equal(protoNode, protoUnmarshaledNode)
+	}
+}
