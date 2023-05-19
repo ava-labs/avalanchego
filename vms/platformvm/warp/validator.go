@@ -9,8 +9,6 @@ import (
 	"errors"
 	"fmt"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -53,7 +51,8 @@ func GetCanonicalValidatorSet(
 	}
 
 	var (
-		vdrs        = make(map[string]*Validator, len(vdrSet))
+		indices     = make(map[string]int, len(vdrSet))
+		result      = make([]*Validator, 0, len(vdrSet))
 		totalWeight uint64
 	)
 	for _, vdr := range vdrSet {
@@ -66,24 +65,27 @@ func GetCanonicalValidatorSet(
 			continue
 		}
 
+		var uniqueVdr *Validator
+
 		pkBytes := vdr.PublicKey.Serialize()
-		uniqueVdr, ok := vdrs[string(pkBytes)]
+		idx, ok := indices[string(pkBytes)]
 		if !ok {
 			uniqueVdr = &Validator{
 				PublicKey:      vdr.PublicKey,
 				PublicKeyBytes: pkBytes,
 			}
-			vdrs[string(pkBytes)] = uniqueVdr
+
+			indices[string(pkBytes)] = len(indices)
+			result = append(result, uniqueVdr)
+		} else {
+			uniqueVdr = result[idx]
 		}
 
 		uniqueVdr.Weight += vdr.Weight // Impossible to overflow here
 		uniqueVdr.NodeIDs = append(uniqueVdr.NodeIDs, vdr.NodeID)
 	}
 
-	// Sort validators by public key
-	vdrList := maps.Values(vdrs)
-	utils.Sort(vdrList)
-	return vdrList, totalWeight, nil
+	return result, totalWeight, nil
 }
 
 // FilterValidators returns the validators in [vdrs] whose bit is set to 1 in

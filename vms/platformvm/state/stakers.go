@@ -99,6 +99,10 @@ type baseStakers struct {
 	// subnetID --> nodeID --> current state for the validator of the subnet
 	validators map[ids.ID]map[ids.NodeID]*baseStaker
 	stakers    *btree.BTreeG[*Staker]
+
+	// ordered view of each subnet validator set
+	subnetValidators map[ids.ID]*btree.BTreeG[*Staker]
+
 	// subnetID --> nodeID --> diff for that validator since the last db write
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 }
@@ -110,9 +114,10 @@ type baseStaker struct {
 
 func newBaseStakers() *baseStakers {
 	return &baseStakers{
-		validators:     make(map[ids.ID]map[ids.NodeID]*baseStaker),
-		stakers:        btree.NewG(defaultTreeDegree, (*Staker).Less),
-		validatorDiffs: make(map[ids.ID]map[ids.NodeID]*diffValidator),
+		validators:       make(map[ids.ID]map[ids.NodeID]*baseStaker),
+		stakers:          btree.NewG(defaultTreeDegree, (*Staker).Less),
+		subnetValidators: make(map[ids.ID]*btree.BTreeG[*Staker]),
+		validatorDiffs:   make(map[ids.ID]map[ids.NodeID]*diffValidator),
 	}
 }
 
@@ -140,6 +145,8 @@ func (v *baseStakers) PutValidator(staker *Staker) {
 	validatorDiff.validator = staker
 
 	v.stakers.ReplaceOrInsert(staker)
+	subnetValidators := v.getOrCreateSubnetValidators(staker.SubnetID)
+	subnetValidators.ReplaceOrInsert(staker)
 }
 
 func (v *baseStakers) DeleteValidator(staker *Staker) {
@@ -152,6 +159,7 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validatorDiff.validator = staker
 
 	v.stakers.Delete(staker)
+	v.subnetValidators[staker.SubnetID].Delete(staker)
 }
 
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
@@ -214,6 +222,16 @@ func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *
 		subnetValidators[nodeID] = validator
 	}
 	return validator
+}
+
+func (v *baseStakers) getOrCreateSubnetValidators(subnetID ids.ID) *btree.BTreeG[*Staker] {
+	subnetValidators, ok := v.subnetValidators[subnetID]
+	if !ok {
+		subnetValidators = btree.NewG[*Staker](defaultTreeDegree, (*Staker).Less)
+		v.subnetValidators[subnetID] = subnetValidators
+	}
+
+	return subnetValidators
 }
 
 // pruneValidator assumes that the named validator is currently in the

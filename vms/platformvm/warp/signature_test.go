@@ -42,13 +42,12 @@ func (v *testValidator) Less(o *testValidator) bool {
 	return v.vdr.Less(o.vdr)
 }
 
-func newTestValidator() *testValidator {
+func newTestValidator(nodeID ids.NodeID) *testValidator {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		panic(err)
 	}
 
-	nodeID := ids.GenerateTestNodeID()
 	pk := bls.PublicFromSecretKey(sk)
 	return &testValidator{
 		nodeID: nodeID,
@@ -64,9 +63,9 @@ func newTestValidator() *testValidator {
 
 func init() {
 	testVdrs = []*testValidator{
-		newTestValidator(),
-		newTestValidator(),
-		newTestValidator(),
+		newTestValidator(ids.NodeID{0}),
+		newTestValidator(ids.NodeID{1}),
+		newTestValidator(ids.NodeID{2}),
 	}
 	utils.Sort(testVdrs)
 }
@@ -135,18 +134,18 @@ func TestNumSigners(t *testing.T) {
 }
 
 func TestSignatureVerification(t *testing.T) {
-	vdrs := map[ids.NodeID]*validators.GetValidatorOutput{
-		testVdrs[0].nodeID: {
+	vdrs := []*validators.GetValidatorOutput{
+		{
 			NodeID:    testVdrs[0].nodeID,
 			PublicKey: testVdrs[0].vdr.PublicKey,
 			Weight:    testVdrs[0].vdr.Weight,
 		},
-		testVdrs[1].nodeID: {
+		{
 			NodeID:    testVdrs[1].nodeID,
 			PublicKey: testVdrs[1].vdr.PublicKey,
 			Weight:    testVdrs[1].vdr.Weight,
 		},
-		testVdrs[2].nodeID: {
+		{
 			NodeID:    testVdrs[2].nodeID,
 			PublicKey: testVdrs[2].vdr.PublicKey,
 			Weight:    testVdrs[2].vdr.Weight,
@@ -219,13 +218,13 @@ func TestSignatureVerification(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return([]*validators.GetValidatorOutput{
+					{
 						NodeID:    testVdrs[0].nodeID,
 						PublicKey: testVdrs[0].vdr.PublicKey,
 						Weight:    math.MaxUint64,
 					},
-					testVdrs[1].nodeID: {
+					{
 						NodeID:    testVdrs[1].nodeID,
 						PublicKey: testVdrs[1].vdr.PublicKey,
 						Weight:    math.MaxUint64,
@@ -645,18 +644,18 @@ func TestSignatureVerification(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return([]*validators.GetValidatorOutput{
+					{
 						NodeID:    testVdrs[0].nodeID,
 						PublicKey: nil,
 						Weight:    testVdrs[0].vdr.Weight,
 					},
-					testVdrs[1].nodeID: {
+					{
 						NodeID:    testVdrs[1].nodeID,
 						PublicKey: testVdrs[1].vdr.PublicKey,
 						Weight:    testVdrs[1].vdr.Weight,
 					},
-					testVdrs[2].nodeID: {
+					{
 						NodeID:    testVdrs[2].nodeID,
 						PublicKey: testVdrs[2].vdr.PublicKey,
 						Weight:    testVdrs[2].vdr.Weight,
@@ -706,18 +705,18 @@ func TestSignatureVerification(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return([]*validators.GetValidatorOutput{
+					{
 						NodeID:    testVdrs[0].nodeID,
 						PublicKey: nil,
 						Weight:    testVdrs[0].vdr.Weight,
 					},
-					testVdrs[1].nodeID: {
+					{
 						NodeID:    testVdrs[1].nodeID,
 						PublicKey: testVdrs[2].vdr.PublicKey,
 						Weight:    testVdrs[1].vdr.Weight,
 					},
-					testVdrs[2].nodeID: {
+					{
 						NodeID:    testVdrs[2].nodeID,
 						PublicKey: testVdrs[2].vdr.PublicKey,
 						Weight:    testVdrs[2].vdr.Weight,

@@ -43,13 +43,13 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
-						testVdrs[0].nodeID: {
+					[]*validators.GetValidatorOutput{
+						{
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
-						testVdrs[1].nodeID: {
+						{
 							NodeID:    testVdrs[1].nodeID,
 							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
@@ -68,18 +68,18 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
-						testVdrs[0].nodeID: {
+					[]*validators.GetValidatorOutput{
+						{
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
-						testVdrs[1].nodeID: {
+						{
 							NodeID:    testVdrs[1].nodeID,
 							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
 						},
-						testVdrs[2].nodeID: {
+						{
 							NodeID:    testVdrs[2].nodeID,
 							PublicKey: testVdrs[0].vdr.PublicKey,
 							Weight:    testVdrs[0].vdr.Weight,
@@ -109,13 +109,13 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(
-					map[ids.NodeID]*validators.GetValidatorOutput{
-						testVdrs[0].nodeID: {
+					[]*validators.GetValidatorOutput{
+						{
 							NodeID:    testVdrs[0].nodeID,
 							PublicKey: nil,
 							Weight:    testVdrs[0].vdr.Weight,
 						},
-						testVdrs[1].nodeID: {
+						{
 							NodeID:    testVdrs[1].nodeID,
 							PublicKey: testVdrs[1].vdr.PublicKey,
 							Weight:    testVdrs[1].vdr.Weight,
@@ -324,14 +324,9 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	}
 
 	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
-		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-		for i := 0; i < size; i++ {
-			validator := getValidatorOutputs[i]
-			getValidatorsOutput[validator.NodeID] = validator
-		}
 		validatorState := &validators.TestState{
-			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-				return getValidatorsOutput, nil
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) ([]*validators.GetValidatorOutput, error) {
+				return getValidatorOutputs, nil
 			},
 		}
 

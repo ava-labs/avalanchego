@@ -52,7 +52,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		require.NoError(t, err)
 
 		vdrs = append(vdrs, &validators.Validator{
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    ids.NodeID{byte(i)},
 			PublicKey: bls.PublicFromSecretKey(sk),
 			Weight:    vdrBaseWeight + uint64(i),
 		})
@@ -73,7 +73,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		// Diff at tip, block before tip, etc.
 		// This must have [lastAcceptedHeight] - [height] elements
 		pkDiffs        []map[ids.NodeID]*bls.PublicKey
-		expectedVdrSet map[ids.NodeID]*validators.GetValidatorOutput
+		expectedVdrSet []*validators.GetValidatorOutput
 		expectedErr    error
 	}
 
@@ -82,7 +82,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "after tip",
 			height:             1,
 			lastAcceptedHeight: 0,
-			expectedVdrSet:     map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedVdrSet:     []*validators.GetValidatorOutput{},
 			expectedErr:        database.ErrNotFound,
 		},
 		{
@@ -95,8 +95,8 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			currentSubnetValidators: []*validators.Validator{
 				copySubnetValidator(vdrs[0]),
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight,
@@ -140,18 +140,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 					vdrs[2].NodeID: vdrs[2].PublicKey,
 				},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
+				{
 					NodeID:    vdrs[1].NodeID,
 					PublicKey: vdrs[1].PublicKey,
 					Weight:    vdrs[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
+				{
 					NodeID:    vdrs[2].NodeID,
 					PublicKey: vdrs[2].PublicKey,
 					Weight:    vdrs[2].Weight,
@@ -212,13 +212,13 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				},
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight + 2,
 				},
-				vdrs[1].NodeID: {
+				{
 					NodeID:    vdrs[1].NodeID,
 					PublicKey: vdrs[1].PublicKey,
 					Weight:    vdrs[1].Weight - 2,
@@ -260,18 +260,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
+				{
 					NodeID:    vdrs[1].NodeID,
 					PublicKey: vdrs[1].PublicKey,
 					Weight:    vdrs[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
+				{
 					NodeID: vdrs[2].NodeID,
 					Weight: vdrs[2].Weight,
 				},
@@ -314,18 +314,18 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
+				{
 					NodeID:    vdrs[1].NodeID,
 					PublicKey: vdrs[1].PublicKey,
 					Weight:    vdrs[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
+				{
 					NodeID: vdrs[2].NodeID,
 					Weight: vdrs[2].Weight,
 				},
@@ -351,8 +351,8 @@ func TestVM_GetValidatorSet(t *testing.T) {
 					vdrs[1].NodeID: vdrs[1].PublicKey,
 				},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
+			expectedVdrSet: []*validators.GetValidatorOutput{
+				{
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
 					Weight:    vdrs[0].Weight,

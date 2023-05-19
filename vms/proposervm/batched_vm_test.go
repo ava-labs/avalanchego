@@ -1008,21 +1008,21 @@ func initTestRemoteProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			proVM.ctx.NodeID: {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) ([]*validators.GetValidatorOutput, error) {
+		return []*validators.GetValidatorOutput{
+			{
 				NodeID: proVM.ctx.NodeID,
 				Weight: 10,
 			},
-			{1}: {
+			{
 				NodeID: ids.NodeID{1},
 				Weight: 5,
 			},
-			{2}: {
+			{
 				NodeID: ids.NodeID{2},
 				Weight: 6,
 			},
-			{3}: {
+			{
 				NodeID: ids.NodeID{3},
 				Weight: 7,
 			},

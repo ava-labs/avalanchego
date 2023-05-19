@@ -147,7 +147,7 @@ func TestGetValidatorSet(t *testing.T) {
 	sk0, err := bls.NewSecretKey()
 	require.NoError(err)
 	vdr0 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
+		NodeID:    ids.NodeID{0},
 		PublicKey: bls.PublicFromSecretKey(sk0),
 		Weight:    1,
 	}
@@ -155,21 +155,21 @@ func TestGetValidatorSet(t *testing.T) {
 	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 	vdr1 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
+		NodeID:    ids.NodeID{1},
 		PublicKey: bls.PublicFromSecretKey(sk1),
 		Weight:    2,
 	}
 
 	vdr2 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
+		NodeID:    ids.NodeID{2},
 		PublicKey: nil,
 		Weight:    3,
 	}
 
-	expectedVdrs := map[ids.NodeID]*validators.GetValidatorOutput{
-		vdr0.NodeID: vdr0,
-		vdr1.NodeID: vdr1,
-		vdr2.NodeID: vdr2,
+	expectedVdrs := []*validators.GetValidatorOutput{
+		vdr0,
+		vdr1,
+		vdr2,
 	}
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()
@@ -211,7 +211,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}
 }
 
-func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
+func benchmarkGetValidatorSet(b *testing.B, vs []*validators.GetValidatorOutput) {
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
@@ -231,20 +231,20 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	b.StopTimer()
 }
 
-func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetValidatorOutput {
+func setupValidatorSet(b *testing.B, size int) []*validators.GetValidatorOutput {
 	b.Helper()
 
-	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
+	set := make([]*validators.GetValidatorOutput, size)
 	sk, err := bls.NewSecretKey()
 	require.NoError(b, err)
 	pk := bls.PublicFromSecretKey(sk)
 	for i := 0; i < size; i++ {
 		id := ids.GenerateTestNodeID()
-		set[id] = &validators.GetValidatorOutput{
+		set = append(set, &validators.GetValidatorOutput{
 			NodeID:    id,
 			PublicKey: pk,
 			Weight:    uint64(i),
-		}
+		})
 	}
 	return set
 }

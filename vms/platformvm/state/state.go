@@ -127,8 +127,7 @@ type State interface {
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
 	AddStatelessBlock(block blocks.Block, status choices.Status)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
+	// ValidatorSet adds all of the validators of [subnetID] into [vdrs].
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
@@ -924,23 +923,17 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 }
 
 func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
-	for nodeID, validator := range s.currentStakers.validators[subnetID] {
-		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
-			return err
-		}
+	var err error
+	validatorSet := s.currentStakers.getOrCreateSubnetValidators(subnetID)
 
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
-				return err
-			}
+	validatorSet.Ascend(func(i *Staker) bool {
+		if err := vdrs.Add(i.NodeID, i.PublicKey, i.TxID, i.Weight); err != nil {
+			return false
 		}
-		delegatorIterator.Release()
-	}
-	return nil
+		return true
+	})
+
+	return err
 }
 
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
@@ -1153,10 +1146,12 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.validator = staker
+		currentValidator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		currentValidator.validator = staker
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
+		subnet := s.currentStakers.getOrCreateSubnetValidators(staker.SubnetID)
+		subnet.ReplaceOrInsert(staker)
 
 		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
@@ -1194,10 +1189,12 @@ func (s *state) loadCurrentValidators() error {
 		if err != nil {
 			return err
 		}
-		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.validator = staker
+		currentValidator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+		currentValidator.validator = staker
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
+		subnet := s.currentStakers.subnetValidators[staker.SubnetID]
+		subnet.ReplaceOrInsert(staker)
 
 		s.validatorState.LoadValidatorMetadata(staker.NodeID, staker.SubnetID, metadata)
 	}
@@ -1287,10 +1284,12 @@ func (s *state) loadPendingValidators() error {
 				return err
 			}
 
-			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-			validator.validator = staker
+			pendingValidator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			pendingValidator.validator = staker
 
 			s.pendingStakers.stakers.ReplaceOrInsert(staker)
+			subnet := s.currentStakers.subnetValidators[staker.SubnetID]
+			subnet.ReplaceOrInsert(staker)
 		}
 	}
 

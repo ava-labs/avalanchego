@@ -66,17 +66,17 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 
 func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.NodeID, error) {
 	// get the validator set by the p-chain height
-	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
+	validatorsList, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
 		return nil, err
 	}
 
 	// convert the map of validators to a slice
-	validators := make([]validatorData, 0, len(validatorsMap))
+	validators := make([]validatorData, 0, len(validatorsList))
 	weight := uint64(0)
-	for k, v := range validatorsMap {
+	for _, v := range validatorsList {
 		validators = append(validators, validatorData{
-			id:     k,
+			id:     v.NodeID,
 			weight: v.Weight,
 		})
 		newWeight, err := math.Add64(weight, v.Weight)
