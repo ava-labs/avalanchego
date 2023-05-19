@@ -314,7 +314,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		StakingEnabled:         true,
+		SybilProtectionEnabled: true,
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
