@@ -1532,3 +1532,21 @@ func TestVerifyProofPath(t *testing.T) {
 		})
 	}
 }
+
+// TODO
+// func TestProofNodeToProto(t *testing.T) {
+// 	type test struct {
+// 		name string
+// 		node ProofNode
+// 	}
+
+// 	tests := []test{}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			pbNode := tt.node.ToProto()
+
+// 			require.Equal(t, tt.node, ProofNodeFromProto(proto))
+// 		})
+// 	}
+// }

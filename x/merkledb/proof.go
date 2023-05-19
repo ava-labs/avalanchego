@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const verificationCacheSize = 2_000
@@ -43,6 +45,26 @@ type ProofNode struct {
 	// The hash of the value in this node otherwise.
 	ValueOrHash Maybe[[]byte]
 	Children    map[byte]ids.ID
+}
+
+func (node *ProofNode) ToProto() *syncpb.ProofNode {
+	pbNode := &syncpb.ProofNode{
+		Key: &syncpb.SerializedPath{
+			NibbleLength: uint32(node.KeyPath.NibbleLength),
+			Value:        node.KeyPath.Value,
+		},
+		Children: make(map[uint32][]byte, len(node.Children)),
+	}
+
+	for childIndex, childID := range node.Children {
+		pbNode.Children[uint32(childIndex)] = childID[:]
+	}
+
+	if node.ValueOrHash.hasValue {
+		pbNode.ValueOrHash = node.ValueOrHash.value
+	}
+
+	return pbNode
 }
 
 // An inclusion/exclustion proof of a key.
@@ -247,6 +269,32 @@ func (proof *RangeProof) Verify(
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedRootID)
 	}
 	return nil
+}
+
+func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
+	startProof := make([]*syncpb.ProofNode, len(proof.StartProof))
+	for i, node := range proof.StartProof {
+		startProof[i] = node.ToProto()
+	}
+
+	endProof := make([]*syncpb.ProofNode, len(proof.EndProof))
+	for i, node := range proof.EndProof {
+		endProof[i] = node.ToProto()
+	}
+
+	keyValues := make([]*syncpb.KeyValue, len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		keyValues[i] = &syncpb.KeyValue{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	return &syncpb.RangeProofResponse{
+		Start:     startProof,
+		End:       endProof,
+		KeyValues: keyValues,
+	}
 }
 
 // Verify that all non-intermediate nodes in [proof] which have keys

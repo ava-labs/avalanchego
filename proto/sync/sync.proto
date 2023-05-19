@@ -53,7 +53,7 @@ message SerializedPath {
 
 /* ProofNode is a node in a merkle proof */
 message ProofNode {
-  bytes key = 1;
+  SerializedPath key = 1;
   optional bytes value_or_hash = 2;
   map<uint32, bytes> children = 3;
 }
