@@ -25,7 +25,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	cache := newOnEvictCache[int](maxSize, onEviction)
 	require.Equal(maxSize, cache.maxSize)
 	require.NotNil(cache.fifo)
-	require.Equal(0, cache.fifo.Len())
+	require.Zero(cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
 	err := cache.onEviction(0)
@@ -60,7 +60,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	// Get key
 	val, ok := cache.Get(0)
 	require.True(ok)
-	require.Equal(0, val)
+	require.Zero(val)
 
 	// Get non-existent key
 	_, ok = cache.Get(1)
@@ -72,7 +72,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 		require.NoError(err)
 		require.Equal(i+1, cache.fifo.Len())
 	}
-	require.Len(evicted, 0)
+	require.Empty(evicted)
 
 	// Cache has [0,1,2]
 
@@ -81,7 +81,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require.NoError(err)
 	require.Equal(maxSize, cache.fifo.Len())
 	require.Len(evicted, 1)
-	require.Equal(0, evicted[0])
+	require.Zero(evicted[0])
 
 	// Cache has [1,2,3]
 	iter := cache.fifo.NewIterator()
@@ -148,10 +148,10 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require.NoError(err)
 
 	// Cache should be empty
-	require.Equal(0, cache.fifo.Len())
+	require.Zero(cache.fifo.Len())
 	require.Len(evicted, 5)
 	require.Equal([]int{0, 1, 2, 3, 4}, evicted)
-	require.Equal(0, cache.fifo.Len())
+	require.Zero(cache.fifo.Len())
 	require.Equal(maxSize, cache.maxSize) // Should be unchanged
 }
 
@@ -204,7 +204,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	require.ErrorIs(err, errTest)
 
 	// Should still be empty.
-	require.Equal(0, cache.fifo.Len())
+	require.Zero(cache.fifo.Len())
 	require.Equal(evicted, []int{0, 1, 2})
 	_, ok = cache.Get(0)
 	require.False(ok)
