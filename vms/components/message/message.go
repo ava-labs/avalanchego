@@ -5,14 +5,20 @@ package message
 
 import (
 	"errors"
+	"fmt"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/message"
 )
 
 var (
 	_ Message = (*Tx)(nil)
 
 	ErrUnexpectedCodecVersion = errors.New("unexpected codec version")
+	errUnknownMessageType     = errors.New("unknown message type")
 )
 
 type Message interface {
@@ -39,13 +45,33 @@ func (m *message) Bytes() []byte {
 }
 
 func Parse(bytes []byte) (Message, error) {
-	var msg Message
-	version, err := c.Unmarshal(bytes, &msg)
-	if err != nil {
-		return nil, err
-	}
-	if version != codecVersion {
-		return nil, ErrUnexpectedCodecVersion
+	var (
+		msg      Message
+		protoMsg pb.Message
+	)
+
+	if err := proto.Unmarshal(bytes, &protoMsg); err == nil {
+		// This message was encoded with proto.
+		switch m := protoMsg.GetMessage().(type) {
+		case *pb.Message_Tx:
+			msg = &Tx{
+				Tx: m.Tx.Tx,
+			}
+		default:
+			return nil, fmt.Errorf("%w: %T", errUnknownMessageType, protoMsg.GetMessage())
+		}
+	} else {
+		// This message wasn't encoded with proto.
+		// It must have been encoded with avalanchego's codec.
+		// TODO remove else statement remove once all nodes support proto encoding.
+		// i.e. when all nodes are on v1.11.0 or later.
+		version, err := c.Unmarshal(bytes, &msg)
+		if err != nil {
+			return nil, err
+		}
+		if version != codecVersion {
+			return nil, ErrUnexpectedCodecVersion
+		}
 	}
 	msg.initialize(bytes)
 	return msg, nil

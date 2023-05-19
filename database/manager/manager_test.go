@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -38,7 +39,7 @@ func TestNewSingleLevelDB(t *testing.T) {
 
 	semDB := manager.Current()
 	cmp := semDB.Version.Compare(v1)
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
 	require.False(exists, "there should be no previous database")
@@ -62,7 +63,7 @@ func TestNewCreatesSingleDB(t *testing.T) {
 
 	semDB := manager.Current()
 	cmp := semDB.Version.Compare(v1)
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
 	require.False(exists, "there should be no previous database")
@@ -102,7 +103,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	require.NoError(err)
 
 	_, err = NewLevelDB(dir, nil, logging.NoLog{}, v2, "", prometheus.NewRegistry())
-	require.Error(err, "expected to error creating the manager due to an open db")
+	require.ErrorIs(err, leveldb.ErrCouldNotOpen)
 
 	err = db1.Close()
 	require.NoError(err)
@@ -172,19 +173,19 @@ func TestNewSortsDatabases(t *testing.T) {
 
 	semDB := manager.Current()
 	cmp := semDB.Version.Compare(vers[0])
-	require.Equal(0, cmp, "incorrect version on current database")
+	require.Zero(cmp, "incorrect version on current database")
 
 	prev, exists := manager.Previous()
 	require.True(exists, "expected to find a previous database")
 	cmp = prev.Version.Compare(vers[1])
-	require.Equal(0, cmp, "incorrect version on previous database")
+	require.Zero(cmp, "incorrect version on previous database")
 
 	dbs := manager.GetDatabases()
-	require.Equal(len(vers), len(dbs))
+	require.Len(dbs, len(vers))
 
 	for i, db := range dbs {
 		cmp = db.Version.Compare(vers[i])
-		require.Equal(0, cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
+		require.Zero(cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
 	}
 }
 
@@ -305,16 +306,13 @@ func TestMeterDBManager(t *testing.T) {
 	dbs := manager.GetDatabases()
 	require.Len(dbs, 3)
 
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	require.False(ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	require.False(ok)
+	require.IsType(&meterdb.Database{}, dbs[0].Database)
+	require.IsType(&memdb.Database{}, dbs[1].Database)
+	require.IsType(&memdb.Database{}, dbs[2].Database)
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewMeterDBManager("", registry)
-	require.Error(err)
+	require.ErrorIs(err, metric.ErrFailedRegistering)
 }
 
 func TestCompleteMeterDBManager(t *testing.T) {
@@ -354,16 +352,13 @@ func TestCompleteMeterDBManager(t *testing.T) {
 	dbs := manager.GetDatabases()
 	require.Len(dbs, 3)
 
-	_, ok := dbs[0].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[1].Database.(*meterdb.Database)
-	require.True(ok)
-	_, ok = dbs[2].Database.(*meterdb.Database)
-	require.True(ok)
+	require.IsType(&meterdb.Database{}, dbs[0].Database)
+	require.IsType(&meterdb.Database{}, dbs[1].Database)
+	require.IsType(&meterdb.Database{}, dbs[2].Database)
 
 	// Confirm that the error from a name conflict is handled correctly
 	_, err = m.NewCompleteMeterDBManager("", registry)
-	require.Error(err)
+	require.ErrorIs(err, metric.ErrFailedRegistering)
 }
 
 func TestNewManagerFromDBs(t *testing.T) {
@@ -406,7 +401,7 @@ func TestNewManagerFromDBs(t *testing.T) {
 	dbs := m.GetDatabases()
 	require.Len(dbs, len(versions))
 	for i, db := range dbs {
-		require.Equal(0, db.Version.Compare(versions[i]))
+		require.Zero(db.Version.Compare(versions[i]))
 	}
 }
 
@@ -414,7 +409,7 @@ func TestNewManagerFromNoDBs(t *testing.T) {
 	require := require.New(t)
 	// Should error if no dbs are given
 	_, err := NewManagerFromDBs(nil)
-	require.Error(err)
+	require.ErrorIs(err, errNoDBs)
 }
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
@@ -447,5 +442,5 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 				},
 			},
 		})
-	require.Error(err)
+	require.ErrorIs(err, errNonSortedAndUniqueDBs)
 }

@@ -33,10 +33,12 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	err = addValidatorTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
@@ -107,7 +109,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, avax.ErrWrongNetworkID)
 	addValidatorTx.NetworkID--
 
 	// Case: Stake owner has no addresses
@@ -119,7 +121,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, secp256k1fx.ErrOutputUnspendable)
 	addValidatorTx.StakeOuts = stakes
 
 	// Case: Rewards owner has no addresses
@@ -128,7 +130,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, secp256k1fx.ErrOutputUnspendable)
 	addValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners).Addrs = []ids.ShortID{rewardAddress}
 
 	// Case: Too many shares
@@ -137,7 +139,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
+	require.ErrorIs(err, errTooManyShares)
 	addValidatorTx.DelegationShares--
 }
 
@@ -215,7 +217,9 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
-	require.Error(stx.SyntacticVerify(ctx))
+
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, errStakeMustBeAVAX)
 }
 
 func TestAddValidatorTxNotDelegatorTx(t *testing.T) {

@@ -94,7 +94,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
 	require.NoError(err)
-	require.True(loadedForkHeight == 1)
+	require.Equal(uint64(1), loadedForkHeight)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
 		require.NoError(err)
@@ -174,10 +174,10 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
 	require.NoError(err)
-	require.True(loadedForkHeight == forkHeight)
+	require.Equal(forkHeight, loadedForkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		require.Error(err, database.ErrNotFound)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 	for height := forkHeight; height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
@@ -270,7 +270,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
 	require.NoError(err)
-	require.True(loadedForkHeight == forkHeight)
+	require.Equal(forkHeight, loadedForkHeight)
 	for height := forkHeight; height <= checkpointBlk.Height(); height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
 		require.NoError(err)

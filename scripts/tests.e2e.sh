@@ -6,7 +6,6 @@ set -o pipefail
 # e.g.,
 # ./scripts/build.sh
 # ./scripts/tests.e2e.sh ./build/avalanchego
-# ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -27,15 +26,6 @@ export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 # While CGO_ENABLED doesn't need to be explicitly set, it produces a much more
 # clear error due to the default value change in go1.20.
 export CGO_ENABLED=1
-
-ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
-# ref. https://onsi.github.io/ginkgo/#spec-labels
-GINKGO_LABEL_FILTER="!whitelist-tx"
-if [[ ${ENABLE_WHITELIST_VTX_TESTS} == true ]]; then
-  # run only "whitelist-tx" tests, no other test
-  GINKGO_LABEL_FILTER="whitelist-tx"
-fi
-echo GINKGO_LABEL_FILTER: ${GINKGO_LABEL_FILTER}
 
 #################################
 # download avalanche-network-runner
@@ -85,7 +75,7 @@ echo "running e2e tests against the local cluster with ${AVALANCHEGO_PATH}"
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
 --network-runner-avalanchego-path=${AVALANCHEGO_PATH} \
 --network-runner-avalanchego-log-level="WARN" \
---test-keys-file=tests/test.insecure.secp256k1.keys --ginkgo.label-filter="${GINKGO_LABEL_FILTER}" \
+--test-keys-file=tests/test.insecure.secp256k1.keys \
 && EXIT_CODE=$? || EXIT_CODE=$?
 
 kill ${PID}

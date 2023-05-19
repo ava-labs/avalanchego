@@ -3,9 +3,7 @@
 
 package json
 
-import (
-	"strconv"
-)
+import "strconv"
 
 type Float32 float32
 
