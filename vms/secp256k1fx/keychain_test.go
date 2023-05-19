@@ -67,7 +67,7 @@ func TestKeychainNew(t *testing.T) {
 	require := require.New(t)
 	kc := NewKeychain()
 
-	require.Equal(0, kc.Addresses().Len())
+	require.Zero(kc.Addresses().Len())
 
 	sk, err := kc.New()
 	require.NoError(err)

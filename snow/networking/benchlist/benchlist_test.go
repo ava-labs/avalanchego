@@ -72,9 +72,9 @@ func TestBenchlistAdd(t *testing.T) {
 	require.False(t, b.isBenched(vdrID2))
 	require.False(t, b.isBenched(vdrID3))
 	require.False(t, b.isBenched(vdrID4))
-	require.Len(t, b.failureStreaks, 0)
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
+	require.Empty(t, b.failureStreaks)
+	require.Zero(t, b.benchedQueue.Len())
+	require.Zero(t, b.benchlistSet.Len())
 	b.lock.Unlock()
 
 	// Register [threshold - 1] failures in a row for vdr0
@@ -84,8 +84,8 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Still shouldn't be benched due to not enough consecutive failure
 	require.False(t, b.isBenched(vdrID0))
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
+	require.Zero(t, b.benchedQueue.Len())
+	require.Zero(t, b.benchlistSet.Len())
 	require.Len(t, b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID0]
 	require.Equal(t, threshold-1, fs.consecutive)
@@ -98,8 +98,8 @@ func TestBenchlistAdd(t *testing.T) {
 	// has passed since the first failure
 	b.lock.Lock()
 	require.False(t, b.isBenched(vdrID0))
-	require.Equal(t, b.benchedQueue.Len(), 0)
-	require.Equal(t, b.benchlistSet.Len(), 0)
+	require.Zero(t, b.benchedQueue.Len())
+	require.Zero(t, b.benchlistSet.Len())
 	b.lock.Unlock()
 
 	// Move the time up
@@ -126,7 +126,7 @@ func TestBenchlistAdd(t *testing.T) {
 	require.Equal(t, vdrID0, next.nodeID)
 	require.True(t, !next.benchedUntil.After(now.Add(duration)))
 	require.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
-	require.Len(t, b.failureStreaks, 0)
+	require.Empty(t, b.failureStreaks)
 	require.True(t, benched)
 	benchable.BenchedF = nil
 	b.lock.Unlock()
@@ -146,7 +146,7 @@ func TestBenchlistAdd(t *testing.T) {
 	require.False(t, b.isBenched(vdrID1))
 	require.Equal(t, b.benchedQueue.Len(), 1)
 	require.Equal(t, b.benchlistSet.Len(), 1)
-	require.Len(t, b.failureStreaks, 0)
+	require.Empty(t, b.failureStreaks)
 	b.lock.Unlock()
 
 	// Register another failure for vdr0, who is benched
@@ -154,7 +154,7 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// A failure for an already benched validator should not count against it
 	b.lock.Lock()
-	require.Len(t, b.failureStreaks, 0)
+	require.Empty(t, b.failureStreaks)
 	b.lock.Unlock()
 }
 
@@ -369,7 +369,7 @@ func TestBenchlistRemove(t *testing.T) {
 	require.True(t, b.isBenched(vdrID2))
 	require.Equal(t, 3, b.benchedQueue.Len())
 	require.Equal(t, 3, b.benchlistSet.Len())
-	require.Len(t, b.failureStreaks, 0)
+	require.Empty(t, b.failureStreaks)
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
