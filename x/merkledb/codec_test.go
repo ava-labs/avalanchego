@@ -21,6 +21,8 @@ import (
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
+	serializedKey := newPath(key).Serialize()
+
 	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404
 
@@ -32,22 +34,28 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 			children[byte(j)] = childID
 		}
 	}
-	// use the hash instead when length is greater than the hash length
-	if len(val) >= HashLength {
-		val = hashing.ComputeHash256(val)
-	} else if len(val) == 0 {
-		// We do this because when we encode a value of []byte{} we will later
-		// decode it as nil.
-		// Doing this prevents inconsistency when comparing the encoded and
-		// decoded values.
-		// Calling nilEmptySlices doesn't set this because it is a private
-		// variable on the struct
-		val = nil
+
+	hasValue := rand.Intn(2) == 1 // #nosec G404
+	var valueOrHash Maybe[[]byte]
+	if hasValue {
+		// use the hash instead when length is greater than the hash length
+		if len(val) >= HashLength {
+			val = hashing.ComputeHash256(val)
+		} else if len(val) == 0 {
+			// We do this because when we encode a value of []byte{} we will later
+			// decode it as nil.
+			// Doing this prevents inconsistency when comparing the encoded and
+			// decoded values.
+			// Calling nilEmptySlices doesn't set this because it is a private
+			// variable on the struct
+			val = nil
+		}
+		valueOrHash = Some(val)
 	}
 
 	return ProofNode{
-		KeyPath:     newPath(key).Serialize(),
-		ValueOrHash: Some(val),
+		KeyPath:     serializedKey,
+		ValueOrHash: valueOrHash,
 		Children:    children,
 	}
 }

@@ -1536,46 +1536,71 @@ func TestVerifyProofPath(t *testing.T) {
 
 func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337))
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
 
 	for i := 0; i < 1_000; i++ {
-		// Make a random proof node.
-		keyLen := rand.Intn(32)
-		key := make([]byte, keyLen)
-		_, _ = rand.Read(key)
-		serializedKey := newPath(key).Serialize()
-
-		var value Maybe[[]byte]
-		hasValue := rand.Intn(2) == 1
-		if hasValue {
-			valueBytes := make([]byte, rand.Intn(32))
-			_, _ = rand.Read(valueBytes)
-			value = Some(valueBytes)
-		}
-
-		children := map[byte]ids.ID{}
-		numChildren := rand.Intn(NodeBranchFactor + 1)
-		for i := 0; i < numChildren; i++ {
-			childID := ids.Empty.Prefix(uint64(i))
-			children[byte(i)] = childID
-		}
-
-		node := ProofNode{
-			KeyPath:     serializedKey,
-			ValueOrHash: value,
-			Children:    children,
-		}
+		node := newRandomProofNode(rand)
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
-		err := unmarshaledNode.FromProto(protoNode)
+		err := unmarshaledNode.UnmarshalProto(protoNode)
 		require.NoError(err)
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
+	}
+}
+
+func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random range proof.
+		startProofLen := rand.Intn(32)
+		startProof := make([]ProofNode, startProofLen)
+		for i := 0; i < startProofLen; i++ {
+			startProof[i] = newRandomProofNode(rand)
+		}
+
+		endProofLen := rand.Intn(32)
+		endProof := make([]ProofNode, endProofLen)
+		for i := 0; i < endProofLen; i++ {
+			endProof[i] = newRandomProofNode(rand)
+		}
+
+		numKeyValues := rand.Intn(128)
+		keyValues := make([]KeyValue, numKeyValues)
+		for i := 0; i < numKeyValues; i++ {
+			keyLen := rand.Intn(32)
+			key := make([]byte, keyLen)
+			_, _ = rand.Read(key)
+
+			valueLen := rand.Intn(32)
+			value := make([]byte, valueLen)
+			_, _ = rand.Read(value)
+
+			keyValues[i] = KeyValue{
+				Key:   key,
+				Value: value,
+			}
+		}
+
+		proof := RangeProof{
+			StartProof: startProof,
+			EndProof:   endProof,
+			KeyValues:  keyValues,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof RangeProof
+		err := unmarshaledProof.UnmarshalProto(proof.ToProto())
+		require.NoError(err)
+		require.Equal(proof, unmarshaledProof)
 	}
 }

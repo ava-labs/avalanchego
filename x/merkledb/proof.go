@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"google.golang.org/protobuf/proto"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -63,13 +62,19 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	}
 
 	if node.ValueOrHash.hasValue {
-		pbNode.ValueOrHash = node.ValueOrHash.value
+		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+			Value: node.ValueOrHash.value,
+		}
+	} else {
+		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+			IsNothing: true,
+		}
 	}
 
 	return pbNode
 }
 
-func (node *ProofNode) FromProto(pbNode *syncpb.ProofNode) error {
+func (node *ProofNode) UnmarshalProto(pbNode *syncpb.ProofNode) error {
 	node.KeyPath.NibbleLength = int(pbNode.Key.NibbleLength)
 	node.KeyPath.Value = pbNode.Key.Value
 
@@ -82,8 +87,8 @@ func (node *ProofNode) FromProto(pbNode *syncpb.ProofNode) error {
 		node.Children[byte(childIndex)] = childID
 	}
 
-	if pbNode.ValueOrHash != nil {
-		node.ValueOrHash = Some(pbNode.ValueOrHash)
+	if !pbNode.ValueOrHash.IsNothing {
+		node.ValueOrHash = Some(pbNode.ValueOrHash.Value)
 	}
 
 	return nil
@@ -321,25 +326,25 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
 
 // Unmarshals [proofBytes], which is the byte representation of a
 // syncpb.RangeProofResponse, into [proof].
-func (proof *RangeProof) UnmarshalProto(proofBytes []byte) error {
-	var pbProof syncpb.RangeProofResponse
-
-	if err := proto.Unmarshal(proofBytes, &pbProof); err != nil {
-		return err
-	}
-
+func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) error {
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
-	for i, node := range pbProof.Start {
-		if err := proof.StartProof[i].FromProto(node); err != nil {
+	for i, protoNode := range pbProof.Start {
+		var node ProofNode
+		err := node.UnmarshalProto(protoNode)
+		if err != nil {
 			return err
 		}
+		proof.StartProof[i] = node
 	}
 
 	proof.EndProof = make([]ProofNode, len(pbProof.End))
-	for i, node := range pbProof.End {
-		if err := proof.EndProof[i].FromProto(node); err != nil {
+	for i, protoNode := range pbProof.End {
+		var node ProofNode
+		err := node.UnmarshalProto(protoNode)
+		if err != nil {
 			return err
 		}
+		proof.EndProof[i] = node
 	}
 
 	proof.KeyValues = make([]KeyValue, len(pbProof.KeyValues))
