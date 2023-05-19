@@ -26,7 +26,7 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 	}
 }
 
-// Get an element from this cache.
+// Remove an element from this cache.
 func (c *onEvictCache[K, V]) Remove(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -58,7 +58,7 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	return nil
 }
 
-// Removes all elements from the cache.
+// Flush removes all elements from the cache.
 // Returns the last non-nil error during [c.onEviction], if any.
 // If [c.onEviction] errors, it will still be called for any
 // subsequent elements and the cache will still be emptied.
