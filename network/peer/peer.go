@@ -737,7 +737,7 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 	}
 
 	subnetUptimes := make([]*p2p.SubnetUptime, 0, p.trackedSubnets.Len())
-	for subnetID := range p.TrackedSubnets() {
+	for subnetID := range p.trackedSubnets {
 		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
 		if err != nil {
 			p.Log.Debug("failed to get peer uptime percentage",
