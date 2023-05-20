@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/utils/math"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
@@ -24,7 +25,7 @@ func newOnEvictCache[K comparable, V any](maxSize int, evictionBatchSize int, on
 		maxSize:           maxSize,
 		fifo:              linkedhashmap.New[K, V](),
 		onEviction:        onEviction,
-		evictionBatchSize: evictionBatchSize,
+		evictionBatchSize: math.Min(maxSize, evictionBatchSize),
 	}
 }
 
