@@ -312,8 +312,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 				// Note the duration is more than the maximum
-				tx.Validator.Start = 0
-				tx.Validator.End = 1 + uint64(unsignedTransformTx.MaxStakeDuration)
+				tx.Validator.Start = 1
+				tx.Validator.End = 2 + uint64(unsignedTransformTx.MaxStakeDuration)
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
@@ -463,6 +463,58 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &verifiedTx
 			},
 			expectedErr: ErrFlowCheckFailed,
+		},
+		{
+			name: "starts too far in the future",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil)
+
+				return &Backend{
+					FlowChecker: flowChecker,
+					Config: &config.Config{
+						CortinaTime:           time.Time{},
+						ContinuousStakingTime: mockable.MaxTime,
+						AddSubnetValidatorFee: 1,
+					},
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
+				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				primaryNetworkVdr := &state.Staker{
+					StartTime: time.Unix(0, 0),
+					EndTime:   mockable.MaxTime,
+				}
+				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				// Note this copies [verifiedTx]
+				tx := verifiedTx
+				tx.Validator.Start = uint64(MaxFutureStartTime.Seconds()) + 1
+				tx.Validator.End = tx.Validator.Start + uint64(unsignedTransformTx.MinStakeDuration)
+				return &tx
+			},
+			expectedErr: ErrFutureStakeTime,
 		},
 		{
 			name: "success",
