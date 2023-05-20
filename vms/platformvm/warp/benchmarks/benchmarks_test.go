@@ -81,15 +81,13 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 	}
 
 	// Add a dummyBlock to update relevant quantities
-	dummyValidatorsBlock := &blocks.BanffStandardBlock{
-		ApricotStandardBlock: blocks.ApricotStandardBlock{
-			CommonBlock: blocks.CommonBlock{
-				PrntID:  env.state.GetLastAccepted(),
-				Hght:    pChainHeight,
-				BlockID: ids.GenerateTestID(),
-			},
-		},
-	}
+	dummyValidatorsBlock, err := blocks.NewBanffStandardBlock(
+		env.state.GetTimestamp(),
+		env.state.GetLastAccepted(),
+		pChainHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
 
 	// Push block and tx changes to env.state.
 	require.NoError(diff.Apply(env.state))
@@ -161,15 +159,13 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 		primaryDiff.AddTx(addPrimaryValidatorTx, status.Committed)
 	}
 	// Add a dummyBlock to update relevant quantities
-	dummyPrimariesBlock := &blocks.BanffStandardBlock{
-		ApricotStandardBlock: blocks.ApricotStandardBlock{
-			CommonBlock: blocks.CommonBlock{
-				PrntID:  env.state.GetLastAccepted(),
-				Hght:    1,
-				BlockID: ids.GenerateTestID(),
-			},
-		},
-	}
+	dummyPrimariesBlock, err := blocks.NewBanffStandardBlock(
+		env.state.GetTimestamp(),
+		env.state.GetLastAccepted(),
+		1,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
 
 	// Push block and tx changes to env.state.
 	require.NoError(primaryDiff.Apply(env.state))
@@ -204,15 +200,13 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 		}
 
 		// Add a dummyBlock to update relevant quantities
-		dummySecondaryBlock := &blocks.BanffStandardBlock{
-			ApricotStandardBlock: blocks.ApricotStandardBlock{
-				CommonBlock: blocks.CommonBlock{
-					PrntID:  env.state.GetLastAccepted(),
-					Hght:    height,
-					BlockID: ids.GenerateTestID(),
-				},
-			},
-		}
+		dummySecondaryBlock, err := blocks.NewBanffStandardBlock(
+			env.state.GetTimestamp(),
+			env.state.GetLastAccepted(),
+			height,
+			[]*txs.Tx{},
+		)
+		require.NoError(err)
 
 		// Push block and tx changes to env.state.
 		require.NoError(subnetsValDiff.Apply(env.state))
