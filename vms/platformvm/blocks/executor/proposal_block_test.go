@@ -35,7 +35,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, apricotFork)
+	env := newEnvironment(t, ctrl, apricotPhase5Fork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -150,7 +150,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	env := newEnvironment(t, ctrl, cortinaFork)
+	env := newEnvironment(t, ctrl, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -565,7 +565,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, cortinaFork)
+			env := newEnvironment(t, nil, latestFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()
@@ -713,7 +713,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, cortinaFork)
+	env := newEnvironment(t, nil, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -854,7 +854,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, cortinaFork)
+			env := newEnvironment(t, nil, latestFork)
 			defer func() {
 				require.NoError(shutdownEnvironment(env))
 			}()

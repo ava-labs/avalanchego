@@ -52,13 +52,14 @@ import (
 type activeFork uint8
 
 const (
-	testNetworkID = 10 // To be used in tests
 	defaultWeight = 5 * units.MilliAvax
 
-	apricotFork           activeFork = 0
-	banffFork             activeFork = 1
-	cortinaFork           activeFork = 2
-	continuousStakingFork activeFork = 3
+	apricotPhase3Fork     activeFork = 0
+	apricotPhase5Fork     activeFork = 1
+	banffFork             activeFork = 2
+	cortinaFork           activeFork = 3
+	continuousStakingFork activeFork = 4
+	latestFork            activeFork = continuousStakingFork
 )
 
 var (
@@ -124,7 +125,7 @@ func newEnvironment(fork activeFork) *environment {
 	isBootstrapped.Set(true)
 
 	config := defaultConfig(fork)
-	clk := defaultClock(fork != apricotFork)
+	clk := defaultClock(fork != apricotPhase5Fork)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -291,25 +292,34 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
-		apricotPhase3Time     = defaultValidateEndTime
-		apricotPhase5Time     = defaultValidateEndTime
+		apricotPhase3Time     = mockable.MaxTime
+		apricotPhase5Time     = mockable.MaxTime
 		banffTime             = mockable.MaxTime
 		cortinaTime           = mockable.MaxTime
 		continuousStakingTime = mockable.MaxTime
 	)
 
 	switch fork {
-	case apricotFork:
-		// nothing todo
+	case apricotPhase3Fork:
+		apricotPhase3Time = defaultValidateEndTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case banffFork:
 		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case cortinaFork:
-		banffTime = defaultValidateEndTime
 		cortinaTime = defaultValidateStartTime
+		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case continuousStakingFork:
-		banffTime = defaultValidateEndTime
-		cortinaTime = defaultValidateStartTime
 		continuousStakingTime = defaultValidateStartTime
+		cortinaTime = defaultValidateStartTime
+		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
