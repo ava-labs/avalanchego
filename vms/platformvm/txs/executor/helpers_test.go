@@ -52,7 +52,6 @@ import (
 type activeFork uint8
 
 const (
-	testNetworkID = 10 // To be used in tests
 	defaultWeight = 5 * units.MilliAvax
 
 	apricotFork activeFork = 0
