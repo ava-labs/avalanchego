@@ -14,15 +14,17 @@ import (
 type onEvictCache[K comparable, V any] struct {
 	lock       sync.RWMutex
 	maxSize    int
+	batchSize  int
 	fifo       linkedhashmap.LinkedHashmap[K, V]
-	onEviction func(V) error
+	onEviction func([]V) error
 }
 
-func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error) onEvictCache[K, V] {
+func newOnEvictCache[K comparable, V any](maxSize int, batchSize int, onEviction func([]V) error) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
 		fifo:       linkedhashmap.New[K, V](),
 		onEviction: onEviction,
+		batchSize:  batchSize,
 	}
 }
 
@@ -44,14 +46,18 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.fifo.Put(key, value) // Mark as MRU
 
 	if c.fifo.Len() > c.maxSize {
-		oldestKey, oldsetVal, _ := c.fifo.Oldest()
-		c.fifo.Delete(oldestKey)
-		return c.onEviction(oldsetVal)
+		evictedValues := make([]V, c.batchSize)
+		for i := 0; i < c.batchSize; i++ {
+			oldestKey, oldestVal, _ := c.fifo.Oldest()
+			c.fifo.Delete(oldestKey)
+			evictedValues[i] = oldestVal
+		}
+		return c.onEviction(evictedValues)
 	}
 	return nil
 }
 
-// Removes all elements from the cache.
+// Flush removes all elements from the cache.
 // Returns the last non-nil error during [c.onEviction], if any.
 // If [c.onEviction] errors, it will still be called for any
 // subsequent elements and the cache will still be emptied.
@@ -64,9 +70,16 @@ func (c *onEvictCache[K, V]) Flush() error {
 
 	var errs wrappers.Errs
 	iter := c.fifo.NewIterator()
+	evictedValues := make([]V, 0, c.batchSize)
 	for iter.Next() {
 		val := iter.Value()
-		errs.Add(c.onEviction(val))
+		evictedValues = append(evictedValues, val)
+		if len(evictedValues) > c.batchSize {
+			errs.Add(c.onEviction(evictedValues))
+			evictedValues = make([]V, 0, c.batchSize)
+		}
 	}
+	errs.Add(c.onEviction(evictedValues))
+
 	return errs.Err
 }

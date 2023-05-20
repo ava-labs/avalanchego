@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
-
+	RootPath          = EmptyPath
+	evictionBatchSize = 100
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -122,7 +122,7 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
+	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, evictionBatchSize, trieDB.onEviction)
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -695,23 +695,31 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
-func (db *Database) onEviction(node *node) error {
-	if node == nil || node.hasValue() {
-		// only persist intermediary nodes
-		return nil
-	}
+func (db *Database) onEviction(nodes []*node) error {
+	batch := db.nodeDB.NewBatch()
+	var (
+		err       error
+		nodeBytes []byte
+	)
+	for _, n := range nodes {
+		if n == nil || n.hasValue() {
+			// only persist intermediary nodes
+			continue
+		}
 
-	nodeBytes, err := node.marshal()
+		nodeBytes, err = n.marshal()
+		if err != nil {
+			break
+		}
+
+		if err := batch.Put(n.key.Bytes(), nodeBytes); err != nil {
+			break
+		}
+	}
+	if err == nil {
+		err = batch.Write()
+	}
 	if err != nil {
-		db.onEvictionErr.Set(err)
-		// Prevent reads/writes from/to [db.nodeDB] to avoid inconsistent state.
-		_ = db.nodeDB.Close()
-		// This is a fatal error.
-		go db.Close()
-		return err
-	}
-
-	if err := db.nodeDB.Put(node.key.Bytes(), nodeBytes); err != nil {
 		db.onEvictionErr.Set(err)
 		_ = db.nodeDB.Close()
 		go db.Close()
