@@ -25,7 +25,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -128,7 +128,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -352,7 +352,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -575,7 +575,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -737,7 +737,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()

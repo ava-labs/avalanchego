@@ -58,14 +58,13 @@ import (
 type activeFork uint8
 
 const (
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
+	defaultWeight = 10000
 
-	apricotFork activeFork = 0
-	banffFork   activeFork = 1
-	cortinaFork activeFork = 2
-	latestFork             = cortinaFork
+	apricotPhase3Fork activeFork = 0
+	apricotPhase5Fork activeFork = 1
+	banffFork         activeFork = 2
+	cortinaFork       activeFork = 3
+	latestFork        activeFork = cortinaFork
 )
 
 var (
@@ -118,7 +117,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unpar
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
-		clk:            defaultClock(fork != apricotFork),
+		clk:            defaultClock(fork != apricotPhase5Fork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -303,20 +302,27 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
-		apricotPhase3Time = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = mockable.MaxTime
+		apricotPhase5Time = mockable.MaxTime
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 	)
 
 	switch fork {
-	case apricotFork:
-		// nothing todo
+	case apricotPhase3Fork:
+		apricotPhase3Time = defaultValidateEndTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case banffFork:
 		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case cortinaFork:
-		banffTime = defaultValidateEndTime
 		cortinaTime = defaultValidateEndTime
+		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
