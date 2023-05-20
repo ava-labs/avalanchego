@@ -138,6 +138,33 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name: "start time too early",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime:           time.Time{},
+						ContinuousStakingTime: mockable.MaxTime,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(verifiedTx.StartTime())
+				return state
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrTimestampNotBeforeStartTime,
+		},
+		{
 			name: "weight too low",
 			backendF: func(*gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}

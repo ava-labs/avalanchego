@@ -94,10 +94,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				gomega.Expect(pBalance, err).To(gomega.BeNumerically(">=", minBalance))
 			})
 			// create validator data
+			validatorStartTimeDiff := 30 * time.Second
+			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
+
 			vdr := &txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
-				Start:  0,
-				End:    uint64(time.Unix(0, 0).Add(72 * time.Hour).Unix()),
+				Start:  uint64(vdrStartTime.Unix()),
+				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,
 			}
 			rewardOwner := &secp256k1fx.OutputOwners{
