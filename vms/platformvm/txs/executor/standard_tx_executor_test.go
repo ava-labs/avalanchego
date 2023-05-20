@@ -820,7 +820,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(latestFork)
+	env := newEnvironment(cortinaFork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

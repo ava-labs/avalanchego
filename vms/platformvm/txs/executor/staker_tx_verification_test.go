@@ -64,8 +64,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
-				Start:  uint64(0),
-				End:    uint64(unsignedTransformTx.MinStakeDuration),
+				Start:  1,
+				End:    1 + uint64(unsignedTransformTx.MinStakeDuration),
 				Wght:   unsignedTransformTx.MinValidatorStake,
 			},
 			Subnet: subnetID,
@@ -252,8 +252,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
 				// Note the duration is 1 less than the minimum
-				tx.Validator.Start = 0
-				tx.Validator.End = uint64(unsignedTransformTx.MinStakeDuration) - 1
+				tx.Validator.Start = 1
+				tx.Validator.End = uint64(unsignedTransformTx.MinStakeDuration)
 				return &tx
 			},
 			expectedErr: ErrStakeTooShort,
@@ -376,8 +376,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				// Validator time isn't subset of primary network validator time
 				primaryNetworkVdr := &state.Staker{
-					StartTime: verifiedTx.StartTime(),
-					EndTime:   verifiedTx.EndTime().Add(-1 * time.Second),
+					StartTime: verifiedTx.StartTime().Add(time.Second),
+					EndTime:   verifiedTx.EndTime(),
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
@@ -423,7 +423,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				mockState.EXPECT().GetPendingValidator(subnetID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				primaryNetworkVdr := &state.Staker{
-					StartTime: verifiedTx.StartTime(),
+					StartTime: verifiedTx.StartTime().Add(-1 * time.Second),
 					EndTime:   verifiedTx.EndTime(),
 				}
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
