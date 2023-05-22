@@ -79,9 +79,9 @@ message RangeProofResponse {
    the use of KeyChange instead of KeyValue) */
 message ChangeProof {
   bool had_roots_in_history = 1; // TODO remove
-  repeated ProofNode start_proof = 1;
-  repeated ProofNode end_proof = 2;
-  repeated KeyChange key_changes = 3;
+  repeated ProofNode start_proof = 2;
+  repeated ProofNode end_proof = 3;
+  repeated KeyChange key_changes = 4;
 }
 
 /* ChangeProofResponse is the response for a ChangeProofRequest */
