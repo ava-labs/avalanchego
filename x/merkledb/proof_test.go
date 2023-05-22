@@ -1578,3 +1578,81 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		require.Equal(protoProof, protoUnmarshaledProof)
 	}
 }
+
+func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random change proof.
+		startProofLen := rand.Intn(32)
+		startProof := make([]ProofNode, startProofLen)
+		for i := 0; i < startProofLen; i++ {
+			startProof[i] = newRandomProofNode(rand)
+		}
+
+		endProofLen := rand.Intn(32)
+		endProof := make([]ProofNode, endProofLen)
+		for i := 0; i < endProofLen; i++ {
+			endProof[i] = newRandomProofNode(rand)
+		}
+
+		numKeyChanges := rand.Intn(128)
+		keyChanges := make([]KeyChange, numKeyChanges)
+		for i := 0; i < numKeyChanges; i++ {
+			keyLen := rand.Intn(32)
+			key := make([]byte, keyLen)
+			_, _ = rand.Read(key)
+
+			var value Maybe[[]byte]
+			hasValue := rand.Intn(2) == 0
+			if hasValue {
+				valueLen := rand.Intn(32)
+				valueBytes := make([]byte, valueLen)
+				_, _ = rand.Read(valueBytes)
+				value = Some(valueBytes)
+			}
+
+			keyChanges[i] = KeyChange{
+				Key:   key,
+				Value: value,
+			}
+		}
+
+		proof := ChangeProof{
+			StartProof: startProof,
+			EndProof:   endProof,
+			KeyChanges: keyChanges,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof ChangeProof
+		protoProof := proof.ToProto()
+		err := unmarshaledProof.UnmarshalProto(protoProof)
+		require.NoError(err)
+		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
+	}
+}
+
+func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
+	protoProof := &syncpb.ChangeProof{
+		KeyChanges: []*syncpb.KeyChange{
+			{
+				Key: []byte{1},
+				Value: &syncpb.MaybeBytes{
+					Value:     []byte{1},
+					IsNothing: true,
+				},
+			},
+		},
+	}
+
+	var proof ChangeProof
+	err := proof.UnmarshalProto(protoProof)
+	require.ErrorIs(t, err, ErrInvalidMaybe)
+}

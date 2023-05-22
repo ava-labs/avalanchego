@@ -338,8 +338,7 @@ func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) erro
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
 	for i, protoNode := range pbProof.Start {
 		var node ProofNode
-		err := node.UnmarshalProto(protoNode)
-		if err != nil {
+		if err := node.UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 		proof.StartProof[i] = node
@@ -348,8 +347,7 @@ func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) erro
 	proof.EndProof = make([]ProofNode, len(pbProof.End))
 	for i, protoNode := range pbProof.End {
 		var node ProofNode
-		err := node.UnmarshalProto(protoNode)
-		if err != nil {
+		if err := node.UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 		proof.EndProof[i] = node
@@ -562,6 +560,82 @@ func (proof *ChangeProof) Verify(
 	}
 	if expectedEndRootID != calculatedRoot {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedEndRootID)
+	}
+
+	return nil
+}
+
+func (proof *ChangeProof) ToProto() *syncpb.ChangeProof {
+	startProof := make([]*syncpb.ProofNode, len(proof.StartProof))
+	for i, node := range proof.StartProof {
+		startProof[i] = node.ToProto()
+	}
+
+	endProof := make([]*syncpb.ProofNode, len(proof.EndProof))
+	for i, node := range proof.EndProof {
+		endProof[i] = node.ToProto()
+	}
+
+	keyChanges := make([]*syncpb.KeyChange, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		var value syncpb.MaybeBytes
+		if kv.Value.hasValue {
+			value = syncpb.MaybeBytes{
+				Value:     kv.Value.value,
+				IsNothing: false,
+			}
+		} else {
+			value = syncpb.MaybeBytes{
+				Value:     nil,
+				IsNothing: true,
+			}
+		}
+		keyChanges[i] = &syncpb.KeyChange{
+			Key:   kv.Key,
+			Value: &value,
+		}
+	}
+
+	return &syncpb.ChangeProof{
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyChanges: keyChanges,
+	}
+}
+
+func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
+	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	for i, protoNode := range pbProof.StartProof {
+		var node ProofNode
+		if err := node.UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+		proof.StartProof[i] = node
+	}
+
+	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	for i, protoNode := range pbProof.EndProof {
+		var node ProofNode
+		if err := node.UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+		proof.EndProof[i] = node
+	}
+
+	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
+	for i, kv := range pbProof.KeyChanges {
+		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
+			return ErrInvalidMaybe
+		}
+
+		var value Maybe[[]byte]
+		if !kv.Value.IsNothing {
+			value = Some(kv.Value.Value)
+		}
+		proof.KeyChanges[i] = KeyChange{
+			Key:   kv.Key,
+			Value: value,
+		}
 	}
 
 	return nil
