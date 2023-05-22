@@ -54,7 +54,6 @@ var (
 	errTooManyChildren        = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
 	errChildIndexTooLarge     = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
 	errNegativeNibbleLength   = errors.New("nibble length is negative")
-	errNegativeNumKeyValues   = errors.New("negative number of key values")
 	errIntTooLarge            = errors.New("integer too large to be decoded")
 	errLeadingZeroes          = errors.New("varint has leading zeroes")
 	errInvalidBool            = errors.New("decoded bool is neither true nor false")
@@ -302,34 +301,6 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 		return 0, errExtraSpace
 	}
 	return codecVersion, err
-}
-
-func (c *codecImpl) decodeKeyChange(src *bytes.Reader) (KeyChange, error) {
-	if minKeyChangeLen > src.Len() {
-		return KeyChange{}, io.ErrUnexpectedEOF
-	}
-
-	var (
-		result KeyChange
-		err    error
-	)
-	if result.Key, err = c.decodeByteSlice(src); err != nil {
-		return result, err
-	}
-	if result.Value, err = c.decodeMaybeByteSlice(src); err != nil {
-		return result, err
-	}
-	return result, nil
-}
-
-func (c *codecImpl) encodeKeyChange(kv KeyChange, dst io.Writer) error {
-	if err := c.encodeByteSlice(dst, kv.Key); err != nil {
-		return err
-	}
-	if err := c.encodeMaybeByteSlice(dst, kv.Value); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (*codecImpl) encodeBool(dst io.Writer, value bool) error {

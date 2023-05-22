@@ -60,24 +60,6 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	}
 }
 
-func newKeyChanges(r *rand.Rand, num uint) []KeyChange {
-	keyChanges := make([]KeyChange, num)
-	for i := range keyChanges {
-		key := make([]byte, r.Intn(32)) // #nosec G404
-		_, _ = r.Read(key)              // #nosec G404
-		val := make([]byte, r.Intn(32)) // #nosec G404
-		_, _ = r.Read(val)              // #nosec G404
-		if len(val) == 0 {
-			val = nil
-		}
-		keyChanges[i] = KeyChange{
-			Key:   key,
-			Value: Some(val),
-		}
-	}
-	return keyChanges
-}
-
 func nilEmptySlices(dest interface{}) {
 	if dest == nil {
 		return
