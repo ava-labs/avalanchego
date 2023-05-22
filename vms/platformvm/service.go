@@ -479,7 +479,7 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 		}
 		response.UTXOs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode UTXO %s as string: %w", utxo.InputID(), err)
+			return fmt.Errorf("couldn't encode UTXO %s as %s: %w", utxo.InputID(), args.Encoding, err)
 		}
 	}
 
@@ -2160,7 +2160,7 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetT
 
 	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
 	if err != nil {
-		return fmt.Errorf("couldn't encode tx as a string: %w", err)
+		return fmt.Errorf("couldn't encode tx as %s: %w", args.Encoding, err)
 	}
 	return nil
 }
@@ -2238,7 +2238,8 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 
 type GetStakeArgs struct {
 	api.JSONAddresses
-	Encoding formatting.Encoding `json:"encoding"`
+	ValidatorsOnly bool                `json:"validatorsOnly"`
+	Encoding       formatting.Encoding `json:"encoding"`
 }
 
 // GetStakeReply is the response from calling GetStake.
@@ -2288,6 +2289,10 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
 
+		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+			continue
+		}
+
 		tx, _, err := s.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
@@ -2304,6 +2309,10 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 
 	for pendingStakerIterator.Next() { // Iterates over pending stakers
 		staker := pendingStakerIterator.Value()
+
+		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+			continue
+		}
 
 		tx, _, err := s.vm.state.GetTx(staker.TxID)
 		if err != nil {
@@ -2323,7 +2332,7 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 		}
 		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode output %s as string: %w", output.ID, err)
+			return fmt.Errorf("couldn't encode output %s as %s: %w", output.ID, args.Encoding, err)
 		}
 	}
 	response.Encoding = args.Encoding
@@ -2496,7 +2505,7 @@ func (s *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *Ge
 
 		utxoStr, err := formatting.Encode(args.Encoding, utxoBytes)
 		if err != nil {
-			return fmt.Errorf("couldn't encode utxo as a string: %w", err)
+			return fmt.Errorf("couldn't encode utxo as %s: %w", args.Encoding, err)
 		}
 		reply.UTXOs[i] = utxoStr
 	}
@@ -2580,7 +2589,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 
 	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
 	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
+		return fmt.Errorf("couldn't encode block %s as %s: %w", args.BlockID, args.Encoding, err)
 	}
 
 	return nil
@@ -2606,6 +2615,7 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 	apiOwner := &platformapi.Owner{
 		Locktime:  json.Uint64(owner.Locktime),
 		Threshold: json.Uint32(owner.Threshold),
+		Addresses: make([]string, 0, len(owner.Addrs)),
 	}
 	for _, addr := range owner.Addrs {
 		addrStr, err := s.addrManager.FormatLocalAddress(addr)

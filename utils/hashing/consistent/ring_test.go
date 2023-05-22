@@ -211,11 +211,8 @@ func TestGetOnEmptyRingReturnsError(t *testing.T) {
 		key:  "foo",
 		hash: 0,
 	}
-
-	node, err := ring.Get(foo)
-
-	require.Equal(t, nil, node)
-	require.Equal(t, errEmptyRing, err)
+	_, err := ring.Get(foo)
+	require.ErrorIs(t, err, errEmptyRing)
 }
 
 // Tests that trying to call Remove on a node that doesn't exist should return false.

@@ -20,7 +20,7 @@ func TestMintOutputVerify(t *testing.T) {
 		{
 			name:        "nil",
 			out:         nil,
-			expectedErr: errNilOutput,
+			expectedErr: ErrNilOutput,
 		},
 		{
 			name: "invalid output owners",
@@ -30,7 +30,7 @@ func TestMintOutputVerify(t *testing.T) {
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 				},
 			},
-			expectedErr: errOutputUnspendable,
+			expectedErr: ErrOutputUnspendable,
 		},
 		{
 			name: "passes verification",
@@ -46,8 +46,11 @@ func TestMintOutputVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, tt.out.Verify(), tt.expectedErr)
-			require.ErrorIs(t, tt.out.VerifyState(), tt.expectedErr)
+			require := require.New(t)
+			err := tt.out.Verify()
+			require.ErrorIs(err, tt.expectedErr)
+			err = tt.out.VerifyState()
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
