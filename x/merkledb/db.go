@@ -698,7 +698,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (db *Database) onEviction(n *node) error {
 	batch := db.nodeDB.NewBatch()
 	var err error
-	if err = writeNode(batch, n); err != nil {
+	if err = writeNodeToBatch(batch, n); err != nil {
 		return err
 	}
 	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
@@ -706,7 +706,7 @@ func (db *Database) onEviction(n *node) error {
 		if !exists {
 			break
 		}
-		if err = writeNode(batch, n); err != nil {
+		if err = writeNodeToBatch(batch, n); err != nil {
 			break
 		}
 
@@ -723,7 +723,7 @@ func (db *Database) onEviction(n *node) error {
 	return nil
 }
 
-func writeNode(batch database.Batch, n *node) error {
+func writeNodeToBatch(batch database.Batch, n *node) error {
 	if n == nil || n.hasValue() {
 		// only persist intermediary nodes
 		return nil
@@ -839,14 +839,8 @@ func (db *Database) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			// Otherwise, intermediary nodes are persisted on cache eviction or
 			// shutdown.
 			db.metrics.IOKeyWrite()
-			nodeBytes, err := nodeChange.after.marshal()
+			err := writeNodeToBatch(db.currentBatch, nodeChange.after)
 			if err != nil {
-				db.currentBatch.Reset()
-				nodesSpan.End()
-				return err
-			}
-
-			if err := db.currentBatch.Put(key.Bytes(), nodeBytes); err != nil {
 				db.currentBatch.Reset()
 				nodesSpan.End()
 				return err
