@@ -62,6 +62,7 @@ type validatorMetadata struct {
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
 	StakerStartTime          int64         `v1:"true"`
+	StakerEndTime            int64         `v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
