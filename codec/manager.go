@@ -40,10 +40,6 @@ type Manager interface {
 	// Associate the given codec with the given version ID
 	RegisterCodec(version uint16, codec Codec) error
 
-	// Define the maximum size, in bytes, of something serialized/deserialized
-	// by this codec manager
-	SetMaxSize(int)
-
 	// Size returns the size, in bytes, of [value] when it's marshaled
 	// using the codec with the given version.
 	// RegisterCodec must have been called with that version.
@@ -92,13 +88,6 @@ func (m *manager) RegisterCodec(version uint16, codec Codec) error {
 	return nil
 }
 
-// SetMaxSize of bytes allowed
-func (m *manager) SetMaxSize(size int) {
-	m.lock.Lock()
-	m.maxSize = size
-	m.lock.Unlock()
-}
-
 func (m *manager) Size(version uint16, value interface{}) (int, error) {
 	if value == nil {
 		return 0, errMarshalNil // can't marshal nil
@@ -127,7 +116,6 @@ func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
 	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
-
 	if !exists {
 		return nil, ErrUnknownVersion
 	}
@@ -150,22 +138,19 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 		return 0, errUnmarshalNil
 	}
 
-	m.lock.RLock()
 	if byteLen := len(bytes); byteLen > m.maxSize {
-		m.lock.RUnlock()
 		return 0, fmt.Errorf("%w: %d > %d", errUnmarshalTooBig, byteLen, m.maxSize)
 	}
 
 	p := wrappers.Packer{
 		Bytes: bytes,
 	}
-
 	version := p.UnpackShort()
 	if p.Errored() { // Make sure the codec version is correct
-		m.lock.RUnlock()
 		return 0, errCantUnpackVersion
 	}
 
+	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
 	if !exists {
