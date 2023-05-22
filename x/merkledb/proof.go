@@ -597,13 +597,16 @@ func (proof *ChangeProof) ToProto() *syncpb.ChangeProof {
 	}
 
 	return &syncpb.ChangeProof{
-		StartProof: startProof,
-		EndProof:   endProof,
-		KeyChanges: keyChanges,
+		HadRootsInHistory: proof.HadRootsInHistory,
+		StartProof:        startProof,
+		EndProof:          endProof,
+		KeyChanges:        keyChanges,
 	}
 }
 
 func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
+	proof.HadRootsInHistory = pbProof.HadRootsInHistory
+
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
 		var node ProofNode
