@@ -68,6 +68,5 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 		registerer.Register(m.numDiskWrites),
 		registerer.Register(m.numDiskWritesBytes),
 	)
-
 	return m, errs.Err
 }

@@ -65,6 +65,8 @@ type Manager interface {
 }
 
 type manager struct {
+	processMetrics *metrics
+
 	processesLock sync.Mutex
 	processes     map[int]*proc
 
@@ -79,22 +81,26 @@ type manager struct {
 
 	closeOnce sync.Once
 	onClose   chan struct{}
-
-	processMetrics *metrics
 }
 
-func NewManager(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration, metricsRegisterer prometheus.Registerer) (Manager, error) {
-	m := &manager{
-		processes:          make(map[int]*proc),
-		onClose:            make(chan struct{}),
-		availableDiskBytes: math.MaxUint64,
-	}
-
+func NewManager(
+	diskPath string,
+	frequency,
+	cpuHalflife,
+	diskHalflife time.Duration,
+	metricsRegisterer prometheus.Registerer,
+) (Manager, error) {
 	processMetrics, err := newMetrics("system_resources", metricsRegisterer)
 	if err != nil {
 		return nil, err
 	}
-	m.processMetrics = processMetrics
+
+	m := &manager{
+		processMetrics:     processMetrics,
+		processes:          make(map[int]*proc),
+		onClose:            make(chan struct{}),
+		availableDiskBytes: math.MaxUint64,
+	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
 	return m, nil
@@ -202,9 +208,9 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 
 		processIDStr := strconv.Itoa(int(p.p.Pid))
 		m.processMetrics.numCPUCycles.WithLabelValues(processIDStr).Set(p.lastTotalCPU)
-		m.processMetrics.numDiskReads.WithLabelValues(processIDStr).Set(float64(p.read))
+		m.processMetrics.numDiskReads.WithLabelValues(processIDStr).Set(float64(p.numReads))
 		m.processMetrics.numDiskReadBytes.WithLabelValues(processIDStr).Set(float64(p.lastReadBytes))
-		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.write))
+		m.processMetrics.numDiskWrites.WithLabelValues(processIDStr).Set(float64(p.numWrites))
 		m.processMetrics.numDiskWritesBytes.WithLabelValues(processIDStr).Set(float64(p.lastWriteBytes))
 	}
 
@@ -219,14 +225,16 @@ type proc struct {
 	// [lastTotalCPU] is the most recent measurement of total CPU usage.
 	lastTotalCPU float64
 
+	// [numReads] is the total number of disk reads performed.
+	numReads uint64
 	// [lastReadBytes] is the most recent measurement of total disk bytes read.
 	lastReadBytes uint64
+
+	// [numWrites] is the total number of disk writes performed.
+	numWrites uint64
 	// [lastWriteBytes] is the most recent measurement of total disk bytes
 	// written.
 	lastWriteBytes uint64
-
-	// number of reads and writes
-	read, write uint64
 }
 
 func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64, float64) {
@@ -256,18 +264,18 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 		if io.ReadBytes > p.lastReadBytes {
 			newRead := io.ReadBytes - p.lastReadBytes
 			read = float64(newRead) / secondsSinceLastUpdate
-			p.read = io.ReadCount
 		}
 		if io.WriteBytes > p.lastWriteBytes {
 			newWrite := io.WriteBytes - p.lastWriteBytes
 			write = float64(newWrite) / secondsSinceLastUpdate
-			p.write = io.WriteCount
 		}
 	}
 
 	p.initialized = true
 	p.lastTotalCPU = totalCPU
+	p.numReads = io.ReadCount
 	p.lastReadBytes = io.ReadBytes
+	p.numWrites = io.WriteCount
 	p.lastWriteBytes = io.WriteBytes
 
 	return cpu, read, write

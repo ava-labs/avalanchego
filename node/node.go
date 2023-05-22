@@ -1201,7 +1201,7 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
-		n.MetricsRegisterer,
+		reg,
 	)
 	if err != nil {
 		return err
