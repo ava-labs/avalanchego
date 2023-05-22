@@ -48,6 +48,7 @@ type ProofNode struct {
 	Children    map[byte]ids.ID
 }
 
+// Assumes [node.Key.KeyPath.NibbleLength] <= math.MaxUint32.
 func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	pbNode := &syncpb.ProofNode{
 		Key: &syncpb.SerializedPath{
