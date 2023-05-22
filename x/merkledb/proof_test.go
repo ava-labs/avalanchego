@@ -1536,7 +1536,7 @@ func TestVerifyProofPath(t *testing.T) {
 	}
 }
 
-func TestProofNodeInvalidMaybe(t *testing.T) {
+func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	rand := rand.New(rand.NewSource(1337)) // #nosec G404
 
 	node := newRandomProofNode(rand)
@@ -1551,6 +1551,35 @@ func TestProofNodeInvalidMaybe(t *testing.T) {
 	var unmarshaledNode ProofNode
 	err := unmarshaledNode.UnmarshalProto(protoNode)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
+}
+
+func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	protoNode.Children = map[uint32][]byte{
+		1: []byte("not 32 bytes"),
+	}
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
+}
+
+func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	childID := ids.GenerateTestID()
+	protoNode.Children[NodeBranchFactor] = childID[:]
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, ErrInvalidChildIndex)
 }
 
 func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {

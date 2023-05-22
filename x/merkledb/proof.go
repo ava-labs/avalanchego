@@ -37,6 +37,7 @@ var (
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
+	ErrInvalidChildIndex           = fmt.Errorf("child index must be less than %d", NodeBranchFactor)
 )
 
 type ProofNode struct {
@@ -86,6 +87,9 @@ func (node *ProofNode) UnmarshalProto(pbNode *syncpb.ProofNode) error {
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
+		if childIndex >= NodeBranchFactor {
+			return ErrInvalidChildIndex
+		}
 		childID, err := ids.ToID(childIDBytes)
 		if err != nil {
 			return err
