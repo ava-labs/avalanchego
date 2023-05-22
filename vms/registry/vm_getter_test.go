@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -149,7 +150,13 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 			FileReader:      mockReader,
 			Manager:         mockManager,
 			PluginDirectory: pluginDir,
-			CPUTracker:      resource.NewManager("", time.Hour, time.Hour, time.Hour),
+			CPUTracker: resource.NewManager(
+				logging.NoLog{},
+				"",
+				time.Hour,
+				time.Hour,
+				time.Hour,
+			),
 		},
 	)
 

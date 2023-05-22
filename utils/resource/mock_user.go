@@ -50,6 +50,20 @@ func (mr *MockUserMockRecorder) AvailableDiskBytes() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableDiskBytes", reflect.TypeOf((*MockUser)(nil).AvailableDiskBytes))
 }
 
+// AvailableMemoryBytes mocks base method.
+func (m *MockUser) AvailableMemoryBytes() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AvailableMemoryBytes")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// AvailableMemoryBytes indicates an expected call of AvailableMemoryBytes.
+func (mr *MockUserMockRecorder) AvailableMemoryBytes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableMemoryBytes", reflect.TypeOf((*MockUser)(nil).AvailableMemoryBytes))
+}
+
 // CPUUsage mocks base method.
 func (m *MockUser) CPUUsage() float64 {
 	m.ctrl.T.Helper()
@@ -77,4 +91,18 @@ func (m *MockUser) DiskUsage() (float64, float64) {
 func (mr *MockUserMockRecorder) DiskUsage() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiskUsage", reflect.TypeOf((*MockUser)(nil).DiskUsage))
+}
+
+// MemoryUsage mocks base method.
+func (m *MockUser) MemoryUsage() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MemoryUsage")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// MemoryUsage indicates an expected call of MemoryUsage.
+func (mr *MockUserMockRecorder) MemoryUsage() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MemoryUsage", reflect.TypeOf((*MockUser)(nil).MemoryUsage))
 }

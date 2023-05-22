@@ -1207,15 +1207,26 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
-func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warningThresholdAvailableDiskSpace uint64, err error) {
-	requiredAvailableDiskSpace = v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
-	warningThresholdAvailableDiskSpace = v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
-	switch {
-	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
-	default:
-		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, nil
+// getResourceAvailableConfig returns:
+// - requiredThreshold under which the node may shutdown
+// - warningThreshold under which the node may report unhealthy
+func getResourceAvailableConfig(
+	v *viper.Viper,
+	requiredKey string,
+	warningKey string,
+) (uint64, uint64, error) {
+	requiredThreshold := v.GetUint64(requiredKey)
+	warningThreshold := v.GetUint64(warningKey)
+	if warningThreshold < requiredThreshold {
+		return 0, 0, fmt.Errorf(
+			"%q (%d) < %q (%d)",
+			warningKey,
+			warningThreshold,
+			requiredKey,
+			requiredThreshold,
+		)
 	}
+	return requiredThreshold, warningThreshold, nil
 }
 
 func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
@@ -1479,7 +1490,20 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
-	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
+	nodeConfig.RequiredAvailableMemory, nodeConfig.WarningThresholdAvailableMemory, err = getResourceAvailableConfig(
+		v,
+		SystemTrackerRequiredAvailableMemoryKey,
+		SystemTrackerWarningThresholdAvailableMemoryKey,
+	)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getResourceAvailableConfig(
+		v,
+		SystemTrackerRequiredAvailableDiskSpaceKey,
+		SystemTrackerWarningThresholdAvailableDiskSpaceKey,
+	)
 	if err != nil {
 		return node.Config{}, err
 	}
