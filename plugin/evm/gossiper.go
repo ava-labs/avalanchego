@@ -205,7 +205,7 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 	return append(localQueued, remoteQueued...)
 }
 
-// queueRegossipTxs finds the best priority transactions in the mempool and adds up to
+// queuePriorityRegossipTxs finds the best priority transactions in the mempool and adds up to
 // [PriorityRegossipMaxTxs] of them to [txsToGossip].
 func (n *pushGossiper) queuePriorityRegossipTxs() types.Transactions {
 	// Fetch all pending transactions from the priority addresses
