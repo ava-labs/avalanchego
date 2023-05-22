@@ -38,11 +38,11 @@ message KeyValue {
 }
 
 /* KeyChange is a change for a key from one version to another
-   used in ChangeProofResponse. If the value is nil, the key
-   is deleted in the final proof */
+   used in ChangeProofResponse. If the value is None, the key
+   was deleted. */
 message KeyChange {
   bytes key = 1;
-  optional bytes value = 2;
+  MaybeBytes value = 2;
 }
 
 /* SerializedPath is the serialized representation of a path */
@@ -53,8 +53,7 @@ message SerializedPath {
 
 /* MaybeBytes is an option wrapping bytes. */
 message MaybeBytes {
-  // optional to distinguish nil from empty byte slice.
-  optional bytes value = 1;
+  bytes value = 1;
   // If false, this is None.
   bool is_nothing = 2;
 }
