@@ -410,39 +410,11 @@ func (c *codecImpl) decodeKeyChange(src *bytes.Reader) (KeyChange, error) {
 	return result, nil
 }
 
-func (c *codecImpl) decodeKeyValue(src *bytes.Reader) (KeyValue, error) {
-	if minKeyValueLen > src.Len() {
-		return KeyValue{}, io.ErrUnexpectedEOF
-	}
-
-	var (
-		result KeyValue
-		err    error
-	)
-	if result.Key, err = c.decodeByteSlice(src); err != nil {
-		return result, err
-	}
-	if result.Value, err = c.decodeByteSlice(src); err != nil {
-		return result, err
-	}
-	return result, nil
-}
-
 func (c *codecImpl) encodeKeyChange(kv KeyChange, dst io.Writer) error {
 	if err := c.encodeByteSlice(dst, kv.Key); err != nil {
 		return err
 	}
 	if err := c.encodeMaybeByteSlice(dst, kv.Value); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *codecImpl) encodeKeyValue(kv KeyValue, dst io.Writer) error {
-	if err := c.encodeByteSlice(dst, kv.Key); err != nil {
-		return err
-	}
-	if err := c.encodeByteSlice(dst, kv.Value); err != nil {
 		return err
 	}
 	return nil
