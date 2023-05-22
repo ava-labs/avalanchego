@@ -139,8 +139,12 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 	if err != nil {
 		return nil, err
 	}
-	startTime := staker.StartTime()
-	duration := staker.EndTime().Sub(startTime)
+	var (
+		startTime = staker.StartTime()
+		endTime   = staker.EndTime()
+		duration  = endTime.Sub(startTime)
+	)
+
 	return &Staker{
 		TxID:          txID,
 		NodeID:        staker.NodeID(),
@@ -148,7 +152,7 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 		SubnetID:      staker.SubnetID(),
 		Weight:        staker.Weight(),
 		StartTime:     startTime,
-		EndTime:       staker.EndTime(),
+		EndTime:       endTime,
 		StakingPeriod: duration,
 		NextTime:      startTime,
 		Priority:      staker.PendingPriority(),

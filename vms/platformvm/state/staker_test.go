@@ -154,7 +154,6 @@ func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
 	stakerTx := txs.NewMockStaker(ctrl)
-	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().StakingPeriod().Return(duration)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
@@ -202,7 +201,6 @@ func TestNewCurrentStaker(t *testing.T) {
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
 	stakerTx := txs.NewMockStaker(ctrl)
-	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().StakingPeriod().Return(duration)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
@@ -350,7 +348,7 @@ func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
 	stakerTx.EXPECT().StakingPeriod().Return(duration)
-	stakerTx.EXPECT().EndTime().Return(endTime)
+	stakerTx.EXPECT().EndTime().Return(endTime).AnyTimes()
 	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
 
 	stakerTx.EXPECT().PublicKey().Return(nil, true, nil)
@@ -394,7 +392,7 @@ func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().SubnetID().Return(subnetID)
 	stakerTx.EXPECT().StakingPeriod().Return(duration)
-	stakerTx.EXPECT().EndTime().Return(endTime)
+	stakerTx.EXPECT().EndTime().Return(endTime).AnyTimes()
 	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
 
 	stakerTx.EXPECT().PublicKey().Return(nil, true, nil)
