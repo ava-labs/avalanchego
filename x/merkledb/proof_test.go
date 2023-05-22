@@ -1599,8 +1599,13 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
-		err := unmarshaledProof.UnmarshalProto(proof.ToProto())
+		protoProof := proof.ToProto()
+		err := unmarshaledProof.UnmarshalProto(protoProof)
 		require.NoError(err)
 		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
 	}
 }
