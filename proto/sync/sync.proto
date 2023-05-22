@@ -51,10 +51,18 @@ message SerializedPath {
   bytes value = 2;
 }
 
+/* MaybeBytes is an option wrapping bytes. */
+message MaybeBytes {
+  // optional to distinguish nil from empty byte slice.
+  optional bytes value = 1;
+  // If false, this is None.
+  bool is_nothing = 2;
+}
+
 /* ProofNode is a node in a merkle proof */
 message ProofNode {
-  bytes key = 1;
-  optional bytes value_or_hash = 2;
+  SerializedPath key = 1;
+  MaybeBytes value_or_hash = 2;
   map<uint32, bytes> children = 3;
 }
 
