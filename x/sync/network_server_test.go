@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/require"
 
@@ -95,7 +96,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			sender := common.NewMockSender(ctrl)
-			var proofResult *merkledb.RangeProof
+			var proof *merkledb.RangeProof
 			sender.EXPECT().SendAppResponse(
 				gomock.Any(), // ctx
 				gomock.Any(), // nodeID
@@ -105,10 +106,13 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
-						var err error
-						proofResult = &merkledb.RangeProof{}
-						_, err = merkledb.Codec.DecodeRangeProof(responseBytes, proofResult)
+						var proofProto syncpb.RangeProofResponse
+						err := proto.Unmarshal(responseBytes, &proofProto)
 						require.NoError(err)
+
+						var p merkledb.RangeProof
+						require.NoError(p.UnmarshalProto(&proofProto))
+						proof = &p
 					}
 					return nil
 				},
@@ -121,15 +125,15 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			}
 			require.NoError(err)
 			if test.proofNil {
-				require.Nil(proofResult)
+				require.Nil(proof)
 				return
 			}
-			require.NotNil(proofResult)
+			require.NotNil(proof)
 			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proofResult.KeyValues), test.expectedResponseLen)
+				require.LessOrEqual(len(proof.KeyValues), test.expectedResponseLen)
 			}
 
-			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proofResult)
+			bytes, err := proto.Marshal(proof.ToProto())
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
