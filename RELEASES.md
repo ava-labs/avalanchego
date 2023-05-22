@@ -6,6 +6,37 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 
 ### APIs
 
+- Significantly improved the performance of `platform.getStake`.
+- Added `portion_filled` metric for all metered caches.
+
+### Configs
+
+- Deprecated `--genesis` in favor of `--genesis-file`
+- Deprecated `--genesis-content` in favor of `--genesis-file-content`
+- Deprecated `--inbound-connection-throttling-cooldown` in favor of `--network-inbound-connection-throttling-cooldown`
+- Deprecated `--inbound-connection-throttling-max-conns-per-sec` in favor of `--network-inbound-connection-throttling-max-conns-per-sec`
+- Deprecated `--outbound-connection-throttling-rps` in favor of `--network-outbound-connection-throttling-rps`
+- Deprecated `--outbound-connection-timeout` in favor of `--network-outbound-connection-timeout`
+- Deprecated `--staking-enabled` in favor of `--sybil-protection-enabled`
+- Deprecated `--staking-disabled-weight` in favor of `--sybil-protection-disabled-weight`
+- Deprecated `--consensus-gossip-frequency` in favor of `--consensus-accepted-frontier-gossip-frequency`
+
+### Fixes
+
+- Fixed `--network-compression-type` to correctly honor the requested compression type, rather than always using gzip.
+
+### What's Changed
+
+### New Contributors
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.1...v1.10.2
+
+## [v1.10.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.1)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged. The supported plugin version is `26`.
+
+### APIs
+
 - Enabled `avm.getBlockByHeight` to take in `height` as a string
 - Added IDs to json formats
   - `platform.getTx` now includes `id` in the `tx` response
