@@ -37,9 +37,8 @@ message KeyValue {
   bytes value = 2;
 }
 
-/* KeyChange is a change for a key from one version to another
-   used in ChangeProofResponse. If the value is None, the key
-   was deleted. */
+/* KeyChange is a change for a key from one revision to another.
+   If the value is None, the key was deleted. */
 message KeyChange {
   bytes key = 1;
   MaybeBytes value = 2;
