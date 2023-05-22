@@ -328,9 +328,9 @@ func (n *pushGossiper) gossipTxs(force bool) (int, error) {
 	}
 	n.lastGossiped = time.Now()
 	txs := make([]*types.Transaction, 0, len(n.txsToGossip))
-	for _, tx := range n.txsToGossip {
+	for txHash, tx := range n.txsToGossip {
 		txs = append(txs, tx)
-		delete(n.txsToGossip, tx.Hash())
+		delete(n.txsToGossip, txHash)
 	}
 
 	selectedTxs := make([]*types.Transaction, 0)
