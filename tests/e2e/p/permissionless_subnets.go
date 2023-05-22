@@ -191,14 +191,15 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
+			validatorStartTime := time.Now().Add(time.Minute)
 			ginkgo.By("add permissionless validator", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				addSubnetValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
-							Start:  0,
-							End:    uint64(time.Unix(0, 0).Add(time.Minute).Unix()),
+							Start:  uint64(validatorStartTime.Unix()),
+							End:    uint64(validatorStartTime.Add(time.Minute).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,
@@ -219,14 +220,15 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
+			delegatorStartTime := validatorStartTime
 			ginkgo.By("add permissionless delegator", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				addSubnetDelegatorTxID, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
-							Start:  0,
-							End:    uint64(time.Unix(0, 0).Add(1 * time.Second).Unix()),
+							Start:  uint64(delegatorStartTime.Unix()),
+							End:    uint64(delegatorStartTime.Add(time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
 						Subnet: subnetID,

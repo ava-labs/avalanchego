@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -67,7 +68,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(continuousStakingFork)
+	vm, _, mutableSharedMemory := defaultVM(latestFork)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -286,8 +287,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					0,
-					uint64(time.Unix(0, 0).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,

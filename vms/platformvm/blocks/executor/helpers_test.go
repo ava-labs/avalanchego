@@ -56,20 +56,23 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-type activeFork uint8
+type (
+	activeFork   uint8
+	stakerStatus uint
+)
 
 const (
-	pending stakerStatus = iota
-	current
+	pending stakerStatus = 0
+	current stakerStatus = 1
 
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
+	apricotPhase3Fork     activeFork = 0
+	apricotPhase5Fork     activeFork = 1
+	banffFork             activeFork = 2
+	cortinaFork           activeFork = 3
+	continuousStakingFork activeFork = 4
+	latestFork            activeFork = continuousStakingFork
 
-	apricotFork           activeFork = 0
-	banffFork             activeFork = 1
-	cortinaFork           activeFork = 2
-	continuousStakingFork activeFork = 3
+	defaultWeight = 10000
 )
 
 var (
@@ -94,8 +97,6 @@ var (
 	errMissingPrimaryValidators = errors.New("missing primary validator set")
 	errMissing                  = errors.New("missing")
 )
-
-type stakerStatus uint
 
 type staker struct {
 	nodeID        ids.NodeID
@@ -145,7 +146,7 @@ func newEnvironment(
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
-		clk:            defaultClock(fork != apricotFork),
+		clk:            defaultClock(fork != apricotPhase5Fork),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -339,25 +340,34 @@ func defaultCtx(db database.Database) *snow.Context {
 
 func defaultConfig(fork activeFork) *config.Config {
 	var (
-		apricotPhase3Time     = defaultValidateEndTime
-		apricotPhase5Time     = defaultValidateEndTime
+		apricotPhase3Time     = mockable.MaxTime
+		apricotPhase5Time     = mockable.MaxTime
 		banffTime             = mockable.MaxTime
 		cortinaTime           = mockable.MaxTime
 		continuousStakingTime = mockable.MaxTime
 	)
 
 	switch fork {
-	case apricotFork:
-		// nothing todo
+	case apricotPhase3Fork:
+		apricotPhase3Time = defaultValidateEndTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case banffFork:
 		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case cortinaFork:
-		banffTime = defaultValidateEndTime
 		cortinaTime = defaultValidateEndTime
+		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	case continuousStakingFork:
-		banffTime = defaultValidateEndTime
-		cortinaTime = defaultValidateEndTime
 		continuousStakingTime = defaultValidateEndTime
+		cortinaTime = defaultValidateEndTime
+		banffTime = defaultValidateEndTime
+		apricotPhase5Time = defaultValidateEndTime
+		apricotPhase3Time = defaultValidateEndTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}

@@ -42,7 +42,7 @@ var errTest = errors.New("non-nil error")
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(apricotFork)
+	env := newEnvironment(apricotPhase5Fork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -170,7 +170,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	dummyH := newEnvironment(apricotFork)
+	dummyH := newEnvironment(apricotPhase5Fork)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -336,7 +336,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(apricotFork)
+			freshTH := newEnvironment(apricotPhase5Fork)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				require.NoError(shutdownEnvironment(freshTH))
