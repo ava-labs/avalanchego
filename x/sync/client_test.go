@@ -349,17 +349,26 @@ func sendChangeRequest(
 	).DoAndReturn(
 		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
-			response := &merkledb.ChangeProof{}
-			_, err := merkledb.Codec.DecodeChangeProof(responseBytes, response)
+			var responseProto syncpb.ChangeProofResponse
+			err := proto.Unmarshal(responseBytes, &responseProto)
 			require.NoError(err)
+
+			var changeProof merkledb.ChangeProof
+			// TODO when the client/server support including range proofs in the response,
+			// this will need to be updated.
+			require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
 
 			// modify if needed
 			if modifyResponse != nil {
-				modifyResponse(response)
+				modifyResponse(&changeProof)
 			}
 
 			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeChangeProof(merkledb.Version, response)
+			responseBytes, err = proto.Marshal(&syncpb.ChangeProofResponse{
+				Response: &syncpb.ChangeProofResponse_ChangeProof{
+					ChangeProof: changeProof.ToProto(),
+				},
+			})
 			require.NoError(err)
 			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
 			require.NoError(err)
@@ -543,7 +552,14 @@ func TestGetChangeProof(t *testing.T) {
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}
-			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proof)
+
+			// TODO when the client/server support including range proofs in the response,
+			// this will need to be updated.
+			bytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+				Response: &syncpb.ChangeProofResponse_ChangeProof{
+					ChangeProof: proof.ToProto(),
+				},
+			})
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 		})

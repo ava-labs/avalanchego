@@ -259,10 +259,16 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
-						var err error
-						proofResult = &merkledb.ChangeProof{}
-						_, err = merkledb.Codec.DecodeChangeProof(responseBytes, proofResult)
+						var responseProto syncpb.ChangeProofResponse
+						err := proto.Unmarshal(responseBytes, &responseProto)
 						require.NoError(err)
+
+						// TODO when the client/server support including range proofs in the response,
+						// this will need to be updated.
+						var p merkledb.ChangeProof
+						err = p.UnmarshalProto(responseProto.GetChangeProof())
+						require.NoError(err)
+						proofResult = &p
 					}
 					return nil
 				},
@@ -283,7 +289,13 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				require.LessOrEqual(len(proofResult.KeyChanges), test.expectedResponseLen)
 			}
 
-			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proofResult)
+			// TODO when the client/server support including range proofs in the response,
+			// this will need to be updated.
+			bytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+				Response: &syncpb.ChangeProofResponse_ChangeProof{
+					ChangeProof: proofResult.ToProto(),
+				},
+			})
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {

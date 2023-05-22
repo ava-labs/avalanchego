@@ -73,7 +73,6 @@ type EncoderDecoder interface {
 
 type Encoder interface {
 	EncodeProof(version uint16, p *Proof) ([]byte, error)
-	EncodeChangeProof(version uint16, p *ChangeProof) ([]byte, error)
 
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
 	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
@@ -81,7 +80,6 @@ type Encoder interface {
 
 type Decoder interface {
 	DecodeProof(bytes []byte, p *Proof) (uint16, error)
-	DecodeChangeProof(bytes []byte, p *ChangeProof) (uint16, error)
 
 	decodeDBNode(bytes []byte, n *dbNode) (uint16, error)
 }
@@ -121,40 +119,6 @@ func (c *codecImpl) EncodeProof(version uint16, proof *Proof) ([]byte, error) {
 	}
 	if err := c.encodeMaybeByteSlice(buf, proof.Value); err != nil {
 		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (c *codecImpl) EncodeChangeProof(version uint16, proof *ChangeProof) ([]byte, error) {
-	if proof == nil {
-		return nil, errEncodeNil
-	}
-
-	if version != codecVersion {
-		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
-	}
-
-	buf := &bytes.Buffer{}
-
-	if err := c.encodeInt(buf, int(version)); err != nil {
-		return nil, err
-	}
-	if err := c.encodeBool(buf, proof.HadRootsInHistory); err != nil {
-		return nil, err
-	}
-	if err := c.encodeProofPath(buf, proof.StartProof); err != nil {
-		return nil, err
-	}
-	if err := c.encodeProofPath(buf, proof.EndProof); err != nil {
-		return nil, err
-	}
-	if err := c.encodeInt(buf, len(proof.KeyChanges)); err != nil {
-		return nil, err
-	}
-	for _, kv := range proof.KeyChanges {
-		if err := c.encodeKeyChange(kv, buf); err != nil {
-			return nil, err
-		}
 	}
 	return buf.Bytes(), nil
 }
@@ -264,58 +228,6 @@ func (c *codecImpl) DecodeProof(b []byte, proof *Proof) (uint16, error) {
 	}
 	if proof.Value, err = c.decodeMaybeByteSlice(src); err != nil {
 		return 0, err
-	}
-	if src.Len() != 0 {
-		return 0, errExtraSpace
-	}
-	return codecVersion, nil
-}
-
-func (c *codecImpl) DecodeChangeProof(b []byte, proof *ChangeProof) (uint16, error) {
-	if proof == nil {
-		return 0, errDecodeNil
-	}
-	if minChangeProofLen > len(b) {
-		return 0, io.ErrUnexpectedEOF
-	}
-
-	var (
-		src = bytes.NewReader(b)
-		err error
-	)
-
-	gotCodecVersion, err := c.decodeInt(src)
-	if err != nil {
-		return 0, err
-	}
-	if gotCodecVersion != codecVersion {
-		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
-	}
-	if proof.HadRootsInHistory, err = c.decodeBool(src); err != nil {
-		return 0, err
-	}
-	if proof.StartProof, err = c.decodeProofPath(src); err != nil {
-		return 0, err
-	}
-	if proof.EndProof, err = c.decodeProofPath(src); err != nil {
-		return 0, err
-	}
-
-	numKeyChanges, err := c.decodeInt(src)
-	if err != nil {
-		return 0, err
-	}
-	if numKeyChanges < 0 {
-		return 0, errNegativeNumKeyValues
-	}
-	if numKeyChanges > src.Len()/minKeyChangeLen {
-		return 0, io.ErrUnexpectedEOF
-	}
-	proof.KeyChanges = make([]KeyChange, numKeyChanges)
-	for i := range proof.KeyChanges {
-		if proof.KeyChanges[i], err = c.decodeKeyChange(src); err != nil {
-			return 0, err
-		}
 	}
 	if src.Len() != 0 {
 		return 0, errExtraSpace
