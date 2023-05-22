@@ -1307,7 +1307,7 @@ func (n *Node) Initialize(
 		n.Log,
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		constants.DefaultNetworkCompressionType,
+		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
