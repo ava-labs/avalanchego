@@ -36,6 +36,7 @@ var (
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
+	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
 )
 
 type ProofNode struct {
@@ -75,6 +76,10 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 }
 
 func (node *ProofNode) UnmarshalProto(pbNode *syncpb.ProofNode) error {
+	if pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0 {
+		return ErrInvalidMaybe
+	}
+
 	node.KeyPath.NibbleLength = int(pbNode.Key.NibbleLength)
 	node.KeyPath.Value = pbNode.Key.Value
 
@@ -324,8 +329,6 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
 	}
 }
 
-// Unmarshals [proofBytes], which is the byte representation of a
-// syncpb.RangeProofResponse, into [proof].
 func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) error {
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
 	for i, protoNode := range pbProof.Start {

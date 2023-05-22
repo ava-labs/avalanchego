@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func getBasicDB() (*Database, error) {
@@ -1532,6 +1534,23 @@ func TestVerifyProofPath(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
+}
+
+func TestProofNodeInvalidMaybe(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	// It's invalid to have a value and be nothing.
+	protoNode.ValueOrHash = &syncpb.MaybeBytes{
+		Value:     []byte{1, 2, 3},
+		IsNothing: true,
+	}
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 
 func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
