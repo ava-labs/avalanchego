@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/require"
