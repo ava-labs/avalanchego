@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 )
 
 const (
@@ -86,8 +86,11 @@ type mempool struct {
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
-	unissuedDecisionTxs txheap.Heap
-	unissuedStakerTxs   txheap.Heap
+	unissuedDecisionTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	decisionTxsNum      prometheus.Gauge
+
+	unissuedStakerTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	stakerTxsNum      prometheus.Gauge
 
 	// Key: Tx ID
 	// Value: Verification error
@@ -112,21 +115,21 @@ func NewMempool(
 		return nil, err
 	}
 
-	unissuedDecisionTxs, err := txheap.NewWithMetrics(
-		txheap.NewByAge(),
-		fmt.Sprintf("%s_decision_txs", namespace),
-		registerer,
-	)
-	if err != nil {
+	decisionTxsNum := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "decision_txs",
+		Help:      "Number of decision transactions in the mempool",
+	})
+	if err := registerer.Register(decisionTxsNum); err != nil {
 		return nil, err
 	}
 
-	unissuedStakerTxs, err := txheap.NewWithMetrics(
-		txheap.NewByStartTime(),
-		fmt.Sprintf("%s_staker_txs", namespace),
-		registerer,
-	)
-	if err != nil {
+	stakerTxsNum := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "staker_txs",
+		Help:      "Number of staker transactions in the mempool",
+	})
+	if err := registerer.Register(stakerTxsNum); err != nil {
 		return nil, err
 	}
 
@@ -134,12 +137,17 @@ func NewMempool(
 	return &mempool{
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
-		unissuedDecisionTxs:  unissuedDecisionTxs,
-		unissuedStakerTxs:    unissuedStakerTxs,
-		droppedTxIDs:         &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
-		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
-		dropIncoming:         false, // enable tx adding by default
-		blkTimer:             blkTimer,
+
+		unissuedDecisionTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+		decisionTxsNum:      decisionTxsNum,
+
+		unissuedStakerTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+		stakerTxsNum:      stakerTxsNum,
+
+		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
+		dropIncoming:  false, // enable tx adding by default
+		blkTimer:      blkTimer,
 	}, nil
 }
 
@@ -202,10 +210,11 @@ func (m *mempool) Has(txID ids.ID) bool {
 }
 
 func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	if tx := m.unissuedDecisionTxs.Get(txID); tx != nil {
+	if tx, _ := m.unissuedDecisionTxs.Get(txID); tx != nil {
 		return tx
 	}
-	return m.unissuedStakerTxs.Get(txID)
+	tx, _ := m.unissuedStakerTxs.Get(txID)
+	return tx
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
@@ -224,26 +233,33 @@ func (m *mempool) HasTxs() bool {
 }
 
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	txs := m.unissuedDecisionTxs.List()
-	txs = append(txs, m.unissuedStakerTxs.List()...)
+	txs := make([]*txs.Tx, 0)
+	txsSizeSum := 0
 
-	size := 0
-	for i, tx := range txs {
-		size += len(tx.Bytes())
-		if size > maxTxsBytes {
-			return txs[:i]
-		}
+	txIter := m.unissuedDecisionTxs.NewIterator()
+	for txsSizeSum <= maxTxsBytes && txIter.Next() {
+		tx := txIter.Value()
+		txs = append(txs, tx)
+		txsSizeSum += tx.Size()
 	}
+
+	txIter = m.unissuedStakerTxs.NewIterator()
+	for txsSizeSum <= maxTxsBytes && txIter.Next() {
+		tx := txIter.Value()
+		txs = append(txs, tx)
+		txsSizeSum += tx.Size()
+	}
+
 	return txs
 }
 
 func (m *mempool) addDecisionTx(tx *txs.Tx) {
-	m.unissuedDecisionTxs.Add(tx)
+	m.unissuedDecisionTxs.Put(tx.ID(), tx)
 	m.register(tx)
 }
 
 func (m *mempool) addStakerTx(tx *txs.Tx) {
-	m.unissuedStakerTxs.Add(tx)
+	m.unissuedStakerTxs.Put(tx.ID(), tx)
 	m.register(tx)
 }
 
@@ -254,7 +270,7 @@ func (m *mempool) HasStakerTx() bool {
 func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
 	for _, tx := range txs {
 		txID := tx.ID()
-		if m.unissuedDecisionTxs.Remove(txID) != nil {
+		if m.unissuedDecisionTxs.Delete(txID) {
 			m.deregister(tx)
 		}
 	}
@@ -262,7 +278,7 @@ func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
 
 func (m *mempool) removeStakerTx(tx *txs.Tx) {
 	txID := tx.ID()
-	if m.unissuedStakerTxs.Remove(txID) != nil {
+	if m.unissuedStakerTxs.Delete(txID) {
 		m.deregister(tx)
 	}
 }
@@ -272,7 +288,8 @@ func (m *mempool) PeekStakerTx() *txs.Tx {
 		return nil
 	}
 
-	return m.unissuedStakerTxs.Peek()
+	_, tx, _ := m.unissuedStakerTxs.Newest()
+	return tx
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
