@@ -16,19 +16,19 @@ func TestNewOnEvictCache(t *testing.T) {
 	require := require.New(t)
 
 	called := false
-	onEviction := func([]int) error {
+	onEviction := func(int) error {
 		called = true
 		return nil
 	}
 	maxSize := 10
 
-	cache := newOnEvictCache[int](maxSize, 1, onEviction)
+	cache := newOnEvictCache[int](maxSize, onEviction)
 	require.Equal(maxSize, cache.maxSize)
 	require.NotNil(cache.fifo)
 	require.Zero(cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
-	err := cache.onEviction([]int{0})
+	err := cache.onEviction(0)
 	require.NoError(err)
 	require.True(called)
 }
@@ -40,13 +40,13 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require := require.New(t)
 
 	evicted := []int{}
-	onEviction := func(n []int) error {
-		evicted = append(evicted, n...)
+	onEviction := func(n int) error {
+		evicted = append(evicted, n)
 		return nil
 	}
 	maxSize := 3
 
-	cache := newOnEvictCache[int](maxSize, 1, onEviction)
+	cache := newOnEvictCache[int](maxSize, onEviction)
 
 	// Get non-existent key
 	_, ok := cache.Get(0)
@@ -162,20 +162,18 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
 		evicted    = []int{}
-		onEviction = func(ns []int) error {
+		onEviction = func(n int) error {
 			// Evicting even keys errors
-			for _, n := range ns {
-				evicted = append(evicted, n)
-				if n%2 == 0 {
-					return errTest
-				}
+			evicted = append(evicted, n)
+			if n%2 == 0 {
+				return errTest
 			}
 			return nil
 		}
 		maxSize = 2
 	)
 
-	cache := newOnEvictCache[int](maxSize, 1, onEviction)
+	cache := newOnEvictCache[int](maxSize, onEviction)
 
 	// Fill the cache
 	for i := 0; i < maxSize; i++ {

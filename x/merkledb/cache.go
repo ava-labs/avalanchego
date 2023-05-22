@@ -6,28 +6,33 @@ package merkledb
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/math"
-
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // A cache that calls [onEviction] on the evicted element.
 type onEvictCache[K comparable, V any] struct {
-	lock              sync.RWMutex
-	maxSize           int
-	evictionBatchSize int
-	fifo              linkedhashmap.LinkedHashmap[K, V]
-	onEviction        func([]V) error
+	lock       sync.RWMutex
+	maxSize    int
+	fifo       linkedhashmap.LinkedHashmap[K, V]
+	onEviction func(V) error
 }
 
-func newOnEvictCache[K comparable, V any](maxSize int, evictionBatchSize int, onEviction func([]V) error) onEvictCache[K, V] {
+func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
-		maxSize:           maxSize,
-		fifo:              linkedhashmap.New[K, V](),
-		onEviction:        onEviction,
-		evictionBatchSize: math.Min(maxSize, evictionBatchSize),
+		maxSize:    maxSize,
+		fifo:       linkedhashmap.New[K, V](),
+		onEviction: onEviction,
 	}
+}
+
+// RemoveOldest returns and removes the oldest element from this cache.
+func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
+	k, v, exists := c.fifo.Oldest()
+	if exists {
+		c.fifo.Delete(k)
+	}
+	return k, v, exists
 }
 
 // Get an element from this cache.
@@ -48,13 +53,9 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.fifo.Put(key, value) // Mark as MRU
 
 	if c.fifo.Len() > c.maxSize {
-		evictedValues := make([]V, c.evictionBatchSize)
-		for i := 0; i < c.evictionBatchSize; i++ {
-			oldestKey, oldestVal, _ := c.fifo.Oldest()
-			c.fifo.Delete(oldestKey)
-			evictedValues[i] = oldestVal
-		}
-		return c.onEviction(evictedValues)
+		oldestKey, oldestVal, _ := c.fifo.Oldest()
+		c.fifo.Delete(oldestKey)
+		return c.onEviction(oldestVal)
 	}
 	return nil
 }
@@ -72,16 +73,9 @@ func (c *onEvictCache[K, V]) Flush() error {
 
 	var errs wrappers.Errs
 	iter := c.fifo.NewIterator()
-	evictedValues := make([]V, 0, c.evictionBatchSize)
 	for iter.Next() {
-		val := iter.Value()
-		evictedValues = append(evictedValues, val)
-		if len(evictedValues) == c.evictionBatchSize {
-			errs.Add(c.onEviction(evictedValues))
-			evictedValues = make([]V, 0, c.evictionBatchSize)
-		}
+		errs.Add(c.onEviction(iter.Value()))
 	}
-	errs.Add(c.onEviction(evictedValues))
 
 	return errs.Err
 }

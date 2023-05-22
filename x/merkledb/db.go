@@ -122,7 +122,7 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, evictionBatchSize, trieDB.onEviction)
+	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -695,26 +695,21 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
-func (db *Database) onEviction(nodes []*node) error {
+func (db *Database) onEviction(n *node) error {
 	batch := db.nodeDB.NewBatch()
-	var (
-		err       error
-		nodeBytes []byte
-	)
-	for _, n := range nodes {
-		if n == nil || n.hasValue() {
-			// only persist intermediary nodes
-			continue
+	var err error
+	if err = writeNode(batch, n); err != nil {
+		return err
+	}
+	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
+		_, n, exists := db.nodeCache.removeOldest()
+		if !exists {
+			break
 		}
-
-		nodeBytes, err = n.marshal()
-		if err != nil {
+		if err = writeNode(batch, n); err != nil {
 			break
 		}
 
-		if err := batch.Put(n.key.Bytes(), nodeBytes); err != nil {
-			break
-		}
 	}
 	if err == nil {
 		err = batch.Write()
@@ -726,6 +721,20 @@ func (db *Database) onEviction(nodes []*node) error {
 		return err
 	}
 	return nil
+}
+
+func writeNode(batch database.Batch, n *node) error {
+	if n == nil || n.hasValue() {
+		// only persist intermediary nodes
+		return nil
+	}
+
+	nodeBytes, err := n.marshal()
+	if err != nil {
+		return err
+	}
+
+	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
 // Put upserts the key/value pair into the db.
