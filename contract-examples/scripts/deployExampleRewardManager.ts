@@ -6,7 +6,7 @@ import { ethers } from "hardhat"
 
 
 const main = async (): Promise<any> => {
-  const Contract: ContractFactory = await ethers.getContractFactory("ExampleRewardDistributor")
+  const Contract: ContractFactory = await ethers.getContractFactory("ExampleRewardManager")
   const contract: Contract = await Contract.deploy()
 
   await contract.deployed()
