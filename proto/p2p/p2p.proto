@@ -61,12 +61,16 @@ message Message {
   }
 }
 
-// Message that the local node sends to its remote peers,
-// in order to periodically check its uptime.
+// Message that a node sends to its peers in order to periodically check
+// responsivness and report the local node's uptime measurements of the peer.
 //
-// On receiving "ping", the remote peer responds with the observed
-// uptime value of the message sender in "pong" message.
-message Ping {}
+// On receiving a "ping", the peer should respond with a "pong".
+message Ping {
+  // uptime is the primary network uptime percentage.
+  uint32 uptime = 1;
+  // subnet_uptimes contains subnet uptime percentages.
+  repeated SubnetUptime subnet_uptimes = 2;
+}
 
 // Contains subnet id and the related observed subnet uptime of the message
 // receiver (remote peer).
@@ -79,6 +83,7 @@ message SubnetUptime {
 // from the sender's point of view, in response to "ping" message.
 // Uptimes are expected to be provided as integers ranging in [0, 100].
 message Pong {
+  // Deprecated: remove all these fields in the future, but keep the message.
   // uptime is the primary network uptime percentage.
   uint32 uptime = 1;
   // subnet_uptimes contains subnet uptime percentages.
