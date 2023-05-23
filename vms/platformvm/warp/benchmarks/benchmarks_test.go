@@ -135,15 +135,15 @@ func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
 	b.StopTimer() // done testing
 }
 
-func BenchmarkGetValidatorSet_Validators_100(b *testing.B) {
+func BenchmarkGetValidatorSetBySize_Validators_100(b *testing.B) {
 	benchGetValidatorSetBySize(b, 100)
 }
 
-func BenchmarkGetValidatorSet_Validators_1000(b *testing.B) {
+func BenchmarkGetValidatorSetBySize_Validators_1000(b *testing.B) {
 	benchGetValidatorSetBySize(b, 1000)
 }
 
-func BenchmarkGetValidatorSet_Validators_10000(b *testing.B) {
+func BenchmarkGetValidatorSetBySize_Validators_10000(b *testing.B) {
 	benchGetValidatorSetBySize(b, 10_000)
 }
 
@@ -220,6 +220,120 @@ func benchGetValidatorSetBySize(b *testing.B, validatorsCount int) {
 		)
 		require.NoError(err)
 		require.Len(vals, validatorsCount)
+	}
+	b.StopTimer() // done testing
+}
+
+func BenchmarkGetValidatorSetByHeight_Validators_1000(b *testing.B) {
+	benchGetValidatorSetByHeight(b, 1000, 10)
+}
+
+func benchGetValidatorSetByHeight(b *testing.B, validatorsCount int, heightsRange uint64) {
+	b.StopTimer()
+	require := require.New(b)
+
+	// Prepare the bench environment (don't time it)
+	subnetID := ids.GenerateTestID()
+	env := newEnvironment(b, subnetID)
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	validatorsPerHeight := validatorsCount / int(heightsRange)
+
+	// Store all primary network validators at height 1
+	primaryValidatorIDs := make([]ids.NodeID, 0, validatorsCount)
+	primaryDiff, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	require.NoError(err)
+	for i := 0; i < validatorsCount; i++ {
+		nodeID := ids.GenerateTestNodeID()
+		primaryValidatorIDs = append(primaryValidatorIDs, nodeID)
+
+		// create primary network validator tx
+		addPrimaryValidatorTx, err := createPrimaryNetworkValidatorTx(nodeID, env.state.GetTimestamp())
+		require.NoError(err)
+
+		// store corresponding primaryStaker in the diff
+		primaryStaker, err := state.NewCurrentStaker(
+			addPrimaryValidatorTx.ID(),
+			addPrimaryValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
+			10000, // potential reward
+		)
+		require.NoError(err)
+		primaryDiff.PutCurrentValidator(primaryStaker)
+		primaryDiff.AddTx(addPrimaryValidatorTx, status.Committed)
+	}
+	// Add a dummyBlock to update relevant quantities
+	dummyPrimariesBlock, err := blocks.NewBanffStandardBlock(
+		env.state.GetTimestamp(),
+		env.state.GetLastAccepted(),
+		1,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
+	// Push block and tx changes to env.state.
+	require.NoError(primaryDiff.Apply(env.state))
+	env.state.SetHeight(1)
+	env.state.AddStatelessBlock(dummyPrimariesBlock, choices.Accepted)
+	env.state.SetLastAccepted(dummyPrimariesBlock.BlockID)
+	require.NoError(env.state.Commit())
+
+	// store subnet validators at different heights
+	startHeight := uint64(1) + 1
+	for height := startHeight; height < startHeight+heightsRange; height++ {
+		subnetsValDiff, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+		require.NoError(err)
+
+		for i := 0; i < validatorsPerHeight; i++ {
+			nodeIdx := int(height-startHeight)*validatorsPerHeight + i
+			nodeID := primaryValidatorIDs[nodeIdx]
+
+			// create subnet validator tx
+			permissionlessValidatorTx, err := createSubnetValidatorTx(subnetID, nodeID, env.state.GetTimestamp())
+			require.NoError(err)
+
+			// store corresponding staker in the diff
+			subnetStaker, err := state.NewCurrentStaker(
+				permissionlessValidatorTx.ID(),
+				permissionlessValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
+				10000, // dummy potential reward
+			)
+			require.NoError(err)
+			subnetsValDiff.PutCurrentValidator(subnetStaker)
+			subnetsValDiff.AddTx(permissionlessValidatorTx, status.Committed)
+		}
+
+		// Add a dummyBlock to update relevant quantities
+		dummySecondaryBlock, err := blocks.NewBanffStandardBlock(
+			env.state.GetTimestamp(),
+			env.state.GetLastAccepted(),
+			height,
+			[]*txs.Tx{},
+		)
+		require.NoError(err)
+
+		// Push block and tx changes to env.state.
+		require.NoError(subnetsValDiff.Apply(env.state))
+		env.state.SetHeight(height)
+		env.state.AddStatelessBlock(dummySecondaryBlock, choices.Accepted)
+		env.state.SetLastAccepted(dummySecondaryBlock.BlockID)
+		require.NoError(env.state.Commit())
+	}
+
+	b.StartTimer() // start testing
+	for depth := uint64(0); depth < heightsRange; depth++ {
+		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				vals, err := env.validatorsManager.GetValidatorSet(
+					context.Background(),
+					heightsRange-depth,
+					subnetID,
+				)
+				require.NoError(err)
+				require.Len(vals, validatorsCount-int(depth+1)*validatorsPerHeight)
+			}
+		})
 	}
 	b.StopTimer() // done testing
 }
