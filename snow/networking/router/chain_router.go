@@ -381,7 +381,7 @@ func (cr *ChainRouter) Shutdown(ctx context.Context) {
 			)
 		} else {
 			chainLog.Info("chain shutdown",
-				zap.Duration("shutdownTime", shutdownDuration),
+				zap.Duration("shutdownDuration", shutdownDuration),
 			)
 		}
 	}
@@ -663,7 +663,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 		)
 	} else {
 		chainLog.Info("chain shutdown",
-			zap.Duration("shutdownTime", shutdownDuration),
+			zap.Duration("shutdownDuration", shutdownDuration),
 		)
 	}
 
