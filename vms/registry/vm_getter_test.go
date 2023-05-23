@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -146,7 +147,14 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 	mockReader := filesystem.NewMockReader(ctrl)
 	mockManager := vms.NewMockManager(ctrl)
 	mockRegistry := prometheus.NewRegistry()
-	mockCPUTracker, err := resource.NewManager(" ", time.Hour, time.Hour, time.Hour, mockRegistry)
+	mockCPUTracker, err := resource.NewManager(
+		logging.NoLog{},
+		"",
+		time.Hour,
+		time.Hour,
+		time.Hour,
+		mockRegistry,
+	)
 	require.NoError(t, err)
 
 	getter := NewVMGetter(

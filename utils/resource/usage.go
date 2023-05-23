@@ -11,8 +11,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
@@ -65,6 +69,7 @@ type Manager interface {
 }
 
 type manager struct {
+	log            logging.Logger
 	processMetrics *metrics
 
 	processesLock sync.Mutex
@@ -84,6 +89,7 @@ type manager struct {
 }
 
 func NewManager(
+	log logging.Logger,
 	diskPath string,
 	frequency,
 	cpuHalflife,
@@ -96,6 +102,7 @@ func NewManager(
 	}
 
 	m := &manager{
+		log:                log,
 		processMetrics:     processMetrics,
 		processes:          make(map[int]*proc),
 		onClose:            make(chan struct{}),
@@ -133,7 +140,10 @@ func (m *manager) TrackProcess(pid int) {
 		return
 	}
 
-	process := &proc{p: p}
+	process := &proc{
+		p:   p,
+		log: m.log,
+	}
 
 	m.processesLock.Lock()
 	m.processes[pid] = process
@@ -167,6 +177,12 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
 		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+		if getBytesErr != nil {
+			m.log.Debug("failed to lookup resource",
+				zap.String("resource", "system disk"),
+				zap.Error(getBytesErr),
+			)
+		}
 
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
@@ -218,7 +234,8 @@ func (m *manager) getActiveUsage(secondsSinceLastUpdate float64) (float64, float
 }
 
 type proc struct {
-	p *process.Process
+	p   *process.Process
+	log logging.Logger
 
 	initialized bool
 
@@ -242,12 +259,24 @@ func (p *proc) getActiveUsage(secondsSinceLastUpdate float64) (float64, float64,
 	// assume that the utilization is 0.
 	times, err := p.p.Times()
 	if err != nil {
-		return 0, 0, 0
+		p.log.Debug("failed to lookup resource",
+			zap.String("resource", "process CPU"),
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
+		times = &cpu.TimesStat{}
 	}
 
+	// Note: IOCounters is not implemented on macos and therefore always returns
+	// an error on macos.
 	io, err := p.p.IOCounters()
 	if err != nil {
-		return 0, 0, 0
+		p.log.Debug("failed to lookup resource",
+			zap.String("resource", "process IO"),
+			zap.Int32("pid", p.p.Pid),
+			zap.Error(err),
+		)
+		io = &process.IOCountersStat{}
 	}
 
 	var (
