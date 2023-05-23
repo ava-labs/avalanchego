@@ -42,9 +42,12 @@ const (
 )
 
 func TestShutdown(t *testing.T) {
+	require := require.New(t)
+
 	vdrs := validators.NewSet()
 	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(err)
+
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -58,7 +61,7 @@ func TestShutdown(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
@@ -75,29 +78,30 @@ func TestShutdown(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	ctx := snow.DefaultConsensusContextTest()
+	chainCtx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
 		meter.ContinuousFactory{},
 		time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
+
 	h, err := handler.New(
-		ctx,
+		chainCtx,
 		vdrs,
 		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(chainCtx.NodeID, subnets.Config{}),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -110,7 +114,7 @@ func TestShutdown(t *testing.T) {
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
-		return ctx
+		return chainCtx
 	}
 	bootstrapper.ShutdownF = func(context.Context) error {
 		shutdownCalled <- struct{}{}
@@ -125,7 +129,7 @@ func TestShutdown(t *testing.T) {
 	engine.Default(true)
 	engine.CantGossip = false
 	engine.ContextF = func() *snow.ConsensusContext {
-		return ctx
+		return chainCtx
 	}
 	engine.ShutdownF = func(context.Context) error {
 		shutdownCalled <- struct{}{}
@@ -147,7 +151,7 @@ func TestShutdown(t *testing.T) {
 			Consensus:    engine,
 		},
 	})
-	ctx.State.Set(snow.EngineState{
+	chainCtx.State.Set(snow.EngineState{
 		Type:  engineType,
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
@@ -161,18 +165,19 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter.Shutdown(context.Background())
 
-	ticker := time.NewTicker(250 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+
 	select {
-	case <-ticker.C:
-		t.Fatalf("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
+	case <-ctx.Done():
+		require.FailNow("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
 	case <-shutdownCalled:
 	}
 
-	select {
-	case <-h.Stopped():
-	default:
-		t.Fatal("handler shutdown but never closed its closing channel")
-	}
+	shutdownDuration, err := h.AwaitStopped(ctx)
+	require.NoError(err)
+	require.GreaterOrEqual(shutdownDuration, time.Duration(0))
+	require.Less(shutdownDuration, 250*time.Millisecond)
 }
 
 func TestShutdownTimesOut(t *testing.T) {
