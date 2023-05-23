@@ -4,7 +4,7 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-/* Request represents the two requests you can make */
+// Request represents a request for information during syncing.
 message Request {
   oneof message {
     RangeProofRequest range_proof_request = 1;
@@ -12,7 +12,8 @@ message Request {
   }
 }
 
-/* A RangeProofRequest requests a proof between two keys at a specific revision */
+// A RangeProofRequest requests the key-value pairs in a given key range
+// at a specific revision.
 message RangeProofRequest {
   bytes root_hash = 1;
   bytes start_key = 2;
@@ -21,7 +22,7 @@ message RangeProofRequest {
   uint32 bytes_limit = 5;
 }
 
-/* A ChangeProofRequest request a proof for all changes between two revisions */
+// A ChangeProofRequest requests the changes between two revisions.
 message ChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
