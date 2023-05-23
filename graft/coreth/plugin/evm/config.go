@@ -19,7 +19,7 @@ const (
 	defaultPruningEnabled                             = true
 	defaultCommitInterval                             = 4096
 	defaultTrieCleanCache                             = 512
-	defaultTrieDirtyCache                             = 256
+	defaultTrieDirtyCache                             = 512
 	defaultTrieDirtyCommitTarget                      = 20
 	defaultSnapshotCache                              = 256
 	defaultSyncableCommitInterval                     = defaultCommitInterval * 4
